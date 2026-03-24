@@ -1,58 +1,111 @@
+process.env.TS_NODE_PREFER_TS_EXTS = 'true';
+require('ts-node/register/transpile-only');
 require('dotenv').config();
+
 const mongoose = require('mongoose');
-const User = require('./src/models/User');
-const ROLES = require('./src/constants/roles');
-const bcrypt = require('bcryptjs');
+const bcrypt = require('bcrypt');
+const { User } = require('./src/modules/user/user.model');
+const { UserRole } = require('./src/types/roles.types');
+
+const DEFAULT_PASSWORD = 'Password123!';
+const ONE_YEAR_MS = 365 * 24 * 60 * 60 * 1000;
+
+const SEED_USERS = [
+  {
+    role: UserRole.STUDENT,
+    email: 'student@test.com',
+    displayName: 'Test Student',
+    accessGrantedBy: 'startup_school',
+  },
+  {
+    role: UserRole.SCHOOL,
+    email: 'school@test.com',
+    displayName: 'Test School',
+    accessGrantedBy: 'startup_school',
+  },
+  {
+    role: UserRole.COLLEGE,
+    email: 'college@test.com',
+    displayName: 'Test College',
+    accessGrantedBy: 'iii',
+  },
+  {
+    role: UserRole.MENTOR,
+    email: 'mentor@test.com',
+    displayName: 'Test Mentor',
+    accessGrantedBy: 'skill_dev',
+  },
+  {
+    role: UserRole.INVESTOR,
+    email: 'investor@test.com',
+    displayName: 'Test Investor',
+    accessGrantedBy: 'instant_internship',
+  },
+  {
+    role: UserRole.RECRUITER,
+    email: 'recruiter@test.com',
+    displayName: 'Test Recruiter',
+    accessGrantedBy: 'instant_internship',
+  },
+  {
+    role: UserRole.ADMIN,
+    email: 'admin@test.com',
+    displayName: 'Test Admin',
+    accessGrantedBy: 'admin',
+  },
+];
 
 const seedUsers = async () => {
   try {
+    if (!process.env.MONGODB_URI) {
+      throw new Error('MONGODB_URI is missing from Server/.env');
+    }
+
     await mongoose.connect(process.env.MONGODB_URI);
     console.log('Connected to MongoDB');
 
-    const passwordHash = await bcrypt.hash('Password123!', parseInt(process.env.BCRYPT_ROUNDS) || 12);
+    const passwordHash = await bcrypt.hash(DEFAULT_PASSWORD, 12);
 
-    for (const roleKey of Object.keys(ROLES)) {
-      const role = ROLES[roleKey];
-      const email = `${role}@test.com`;
-
-      await User.deleteOne({ email });
-
-      const ProfileModel = require('./src/modules/auth/auth.service').PROFILE_MODEL_MAP[role];
-      const user = new User({
-        name: `Test ${role}`,
-        email,
-        password: passwordHash,
-        role,
-        isVerified: true,
+    for (const seedUser of SEED_USERS) {
+      const payload = {
+        email: seedUser.email,
+        passwordHash,
+        role: seedUser.role,
+        displayName: seedUser.displayName,
+        profileComplete: false,
+        innovationScore: 0,
+        scoreBreakdown: {
+          problemsClaimed: 0,
+          skillsCompleted: 0,
+          progressUploads: 0,
+          patentsSubmitted: 0,
+          patentsApproved: 0,
+          mvpsVerified: 0,
+          marketReadyVerified: 0,
+          startupsLaunched: 0,
+          awardsApproved: 0,
+        },
+        accessGrantedBy: seedUser.accessGrantedBy,
+        accessExpiresAt: new Date(Date.now() + ONE_YEAR_MS),
         isActive: true,
+      };
+
+      await User.findOneAndUpdate({ email: seedUser.email }, payload, {
+        upsert: true,
+        new: true,
+        setDefaultsOnInsert: true,
       });
 
-      // skip hashing pre-save since it's already hashed manually or we just let pre-save do it.
-      // Wait, User.js has a pre-save hook for password!
-      // So I should pass the plain password and let the hook hash it!
-      const user2 = new User({
-        name: `Test ${role}`,
-        email,
-        password: 'Password123!',
-        role,
-        isVerified: true,
-        isActive: true,
-      });
-      await user2.save();
-
-      if (ProfileModel) {
-        await ProfileModel.create({ userId: user2._id });
-      }
-
-      console.log(`Created user for role: ${role} (${email})`);
+      console.log(`Seeded ${seedUser.role}: ${seedUser.email}`);
     }
 
-    console.log('Seed completed successfully.');
-    process.exit(0);
+    console.log(`Seed completed successfully. Password for all users: ${DEFAULT_PASSWORD}`);
   } catch (error) {
     console.error('Seed error:', error);
-    process.exit(1);
+    process.exitCode = 1;
+  } finally {
+    await mongoose.disconnect();
   }
 };
 
-seedUsers();
+void seedUsers();

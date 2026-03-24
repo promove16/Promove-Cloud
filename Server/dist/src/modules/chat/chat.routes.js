@@ -1,0 +1,11 @@
+"use strict";
+Object.defineProperty(exports, "__esModule", { value: true });
+const express_1 = require("express");
+const authenticate_1 = require("../../middleware/authenticate");
+const authorize_1 = require("../../middleware/authorize");
+const roles_types_1 = require("../../types/roles.types");
+const asyncHandler_1 = require("../../utils/asyncHandler");
+const chat_controller_1 = require("./chat.controller");
+const router = (0, express_1.Router)();
+router.get('/workspace/:workspaceId', authenticate_1.authenticate, (0, authorize_1.authorize)(roles_types_1.UserRole.STUDENT), (0, asyncHandler_1.asyncHandler)(chat_controller_1.getChatHistory));
+exports.default = router;

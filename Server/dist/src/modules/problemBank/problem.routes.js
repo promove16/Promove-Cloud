@@ -1,0 +1,14 @@
+"use strict";
+Object.defineProperty(exports, "__esModule", { value: true });
+const express_1 = require("express");
+const authenticate_1 = require("../../middleware/authenticate");
+const authorize_1 = require("../../middleware/authorize");
+const roles_types_1 = require("../../types/roles.types");
+const asyncHandler_1 = require("../../utils/asyncHandler");
+const problem_controller_1 = require("./problem.controller");
+const router = (0, express_1.Router)();
+router.use(authenticate_1.authenticate, (0, authorize_1.authorize)(roles_types_1.UserRole.STUDENT));
+router.get('/', (0, asyncHandler_1.asyncHandler)(problem_controller_1.getProblems));
+router.get('/:id', (0, asyncHandler_1.asyncHandler)(problem_controller_1.getProblem));
+router.post('/:id/claim', (0, asyncHandler_1.asyncHandler)(problem_controller_1.claimProblemController));
+exports.default = router;

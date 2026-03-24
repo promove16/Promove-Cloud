@@ -1,0 +1,1 @@
+export { LeadershipProfile } from "./LeadershipProfile";
