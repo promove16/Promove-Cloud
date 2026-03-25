@@ -9,6 +9,8 @@ const cors_1 = __importDefault(require("cors"));
 const express_1 = __importDefault(require("express"));
 const helmet_1 = __importDefault(require("helmet"));
 const morgan_1 = __importDefault(require("morgan"));
+const path_1 = __importDefault(require("path"));
+const fs_1 = require("fs");
 const env_1 = require("./config/env");
 const rateLimiter_1 = require("./middleware/rateLimiter");
 const errorHandler_1 = require("./middleware/errorHandler");
@@ -33,6 +35,8 @@ const admin_routes_1 = __importDefault(require("./modules/admin/admin.routes"));
 const ApiError_1 = require("./utils/ApiError");
 const createApp = () => {
     const app = (0, express_1.default)();
+    const clientBuildPath = path_1.default.resolve(__dirname, '../../public');
+    const hasClientBuild = (0, fs_1.existsSync)(clientBuildPath);
     app.set('trust proxy', 1);
     app.use((0, helmet_1.default)());
     app.use((0, cors_1.default)({
@@ -65,6 +69,12 @@ const createApp = () => {
     app.get('/api/health', (_req, res) => {
         res.status(200).json({ success: true, data: { status: 'ok' } });
     });
+    if (hasClientBuild) {
+        app.use(express_1.default.static(clientBuildPath));
+        app.get(/^(?!\/api(?:\/|$)).*/, (_req, res) => {
+            res.sendFile(path_1.default.join(clientBuildPath, 'index.html'));
+        });
+    }
     app.use((_req, _res, next) => {
         next(new ApiError_1.ApiError(404, 'NOT_FOUND', 'Route not found'));
     });

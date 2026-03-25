@@ -1,6 +1,5 @@
 .git
 .github
-Client
 docs
 temp
 node_modules
@@ -14,3 +13,7 @@ Server/node_modules
 Server/dist
 Server/.env
 Server/*.log
+Client/node_modules
+Client/dist
+Client/.env
+Client/.env.*

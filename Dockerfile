@@ -1,4 +1,4 @@
-FROM node:20-alpine AS build
+FROM node:20-alpine AS server-build
 
 WORKDIR /app
 
@@ -8,15 +8,26 @@ RUN npm ci
 COPY Server/ ./
 RUN npm run build && npm prune --omit=dev
 
+FROM node:20-alpine AS client-build
+
+WORKDIR /app
+
+COPY Client/package*.json ./
+RUN npm ci
+
+COPY Client/ ./
+RUN npm run build
+
 FROM node:20-alpine AS runtime
 
 WORKDIR /app
 
 ENV NODE_ENV=production
 
-COPY --from=build /app/package*.json ./
-COPY --from=build /app/node_modules ./node_modules
-COPY --from=build /app/dist ./dist
+COPY --from=server-build /app/package*.json ./
+COPY --from=server-build /app/node_modules ./node_modules
+COPY --from=server-build /app/dist ./dist
+COPY --from=client-build /app/dist ./public
 
 EXPOSE 10000
 

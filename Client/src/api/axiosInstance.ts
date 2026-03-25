@@ -10,7 +10,7 @@ interface RetriableRequestConfig extends InternalAxiosRequestConfig {
   _retry?: boolean;
 }
 
-const baseURL = import.meta.env.VITE_API_BASE_URL ?? 'http://localhost:5000';
+const baseURL = import.meta.env.VITE_API_BASE_URL ?? '/api';
 
 const redirectToLogin = () => {
   if (window.location.pathname !== '/login') {
@@ -71,7 +71,7 @@ axiosInstance.interceptors.response.use(
 
     if (!refreshPromise) {
       refreshPromise = refreshClient
-        .post<ApiSuccessResponse<AuthPayload>>('/api/auth/refresh')
+        .post<ApiSuccessResponse<AuthPayload>>('/auth/refresh')
         .then((response) => {
           const payload = response.data.data;
           useAuthStore.getState().setAuth(payload.user, payload.accessToken);

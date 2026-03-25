@@ -1,21 +1,24 @@
-import { Job, Worker } from 'bullmq';
-import { bullmqConnection } from '../config/bullmq';
+import { createQueueWorker, QueueJob } from '../config/bullmq';
 import { redis } from '../config/redis';
 import { io } from '../config/socket';
 import { NotificationService } from '../modules/notification/notification.service';
 
 export const startNotificationWorker = () => {
-  const worker = new Worker(
+  const worker = createQueueWorker<{
+    userId: string;
+    type: Parameters<typeof NotificationService.create>[0]['type'];
+    title: string;
+    body: string;
+    link?: string;
+  }>(
     'notifications',
-    async (
-      job: Job<{
-        userId: string;
-        type: Parameters<typeof NotificationService.create>[0]['type'];
-        title: string;
-        body: string;
-        link?: string;
-      }>,
-    ) => {
+    async (job: QueueJob<{
+      userId: string;
+      type: Parameters<typeof NotificationService.create>[0]['type'];
+      title: string;
+      body: string;
+      link?: string;
+    }>) => {
       const { userId, type, title, body, link } = job.data as {
         userId: string;
         type: Parameters<typeof NotificationService.create>[0]['type'];
@@ -39,7 +42,6 @@ export const startNotificationWorker = () => {
       await redis.lpush(`notif:${userId}`, JSON.stringify(notification));
       await redis.expire(`notif:${userId}`, 172800);
     },
-    { connection: bullmqConnection },
   );
 
   return worker;

@@ -3,6 +3,8 @@ import cors from 'cors';
 import express from 'express';
 import helmet from 'helmet';
 import morgan from 'morgan';
+import path from 'path';
+import { existsSync } from 'fs';
 import { env } from './config/env';
 import { apiLimiter, withRateLimit } from './middleware/rateLimiter';
 import { errorHandler } from './middleware/errorHandler';
@@ -28,6 +30,8 @@ import { ApiError } from './utils/ApiError';
 
 export const createApp = () => {
   const app = express();
+  const clientBuildPath = path.resolve(__dirname, '../../public');
+  const hasClientBuild = existsSync(clientBuildPath);
 
   app.set('trust proxy', 1);
   app.use(helmet());
@@ -63,6 +67,14 @@ export const createApp = () => {
   app.get('/api/health', (_req, res) => {
     res.status(200).json({ success: true, data: { status: 'ok' } });
   });
+
+  if (hasClientBuild) {
+    app.use(express.static(clientBuildPath));
+    app.get(/^(?!\/api(?:\/|$)).*/, (_req, res) => {
+      res.sendFile(path.join(clientBuildPath, 'index.html'));
+    });
+  }
+
   app.use((_req, _res, next) => {
     next(new ApiError(404, 'NOT_FOUND', 'Route not found'));
   });

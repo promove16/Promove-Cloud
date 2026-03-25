@@ -1,13 +1,12 @@
 "use strict";
 Object.defineProperty(exports, "__esModule", { value: true });
 exports.startNotificationWorker = void 0;
-const bullmq_1 = require("bullmq");
-const bullmq_2 = require("../config/bullmq");
+const bullmq_1 = require("../config/bullmq");
 const redis_1 = require("../config/redis");
 const socket_1 = require("../config/socket");
 const notification_service_1 = require("../modules/notification/notification.service");
 const startNotificationWorker = () => {
-    const worker = new bullmq_1.Worker('notifications', async (job) => {
+    const worker = (0, bullmq_1.createQueueWorker)('notifications', async (job) => {
         const { userId, type, title, body, link } = job.data;
         const notification = await notification_service_1.NotificationService.create({
             userId,
@@ -21,7 +20,7 @@ const startNotificationWorker = () => {
         }
         await redis_1.redis.lpush(`notif:${userId}`, JSON.stringify(notification));
         await redis_1.redis.expire(`notif:${userId}`, 172800);
-    }, { connection: bullmq_2.bullmqConnection });
+    });
     return worker;
 };
 exports.startNotificationWorker = startNotificationWorker;
