@@ -1,11 +1,10 @@
 "use strict";
 Object.defineProperty(exports, "__esModule", { value: true });
 exports.applyScoreAsync = exports.applyScore = exports.SCORE_DELTAS = void 0;
+const user_model_1 = require("../modules/user/user.model");
 const redis_1 = require("../config/redis");
 const bullmq_1 = require("../config/bullmq");
 const socket_1 = require("../config/socket");
-const user_model_1 = require("../modules/user/user.model");
-const score_model_1 = require("../modules/innovationScore/score.model");
 exports.SCORE_DELTAS = {
     PROBLEM_CLAIMED: 5,
     SKILL_COMPLETED: 8,
@@ -30,39 +29,74 @@ const BREAKDOWN_FIELD_MAP = {
     AWARD_SUBMITTED: null,
     AWARD_APPROVED: 'awardsApproved',
 };
+const MAX_TIEBREAKER_EPOCH = 9999999999999;
+const getInstitutionLeaderboardScore = (score, createdAt) => {
+    const tiebreaker = (MAX_TIEBREAKER_EPOCH - createdAt.getTime()) / 1_000_000_000_000_000;
+    return score + tiebreaker;
+};
 const applyScore = async ({ userId, trigger, metadata }) => {
     const delta = exports.SCORE_DELTAS[trigger];
-    if (delta === 0) {
-        const user = await user_model_1.User.findById(userId).select('innovationScore').lean();
-        return user?.innovationScore ?? 0;
-    }
+    if (delta === 0)
+        return 0;
     const breakdownField = BREAKDOWN_FIELD_MAP[trigger];
-    const user = await user_model_1.User.findById(userId).select('innovationScore institutionId').lean();
-    if (!user) {
+    const user = await user_model_1.User.findById(userId).select('innovationScore institutionId createdAt').lean();
+    if (!user)
         throw new Error(`User ${userId} not found`);
+    const currentScore = user.innovationScore || 0;
+    const newScore = Math.min(200, currentScore + delta);
+    const actualDelta = newScore - currentScore;
+    if (actualDelta <= 0)
+        return currentScore;
+    const updateOp = {
+        $inc: { innovationScore: actualDelta },
+    };
+    if (breakdownField) {
+        updateOp.$inc[`scoreBreakdown.${breakdownField}`] = 1;
     }
-    const newScore = Math.min(200, user.innovationScore + delta);
-    const actualDelta = newScore - user.innovationScore;
-    if (actualDelta <= 0) {
-        return user.innovationScore;
-    }
-    await user_model_1.User.findByIdAndUpdate(userId, {
-        $inc: {
-            innovationScore: actualDelta,
-            ...(breakdownField ? { [`scoreBreakdown.${breakdownField}`]: 1 } : {}),
-        },
-    });
-    await score_model_1.ScoreEvent.create({
-        userId,
-        trigger,
-        delta: actualDelta,
-        scoreAfter: newScore,
-        metadata,
-    });
+    await user_model_1.User.findByIdAndUpdate(userId, updateOp);
     await redis_1.redis.del(`score:${userId}`);
     await redis_1.redis.zadd('lb:global', { score: newScore, member: userId });
     if (user.institutionId) {
-        await redis_1.redis.zadd(`lb:${String(user.institutionId)}`, { score: newScore, member: userId });
+        await redis_1.redis.zadd(`lb:${user.institutionId}`, {
+            score: getInstitutionLeaderboardScore(newScore, user.createdAt),
+            member: userId,
+        });
+    }
+    await redis_1.redis.lpush(`student:activity:${userId}`, JSON.stringify({
+        trigger,
+        newScore,
+        delta: actualDelta,
+        timestamp: new Date().toISOString(),
+    }));
+    await redis_1.redis.ltrim(`student:activity:${userId}`, 0, 49);
+    await redis_1.redis.expire(`student:activity:${userId}`, 7 * 24 * 60 * 60);
+    const mentorIds = (await redis_1.redis.smembers(`student:watchers:${userId}`));
+    if (mentorIds.length > 0) {
+        const activityPayload = JSON.stringify({
+            studentId: userId,
+            trigger,
+            newScore,
+            delta: actualDelta,
+            timestamp: new Date().toISOString(),
+        });
+        await Promise.all(mentorIds.map(async (mentorId) => {
+            await redis_1.redis.lpush(`mentor:feed:${mentorId}`, activityPayload);
+            await redis_1.redis.ltrim(`mentor:feed:${mentorId}`, 0, 49);
+            await redis_1.redis.expire(`mentor:feed:${mentorId}`, 7 * 24 * 60 * 60);
+        }));
+    }
+    try {
+        const { ScoreEvent } = require('../modules/innovationScore/score.model');
+        await ScoreEvent.create({
+            userId,
+            trigger,
+            delta: actualDelta,
+            scoreAfter: newScore,
+            metadata
+        });
+    }
+    catch (err) {
+        console.error('Failed to create ScoreEvent log:', err);
     }
     if (socket_1.io) {
         socket_1.io.of('/score').to(`user:${userId}`).emit('score:updated', {
@@ -70,6 +104,13 @@ const applyScore = async ({ userId, trigger, metadata }) => {
             newScore,
             delta: actualDelta,
             trigger,
+        });
+        socket_1.io.of('/mentor').to(`student-feed:${userId}`).emit('student:activity', {
+            studentId: userId,
+            trigger,
+            newScore,
+            delta: actualDelta,
+            timestamp: new Date(),
         });
     }
     return newScore;

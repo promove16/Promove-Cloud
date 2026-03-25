@@ -7,7 +7,7 @@ exports.sendTeamInviteEmail = void 0;
 const nodemailer_1 = __importDefault(require("nodemailer"));
 const client_ses_1 = require("@aws-sdk/client-ses");
 const env_1 = require("../config/env");
-const sesClient = env_1.env.AWS_ACCESS_KEY_ID && env_1.env.AWS_SECRET_ACCESS_KEY
+const sesClient = env_1.env.NODE_ENV === 'production' && env_1.env.AWS_ACCESS_KEY_ID && env_1.env.AWS_SECRET_ACCESS_KEY
     ? new client_ses_1.SESClient({
         region: env_1.env.AWS_REGION,
         credentials: {

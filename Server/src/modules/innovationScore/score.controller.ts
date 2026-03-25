@@ -2,6 +2,7 @@ import { Request, Response } from 'express';
 import { redis } from '../../config/redis';
 import { ApiError } from '../../utils/ApiError';
 import { ApiResponse } from '../../utils/ApiResponse';
+import { readRedisJson } from '../../utils/redisJson';
 import { User } from '../user/user.model';
 import { ScoreEvent } from './score.model';
 
@@ -27,8 +28,9 @@ export const getMyScore = async (req: Request, res: Response) => {
     breakdown: unknown;
   };
 
-  if (cached) {
-    scorePayload = JSON.parse(cached);
+  const cachedPayload = readRedisJson<typeof scorePayload>(cached);
+  if (cachedPayload) {
+    scorePayload = cachedPayload;
   } else {
     const user = await User.findById(req.user._id)
       .select('innovationScore scoreBreakdown')

@@ -6,6 +6,7 @@ const SOCKET_URL = import.meta.env.VITE_SOCKET_URL ?? import.meta.env.VITE_API_B
 let scoreSocket: Socket | null = null;
 let chatSocket: Socket | null = null;
 let notifSocket: Socket | null = null;
+let mentorSocket: Socket | null = null;
 
 const getToken = () => useAuthStore.getState().accessToken;
 
@@ -48,11 +49,24 @@ export const getNotifSocket = () => {
   return notifSocket;
 };
 
+export const getMentorSocket = () => {
+  if (!mentorSocket) {
+    mentorSocket = io(`${SOCKET_URL}/mentor`, {
+      withCredentials: true,
+      autoConnect: false,
+    });
+  }
+  applyAuth(mentorSocket);
+  return mentorSocket;
+};
+
 export const disconnectAll = () => {
   scoreSocket?.disconnect();
   chatSocket?.disconnect();
   notifSocket?.disconnect();
+  mentorSocket?.disconnect();
   scoreSocket = null;
   chatSocket = null;
   notifSocket = null;
+  mentorSocket = null;
 };

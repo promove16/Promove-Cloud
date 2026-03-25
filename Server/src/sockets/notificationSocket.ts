@@ -1,24 +1,29 @@
 import { Server } from 'socket.io';
-import { Notification } from '../modules/notification/notification.model';
-import { verifySocketToken } from './auth';
+import jwt from 'jsonwebtoken';
+import { env } from '../config/env';
+import { NotificationService } from '../modules/notification/notification.service';
 
 export const initNotificationSocket = (io: Server) => {
-  const notifications = io.of('/notifications');
+  const notifs = io.of('/notifications');
 
-  notifications.use((socket, next) => {
+  notifs.use((socket, next) => {
+    const token = socket.handshake.auth.token;
+    if (!token) return next(new Error('Unauthorized'));
     try {
-      verifySocketToken(socket);
+      const decoded = jwt.verify(token, env.JWT_ACCESS_SECRET) as any;
+      socket.data.userId = decoded._id;
+      socket.data.role = decoded.role;
       next();
-    } catch (error) {
-      next(error as Error);
+    } catch {
+      next(new Error('Unauthorized'));
     }
   });
 
-  notifications.on('connection', (socket) => {
-    socket.join(`user:${socket.data.userId as string}`);
+  notifs.on('connection', (socket) => {
+    socket.join(`user:${socket.data.userId}`);
 
     socket.on('notif:mark-read', async ({ notificationId }) => {
-      await Notification.findByIdAndUpdate(notificationId, { isRead: true });
+      await NotificationService.markRead(socket.data.userId, notificationId);
     });
   });
 };

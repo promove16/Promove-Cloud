@@ -5,6 +5,8 @@ import { applyScoreAsync } from '../../services/scoreEngine';
 import { User } from '../user/user.model';
 import { Startup } from './startup.model';
 import { ApiError } from '../../utils/ApiError';
+import { PlacementRecord } from '../college/placementRecord.model';
+import { UserRole } from '../../types/roles.types';
 
 export const startupSchema = z.object({
   projectId: z.string().optional(),
@@ -92,7 +94,37 @@ export const launchStartup = async (
   await startup.save();
 
   if (payload.launchTo === 'recruiters') {
-    await User.findByIdAndUpdate(userId, { discoverableToRecruiters: true });
+    const founder = await User.findByIdAndUpdate(
+      userId,
+      { discoverableToRecruiters: true },
+      { new: true },
+    )
+      .select('innovationScore institutionId')
+      .lean();
+
+    if (founder?.institutionId) {
+      const institution = await User.findById(founder.institutionId).select('role').lean();
+      if (institution?.role === UserRole.COLLEGE) {
+        await PlacementRecord.findOneAndUpdate(
+          {
+            studentId: userId,
+            collegeId: founder.institutionId,
+            status: 'Discovered',
+          },
+          {
+            studentId: userId,
+            collegeId: founder.institutionId,
+            status: 'Discovered',
+            innovationScoreAtTime: founder.innovationScore ?? 0,
+          },
+          {
+            upsert: true,
+            new: true,
+            setDefaultsOnInsert: true,
+          },
+        );
+      }
+    }
   } else {
     await applyScoreAsync({
       userId,
@@ -103,22 +135,49 @@ export const launchStartup = async (
 
   const targetRoles =
     payload.launchTo === 'both'
-      ? ['investor', 'mentor']
+      ? [UserRole.INVESTOR, UserRole.MENTOR]
       : payload.launchTo === 'investors'
-        ? ['investor']
+        ? [UserRole.INVESTOR]
         : payload.launchTo === 'mentors'
-          ? ['mentor']
-          : ['recruiter'];
-  const recipients = await User.find({ role: { $in: targetRoles }, isActive: true }).select('_id').lean();
+          ? [UserRole.MENTOR]
+          : [UserRole.RECRUITER];
+
+  const recipients = await User.find({ role: { $in: targetRoles }, isActive: true })
+    .select('_id role')
+    .lean<Array<{ _id: unknown; role: UserRole }>>();
+
+  const getLaunchNotification = (recipientRole: UserRole) => {
+    if (recipientRole === UserRole.INVESTOR) {
+      return {
+        type: 'startup_launch' as const,
+        title: 'New startup is seeking investors',
+        body: `${startup.name} is seeking investors on ProMove.`,
+        link: '/dashboard/investor/startups',
+      };
+    }
+
+    if (recipientRole === UserRole.MENTOR) {
+      return {
+        type: 'startup_launch' as const,
+        title: 'New startup in your area launched',
+        body: `${startup.name} has launched and is looking for mentorship.`,
+        link: '/dashboard/mentor/students',
+      };
+    }
+
+    return {
+      type: 'deal_interest' as const,
+      title: 'New startup launch',
+      body: `${startup.name} is now live on ProMove.`,
+      link: '/dashboard/recruiter',
+    };
+  };
 
   await Promise.all(
     recipients.map((recipient) =>
       notificationQueue.add('startup-launch', {
         userId: String(recipient._id),
-        type: payload.launchTo === 'recruiters' ? 'deal_interest' : 'startup_launch',
-        title: 'New startup launch',
-        body: `${startup.name} is now live on ProMove.`,
-        link: '/startup-launch',
+        ...getLaunchNotification(recipient.role),
       }),
     ),
   );

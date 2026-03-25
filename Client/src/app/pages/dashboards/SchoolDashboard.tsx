@@ -123,7 +123,7 @@ export function SchoolDashboard() {
         ))}
       </div>
 
-      {/* AIM Ecosystem Badge */}
+      {/* Innovation Network Badge */}
       <div className="bg-gradient-to-r from-orange-900/30 via-slate-900 to-blue-900/30 border-2 border-orange-500/30 rounded-2xl p-6 relative overflow-hidden">
         <div className="absolute top-0 right-0 w-64 h-64 bg-gradient-to-br from-orange-500/10 to-transparent rounded-full blur-3xl"></div>
         <div className="relative flex items-center justify-between">
@@ -133,15 +133,15 @@ export function SchoolDashboard() {
             </div>
             <div>
               <div className="flex items-center gap-3 mb-2">
-                <h3 className="text-2xl font-bold text-white">Connected to Atal Innovation Mission</h3>
+                <h3 className="text-2xl font-bold text-white">Institution Innovation Network</h3>
                 <span className="px-3 py-1 bg-green-500/10 border border-green-500/30 rounded-full text-green-400 text-xs font-semibold">
                   VERIFIED
                 </span>
               </div>
               <p className="text-slate-300 text-lg">
-                via <span className="font-semibold text-orange-400">AIC-SKU</span> × <span className="font-semibold text-blue-400">ProMove Innovation Cloud</span>
+                Integrated with <span className="font-semibold text-blue-400">ProMove Innovation Cloud</span>
               </p>
-              <p className="text-sm text-slate-400 mt-1">Empowered by NITI Aayog's Atal Innovation Mission</p>
+              <p className="text-sm text-slate-400 mt-1">Verified institutional innovation partner</p>
             </div>
           </div>
           <div className="hidden lg:flex items-center gap-4">

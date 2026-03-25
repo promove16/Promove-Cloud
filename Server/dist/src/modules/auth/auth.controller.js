@@ -17,6 +17,14 @@ const cookieOptions = {
 const register = async (req, res) => {
     const payload = auth_schema_1.registerSchema.parse(req.body);
     const result = await (0, auth_service_1.registerUser)(payload);
+    if ('requiresVerification' in result) {
+        res.status(202).json(new ApiResponse_1.ApiResponse({
+            requiresVerification: true,
+            message: result.message,
+            user: result.user,
+        }));
+        return;
+    }
     res.cookie(COOKIE_NAME, result.refreshToken, cookieOptions);
     res.status(201).json(new ApiResponse_1.ApiResponse({
         accessToken: result.accessToken,

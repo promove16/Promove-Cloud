@@ -1,3 +1,4 @@
+import { PropsWithChildren } from 'react';
 import { Navigate, Outlet, createBrowserRouter } from 'react-router-dom';
 import { AuthLayout } from '../components/layouts/AuthLayout';
 import { DashboardLayout } from '../components/layouts/DashboardLayout';
@@ -5,18 +6,51 @@ import { Card } from '../components/ui/Card';
 import { Spinner } from '../components/ui/Spinner';
 import { LoginPage } from '../features/auth/LoginPage';
 import { SignupPage } from '../features/auth/SignupPage';
-import { AuthBootstrap } from '../features/auth/useAuth';
+import SchoolDashboard from '../features/school/Dashboard';
+import SchoolStudentLeaderboard from '../features/school/StudentLeaderboard';
+import SchoolInvestorDirectory from '../features/school/InvestorDirectory';
+import SchoolComplianceReport from '../features/school/ComplianceReport';
+import CollegeDashboard from '../features/college/Dashboard';
+import CollegeStudentLeaderboard from '../features/college/StudentLeaderboard';
+import CollegeInvestorDirectory from '../features/college/InvestorDirectory';
+import RecruiterDirectory from '../features/college/RecruiterDirectory';
+import PlacementTracker from '../features/college/PlacementTracker';
+import EventManager from '../features/college/EventManager';
+import CollegeComplianceReport from '../features/college/ComplianceReport';
+import MentorDashboard from '../features/mentor/Dashboard';
+import MentorStudentFeed from '../features/mentor/StudentFeed';
+import MentorSessions from '../features/mentor/Sessions';
+import AdminDashboard from '../features/admin/Dashboard';
+import AdminUserManagement from '../features/admin/UserManagement';
+import AdminPatents from '../features/admin/Patents';
+import AdminAwards from '../features/admin/Awards';
+import AdminDeals from '../features/admin/Deals';
+import AdminAnalytics from '../features/admin/Analytics';
+import AdminCapacity from '../features/admin/Capacity';
+import RecruiterDashboard from '../features/recruiter/Dashboard';
+import RecruiterTalentSearch from '../features/recruiter/TalentSearch';
+import RecruiterCollegeConnect from '../features/recruiter/CollegeConnect';
+import RecruiterActiveDrives from '../features/recruiter/ActiveDrives';
+import RecruiterOnboardingTracker from '../features/recruiter/OnboardingTracker';
+import InvestorDashboard from '../features/investor/Dashboard';
+import InvestorStartupMarketplace from '../features/investor/StartupMarketplace';
+import InvestorInstitutions from '../features/investor/Institutions';
+import InvestorPortfolio from '../features/investor/Portfolio';
+import { MentorDirectory } from '../features/institution/MentorDirectory';
 import { useProtectedRoute } from '../hooks/useProtectedRoute';
 import { useAuthStore } from '../store/authStore';
 import { UserRole } from '../types/roles.types';
 import { roleRedirect } from '../utils/roleRedirect';
+import { Dashboard as LegacyDashboard } from '../app/pages/Dashboard';
+import { ProblemBank } from '../app/pages/ProblemBank';
+import { ProductWorkspace } from '../app/pages/ProductWorkspace';
+import { PatentSupport } from '../app/pages/PatentSupport';
+import { StartupLaunch } from '../app/pages/StartupLaunch';
+import { LeadershipProfile } from '../app/pages/LeadershipProfile';
+import { Marketplace } from '../features/student/Marketplace';
 
 function RootLayout() {
-  return (
-    <AuthBootstrap>
-      <Outlet />
-    </AuthBootstrap>
-  );
+  return <Outlet />;
 }
 
 function PublicOnlyRoute() {
@@ -37,7 +71,10 @@ function PublicOnlyRoute() {
   return <Outlet />;
 }
 
-function ProtectedDashboard({ role }: { role: UserRole }) {
+function ProtectedRoleRoute({
+  role,
+  children,
+}: PropsWithChildren<{ role: UserRole }>) {
   const route = useProtectedRoute([role]);
 
   if (route.status === 'loading') {
@@ -52,33 +89,36 @@ function ProtectedDashboard({ role }: { role: UserRole }) {
     return <Navigate to={route.redirectTo} replace />;
   }
 
-  return <Outlet />;
+  return children ? <>{children}</> : <Outlet />;
 }
 
-function DashboardPlaceholder({ role }: { role: UserRole }) {
-  return (
-    <Card className="mx-auto max-w-3xl p-8">
-      <h1 className="text-3xl font-bold text-white capitalize">{role} Dashboard</h1>
-      <p className="mt-3 text-slate-400">
-        Phase 1 keeps this dashboard as a protected placeholder shell so auth and role gating are
-        ready before feature modules land.
-      </p>
-    </Card>
-  );
-}
+function ProtectedAnyRoute({ children }: PropsWithChildren) {
+  const route = useProtectedRoute();
 
-function AuthRedirect() {
-  const { user, isAuthenticated, isLoading } = useAuthStore();
-
-  if (isLoading) {
+  if (route.status === 'loading') {
     return (
-      <div className="flex min-h-screen items-center justify-center bg-slate-950">
+      <div className="flex min-h-[40vh] items-center justify-center">
         <Spinner />
       </div>
     );
   }
 
-  return <Navigate to={isAuthenticated && user ? roleRedirect(user.role) : '/login'} replace />;
+  if (route.status !== 'authorized') {
+    return <Navigate to={route.redirectTo} replace />;
+  }
+
+  return children ? <>{children}</> : <Outlet />;
+}
+
+function SettingsPage() {
+  return (
+    <Card className="mx-auto max-w-3xl p-8">
+      <h1 className="text-3xl font-bold text-white">Settings</h1>
+      <p className="mt-3 text-slate-400">
+        Account and institution settings stay role-aware and will expand in later phases.
+      </p>
+    </Card>
+  );
 }
 
 export const router = createBrowserRouter([
@@ -88,7 +128,7 @@ export const router = createBrowserRouter([
     children: [
       {
         index: true,
-        element: <AuthRedirect />,
+        element: <Navigate to="/login" replace />,
       },
       {
         element: <PublicOnlyRoute />,
@@ -103,49 +143,195 @@ export const router = createBrowserRouter([
         ],
       },
       {
+        path: '/student',
+        element: (
+          <ProtectedRoleRoute role={UserRole.STUDENT}>
+            <LegacyDashboard />
+          </ProtectedRoleRoute>
+        ),
+      },
+      {
+        path: '/mentor',
+        element: (
+          <ProtectedRoleRoute role={UserRole.MENTOR}>
+            <LegacyDashboard />
+          </ProtectedRoleRoute>
+        ),
+      },
+      {
+        path: '/investor',
+        element: (
+          <ProtectedRoleRoute role={UserRole.INVESTOR}>
+            <LegacyDashboard />
+          </ProtectedRoleRoute>
+        ),
+      },
+      {
+        path: '/recruiter',
+        element: (
+          <ProtectedRoleRoute role={UserRole.RECRUITER}>
+            <Navigate to="/dashboard/recruiter" replace />
+          </ProtectedRoleRoute>
+        ),
+      },
+      {
+        path: '/admin',
+        element: (
+          <ProtectedRoleRoute role={UserRole.ADMIN}>
+            <LegacyDashboard />
+          </ProtectedRoleRoute>
+        ),
+      },
+      {
+        path: '/problem-bank',
+        element: (
+          <ProtectedRoleRoute role={UserRole.STUDENT}>
+            <ProblemBank />
+          </ProtectedRoleRoute>
+        ),
+      },
+      {
+        path: '/product-workspace/:projectId?',
+        element: (
+          <ProtectedRoleRoute role={UserRole.STUDENT}>
+            <ProductWorkspace />
+          </ProtectedRoleRoute>
+        ),
+      },
+      {
+        path: '/patent-support/:innovationId?',
+        element: (
+          <ProtectedRoleRoute role={UserRole.STUDENT}>
+            <PatentSupport />
+          </ProtectedRoleRoute>
+        ),
+      },
+      {
+        path: '/startup-launch/:startupId?',
+        element: (
+          <ProtectedRoleRoute role={UserRole.STUDENT}>
+            <StartupLaunch />
+          </ProtectedRoleRoute>
+        ),
+      },
+      {
+        path: '/leadership-profile',
+        element: (
+          <ProtectedRoleRoute role={UserRole.STUDENT}>
+            <LeadershipProfile />
+          </ProtectedRoleRoute>
+        ),
+      },
+      {
+        path: '/marketplace',
+        element: (
+          <ProtectedRoleRoute role={UserRole.STUDENT}>
+            <Marketplace />
+          </ProtectedRoleRoute>
+        ),
+      },
+      {
+        path: '/school',
+        element: <Navigate to="/dashboard/school" replace />,
+      },
+      {
+        path: '/college',
+        element: <Navigate to="/dashboard/college" replace />,
+      },
+      {
         path: '/dashboard',
         element: <DashboardLayout />,
         children: [
           {
             path: 'student',
-            element: <ProtectedDashboard role={UserRole.STUDENT} />,
-            children: [{ index: true, element: <DashboardPlaceholder role={UserRole.STUDENT} /> }],
-          },
-          {
-            path: 'school',
-            element: <ProtectedDashboard role={UserRole.SCHOOL} />,
-            children: [{ index: true, element: <DashboardPlaceholder role={UserRole.SCHOOL} /> }],
-          },
-          {
-            path: 'college',
-            element: <ProtectedDashboard role={UserRole.COLLEGE} />,
-            children: [{ index: true, element: <DashboardPlaceholder role={UserRole.COLLEGE} /> }],
+            element: <Navigate to="/student" replace />,
           },
           {
             path: 'mentor',
-            element: <ProtectedDashboard role={UserRole.MENTOR} />,
-            children: [{ index: true, element: <DashboardPlaceholder role={UserRole.MENTOR} /> }],
+            element: <ProtectedRoleRoute role={UserRole.MENTOR} />,
+            children: [
+              { index: true, element: <MentorDashboard /> },
+              { path: 'students', element: <MentorStudentFeed /> },
+              { path: 'students/:id', element: <MentorStudentFeed /> },
+              { path: 'sessions', element: <MentorSessions /> },
+            ],
           },
           {
             path: 'investor',
-            element: <ProtectedDashboard role={UserRole.INVESTOR} />,
-            children: [{ index: true, element: <DashboardPlaceholder role={UserRole.INVESTOR} /> }],
+            element: <ProtectedRoleRoute role={UserRole.INVESTOR} />,
+            children: [
+              { index: true, element: <InvestorDashboard /> },
+              { path: 'startups', element: <InvestorStartupMarketplace /> },
+              { path: 'institutions', element: <InvestorInstitutions /> },
+              { path: 'portfolio', element: <InvestorPortfolio /> },
+              {
+                path: 'settings',
+                element: <ProtectedAnyRoute />,
+                children: [{ index: true, element: <SettingsPage /> }],
+              },
+            ],
           },
           {
             path: 'recruiter',
-            element: <ProtectedDashboard role={UserRole.RECRUITER} />,
-            children: [{ index: true, element: <DashboardPlaceholder role={UserRole.RECRUITER} /> }],
+            element: <ProtectedRoleRoute role={UserRole.RECRUITER} />,
+            children: [
+              { index: true, element: <RecruiterDashboard /> },
+              { path: 'talent', element: <RecruiterTalentSearch /> },
+              { path: 'colleges', element: <RecruiterCollegeConnect /> },
+              { path: 'drives', element: <RecruiterActiveDrives /> },
+              { path: 'onboarding', element: <RecruiterOnboardingTracker /> },
+            ],
           },
           {
             path: 'admin',
-            element: <ProtectedDashboard role={UserRole.ADMIN} />,
-            children: [{ index: true, element: <DashboardPlaceholder role={UserRole.ADMIN} /> }],
+            element: <ProtectedRoleRoute role={UserRole.ADMIN} />,
+            children: [
+              { index: true, element: <AdminDashboard /> },
+              { path: 'users', element: <AdminUserManagement /> },
+              { path: 'patents', element: <AdminPatents /> },
+              { path: 'awards', element: <AdminAwards /> },
+              { path: 'deals', element: <AdminDeals /> },
+              { path: 'analytics', element: <AdminAnalytics /> },
+              { path: 'capacity', element: <AdminCapacity /> },
+            ],
+          },
+          {
+            path: 'settings',
+            element: <ProtectedAnyRoute />,
+            children: [{ index: true, element: <SettingsPage /> }],
+          },
+          {
+            path: 'school',
+            element: <ProtectedRoleRoute role={UserRole.SCHOOL} />,
+            children: [
+              { index: true, element: <SchoolDashboard /> },
+              { path: 'students', element: <SchoolStudentLeaderboard /> },
+              { path: 'students/:id', element: <SchoolStudentLeaderboard /> },
+              { path: 'investors', element: <SchoolInvestorDirectory /> },
+              { path: 'mentors', element: <MentorDirectory /> },
+              { path: 'compliance', element: <SchoolComplianceReport /> },
+            ],
+          },
+          {
+            path: 'college',
+            element: <ProtectedRoleRoute role={UserRole.COLLEGE} />,
+            children: [
+              { index: true, element: <CollegeDashboard /> },
+              { path: 'students', element: <CollegeStudentLeaderboard /> },
+              { path: 'students/:id', element: <CollegeStudentLeaderboard /> },
+              { path: 'recruiters', element: <RecruiterDirectory /> },
+              { path: 'investors', element: <CollegeInvestorDirectory /> },
+              { path: 'mentors', element: <MentorDirectory /> },
+              { path: 'placement', element: <PlacementTracker /> },
+              { path: 'events', element: <EventManager /> },
+              { path: 'compliance', element: <CollegeComplianceReport /> },
+            ],
           },
         ],
       },
       {
         path: '*',
-        element: <AuthRedirect />,
+        element: <Navigate to="/login" replace />,
       },
     ],
   },

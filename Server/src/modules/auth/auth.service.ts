@@ -8,6 +8,10 @@ import { AccessGrantedBy, SanitizedUser } from '../user/user.types';
 import { UserRole } from '../../types/roles.types';
 import { ApiError } from '../../utils/ApiError';
 import { toSanitizedUser } from '../user/user.service';
+import {
+  registerTokenUsage,
+  resolveInstitutionToken,
+} from '../institution/institutionAccess.service';
 
 const REFRESH_TTL_SECONDS = 30 * 24 * 60 * 60;
 const MS_IN_YEAR = 365 * 24 * 60 * 60 * 1000;
@@ -18,6 +22,12 @@ interface AuthResult {
   user: SanitizedUser;
 }
 
+interface PendingStudentRegistrationResult {
+  requiresVerification: true;
+  message: string;
+  user: SanitizedUser;
+}
+
 interface RefreshPayload extends jwt.JwtPayload {
   _id: string;
   email: string;
@@ -25,38 +35,6 @@ interface RefreshPayload extends jwt.JwtPayload {
   tokenId: string;
   type: 'refresh';
 }
-
-const ACCESS_CODE_MAP: Record<string, AccessGrantedBy> = {
-  STARTUPSCHOOL: 'startup_school',
-  STARTUPSCHOOLACCESS: 'startup_school',
-  STARTUP_SCHOOL: 'startup_school',
-  INSTANTINTERNSHIP: 'instant_internship',
-  INSTANT_INTERNSHIP: 'instant_internship',
-  SKILLDEV: 'skill_dev',
-  SKILL_DEV: 'skill_dev',
-  III: 'iii',
-  ADMIN: 'admin',
-  ADMINACCESS: 'admin',
-  ADMIN_ACCESS: 'admin',
-};
-
-const normalizeAccessCode = (value: string) => value.replace(/[^a-zA-Z]/g, '').toUpperCase();
-
-const resolveAccessGrant = (accessCode: string): AccessGrantedBy => {
-  const direct = ACCESS_CODE_MAP[accessCode.toUpperCase()];
-
-  if (direct) {
-    return direct;
-  }
-
-  const normalized = ACCESS_CODE_MAP[normalizeAccessCode(accessCode)];
-
-  if (!normalized) {
-    throw new ApiError(400, 'INVALID_ACCESS_CODE', 'Invalid access code');
-  }
-
-  return normalized;
-};
 
 const signToken = (
   payload: Record<string, string>,
@@ -112,8 +90,18 @@ export const registerUser = async (payload: {
   password: string;
   displayName: string;
   role: UserRole;
-  accessCode: string;
-}): Promise<AuthResult> => {
+  institutionToken?: string;
+  accessCode?: string;
+  domain?: string;
+  bio?: string;
+  institutionProfile?: {
+    institutionName: string;
+    location: string;
+    totalStudentsEnrolled: number;
+    academicYear: string;
+    iicStarRating?: number;
+  };
+}): Promise<AuthResult | PendingStudentRegistrationResult> => {
   const activeUsers = await User.countDocuments({ isActive: true });
 
   if (activeUsers >= env.MAX_USERS_YEAR_ONE) {
@@ -130,19 +118,66 @@ export const registerUser = async (payload: {
     throw new ApiError(409, 'DUPLICATE_KEY', 'Email already registered');
   }
 
-  const accessGrantedBy = resolveAccessGrant(payload.accessCode);
   const passwordHash = await bcrypt.hash(payload.password, 12);
+  const isStudent = payload.role === UserRole.STUDENT;
+  const institutionTokenValue = payload.institutionToken ?? payload.accessCode;
+  const tokenRecord = isStudent
+    ? await resolveInstitutionToken(institutionTokenValue ?? '')
+    : undefined;
+  const accessGrantedBy: AccessGrantedBy = isStudent ? 'institution_token' : 'self_registered';
 
   const createdUser = await User.create({
     email: payload.email.toLowerCase(),
     passwordHash,
     role: payload.role,
     displayName: payload.displayName,
+    ...(payload.domain ? { domain: payload.domain } : {}),
+    ...(payload.bio ? { bio: payload.bio } : {}),
+    ...(payload.institutionProfile
+      ? {
+          institutionProfile: {
+            institutionName: payload.institutionProfile.institutionName,
+            location: payload.institutionProfile.location,
+            totalStudentsEnrolled: payload.institutionProfile.totalStudentsEnrolled,
+            academicYear: payload.institutionProfile.academicYear,
+            iicStarRating: payload.institutionProfile.iicStarRating ?? 0,
+            policies: [],
+            stats: {
+              totalInnovationActivities: 0,
+              patentsFiled: 0,
+              totalMentoringHours: 0,
+              startupsLaunched: 0,
+              industryCollaborations: 0,
+            },
+          },
+        }
+      : {}),
+    ...(tokenRecord ? { institutionId: tokenRecord.institutionId } : {}),
+    profileComplete:
+      payload.role === UserRole.SCHOOL || payload.role === UserRole.COLLEGE
+        ? Boolean(payload.institutionProfile)
+        : Boolean(payload.domain || payload.bio),
     accessGrantedBy,
     accessExpiresAt: new Date(Date.now() + MS_IN_YEAR),
+    isActive: isStudent ? false : true,
+    verificationStatus: isStudent ? 'pending' : 'not_required',
+    ...(isStudent ? { verificationRequestedAt: new Date() } : {}),
   });
 
+  if (tokenRecord) {
+    await registerTokenUsage(String(tokenRecord._id));
+  }
+
   const user = toSanitizedUser(createdUser.toObject());
+  if (isStudent) {
+    return {
+      requiresVerification: true,
+      message:
+        'Your account has been created and is waiting for school or college approval before sign-in.',
+      user,
+    };
+  }
+
   const tokens = await createTokenPair(user);
 
   return {
@@ -164,6 +199,27 @@ export const loginUser = async (payload: {
 
   if (user.role !== payload.role) {
     throw new ApiError(401, 'ROLE_MISMATCH', 'Selected role does not match your account.');
+  }
+
+  if (!user.isActive) {
+    if (user.role === UserRole.STUDENT && user.verificationStatus === 'pending') {
+      throw new ApiError(
+        403,
+        'INSTITUTION_VERIFICATION_PENDING',
+        'Your school or college still needs to verify your account before you can sign in.',
+      );
+    }
+
+    if (user.role === UserRole.STUDENT && user.verificationStatus === 'rejected') {
+      throw new ApiError(
+        403,
+        'INSTITUTION_VERIFICATION_REJECTED',
+        user.verificationRejectedReason ||
+          'Your institution could not verify your account. Please contact them for support.',
+      );
+    }
+
+    throw new ApiError(403, 'ACCESS_DISABLED', 'Your account is currently inactive');
   }
 
   const passwordMatches = await bcrypt.compare(payload.password, user.passwordHash);
@@ -211,6 +267,10 @@ export const refreshUserToken = async (refreshToken: string | undefined): Promis
   const user = await User.findById(decoded._id);
 
   if (!user) {
+    throw new ApiError(401, 'UNAUTHORIZED', 'Invalid or expired token');
+  }
+
+  if (!user.isActive) {
     throw new ApiError(401, 'UNAUTHORIZED', 'Invalid or expired token');
   }
 

@@ -1,4 +1,4 @@
-import { PropsWithChildren, ReactElement, useEffect, useRef } from 'react';
+import { PropsWithChildren, ReactElement, useEffect } from 'react';
 import { useMutation } from '@tanstack/react-query';
 import axios, { isAxiosError } from 'axios';
 import api, { refreshClient } from '../../api/axiosInstance';
@@ -8,6 +8,7 @@ import {
   ApiSuccessResponse,
   AuthPayload,
   LoginInput,
+  SignupResponse,
   SignupInput,
 } from '../../types/auth.types';
 
@@ -18,6 +19,8 @@ const parseError = (error: unknown) => {
 
   return undefined;
 };
+
+let bootstrapPromise: Promise<AuthPayload | null> | null = null;
 
 export const useLoginMutation = () => {
   const setAuth = useAuthStore((state) => state.setAuth);
@@ -41,11 +44,13 @@ export const useSignupMutation = () => {
 
   return useMutation({
     mutationFn: async (payload: SignupInput) => {
-      const response = await api.post<ApiSuccessResponse<AuthPayload>>('/api/auth/register', payload);
+      const response = await api.post<ApiSuccessResponse<SignupResponse>>('/api/auth/register', payload);
       return response.data.data;
     },
     onSuccess: (payload) => {
-      setAuth(payload.user, payload.accessToken);
+      if ('accessToken' in payload) {
+        setAuth(payload.user, payload.accessToken);
+      }
     },
     meta: {
       parseError,
@@ -86,45 +91,56 @@ export const useLogoutMutation = () => {
 };
 
 export const useBootstrapAuth = () => {
-  const hasBootstrapped = useRef(false);
-  const persistedUser = useAuthStore((state) => state.user);
+  const persistedUserId = useAuthStore((state) => state.user?._id ?? null);
   const setAuth = useAuthStore((state) => state.setAuth);
   const clearAuth = useAuthStore((state) => state.clearAuth);
   const setLoading = useAuthStore((state) => state.setLoading);
 
   useEffect(() => {
-    if (hasBootstrapped.current) {
-      return;
-    }
-
-    hasBootstrapped.current = true;
-    let cancelled = false;
+    let active = true;
 
     const bootstrap = async () => {
       setLoading(true);
 
-      if (!persistedUser) {
+      if (!persistedUserId) {
         clearAuth();
         setLoading(false);
         return;
       }
 
       try {
-        const response = await refreshClient.post<ApiSuccessResponse<AuthPayload>>('/api/auth/refresh');
+        if (!bootstrapPromise) {
+          bootstrapPromise = refreshClient
+            .post<ApiSuccessResponse<AuthPayload>>('/api/auth/refresh')
+            .then((response) => response.data.data)
+            .catch((error) => {
+              if (axios.isAxiosError(error) && error.response?.status === 401) {
+                return null;
+              }
+              throw error;
+            })
+            .finally(() => {
+              bootstrapPromise = null;
+            });
+        }
 
-        if (!cancelled) {
-          setAuth(response.data.data.user, response.data.data.accessToken);
+        const payload = await bootstrapPromise;
+
+        if (!active) {
+          return;
+        }
+
+        if (payload) {
+          setAuth(payload.user, payload.accessToken);
+        } else {
+          clearAuth();
         }
       } catch (error) {
-        if (!cancelled) {
-          if (axios.isAxiosError(error) && error.response?.status !== 401) {
-            clearAuth();
-          } else {
-            clearAuth();
-          }
+        if (active) {
+          clearAuth();
         }
       } finally {
-        if (!cancelled) {
+        if (active) {
           setLoading(false);
         }
       }
@@ -133,9 +149,9 @@ export const useBootstrapAuth = () => {
     void bootstrap();
 
     return () => {
-      cancelled = true;
+      active = false;
     };
-  }, [clearAuth, persistedUser, setAuth, setLoading]);
+  }, [clearAuth, persistedUserId, setAuth, setLoading]);
 };
 
 export function AuthBootstrap({ children }: PropsWithChildren) {

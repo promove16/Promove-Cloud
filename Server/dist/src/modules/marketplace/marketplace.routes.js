@@ -7,6 +7,6 @@ const roles_types_1 = require("../../types/roles.types");
 const asyncHandler_1 = require("../../utils/asyncHandler");
 const marketplace_controller_1 = require("./marketplace.controller");
 const router = (0, express_1.Router)();
-router.get('/', authenticate_1.authenticate, (0, authorize_1.authorize)(roles_types_1.UserRole.STUDENT), (0, asyncHandler_1.asyncHandler)(marketplace_controller_1.getMarketplace));
-router.get('/:userId', authenticate_1.authenticate, (0, asyncHandler_1.asyncHandler)(marketplace_controller_1.getMarketplaceProfile));
+router.get('/', authenticate_1.authenticate, (0, authorize_1.authorize)(roles_types_1.UserRole.STUDENT, roles_types_1.UserRole.SCHOOL, roles_types_1.UserRole.COLLEGE), (0, asyncHandler_1.asyncHandler)(marketplace_controller_1.getMarketplace));
+router.get('/:userId', authenticate_1.authenticate, (0, authorize_1.authorize)(roles_types_1.UserRole.STUDENT, roles_types_1.UserRole.SCHOOL, roles_types_1.UserRole.COLLEGE), (0, asyncHandler_1.asyncHandler)(marketplace_controller_1.getMarketplaceProfile));
 exports.default = router;

@@ -10,7 +10,7 @@ export interface TeamInviteEmailParams {
 }
 
 const sesClient =
-  env.AWS_ACCESS_KEY_ID && env.AWS_SECRET_ACCESS_KEY
+  env.NODE_ENV === 'production' && env.AWS_ACCESS_KEY_ID && env.AWS_SECRET_ACCESS_KEY
     ? new SESClient({
         region: env.AWS_REGION,
         credentials: {

@@ -1,0 +1,66 @@
+import { z } from 'zod';
+
+export const objectIdSchema = z.string().regex(/^[0-9a-fA-F]{24}$/, 'Invalid ID format');
+
+export const talentQuerySchema = z.object({
+  minScore: z.coerce.number().min(0).max(200).optional(),
+  maxScore: z.coerce.number().min(0).max(200).optional(),
+  domain: z.string().trim().min(1).max(120).optional(),
+  institution: z.string().trim().min(1).max(160).optional(),
+  search: z.string().trim().min(1).max(160).optional(),
+  page: z.coerce.number().int().min(1).default(1),
+  limit: z.coerce.number().int().min(1).max(50).default(20),
+});
+
+export const jobCreateSchema = z.object({
+  title: z.string().trim().min(2).max(160),
+  company: z.string().trim().min(2).max(160),
+  description: z.string().trim().min(10).max(4000),
+  domain: z.string().trim().min(2).max(120),
+  minimumInnovationScore: z.coerce.number().min(0).max(200).default(0),
+  type: z.enum(['Full-time', 'Internship', 'Contract', 'Part-time']),
+  location: z.string().trim().min(2).max(120),
+  expiresAt: z.string().datetime().optional(),
+});
+
+export const jobUpdateSchema = jobCreateSchema.partial().extend({
+  isActive: z.boolean().optional(),
+});
+
+export const driveCreateSchema = z.object({
+  title: z.string().trim().min(2).max(160),
+  collegeId: objectIdSchema,
+  type: z.enum(['Placement Drive', 'Internship Drive', 'Hackathon']),
+  scheduledAt: z.string().datetime(),
+  description: z.string().trim().min(10).max(4000),
+  minimumInnovationScore: z.coerce.number().min(0).max(200).default(0),
+});
+
+export const driveScoreSchema = z.object({
+  studentId: objectIdSchema,
+  submissionScore: z.coerce.number().min(0).max(100),
+});
+
+export const hireSchema = z.object({
+  companyName: z.string().trim().min(2).max(160),
+});
+
+export const messageSchema = z.object({
+  body: z.string().trim().min(2).max(500).optional(),
+});
+
+export const driveIdSchema = z.object({
+  driveId: objectIdSchema,
+});
+
+export const jobIdSchema = z.object({
+  jobId: objectIdSchema,
+});
+
+export const studentIdSchema = z.object({
+  studentId: objectIdSchema,
+});
+
+export const publicJobsQuerySchema = z.object({
+  recruiterId: objectIdSchema,
+});

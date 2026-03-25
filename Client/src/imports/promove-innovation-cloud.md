@@ -101,7 +101,7 @@ build teams
 assign roles
 collaborate with mentors
 5. Leadership Profile
-Each student must have a digital innovation passport.
+Each student must have a digital leadership profile.
 The passport tracks:
 problems solved
 innovations created

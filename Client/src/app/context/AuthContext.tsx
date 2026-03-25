@@ -8,7 +8,7 @@ import {
   ApiSuccessResponse,
   AuthPayload,
   LoginInput,
-  SignupInput,
+  SignupResponse,
 } from '../../types/auth.types';
 import { UserRole } from '../../types/roles.types';
 
@@ -37,17 +37,6 @@ interface AuthContextType {
 }
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
-
-const accessCodeByRole: Record<string, SignupInput['accessCode']> = {
-  student: 'STARTUP_SCHOOL',
-  school: 'STARTUP_SCHOOL',
-  college: 'III',
-  mentor: 'SKILL_DEV',
-  investor: 'INSTANT_INTERNSHIP',
-  recruiter: 'INSTANT_INTERNSHIP',
-  company: 'INSTANT_INTERNSHIP',
-  admin: 'ADMIN_ACCESS',
-};
 
 const roleHome: Record<string, string> = {
   student: '/student',
@@ -106,16 +95,31 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   }) => {
     const normalizedRole = userData.role === 'company' ? 'recruiter' : userData.role;
 
+    if (normalizedRole === UserRole.STUDENT) {
+      return {
+        success: false,
+        error: 'Student signup now requires an institution token from a school or college.',
+        code: 'INSTITUTION_TOKEN_REQUIRED',
+      };
+    }
+
     try {
-      const response = await api.post<ApiSuccessResponse<AuthPayload>>('/api/auth/register', {
+      const response = await api.post<ApiSuccessResponse<SignupResponse>>('/api/auth/register', {
         email: userData.email,
         password: userData.password,
         displayName: userData.name,
         role: normalizedRole as UserRole,
-        accessCode: accessCodeByRole[userData.role] ?? 'STARTUP_SCHOOL',
       });
 
       const payload = response.data.data;
+      if (!('accessToken' in payload)) {
+        return {
+          success: false,
+          error: payload.message,
+          code: 'INSTITUTION_VERIFICATION_PENDING',
+        };
+      }
+
       setAuth(payload.user, payload.accessToken);
 
       return {

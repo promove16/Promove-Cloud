@@ -1,9 +1,10 @@
 import { Server as HttpServer } from 'http';
 import { Server as SocketServer } from 'socket.io';
 import { env } from './env';
+import { initScoreSocket } from '../sockets/scoreSocket';
 import { initChatSocket } from '../sockets/chatSocket';
 import { initNotificationSocket } from '../sockets/notificationSocket';
-import { initScoreSocket } from '../sockets/scoreSocket';
+import { initMentorSocket } from '../sockets/mentorSocket';
 
 export let io: SocketServer;
 
@@ -20,6 +21,7 @@ export const initSocket = (httpServer: HttpServer): SocketServer => {
   initScoreSocket(io);
   initChatSocket(io);
   initNotificationSocket(io);
+  initMentorSocket(io);
 
   return io;
 };

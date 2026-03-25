@@ -10,35 +10,12 @@ const crypto_1 = require("crypto");
 const redis_1 = require("../../config/redis");
 const env_1 = require("../../config/env");
 const user_model_1 = require("../user/user.model");
+const roles_types_1 = require("../../types/roles.types");
 const ApiError_1 = require("../../utils/ApiError");
 const user_service_1 = require("../user/user.service");
+const institutionAccess_service_1 = require("../institution/institutionAccess.service");
 const REFRESH_TTL_SECONDS = 30 * 24 * 60 * 60;
 const MS_IN_YEAR = 365 * 24 * 60 * 60 * 1000;
-const ACCESS_CODE_MAP = {
-    STARTUPSCHOOL: 'startup_school',
-    STARTUPSCHOOLACCESS: 'startup_school',
-    STARTUP_SCHOOL: 'startup_school',
-    INSTANTINTERNSHIP: 'instant_internship',
-    INSTANT_INTERNSHIP: 'instant_internship',
-    SKILLDEV: 'skill_dev',
-    SKILL_DEV: 'skill_dev',
-    III: 'iii',
-    ADMIN: 'admin',
-    ADMINACCESS: 'admin',
-    ADMIN_ACCESS: 'admin',
-};
-const normalizeAccessCode = (value) => value.replace(/[^a-zA-Z]/g, '').toUpperCase();
-const resolveAccessGrant = (accessCode) => {
-    const direct = ACCESS_CODE_MAP[accessCode.toUpperCase()];
-    if (direct) {
-        return direct;
-    }
-    const normalized = ACCESS_CODE_MAP[normalizeAccessCode(accessCode)];
-    if (!normalized) {
-        throw new ApiError_1.ApiError(400, 'INVALID_ACCESS_CODE', 'Invalid access code');
-    }
-    return normalized;
-};
 const signToken = (payload, secret, expiresIn, tokenType, tokenId) => {
     const options = {
         algorithm: 'RS256',
@@ -74,17 +51,60 @@ const registerUser = async (payload) => {
     if (existingUser) {
         throw new ApiError_1.ApiError(409, 'DUPLICATE_KEY', 'Email already registered');
     }
-    const accessGrantedBy = resolveAccessGrant(payload.accessCode);
     const passwordHash = await bcrypt_1.default.hash(payload.password, 12);
+    const isStudent = payload.role === roles_types_1.UserRole.STUDENT;
+    const institutionTokenValue = payload.institutionToken ?? payload.accessCode;
+    const tokenRecord = isStudent
+        ? await (0, institutionAccess_service_1.resolveInstitutionToken)(institutionTokenValue ?? '')
+        : undefined;
+    const accessGrantedBy = isStudent ? 'institution_token' : 'self_registered';
     const createdUser = await user_model_1.User.create({
         email: payload.email.toLowerCase(),
         passwordHash,
         role: payload.role,
         displayName: payload.displayName,
+        ...(payload.domain ? { domain: payload.domain } : {}),
+        ...(payload.bio ? { bio: payload.bio } : {}),
+        ...(payload.institutionProfile
+            ? {
+                institutionProfile: {
+                    institutionName: payload.institutionProfile.institutionName,
+                    location: payload.institutionProfile.location,
+                    totalStudentsEnrolled: payload.institutionProfile.totalStudentsEnrolled,
+                    academicYear: payload.institutionProfile.academicYear,
+                    iicStarRating: payload.institutionProfile.iicStarRating ?? 0,
+                    policies: [],
+                    stats: {
+                        totalInnovationActivities: 0,
+                        patentsFiled: 0,
+                        totalMentoringHours: 0,
+                        startupsLaunched: 0,
+                        industryCollaborations: 0,
+                    },
+                },
+            }
+            : {}),
+        ...(tokenRecord ? { institutionId: tokenRecord.institutionId } : {}),
+        profileComplete: payload.role === roles_types_1.UserRole.SCHOOL || payload.role === roles_types_1.UserRole.COLLEGE
+            ? Boolean(payload.institutionProfile)
+            : Boolean(payload.domain || payload.bio),
         accessGrantedBy,
         accessExpiresAt: new Date(Date.now() + MS_IN_YEAR),
+        isActive: isStudent ? false : true,
+        verificationStatus: isStudent ? 'pending' : 'not_required',
+        ...(isStudent ? { verificationRequestedAt: new Date() } : {}),
     });
+    if (tokenRecord) {
+        await (0, institutionAccess_service_1.registerTokenUsage)(String(tokenRecord._id));
+    }
     const user = (0, user_service_1.toSanitizedUser)(createdUser.toObject());
+    if (isStudent) {
+        return {
+            requiresVerification: true,
+            message: 'Your account has been created and is waiting for school or college approval before sign-in.',
+            user,
+        };
+    }
     const tokens = await createTokenPair(user);
     return {
         ...tokens,
@@ -99,6 +119,16 @@ const loginUser = async (payload) => {
     }
     if (user.role !== payload.role) {
         throw new ApiError_1.ApiError(401, 'ROLE_MISMATCH', 'Selected role does not match your account.');
+    }
+    if (!user.isActive) {
+        if (user.role === roles_types_1.UserRole.STUDENT && user.verificationStatus === 'pending') {
+            throw new ApiError_1.ApiError(403, 'INSTITUTION_VERIFICATION_PENDING', 'Your school or college still needs to verify your account before you can sign in.');
+        }
+        if (user.role === roles_types_1.UserRole.STUDENT && user.verificationStatus === 'rejected') {
+            throw new ApiError_1.ApiError(403, 'INSTITUTION_VERIFICATION_REJECTED', user.verificationRejectedReason ||
+                'Your institution could not verify your account. Please contact them for support.');
+        }
+        throw new ApiError_1.ApiError(403, 'ACCESS_DISABLED', 'Your account is currently inactive');
     }
     const passwordMatches = await bcrypt_1.default.compare(payload.password, user.passwordHash);
     if (!passwordMatches) {
@@ -135,6 +165,9 @@ const refreshUserToken = async (refreshToken) => {
     await redis_1.redis.del(key);
     const user = await user_model_1.User.findById(decoded._id);
     if (!user) {
+        throw new ApiError_1.ApiError(401, 'UNAUTHORIZED', 'Invalid or expired token');
+    }
+    if (!user.isActive) {
         throw new ApiError_1.ApiError(401, 'UNAUTHORIZED', 'Invalid or expired token');
     }
     const sanitizedUser = (0, user_service_1.toSanitizedUser)(user.toObject());

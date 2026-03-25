@@ -8,6 +8,8 @@ const scoreEngine_1 = require("../../services/scoreEngine");
 const user_model_1 = require("../user/user.model");
 const startup_model_1 = require("./startup.model");
 const ApiError_1 = require("../../utils/ApiError");
+const placementRecord_model_1 = require("../college/placementRecord.model");
+const roles_types_1 = require("../../types/roles.types");
 exports.startupSchema = zod_1.z.object({
     projectId: zod_1.z.string().optional(),
     name: zod_1.z.string().trim().min(0).max(120).default(''),
@@ -79,7 +81,28 @@ const launchStartup = async (startupId, userId, payload) => {
     }
     await startup.save();
     if (payload.launchTo === 'recruiters') {
-        await user_model_1.User.findByIdAndUpdate(userId, { discoverableToRecruiters: true });
+        const founder = await user_model_1.User.findByIdAndUpdate(userId, { discoverableToRecruiters: true }, { new: true })
+            .select('innovationScore institutionId')
+            .lean();
+        if (founder?.institutionId) {
+            const institution = await user_model_1.User.findById(founder.institutionId).select('role').lean();
+            if (institution?.role === roles_types_1.UserRole.COLLEGE) {
+                await placementRecord_model_1.PlacementRecord.findOneAndUpdate({
+                    studentId: userId,
+                    collegeId: founder.institutionId,
+                    status: 'Discovered',
+                }, {
+                    studentId: userId,
+                    collegeId: founder.institutionId,
+                    status: 'Discovered',
+                    innovationScoreAtTime: founder.innovationScore ?? 0,
+                }, {
+                    upsert: true,
+                    new: true,
+                    setDefaultsOnInsert: true,
+                });
+            }
+        }
     }
     else {
         await (0, scoreEngine_1.applyScoreAsync)({
@@ -89,19 +112,42 @@ const launchStartup = async (startupId, userId, payload) => {
         });
     }
     const targetRoles = payload.launchTo === 'both'
-        ? ['investor', 'mentor']
+        ? [roles_types_1.UserRole.INVESTOR, roles_types_1.UserRole.MENTOR]
         : payload.launchTo === 'investors'
-            ? ['investor']
+            ? [roles_types_1.UserRole.INVESTOR]
             : payload.launchTo === 'mentors'
-                ? ['mentor']
-                : ['recruiter'];
-    const recipients = await user_model_1.User.find({ role: { $in: targetRoles }, isActive: true }).select('_id').lean();
+                ? [roles_types_1.UserRole.MENTOR]
+                : [roles_types_1.UserRole.RECRUITER];
+    const recipients = await user_model_1.User.find({ role: { $in: targetRoles }, isActive: true })
+        .select('_id role')
+        .lean();
+    const getLaunchNotification = (recipientRole) => {
+        if (recipientRole === roles_types_1.UserRole.INVESTOR) {
+            return {
+                type: 'startup_launch',
+                title: 'New startup is seeking investors',
+                body: `${startup.name} is seeking investors on ProMove.`,
+                link: '/dashboard/investor/startups',
+            };
+        }
+        if (recipientRole === roles_types_1.UserRole.MENTOR) {
+            return {
+                type: 'startup_launch',
+                title: 'New startup in your area launched',
+                body: `${startup.name} has launched and is looking for mentorship.`,
+                link: '/dashboard/mentor/students',
+            };
+        }
+        return {
+            type: 'deal_interest',
+            title: 'New startup launch',
+            body: `${startup.name} is now live on ProMove.`,
+            link: '/dashboard/recruiter',
+        };
+    };
     await Promise.all(recipients.map((recipient) => bullmq_1.notificationQueue.add('startup-launch', {
         userId: String(recipient._id),
-        type: payload.launchTo === 'recruiters' ? 'deal_interest' : 'startup_launch',
-        title: 'New startup launch',
-        body: `${startup.name} is now live on ProMove.`,
-        link: '/startup-launch',
+        ...getLaunchNotification(recipient.role),
     })));
     return startup.toObject();
 };

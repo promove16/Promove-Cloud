@@ -1,20 +1,25 @@
 import { Server } from 'socket.io';
-import { verifySocketToken } from './auth';
+import jwt from 'jsonwebtoken';
+import { env } from '../config/env';
 
 export const initScoreSocket = (io: Server) => {
   const score = io.of('/score');
 
   score.use((socket, next) => {
+    const token = socket.handshake.auth.token;
+    if (!token) return next(new Error('Unauthorized'));
     try {
-      verifySocketToken(socket);
+      const decoded = jwt.verify(token, env.JWT_ACCESS_SECRET) as any;
+      socket.data.userId = decoded._id;
+      socket.data.role = decoded.role;
       next();
-    } catch (error) {
-      next(error as Error);
+    } catch {
+      next(new Error('Unauthorized'));
     }
   });
 
   score.on('connection', (socket) => {
-    const userId = socket.data.userId as string;
+    const userId = socket.data.userId;
     socket.join(`user:${userId}`);
 
     socket.on('disconnect', () => {

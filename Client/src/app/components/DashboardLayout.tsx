@@ -4,22 +4,118 @@ import {
   Rocket, Home, Globe, FileText, Trophy, 
   Award, TrendingUp, ShoppingCart, Building2, Settings, 
   LogOut, Menu, X, User, Bell, Calendar, Briefcase, Layers,
-  Search, Users, Target
+  Search, Users, Target, GraduationCap
 } from "lucide-react";
+import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { useState } from "react";
 import { useAuth } from "../context/AuthContext";
 import { useNotifications } from "../../hooks/useNotifications";
+import { notificationApi } from "../../api/notification.api";
+import { NotificationItem } from "../../types/notification.types";
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuLabel,
+  DropdownMenuSeparator,
+  DropdownMenuTrigger,
+} from "./ui/dropdown-menu";
 
 interface DashboardLayoutProps {
   children: ReactNode;
-  role: "student" | "school" | "mentor" | "admin" | "investor" | "recruiter";
+  role: "student" | "school" | "college" | "mentor" | "admin" | "investor" | "recruiter";
+}
+
+function NotificationBell() {
+  const navigate = useNavigate();
+  const queryClient = useQueryClient();
+  const notificationsQuery = useNotifications();
+
+  const markReadMutation = useMutation({
+    mutationFn: notificationApi.markRead,
+    onSuccess: (updated) => {
+      queryClient.setQueryData<NotificationItem[] | undefined>(["notifications"], (current) =>
+        current?.map((item) => (item._id === updated._id ? updated : item)),
+      );
+    },
+  });
+
+  const markAllReadMutation = useMutation({
+    mutationFn: notificationApi.markAllRead,
+    onSuccess: () => {
+      queryClient.setQueryData<NotificationItem[] | undefined>(["notifications"], (current) =>
+        current?.map((item) => ({ ...item, isRead: true })),
+      );
+    },
+  });
+
+  const notifications = notificationsQuery.data ?? [];
+  const unreadCount = notificationsQuery.unreadCount;
+
+  return (
+    <DropdownMenu>
+      <DropdownMenuTrigger asChild>
+        <button type="button" className="relative rounded-lg p-2 transition-colors hover:bg-slate-800" aria-label="Notifications">
+          <Bell className="h-5 w-5 text-slate-400" />
+          {unreadCount > 0 ? (
+            <div className="absolute -right-1 -top-1 flex h-5 min-w-5 items-center justify-center rounded-full bg-blue-500 px-1 text-[10px] font-bold text-white">
+              {Math.min(unreadCount, 99)}
+            </div>
+          ) : null}
+        </button>
+      </DropdownMenuTrigger>
+      <DropdownMenuContent align="end" className="w-[22rem] border-slate-800 bg-slate-950 text-white">
+        <div className="flex items-center justify-between px-2 py-1">
+          <DropdownMenuLabel className="px-0 text-sm font-semibold text-white">Notifications</DropdownMenuLabel>
+          <button
+            type="button"
+            onClick={() => markAllReadMutation.mutate()}
+            className="text-xs font-semibold text-cyan-300 hover:text-cyan-200"
+          >
+            Mark all read
+          </button>
+        </div>
+        <DropdownMenuSeparator className="bg-slate-800" />
+        {notifications.length === 0 ? (
+          <div className="px-3 py-4 text-sm text-slate-400">You're all caught up.</div>
+        ) : (
+          notifications.slice(0, 6).map((notification) => (
+            <DropdownMenuItem
+              key={notification._id}
+              className={`cursor-pointer rounded-xl px-3 py-3 focus:bg-slate-900 ${
+                notification.isRead ? 'opacity-70' : ''
+              }`}
+              onSelect={() => {
+                markReadMutation.mutate(notification._id);
+                if (notification.link) {
+                  navigate(notification.link);
+                }
+              }}
+            >
+              <div className="w-full space-y-1">
+                <div className="flex items-start justify-between gap-3">
+                  <div className="text-sm font-semibold text-white">{notification.title}</div>
+                  {!notification.isRead ? (
+                    <span className="mt-1 h-2.5 w-2.5 rounded-full bg-cyan-400" />
+                  ) : null}
+                </div>
+                <div className="text-xs leading-5 text-slate-400">{notification.body}</div>
+                <div className="text-[11px] uppercase tracking-[0.25em] text-slate-500">
+                  {new Date(notification.createdAt).toLocaleString('en-IN')}
+                </div>
+              </div>
+            </DropdownMenuItem>
+          ))
+        )}
+      </DropdownMenuContent>
+    </DropdownMenu>
+  );
 }
 
 export function DashboardLayout({ children, role }: DashboardLayoutProps) {
   const navigate = useNavigate();
   const { user, logout } = useAuth();
   const [sidebarOpen, setSidebarOpen] = useState(false);
-  const { unreadCount } = useNotifications();
 
   const studentMenu = [
     { icon: Home, label: "Dashboard", path: "/student" },
@@ -32,11 +128,22 @@ export function DashboardLayout({ children, role }: DashboardLayoutProps) {
   ];
 
   const schoolMenu = [
-    { icon: Home, label: "Dashboard", path: "/school" },
-    { icon: User, label: "Student Innovators", path: "/school" },
-    { icon: Trophy, label: "Innovation Stats", path: "/school" },
-    { icon: Globe, label: "Projects", path: "/school" },
-    { icon: Award, label: "Competitions", path: "/school" },
+    { icon: Home, label: "Dashboard", path: "/dashboard/school" },
+    { icon: User, label: "Student Innovators", path: "/dashboard/school/students" },
+    { icon: TrendingUp, label: "Investors", path: "/dashboard/school/investors" },
+    { icon: Users, label: "Mentors", path: "/dashboard/school/mentors" },
+    { icon: FileText, label: "Compliance Report", path: "/dashboard/school/compliance" },
+  ];
+
+  const collegeMenu = [
+    { icon: Home, label: "Dashboard", path: "/dashboard/college" },
+    { icon: Users, label: "Student Innovators", path: "/dashboard/college/students" },
+    { icon: Briefcase, label: "Recruiters", path: "/dashboard/college/recruiters" },
+    { icon: TrendingUp, label: "Investors", path: "/dashboard/college/investors" },
+    { icon: GraduationCap, label: "Mentors", path: "/dashboard/college/mentors" },
+    { icon: Target, label: "Placement Tracker", path: "/dashboard/college/placement" },
+    { icon: Calendar, label: "Events", path: "/dashboard/college/events" },
+    { icon: FileText, label: "Compliance Report", path: "/dashboard/college/compliance" },
   ];
 
   const investorMenu = [
@@ -71,6 +178,7 @@ export function DashboardLayout({ children, role }: DashboardLayoutProps) {
 
   const menu = role === "student" ? studentMenu : 
                 role === "school" ? schoolMenu : 
+                role === "college" ? collegeMenu :
                 role === "mentor" ? mentorMenu :
                 role === "investor" ? investorMenu : 
                 role === "recruiter" ? recruiterMenu :
@@ -107,14 +215,7 @@ export function DashboardLayout({ children, role }: DashboardLayoutProps) {
             </Link>
           </div>
           <div className="flex items-center gap-3">
-            <button className="relative p-2 hover:bg-slate-800 rounded-lg transition-colors">
-              <Bell className="w-5 h-5 text-slate-400" />
-              {unreadCount > 0 ? (
-                <div className="absolute -top-1 -right-1 min-w-5 h-5 px-1 bg-blue-500 rounded-full flex items-center justify-center text-[10px] text-white font-bold">
-                  {Math.min(unreadCount, 99)}
-                </div>
-              ) : null}
-            </button>
+            <NotificationBell />
             <button className="flex items-center gap-2 px-3 py-2 hover:bg-slate-800 rounded-lg transition-colors">
               <div className="w-8 h-8 bg-gradient-to-br from-blue-500 to-purple-500 rounded-full flex items-center justify-center">
                 <span className="text-white font-semibold text-sm">

@@ -4,6 +4,7 @@ exports.getScoreHistory = exports.getMyScore = void 0;
 const redis_1 = require("../../config/redis");
 const ApiError_1 = require("../../utils/ApiError");
 const ApiResponse_1 = require("../../utils/ApiResponse");
+const redisJson_1 = require("../../utils/redisJson");
 const user_model_1 = require("../user/user.model");
 const score_model_1 = require("./score.model");
 const percentileFromRank = (rank, total) => {
@@ -20,8 +21,9 @@ const getMyScore = async (req, res) => {
     const cacheKey = `score:${req.user._id}`;
     const cached = await redis_1.redis.get(cacheKey);
     let scorePayload;
-    if (cached) {
-        scorePayload = JSON.parse(cached);
+    const cachedPayload = (0, redisJson_1.readRedisJson)(cached);
+    if (cachedPayload) {
+        scorePayload = cachedPayload;
     }
     else {
         const user = await user_model_1.User.findById(req.user._id)

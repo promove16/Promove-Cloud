@@ -1,25 +1,22 @@
 import { Queue } from 'bullmq';
 import { env } from './env';
 
-export const bullmqConnection = {
+const connection = {
   host: env.UPSTASH_REDIS_HOST,
   port: 6379,
   password: env.UPSTASH_REDIS_REST_TOKEN,
   tls: {},
 };
 
-type QueueAddOnly = Pick<Queue, 'add'>;
+export const bullmqConnection = connection;
 
-const createTestQueue = (): QueueAddOnly => ({
-  add: async () => ({ id: 'test-job' }) as Awaited<ReturnType<Queue['add']>>,
+type QueueLike = Pick<Queue, 'add'>;
+
+const createMockQueue = (): QueueLike => ({
+  add: async () => ({ id: 'mock-job' } as never),
 });
 
-export const scoreQueue: QueueAddOnly =
-  env.NODE_ENV === 'test'
-    ? createTestQueue()
-    : new Queue('score-recalc', { connection: bullmqConnection });
-
-export const notificationQueue: QueueAddOnly =
-  env.NODE_ENV === 'test'
-    ? createTestQueue()
-    : new Queue('notifications', { connection: bullmqConnection });
+export const scoreQueue: QueueLike =
+  env.NODE_ENV === 'test' ? createMockQueue() : new Queue('score-recalc', { connection });
+export const notificationQueue: QueueLike =
+  env.NODE_ENV === 'test' ? createMockQueue() : new Queue('notifications', { connection });

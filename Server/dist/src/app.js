@@ -14,14 +14,22 @@ const rateLimiter_1 = require("./middleware/rateLimiter");
 const errorHandler_1 = require("./middleware/errorHandler");
 const auth_routes_1 = __importDefault(require("./modules/auth/auth.routes"));
 const chat_routes_1 = __importDefault(require("./modules/chat/chat.routes"));
+const college_routes_1 = __importDefault(require("./modules/college/college.routes"));
+const deal_routes_1 = __importDefault(require("./modules/deal/deal.routes"));
+const event_routes_1 = __importDefault(require("./modules/event/event.routes"));
+const investor_routes_1 = __importDefault(require("./modules/investor/investor.routes"));
 const marketplace_routes_1 = __importDefault(require("./modules/marketplace/marketplace.routes"));
 const notification_routes_1 = __importDefault(require("./modules/notification/notification.routes"));
 const patent_routes_1 = __importDefault(require("./modules/patent/patent.routes"));
 const problem_routes_1 = __importDefault(require("./modules/problemBank/problem.routes"));
+const recruiter_routes_1 = __importDefault(require("./modules/recruiter/recruiter.routes"));
+const school_routes_1 = __importDefault(require("./modules/school/school.routes"));
 const score_routes_1 = __importDefault(require("./modules/innovationScore/score.routes"));
+const mentor_routes_1 = __importDefault(require("./modules/mentor/mentor.routes"));
 const startup_routes_1 = __importDefault(require("./modules/startup/startup.routes"));
 const user_routes_1 = __importDefault(require("./modules/user/user.routes"));
 const workspace_routes_1 = __importDefault(require("./modules/workspace/workspace.routes"));
+const admin_routes_1 = __importDefault(require("./modules/admin/admin.routes"));
 const ApiError_1 = require("./utils/ApiError");
 const createApp = () => {
     const app = (0, express_1.default)();
@@ -32,7 +40,7 @@ const createApp = () => {
         credentials: true,
     }));
     app.use(express_1.default.json({ limit: '10kb' }));
-    app.use(express_1.default.urlencoded({ extended: true }));
+    app.use(express_1.default.urlencoded({ extended: true, limit: '10kb' }));
     app.use((0, cookie_parser_1.default)());
     app.use((0, morgan_1.default)(env_1.env.NODE_ENV === 'production' ? 'combined' : 'dev'));
     app.use('/api', (0, rateLimiter_1.withRateLimit)(rateLimiter_1.apiLimiter));
@@ -44,8 +52,16 @@ const createApp = () => {
     app.use('/api/chat', chat_routes_1.default);
     app.use('/api/patents', patent_routes_1.default);
     app.use('/api/startup', startup_routes_1.default);
+    app.use('/api/investor', investor_routes_1.default);
     app.use('/api/marketplace', marketplace_routes_1.default);
     app.use('/api/notifications', notification_routes_1.default);
+    app.use('/api/deals', deal_routes_1.default);
+    app.use('/api/recruiter', recruiter_routes_1.default);
+    app.use('/api/mentor', mentor_routes_1.default);
+    app.use('/api/school', school_routes_1.default);
+    app.use('/api/college', college_routes_1.default);
+    app.use('/api/events', event_routes_1.default);
+    app.use('/api/admin', admin_routes_1.default);
     app.get('/api/health', (_req, res) => {
         res.status(200).json({ success: true, data: { status: 'ok' } });
     });

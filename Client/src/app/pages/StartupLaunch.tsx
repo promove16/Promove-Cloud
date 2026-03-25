@@ -2,6 +2,7 @@ import { useMemo, useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { CheckCircle, Download, Rocket, Target, TrendingUp, Upload, Users, X } from "lucide-react";
 import { DashboardLayout } from "../components/DashboardLayout";
+import { dealApi } from "../../api/deal.api";
 import { startupApi, StartupPayload } from "../../api/startup.api";
 import { workspaceApi } from "../../api/workspace.api";
 
@@ -27,9 +28,15 @@ export function StartupLaunch() {
 
   const workspaceQuery = useQuery({ queryKey: ["workspaces"], queryFn: () => workspaceApi.list() });
   const startupQuery = useQuery({ queryKey: ["startup", "mine"], queryFn: () => startupApi.mine() });
+  const dealsQuery = useQuery({
+    queryKey: ["student", "active-deals"],
+    queryFn: dealApi.getMyDeals,
+    refetchInterval: 60_000,
+  });
 
   const startup = startupQuery.data;
   const activeWorkspace = workspaceQuery.data?.[0];
+  const activeDeals = dealsQuery.data?.items ?? [];
   const teamSize = activeWorkspace?.teamMembers?.length ?? activeWorkspace?.teamMemberIds.length ?? 1;
 
   const hydratedForm = useMemo(
@@ -233,6 +240,50 @@ export function StartupLaunch() {
                 <li>Pitch deck upload is optional but recommended</li>
                 <li>Launch to recruiters is available from Leadership Profile too</li>
               </ul>
+            </div>
+
+            <div className="bg-slate-900 border border-slate-800 rounded-xl p-6">
+              <div className="flex items-center justify-between mb-4">
+                <h3 className="font-bold text-white">Active Investor Deals</h3>
+                <span className="text-sm text-slate-400">{activeDeals.length} active deals</span>
+              </div>
+              {dealsQuery.isLoading ? (
+                <div className="rounded-lg border border-dashed border-slate-700 bg-slate-950 p-6 text-center text-slate-400">
+                  Loading deal flow...
+                </div>
+              ) : activeDeals.length === 0 ? (
+                <div className="rounded-lg border border-dashed border-slate-700 bg-slate-950 p-6 text-center text-slate-400">
+                  No investor deals yet. Launch your startup to investors from this page to begin deal flow.
+                </div>
+              ) : (
+                <div className="grid gap-3 md:grid-cols-2">
+                  {activeDeals.map((deal, index) => (
+                    <div key={deal._id} className="rounded-lg border border-slate-800 bg-slate-950 p-4">
+                      <div className="flex items-start justify-between gap-3">
+                        <div>
+                          <div className="font-semibold text-white">
+                            {deal.currentStage < 2 ? `Investor #${index + 1}` : deal.investorDisplayName}
+                          </div>
+                          <div className="text-sm text-slate-400">{deal.startupName}</div>
+                        </div>
+                        <span className="rounded bg-blue-500/10 px-2 py-1 text-xs font-semibold text-blue-400">
+                          Stage {deal.currentStage}
+                        </span>
+                      </div>
+                      <div className="mt-3 text-sm text-slate-300">{deal.nextActionLabel}</div>
+                      <div className="mt-2 text-xs text-slate-500">
+                        {deal.currentStage === 1
+                          ? "Due diligence in progress"
+                          : deal.currentStage === 2
+                            ? "Fund transfer in progress"
+                            : deal.currentStage === 3
+                              ? "Awaiting equity verification by admin"
+                              : "Deal closed - check your portfolio!"}
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              )}
             </div>
           </div>
         </div>

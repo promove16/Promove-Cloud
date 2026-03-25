@@ -10,9 +10,10 @@ import { AdminDashboard } from "./dashboards/AdminDashboard";
 export function Dashboard() {
   const { user } = useAuth();
 
-  const getRoleForLayout = (): "student" | "school" | "mentor" | "admin" | "investor" | "recruiter" => {
+  const getRoleForLayout = (): "student" | "school" | "college" | "mentor" | "admin" | "investor" | "recruiter" => {
     if (!user?.role) return "student";
-    if (user.role === "school" || user.role === "college") return "school";
+    if (user.role === "school") return "school";
+    if (user.role === "college") return "college";
     if (user.role === "mentor") return "mentor";
     if (user.role === "investor") return "investor";
     if (user.role === "company" || user.role === "recruiter") return "recruiter";

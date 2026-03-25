@@ -51,7 +51,7 @@ export const listProblems = async (query: Record<string, unknown>) => {
   const cached = await redis.get<string>(cacheKey);
 
   if (cached) {
-    return JSON.parse(cached);
+    return typeof cached === 'string' ? JSON.parse(cached) : cached;
   }
 
   const filter: Record<string, unknown> = {};
@@ -97,12 +97,8 @@ export const claimProblem = async (problemId: string, userId: string) => {
   if (!problem) {
     throw new ApiError(404, 'PROBLEM_NOT_FOUND', 'Problem not found');
   }
-  if (problem.claimedBy && String(problem.claimedBy) !== userId) {
+  if (problem.claimedBy) {
     throw new ApiError(400, 'PROBLEM_ALREADY_CLAIMED', 'Problem already claimed');
-  }
-  if (problem.claimedBy && String(problem.claimedBy) === userId) {
-    const existingWorkspace = await Workspace.findOne({ claimedProblemId: problem._id }).lean();
-    return existingWorkspace;
   }
 
   problem.claimedBy = new Types.ObjectId(userId);

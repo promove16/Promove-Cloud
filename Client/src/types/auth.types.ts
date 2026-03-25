@@ -8,10 +8,24 @@ export interface AuthUser {
   avatar?: string;
   profileComplete: boolean;
   innovationScore: number;
+  accessGrantedBy?: 'self_registered' | 'institution_token';
+  isActive?: boolean;
+  verificationStatus?: 'not_required' | 'pending' | 'verified' | 'rejected';
+  verificationRequestedAt?: string;
+  verifiedAt?: string;
+  verificationRejectedAt?: string;
+  verificationRejectedReason?: string;
+  institutionId?: string;
 }
 
 export interface AuthPayload {
   accessToken: string;
+  user: AuthUser;
+}
+
+export interface PendingSignupPayload {
+  requiresVerification: true;
+  message: string;
   user: AuthUser;
 }
 
@@ -26,8 +40,20 @@ export interface SignupInput {
   email: string;
   password: string;
   role: UserRole;
-  accessCode: string;
+  institutionToken?: string;
+  accessCode?: string;
+  domain?: string;
+  bio?: string;
+  institutionProfile?: {
+    institutionName: string;
+    location: string;
+    totalStudentsEnrolled: number;
+    academicYear: string;
+    iicStarRating?: number;
+  };
 }
+
+export type SignupResponse = AuthPayload | PendingSignupPayload;
 
 export interface ApiErrorResponse {
   success: false;

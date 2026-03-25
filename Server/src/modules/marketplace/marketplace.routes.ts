@@ -7,7 +7,17 @@ import { getMarketplace, getMarketplaceProfile } from './marketplace.controller'
 
 const router = Router();
 
-router.get('/', authenticate, authorize(UserRole.STUDENT), asyncHandler(getMarketplace));
-router.get('/:userId', authenticate, asyncHandler(getMarketplaceProfile));
+router.get(
+  '/',
+  authenticate,
+  authorize(UserRole.STUDENT, UserRole.SCHOOL, UserRole.COLLEGE),
+  asyncHandler(getMarketplace),
+);
+router.get(
+  '/:userId',
+  authenticate,
+  authorize(UserRole.STUDENT, UserRole.SCHOOL, UserRole.COLLEGE),
+  asyncHandler(getMarketplaceProfile),
+);
 
 export default router;

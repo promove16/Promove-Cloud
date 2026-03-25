@@ -19,6 +19,17 @@ export const register = async (req: Request, res: Response) => {
   const payload = registerSchema.parse(req.body);
   const result = await registerUser(payload);
 
+  if ('requiresVerification' in result) {
+    res.status(202).json(
+      new ApiResponse({
+        requiresVerification: true,
+        message: result.message,
+        user: result.user,
+      }),
+    );
+    return;
+  }
+
   res.cookie(COOKIE_NAME, result.refreshToken, cookieOptions);
   res.status(201).json(
     new ApiResponse({

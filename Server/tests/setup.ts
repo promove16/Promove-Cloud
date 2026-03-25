@@ -22,12 +22,12 @@ process.env.JWT_REFRESH_SECRET = refreshPrivateKey
 process.env.JWT_ACCESS_EXPIRES = '15m';
 process.env.JWT_REFRESH_EXPIRES = '30d';
 process.env.MAX_USERS_YEAR_ONE = '2000';
-process.env.CLOUDINARY_CLOUD_NAME = '';
-process.env.CLOUDINARY_API_KEY = '';
-process.env.CLOUDINARY_API_SECRET = '';
+process.env.CLOUDINARY_CLOUD_NAME = 'test-cloud';
+process.env.CLOUDINARY_API_KEY = 'test-key';
+process.env.CLOUDINARY_API_SECRET = 'test-secret';
 process.env.AWS_REGION = 'ap-south-1';
-process.env.AWS_ACCESS_KEY_ID = '';
-process.env.AWS_SECRET_ACCESS_KEY = '';
+process.env.AWS_ACCESS_KEY_ID = 'test-access-key';
+process.env.AWS_SECRET_ACCESS_KEY = 'test-secret-key';
 process.env.FROM_EMAIL = 'noreply@promovecyc.com';
 
 type SetOptions = { ex?: number };

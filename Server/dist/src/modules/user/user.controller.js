@@ -1,6 +1,6 @@
 "use strict";
 Object.defineProperty(exports, "__esModule", { value: true });
-exports.patchMe = exports.getMe = void 0;
+exports.launchToRecruiters = exports.getMySessions = exports.patchMe = exports.getMe = void 0;
 const ApiResponse_1 = require("../../utils/ApiResponse");
 const ApiError_1 = require("../../utils/ApiError");
 const user_service_1 = require("./user.service");
@@ -21,3 +21,19 @@ const patchMe = async (req, res) => {
     res.status(200).json(new ApiResponse_1.ApiResponse(user));
 };
 exports.patchMe = patchMe;
+const getMySessions = async (req, res) => {
+    if (!req.user) {
+        throw new ApiError_1.ApiError(401, 'UNAUTHORIZED', 'Invalid or expired token');
+    }
+    const sessions = await (0, user_service_1.getCurrentUserMentorSessions)(req.user._id);
+    res.status(200).json(new ApiResponse_1.ApiResponse(sessions));
+};
+exports.getMySessions = getMySessions;
+const launchToRecruiters = async (req, res) => {
+    if (!req.user) {
+        throw new ApiError_1.ApiError(401, 'UNAUTHORIZED', 'Invalid or expired token');
+    }
+    const result = await (0, user_service_1.launchCurrentUserToRecruiters)(req.user._id);
+    res.status(200).json(new ApiResponse_1.ApiResponse(result));
+};
+exports.launchToRecruiters = launchToRecruiters;

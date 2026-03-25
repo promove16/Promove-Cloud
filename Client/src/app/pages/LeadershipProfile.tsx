@@ -3,6 +3,7 @@ import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { Award, Calendar, Download, Rocket, Share2, Star, Target, TrendingUp } from "lucide-react";
 import { jsPDF } from "jspdf";
 import { DashboardLayout } from "../components/DashboardLayout";
+import { studentApi } from "../../api/student.api";
 import { scoreApi } from "../../api/score.api";
 import { startupApi } from "../../api/startup.api";
 import { workspaceApi } from "../../api/workspace.api";
@@ -42,17 +43,19 @@ export function LeadershipProfile() {
 
   const launchToRecruiters = async () => {
     try {
-      const profile = startup.data ?? (await startupApi.create({
-        projectId: workspaces.data?.[0]?._id,
-        name: workspaces.data?.[0]?.title ?? "Student Innovation Profile",
-        tagline: "Leadership profile launch",
-        category: workspaces.data?.[0]?.category ?? "Innovation",
-        stage: "Pre-Launch",
-        activeProducts: 1,
-        teamSize: workspaces.data?.[0]?.teamMembers?.length ?? 1,
-        traction: { patentFiled: false, mvpBuilt: false, revenueGenerating: false },
-      }));
-      await startupApi.launch(profile._id, "recruiters");
+      if (!startup.data) {
+        await startupApi.create({
+          projectId: workspaces.data?.[0]?._id,
+          name: workspaces.data?.[0]?.title ?? "Student Innovation Profile",
+          tagline: "Leadership profile launch",
+          category: workspaces.data?.[0]?.category ?? "Innovation",
+          stage: "Pre-Launch",
+          activeProducts: 1,
+          teamSize: workspaces.data?.[0]?.teamMembers?.length ?? 1,
+          traction: { patentFiled: false, mvpBuilt: false, revenueGenerating: false },
+        });
+      }
+      await studentApi.launchToRecruiters();
       setToast("Your profile is now visible to recruiters matching your skill set.");
       await queryClient.invalidateQueries({ queryKey: ["startup", "mine"] });
     } catch (error) {

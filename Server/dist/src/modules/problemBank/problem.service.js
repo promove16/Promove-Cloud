@@ -51,7 +51,7 @@ const listProblems = async (query) => {
     const cacheKey = `problems:${crypto_1.default.createHash('sha1').update(JSON.stringify(query)).digest('hex')}`;
     const cached = await redis_1.redis.get(cacheKey);
     if (cached) {
-        return JSON.parse(cached);
+        return typeof cached === 'string' ? JSON.parse(cached) : cached;
     }
     const filter = {};
     if (typeof query.category === 'string' && query.category && query.category !== 'All Problems') {
@@ -94,12 +94,8 @@ const claimProblem = async (problemId, userId) => {
     if (!problem) {
         throw new ApiError_1.ApiError(404, 'PROBLEM_NOT_FOUND', 'Problem not found');
     }
-    if (problem.claimedBy && String(problem.claimedBy) !== userId) {
+    if (problem.claimedBy) {
         throw new ApiError_1.ApiError(400, 'PROBLEM_ALREADY_CLAIMED', 'Problem already claimed');
-    }
-    if (problem.claimedBy && String(problem.claimedBy) === userId) {
-        const existingWorkspace = await workspace_model_1.Workspace.findOne({ claimedProblemId: problem._id }).lean();
-        return existingWorkspace;
     }
     problem.claimedBy = new mongoose_1.Types.ObjectId(userId);
     problem.claimedAt = new Date();

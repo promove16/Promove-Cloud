@@ -1,36 +1,35 @@
+import { User } from '../modules/user/user.model';
+import { IUser } from '../modules/user/user.types';
 import { redis } from '../config/redis';
 import { scoreQueue } from '../config/bullmq';
 import { io } from '../config/socket';
-import { User } from '../modules/user/user.model';
-import { ScoreEvent } from '../modules/innovationScore/score.model';
-import { IScoreBreakdown } from '../modules/innovationScore/score.types';
 
 export const SCORE_DELTAS = {
-  PROBLEM_CLAIMED: 5,
-  SKILL_COMPLETED: 8,
-  PROGRESS_UPLOADED: 3,
-  PATENT_SUBMITTED: 15,
-  PATENT_APPROVED: 25,
-  MVP_VERIFIED: 20,
-  MARKET_READY_VERIFIED: 30,
-  STARTUP_LAUNCHED: 10,
-  AWARD_SUBMITTED: 0,
-  AWARD_APPROVED: 15,
+  PROBLEM_CLAIMED:         5,
+  SKILL_COMPLETED:         8,
+  PROGRESS_UPLOADED:       3,
+  PATENT_SUBMITTED:        15,
+  PATENT_APPROVED:         25,
+  MVP_VERIFIED:            20,
+  MARKET_READY_VERIFIED:   30,
+  STARTUP_LAUNCHED:        10,
+  AWARD_SUBMITTED:         0,
+  AWARD_APPROVED:          15,
 } as const;
 
 export type ScoreTrigger = keyof typeof SCORE_DELTAS;
 
-const BREAKDOWN_FIELD_MAP: Record<ScoreTrigger, keyof IScoreBreakdown | null> = {
-  PROBLEM_CLAIMED: 'problemsClaimed',
-  SKILL_COMPLETED: 'skillsCompleted',
-  PROGRESS_UPLOADED: 'progressUploads',
-  PATENT_SUBMITTED: 'patentsSubmitted',
-  PATENT_APPROVED: 'patentsApproved',
-  MVP_VERIFIED: 'mvpsVerified',
-  MARKET_READY_VERIFIED: 'marketReadyVerified',
-  STARTUP_LAUNCHED: 'startupsLaunched',
-  AWARD_SUBMITTED: null,
-  AWARD_APPROVED: 'awardsApproved',
+const BREAKDOWN_FIELD_MAP: Record<ScoreTrigger, keyof IUser['scoreBreakdown'] | null> = {
+  PROBLEM_CLAIMED:        'problemsClaimed',
+  SKILL_COMPLETED:        'skillsCompleted',
+  PROGRESS_UPLOADED:      'progressUploads',
+  PATENT_SUBMITTED:       'patentsSubmitted',
+  PATENT_APPROVED:        'patentsApproved',
+  MVP_VERIFIED:           'mvpsVerified',
+  MARKET_READY_VERIFIED:  'marketReadyVerified',
+  STARTUP_LAUNCHED:       'startupsLaunched',
+  AWARD_SUBMITTED:        null,
+  AWARD_APPROVED:         'awardsApproved',
 };
 
 export interface ApplyScoreParams {
@@ -39,48 +38,93 @@ export interface ApplyScoreParams {
   metadata?: Record<string, unknown>;
 }
 
+const MAX_TIEBREAKER_EPOCH = 9999999999999;
+
+const getInstitutionLeaderboardScore = (score: number, createdAt: Date): number => {
+  const tiebreaker = (MAX_TIEBREAKER_EPOCH - createdAt.getTime()) / 1_000_000_000_000_000;
+  return score + tiebreaker;
+};
+
 export const applyScore = async ({ userId, trigger, metadata }: ApplyScoreParams): Promise<number> => {
   const delta = SCORE_DELTAS[trigger];
-
-  if (delta === 0) {
-    const user = await User.findById(userId).select('innovationScore').lean();
-    return user?.innovationScore ?? 0;
-  }
+  if (delta === 0) return 0;
 
   const breakdownField = BREAKDOWN_FIELD_MAP[trigger];
-  const user = await User.findById(userId).select('innovationScore institutionId').lean();
 
-  if (!user) {
-    throw new Error(`User ${userId} not found`);
+  const user = await User.findById(userId).select('innovationScore institutionId createdAt').lean();
+  if (!user) throw new Error(`User ${userId} not found`);
+
+  const currentScore = user.innovationScore || 0;
+  const newScore = Math.min(200, currentScore + delta);
+  const actualDelta = newScore - currentScore;
+
+  if (actualDelta <= 0) return currentScore;
+
+  const updateOp: {
+    $inc: Record<string, number>;
+  } = {
+    $inc: { innovationScore: actualDelta },
+  };
+
+  if (breakdownField) {
+    updateOp.$inc[`scoreBreakdown.${breakdownField}`] = 1;
   }
 
-  const newScore = Math.min(200, user.innovationScore + delta);
-  const actualDelta = newScore - user.innovationScore;
-
-  if (actualDelta <= 0) {
-    return user.innovationScore;
-  }
-
-  await User.findByIdAndUpdate(userId, {
-    $inc: {
-      innovationScore: actualDelta,
-      ...(breakdownField ? { [`scoreBreakdown.${breakdownField}`]: 1 } : {}),
-    },
-  });
-
-  await ScoreEvent.create({
-    userId,
-    trigger,
-    delta: actualDelta,
-    scoreAfter: newScore,
-    metadata,
-  });
+  await User.findByIdAndUpdate(userId, updateOp);
 
   await redis.del(`score:${userId}`);
+
   await redis.zadd('lb:global', { score: newScore, member: userId });
 
   if (user.institutionId) {
-    await redis.zadd(`lb:${String(user.institutionId)}`, { score: newScore, member: userId });
+    await redis.zadd(`lb:${user.institutionId}`, {
+      score: getInstitutionLeaderboardScore(newScore, user.createdAt),
+      member: userId,
+    });
+  }
+
+  await redis.lpush(
+    `student:activity:${userId}`,
+    JSON.stringify({
+      trigger,
+      newScore,
+      delta: actualDelta,
+      timestamp: new Date().toISOString(),
+    }),
+  );
+  await redis.ltrim(`student:activity:${userId}`, 0, 49);
+  await redis.expire(`student:activity:${userId}`, 7 * 24 * 60 * 60);
+
+  const mentorIds = (await redis.smembers(`student:watchers:${userId}`)) as string[];
+  if (mentorIds.length > 0) {
+    const activityPayload = JSON.stringify({
+      studentId: userId,
+      trigger,
+      newScore,
+      delta: actualDelta,
+      timestamp: new Date().toISOString(),
+    });
+
+    await Promise.all(
+      mentorIds.map(async (mentorId) => {
+        await redis.lpush(`mentor:feed:${mentorId}`, activityPayload);
+        await redis.ltrim(`mentor:feed:${mentorId}`, 0, 49);
+        await redis.expire(`mentor:feed:${mentorId}`, 7 * 24 * 60 * 60);
+      }),
+    );
+  }
+
+  try {
+    const { ScoreEvent } = require('../modules/innovationScore/score.model');
+    await ScoreEvent.create({
+      userId,
+      trigger,
+      delta: actualDelta,
+      scoreAfter: newScore,
+      metadata
+    });
+  } catch (err) {
+    console.error('Failed to create ScoreEvent log:', err);
   }
 
   if (io) {
@@ -89,6 +133,14 @@ export const applyScore = async ({ userId, trigger, metadata }: ApplyScoreParams
       newScore,
       delta: actualDelta,
       trigger,
+    });
+
+    io.of('/mentor').to(`student-feed:${userId}`).emit('student:activity', {
+      studentId: userId,
+      trigger,
+      newScore,
+      delta: actualDelta,
+      timestamp: new Date(),
     });
   }
 

@@ -1,0 +1,137 @@
+import { Request, Response } from 'express';
+import { ApiError } from '../../utils/ApiError';
+import { ApiResponse } from '../../utils/ApiResponse';
+import { UserRole } from '../../types/roles.types';
+import { listUsersQuerySchema, milestoneVerifySchema, patentRejectSchema, awardRejectSchema } from './admin.validation';
+import {
+  approveAward,
+  getDealAwaitingApproval,
+  approveDealStage,
+  approvePatent,
+  getAnalytics,
+  getCapacity,
+  listAwards,
+  listDealsAwaitingApproval,
+  listPatents,
+  listUsers,
+  rejectAward,
+  rejectPatent,
+  updateUserAccess,
+  updateUserRole,
+  verifyMilestone,
+} from './admin.service';
+
+const getParam = (value: string | string[] | undefined) =>
+  Array.isArray(value) ? value[0] : value;
+
+const isObjectId = (value: string) => /^[0-9a-fA-F]{24}$/.test(value);
+
+export const getUsersController = async (req: Request, res: Response) => {
+  const query = listUsersQuerySchema.parse(req.query);
+  const data = await listUsers({
+    page: query.page,
+    limit: query.limit,
+    role: query.role,
+    isActive: query.isActive,
+  });
+  res.status(200).json(new ApiResponse(data));
+};
+
+export const updateUserRoleController = async (req: Request, res: Response) => {
+  if (!req.user) throw new ApiError(401, 'UNAUTHORIZED', 'Invalid or expired token');
+  const userId = getParam(req.params.id);
+  if (!userId || !isObjectId(userId)) throw new ApiError(400, 'INVALID_ID', 'Invalid ID format');
+  const role = req.body.role as UserRole;
+  if (!Object.values(UserRole).includes(role)) {
+    throw new ApiError(400, 'INVALID_ROLE', 'Invalid role');
+  }
+  res.status(200).json(new ApiResponse(await updateUserRole(req.user._id, userId, role)));
+};
+
+export const updateUserAccessController = async (req: Request, res: Response) => {
+  if (!req.user) throw new ApiError(401, 'UNAUTHORIZED', 'Invalid or expired token');
+  const userId = getParam(req.params.id);
+  if (!userId || !isObjectId(userId)) throw new ApiError(400, 'INVALID_ID', 'Invalid ID format');
+  if (typeof req.body?.isActive !== 'boolean') {
+    throw new ApiError(400, 'INVALID_BODY', 'isActive must be a boolean');
+  }
+  res.status(200).json(new ApiResponse(await updateUserAccess(req.user._id, userId, req.body.isActive)));
+};
+
+export const getPatentsController = async (req: Request, res: Response) => {
+  const status = typeof req.query.status === 'string' ? req.query.status : undefined;
+  res.status(200).json(new ApiResponse(await listPatents(status)));
+};
+
+export const approvePatentController = async (req: Request, res: Response) => {
+  if (!req.user) throw new ApiError(401, 'UNAUTHORIZED', 'Invalid or expired token');
+  const patentId = getParam(req.params.id);
+  if (!patentId || !isObjectId(patentId)) throw new ApiError(400, 'INVALID_ID', 'Invalid ID format');
+  const newScore = await approvePatent(req.user._id, patentId, 'PATENT_APPROVED');
+  res.status(200).json(new ApiResponse({ approved: true, newScore }));
+};
+
+export const rejectPatentController = async (req: Request, res: Response) => {
+  if (!req.user) throw new ApiError(401, 'UNAUTHORIZED', 'Invalid or expired token');
+  const patentId = getParam(req.params.id);
+  if (!patentId || !isObjectId(patentId)) throw new ApiError(400, 'INVALID_ID', 'Invalid ID format');
+  const { adminNotes } = patentRejectSchema.parse(req.body);
+  await rejectPatent(req.user._id, patentId, adminNotes);
+  res.status(200).json(new ApiResponse({ rejected: true }));
+};
+
+export const getAwardsController = async (_req: Request, res: Response) => {
+  res.status(200).json(new ApiResponse(await listAwards()));
+};
+
+export const approveAwardController = async (req: Request, res: Response) => {
+  if (!req.user) throw new ApiError(401, 'UNAUTHORIZED', 'Invalid or expired token');
+  const awardId = getParam(req.params.id);
+  if (!awardId || !isObjectId(awardId)) throw new ApiError(400, 'INVALID_ID', 'Invalid ID format');
+  const newScore = await approveAward(req.user._id, awardId);
+  res.status(200).json(new ApiResponse({ approved: true, newScore }));
+};
+
+export const rejectAwardController = async (req: Request, res: Response) => {
+  if (!req.user) throw new ApiError(401, 'UNAUTHORIZED', 'Invalid or expired token');
+  const awardId = getParam(req.params.id);
+  if (!awardId || !isObjectId(awardId)) throw new ApiError(400, 'INVALID_ID', 'Invalid ID format');
+  const { adminNotes } = awardRejectSchema.parse(req.body);
+  await rejectAward(req.user._id, awardId, adminNotes);
+  res.status(200).json(new ApiResponse({ rejected: true }));
+};
+
+export const getDealsController = async (_req: Request, res: Response) => {
+  res.status(200).json(new ApiResponse(await listDealsAwaitingApproval()));
+};
+
+export const getDealController = async (req: Request, res: Response) => {
+  const dealId = getParam(req.params.id);
+  if (!dealId || !isObjectId(dealId)) throw new ApiError(400, 'INVALID_ID', 'Invalid ID format');
+  res.status(200).json(new ApiResponse(await getDealAwaitingApproval(dealId)));
+};
+
+export const approveDealStageController = async (req: Request, res: Response) => {
+  if (!req.user) throw new ApiError(401, 'UNAUTHORIZED', 'Invalid or expired token');
+  const dealId = getParam(req.params.id);
+  if (!dealId || !isObjectId(dealId)) throw new ApiError(400, 'INVALID_ID', 'Invalid ID format');
+  await approveDealStage(req.user._id, dealId);
+  res.status(200).json(new ApiResponse({ approved: true }));
+};
+
+export const getAnalyticsController = async (_req: Request, res: Response) => {
+  res.status(200).json(new ApiResponse(await getAnalytics()));
+};
+
+export const getCapacityController = async (_req: Request, res: Response) => {
+  res.status(200).json(new ApiResponse(await getCapacity()));
+};
+
+export const verifyMilestoneController = async (req: Request, res: Response) => {
+  if (!req.user) throw new ApiError(401, 'UNAUTHORIZED', 'Invalid or expired token');
+  const milestoneId = getParam(req.params.id);
+  if (!milestoneId || !isObjectId(milestoneId)) throw new ApiError(400, 'INVALID_ID', 'Invalid ID format');
+  const { milestoneType } = milestoneVerifySchema.parse(req.body);
+  const newScore = await verifyMilestone(req.user._id, milestoneId, milestoneType);
+  res.status(200).json(new ApiResponse({ verified: true, newScore }));
+};
