@@ -1,0 +1,16 @@
+.git
+.github
+Client
+docs
+temp
+node_modules
+README.md
+test_*.js
+*.log
+.env
+.env.*
+!.env.example
+Server/node_modules
+Server/dist
+Server/.env
+Server/*.log

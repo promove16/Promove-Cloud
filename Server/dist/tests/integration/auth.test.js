@@ -109,6 +109,24 @@ describe('auth integration', () => {
             expect(response.body.data.user.institutionProfile.institutionName).toBe('Future Ready School');
             expect(response.body.data.user.profileComplete).toBe(true);
         });
+        it('stores institution details for college registrations', async () => {
+            const response = await (0, supertest_1.default)(app_1.default).post('/api/auth/register').send({
+                email: 'college@example.com',
+                password: 'Password123!',
+                displayName: 'Incubation Program Lead',
+                role: 'college',
+                institutionProfile: {
+                    institutionName: 'Future Ready College',
+                    location: 'Bengaluru',
+                    totalStudentsEnrolled: 1200,
+                    academicYear: '2025-26',
+                },
+            });
+            expect(response.status).toBe(201);
+            expect(response.body.data.user.role).toBe('college');
+            expect(response.body.data.user.institutionProfile.institutionName).toBe('Future Ready College');
+            expect(response.body.data.user.profileComplete).toBe(true);
+        });
         it('rejects student registrations without an institution token', async () => {
             const response = await (0, supertest_1.default)(app_1.default).post('/api/auth/register').send({
                 email: 'student-without-token@example.com',
