@@ -37,6 +37,11 @@ export const refreshClient = axios.create({
   withCredentials: true,
 });
 
+refreshClient.interceptors.request.use((config) => {
+  config.url = normalizeApiUrl(config.baseURL, config.url);
+  return config;
+});
+
 const axiosInstance = axios.create({
   baseURL,
   withCredentials: true,
@@ -86,7 +91,7 @@ axiosInstance.interceptors.response.use(
 
     if (!refreshPromise) {
       refreshPromise = refreshClient
-        .post<ApiSuccessResponse<AuthPayload>>("/auth/refresh")
+        .post<ApiSuccessResponse<AuthPayload>>("/api/auth/refresh")
         .then((response) => {
           const payload = response.data.data;
           useAuthStore.getState().setAuth(payload.user, payload.accessToken);

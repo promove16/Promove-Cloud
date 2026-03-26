@@ -117,7 +117,7 @@ export const useBootstrapAuth = () => {
       try {
         if (!bootstrapPromise) {
           bootstrapPromise = refreshClient
-            .post<ApiSuccessResponse<AuthPayload>>("/auth/refresh")
+            .post<ApiSuccessResponse<AuthPayload>>("/api/auth/refresh")
             .then((response) => response.data.data)
             .catch((error) => {
               if (axios.isAxiosError(error) && error.response?.status === 401) {
