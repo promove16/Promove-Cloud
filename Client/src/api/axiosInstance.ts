@@ -2,19 +2,33 @@ import axios, {
   AxiosError,
   InternalAxiosRequestConfig,
   isAxiosError,
-} from 'axios';
-import { useAuthStore } from '../store/authStore';
-import { ApiSuccessResponse, AuthPayload } from '../types/auth.types';
+} from "axios";
+import { useAuthStore } from "../store/authStore";
+import { ApiSuccessResponse, AuthPayload } from "../types/auth.types";
 
 interface RetriableRequestConfig extends InternalAxiosRequestConfig {
   _retry?: boolean;
 }
 
-const baseURL = import.meta.env.VITE_API_BASE_URL ?? '/api';
+const baseURL = import.meta.env.VITE_API_BASE_URL ?? "/api";
+
+const normalizeApiUrl = (base: string | undefined, url: string | undefined) => {
+  if (!base || !url) {
+    return url;
+  }
+
+  const baseEndsWithApi = /\/api\/?$/.test(base);
+  if (!baseEndsWithApi) {
+    return url;
+  }
+
+  // Avoid /api/api/... when endpoint constants already include /api.
+  return url.replace(/^\/api(?=\/|$)/, "");
+};
 
 const redirectToLogin = () => {
-  if (window.location.pathname !== '/login') {
-    window.location.assign('/login');
+  if (window.location.pathname !== "/login") {
+    window.location.assign("/login");
   }
 };
 
@@ -33,16 +47,17 @@ let refreshPromise: Promise<string | null> | null = null;
 const isAuthRequest = (url?: string) =>
   Boolean(
     url &&
-      (url.includes('/api/auth/login') ||
-        url.includes('/api/auth/register') ||
-        url.includes('/api/auth/refresh')),
+    (/\/(?:api\/)?auth\/login(?:\?|$)/.test(url) ||
+      /\/(?:api\/)?auth\/register(?:\?|$)/.test(url) ||
+      /\/(?:api\/)?auth\/refresh(?:\?|$)/.test(url)),
   );
 
 axiosInstance.interceptors.request.use((config) => {
+  config.url = normalizeApiUrl(config.baseURL, config.url);
   const token = useAuthStore.getState().accessToken;
 
   if (token) {
-    config.headers.set('Authorization', `Bearer ${token}`);
+    config.headers.set("Authorization", `Bearer ${token}`);
   }
 
   return config;
@@ -71,7 +86,7 @@ axiosInstance.interceptors.response.use(
 
     if (!refreshPromise) {
       refreshPromise = refreshClient
-        .post<ApiSuccessResponse<AuthPayload>>('/auth/refresh')
+        .post<ApiSuccessResponse<AuthPayload>>("/auth/refresh")
         .then((response) => {
           const payload = response.data.data;
           useAuthStore.getState().setAuth(payload.user, payload.accessToken);
@@ -98,7 +113,7 @@ axiosInstance.interceptors.response.use(
       return Promise.reject(error);
     }
 
-    originalRequest.headers.set('Authorization', `Bearer ${refreshedToken}`);
+    originalRequest.headers.set("Authorization", `Bearer ${refreshedToken}`);
     return axiosInstance(originalRequest);
   },
 );

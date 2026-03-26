@@ -1,8 +1,8 @@
-import { PropsWithChildren, ReactElement, useEffect } from 'react';
-import { useMutation } from '@tanstack/react-query';
-import axios, { isAxiosError } from 'axios';
-import api, { refreshClient } from '../../api/axiosInstance';
-import { useAuthStore } from '../../store/authStore';
+import { PropsWithChildren, ReactElement, useEffect } from "react";
+import { useMutation } from "@tanstack/react-query";
+import axios, { isAxiosError } from "axios";
+import api, { refreshClient } from "../../api/axiosInstance";
+import { useAuthStore } from "../../store/authStore";
 import {
   ApiErrorResponse,
   ApiSuccessResponse,
@@ -10,7 +10,7 @@ import {
   LoginInput,
   SignupResponse,
   SignupInput,
-} from '../../types/auth.types';
+} from "../../types/auth.types";
 
 const parseError = (error: unknown) => {
   if (isAxiosError<ApiErrorResponse>(error)) {
@@ -27,7 +27,10 @@ export const useLoginMutation = () => {
 
   return useMutation({
     mutationFn: async (payload: LoginInput) => {
-      const response = await api.post<ApiSuccessResponse<AuthPayload>>('/api/auth/login', payload);
+      const response = await api.post<ApiSuccessResponse<AuthPayload>>(
+        "/api/auth/login",
+        payload,
+      );
       return response.data.data;
     },
     onSuccess: (payload) => {
@@ -44,11 +47,14 @@ export const useSignupMutation = () => {
 
   return useMutation({
     mutationFn: async (payload: SignupInput) => {
-      const response = await api.post<ApiSuccessResponse<SignupResponse>>('/api/auth/register', payload);
+      const response = await api.post<ApiSuccessResponse<SignupResponse>>(
+        "/api/auth/register",
+        payload,
+      );
       return response.data.data;
     },
     onSuccess: (payload) => {
-      if ('accessToken' in payload) {
+      if ("accessToken" in payload) {
         setAuth(payload.user, payload.accessToken);
       }
     },
@@ -70,7 +76,7 @@ export const useLogoutMutation = () => {
 
       try {
         await api.post(
-          '/api/auth/logout',
+          "/api/auth/logout",
           {},
           {
             headers: { Authorization: `Bearer ${accessToken}` },
@@ -111,7 +117,7 @@ export const useBootstrapAuth = () => {
       try {
         if (!bootstrapPromise) {
           bootstrapPromise = refreshClient
-            .post<ApiSuccessResponse<AuthPayload>>('/api/auth/refresh')
+            .post<ApiSuccessResponse<AuthPayload>>("/auth/refresh")
             .then((response) => response.data.data)
             .catch((error) => {
               if (axios.isAxiosError(error) && error.response?.status === 401) {
