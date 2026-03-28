@@ -1,34 +1,43 @@
 import jwt from 'jsonwebtoken';
+import { randomUUID } from 'crypto';
 import request from 'supertest';
 import app from '../../src/app';
 import { env } from '../../src/config/env';
 import { institutionVerifyQueue } from '../../src/config/bullmq';
 import { User } from '../../src/modules/user/user.model';
 
-const validRegisterPayload = {
-  email: 'mentor@example.com',
+const buildValidRegisterPayload = (overrides?: Partial<{
+  email: string;
+  password: string;
+  displayName: string;
+  role: 'mentor';
+  domain: string;
+}>) => ({
+  email: `mentor-${randomUUID()}@example.com`,
   password: 'Password123!',
   displayName: 'Mentor User',
   role: 'mentor',
   domain: 'Product Strategy',
-} as const;
+  ...overrides,
+} as const);
 
-const registerAndExtract = async () => {
-  const response = await request(app).post('/api/auth/register').send(validRegisterPayload);
+const registerAndExtract = async (payload = buildValidRegisterPayload()) => {
+  const response = await request(app).post('/api/auth/register').send(payload);
   const cookie = response.headers['set-cookie']?.[0];
   const accessToken = response.body.data.accessToken as string;
-  return { response, cookie, accessToken };
+  return { response, cookie, accessToken, payload };
 };
 
 describe('auth integration', () => {
   describe('POST /api/auth/register', () => {
     it('creates non-student accounts without an access code', async () => {
-      const response = await request(app).post('/api/auth/register').send(validRegisterPayload);
+      const payload = buildValidRegisterPayload();
+      const response = await request(app).post('/api/auth/register').send(payload);
 
       expect(response.status).toBe(201);
       expect(response.body.success).toBe(true);
       expect(response.body.data.accessToken).toEqual(expect.any(String));
-      expect(response.body.data.user.email).toBe(validRegisterPayload.email);
+      expect(response.body.data.user.email).toBe(payload.email);
       expect(response.body.data.user.accessGrantedBy).toBe('self_registered');
       expect(response.body.data.nextStep).toBe('profile_setup');
       expect(response.headers['set-cookie']?.[0]).toContain('refreshToken=');
@@ -50,7 +59,7 @@ describe('auth integration', () => {
       expect(response.headers['set-cookie']?.[0]).toContain('refreshToken=');
     });
 
-    it('creates a student with an institution token and queues verification without blocking sign-in', async () => {
+    it('creates a student with an institution token and returns a pending verification response', async () => {
       const queueSpy = jest.spyOn(institutionVerifyQueue, 'add');
 
       const response = await request(app).post('/api/auth/register').send({
@@ -63,12 +72,12 @@ describe('auth integration', () => {
 
       expect(response.status).toBe(201);
       expect(response.body.success).toBe(true);
-      expect(response.body.data.accessToken).toEqual(expect.any(String));
+      expect(response.body.data.requiresVerification).toBe(true);
       expect(response.body.data.user.registrationStage).toBe('institution_pending');
       expect(response.body.data.user.institutionVerificationStatus).toBe('pending');
-      expect(response.body.data.user.accessGrantedBy).toBe('admin');
+      expect(response.body.data.user.accessGrantedBy).toBe('institution_token');
       expect(response.body.data.user.passwordHash).toBeUndefined();
-      expect(response.headers['set-cookie']?.[0]).toContain('refreshToken=');
+      expect(response.headers['set-cookie']).toBeUndefined();
       expect(queueSpy).toHaveBeenCalledWith(
         'verify',
         expect.objectContaining({
@@ -79,22 +88,67 @@ describe('auth integration', () => {
       );
     });
 
+    it('creates a roster-linked student without a token and leaves the account pending approval', async () => {
+      const schoolRegister = await request(app).post('/api/auth/register').send({
+        email: 'school-roster@example.com',
+        password: 'Password123!',
+        displayName: 'Roster School',
+        role: 'school',
+        institutionProfile: {
+          institutionName: 'Roster School',
+          location: 'Hyderabad',
+          totalStudentsEnrolled: 850,
+          academicYear: '2025-26',
+        },
+      });
+
+      const schoolToken = schoolRegister.body.data.accessToken as string;
+
+      const rosterResponse = await request(app)
+        .post('/api/school/student-roster/manual')
+        .set('Authorization', `Bearer ${schoolToken}`)
+        .send({
+          displayName: 'Roster Student',
+          email: 'student.roster@school.test',
+          gradeOrProgram: 'Class 12',
+          rollNumber: 'SCH-001',
+        });
+
+      expect(rosterResponse.status).toBe(201);
+
+      const response = await request(app).post('/api/auth/register').send({
+        email: 'student.roster@school.test',
+        password: 'Password123!',
+        displayName: 'Roster Student',
+        role: 'student',
+      });
+
+      expect(response.status).toBe(201);
+      expect(response.body.data.requiresVerification).toBe(true);
+      expect(response.body.data.user.accessGrantedBy).toBe('institution_roster');
+      expect(response.body.data.user.institutionVerificationStatus).toBe('verified');
+      expect(response.body.data.user.verificationStatus).toBe('pending');
+      expect(response.headers['set-cookie']).toBeUndefined();
+    });
+
     it('rejects duplicate email registrations', async () => {
-      await request(app).post('/api/auth/register').send(validRegisterPayload);
-      const response = await request(app).post('/api/auth/register').send(validRegisterPayload);
+      const payload = buildValidRegisterPayload();
+      await request(app).post('/api/auth/register').send(payload);
+      const response = await request(app).post('/api/auth/register').send(payload);
 
       expect(response.status).toBe(409);
       expect(response.body.error.code).toBe('DUPLICATE_KEY');
     });
 
     it('rejects when capacity is reached', async () => {
+      const payload = buildValidRegisterPayload();
       const previousMax = env.MAX_USERS_YEAR_ONE;
       env.MAX_USERS_YEAR_ONE = 1;
 
-      await request(app).post('/api/auth/register').send(validRegisterPayload);
+      await request(app).post('/api/auth/register').send(payload);
 
       const response = await request(app).post('/api/auth/register').send({
-        ...validRegisterPayload,
+        ...payload,
         email: 'second@example.com',
       });
 
@@ -105,8 +159,9 @@ describe('auth integration', () => {
     });
 
     it('rejects invalid role payloads', async () => {
+      const payload = buildValidRegisterPayload();
       const response = await request(app).post('/api/auth/register').send({
-        ...validRegisterPayload,
+        ...payload,
         role: 'company',
       });
 
@@ -211,12 +266,13 @@ describe('auth integration', () => {
 
   describe('POST /api/auth/login', () => {
     it('logs in successfully', async () => {
-      await request(app).post('/api/auth/register').send(validRegisterPayload);
+      const payload = buildValidRegisterPayload();
+      await request(app).post('/api/auth/register').send(payload);
 
       const response = await request(app).post('/api/auth/login').send({
-        email: validRegisterPayload.email,
-        password: validRegisterPayload.password,
-        role: validRegisterPayload.role,
+        email: payload.email,
+        password: payload.password,
+        role: payload.role,
       });
 
       expect(response.status).toBe(200);
@@ -225,19 +281,20 @@ describe('auth integration', () => {
     });
 
     it('rejects wrong password', async () => {
-      await request(app).post('/api/auth/register').send(validRegisterPayload);
+      const payload = buildValidRegisterPayload();
+      await request(app).post('/api/auth/register').send(payload);
 
       const response = await request(app).post('/api/auth/login').send({
-        email: validRegisterPayload.email,
+        email: payload.email,
         password: 'WrongPassword123!',
-        role: validRegisterPayload.role,
+        role: payload.role,
       });
 
       expect(response.status).toBe(401);
       expect(response.body.error.code).toBe('INVALID_CREDENTIALS');
     });
 
-    it('allows student login while institution verification is pending', async () => {
+    it('blocks student login while institution verification is pending', async () => {
       await request(app).post('/api/auth/register').send({
         email: 'pending-student@example.com',
         password: 'Password123!',
@@ -252,17 +309,17 @@ describe('auth integration', () => {
         role: 'student',
       });
 
-      expect(response.status).toBe(200);
-      expect(response.body.data.user.role).toBe('student');
-      expect(response.body.data.user.institutionVerificationStatus).toBe('pending');
+      expect(response.status).toBe(403);
+      expect(response.body.error.code).toBe('INSTITUTION_APPROVAL_PENDING');
     });
 
     it('rejects role mismatch', async () => {
-      await request(app).post('/api/auth/register').send(validRegisterPayload);
+      const payload = buildValidRegisterPayload();
+      await request(app).post('/api/auth/register').send(payload);
 
       const response = await request(app).post('/api/auth/login').send({
-        email: validRegisterPayload.email,
-        password: validRegisterPayload.password,
+        email: payload.email,
+        password: payload.password,
         role: 'investor',
       });
 
@@ -357,14 +414,14 @@ describe('auth integration', () => {
 
   describe('GET /api/users/me', () => {
     it('returns the authenticated user without passwordHash', async () => {
-      const { accessToken } = await registerAndExtract();
+      const { accessToken, payload } = await registerAndExtract();
 
       const response = await request(app)
         .get('/api/users/me')
         .set('Authorization', `Bearer ${accessToken}`);
 
       expect(response.status).toBe(200);
-      expect(response.body.data.email).toBe(validRegisterPayload.email);
+      expect(response.body.data.email).toBe(payload.email);
       expect(response.body.data.passwordHash).toBeUndefined();
     });
 
@@ -382,7 +439,7 @@ describe('auth integration', () => {
       const expiredAccessToken = jwt.sign(
         {
           _id: userId,
-          email: validRegisterPayload.email,
+          email: registerResponse.body.data.user.email,
           role: 'student',
           type: 'access',
         },
@@ -396,6 +453,66 @@ describe('auth integration', () => {
 
       expect(response.status).toBe(401);
       expect(response.body.error.code).toBe('UNAUTHORIZED');
+    });
+  });
+
+  describe('institution student roster', () => {
+    it('lets a school add and bulk import student roster entries', async () => {
+      const schoolRegister = await request(app).post('/api/auth/register').send({
+        email: 'school-import@example.com',
+        password: 'Password123!',
+        displayName: 'Import School',
+        role: 'school',
+        institutionProfile: {
+          institutionName: 'Import School',
+          location: 'Delhi',
+          totalStudentsEnrolled: 1100,
+          academicYear: '2025-26',
+        },
+      });
+
+      const schoolToken = schoolRegister.body.data.accessToken as string;
+
+      const manualResponse = await request(app)
+        .post('/api/school/student-roster/manual')
+        .set('Authorization', `Bearer ${schoolToken}`)
+        .send({
+          displayName: 'Manual Student',
+          email: 'manual@student.test',
+          gradeOrProgram: 'Class 11',
+          rollNumber: 'M-001',
+        });
+
+      expect(manualResponse.status).toBe(201);
+      expect(manualResponse.body.data.email).toBe('manual@student.test');
+
+      const csv = [
+        'name,email,class,roll number,notes',
+        'CSV Student,csv@student.test,Class 10,C-001,Imported via CSV',
+        'Second Student,second@student.test,Class 9,C-002,Imported via CSV',
+      ].join('\n');
+
+      const importResponse = await request(app)
+        .post('/api/school/student-roster/import')
+        .set('Authorization', `Bearer ${schoolToken}`)
+        .attach('file', Buffer.from(csv), 'students.csv');
+
+      expect(importResponse.status).toBe(200);
+      expect(importResponse.body.data.createdCount).toBe(2);
+      expect(importResponse.body.data.skippedCount).toBe(0);
+
+      const listResponse = await request(app)
+        .get('/api/school/student-roster')
+        .set('Authorization', `Bearer ${schoolToken}`);
+
+      expect(listResponse.status).toBe(200);
+      expect(listResponse.body.data).toEqual(
+        expect.arrayContaining([
+          expect.objectContaining({ email: 'manual@student.test' }),
+          expect.objectContaining({ email: 'csv@student.test' }),
+          expect.objectContaining({ email: 'second@student.test' }),
+        ]),
+      );
     });
   });
 

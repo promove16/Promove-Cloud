@@ -165,6 +165,39 @@ export interface StudentVerificationReviewResponse {
   reason?: string;
 }
 
+export interface StudentRosterEntry {
+  _id: string;
+  displayName: string;
+  email: string;
+  status: 'invited' | 'registered_pending' | 'verified' | 'rejected';
+  onboardingStatus: 'listed' | 'pending_verification' | 'verified' | 'rejected';
+  source: 'manual' | 'csv' | 'xlsx';
+  createdAt: string;
+  updatedAt: string;
+  gradeOrProgram?: string;
+  rollNumber?: string;
+  notes?: string;
+  linkedUserId?: string;
+  registeredAt?: string;
+  reviewedAt?: string;
+}
+
+export interface StudentRosterImportResult {
+  createdCount: number;
+  updatedCount: number;
+  skippedCount: number;
+  created: number;
+  updated: number;
+  skipped: number;
+  importedRows: number;
+  entries: StudentRosterEntry[];
+  errors: Array<{
+    row: number;
+    email?: string;
+    message: string;
+  }>;
+}
+
 export interface ComplianceReportRecord {
   _id: string;
   institutionId: string;

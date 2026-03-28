@@ -2,6 +2,8 @@ import { generateKeyPairSync } from 'crypto';
 import mongoose from 'mongoose';
 import { MongoMemoryServer } from 'mongodb-memory-server';
 
+jest.setTimeout(180_000);
+
 const { privateKey: accessPrivateKey } = generateKeyPairSync('rsa', {
   modulusLength: 2048,
 });
@@ -153,24 +155,41 @@ jest.mock('@upstash/ratelimit', () => {
 });
 
 let mongoServer: MongoMemoryServer;
-let connectDB: typeof import('../src/config/db').connectDB;
-let disconnectDB: typeof import('../src/config/db').disconnectDB;
+
+const wait = (ms: number) => new Promise((resolve) => setTimeout(resolve, ms));
+
+const dropDatabaseWithRetry = async (attempts = 5) => {
+  for (let attempt = 0; attempt < attempts; attempt += 1) {
+    try {
+      await mongoose.connection.db?.dropDatabase();
+      return;
+    } catch (error) {
+      const message = error instanceof Error ? error.message : '';
+
+      if (!message.includes('currently being dropped') || attempt === attempts - 1) {
+        throw error;
+      }
+
+      await wait(50 * (attempt + 1));
+    }
+  }
+};
 
 beforeAll(async () => {
   mongoServer = await MongoMemoryServer.create();
-  process.env.MONGODB_URI = mongoServer.getUri();
-  ({ connectDB, disconnectDB } = await import('../src/config/db'));
-  await connectDB();
+  await mongoose.connect(mongoServer.getUri());
 });
 
 beforeEach(async () => {
   redisStore.clear();
   redisLists.clear();
   rateState.clear();
-  await mongoose.connection.db?.dropDatabase();
+  await dropDatabaseWithRetry();
 });
 
 afterAll(async () => {
-  await disconnectDB();
+  if (mongoose.connection.readyState !== 0) {
+    await mongoose.disconnect();
+  }
   await mongoServer.stop();
 });

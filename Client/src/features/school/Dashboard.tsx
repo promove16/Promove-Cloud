@@ -5,6 +5,7 @@ import { Award, ClipboardCheck, KeyRound, Sparkles, UserCheck, Users } from 'luc
 import { Card } from '../../components/ui/Card';
 import { Button } from '../../components/ui/Button';
 import { schoolApi } from '../../api/school.api';
+import { StudentIntakePanel } from '../institution/StudentIntakePanel';
 
 const statusTone: Record<string, string> = {
   Active: 'text-emerald-300 bg-emerald-500/10 border-emerald-500/30',
@@ -28,11 +29,33 @@ export default function Dashboard() {
     queryKey: ['school-student-verifications'],
     queryFn: schoolApi.getPendingStudentVerifications,
   });
+  const rosterQuery = useQuery({
+    queryKey: ['school-student-roster'],
+    queryFn: () => schoolApi.getStudentRoster(),
+  });
   const createTokenMutation = useMutation({
     mutationFn: schoolApi.createStudentAccessToken,
     onSuccess: () => {
       setTokenLabel('');
       void queryClient.invalidateQueries({ queryKey: ['school-student-access-tokens'] });
+    },
+  });
+  const createRosterEntryMutation = useMutation({
+    mutationFn: schoolApi.createStudentRosterEntry,
+    onSuccess: () => {
+      void Promise.all([
+        queryClient.invalidateQueries({ queryKey: ['school-student-roster'] }),
+        queryClient.invalidateQueries({ queryKey: ['school-dashboard'] }),
+      ]);
+    },
+  });
+  const importRosterMutation = useMutation({
+    mutationFn: schoolApi.importStudentRoster,
+    onSuccess: () => {
+      void Promise.all([
+        queryClient.invalidateQueries({ queryKey: ['school-student-roster'] }),
+        queryClient.invalidateQueries({ queryKey: ['school-dashboard'] }),
+      ]);
     },
   });
   const reviewMutation = useMutation({
@@ -200,6 +223,19 @@ export default function Dashboard() {
         </Card>
       </div>
 
+      <StudentIntakePanel
+        heading="Feed student data manually or from Excel"
+        description="Create a school-managed student roster, then let students sign up using the exact institution email you seeded. Shared tokens still work for open cohorts."
+        secondaryFieldLabel="Class / Section"
+        secondaryFieldPlaceholder="Grade 12 - A"
+        roster={rosterQuery.data ?? []}
+        isRosterLoading={rosterQuery.isLoading}
+        isManualSubmitting={createRosterEntryMutation.isPending}
+        isImportSubmitting={importRosterMutation.isPending}
+        onCreateManualEntry={(payload) => createRosterEntryMutation.mutate(payload)}
+        onImportFile={(file) => importRosterMutation.mutate(file)}
+      />
+
       <div className="grid gap-6 xl:grid-cols-2">
         <Card className="p-6">
           <div className="mb-4 flex items-start justify-between gap-4">
@@ -207,7 +243,7 @@ export default function Dashboard() {
               <div className="text-xs uppercase tracking-[0.3em] text-cyan-300">Student Token Desk</div>
               <h2 className="mt-2 text-xl font-semibold text-white">Issue institution tokens</h2>
               <p className="mt-2 text-sm text-slate-400">
-                Students use these tokens during signup, then wait for your approval before access is activated.
+                Students can use a shared token during signup, or register with a preloaded institution email from your roster.
               </p>
             </div>
             <div className="flex h-12 w-12 items-center justify-center rounded-2xl bg-slate-900">
@@ -263,7 +299,7 @@ export default function Dashboard() {
               <div className="text-xs uppercase tracking-[0.3em] text-cyan-300">Pending Approval</div>
               <h2 className="mt-2 text-xl font-semibold text-white">Review new student signups</h2>
               <p className="mt-2 text-sm text-slate-400">
-                Approve students to activate their login, or reject if the token was shared incorrectly.
+                Approve students to activate their login, whether they came through a shared token or a preloaded school roster entry.
               </p>
             </div>
             <div className="flex h-12 w-12 items-center justify-center rounded-2xl bg-slate-900">

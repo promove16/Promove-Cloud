@@ -15,6 +15,13 @@ import {
   reviewStudentVerificationSchema,
 } from '../institution/institutionAccess.service';
 import {
+  createStudentRosterEntry,
+  importStudentRosterEntries,
+  listStudentRosterEntries,
+  listStudentRosterQuerySchema,
+  manualStudentRosterEntrySchema,
+} from '../institution/studentRoster.service';
+import {
   getDashboardStats,
   getInvestorDirectory,
   getLatestComplianceReport,
@@ -376,4 +383,26 @@ export const reviewCollegeStudentVerification = (
 ): Promise<StudentVerificationReviewResult> =>
   reviewStudentVerification(collegeId, UserRole.COLLEGE, reviewerId, studentId, payload);
 
-export { createStudentAccessTokenSchema, reviewStudentVerificationSchema };
+export const createCollegeStudentRosterEntry = (
+  collegeId: string,
+  actorId: string,
+  payload: z.infer<typeof manualStudentRosterEntrySchema>,
+) => createStudentRosterEntry(collegeId, UserRole.COLLEGE, actorId, payload);
+
+export const importCollegeStudentRosterEntries = (
+  collegeId: string,
+  actorId: string,
+  file: { originalname: string; buffer: Buffer },
+) => importStudentRosterEntries(collegeId, UserRole.COLLEGE, actorId, file);
+
+export const getCollegeStudentRoster = (
+  collegeId: string,
+  search?: string,
+) => listStudentRosterEntries(collegeId, UserRole.COLLEGE, search);
+
+export {
+  createStudentAccessTokenSchema,
+  listStudentRosterQuerySchema,
+  manualStudentRosterEntrySchema,
+  reviewStudentVerificationSchema,
+};

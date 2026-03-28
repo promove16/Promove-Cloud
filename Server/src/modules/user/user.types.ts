@@ -4,6 +4,7 @@ import { UserRole } from '../../types/roles.types';
 export type AccessGrantedBy =
   | 'self_registered'
   | 'institution_token'
+  | 'institution_roster'
   | 'admin'
   | 'startup_school'
   | 'skill_dev';

@@ -2,9 +2,11 @@ import { Request, Response } from 'express';
 import { ApiResponse } from '../../utils/ApiResponse';
 import {
   createCollegeStudentAccessToken,
+  createCollegeStudentRosterEntry,
   createStudentAccessTokenSchema,
   createCollegeEvent,
   getCollegePendingStudentVerifications,
+  getCollegeStudentRoster,
   getCollegeStudentAccessTokens,
   getCollegeDashboard,
   getCollegeEventRankings,
@@ -14,7 +16,10 @@ import {
   getCollegeStudentLeaderboard,
   getLatestCollegeComplianceReport,
   getRecruiterDirectory,
+  importCollegeStudentRosterEntries,
+  listStudentRosterQuerySchema,
   listCollegeEvents,
+  manualStudentRosterEntrySchema,
   placementStatusSchema,
   reviewCollegeStudentVerification,
   reviewStudentVerificationSchema,
@@ -22,6 +27,7 @@ import {
 } from './college.service';
 import { createEventSchema } from '../event/event.service';
 import { generateCollegeReport } from '../../services/complianceReport';
+import { ApiError } from '../../utils/ApiError';
 
 export const getCollegeDashboardController = async (req: Request, res: Response) => {
   const data = await getCollegeDashboard(req.user!._id);
@@ -127,5 +133,29 @@ export const reviewCollegeStudentVerificationController = async (req: Request, r
     String(req.params.studentId),
     payload,
   );
+  res.status(200).json(new ApiResponse(data));
+};
+
+export const listCollegeStudentRosterController = async (req: Request, res: Response) => {
+  const { search } = listStudentRosterQuerySchema.parse(req.query);
+  const data = await getCollegeStudentRoster(req.user!._id, search);
+  res.status(200).json(new ApiResponse(data));
+};
+
+export const createCollegeStudentRosterEntryController = async (req: Request, res: Response) => {
+  const payload = manualStudentRosterEntrySchema.parse(req.body);
+  const data = await createCollegeStudentRosterEntry(req.user!._id, req.user!._id, payload);
+  res.status(201).json(new ApiResponse(data));
+};
+
+export const importCollegeStudentRosterController = async (req: Request, res: Response) => {
+  if (!req.file?.buffer) {
+    throw new ApiError(400, 'FILE_REQUIRED', 'An Excel or CSV file is required.');
+  }
+
+  const data = await importCollegeStudentRosterEntries(req.user!._id, req.user!._id, {
+    originalname: req.file.originalname,
+    buffer: req.file.buffer,
+  });
   res.status(200).json(new ApiResponse(data));
 };

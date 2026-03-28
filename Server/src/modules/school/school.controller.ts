@@ -2,18 +2,24 @@ import { Request, Response } from 'express';
 import { ApiResponse } from '../../utils/ApiResponse';
 import {
   createSchoolStudentAccessToken,
+  createSchoolStudentRosterEntry,
   createStudentAccessTokenSchema,
   getInvestorDirectory,
   getLatestComplianceReport,
   getSchoolPendingStudentVerifications,
+  getSchoolStudentRoster,
   getSchoolStudentAccessTokens,
   getSchoolDashboard,
   getStudentJourney,
   getStudentLeaderboard,
+  importSchoolStudentRosterEntries,
+  listStudentRosterQuerySchema,
+  manualStudentRosterEntrySchema,
   reviewSchoolStudentVerification,
   reviewStudentVerificationSchema,
 } from './school.service';
 import { generateSchoolReport } from '../../services/complianceReport';
+import { ApiError } from '../../utils/ApiError';
 
 export const getSchoolDashboardController = async (req: Request, res: Response) => {
   const data = await getSchoolDashboard(req.user!._id);
@@ -74,5 +80,29 @@ export const reviewSchoolStudentVerificationController = async (req: Request, re
     String(req.params.studentId),
     payload,
   );
+  res.status(200).json(new ApiResponse(data));
+};
+
+export const listSchoolStudentRosterController = async (req: Request, res: Response) => {
+  const { search } = listStudentRosterQuerySchema.parse(req.query);
+  const data = await getSchoolStudentRoster(req.user!._id, search);
+  res.status(200).json(new ApiResponse(data));
+};
+
+export const createSchoolStudentRosterEntryController = async (req: Request, res: Response) => {
+  const payload = manualStudentRosterEntrySchema.parse(req.body);
+  const data = await createSchoolStudentRosterEntry(req.user!._id, req.user!._id, payload);
+  res.status(201).json(new ApiResponse(data));
+};
+
+export const importSchoolStudentRosterController = async (req: Request, res: Response) => {
+  if (!req.file?.buffer) {
+    throw new ApiError(400, 'FILE_REQUIRED', 'An Excel or CSV file is required.');
+  }
+
+  const data = await importSchoolStudentRosterEntries(req.user!._id, req.user!._id, {
+    originalname: req.file.originalname,
+    buffer: req.file.buffer,
+  });
   res.status(200).json(new ApiResponse(data));
 };

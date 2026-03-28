@@ -4,6 +4,7 @@ import { redis } from '../../config/redis';
 import { UserRole } from '../../types/roles.types';
 import { ApiError } from '../../utils/ApiError';
 import { NotificationService } from '../notification/notification.service';
+import { syncStudentRosterVerificationStatus } from './studentRoster.service';
 import { StudentVerificationReviewResult } from '../school/school.types';
 import { User } from '../user/user.model';
 import { StudentAccessToken } from './studentAccessToken.model';
@@ -216,6 +217,12 @@ export const reviewStudentVerification = async (
 
   await student.save();
   await invalidateInstitutionCaches(institutionId);
+  await syncStudentRosterVerificationStatus(
+    institutionId,
+    student.email,
+    String(student._id),
+    payload.decision === 'approved' ? 'verified' : 'rejected',
+  );
 
   const title =
     payload.decision === 'approved'

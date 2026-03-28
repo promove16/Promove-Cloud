@@ -1,4 +1,5 @@
 import { Router } from 'express';
+import multer from 'multer';
 import { authenticate } from '../../middleware/authenticate';
 import { authorize } from '../../middleware/authorize';
 import { connectionGuard } from '../../middleware/connectionGuard';
@@ -6,6 +7,7 @@ import { UserRole } from '../../types/roles.types';
 import { asyncHandler } from '../../utils/asyncHandler';
 import {
   createCollegeStudentAccessTokenController,
+  createCollegeStudentRosterEntryController,
   createCollegeComplianceReportController,
   createCollegeEventController,
   getCollegeDashboardController,
@@ -13,7 +15,9 @@ import {
   getCollegePlacementController,
   getCollegeStudentJourneyController,
   getLatestCollegeComplianceReportController,
+  importCollegeStudentRosterController,
   listCollegePendingStudentVerificationsController,
+  listCollegeStudentRosterController,
   listCollegeStudentAccessTokensController,
   listCollegeEventsController,
   listCollegeInvestorsController,
@@ -24,6 +28,10 @@ import {
 } from './college.controller';
 
 const router = Router();
+const rosterUpload = multer({
+  storage: multer.memoryStorage(),
+  limits: { fileSize: 5 * 1024 * 1024 },
+});
 
 router.use(authenticate);
 
@@ -79,6 +87,22 @@ router.post(
   '/student-access-tokens',
   authorize(UserRole.COLLEGE),
   asyncHandler(createCollegeStudentAccessTokenController),
+);
+router.get(
+  '/student-roster',
+  authorize(UserRole.COLLEGE),
+  asyncHandler(listCollegeStudentRosterController),
+);
+router.post(
+  '/student-roster/manual',
+  authorize(UserRole.COLLEGE),
+  asyncHandler(createCollegeStudentRosterEntryController),
+);
+router.post(
+  '/student-roster/import',
+  authorize(UserRole.COLLEGE),
+  rosterUpload.single('file'),
+  asyncHandler(importCollegeStudentRosterController),
 );
 router.get(
   '/student-verifications',

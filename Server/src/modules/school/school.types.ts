@@ -52,6 +52,39 @@ export interface PendingStudentVerificationView {
   createdAt: Date;
 }
 
+export interface StudentRosterEntryView {
+  _id: string;
+  displayName: string;
+  email: string;
+  status: 'invited' | 'registered_pending' | 'verified' | 'rejected';
+  onboardingStatus: 'listed' | 'pending_verification' | 'verified' | 'rejected';
+  source: 'manual' | 'csv' | 'xlsx';
+  createdAt: Date;
+  updatedAt: Date;
+  gradeOrProgram?: string;
+  rollNumber?: string;
+  notes?: string;
+  linkedUserId?: string;
+  registeredAt?: Date;
+  reviewedAt?: Date;
+}
+
+export interface StudentRosterImportResult {
+  createdCount: number;
+  updatedCount: number;
+  skippedCount: number;
+  created: number;
+  updated: number;
+  skipped: number;
+  importedRows: number;
+  entries: StudentRosterEntryView[];
+  errors: Array<{
+    row: number;
+    message: string;
+    email?: string;
+  }>;
+}
+
 export interface StudentVerificationReviewResult {
   _id: string;
   status: 'verified' | 'rejected';

@@ -561,7 +561,7 @@ const userSchema = new Schema<IUser>(
     },
     accessGrantedBy: {
       type: String,
-      enum: ['self_registered', 'institution_token', 'admin', 'startup_school', 'skill_dev'],
+      enum: ['self_registered', 'institution_token', 'institution_roster', 'admin', 'startup_school', 'skill_dev'],
       required: true,
     },
     accessExpiresAt: {

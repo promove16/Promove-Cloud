@@ -37,7 +37,7 @@ const ROLE_COPY: Record<
     displayNamePlaceholder: 'Sarah Chen',
     institutionTokenPlaceholder: 'SCH-AB12CD34',
     institutionTokenHelp:
-      'Enter the institution token shared by your school or college. Your account stays pending until they approve it.',
+      'Use your school or college token if one was shared with you, or leave it blank if your institution already preloaded your email in its student roster.',
     domainLabel: 'Innovation Domain',
     domainPlaceholder: 'AgriTech, AI, HealthTech',
     bioLabel: 'Short Bio',
@@ -132,7 +132,7 @@ export function SignupPage() {
     selectedRole === UserRole.MENTOR ||
     selectedRole === UserRole.INVESTOR ||
     selectedRole === UserRole.RECRUITER;
-  const studentNeedsInstitutionToken = selectedRole === UserRole.STUDENT;
+  const studentUsesInstitutionOnboarding = selectedRole === UserRole.STUDENT;
 
   const handleSubmit = async (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault();
@@ -165,18 +165,13 @@ export function SignupPage() {
       return;
     }
 
-    if (studentNeedsInstitutionToken && !formData.institutionToken.trim()) {
-      setError('Please enter the institution token shared by your school or college');
-      return;
-    }
-
     try {
       const payload = await signupMutation.mutateAsync({
         displayName: formData.displayName.trim(),
         email: formData.email.trim(),
         password: formData.password,
         role: selectedRole,
-        ...(studentNeedsInstitutionToken
+        ...(studentUsesInstitutionOnboarding && formData.institutionToken.trim()
           ? { institutionToken: formData.institutionToken.trim() }
           : {}),
         ...(formData.domain.trim() ? { domain: formData.domain.trim() } : {}),
@@ -214,8 +209,13 @@ export function SignupPage() {
           apiError?.code === 'CAPACITY_REACHED'
             ? 'Platform is at capacity for Year 1. Please join the waitlist.'
             : apiError?.code === 'INSTITUTION_TOKEN_EXPIRED'
-              ? 'That institution token has expired. Please ask your school or college for a fresh one.'
-              : detailMessage ?? apiError?.message ?? 'Unable to create your account right now.',
+                ? 'That institution token has expired. Please ask your school or college for a fresh one.'
+                : apiError?.code === 'STUDENT_INSTITUTION_ACCESS_REQUIRED'
+                  ? 'Use a valid institution token or sign up with the email already registered by your school or college.'
+                  : apiError?.code === 'INSTITUTION_ROSTER_CONFLICT' ||
+                      apiError?.code === 'MULTIPLE_INSTITUTION_MATCHES'
+                    ? 'This email is listed by more than one institution. Use the correct institution token or contact your institution.'
+                    : detailMessage ?? apiError?.message ?? 'Unable to create your account right now.',
         );
         return;
       }
@@ -441,10 +441,10 @@ export function SignupPage() {
             </div>
           ) : null}
 
-          {studentNeedsInstitutionToken ? (
+          {studentUsesInstitutionOnboarding ? (
             <div className="mb-6">
               <label className="mb-2 block text-sm font-semibold text-white">
-                Institution Token <span className="text-red-400">*</span>
+                Institution Token <span className="text-slate-500">(optional)</span>
               </label>
               <div className="relative">
                 <Ticket className="absolute left-4 top-1/2 h-5 w-5 -translate-y-1/2 text-slate-400" />
@@ -454,13 +454,15 @@ export function SignupPage() {
                   onChange={(event) => updateField('institutionToken', event.target.value)}
                   placeholder={roleCopy?.institutionTokenPlaceholder ?? 'SCH-AB12CD34'}
                   className="w-full rounded-lg border border-slate-800 bg-slate-950 py-3 pl-12 pr-4 text-white placeholder-slate-500 focus:border-blue-500 focus:outline-none"
-                  required
                 />
               </div>
               <p className="mt-2 text-xs text-slate-500">
                 {roleCopy?.institutionTokenHelp ??
                   'Enter the institution token provided by your school or college.'}
               </p>
+              <div className="mt-3 rounded-2xl border border-slate-800 bg-slate-950/70 p-4 text-sm text-slate-400">
+                If your school or college already uploaded your email in its student roster, you can register without a token and the institution will be linked automatically.
+              </div>
             </div>
           ) : (
             <div className="mb-6 rounded-2xl border border-slate-800 bg-slate-950/70 p-4 text-sm text-slate-400">

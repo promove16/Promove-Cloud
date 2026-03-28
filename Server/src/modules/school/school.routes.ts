@@ -1,4 +1,5 @@
 import { NextFunction, Request, Response, Router } from 'express';
+import multer from 'multer';
 import { authenticate } from '../../middleware/authenticate';
 import { authorize } from '../../middleware/authorize';
 import { connectionGuard } from '../../middleware/connectionGuard';
@@ -7,10 +8,13 @@ import { ApiError } from '../../utils/ApiError';
 import { asyncHandler } from '../../utils/asyncHandler';
 import {
   createSchoolStudentAccessTokenController,
+  createSchoolStudentRosterEntryController,
   createSchoolComplianceReportController,
   getLatestSchoolComplianceReportController,
   getSchoolDashboardController,
   getSchoolStudentJourneyController,
+  importSchoolStudentRosterController,
+  listSchoolStudentRosterController,
   listSchoolPendingStudentVerificationsController,
   listSchoolStudentAccessTokensController,
   listSchoolInvestorsController,
@@ -19,6 +23,10 @@ import {
 } from './school.controller';
 
 const router = Router();
+const rosterUpload = multer({
+  storage: multer.memoryStorage(),
+  limits: { fileSize: 5 * 1024 * 1024 },
+});
 
 const rejectRecruiterTargets = (req: Request, _res: Response, next: NextFunction) => {
   const path = req.path.toLowerCase();
@@ -58,6 +66,13 @@ router.get(
 );
 router.get('/student-access-tokens', asyncHandler(listSchoolStudentAccessTokensController));
 router.post('/student-access-tokens', asyncHandler(createSchoolStudentAccessTokenController));
+router.get('/student-roster', asyncHandler(listSchoolStudentRosterController));
+router.post('/student-roster/manual', asyncHandler(createSchoolStudentRosterEntryController));
+router.post(
+  '/student-roster/import',
+  rosterUpload.single('file'),
+  asyncHandler(importSchoolStudentRosterController),
+);
 router.get(
   '/student-verifications',
   asyncHandler(listSchoolPendingStudentVerificationsController),

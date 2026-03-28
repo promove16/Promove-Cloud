@@ -13,6 +13,7 @@ import {
 import { Card } from '../../components/ui/Card';
 import { Button } from '../../components/ui/Button';
 import { collegeApi } from '../../api/college.api';
+import { StudentIntakePanel } from '../institution/StudentIntakePanel';
 
 export default function Dashboard() {
   const queryClient = useQueryClient();
@@ -29,11 +30,33 @@ export default function Dashboard() {
     queryKey: ['college-student-verifications'],
     queryFn: collegeApi.getPendingStudentVerifications,
   });
+  const rosterQuery = useQuery({
+    queryKey: ['college-student-roster'],
+    queryFn: () => collegeApi.getStudentRoster(),
+  });
   const createTokenMutation = useMutation({
     mutationFn: collegeApi.createStudentAccessToken,
     onSuccess: () => {
       setTokenLabel('');
       void queryClient.invalidateQueries({ queryKey: ['college-student-access-tokens'] });
+    },
+  });
+  const createRosterEntryMutation = useMutation({
+    mutationFn: collegeApi.createStudentRosterEntry,
+    onSuccess: () => {
+      void Promise.all([
+        queryClient.invalidateQueries({ queryKey: ['college-student-roster'] }),
+        queryClient.invalidateQueries({ queryKey: ['college-dashboard'] }),
+      ]);
+    },
+  });
+  const importRosterMutation = useMutation({
+    mutationFn: collegeApi.importStudentRoster,
+    onSuccess: () => {
+      void Promise.all([
+        queryClient.invalidateQueries({ queryKey: ['college-student-roster'] }),
+        queryClient.invalidateQueries({ queryKey: ['college-dashboard'] }),
+      ]);
     },
   });
   const reviewMutation = useMutation({
@@ -180,6 +203,19 @@ export default function Dashboard() {
         </Link>
       </div>
 
+      <StudentIntakePanel
+        heading="Feed student intake data for your college"
+        description="Build a managed student roster from manual entries or Excel-compatible files, then let students register using their institution email before you verify them."
+        secondaryFieldLabel="Program / Year"
+        secondaryFieldPlaceholder="B.Tech CSE - 3rd Year"
+        roster={rosterQuery.data ?? []}
+        isRosterLoading={rosterQuery.isLoading}
+        isManualSubmitting={createRosterEntryMutation.isPending}
+        isImportSubmitting={importRosterMutation.isPending}
+        onCreateManualEntry={(payload) => createRosterEntryMutation.mutate(payload)}
+        onImportFile={(file) => importRosterMutation.mutate(file)}
+      />
+
       <div className="grid gap-6 xl:grid-cols-2">
         <Card className="p-6">
           <div className="mb-4 flex items-start justify-between gap-4">
@@ -187,7 +223,7 @@ export default function Dashboard() {
               <div className="text-xs uppercase tracking-[0.3em] text-cyan-300">Student Token Desk</div>
               <h2 className="mt-2 text-xl font-semibold text-white">Issue college verification tokens</h2>
               <p className="mt-2 text-sm text-slate-400">
-                Share these tokens with students so they can register against your institution and wait for review.
+                Students can register either with a shared token or with an institution email already present in your roster feed.
               </p>
             </div>
             <div className="flex h-12 w-12 items-center justify-center rounded-2xl bg-slate-900">
@@ -243,7 +279,7 @@ export default function Dashboard() {
               <div className="text-xs uppercase tracking-[0.3em] text-cyan-300">Pending Approval</div>
               <h2 className="mt-2 text-xl font-semibold text-white">Review student registrations</h2>
               <p className="mt-2 text-sm text-slate-400">
-                Only approved students get access to the platform and show up in your live college metrics.
+                Only approved students get access to the platform and show up in your live college metrics, whether they entered through token signup or roster-based onboarding.
               </p>
             </div>
             <div className="flex h-12 w-12 items-center justify-center rounded-2xl bg-slate-900">

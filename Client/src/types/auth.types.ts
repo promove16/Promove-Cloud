@@ -12,7 +12,7 @@ export interface AuthUser {
   linkedinUrl?: string | null;
   profileComplete: boolean;
   innovationScore: number;
-  accessGrantedBy?: 'self_registered' | 'institution_token' | 'admin' | 'startup_school' | 'skill_dev';
+  accessGrantedBy?: 'self_registered' | 'institution_token' | 'institution_roster' | 'admin' | 'startup_school' | 'skill_dev';
   isActive?: boolean;
   discoverableToRecruiters?: boolean;
   institutionProfile?: {

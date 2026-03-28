@@ -3,6 +3,8 @@ import {
   DashboardEventView,
   PendingStudentVerificationView,
   SchoolDashboardPayload,
+  StudentRosterEntryView,
+  StudentRosterImportResult,
   StudentAccessTokenView,
   StudentVerificationReviewResult,
 } from '../school/school.types';
@@ -85,6 +87,8 @@ export interface PlacementStatusUpdateResult {
 
 export type {
   PendingStudentVerificationView,
+  StudentRosterEntryView,
+  StudentRosterImportResult,
   StudentAccessTokenView,
   StudentVerificationReviewResult,
 };

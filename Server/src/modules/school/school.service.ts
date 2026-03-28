@@ -19,6 +19,13 @@ import {
   reviewStudentVerificationSchema,
 } from '../institution/institutionAccess.service';
 import {
+  createStudentRosterEntry,
+  importStudentRosterEntries,
+  listStudentRosterEntries,
+  listStudentRosterQuerySchema,
+  manualStudentRosterEntrySchema,
+} from '../institution/studentRoster.service';
+import {
   DashboardEventView,
   InvestorProfileView,
   LeaderboardPage,
@@ -443,4 +450,26 @@ export const reviewSchoolStudentVerification = (
 ): Promise<StudentVerificationReviewResult> =>
   reviewStudentVerification(schoolId, UserRole.SCHOOL, reviewerId, studentId, payload);
 
-export { createStudentAccessTokenSchema, reviewStudentVerificationSchema };
+export const createSchoolStudentRosterEntry = (
+  schoolId: string,
+  actorId: string,
+  payload: z.infer<typeof manualStudentRosterEntrySchema>,
+) => createStudentRosterEntry(schoolId, UserRole.SCHOOL, actorId, payload);
+
+export const importSchoolStudentRosterEntries = (
+  schoolId: string,
+  actorId: string,
+  file: { originalname: string; buffer: Buffer },
+) => importStudentRosterEntries(schoolId, UserRole.SCHOOL, actorId, file);
+
+export const getSchoolStudentRoster = (
+  schoolId: string,
+  search?: string,
+) => listStudentRosterEntries(schoolId, UserRole.SCHOOL, search);
+
+export {
+  createStudentAccessTokenSchema,
+  listStudentRosterQuerySchema,
+  manualStudentRosterEntrySchema,
+  reviewStudentVerificationSchema,
+};

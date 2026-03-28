@@ -10,6 +10,10 @@ import { UserRole } from '../../types/roles.types';
 import { ApiError } from '../../utils/ApiError';
 import { toSanitizedUser } from '../user/user.service';
 import { sanitizePlainText } from '../../utils/sanitizeText';
+import {
+  findInstitutionRosterMatchByEmail,
+  markStudentRosterEntryRegistered,
+} from '../institution/studentRoster.service';
 
 const REFRESH_TTL_SECONDS = 30 * 24 * 60 * 60;
 const MS_IN_YEAR = 365 * 24 * 60 * 60 * 1000;
@@ -23,6 +27,12 @@ interface AuthResult {
 interface RegisterResult extends AuthResult {
   nextStep: 'profile_setup';
   message: string;
+}
+
+interface PendingRegisterResult {
+  requiresVerification: true;
+  message: string;
+  user: SanitizedUser;
 }
 
 interface RefreshPayload extends jwt.JwtPayload {
@@ -163,7 +173,7 @@ export const registerUser = async (payload: {
     academicYear: string;
     iicStarRating?: number;
   };
-}): Promise<RegisterResult> => {
+}): Promise<RegisterResult | PendingRegisterResult> => {
   const activeUsers = await User.countDocuments({ isActive: true });
 
   if (activeUsers >= env.MAX_USERS_YEAR_ONE) {
@@ -183,7 +193,16 @@ export const registerUser = async (payload: {
   const passwordHash = await bcrypt.hash(payload.password, 12);
   const isStudent = payload.role === UserRole.STUDENT;
   const institutionTokenValue = payload.institutionToken?.trim() || payload.accessCode?.trim() || undefined;
-  const accessGrantedBy: AccessGrantedBy = isStudent ? 'admin' : 'self_registered';
+  const matchedRoster =
+    isStudent && !institutionTokenValue ? await findInstitutionRosterMatchByEmail(payload.email) : null;
+  const requiresInstitutionReview = Boolean(isStudent && (institutionTokenValue || matchedRoster));
+  const accessGrantedBy: AccessGrantedBy = isStudent
+    ? matchedRoster
+      ? 'institution_roster'
+      : institutionTokenValue
+        ? 'institution_token'
+      : 'admin'
+    : 'self_registered';
   const fallbackDomain = payload.domain ?? payload.accessCode?.trim();
   const sanitizedDisplayName = sanitizePlainText(payload.displayName);
   const sanitizedBio = payload.bio ? sanitizePlainText(payload.bio) : undefined;
@@ -197,13 +216,14 @@ export const registerUser = async (payload: {
   const registrationStage =
     payload.role === UserRole.SCHOOL || payload.role === UserRole.COLLEGE
       ? 'complete'
-      : isStudent && institutionTokenValue
+      : requiresInstitutionReview
         ? 'institution_pending'
         : 'basic';
   const institutionVerificationStatus =
-    isStudent && institutionTokenValue ? 'pending' : 'none';
+    matchedRoster ? 'verified' : isStudent && institutionTokenValue ? 'pending' : 'none';
   const verificationStatus =
-    isStudent && institutionTokenValue ? 'pending' : isStudent ? 'verified' : 'not_required';
+    requiresInstitutionReview ? 'pending' : isStudent ? 'verified' : 'not_required';
+  const verificationTimestamp = new Date();
 
   const createdUser = await User.create({
     email: payload.email.toLowerCase(),
@@ -233,6 +253,7 @@ export const registerUser = async (payload: {
         }
       : {}),
     institutionToken: institutionTokenValue ?? null,
+    ...(matchedRoster ? { institutionId: matchedRoster.institutionId } : {}),
     profileComplete:
       payload.role === UserRole.SCHOOL || payload.role === UserRole.COLLEGE
         ? Boolean(institutionProfile)
@@ -245,18 +266,34 @@ export const registerUser = async (payload: {
     verificationStatus,
     ...(isStudent
       ? {
-          verificationRequestedAt: institutionTokenValue ? new Date() : undefined,
-          verifiedAt: new Date(),
+          verificationRequestedAt: requiresInstitutionReview ? verificationTimestamp : undefined,
+          verifiedAt: requiresInstitutionReview ? undefined : verificationTimestamp,
+          institutionVerifiedAt: matchedRoster ? verificationTimestamp : null,
         }
       : {}),
   });
 
   const user = toSanitizedUser(createdUser.toObject());
-  const tokens = await createTokenPair(user);
 
   if (isStudent && institutionTokenValue) {
     await enqueueInstitutionVerification(user._id, institutionTokenValue);
   }
+
+  if (isStudent && matchedRoster) {
+    await markStudentRosterEntryRegistered(String(matchedRoster.institutionId), payload.email, user._id);
+  }
+
+  if (requiresInstitutionReview) {
+    return {
+      requiresVerification: true,
+      message: matchedRoster
+        ? 'Your institution roster was found. Your account is created and is now waiting for school or college approval.'
+        : 'Your institution token was accepted. Your account is now waiting for school or college approval.',
+      user,
+    };
+  }
+
+  const tokens = await createTokenPair(user);
 
   return {
     ...tokens,
@@ -314,6 +351,14 @@ export const loginUser = async (payload: {
       'INSTITUTION_VERIFICATION_REJECTED',
       user.verificationRejectedReason ||
         'Your institution could not verify your account. Please contact them for support.',
+    );
+  }
+
+  if (user.role === UserRole.STUDENT && user.verificationStatus === 'pending') {
+    throw new ApiError(
+      403,
+      'INSTITUTION_APPROVAL_PENDING',
+      'Your institution has not approved your account yet. Please contact your school or college.',
     );
   }
 

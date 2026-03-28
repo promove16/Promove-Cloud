@@ -8,6 +8,8 @@ import {
   SchoolDashboardData,
   StudentAccessToken,
   StudentJourney,
+  StudentRosterEntry,
+  StudentRosterImportResult,
   StudentVerificationReviewResponse,
 } from '../types/school.types';
 
@@ -70,6 +72,39 @@ export const schoolApi = {
     const response = await api.patch<ApiSuccessResponse<StudentVerificationReviewResponse>>(
       `/api/school/student-verifications/${studentId}`,
       payload,
+    );
+    return response.data.data;
+  },
+  async getStudentRoster(search?: string) {
+    const response = await api.get<ApiSuccessResponse<StudentRosterEntry[]>>('/api/school/student-roster', {
+      params: search ? { search } : undefined,
+    });
+    return response.data.data;
+  },
+  async createStudentRosterEntry(payload: {
+    displayName: string;
+    email: string;
+    gradeOrProgram?: string;
+    rollNumber?: string;
+    notes?: string;
+  }) {
+    const response = await api.post<ApiSuccessResponse<StudentRosterEntry>>(
+      '/api/school/student-roster/manual',
+      payload,
+    );
+    return response.data.data;
+  },
+  async importStudentRoster(file: File) {
+    const formData = new FormData();
+    formData.append('file', file);
+    const response = await api.post<ApiSuccessResponse<StudentRosterImportResult>>(
+      '/api/school/student-roster/import',
+      formData,
+      {
+        headers: {
+          'Content-Type': 'multipart/form-data',
+        },
+      },
     );
     return response.data.data;
   },
