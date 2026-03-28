@@ -23,6 +23,11 @@ export default function EventManager() {
     description: string;
   };
   const [showCreate, setShowCreate] = useState(false);
+  const [scoringEventId, setScoringEventId] = useState<string | null>(null);
+  const [scoreDraft, setScoreDraft] = useState<{ studentId: string; score: string }>({
+    studentId: '',
+    score: '',
+  });
   const [form, setForm] = useState<EventFormState>({
     title: '',
     type: eventTypes[0],
@@ -48,6 +53,15 @@ export default function EventManager() {
     mutationFn: eventApi.computeRankings,
     onSuccess: async () => {
       await queryClient.invalidateQueries({ queryKey: ['college-events'] });
+    },
+  });
+
+  const submissionMutation = useMutation({
+    mutationFn: ({ eventId, studentId, score }: { eventId: string; studentId: string; score: number }) =>
+      eventApi.addSubmissionScore(eventId, studentId, score),
+    onSuccess: async () => {
+      await queryClient.invalidateQueries({ queryKey: ['college-events'] });
+      setScoreDraft({ studentId: '', score: '' });
     },
   });
 
@@ -134,10 +148,110 @@ export default function EventManager() {
                 <Button variant="secondary" onClick={() => computeMutation.mutate(event._id)}>
                   Compute Rankings
                 </Button>
-                <Button variant="secondary" title="Submission scores are added from the event API">
-                  Add Submission Score
+                <Button
+                  variant="secondary"
+                  disabled={event.participants.length === 0}
+                  onClick={() => {
+                    const isClosing = scoringEventId === event._id;
+                    setScoringEventId(isClosing ? null : event._id);
+                    setScoreDraft({
+                      studentId: isClosing ? '' : event.participants[0]?.studentId ?? '',
+                      score: '',
+                    });
+                  }}
+                >
+                  {event.participants.length === 0
+                    ? 'No Participants Yet'
+                    : scoringEventId === event._id
+                      ? 'Hide Score Form'
+                      : 'Add Submission Score'}
                 </Button>
               </div>
+            </div>
+
+            <div className="mt-6 rounded-2xl border border-slate-800 bg-slate-900/60 p-4">
+              <div className="mb-3 text-sm font-semibold uppercase tracking-[0.3em] text-cyan-300">
+                Participants
+              </div>
+              {event.participants.length === 0 ? (
+                <div className="text-sm text-slate-500">
+                  No students have joined this event yet.
+                </div>
+              ) : (
+                <div className="space-y-3">
+                  {event.participants.map((participant) => (
+                    <div
+                      key={`${event._id}-${participant.studentId}`}
+                      className="flex flex-col gap-2 rounded-2xl border border-slate-800 bg-slate-950 px-4 py-4 md:flex-row md:items-center md:justify-between"
+                    >
+                      <div>
+                        <div className="font-semibold text-white">{participant.studentName}</div>
+                        <div className="mt-1 text-sm text-slate-400">
+                          Score {participant.innovationScore} - Joined {new Date(participant.registeredAt).toLocaleDateString('en-IN')}
+                        </div>
+                      </div>
+                      <div className="text-sm text-slate-400">
+                        {typeof participant.submissionScore === 'number'
+                          ? `Submission score: ${participant.submissionScore}`
+                          : 'Submission score pending'}
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              )}
+
+              {scoringEventId === event._id && event.participants.length > 0 ? (
+                <>
+                  <div className="mt-5 grid gap-4 lg:grid-cols-2">
+                    <select
+                      value={scoreDraft.studentId}
+                      onChange={(currentEvent) =>
+                        setScoreDraft((current) => ({ ...current, studentId: currentEvent.target.value }))
+                      }
+                      className="rounded-lg border border-slate-800 bg-slate-950 px-4 py-3 text-white"
+                    >
+                      {event.participants.map((participant) => (
+                        <option key={participant.studentId} value={participant.studentId}>
+                          {participant.studentName}
+                        </option>
+                      ))}
+                    </select>
+                    <Input
+                      type="number"
+                      min={0}
+                      max={100}
+                      value={scoreDraft.score}
+                      onChange={(currentEvent) =>
+                        setScoreDraft((current) => ({ ...current, score: currentEvent.target.value }))
+                      }
+                      placeholder="Submission score"
+                    />
+                  </div>
+                  <div className="mt-3 text-sm text-slate-400">
+                    Save the participant score first, then recompute rankings to refresh the leaderboard.
+                  </div>
+                  <div className="mt-4 flex justify-end">
+                    <Button
+                      onClick={() =>
+                        submissionMutation.mutate({
+                          eventId: event._id,
+                          studentId: scoreDraft.studentId,
+                          score: Number(scoreDraft.score),
+                        })
+                      }
+                      disabled={
+                        submissionMutation.isPending ||
+                        !scoreDraft.studentId ||
+                        scoreDraft.score.trim() === '' ||
+                        Number(scoreDraft.score) < 0 ||
+                        Number(scoreDraft.score) > 100
+                      }
+                    >
+                      {submissionMutation.isPending ? 'Saving...' : 'Save Submission Score'}
+                    </Button>
+                  </div>
+                </>
+              ) : null}
             </div>
 
             <div className="mt-6 rounded-2xl border border-slate-800 bg-slate-900/60 p-4">

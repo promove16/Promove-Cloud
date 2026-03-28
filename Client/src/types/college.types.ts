@@ -53,6 +53,15 @@ export interface EventRanking {
   submissionScore: number;
 }
 
+export interface CollegeEventParticipant {
+  studentId: string;
+  studentName: string;
+  avatar?: string;
+  innovationScore: number;
+  registeredAt: string;
+  submissionScore?: number;
+}
+
 export interface CollegeEvent {
   _id: string;
   title: string;
@@ -60,6 +69,7 @@ export interface CollegeEvent {
   description: string;
   scheduledAt: string;
   participantsCount: number;
+  participants: CollegeEventParticipant[];
   rankingsComputedAt?: string;
   rankings: EventRanking[];
 }

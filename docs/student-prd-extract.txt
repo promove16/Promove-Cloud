@@ -1,0 +1,195 @@
+Role 1 — Student Dashboard 
+ 
+ Students are the platform's core users. Every feature, every other role, and every data flow ultimately serves the student's innovation, learning, and career journey. The student dashboard is the most feature-rich module and acts as the heartbeat of the application. 
+ 
+ Identity Foundation: A student's profile becomes fully trusted only after institution verification. Verified status unlocks: institution leaderboard , HR visibility, event eligibility, and investor discovery. Unverified students have a limited but functional sandbox. 
+ 
+ 4.1 Student Identity &amp; Verification 
+ Register with email + password (Argon2id hashed) 
+ Email verification link sent on registration 
+ Link to School or College via: institution invite code, institutional email domain match, or manual verification request 
+ School/College admin approves roster match → student receives Verified Institution Badge 
+ Verification unlocks: institution leaderboard , HR visibility, hackathon eligibility, verified portfolio badge 
+ Unverified students can still create projects, use Jira boards, and list in marketplace 
+ Institution verification is non-blocking for core features but required for hiring/investment visibility 
+ 
+ 4.2 Project Management — Jira-Style Board 
+ Create a project: title, description, tech stack, domain tags, team visibility setting 
+ Team management: invite by email or student ID; assign roles (Lead, Developer, Designer, Tester, DevOps) 
+ Full Kanban board: Backlog → To Do → In Progress → In Review → Done 
+ Tickets/Issues: title, description, priority (P0 Critical → P3 Low), assignee, due date, labels, attachments 
+ Epics and Milestones: group tickets under epics; milestones trigger mentor approval and investor notifications 
+ Sprint Planning: create sprints (1–4 weeks), assign backlog tickets, set sprint goal and acceptance criteria 
+ Burndown Chart: remaining story points vs. calendar days — auto-rendered per sprint 
+ Sprint velocity history: trend chart across last N sprints 
+ Activity feed: real-time log of all ticket changes, comments, status transitions 
+ Comment threads: per-ticket nested comments with @mention notifications via Socket.io 
+ Optional Phase 2: OAuth 2.0 (3LO) integration with Atlassian Jira Cloud for teams wanting external continuity 
+ 
+ 4.3 Mentor Discovery &amp; Engagement 
+ Browse verified mentors filtered by: domain expertise, availability, price range, rating, institution affiliation 
+ Mentor profile view: bio, LinkedIn, portfolio, past project references, ratings breakdown, available calendar slots 
+ Post a Mentorship Request: project brief, required skills, timeline, budget range, preferred meeting cadence 
+ Receive and compare bids from multiple mentors: proposal, price, timeline, mentorship plan 
+ Accept one bid → system creates Mentorship Contract with status: proposed → active → completed 
+ Payment escrowed at acceptance; released per milestone completion (Stripe Connect) 
+ Communication via in-platform chat; video meetings via Google Meet / Zoom (third-party link generation) 
+ Post-project: rate and review mentor (1–5 stars + written review) — affects mentor future visibility 
+ 
+ 4.4 Investor Pitching 
+ Prepare Project Showcase page: attach pitch deck (PPT/PDF), README, demo video URL, financial projections, team bios 
+ Browse available investors filtered by: investment domain, college partnerships, accepted pitch history 
+ Submit Pitch Request to selected investor(s) with brief message and attached materials 
+ Track pitch lifecycle: Pending → Under Review → Accepted / Declined 
+ Receive structured feedback from investors (mandatory field on decline) 
+ On acceptance: book a meeting from investor's available calendar slots 
+ Post-meeting: investor logs decision and notes (visible to student team and mentor) 
+ Investor can follow project milestone progress for invested/interested teams 
+ 
+ 4.5 Marketplace 
+ List completed or in-progress projects for sale: title, description, asking price, what's included 
+ Upload project assets: source code bundle (ZIP), documentation, demo video, pitch deck, README 
+ Visibility control: public marketplace, institution-only, or invite-only 
+ Receive buyer enquiries: platform-mediated messaging with enquiry status tracking 
+ Negotiation thread per enquiry; final sale closes listing and transfers asset access 
+ Listing states: draft → published → under enquiry → negotiation → sold / archived 
+ Platform fee on completed sales (configurable by Super Admin) 
+ 
+ 4.6 Leaderboard &amp; Competitions 
+ Hackathon Board: rank by aggregate problem-statement scores; institution and global views 
+ Daily Coding Challenge Board: accuracy %, speed, streak days — resets daily, weekly aggregate 
+ EdTech Completion Board: courses finished, certifications earned, learning hours 
+ Institution-filtered view: rank among your school / college cohort only 
+ Global rank: across all verified students on the platform 
+ Badges and Trophies: auto-awarded on rank milestones, streak records, hackathon wins, course completions 
+ Portfolio auto-sync: achievements auto-populate student profile and are visible to HR and Investors 
+ 
+ 4.7 File Management &amp; Profile 
+ Upload types: PDF, DOCX, PPTX, PNG/JPG, MP4 (demo), ZIP (code), README.md — per OWASP file upload guidance 
+ File validation: MIME type + file signature check; size limits enforced server-side; filenames sanitized 
+ S3 presigned URL workflow: client requests upload URL from API; uploads directly to S3; API records asset metadata 
+ Portfolio builder: auto-generated public profile from projects, achievements, skill tags, verified courses 
+ Skill tags: auto-populated from project tech stack and completed EdTech courses 
+ Verified Institution Badge: displayed prominently on public profile 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ Role 2 — School Dashboard 
+ 
+ Schools act as trusted institutional anchors for student verification and structured skill development. Their primary responsibility is maintaining verified student rosters and providing structured mentorship and event programmes. 
+ 
+ 4.8 Student Roster Management 
+ Bulk upload students via CSV/Excel: name, email, roll number, class, section 
+ System auto-sends verification invitations to uploaded student emails 
+ Manual approval for students who self-register and claim institution membership 
+ Verified students gain: institution leaderboard access, special EdTech course eligibility, HR visibility flag 
+ Dashboard view: verification status per student, pending approvals, recently joined 
+ Export verified roster as CSV for offline records 
+ 
+ 4.9 Leaderboard &amp; Progress Monitoring 
+ View student leaderboard filtered to school cohort: coding challenge scores, mentorship training scores 
+ Individual student progress: EdTech course completions, streak history, project activity 
+ Compare cohort performance across batches or sections 
+ Flag top performers for mentor programme consideration 
+ 
+ 4.10 Mentor &amp; Training Management 
+ Browse and invite platform-registered mentors for school-level programmes 
+ Assign mentors to student cohorts or individual students 
+ Track mentor sessions: session logs, attendance records, student feedback ratings 
+ Organise Alumni Meets: create event, set date/venue, send invitations to alumni (linked former students), manage RSVPs 
+ Alumni participation tracked and linked back to current student inspiration metrics 
+ 
+ 4.11 Skill Development Events 
+ Create and publish events: workshops, bootcamps, seminars, coding contests 
+ Set event metadata: capacity, registration deadline, prerequisites, format (online/offline) 
+ Registration management: student self-registration, approval workflows, waitlist 
+ Issue digital certificates post-event (PDF generated from template, emailed to participants) 
+ HR can be invited to collaborate on school events (joint organisation) 
+ Event analytics: attendance rate, feedback scores, certificate issuance coun 
+ Role 3 — College Dashboard 
+ 
+ Colleges are the most connected institutional node — they link to Students, HR for placement, Investors for funding pipelines, and Mentors for project guidance. They also host the most competitive activity on the platform: hackathons. 
+ 
+ 4.12 Student Academic Records Management 
+ Upload and manage student academic records: grades, attendance %, certifications, CGPA 
+ Department-wise student directories with filter by batch, year, branch, specialization 
+ Student record visibility to HR: limited to name, skills, leaderboard rank, project portfolio — GDPR-scoped 
+ Verified student leaderboard shared with partnered HR firms for pre-placement shortlisting 
+ Bulk export student data for placement coordinator use 
+ 
+ 4.13 Hackathon Management 
+ Create hackathons: title, theme, problem statements, prizes, eligibility, team size limits, timeline 
+ Manage team registrations: approve teams, check eligibility, handle late entries 
+ Assign judges (internal faculty + external industry guests) with scoped read access 
+ Evaluation rubric builder: define scoring criteria per problem statement 
+ Results declaration: scores entered by judges → system auto-ranks and publishes results 
+ Results auto-update participant leaderboard scores and award badges/trophies 
+ Export results as PDF certificates and announcement PDFs 
+ 
+ 4.14 Investor Partnership Management 
+ Onboard investors: invite investor to platform as college partner; investor gains access to college's verified student project marketplace 
+ Manage partnership agreements: track active/expired partnerships, renewal alerts 
+ Promote selected student projects to linked investor network 
+ Student pitch requests gated to college-linked investors for institution-level quality control 
+ 
+ 4.15 Hiring Event Coordination 
+ Initiate campus hiring event with HR: select company, set drive date, eligibility criteria 
+ Define eligible student pool: branch, year, CGPA cutoff , placement eligibility flag 
+ Publish drive details to eligible students; students apply through platform 
+ Post-event: track shortlisted, interviewed, offered, accepted, declined — full funnel analytics 
+ Generate offer letter PDFs through platform template system 
+ 
+ 4.16 Mentor Arrangement 
+ Browse platform mentors and invite for college-level project mentorship programmes 
+ Coordinate mentor–student matching based on project domain and mentor expertise 
+ Track active mentorship contracts linked to college students 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ Role 4 — Investor Dashboard 
+ 
+ Investors interact with the platform through a structured pipeline — they never receive unsolicited contact. All engagement is gated through pitch requests, ensuring quality interactions and eliminating spam. Investors also gain curated project health signals (not raw Jira data) to maintain oversight without operational noise. 
+ 4.17 Project Discovery &amp; Marketplace 
+ Browse student projects in marketplace with rich filters: domain, tech stack, college, mentor status, project stage, team size 
+ Project showcase view: team bios, mentor association, uploaded assets (deck, README, demo), project health signals 
+ Health Signals (curated from Jira): last activity date, milestone completion %, sprint velocity trend — never raw tickets 
+ Save/bookmark projects of interest; organize by pipeline stage 
+ Receive college-promoted project recommendations from partner colleges 
+ 
+ 4.18 Pitch Pipeline Management 
+ Receive pitch requests from student teams with pitch deck, demo link, financial projections 
+ Review queue with filtering: domain, college, mentor-backed, date received 
+ Accept pitch: moves to meeting scheduling; student notified 
+ Decline pitch: mandatory structured feedback form (helps students improve) 
+ Track full pitch history: pending → under review → accepted / declined per project 
+ 
+ 4.19 Meeting &amp; Communication 
+ Set weekly availability: time slots available for pitch meetings 
+ Students self-book from available slots (calendar 

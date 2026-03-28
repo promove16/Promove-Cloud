@@ -3,6 +3,62 @@ import { ApiError } from '../../utils/ApiError';
 import { User } from '../user/user.model';
 import { UserRole } from '../../types/roles.types';
 
+type PublicLinkSet = {
+  websiteUrl?: string;
+  githubUrl?: string;
+  linkedinUrl?: string;
+};
+
+type PublicSkill = {
+  name: string;
+  level: string;
+};
+
+type PublicExperienceHighlight = {
+  title: string;
+  company: string;
+  type: string;
+  location?: string;
+  startDate?: Date;
+  endDate?: Date | null;
+  isCurrent: boolean;
+  skills: string[];
+  description?: string;
+};
+
+type PublicEducationHighlight = {
+  institution: string;
+  degree?: string;
+  fieldOfStudy?: string;
+  startYear?: number;
+  endYear?: number | null;
+  isCurrent: boolean;
+  grade?: string;
+};
+
+type PublicPortfolioHighlight = {
+  title: string;
+  description?: string;
+  techStack: string[];
+  repoUrl?: string | null;
+  liveUrl?: string | null;
+  stars: number;
+  forks: number;
+  languages: string[];
+};
+
+type PublicGithubStats = {
+  totalRepos: number;
+  totalStars: number;
+  totalForks: number;
+  contributionsLastYear: number;
+  topLanguages: Array<{
+    language: string;
+    percentage: number;
+  }>;
+  lastSyncedAt?: Date | null;
+};
+
 type PublicUser = {
   _id: { toString(): string };
   displayName: string;
@@ -10,7 +66,51 @@ type PublicUser = {
   role: UserRole;
   domain?: string;
   bio?: string;
+  headline?: string;
+  location?: string;
+  websiteUrl?: string | null;
+  githubUrl?: string | null;
+  linkedinUrl?: string | null;
+  skills?: PublicSkill[];
+  experience?: PublicExperienceHighlight[];
+  education?: PublicEducationHighlight[];
+  portfolioProjects?: PublicPortfolioHighlight[];
+  githubStats?: PublicGithubStats;
   lastLogin?: Date;
+};
+
+const compactString = (value?: string | null) => {
+  const trimmed = value?.trim();
+  return trimmed ? trimmed : undefined;
+};
+
+const mapLinkSet = (user: PublicUser): PublicLinkSet | undefined => {
+  const links = {
+    ...(compactString(user.websiteUrl) ? { websiteUrl: compactString(user.websiteUrl) } : {}),
+    ...(compactString(user.githubUrl) ? { githubUrl: compactString(user.githubUrl) } : {}),
+    ...(compactString(user.linkedinUrl) ? { linkedinUrl: compactString(user.linkedinUrl) } : {}),
+  };
+
+  return Object.keys(links).length > 0 ? links : undefined;
+};
+
+const mapGithubStats = (githubStats?: PublicGithubStats) => {
+  if (!githubStats) {
+    return undefined;
+  }
+
+  const hasMeaningfulStats =
+    githubStats.totalRepos > 0 ||
+    githubStats.totalStars > 0 ||
+    githubStats.totalForks > 0 ||
+    githubStats.contributionsLastYear > 0 ||
+    githubStats.topLanguages.length > 0;
+
+  if (!hasMeaningfulStats) {
+    return undefined;
+  }
+
+  return githubStats;
 };
 
 const mapPublicUser = (user: PublicUser) => ({
@@ -18,8 +118,71 @@ const mapPublicUser = (user: PublicUser) => ({
   displayName: user.displayName,
   ...(user.avatar ? { avatar: user.avatar } : {}),
   role: user.role,
-  ...(user.domain ? { domain: user.domain } : {}),
-  ...(user.bio ? { bio: user.bio } : {}),
+  ...(compactString(user.domain) ? { domain: compactString(user.domain) } : {}),
+  ...(compactString(user.bio) ? { bio: compactString(user.bio) } : {}),
+  ...(compactString(user.headline) ? { headline: compactString(user.headline) } : {}),
+  ...(compactString(user.location) ? { location: compactString(user.location) } : {}),
+  ...(mapLinkSet(user) ? { links: mapLinkSet(user) } : {}),
+  ...(user.skills && user.skills.length > 0
+    ? {
+        skills: user.skills
+          .filter((skill) => compactString(skill.name))
+          .slice(0, 8)
+          .map((skill) => ({
+            name: skill.name.trim(),
+            level: skill.level,
+          })),
+      }
+    : {}),
+  ...(user.experience && user.experience.length > 0
+    ? {
+        experienceHighlights: user.experience.slice(0, 3).map((item) => ({
+          title: item.title,
+          company: item.company,
+          type: item.type,
+          ...(compactString(item.location) ? { location: compactString(item.location) } : {}),
+          ...(item.startDate ? { startDate: item.startDate } : {}),
+          ...(item.endDate !== undefined ? { endDate: item.endDate } : {}),
+          isCurrent: item.isCurrent,
+          skills: item.skills.slice(0, 4),
+          ...(compactString(item.description) ? { description: compactString(item.description) } : {}),
+        })),
+      }
+    : {}),
+  ...(user.education && user.education.length > 0
+    ? {
+        educationHighlights: user.education.slice(0, 2).map((item) => ({
+          institution: item.institution,
+          ...(compactString(item.degree) ? { degree: compactString(item.degree) } : {}),
+          ...(compactString(item.fieldOfStudy) ? { fieldOfStudy: compactString(item.fieldOfStudy) } : {}),
+          ...(item.startYear ? { startYear: item.startYear } : {}),
+          ...(item.endYear !== undefined ? { endYear: item.endYear } : {}),
+          isCurrent: item.isCurrent,
+          ...(compactString(item.grade) ? { grade: compactString(item.grade) } : {}),
+        })),
+      }
+    : {}),
+  ...(user.portfolioProjects && user.portfolioProjects.length > 0
+    ? {
+        portfolioHighlights: user.portfolioProjects.slice(0, 3).map((project) => ({
+          title: project.title,
+          ...(compactString(project.description) ? { description: compactString(project.description) } : {}),
+          techStack: project.techStack.slice(0, 6),
+          ...(compactString(project.repoUrl) ? { repoUrl: compactString(project.repoUrl) } : {}),
+          ...(compactString(project.liveUrl) ? { liveUrl: compactString(project.liveUrl) } : {}),
+          stars: project.stars,
+          forks: project.forks,
+          languages: project.languages.slice(0, 4),
+        })),
+      }
+    : {}),
+  ...(mapGithubStats(user.githubStats) ? { githubStats: mapGithubStats(user.githubStats) } : {}),
+  insightCounts: {
+    skills: user.skills?.length ?? 0,
+    experience: user.experience?.length ?? 0,
+    education: user.education?.length ?? 0,
+    portfolioProjects: user.portfolioProjects?.length ?? 0,
+  },
 });
 
 export const listMarketplaceUsers = async (
@@ -38,7 +201,9 @@ export const listMarketplaceUsers = async (
     isActive: true,
     ...(domain ? { domain: new RegExp(domain, 'i') } : {}),
   })
-    .select('displayName avatar role domain bio lastLogin')
+    .select(
+      'displayName avatar role domain bio headline location websiteUrl githubUrl linkedinUrl skills experience education portfolioProjects githubStats lastLogin',
+    )
     .sort({ lastLogin: -1, updatedAt: -1 })
     .skip((page - 1) * limit)
     .limit(limit)
@@ -49,7 +214,9 @@ export const listMarketplaceUsers = async (
 
 export const getMarketplaceUser = async (requesterRole: UserRole, userId: string) => {
   const user = await User.findById(userId)
-    .select('displayName avatar role domain bio')
+    .select(
+      'displayName avatar role domain bio headline location websiteUrl githubUrl linkedinUrl skills experience education portfolioProjects githubStats',
+    )
     .lean();
 
   if (!user) {

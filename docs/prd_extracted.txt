@@ -1,0 +1,1125 @@
+0: ProMove Innovation Cloud
+1: MERN Stack • Role-Based Access Control Platform
+2: Complete Product Requirement Document
+3: v1.0
+4: Version
+5: 1.0  (Feature-Complete Edition)
+6: Document Type
+7: Product Requirement Document (PRD)
+8: Tech Stack
+9: MongoDB • Express.js • React.js • Node.js (MERN)
+10: Auth System
+11: JWT + RBAC (7 Roles) + Scoped Access + State Guards
+12: Security Ref.
+13: OWASP Top 10 (2025) • NIST RBAC • RFC 7519
+14: Date
+15: 23 March 2026
+16: Status
+17: Merged & Enriched — Ready for Development Sprint Planning
+18: Table of Contents
+19: Table of Contents2
+20: 1.1 Platform Vision4
+21: 1.2 Authorization Philosophy (Three-Layer Model)5
+22: 1.3 Key Platform Differentiators5
+23: 2.1 Full Technology Stack6
+24: 2.2 Application Architecture7
+25: 2.3 Bounded Contexts (Backend Domain Split)7
+26: 2.4 Three-Layer Authorization Middleware7
+27: 2.5 Authentication Token Strategy8
+28: 3.1 Base User Schema9
+29: 3.2 Role-Specific Extended Profiles9
+30: 3.3 Project Schema11
+31: 3.4 Key Supporting Schemas12
+32: 4.1 Student Identity & Verification13
+33: 4.2 Project Management — Jira-Style Board13
+34: 4.3 Mentor Discovery & Engagement14
+35: 4.4 Investor Pitching14
+36: 4.5 Marketplace14
+37: 4.6 Leaderboard & Competitions15
+38: 4.7 File Management & Profile15
+39: 4.8 Student Roster Management16
+40: 4.9 Leaderboard & Progress Monitoring16
+41: 4.10 Mentor & Training Management16
+42: 4.11 Skill Development Events16
+43: 4.12 Student Academic Records Management17
+44: 4.13 Hackathon Management17
+45: 4.14 Investor Partnership Management17
+46: 4.15 Hiring Event Coordination17
+47: 4.16 Mentor Arrangement18
+48: 4.17 Project Discovery & Marketplace19
+49: 4.18 Pitch Pipeline Management19
+50: 4.19 Meeting & Communication19
+51: 4.20 Portfolio & Investment Monitoring19
+52: 4.21 Dual Hiring Mode Overview20
+53: 4.22 Campus-Based Hiring Workflow20
+54: 4.23 Direct Student Hiring Workflow21
+55: 4.24 Interview & Event Management21
+56: 4.25 Mentorship Marketplace — Bidding22
+57: 4.26 Payment & Escrow22
+58: 4.27 SDLC & Project Board Management22
+59: 4.28 Institutional Mentorship Programmes23
+60: 4.29 User & Platform Management24
+61: 4.30 Content & Policy Governance24
+62: 4.31 Financial Oversight24
+63: 4.32 Analytics & System Monitoring24
+64: 4.33 System Configuration25
+65: 5.1 Student Identity & Verification Workflow26
+66: 5.2 Student Project Lifecycle26
+67: 5.3 Mentor Bidding & Escrow Workflow27
+68: 5.4 Investor Pitch & Meeting Workflow27
+69: 5.5 Campus-Based Hiring Workflow27
+70: 5.6 Hackathon Workflow28
+71: 6.1 Route Conventions29
+72: 6.2 Complete Route Specification29
+73: 8.1 React Application Structure33
+74: 8.2 Role-Based Routing Strategy33
+75: 8.3 UI Design System (Based on Figma Screens)34
+76: 9.1 Authentication Security35
+77: 9.2 Authorization Security35
+78: 9.3 File Upload Security (OWASP File Upload Cheat Sheet)35
+79: 9.4 Application Security36
+80: 9.5 Privacy & GDPR Compliance36
+81: 11.1 Phase Expansion Options (Post-Launch)Error! Bookmark not defined.
+82: 1. Executive Summary
+83: ProMove Innovation Cloud is a student-centered innovation ecosystem built on the MERN stack, connecting Students, Schools, Colleges, Mentors, Investors, HR professionals, and Super Admins into one unified platform. The architectural spine is: Identity → Verification → Team / Project → Evidence (tickets, assets, outcomes) → Transactions (mentorship / pitch / hiring / sales). Every other role exists to support, evaluate, invest in, or hire from the student community.
+84: The platform enforces three complementary authorization layers: RBAC for baseline role powers, Scoped Access for institution and contract boundaries, and State Guards for workflow-locked actions (e.g., a pitch deck may only be uploaded after a pitch is accepted). This three-layer model follows OWASP's recommendation that authorization must be server-side, default-deny, and centralized rather than scattered across route guards.
+85: 1.1 Platform Vision
+86: To create a connected innovation ecosystem where every participant adds measurable value to the student journey:
+87: Students build real-world projects, compete, get mentored, pitch to investors, and get hired
+88: Schools and Colleges maintain verified rosters, organize events and hackathons, and act as trusted gatekeepers for HR and investors
+89: Mentors bid on project teams, manage SDLC workflows, and earn through an escrow payment system
+90: Investors discover curated projects, manage pitch pipelines, and monitor funded team progress
+91: HR professionals access verified talent pools via campus drives or direct outreach and run structured interview pipelines
+92: Super Admins govern platform integrity, privacy, audit trails, and system configuration
+93: 1.2 Authorization Philosophy (Three-Layer Model)
+94: OWASP Top 10 (2025) ranks Broken Access Control as the #1 risk. Authorization must be server-side, centralized, and default-deny — not scattered across client-side UI conditionals.
+95: Layer
+96: Answers
+97: Example
+98: Role
+99: What general powers do you have?
+100: Mentor can manage SDLC; HR can schedule interviews
+101: Scope
+102: Which subset of data?
+103: Mentor only sees their contracted project board; HR sees only opted-in students
+104: State
+105: Is this action allowed right now?
+106: Upload pitch deck only when pitch is accepted; release escrow only on project completion
+107: 1.3 Key Platform Differentiators
+108: Feature
+109: Description
+110: Business Benefit
+111: Unified Ecosystem
+112: All 7 roles in one platform with no data silos
+113: Seamless cross-role collaboration and data consistency
+114: 3-Layer RBAC
+115: Role + Scope + State enforced server-side
+116: Prevents broken access control (OWASP #1 risk)
+117: Jira-Style PM
+118: Full project boards, sprints, burndown, epics
+119: Students learn industry-standard practices
+120: Verified Identity
+121: School/College roster verification
+122: Trusted student profiles for HR and Investors
+123: Mentor Bidding + Escrow
+124: Competitive bids, contracts, milestone-based payments
+125: Fair marketplace for mentorship services
+126: Investor Pitch Gate
+127: Structured pitch request > accept > meet flow
+128: No unsolicited messages; quality investor interactions
+129: Marketplace
+130: Sell/showcase projects with full asset bundles
+131: Monetization and IP transfer for student teams
+132: Dual Hiring Mode
+133: Campus drives + direct student outreach
+134: Flexible talent acquisition for every HR scenario
+135: Leaderboards
+136: Hackathons, daily challenges, EdTech, institution ranks
+137: Gamified motivation and talent discovery
+138: Presigned S3 Uploads
+139: Time-limited upload/download URLs per OWASP + AWS guidance
+140: Secure file handling with least-privilege access
+141: 2. System Architecture
+142: 2.1 Full Technology Stack
+143: Layer
+144: Technology
+145: Rationale
+146: Frontend SPA
+147: React.js 18 + Redux Toolkit + TailwindCSS
+148: Reactive UI with centralized state; role-specific lazy-loaded modules
+149: Backend API
+150: Node.js 20 LTS + Express.js 4
+151: Non-blocking I/O ideal for concurrent role dashboards
+152: Database
+153: MongoDB 7 + Mongoose ODM
+154: Flexible schemas for multi-role documents; Atlas Search for discovery
+155: Authentication
+156: JWT (RFC 7519) + bcrypt / Argon2id
+157: Short-lived access tokens + HttpOnly refresh cookies
+158: RBAC Engine
+159: Custom middleware + permission config JSON
+160: Centralized, auditable, default-deny authorization
+161: File Storage
+162: AWS S3 + Presigned URLs + Cloudinary CDN
+163: Least-privilege upload/download; CDN for fast delivery
+164: Payments
+165: Stripe Connect (Destination Charges + Escrow logic)
+166: Marketplace-style mentor payments; platform fee retention
+167: Real-time
+168: Socket.io (WebSockets)
+169: Notifications, Jira updates, meeting alerts
+170: Email
+171: NodeMailer + SendGrid
+172: Transactional emails: verification, invites, alerts
+173: Scheduling
+174: Agenda.js + node-cron
+175: Meeting reminders, event notifications, token cleanup
+176: Search
+177: MongoDB Atlas Search / Elasticsearch
+178: Full-text project and student discovery
+179: Deployment
+180: Docker + AWS EC2 / Railway + Vercel
+181: Containerized, scalable cloud deployment
+182: Monitoring
+183: Sentry + Winston logger + Prometheus
+184: Error tracking, structured logs, API health metrics
+185: 2.2 Application Architecture
+186: The platform follows a strict 3-tier MVC architecture with a bounded-context domain split on the backend:
+187: Presentation: React.js SPA with role-specific dashboards, lazy-loaded per role to minimize bundle size
+188: API: Express.js REST API — routes grouped by bounded context, protected by 3-layer RBAC middleware
+189: Data: MongoDB with domain-separated collections; no cross-context direct joins — service layer handles composition
+190: 2.3 Bounded Contexts (Backend Domain Split)
+191: Bounded Context
+192: Owns
+193: Key Collections
+194: Identity & Access
+195: Auth, sessions, RBAC, audit logs
+196: users, sessions, roles, audit_logs
+197: Institution
+198: Schools, colleges, rosters, verification
+199: institutions, rosters, verification_requests
+200: Project Execution
+201: Teams, projects, tickets, milestones, assets
+202: teams, projects, tickets, milestones, assets
+203: Programs
+204: Hackathons, challenges, courses, leaderboards
+205: events, leaderboard_entries, submissions
+206: Transactions
+207: Mentorship bids/contracts/payments, pitch, marketplace
+208: mentorship_requests, contracts, pitch_requests, marketplace_listings
+209: Hiring
+210: HR events, interviews, offers
+211: hiring_events, interviews, offers
+212: 2.4 Three-Layer Authorization Middleware
+213: Every API request passes through a three-stage pipeline before reaching the route handler:
+214: Authenticate: Verify JWT signature (RS256), decode payload {userId, role, institutionId, contractIds[]}
+215: Role-Check: Match requested action against role permission set from centralized permission config
+216: Scope + State Guard: Verify resource ownership and that the workflow state permits this action
+217: OWASP Transaction Authorization: Authorization must be enforced server-side. Transaction state (e.g., pitch accepted, contract active) must be checked at every protected action — not assumed from client-side state.
+218: 2.5 Authentication Token Strategy
+219: Following RFC 7519 and OWASP Session Management guidance:
+220: Access Token: JWT signed with RS256, 15-minute TTL, carried in Authorization header
+221: Refresh Token: Opaque token, 7-day TTL, stored in HttpOnly + Secure + SameSite=Strict cookie
+222: CSRF Defense: Cookie-to-header CSRF token pattern for all state-mutating endpoints
+223: Password hashing: Argon2id (preferred) with fallback to bcrypt (12 salt rounds) per OWASP Password Storage Cheat Sheet
+224: Token rotation: Refresh tokens rotated on every use; old token invalidated immediately
+225: 3. Core Data Models
+226: 3.1 Base User Schema
+227: All 7 roles share a single users collection. Role-specific extended data is stored in a separate profile document in the matching collection (e.g., student_profiles, mentor_profiles).
+228: Field
+229: Type
+230: Notes
+231: _id
+232: ObjectId
+233: Unique identifier (auto)
+234: name
+235: String
+236: Full legal name
+237: email
+238: String, unique
+239: Primary login credential; must be verified
+240: password
+241: String
+242: Argon2id / bcrypt hash — never returned in API responses
+243: role
+244: Enum
+245: student | school | college | investor | mentor | hr | superadmin
+246: profilePicture
+247: String (S3 URL)
+248: Avatar stored in S3; CDN URL returned to client
+249: isEmailVerified
+250: Boolean
+251: Set true after email verification link is clicked
+252: isInstitutionVerified
+253: Boolean
+254: Set true by School/College admin after roster match
+255: institutionId
+256: ObjectId ref
+257: Linked school or college (students and mentors)
+258: accountStatus
+259: Enum
+260: active | suspended | banned | pending_verification
+261: twoFactorEnabled
+262: Boolean
+263: Optional TOTP 2FA (authenticator app)
+264: lastLogin
+265: Date
+266: Timestamp of most recent successful login
+267: createdAt
+268: Date
+269: Registration timestamp
+270: actionLog
+271: ObjectId[]
+272: Ref to audit_logs — all sensitive actions tracked
+273: 3.2 Role-Specific Extended Profiles
+274: Role
+275: Extended Profile Fields
+276: Student
+277: teamIds[], activeProjectIds[], completedProjectIds[], mentorContractIds[], leaderboardScore, globalRank, institutionRank, edtechCourseIds[], hackathonIds[], pitchRequestIds[], marketplaceListingIds[], schoolId, collegeId, verificationStatus, skillTags[], badges[]
+278: School
+279: registrationNumber, district, state, principalName, contactEmail, verifiedStudentIds[], organisedEventIds[], assignedMentorIds[], leaderboardEnabled, certificationTemplateUrl
+280: College
+281: universityAffiliation, accreditation, departments[], hackathonIds[], linkedInvestorIds[], linkedHRIds[], studentRecordsUploaded, placementCoordinatorId, partnershipAgreements[]
+282: Investor
+283: firm, designation, investmentDomains[], pitchRequestIds[], acceptedPitchIds[], scheduledMeetingIds[], bookmarkedProjectIds[], investmentNotes[]
+284: Mentor
+285: expertise[], bio, linkedInUrl, portfolioUrl, hourlyRate, availabilityCalendar, activeContractIds[], completedContractIds[], biddingHistory[], sdlcBoardIds[], stripeAccountId, avgRating, totalReviews
+286: HR
+287: company, designation, hiringMode (campus|direct|both), linkedCollegeIds[], scheduledInterviewIds[], offerLetterIds[], shortlistedStudentIds[], visitedCollegeIds[], atsExportHistory[]
+288: Super Admin
+289: adminLevel (1|2|3), permissionOverrides[], managedPolicies[], destructiveActionLog[], featureFlagAccess
+290: 3.3 Project Schema
+291: Field
+292: Type
+293: Description
+294: title
+295: String
+296: Project display name
+297: slug
+298: String, unique
+299: URL-friendly identifier auto-generated from title
+300: description
+301: String
+302: Rich-text overview (max 2000 chars)
+303: teamId
+304: ObjectId ref
+305: Owning team
+306: leadStudentId
+307: ObjectId ref
+308: Team lead student
+309: mentorContractId
+310: ObjectId ref
+311: Active mentorship contract (nullable)
+312: investorId
+313: ObjectId ref
+314: Accepted investor (nullable)
+315: status
+316: Enum
+317: planning | active | paused | completed | sold | archived
+318: visibility
+319: Enum
+320: private | institution | public
+321: fileAssets
+322: Asset[]
+323: {url, type, label, uploadedAt, uploadedBy} — S3 presigned
+324: jiraBoardId
+325: ObjectId ref
+326: Linked project board
+327: techStack
+328: String[]
+329: e.g., [React, Node, MongoDB]
+330: tags
+331: String[]
+332: Domain tags: AI, FinTech, HealthTech, etc.
+333: marketplaceListing
+334: Object
+335: {listedAt, askingPrice, status, enquiries[], closedAt}
+336: pitchHistory
+337: PitchRequest[]
+338: Full pitch lifecycle history per investor
+339: healthSignals
+340: Object
+341: {lastCommit, sprintVelocity, milestoneCompletion%} — for investor view
+342: projectScore
+343: Number
+344: Auto-calculated from hackathon/challenge results
+345: 3.4 Key Supporting Schemas
+346: Collection
+347: Key Fields
+348: mentorship_requests
+349: studentTeamId, projectId, budgetRange, timeline, skillsNeeded, status (open|bidding|matched|closed)
+350: mentor_contracts
+351: mentorId, teamId, projectId, agreedFee, escrowStatus, milestones[], startDate, endDate, rating
+352: pitch_requests
+353: studentTeamId, investorId, projectId, attachments[], status, investorFeedback, meetingId
+354: meetings
+355: participantIds[], scheduledAt, durationMins, platform (GoogleMeet|Zoom), meetLink, notes, recordingUrl
+356: marketplace_listings
+357: projectId, sellerId, askingPrice, assets[], status (draft|published|enquiry|sold), enquiries[]
+358: hiring_events
+359: hrId, institutionId, mode (campus|direct), jobDescriptions[], eligibilityCriteria, status, studentApplicationIds[]
+360: interviews
+361: candidateId, hrId, rounds[], scheduledAt, outcome, feedbackNotes, offerLetterId
+362: leaderboard_entries
+363: studentId, category (hackathon|daily|edtech), score, rank, institutionRank, badges[], updatedAt
+364: audit_logs
+365: actorId, actorRole, action, resourceType, resourceId, ipAddress, timestamp, outcome
+366: 4. Role-Based Dashboards & Feature Specifications
+367: Role 1 — Student Dashboard
+368: Students are the platform's core users. Every feature, every other role, and every data flow ultimately serves the student's innovation, learning, and career journey. The student dashboard is the most feature-rich module and acts as the heartbeat of the application.
+369: Identity Foundation: A student's profile becomes fully trusted only after institution verification. Verified status unlocks: institution leaderboard, HR visibility, event eligibility, and investor discovery. Unverified students have a limited but functional sandbox.
+370: 4.1 Student Identity & Verification
+371: Register with email + password (Argon2id hashed)
+372: Email verification link sent on registration
+373: Link to School or College via: institution invite code, institutional email domain match, or manual verification request
+374: School/College admin approves roster match → student receives Verified Institution Badge
+375: Verification unlocks: institution leaderboard, HR visibility, hackathon eligibility, verified portfolio badge
+376: Unverified students can still create projects, use Jira boards, and list in marketplace
+377: Institution verification is non-blocking for core features but required for hiring/investment visibility
+378: 4.2 Project Management — Jira-Style Board
+379: Create a project: title, description, tech stack, domain tags, team visibility setting
+380: Team management: invite by email or student ID; assign roles (Lead, Developer, Designer, Tester, DevOps)
+381: Full Kanban board: Backlog → To Do → In Progress → In Review → Done
+382: Tickets/Issues: title, description, priority (P0 Critical → P3 Low), assignee, due date, labels, attachments
+383: Epics and Milestones: group tickets under epics; milestones trigger mentor approval and investor notifications
+384: Sprint Planning: create sprints (1–4 weeks), assign backlog tickets, set sprint goal and acceptance criteria
+385: Burndown Chart: remaining story points vs. calendar days — auto-rendered per sprint
+386: Sprint velocity history: trend chart across last N sprints
+387: Activity feed: real-time log of all ticket changes, comments, status transitions
+388: Comment threads: per-ticket nested comments with @mention notifications via Socket.io
+389: Optional Phase 2: OAuth 2.0 (3LO) integration with Atlassian Jira Cloud for teams wanting external continuity
+390: 4.3 Mentor Discovery & Engagement
+391: Browse verified mentors filtered by: domain expertise, availability, price range, rating, institution affiliation
+392: Mentor profile view: bio, LinkedIn, portfolio, past project references, ratings breakdown, available calendar slots
+393: Post a Mentorship Request: project brief, required skills, timeline, budget range, preferred meeting cadence
+394: Receive and compare bids from multiple mentors: proposal, price, timeline, mentorship plan
+395: Accept one bid → system creates Mentorship Contract with status: proposed → active → completed
+396: Payment escrowed at acceptance; released per milestone completion (Stripe Connect)
+397: Communication via in-platform chat; video meetings via Google Meet / Zoom (third-party link generation)
+398: Post-project: rate and review mentor (1–5 stars + written review) — affects mentor future visibility
+399: 4.4 Investor Pitching
+400: Prepare Project Showcase page: attach pitch deck (PPT/PDF), README, demo video URL, financial projections, team bios
+401: Browse available investors filtered by: investment domain, college partnerships, accepted pitch history
+402: Submit Pitch Request to selected investor(s) with brief message and attached materials
+403: Track pitch lifecycle: Pending → Under Review → Accepted / Declined
+404: Receive structured feedback from investors (mandatory field on decline)
+405: On acceptance: book a meeting from investor's available calendar slots
+406: Post-meeting: investor logs decision and notes (visible to student team and mentor)
+407: Investor can follow project milestone progress for invested/interested teams
+408: 4.5 Marketplace
+409: List completed or in-progress projects for sale: title, description, asking price, what's included
+410: Upload project assets: source code bundle (ZIP), documentation, demo video, pitch deck, README
+411: Visibility control: public marketplace, institution-only, or invite-only
+412: Receive buyer enquiries: platform-mediated messaging with enquiry status tracking
+413: Negotiation thread per enquiry; final sale closes listing and transfers asset access
+414: Listing states: draft → published → under enquiry → negotiation → sold / archived
+415: Platform fee on completed sales (configurable by Super Admin)
+416: 4.6 Leaderboard & Competitions
+417: Hackathon Board: rank by aggregate problem-statement scores; institution and global views
+418: Daily Coding Challenge Board: accuracy %, speed, streak days — resets daily, weekly aggregate
+419: EdTech Completion Board: courses finished, certifications earned, learning hours
+420: Institution-filtered view: rank among your school / college cohort only
+421: Global rank: across all verified students on the platform
+422: Badges and Trophies: auto-awarded on rank milestones, streak records, hackathon wins, course completions
+423: Portfolio auto-sync: achievements auto-populate student profile and are visible to HR and Investors
+424: 4.7 File Management & Profile
+425: Upload types: PDF, DOCX, PPTX, PNG/JPG, MP4 (demo), ZIP (code), README.md — per OWASP file upload guidance
+426: File validation: MIME type + file signature check; size limits enforced server-side; filenames sanitized
+427: S3 presigned URL workflow: client requests upload URL from API; uploads directly to S3; API records asset metadata
+428: Portfolio builder: auto-generated public profile from projects, achievements, skill tags, verified courses
+429: Skill tags: auto-populated from project tech stack and completed EdTech courses
+430: Verified Institution Badge: displayed prominently on public profile
+431: Role 2 — School Dashboard
+432: Schools act as trusted institutional anchors for student verification and structured skill development. Their primary responsibility is maintaining verified student rosters and providing structured mentorship and event programmes.
+433: 4.8 Student Roster Management
+434: Bulk upload students via CSV/Excel: name, email, roll number, class, section
+435: System auto-sends verification invitations to uploaded student emails
+436: Manual approval for students who self-register and claim institution membership
+437: Verified students gain: institution leaderboard access, special EdTech course eligibility, HR visibility flag
+438: Dashboard view: verification status per student, pending approvals, recently joined
+439: Export verified roster as CSV for offline records
+440: 4.9 Leaderboard & Progress Monitoring
+441: View student leaderboard filtered to school cohort: coding challenge scores, mentorship training scores
+442: Individual student progress: EdTech course completions, streak history, project activity
+443: Compare cohort performance across batches or sections
+444: Flag top performers for mentor programme consideration
+445: 4.10 Mentor & Training Management
+446: Browse and invite platform-registered mentors for school-level programmes
+447: Assign mentors to student cohorts or individual students
+448: Track mentor sessions: session logs, attendance records, student feedback ratings
+449: Organise Alumni Meets: create event, set date/venue, send invitations to alumni (linked former students), manage RSVPs
+450: Alumni participation tracked and linked back to current student inspiration metrics
+451: 4.11 Skill Development Events
+452: Create and publish events: workshops, bootcamps, seminars, coding contests
+453: Set event metadata: capacity, registration deadline, prerequisites, format (online/offline)
+454: Registration management: student self-registration, approval workflows, waitlist
+455: Issue digital certificates post-event (PDF generated from template, emailed to participants)
+456: HR can be invited to collaborate on school events (joint organisation)
+457: Event analytics: attendance rate, feedback scores, certificate issuance coun
+458: Role 3 — College Dashboard
+459: Colleges are the most connected institutional node — they link to Students, HR for placement, Investors for funding pipelines, and Mentors for project guidance. They also host the most competitive activity on the platform: hackathons.
+460: 4.12 Student Academic Records Management
+461: Upload and manage student academic records: grades, attendance %, certifications, CGPA
+462: Department-wise student directories with filter by batch, year, branch, specialization
+463: Student record visibility to HR: limited to name, skills, leaderboard rank, project portfolio — GDPR-scoped
+464: Verified student leaderboard shared with partnered HR firms for pre-placement shortlisting
+465: Bulk export student data for placement coordinator use
+466: 4.13 Hackathon Management
+467: Create hackathons: title, theme, problem statements, prizes, eligibility, team size limits, timeline
+468: Manage team registrations: approve teams, check eligibility, handle late entries
+469: Assign judges (internal faculty + external industry guests) with scoped read access
+470: Evaluation rubric builder: define scoring criteria per problem statement
+471: Results declaration: scores entered by judges → system auto-ranks and publishes results
+472: Results auto-update participant leaderboard scores and award badges/trophies
+473: Export results as PDF certificates and announcement PDFs
+474: 4.14 Investor Partnership Management
+475: Onboard investors: invite investor to platform as college partner; investor gains access to college's verified student project marketplace
+476: Manage partnership agreements: track active/expired partnerships, renewal alerts
+477: Promote selected student projects to linked investor network
+478: Student pitch requests gated to college-linked investors for institution-level quality control
+479: 4.15 Hiring Event Coordination
+480: Initiate campus hiring event with HR: select company, set drive date, eligibility criteria
+481: Define eligible student pool: branch, year, CGPA cutoff, placement eligibility flag
+482: Publish drive details to eligible students; students apply through platform
+483: Post-event: track shortlisted, interviewed, offered, accepted, declined — full funnel analytics
+484: Generate offer letter PDFs through platform template system
+485: 4.16 Mentor Arrangement
+486: Browse platform mentors and invite for college-level project mentorship programmes
+487: Coordinate mentor–student matching based on project domain and mentor expertise
+488: Track active mentorship contracts linked to college students
+489: Role 4 — Investor Dashboard
+490: Investors interact with the platform through a structured pipeline — they never receive unsolicited contact. All engagement is gated through pitch requests, ensuring quality interactions and eliminating spam. Investors also gain curated project health signals (not raw Jira data) to maintain oversight without operational noise.
+491: 4.17 Project Discovery & Marketplace
+492: Browse student projects in marketplace with rich filters: domain, tech stack, college, mentor status, project stage, team size
+493: Project showcase view: team bios, mentor association, uploaded assets (deck, README, demo), project health signals
+494: Health Signals (curated from Jira): last activity date, milestone completion %, sprint velocity trend — never raw tickets
+495: Save/bookmark projects of interest; organize by pipeline stage
+496: Receive college-promoted project recommendations from partner colleges
+497: 4.18 Pitch Pipeline Management
+498: Receive pitch requests from student teams with pitch deck, demo link, financial projections
+499: Review queue with filtering: domain, college, mentor-backed, date received
+500: Accept pitch: moves to meeting scheduling; student notified
+501: Decline pitch: mandatory structured feedback form (helps students improve)
+502: Track full pitch history: pending → under review → accepted / declined per project
+503: 4.19 Meeting & Communication
+504: Set weekly availability: time slots available for pitch meetings
+505: Students self-book from available slots (calendar widget)
+506: Video meetings via Google Meet / Zoom (third-party link generated and sent to both parties)
+507: Pre-meeting brief auto-sent: project summary, team details, mentor name
+508: Post-meeting: investor logs decision (invest / pass / follow-up) and notes — visible to team + mentor
+509: 4.20 Portfolio & Investment Monitoring
+510: For accepted/invested projects: full project dashboard with milestone timeline
+511: Progress updates from team lead and mentor (structured update posts)
+512: Investor commentary thread on milestones (visible to team; not public)
+513: Escalation alerts: mentor flags stalled project or critical milestone missed
+514: Role 5 — HR Dashboard
+515: HR's platform role is a specialized ATS (Applicant Tracking System) built on top of verified student project evidence. Two distinct hiring modes share a single data model but have different entry flows and visibility rules.
+516: 4.21 Dual Hiring Mode Overview
+517: Aspect
+518: Campus-Based Hiring
+519: Direct Student Hiring
+520: Entry Point
+521: HR requests event → College approves
+522: HR searches student database directly
+523: Student Pool
+524: College-defined eligibility criteria
+525: Global verified students with opted-in visibility
+526: Data Access
+527: Leaderboard + academic record + portfolio
+528: Leaderboard + portfolio (no raw academic records without opt-in)
+529: Privacy
+530: College acts as data controller; student consent on enrolment
+531: Student explicit opt-in required for direct search visibility
+532: Process Flow
+533: Drive posting → Apply → Shortlist → Interview → Offer
+534: Discover → Interest signal → Student accept/decline → Interview → Offer
+535: 4.22 Campus-Based Hiring Workflow
+536: Request campus hiring event: select college partner, proposed date, job description(s), eligibility criteria
+537: College reviews and approves event; sets eligible student pool (year, branch, CGPA filter, placement flag)
+538: Approved event published to eligible students; students apply with one-click profile submission
+539: HR reviews applications: leaderboard rank, project portfolios, EdTech completions, hackathon wins
+540: Shortlist management: tag students as Shortlisted / On Hold / Rejected with internal notes
+541: Interview scheduling: create rounds (Technical, HR, Managerial), assign interviewers, send calendar invites
+542: Record interview outcomes: pass/fail per round, consolidated feedback notes
+543: Offer letters generated from template (college + HR co-branded PDF) and sent through platform
+544: 4.23 Direct Student Hiring Workflow
+545: Search global verified student database with rich filters: skill tags, hackathon wins, project count, leaderboard rank, EdTech completions, institution
+546: Students must have opted into Direct Hiring Visibility in their privacy settings
+547: Send interest signal to selected students with job description and company profile
+548: Student accepts/declines interest (no harassment; student controls engagement)
+549: On acceptance: schedule interview directly between HR and student
+550: 4.24 Interview & Event Management
+551: Manage event logistics: attendee lists, pre-screening questionnaire, confirmation emails
+552: Integrated calendar: availability sync, conflict detection, automated reminders
+553: Interview round tracking: status per candidate per round
+554: Post-interview: consolidated feedback, hiring decision, offer workflow
+555: Export shortlist as CSV with full profile data for internal ATS system upload
+556: Role 6 — Mentor Dashboard
+557: Mentors are vetted professionals who can earn through the platform by guiding student project teams. Their access is strictly contract-scoped — a mentor only sees data for projects they are actively contracted on.
+558: 4.25 Mentorship Marketplace — Bidding
+559: Browse open mentorship requests from student teams: project brief, skills needed, timeline, budget range
+560: Submit bid: proposed fee, mentorship plan (approach, milestones covered, meeting frequency), availability
+561: Multiple mentors can bid on one request; student reviews all bids on a comparison page
+562: Student accepts one bid → Mentorship Contract created with: proposed → active → completed / terminated states
+563: On contract activation: mentor gains scoped access to project board, assets, and team chat
+564: 4.26 Payment & Escrow
+565: Stripe Connect: mentor onboards with a connected Stripe account (destination charge model)
+566: Student pays total agreed fee on contract activation; funds held in escrow
+567: Milestone-based release: at each agreed milestone completion, mentor requests release; student confirms → Stripe releases tranche
+568: Platform fee deducted at each release (configured by Super Admin)
+569: Dispute workflow: either party can raise dispute → Super Admin reviews → decision logged to audit trail
+570: Post-contract: both mentor and student rate each other; ratings affect future bid visibility
+571: 4.27 SDLC & Project Board Management
+572: Full Jira board access for contracted project (scoped — cannot access other projects)
+573: Create and edit tickets, assign to team members, set priority and due dates
+574: Manage SDLC phase transitions: Requirements → Design → Build → Test → Deploy → Maintenance
+575: Create and manage milestones; milestone completion triggers investor notification and payment release
+576: Sprint retrospective notes: posted after each sprint; visible to team and investor (not public)
+577: Flag blocked items: mentor can escalate to investor or college coordinator
+578: 4.28 Institutional Mentorship Programmes
+579: Browse and accept invitations from Schools and Colleges for structured mentorship programmes
+580: Track session logs: date, attendees, topics covered, action items
+581: Student feedback collection after each session (star rating + comments)
+582: Programme dashboard: completion %, student progress, upcoming sessions
+583: Role 7 — Super Admin Dashboard
+584: Super Admins have unrestricted platform access but all destructive or sensitive actions are bounded by operational governance: high-friction confirmation dialogs, immutable audit logs, and role-level access tiers (Admin Level 1/2/3). This follows OWASP's guidance that centralized admin paths reduce risk better than scattered ad-hoc overrides.
+585: 4.29 User & Platform Management
+586: Full CRUD on all user accounts across all 7 roles
+587: Suspend or ban accounts with mandatory reason field; suspension is reversible; ban requires Level 3 admin
+588: Impersonate any user for debugging/support — logged immediately to audit trail with reason
+589: Bulk operations: CSV import/export, role reassignment, bulk suspend/reactivate
+590: Account merge: handle duplicate accounts from institution import vs. self-registration
+591: 4.30 Content & Policy Governance
+592: Manage platform-wide policies: Privacy Policy, Terms of Service, Community Guidelines, Acceptable Use Policy
+593: Policy version history with diff view and publish/rollback controls
+594: Content moderation queue: reported projects, comments, profiles — review with accept/reject/edit actions
+595: Marketplace moderation: approve/reject listings flagged for policy violations or IP concerns
+596: GDPR data deletion: purge all personal data for a user on request — cascades across all collections, logged to audit trail
+597: 4.31 Financial Oversight
+598: Revenue dashboard: platform fees from mentor payments, marketplace transactions, subscription upgrades
+599: Dispute management: review raised disputes, request evidence from both parties, record binding decision
+600: Stripe dashboard integration: view payouts, refunds, failed charges
+601: Configure platform fee percentages per transaction type (mentor payment, marketplace sale)
+602: 4.32 Analytics & System Monitoring
+603: Platform-wide analytics: DAU/MAU, role distribution, engagement heatmaps, feature usage funnels
+604: Hiring analytics: campus vs. direct, offer acceptance rates, top hiring companies
+605: Project health overview: stalled projects, active sprints, marketplace conversion rates
+606: Error monitoring (Sentry integration): live error feed, affected users, stack traces
+607: API health dashboard: response time percentiles, error rates per endpoint, Stripe webhook status
+608: 4.33 System Configuration
+609: Feature flags: enable/disable any feature per role or globally (e.g., disable marketplace for trial users)
+610: Email template manager: edit all transactional email templates with live preview
+611: Platform announcements: create banners and notification blasts per role segment
+612: Leaderboard configuration: adjust scoring weights for hackathon, daily challenge, EdTech categories
+613: Rate limit configuration: adjust per-role API rate limits
+614: 5. Core Cross-Role Workflows
+615: 5.1 Student Identity & Verification Workflow
+616: Step
+617: Action
+618: Actor
+619: State Change
+620: 1
+621: Student registers with email + password
+622: Student
+623: accountStatus: pending_verification
+624: 2
+625: Click email verification link
+626: Student
+627: isEmailVerified: true
+628: 3
+629: Enter institution invite code or request institution link
+630: Student
+631: verificationStatus: pending_institution
+632: 4
+633: School/College admin reviews and approves roster match
+634: School/College
+635: isInstitutionVerified: true, badge awarded
+636: 5
+637: Institution leaderboard, HR visibility, event access unlock
+638: System
+639: Full feature access enabled
+640: 5.2 Student Project Lifecycle
+641: Stage
+642: Action
+643: Actors
+644: Key Outputs
+645: Project Creation
+646: Create project, Jira board, invite team
+647: Student
+648: Project doc, board, team
+649: Mentor Onboarding
+650: Post request → bids received → accept → contract + escrow
+651: Student, Mentor
+652: Active contract, board access
+653: Development
+654: Sprint execution, ticket transitions, milestone completion
+655: Team, Mentor
+656: Burndown, milestone markers
+657: Investor Pitch
+658: Submit pitch → review → accept → meeting
+659: Student, Investor
+660: Meeting scheduled, feedback logged
+661: College Promotion
+662: College promotes project to investor/HR network
+663: College, HR, Investor
+664: Increased visibility
+665: Exit (Hire/Sell)
+666: Hired via HR using portfolio OR project sold in marketplace
+667: Student, HR, Investor
+668: Career milestone or revenue
+669: 5.3 Mentor Bidding & Escrow Workflow
+670: Student team publishes Mentorship Request (brief, skills, timeline, budget, meeting cadence)
+671: Platform-registered mentors view matching requests and submit bids (proposal + fee + scope + availability)
+672: Student reviews bids on a comparison dashboard — can message mentor pre-acceptance for clarification
+673: Student accepts one bid → Mentorship Contract created (proposed state)
+674: Student pays agreed fee → Stripe holds funds in escrow → Contract moves to active state
+675: Mentor gains scoped Jira board access, asset view, and team chat
+676: Mentor marks milestone complete → Student confirms → Stripe releases milestone tranche to mentor
+677: Project completes → final escrow tranche released → both parties rate each other
+678: Dispute at any stage → Super Admin reviews, logs binding decision, adjusts escrow if needed
+679: 5.4 Investor Pitch & Meeting Workflow
+680: Student prepares Project Showcase (deck, README, demo, financial projections) — state: showcase_ready
+681: Student submits Pitch Request to target investor(s) — state: pending
+682: Investor reviews pitch materials; no meeting until state advances
+683: Investor accepts → state: accepted. OR declines with mandatory feedback → state: declined
+684: On accept: student books available meeting slot from investor's calendar
+685: Meeting conducted via Google Meet / Zoom link (auto-generated)
+686: Post-meeting: investor logs decision + notes → visible to team and mentor
+687: State guard prevents students from submitting a pitch to an investor who has already declined the same project within 30 days. Prevents spam and respects investor time.
+688: 5.5 Campus-Based Hiring Workflow
+689: HR requests campus drive with College: company profile, JDs, proposed date, eligibility criteria
+690: College reviews and approves; defines eligible student pool (branch, year, CGPA, placement eligibility flag)
+691: Drive published to eligible students; students apply with profile + optional cover note
+692: HR reviews applicant list: leaderboard rank, projects, skills, EdTech completions
+693: HR shortlists candidates; students notified of shortlist status
+694: Interview rounds scheduled (Technical R1, Technical R2, HR, Managerial) via platform calendar
+695: Interview outcomes recorded per round; consolidated decision made
+696: Offer letters generated from co-branded PDF template; sent through platform to selected students
+697: Student accepts/declines offer; outcome logged; placement stats updated for college dashboard
+698: 5.6 Hackathon Workflow
+699: College creates hackathon: theme, problem statements, prizes, team size limits, eligibility, timeline
+700: Student teams register and submit team details before registration deadline
+701: Hackathon runs (online or offline); teams work on solutions and submit before deadline
+702: Assigned judges (faculty + industry) score submissions using college-defined rubric
+703: Results declared: scores entered → system auto-ranks teams per problem statement
+704: Results published: leaderboard auto-updated; badges and trophies auto-awarded to top teams
+705: Certificates generated (PDF) and emailed to all participants; winners' certificates highlighted
+706: 6. API Route Architecture
+707: 6.1 Route Conventions
+708: All routes prefixed with /api/v1/ — versioned from day one
+709: Standard HTTP verbs: GET (read), POST (create), PUT (full update), PATCH (partial update), DELETE
+710: All write operations return the updated resource for optimistic UI updates
+711: Errors return: {status, code, message, details} — never expose stack traces in production
+712: Rate limiting per role: applied at gateway level (express-rate-limit)
+713: 6.2 Complete Route Specification
+714: Module
+715: Base Route
+716: Key Endpoints & Methods
+717: Auth
+718: /api/v1/auth
+719: POST /register, POST /verify-email, POST /login, POST /refresh, POST /logout, POST /forgot-password, POST /reset-password
+720: Users
+721: /api/v1/users
+722: GET /me, PUT /me, GET /:id (public profile), PATCH /me/privacy-settings, DELETE /me (GDPR)
+723: Students
+724: /api/v1/students
+725: GET /leaderboard, GET /dashboard, GET /portfolio/:id, POST /link-institution, PATCH /direct-hire-visibility
+726: Projects
+727: /api/v1/projects
+728: CRUD /projects, GET /projects/:id/health, POST /projects/:id/pitch, PATCH /projects/:id/status
+729: Teams
+730: /api/v1/teams
+731: POST /create, POST /:id/invite, PATCH /:id/members, DELETE /:id
+732: Boards
+733: /api/v1/boards
+734: CRUD /boards, /boards/:id/sprints, /boards/:id/tickets, /tickets/:id/transitions, /tickets/:id/comments
+735: Mentors
+736: /api/v1/mentors
+737: GET /browse, POST /bids (place bid), PUT /bids/:id/accept, GET /contracts, PATCH /contracts/:id/milestone
+738: Investors
+739: /api/v1/investors
+740: GET /pitches, PATCH /pitches/:id/respond, POST /pitches/:id/schedule, GET /portfolio
+741: HR
+742: /api/v1/hr
+743: GET /students/search, POST /events, PATCH /events/:id, POST /interviews, PATCH /interviews/:id/outcome, POST /offers
+744: Colleges
+745: /api/v1/colleges
+746: CRUD, POST /hackathons, PATCH /hackathons/:id/results, POST /upload-students, GET /students/:id/leaderboard
+747: Schools
+748: /api/v1/schools
+749: CRUD, POST /upload-students, POST /events, POST /events/:id/certificates
+750: Events
+751: /api/v1/events
+752: CRUD /events, POST /:id/register, PATCH /:id/close, GET /:id/attendees, POST /:id/certificates
+753: Marketplace
+754: /api/v1/marketplace
+755: GET /listings, POST /listings, PATCH /listings/:id, POST /listings/:id/enquiry, PATCH /enquiries/:id
+756: Payments
+757: /api/v1/payments
+758: POST /escrow/initiate, POST /escrow/:id/release-milestone, POST /disputes, GET /history
+759: Files
+760: /api/v1/files
+761: POST /upload-url (get S3 presigned URL), POST /confirm-upload, DELETE /:assetId
+762: Notifications
+763: /api/v1/notifications
+764: GET / (paginated), PATCH /:id/read, DELETE /:id
+765: Admin
+766: /api/v1/admin
+767: Full CRUD all resources, GET /analytics, PUT /policies, POST /feature-flags, GET /audit-logs, POST /impersonate
+768: 7. RBAC Permissions Matrix
+769: The following matrix defines Role-level permissions. Scope and State guards add additional constraints at runtime. 'View only' means read-only access to curated/filtered data — not raw collection access.
+770: Resource / Action
+771: Student
+772: School
+773: College
+774: Investor
+775: HR
+776: Mentor
+777: Super Admin
+778: Create / Own Project
+779: Yes
+780: No
+781: No
+782: No
+783: No
+784: No
+785: Yes (any)
+786: Jira Board — Edit Tickets
+787: Yes (own)
+788: No
+789: No
+790: No
+791: No
+792: Yes (contract)
+793: Yes
+794: Jira Board — View Signals
+795: Yes (own)
+796: No
+797: No
+798: View only
+799: No
+800: Yes (contract)
+801: Yes
+802: Submit Pitch to Investor
+803: Yes
+804: No
+805: No
+806: N/A
+807: No
+808: No
+809: Yes
+810: Accept / Decline Pitch
+811: No
+812: No
+813: No
+814: Yes
+815: No
+816: No
+817: Yes
+818: Place Mentor Bid
+819: No
+820: No
+821: No
+822: No
+823: No
+824: Yes
+825: Yes
+826: Accept Mentor Bid
+827: Yes (own)
+828: No
+829: No
+830: No
+831: No
+832: No
+833: Yes
+834: Marketplace — List Project
+835: Yes
+836: No
+837: No
+838: No
+839: No
+840: No
+841: Yes
+842: Marketplace — Buy / Enquire
+843: Yes
+844: No
+845: Yes
+846: Yes
+847: No
+848: No
+849: Yes
+850: Upload Students (Bulk)
+851: No
+852: Yes
+853: Yes
+854: No
+855: No
+856: No
+857: Yes
+858: Verify Student
+859: No
+860: Yes
+861: Yes
+862: No
+863: No
+864: No
+865: Yes
+866: View Leaderboard
+867: Yes
+868: Yes (school)
+869: Yes (college)
+870: No
+871: Yes
+872: No
+873: Yes (global)
+874: Organise Hackathon
+875: No
+876: No
+877: Yes
+878: No
+879: No
+880: No
+881: Yes
+882: Organise Events
+883: No
+884: Yes
+885: Yes
+886: No
+887: Yes (collab)
+888: No
+889: Yes
+890: Schedule Interview
+891: No
+892: No
+893: No
+894: No
+895: Yes
+896: No
+897: Yes
+898: Access Academic Records
+899: Own only
+900: School only
+901: College only
+902: No
+903: Via college
+904: No
+905: Yes
+906: Release Escrow
+907: Confirm
+908: No
+909: No
+910: No
+911: No
+912: Request
+913: Override
+914: Delete Any Account
+915: No
+916: No
+917: No
+918: No
+919: No
+920: No
+921: Yes
+922: Manage Policies
+923: No
+924: No
+925: No
+926: No
+927: No
+928: No
+929: Yes
+930: Feature Flags
+931: No
+932: No
+933: No
+934: No
+935: No
+936: No
+937: Yes
+938: View Audit Logs
+939: Own only
+940: School only
+941: College only
+942: Own only
+943: Own only
+944: Own only
+945: All
+946: Impersonate User
+947: No
+948: No
+949: No
+950: No
+951: No
+952: No
+953: Yes (logged)
+954: View Platform Analytics
+955: No
+956: No
+957: No
+958: No
+959: No
+960: No
+961: Yes
+962: 8. Frontend Architecture & UI Guidelines
+963: 8.1 React Application Structure
+964: Directory / File
+965: Contents & Responsibility
+966: /src/pages/
+967: Role-specific dashboard pages — lazy loaded per role (StudentDashboard, CollegeDashboard, MentorDashboard, etc.)
+968: /src/layouts/
+969: Role-specific layout shells (sidebar nav items differ per role); shared AuthLayout and PublicLayout
+970: /src/components/
+971: Shared UI: Navbar, Sidebar, Modals, Cards, DataTables, Charts, FileUploader, RichTextEditor, CalendarWidget
+972: /src/features/
+973: Redux Toolkit slices — one per domain: authSlice, projectSlice, jiraSlice, mentorSlice, marketplaceSlice, hrSlice, leaderboardSlice
+974: /src/hooks/
+975: Custom hooks: useAuth, useRBAC, useSocket, useLeaderboard, usePagination, useFileUpload, useNotifications
+976: /src/services/
+977: Axios instances per module — one file per backend bounded context; centralised error interceptor
+978: /src/routes/
+979: ProtectedRoute wrapper (checks JWT role); RoleRoute wrapper (renders only if role matches); NotAuthorized (403 page)
+980: /src/utils/
+981: rolePermissions config, date formatters, file validators, leaderboard score calculators, URL helpers
+982: /src/store/
+983: Redux store, middleware setup, RTK Query API slices for server-state caching
+984: /.env.*
+985: Environment files per stage: VITE_API_URL, VITE_STRIPE_PK, VITE_SOCKET_URL, VITE_S3_BASE_URL
+986: 8.2 Role-Based Routing Strategy
+987: On login: JWT decoded client-side to extract role; React Router redirects to /dashboard/{role}
+988: Each role has its own Layout component with role-specific sidebar nav items
+989: ProtectedRoute: if no valid JWT → redirect to /login
+990: RoleRoute: if JWT role does not match route requirement → render 403 Not Authorized page
+991: Lazy loading: each role's dashboard module is code-split; only downloaded when user of that role logs in
+992: Shared components used across roles: leaderboard widget, notification panel, calendar picker, file uploader
+993: 8.3 UI Design System (Based on Figma Screens)
+994: Color system: primary blue palette (#1E40AF, #3B82F6, #DBEAFE) with role accent colors
+995: Typography: Inter / Arial, 6-step size scale (12–32px), consistent weight hierarchy
+996: Layout: left sidebar (240px collapsed to 64px icon rail) + top navbar (64px) + main content area
+997: Card-based dashboard: KPI summary cards at top (active projects, rank, upcoming events, notifications)
+998: Responsive: sidebar collapses to bottom tab bar on mobile; all tables switch to card stacks below 768px
+999: Dark mode: CSS custom properties for all colors; toggled via class on html element; preference stored in localStorage
+1000: Component library: build on Radix UI primitives + TailwindCSS; no third-party UI framework lock-in
+1001: Charts: Recharts for burndown and velocity; Chart.js for leaderboard bars; D3 for advanced analytics (Admin only)
+1002: 9. Security Architecture & Compliance
+1003: OWASP Top 10 (2025): Broken Access Control remains the #1 vulnerability class. Every design decision in this section is grounded in OWASP, NIST, and RFC standards.
+1004: 9.1 Authentication Security
+1005: Password hashing: Argon2id (primary, per OWASP Password Storage Cheat Sheet); bcrypt (12 rounds) as fallback
+1006: JWT (RFC 7519): RS256 signed, 15-minute access token TTL; opaque refresh token with 7-day TTL
+1007: Refresh token storage: HttpOnly + Secure + SameSite=Strict cookie — inaccessible to JavaScript
+1008: CSRF defense: Double-submit cookie pattern for all state-mutating requests
+1009: Token rotation: every refresh token use invalidates the old token (sliding window)
+1010: Brute-force protection: rate limit login endpoint (5 attempts per 15 minutes per IP)
+1011: Optional 2FA: TOTP authenticator app for high-privilege accounts (Mentors, Investors, Admins)
+1012: 9.2 Authorization Security
+1013: Default-deny: all routes return 403 unless explicitly permitted by RBAC middleware
+1014: Server-side enforcement: authorization decisions never delegated to client-side state
+1015: Scope checks: resource ownership verified at handler level (not just route level)
+1016: State guards: workflow-locked actions verified against document state in DB before execution
+1017: Audit trail: all sensitive actions logged with actorId, role, action, resource, IP, timestamp
+1018: 9.3 File Upload Security (OWASP File Upload Cheat Sheet)
+1019: Allowed extensions whitelist: .pdf, .docx, .pptx, .png, .jpg, .zip, .md only
+1020: MIME type validation: check both Content-Type header AND file magic bytes (file signature)
+1021: Filename sanitization: strip path traversal characters, normalize to UUID-based S3 key
+1022: Size limits: enforced server-side before presigned URL issuance (not just client-side)
+1023: Storage isolation: uploaded files stored in S3 with no public access; only presigned URL access
+1024: Presigned URL guardrails (AWS guidance): time-limited (15 min for upload, 1 hour for download), scoped to specific S3 key
+1025: Virus scan: optional ClamAV integration on S3 trigger for high-risk file types (ZIP, DOCX)
+1026: 9.4 Application Security
+1027: Helmet.js: sets Content-Security-Policy, HSTS, X-Frame-Options, X-Content-Type-Options headers
+1028: CORS: explicit origin whitelist — no wildcard in production
+1029: Input validation: Joi schemas on all request bodies; express-validator on query params
+1030: MongoDB injection: Mongoose automatic query sanitization; avoid raw $where operators
+1031: Rate limiting: express-rate-limit per role and per endpoint type
+1032: Dependency audit: npm audit in CI/CD pipeline; Dependabot for automated security updates
+1033: 9.5 Privacy & GDPR Compliance
+1034: Data minimization: only collect fields explicitly needed per role
+1035: Student data visibility to HR: scoped to name, skills, leaderboard, portfolio — never raw grades without college opt-in
+1036: Direct hire visibility: student must explicitly opt-in; default is private
+1037: Right to erasure: /DELETE /api/v1/users/me cascades deletion across all collections; logged to audit trail
+1038: Data retention: define retention policies per data type (audit logs: 2 years, session tokens: 7 days, files: user-controlled)
+1039: Super Admin data purge: GDPR-compliant purge endpoint with 2-admin confirmation for irreversible actions
+1040: 10. Complete Feature Summary by Module
+1041: Module
+1042: Feature Set
+1043: Authentication & Identity
+1044: Register, email verify, JWT login/refresh/logout, password reset, Argon2id hashing, optional TOTP 2FA, institution linking & verification, Direct Hire opt-in/out
+1045: Jira-Style Project Board
+1046: Boards, Epics, Milestones, Sprints (plan/run/close), Backlog, Kanban (5 columns), Tickets (CRUD, priority, assignee, labels, attachments, comments), Burndown chart, Velocity trend, Activity feed, Optional Jira Cloud 3LO integration
+1047: Mentor Marketplace
+1048: Request posting, Bid placement & comparison, Contract lifecycle (proposed→active→completed), Stripe escrow, Milestone-based release, Dispute resolution, Ratings & reviews, Mentor profile (bio, expertise, calendar, Stripe onboarding)
+1049: Investor Pipeline
+1050: Project showcase (curated health signals), Pitch request submission, Accept/decline with structured feedback, Meeting scheduler (calendar slots), Google Meet/Zoom link generation, Post-meeting decision logging, Portfolio monitoring
+1051: Leaderboard Engine
+1052: Hackathon rankings, Daily coding challenge (streak, accuracy, speed), EdTech completions, Institution-filtered + global views, Badges & trophies (auto-awarded), Portfolio auto-sync, Score weighting configurable by Super Admin
+1053: Marketplace
+1054: Project listing (draft→published→sold), Asset bundle upload (code, docs, demo), Visibility controls, Buyer enquiry & negotiation thread, Sale completion & asset transfer, Platform fee on sale
+1055: Hiring Module
+1056: Campus mode (HR→College→Students), Direct mode (HR→Students), Eligibility filter, Shortlist management, Interview round scheduling, Outcome recording, Offer letter PDF generation, ATS CSV export
+1057: Event Management
+1058: Create events (school/college/HR), Capacity & deadline control, Registration & waitlist, Digital certificate generation (PDF), Alumni meet management, HR collaboration on school/college events
+1059: Hackathon Module
+1060: Hackathon creation, Team registration, Judge assignment & scoring rubric, Automated result ranking, Leaderboard auto-update, Certificate + badge auto-award
+1061: File Management
+1062: S3 presigned upload/download, MIME + signature validation, Filename sanitization, Size enforcement, Cloudinary CDN for images/video thumbnails, Asset metadata tracking
+1063: Real-time & Notifications
+1064: Socket.io push notifications (pitch updates, interview alerts, hackathon results, Jira @mentions, meeting reminders), In-platform notification center, Email notifications (SendGrid)
+1065: Analytics Dashboards
+1066: Role-scoped analytics, Platform-wide admin analytics (DAU/MAU, funnel, revenue), Error monitoring (Sentry), API health metrics (Prometheus), Hiring funnel stats, Project health overview
+1067: Payments (Stripe Connect)
+1068: Mentor onboarding (connected account), Escrow initiation, Milestone-based releases, Platform fee deduction, Dispute management, Revenue dashboard (Admin), Refund handling
+1069: Super Admin Panel
+1070: User CRUD + suspend/ban, Impersonation (logged), Content moderation, Policy management with version history, Feature flags, Email template editor, Announcement builder, GDPR purge, Audit log viewer
+1071: 11. Glossary
+1072: RBAC
+1073: Role-Based Access Control — grants permissions based on a user's assigned role
+1074: Scoped Access
+1075: Restricts data visibility based on relationships (institution, contract, event) — adds to RBAC
+1076: State Guard
+1077: Workflow-locked action check — ensures an action is permitted given the current document state
+1078: MERN
+1079: MongoDB, Express.js, React.js, Node.js — JavaScript full-stack framework combination
+1080: JWT
+1081: JSON Web Token (RFC 7519) — compact, URL-safe signed claims for stateless auth
+1082: Argon2id
+1083: Modern password-hashing algorithm recommended by OWASP Password Storage Cheat Sheet
+1084: Jira Board
+1085: Project management board with tickets, epics, sprints, and workflow transitions
+1086: SDLC
+1087: Software Development Life Cycle — phases from requirements through deployment
+1088: Escrow
+1089: Held funds released to mentor upon milestone confirmation — managed via Stripe Connect
+1090: Destination Charge
+1091: Stripe Connect charge type where platform receives payment then routes to connected account
+1092: Presigned URL
+1093: Time-limited AWS S3 URL granting upload or download access to a specific object without changing bucket policy
+1094: Pitch
+1095: Formal project presentation submitted to an investor for funding consideration
+1096: Marketplace
+1097: Platform section where projects can be listed, discovered, and sold
+1098: EdTech
+1099: Educational Technology — online courses, certifications, and learning platforms
+1100: Leaderboard
+1101: Ranked list of students based on scores across hackathons, challenges, and EdTech
+1102: Hackathon
+1103: Time-bound competitive coding/innovation event hosted by colleges with judged submissions
+1104: Campus Hiring
+1105: HR partners with a college to run a structured placement drive for that institution's students
+1106: Direct Hiring
+1107: HR discovers and approaches individual students on the platform directly (student opt-in required)
+1108: Burndown Chart
+1109: Sprint progress graph: remaining story points vs. calendar days remaining in sprint
+1110: Velocity
+1111: Average story points completed per sprint — used to predict future sprint capacity
+1112: Bounded Context
+1113: DDD term: a self-contained domain module with its own data and service logic
+1114: OWASP
+1115: Open Web Application Security Project — industry standard for web security guidelines
+1116: 3LO / OAuth
+1117: 3-Legged OAuth — secure authorization flow for third-party API integrations (e.g., Atlassian Jira)
+1118: Super Admin
+1119: Platform operator with unrestricted administrative access bounded by governance controls
+1120: Feature Flag
+1121: Runtime switch to enable/disable platform features per role or globally without redeployment
+1122: End of Document
+1123: ProMove Innovation Cloud  —  PRD v2.0  —  Merged & Feature-Complete Edition
+1124: For Development & Sprint Planning Use Only  |  Confidential

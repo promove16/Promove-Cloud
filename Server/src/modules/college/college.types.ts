@@ -6,7 +6,7 @@ import {
   StudentAccessTokenView,
   StudentVerificationReviewResult,
 } from '../school/school.types';
-import { EventRankingView } from '../event/event.types';
+import { EventParticipantView, EventRankingView } from '../event/event.types';
 import { PlacementStatus } from './placementRecord.model';
 
 export interface RecruiterDirectoryItem {
@@ -71,6 +71,7 @@ export interface CollegeDashboardPayload
 
 export interface EventListItem extends DashboardEventView {
   rankingsComputedAt?: string;
+  participants: EventParticipantView[];
   rankings: EventRankingView[];
 }
 

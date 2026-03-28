@@ -45,3 +45,12 @@ export interface EventRankingView {
   innovationScore: number;
   submissionScore: number;
 }
+
+export interface EventParticipantView {
+  studentId: string;
+  studentName: string;
+  avatar?: string;
+  innovationScore: number;
+  registeredAt: string;
+  submissionScore?: number;
+}

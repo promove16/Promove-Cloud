@@ -4,7 +4,7 @@ import { io } from '../../config/socket';
 import { ApiError } from '../../utils/ApiError';
 import { User } from '../user/user.model';
 import { Event } from './event.model';
-import { EventRankingView } from './event.types';
+import { EventParticipantView, EventRankingView } from './event.types';
 import { UserRole } from '../../types/roles.types';
 
 export const createEventSchema = z.object({
@@ -48,12 +48,57 @@ export const createEvent = async (
     description: event.description,
     scheduledAt: event.scheduledAt.toISOString(),
     participantsCount: 0,
+    participants: [] as EventParticipantView[],
     rankingsComputedAt: undefined,
   };
 };
 
+const buildParticipantViewMap = async (
+  events: Array<{
+    _id: { toString(): string };
+    participants: Array<{
+      studentId: { toString(): string };
+      joinedAt: Date;
+      submissionScore?: number;
+    }>;
+  }>,
+) => {
+  const studentIds = [...new Set(events.flatMap((event) => event.participants.map((participant) => String(participant.studentId))))];
+
+  const students =
+    studentIds.length > 0
+      ? await User.find({ _id: { $in: studentIds } })
+          .select('_id displayName avatar innovationScore')
+          .lean()
+      : [];
+
+  const studentMap = new Map(students.map((student) => [String(student._id), student]));
+
+  return new Map(
+    events.map((event) => [
+      String(event._id),
+      event.participants.map((participant) => {
+        const student = studentMap.get(String(participant.studentId));
+
+        return {
+          studentId: String(participant.studentId),
+          studentName: student?.displayName ?? 'Student',
+          ...(student?.avatar ? { avatar: student.avatar } : {}),
+          innovationScore: student?.innovationScore ?? 0,
+          registeredAt: participant.joinedAt.toISOString(),
+          ...(typeof participant.submissionScore === 'number'
+            ? { submissionScore: participant.submissionScore }
+            : {}),
+        } satisfies EventParticipantView;
+      }),
+    ]),
+  );
+};
+
 export const listInstitutionEvents = async (institutionId: string) => {
   const events = await Event.find({ institutionId }).sort({ scheduledAt: -1 }).lean();
+  const participantMap = await buildParticipantViewMap(events);
+
   return events.map((event) => ({
     _id: String(event._id),
     title: event.title,
@@ -61,6 +106,7 @@ export const listInstitutionEvents = async (institutionId: string) => {
     description: event.description,
     scheduledAt: event.scheduledAt.toISOString(),
     participantsCount: event.participants.length,
+    participants: participantMap.get(String(event._id)) ?? [],
     ...(event.rankingsComputedAt
       ? { rankingsComputedAt: event.rankingsComputedAt.toISOString() }
       : {}),

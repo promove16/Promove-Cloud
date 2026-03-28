@@ -4,7 +4,7 @@ coverage/
 *.log
 dist/
 temp/
-docs/
+docs/docs/
 .tmp-*.json
 .postman/
 postman/
