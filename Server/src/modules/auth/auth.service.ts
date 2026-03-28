@@ -202,6 +202,8 @@ export const registerUser = async (payload: {
         : 'basic';
   const institutionVerificationStatus =
     isStudent && institutionTokenValue ? 'pending' : 'none';
+  const verificationStatus =
+    isStudent && institutionTokenValue ? 'pending' : isStudent ? 'verified' : 'not_required';
 
   const createdUser = await User.create({
     email: payload.email.toLowerCase(),
@@ -240,7 +242,7 @@ export const registerUser = async (payload: {
     accessExpiresAt: new Date(Date.now() + MS_IN_YEAR),
     isActive: true,
     institutionVerificationStatus,
-    verificationStatus: isStudent ? 'verified' : 'not_required',
+    verificationStatus,
     ...(isStudent
       ? {
           verificationRequestedAt: institutionTokenValue ? new Date() : undefined,
@@ -277,8 +279,11 @@ export const submitInstitutionToken = async (userId: string, institutionToken: s
 
   user.institutionToken = institutionToken.trim().toUpperCase();
   user.institutionVerificationStatus = 'pending';
+  user.verificationStatus = 'pending';
   user.registrationStage = 'institution_pending';
   user.verificationRequestedAt = new Date();
+  user.verificationRejectedAt = undefined;
+  user.verificationRejectedReason = undefined;
   await user.save();
 
   await enqueueInstitutionVerification(userId, user.institutionToken);

@@ -46,6 +46,17 @@ export const logger = winston.createLogger({
     new winston.transports.File({
       filename: logFilePath,
     }),
+    ...(process.env.NODE_ENV === 'development'
+      ? [
+          new winston.transports.Console({
+            format: winston.format.combine(
+              winston.format.colorize(),
+              winston.format.timestamp({ format: 'HH:mm:ss' }),
+              logFormat,
+            ),
+          }),
+        ]
+      : []),
   ],
   exitOnError: false,
 });

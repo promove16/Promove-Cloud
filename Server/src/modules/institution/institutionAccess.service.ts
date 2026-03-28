@@ -199,12 +199,16 @@ export const reviewStudentVerification = async (
 
   if (payload.decision === 'approved') {
     student.verificationStatus = 'verified';
+    student.registrationStage = 'institution_verified';
     student.isActive = true;
     student.verifiedAt = new Date();
+    student.institutionVerificationStatus = 'verified';
+    student.institutionVerifiedAt = student.institutionVerifiedAt ?? student.verifiedAt;
     student.verificationRejectedAt = undefined;
     student.verificationRejectedReason = undefined;
   } else {
     student.verificationStatus = 'rejected';
+    student.registrationStage = 'basic';
     student.isActive = false;
     student.verificationRejectedAt = new Date();
     student.verificationRejectedReason = payload.reason?.trim() || 'Institution verification failed';

@@ -12,6 +12,7 @@ const { privateKey: refreshPrivateKey } = generateKeyPairSync('rsa', {
 process.env.NODE_ENV = 'test';
 process.env.PORT = '5000';
 process.env.CLIENT_URL = 'http://localhost:5173';
+process.env.RATE_LIMIT_ENABLED = 'true';
 process.env.UPSTASH_REDIS_REST_URL = 'https://example.upstash.io';
 process.env.UPSTASH_REDIS_REST_TOKEN = 'token';
 process.env.UPSTASH_REDIS_HOST = 'example.upstash.io';

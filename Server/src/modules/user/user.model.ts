@@ -578,7 +578,7 @@ const userSchema = new Schema<IUser>(
     },
     profileSlug: {
       type: String,
-      default: null,
+      default: undefined,
       trim: true,
     },
     lastLogin: {
