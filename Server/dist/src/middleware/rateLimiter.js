@@ -16,6 +16,8 @@ exports.apiLimiter = new ratelimit_1.Ratelimit({
     analytics: false,
     prefix: 'rl:api',
 });
+// Temporary bypass for Render load testing. Re-enable after the 200-VU run.
+const RATE_LIMIT_BYPASSED_FOR_LOAD_TEST = true;
 const resolveKey = (req) => {
     const forwarded = req.headers['x-forwarded-for'];
     if (Array.isArray(forwarded)) {
@@ -27,6 +29,9 @@ const resolveKey = (req) => {
     return req.ip || 'anonymous';
 };
 const withRateLimit = (limiter) => async (req, res, next) => {
+    if (RATE_LIMIT_BYPASSED_FOR_LOAD_TEST) {
+        return next();
+    }
     const identifier = resolveKey(req);
     try {
         const { success, limit, reset, remaining } = await limiter.limit(identifier);
