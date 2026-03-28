@@ -31,7 +31,7 @@ const sampleProblems = [
 const seedProblemsIfEmpty = async () => {
     const count = await problem_model_1.Problem.countDocuments();
     if (count > 0) {
-        return;
+        return false;
     }
     await problem_model_1.Problem.insertMany(sampleProblems.map(([title, category, difficulty, domain], index) => ({
         title,
@@ -43,15 +43,20 @@ const seedProblemsIfEmpty = async () => {
         isVerified: index % 2 === 0,
         postedBy: index % 3 === 0 ? 'ProMove' : 'Partner Institution',
     })));
+    return true;
 };
 exports.seedProblemsIfEmpty = seedProblemsIfEmpty;
 const listProblems = async (query) => {
     const page = Math.max(1, Number(query.page ?? 1));
     const limit = Math.min(20, Math.max(1, Number(query.limit ?? 10)));
     const cacheKey = `problems:${crypto_1.default.createHash('sha1').update(JSON.stringify(query)).digest('hex')}`;
-    const cached = await redis_1.redis.get(cacheKey);
+    const seeded = await (0, exports.seedProblemsIfEmpty)();
+    const cached = seeded ? null : await redis_1.redis.get(cacheKey);
     if (cached) {
-        return typeof cached === 'string' ? JSON.parse(cached) : cached;
+        const parsed = typeof cached === 'string' ? JSON.parse(cached) : cached;
+        if (parsed.total > 0 || (await problem_model_1.Problem.countDocuments()) === 0) {
+            return parsed;
+        }
     }
     const filter = {};
     if (typeof query.category === 'string' && query.category && query.category !== 'All Problems') {

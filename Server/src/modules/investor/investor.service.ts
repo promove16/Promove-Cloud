@@ -1,10 +1,17 @@
 import { User } from '../user/user.model';
 import { UserRole } from '../../types/roles.types';
 import { ApiError } from '../../utils/ApiError';
-import { DealDetailView, DealGroupView, DealTransitionResponse } from '../deal/deal.types';
+import {
+  DealDetailView,
+  DealGroupView,
+  DealTransitionResponse,
+  InvestorAuthorityView,
+} from '../deal/deal.types';
 import {
   advanceDealStage,
   createInvestorDealFromInterest,
+  ExpressInterestSchema,
+  getInvestorAuthorityPortfolio,
   getInvestorDashboardStats,
   getInvestorPortfolio,
   getInvestorStartup,
@@ -33,14 +40,28 @@ export const getStartups = async (
     stage?: string;
     page?: number;
     limit?: number;
+    acceptingPenny?: boolean;
+    acceptingSole?: boolean;
   },
 ): Promise<InvestorStartupListResponse> => listInvestorStartups(userId, filters);
 
 export const getStartup = async (userId: string, startupId: string): Promise<InvestorStartupDetailResponse> =>
   getInvestorStartup(userId, startupId) as Promise<InvestorStartupDetailResponse>;
 
-export const expressInterest = async (userId: string, startupId: string): Promise<DealDetailView> =>
-  createInvestorDealFromInterest(userId, startupId);
+export const expressInterestSchema = ExpressInterestSchema;
+
+export const expressInterest = async (
+  userId: string,
+  startupId: string,
+  payload: Parameters<typeof createInvestorDealFromInterest>[2],
+): Promise<DealDetailView> => createInvestorDealFromInterest(userId, startupId, payload);
+
+export const investAsSole = async (
+  userId: string,
+  startupId: string,
+  payload: Parameters<typeof createInvestorDealFromInterest>[2],
+): Promise<DealDetailView> =>
+  createInvestorDealFromInterest(userId, startupId, { ...payload, investorType: 'sole' });
 
 export const getDeals = async (userId: string): Promise<DealGroupView[]> => listDealsForInvestor(userId);
 
@@ -56,6 +77,9 @@ export const getInstitutions = async (userId: string, type: 'school' | 'college'
 
 export const getPortfolio = async (userId: string): Promise<InvestorPortfolioResponse> =>
   getInvestorPortfolio(userId) as Promise<InvestorPortfolioResponse>;
+
+export const getInvestorAuthority = async (userId: string): Promise<InvestorAuthorityView[]> =>
+  getInvestorAuthorityPortfolio(userId);
 
 export const updateDealStage = async (
   userId: string,

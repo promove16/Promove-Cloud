@@ -3,6 +3,8 @@ import { IUser } from '../modules/user/user.types';
 import { redis } from '../config/redis';
 import { scoreQueue } from '../config/bullmq';
 import { io } from '../config/socket';
+import { logError } from '../config/logger';
+import { ScoreEvent } from '../modules/innovationScore/score.model';
 
 export const SCORE_DELTAS = {
   PROBLEM_CLAIMED:         5,
@@ -15,6 +17,10 @@ export const SCORE_DELTAS = {
   STARTUP_LAUNCHED:        10,
   AWARD_SUBMITTED:         0,
   AWARD_APPROVED:          15,
+  GITHUB_CONNECTED:        5,
+  LINKEDIN_CONNECTED:      5,
+  RESUME_UPLOADED:         3,
+  PROFILE_COMPLETE:        10,
 } as const;
 
 export type ScoreTrigger = keyof typeof SCORE_DELTAS;
@@ -30,7 +36,18 @@ const BREAKDOWN_FIELD_MAP: Record<ScoreTrigger, keyof IUser['scoreBreakdown'] | 
   STARTUP_LAUNCHED:       'startupsLaunched',
   AWARD_SUBMITTED:        null,
   AWARD_APPROVED:         'awardsApproved',
+  GITHUB_CONNECTED:       null,
+  LINKEDIN_CONNECTED:     null,
+  RESUME_UPLOADED:        null,
+  PROFILE_COMPLETE:       null,
 };
+
+const ONE_TIME_SCORE_TRIGGERS: ScoreTrigger[] = [
+  'GITHUB_CONNECTED',
+  'LINKEDIN_CONNECTED',
+  'RESUME_UPLOADED',
+  'PROFILE_COMPLETE',
+];
 
 export interface ApplyScoreParams {
   userId: string;
@@ -48,6 +65,14 @@ const getInstitutionLeaderboardScore = (score: number, createdAt: Date): number 
 export const applyScore = async ({ userId, trigger, metadata }: ApplyScoreParams): Promise<number> => {
   const delta = SCORE_DELTAS[trigger];
   if (delta === 0) return 0;
+
+  if (ONE_TIME_SCORE_TRIGGERS.includes(trigger)) {
+    const alreadyAwarded = await ScoreEvent.exists({ userId, trigger });
+    if (alreadyAwarded) {
+      const existingUser = await User.findById(userId).select('innovationScore').lean();
+      return existingUser?.innovationScore ?? 0;
+    }
+  }
 
   const breakdownField = BREAKDOWN_FIELD_MAP[trigger];
 
@@ -115,16 +140,15 @@ export const applyScore = async ({ userId, trigger, metadata }: ApplyScoreParams
   }
 
   try {
-    const { ScoreEvent } = require('../modules/innovationScore/score.model');
     await ScoreEvent.create({
       userId,
       trigger,
       delta: actualDelta,
       scoreAfter: newScore,
-      metadata
+      metadata,
     });
   } catch (err) {
-    console.error('Failed to create ScoreEvent log:', err);
+    logError('Failed to create ScoreEvent log', err);
   }
 
   if (io) {
@@ -140,7 +164,7 @@ export const applyScore = async ({ userId, trigger, metadata }: ApplyScoreParams
       trigger,
       newScore,
       delta: actualDelta,
-      timestamp: new Date(),
+      timestamp: new Date().toISOString(),
     });
   }
 

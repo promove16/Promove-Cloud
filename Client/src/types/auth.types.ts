@@ -6,16 +6,29 @@ export interface AuthUser {
   role: UserRole;
   displayName: string;
   avatar?: string;
+  bio?: string;
+  domain?: string;
+  githubUrl?: string | null;
+  linkedinUrl?: string | null;
   profileComplete: boolean;
   innovationScore: number;
-  accessGrantedBy?: 'self_registered' | 'institution_token';
+  accessGrantedBy?: 'self_registered' | 'institution_token' | 'admin' | 'startup_school' | 'skill_dev';
   isActive?: boolean;
+  discoverableToRecruiters?: boolean;
+  institutionProfile?: {
+    institutionName?: string;
+    location?: string;
+    academicYear?: string;
+    iicStarRating?: number;
+  };
   verificationStatus?: 'not_required' | 'pending' | 'verified' | 'rejected';
   verificationRequestedAt?: string;
   verifiedAt?: string;
   verificationRejectedAt?: string;
   verificationRejectedReason?: string;
   institutionId?: string;
+  createdAt?: string;
+  updatedAt?: string;
 }
 
 export interface AuthPayload {

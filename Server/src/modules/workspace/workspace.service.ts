@@ -91,12 +91,18 @@ export const getAccessibleWorkspaces = async (userId: string) => {
 };
 
 export const getWorkspaceForMember = async (workspaceId: string, userId: string) => {
-  const workspace = await Workspace.findOne({
-    _id: workspaceId,
-    $or: [{ ownerId: userId }, { teamMemberIds: userId }],
-  });
+  const workspace = await Workspace.findById(workspaceId);
 
   if (!workspace) {
+    throw new ApiError(404, 'WORKSPACE_NOT_FOUND', 'Workspace not found');
+  }
+
+  const memberIds = new Set([
+    String(workspace.ownerId),
+    ...workspace.teamMemberIds.map((memberId) => String(memberId)),
+  ]);
+
+  if (!memberIds.has(String(userId))) {
     throw new ApiError(404, 'WORKSPACE_NOT_FOUND', 'Workspace not found');
   }
 
@@ -104,10 +110,15 @@ export const getWorkspaceForMember = async (workspaceId: string, userId: string)
 };
 
 export const getWorkspaceForOwner = async (workspaceId: string, userId: string) => {
-  const workspace = await Workspace.findOne({ _id: workspaceId, ownerId: userId });
+  const workspace = await Workspace.findById(workspaceId);
   if (!workspace) {
     throw new ApiError(403, 'FORBIDDEN', 'Only the workspace owner can do that.');
   }
+
+  if (String(workspace.ownerId) !== String(userId)) {
+    throw new ApiError(403, 'FORBIDDEN', 'Only the workspace owner can do that.');
+  }
+
   return workspace;
 };
 

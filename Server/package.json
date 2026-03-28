@@ -5,10 +5,14 @@
   "main": "dist/src/server.js",
   "scripts": {
     "dev": "node -e \"process.env.TS_NODE_PREFER_TS_EXTS='true'; require('ts-node/register/transpile-only'); require('./src/server.ts');\"",
+    "mock": "node ./scripts/dev/run-with-mock.js",
     "start": "node dist/src/server.js",
     "build": "tsc -p tsconfig.json",
     "lint": "tsc --noEmit",
-    "test": "jest --runInBand"
+    "test": "jest --runInBand",
+    "seed:users": "node ./scripts/seed-users.js",
+    "sync:indexes": "node -e \"process.env.TS_NODE_PREFER_TS_EXTS='true'; require('ts-node/register/transpile-only'); require('./scripts/sync-indexes.ts');\"",
+    "test:local": "node -e \"process.env.TS_NODE_PREFER_TS_EXTS='true'; require('ts-node/register/transpile-only'); require('./scripts/manual/test-local.ts');\""
   },
   "dependencies": {
     "@aws-sdk/client-ses": "^3.1015.0",

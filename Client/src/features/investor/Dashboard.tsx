@@ -99,11 +99,16 @@ export default function InvestorDashboard() {
                       <div className="font-semibold text-white">{deal.startupName}</div>
                       <div className="mt-1 text-sm text-slate-400">{deal.startupCategory}</div>
                     </div>
-                    {deal.adminApprovalRequired ? (
-                      <Badge className="border-amber-500/30 bg-amber-500/10 text-amber-300">
-                        Awaiting Admin Approval
+                    <div className="flex flex-col items-end gap-2">
+                      <Badge className={deal.investorType === 'sole' ? 'border-amber-500/30 bg-amber-500/10 text-amber-300' : 'border-cyan-500/30 bg-cyan-500/10 text-cyan-300'}>
+                        {deal.investorType.toUpperCase()}
                       </Badge>
-                    ) : null}
+                      {deal.adminApprovalRequired ? (
+                        <Badge className="border-amber-500/30 bg-amber-500/10 text-amber-300">
+                          Awaiting Admin Approval
+                        </Badge>
+                      ) : null}
+                    </div>
                   </div>
                   <div className="mt-3 flex items-center justify-between text-sm">
                     <span className="text-slate-400">{deal.studentDisplayName}</span>

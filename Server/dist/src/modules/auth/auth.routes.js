@@ -6,7 +6,7 @@ const rateLimiter_1 = require("../../middleware/rateLimiter");
 const asyncHandler_1 = require("../../utils/asyncHandler");
 const auth_controller_1 = require("./auth.controller");
 const router = (0, express_1.Router)();
-router.post('/register', (0, rateLimiter_1.withRateLimit)(rateLimiter_1.authLimiter), (0, asyncHandler_1.asyncHandler)(auth_controller_1.register));
+router.post('/register', (0, asyncHandler_1.asyncHandler)(auth_controller_1.register));
 router.post('/login', (0, rateLimiter_1.withRateLimit)(rateLimiter_1.authLimiter), (0, asyncHandler_1.asyncHandler)(auth_controller_1.login));
 router.post('/refresh', (0, asyncHandler_1.asyncHandler)(auth_controller_1.refresh));
 router.post('/logout', authenticate_1.authenticate, (0, asyncHandler_1.asyncHandler)(auth_controller_1.logout));

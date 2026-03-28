@@ -17,10 +17,6 @@ async function sendMail(message) {
     ...message,
   });
 
-  if (config.NODE_ENV !== 'production') {
-    console.log('[EMAIL DEV]', info.message);
-  }
-
   return info;
 }
 

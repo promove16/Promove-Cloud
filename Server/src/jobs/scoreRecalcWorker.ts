@@ -1,4 +1,5 @@
 import { createQueueWorker, QueueJob } from '../config/bullmq';
+import { logError } from '../config/logger';
 import { ApplyScoreParams, applyScore } from '../services/scoreEngine';
 
 export const startScoreWorker = () => {
@@ -13,7 +14,7 @@ export const startScoreWorker = () => {
   );
 
   worker.on('failed', (job: QueueJob<ApplyScoreParams> | undefined, err: Error) => {
-    console.error(`Score job ${job?.id} failed:`, err.message);
+    logError(`Score job ${job?.id ?? 'unknown'} failed`, err);
   });
 
   return worker;

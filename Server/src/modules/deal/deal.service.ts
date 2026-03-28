@@ -10,6 +10,7 @@ import { Startup } from '../startup/startup.model';
 import { User } from '../user/user.model';
 import { Deal } from './deal.model';
 import {
+  CapTableResponse,
   DealDetailView,
   DealGroupView,
   DealPortfolioItem,
@@ -17,7 +18,12 @@ import {
   DealStatus,
   DealSummaryView,
   DealTransitionResponse,
+  IDeal,
+  InvestmentTypeAnalytics,
+  InvestorAuthorityView,
   InvestorRole,
+  InvestorType,
+  StartupInvestorView,
 } from './deal.types';
 
 const STAGE_LABELS: Record<DealStage, string> = {
@@ -28,37 +34,36 @@ const STAGE_LABELS: Record<DealStage, string> = {
 };
 
 const STAGE_ORDER: DealStage[] = [1, 2, 3, 4];
+const MAX_PENNY_EQUITY = 49;
+const MAX_PENNY_EQUITY_PER_INVESTOR = 5;
+
+export const ExpressInterestSchema = z.object({
+  investorType: z.enum(['penny', 'sole']),
+  proposedAmountINR: z.number().min(20000),
+  proposedEquityPercent: z.number().min(0.01).max(100),
+  chosenRole: z.enum(['shareholder', 'director', 'observer']).optional(),
+});
+
+export const FundTransferSchema = z.object({
+  amountINR: z.number().min(20000),
+});
 
 const transitionSchema = z.object({
   newStage: z.union([z.literal(2), z.literal(3), z.literal(4)]),
   stageData: z
     .object({
       amountINR: z.number().min(20000).optional(),
-      equityPercent: z.number().min(0).max(100).optional(),
-      investorRole: z.enum(['Shareholder', 'Director', 'Co-Founder']).optional(),
+      equityPercent: z.number().min(0.01).max(100).optional(),
+      investorRole: z.enum(['shareholder', 'director', 'observer']).optional(),
     })
     .optional(),
 });
 
-type DealDocumentLike = {
-  _id: Types.ObjectId;
-  investorId: Types.ObjectId;
-  startupId: Types.ObjectId;
-  studentId: Types.ObjectId;
-  stage: DealStage;
-  amountINR?: number;
-  fundTransferInitiatedAt?: Date;
-  equityPercent?: number;
-  investorRole?: InvestorRole;
-  adminApprovalRequired: boolean;
-  adminApprovedAt?: Date;
-  adminApprovedBy?: Types.ObjectId;
-  closedAt?: Date;
-  innovationScoreSnapshot: number;
-  status: DealStatus;
-  createdAt: Date;
-  updatedAt: Date;
-};
+export const updateInvestorRoleSchema = z.object({
+  investorRole: z.enum(['shareholder', 'director', 'observer']),
+});
+
+type DealDocumentLike = IDeal & { _id: Types.ObjectId };
 
 type LeanUser = {
   _id: Types.ObjectId;
@@ -82,6 +87,13 @@ type LeanStartup = {
   launchedAt?: Date;
   innovationScoreAtLaunch: number;
   founderIds: Types.ObjectId[];
+  totalShares: number;
+  availableShares: number;
+  reservedForSole: number;
+  maxPennyInvestors: number;
+  currentPennyCount: number;
+  hasSoleInvestor: boolean;
+  soleInvestorId?: Types.ObjectId | null;
   traction: {
     patentFiled: boolean;
     mvpBuilt: boolean;
@@ -89,14 +101,20 @@ type LeanStartup = {
   };
 };
 
-const currentStage = (deal: DealDocumentLike): DealStage =>
-  deal.stage === 2 && deal.adminApprovalRequired ? 3 : deal.stage;
+type ExpressInterestInput = z.infer<typeof ExpressInterestSchema>;
+
+const capTableCacheKey = (startupId: string) => `cap-table:${startupId}`;
+const pennyEquityCacheKey = (startupId: string) => `penny-equity:${startupId}`;
+const round = (value: number) => Number(value.toFixed(2));
+const computeShares = (equityPercent: number, totalShares: number) =>
+  Math.floor((equityPercent / 100) * totalShares);
+
+const currentStage = (deal: DealDocumentLike): DealStage => deal.stage;
 
 const nextActionLabel = (deal: DealDocumentLike): string => {
-  const stage = currentStage(deal);
-  if (stage === 1) return 'Advance to Fund Transfer';
-  if (stage === 2) return 'Advance to Equity Transfer';
-  if (stage === 3) return deal.adminApprovedAt ? 'Advance to Portfolio' : 'Awaiting Admin Verification';
+  if (deal.stage === 1) return 'Advance to Fund Transfer';
+  if (deal.stage === 2) return 'Advance to Equity Transfer';
+  if (deal.stage === 3) return deal.adminApprovedAt ? 'Advance to Portfolio' : 'Awaiting Admin Verification';
   return 'View in Portfolio';
 };
 
@@ -129,11 +147,17 @@ const buildSummary = (
   startupCategory: startup.category,
   studentDisplayName: student.displayName,
   investorDisplayName,
+  investorType: deal.investorType,
   currentStage: currentStage(deal),
   status: deal.status,
-  ...(deal.amountINR !== undefined ? { amountINR: deal.amountINR } : {}),
-  ...(deal.equityPercent !== undefined ? { equityPercent: deal.equityPercent } : {}),
-  ...(deal.investorRole ? { investorRole: deal.investorRole } : {}),
+  amountINR: deal.amountINR,
+  equityPercent: deal.equityPercent,
+  sharesAllocated: deal.sharesAllocated,
+  investorRole: deal.investorRole,
+  votingWeight: deal.votingWeight,
+  canVeto: deal.canVeto,
+  canAccessFinancials: deal.canAccessFinancials,
+  canRequestUpdates: deal.canRequestUpdates,
   adminApprovalRequired: deal.adminApprovalRequired,
   ...(deal.adminApprovedAt ? { adminApprovedAt: deal.adminApprovedAt.toISOString() } : {}),
   innovationScoreSnapshot: deal.innovationScoreSnapshot,
@@ -167,7 +191,7 @@ const buildDetail = (
 const fetchDealContext = async (deal: DealDocumentLike) => {
   const [startup, student, investor] = await Promise.all([
     Startup.findById(deal.startupId)
-      .select('_id name tagline category stage pitchDeckUrl founderIds launchedToInvestors launchedAt innovationScoreAtLaunch traction')
+      .select('_id name tagline category stage pitchDeckUrl founderIds launchedToInvestors launchedAt innovationScoreAtLaunch traction totalShares availableShares reservedForSole maxPennyInvestors currentPennyCount hasSoleInvestor soleInvestorId')
       .lean<LeanStartup>(),
     User.findById(deal.studentId)
       .select('_id displayName avatar role innovationScore scoreBreakdown')
@@ -208,6 +232,77 @@ const ensureStudent = async (studentId: string) => {
   return student;
 };
 
+const resolveNormalizedRole = (investorType: InvestorType, chosenRole?: InvestorRole): InvestorRole => {
+  if (investorType === 'penny') {
+    return chosenRole === 'shareholder' ? 'shareholder' : 'observer';
+  }
+
+  return chosenRole === 'director' ? 'director' : 'shareholder';
+};
+
+export const resolveInvestorAuthority = (
+  investorType: InvestorType,
+  equityPercent: number,
+  chosenRole?: InvestorRole,
+) => {
+  const investorRole = resolveNormalizedRole(investorType, chosenRole);
+  const isDirector = investorType === 'sole' && investorRole === 'director';
+
+  return {
+    investorRole,
+    votingWeight: isDirector ? Math.max(51, round(equityPercent)) : round(equityPercent),
+    canVeto: isDirector,
+    canAccessFinancials: investorType === 'sole',
+    canRequestUpdates: true,
+  };
+};
+
+const invalidateInvestmentCaches = async (startupId: string, investorId?: string) => {
+  const keys = [capTableCacheKey(startupId), pennyEquityCacheKey(startupId), 'admin:analytics'];
+  if (investorId) {
+    keys.push(`investor:dashboard:${investorId}`);
+  }
+
+  await Promise.all(keys.map((key) => redis.del(key)));
+};
+
+const getTotalPennyEquity = async (startupId: string, excludeId?: string) => {
+  if (!excludeId) {
+    const cached = await redis.get<string>(pennyEquityCacheKey(startupId));
+    const cachedValue = readRedisJson<number>(cached);
+    if (typeof cachedValue === 'number') {
+      return cachedValue;
+    }
+  }
+
+  const deals = await Deal.find({
+    startupId,
+    investorType: 'penny',
+    status: { $ne: 'cancelled' },
+    ...(excludeId ? { _id: { $ne: excludeId } } : {}),
+  })
+    .select('equityPercent')
+    .lean<Array<Pick<DealDocumentLike, 'equityPercent'>>>();
+
+  const total = round(deals.reduce((sum, deal) => sum + deal.equityPercent, 0));
+  if (!excludeId) {
+    await redis.set(pennyEquityCacheKey(startupId), JSON.stringify(total), { ex: 30 });
+  }
+  return total;
+};
+
+const getTotalInvestorEquity = async (startupId: string, excludeId?: string) => {
+  const deals = await Deal.find({
+    startupId,
+    status: { $ne: 'cancelled' },
+    ...(excludeId ? { _id: { $ne: excludeId } } : {}),
+  })
+    .select('equityPercent')
+    .lean<Array<Pick<DealDocumentLike, 'equityPercent'>>>();
+
+  return round(deals.reduce((sum, deal) => sum + deal.equityPercent, 0));
+};
+
 const dealToPortfolioItem = (
   deal: DealDocumentLike,
   student: LeanUser,
@@ -221,8 +316,14 @@ const dealToPortfolioItem = (
     startupId: String(deal.startupId),
     startupName: startup?.name ?? 'Startup',
     startupCategory: startup?.category ?? 'Category pending',
-    ...(deal.investorRole ? { investorRole: deal.investorRole } : {}),
-    ...(deal.equityPercent !== undefined ? { equityPercent: deal.equityPercent } : {}),
+    investorType: deal.investorType,
+    investorRole: deal.investorRole,
+    equityPercent: deal.equityPercent,
+    sharesAllocated: deal.sharesAllocated,
+    votingWeight: deal.votingWeight,
+    canVeto: deal.canVeto,
+    canAccessFinancials: deal.canAccessFinancials,
+    canRequestUpdates: deal.canRequestUpdates,
     currentStage: 4,
     innovationScoreSnapshot: deal.innovationScoreSnapshot,
     liveInnovationScore,
@@ -235,11 +336,89 @@ const dealToPortfolioItem = (
 
 export const transitionBodySchema = transitionSchema;
 
-export const createInvestorDealFromInterest = async (investorId: string, startupId: string) => {
+const validateInvestmentTerms = async ({
+  startup,
+  investorType,
+  equityPercent,
+  chosenRole,
+  excludeId,
+  currentSharesAllocated = 0,
+}: {
+  startup: LeanStartup;
+  investorType: InvestorType;
+  equityPercent: number;
+  chosenRole?: InvestorRole;
+  excludeId?: string;
+  currentSharesAllocated?: number;
+}) => {
+  const normalizedRole = resolveNormalizedRole(investorType, chosenRole);
+
+  if (chosenRole === 'director' && investorType !== 'sole') {
+    throw new ApiError(400, 'DIRECTOR_ROLE_RESERVED', 'Director role is reserved for sole investors only');
+  }
+
+  if (investorType === 'penny' && equityPercent > MAX_PENNY_EQUITY_PER_INVESTOR) {
+    throw new ApiError(400, 'PENNY_EQUITY_LIMIT', 'A penny investor cannot hold more than 5% equity');
+  }
+
+  const sharesToAllocate = computeShares(equityPercent, startup.totalShares);
+
+  if (investorType === 'sole' && normalizedRole === 'director') {
+    if (equityPercent < 51 || sharesToAllocate < startup.reservedForSole) {
+      throw new ApiError(
+        400,
+        'SOLE_DIRECTOR_MINIMUM',
+        'A sole investor with director authority must hold at least 51% equity',
+      );
+    }
+  }
+
+  if (investorType === 'penny') {
+    const currentPennyEquity = await getTotalPennyEquity(String(startup._id), excludeId);
+    if (round(currentPennyEquity + equityPercent) > MAX_PENNY_EQUITY) {
+      throw new ApiError(
+        400,
+        'PENNY_EQUITY_CAP',
+        'Penny investors collectively cannot hold more than 49% equity',
+      );
+    }
+  }
+
+  const totalInvestorEquity = await getTotalInvestorEquity(String(startup._id), excludeId);
+  if (round(totalInvestorEquity + equityPercent) > 100) {
+    throw new ApiError(400, 'TOTAL_EQUITY_EXCEEDED', 'Total investor equity cannot exceed 100%');
+  }
+
+  if (sharesToAllocate > startup.availableShares + currentSharesAllocated) {
+    throw new ApiError(400, 'INSUFFICIENT_SHARES', 'Insufficient shares available');
+  }
+
+  return sharesToAllocate;
+};
+
+const pushFounderNotification = async (founderIds: Types.ObjectId[], title: string, body: string) =>
+  Promise.all(
+    founderIds.map((founderId) =>
+      notificationQueue.add('investment-notification', {
+        userId: String(founderId),
+        type: 'deal_interest' as const,
+        title,
+        body,
+        link: '/startup-launch',
+      }),
+    ),
+  );
+
+export const createInvestorDealFromInterest = async (
+  investorId: string,
+  startupId: string,
+  payload: ExpressInterestInput,
+) => {
+  const parsed = ExpressInterestSchema.parse(payload);
   const investor = await ensureInvestor(investorId);
 
   const startup = await Startup.findById(startupId)
-    .select('_id name category stage pitchDeckUrl founderIds launchedToInvestors launchedAt innovationScoreAtLaunch traction')
+    .select('_id name category stage pitchDeckUrl founderIds launchedToInvestors launchedAt innovationScoreAtLaunch traction totalShares availableShares reservedForSole maxPennyInvestors currentPennyCount hasSoleInvestor soleInvestorId')
     .lean<LeanStartup>();
 
   if (!startup || !startup.launchedToInvestors) {
@@ -262,42 +441,116 @@ export const createInvestorDealFromInterest = async (investorId: string, startup
     investorId,
     startupId,
     studentId,
-    status: 'active',
   }).lean<DealDocumentLike | null>();
 
-  if (existing) {
+  if (existing && existing.status !== 'cancelled') {
     const context = await fetchDealContext(existing);
     return buildDetail(existing, context.startup, context.student, context.investor, context.investor.displayName);
   }
+
+  if (parsed.investorType === 'sole' && startup.hasSoleInvestor) {
+    throw new ApiError(409, 'SOLE_INVESTOR_EXISTS', 'This startup already has a sole investor');
+  }
+
+  if (parsed.investorType === 'penny' && startup.currentPennyCount >= startup.maxPennyInvestors) {
+    throw new ApiError(409, 'PENNY_SLOTS_FULL', 'Penny investor slots are full for this startup');
+  }
+
+  const sharesToAllocate = await validateInvestmentTerms({
+    startup,
+    investorType: parsed.investorType,
+    equityPercent: parsed.proposedEquityPercent,
+    chosenRole: parsed.chosenRole,
+  });
+  const authority = resolveInvestorAuthority(
+    parsed.investorType,
+    parsed.proposedEquityPercent,
+    parsed.chosenRole,
+  );
+  const previousPennyEquity = await getTotalPennyEquity(startupId);
+  const previousPennyCount = startup.currentPennyCount;
 
   const deal = await Deal.create({
     investorId,
     startupId,
     studentId,
+    investorType: parsed.investorType,
     stage: 1,
+    amountINR: parsed.proposedAmountINR,
+    proposedAmountINR: parsed.proposedAmountINR,
+    equityPercent: parsed.proposedEquityPercent,
+    proposedEquityPercent: parsed.proposedEquityPercent,
+    sharesAllocated: sharesToAllocate,
+    ...authority,
     innovationScoreSnapshot: founder.innovationScore ?? 0,
     status: 'active',
     adminApprovalRequired: false,
   });
 
-  await redis.del(`investor:dashboard:${investorId}`);
-
-  await notificationQueue.add('deal-interest', {
-    userId: String(studentId),
-    type: 'deal_interest',
-    title: 'An investor is interested in your startup!',
-    body: `${investor.displayName} expressed interest in ${startup.name}.`,
-    link: '/startup-launch',
+  await Startup.findByIdAndUpdate(startupId, {
+    $inc: {
+      availableShares: -sharesToAllocate,
+      currentPennyCount: parsed.investorType === 'penny' ? 1 : 0,
+    },
+    ...(parsed.investorType === 'sole' ? { hasSoleInvestor: true, soleInvestorId: investorId } : {}),
   });
+
+  await invalidateInvestmentCaches(startupId, investorId);
+
+  if (parsed.investorType === 'sole') {
+    await pushFounderNotification(
+      startup.founderIds,
+      'Sole investor interest received',
+      'A Sole Investor wants to lead your startup — review their proposal',
+    );
+  } else {
+    await pushFounderNotification(
+      startup.founderIds,
+      'New penny investor joined',
+      `New penny investor joined: +${round(parsed.proposedEquityPercent)}% equity allocated`,
+    );
+  }
+
+  if (parsed.investorType === 'penny' && previousPennyCount + 1 === startup.maxPennyInvestors - 1) {
+    await pushFounderNotification(
+      startup.founderIds,
+      'Penny investor slots nearly full',
+      `Your penny investor slots are almost full (${previousPennyCount + 1}/${startup.maxPennyInvestors})`,
+    );
+  }
+
+  if (
+    parsed.investorType === 'penny' &&
+    previousPennyEquity < 45 &&
+    round(previousPennyEquity + parsed.proposedEquityPercent) >= 45
+  ) {
+    await pushFounderNotification(
+      startup.founderIds,
+      'Penny equity cap approaching',
+      `Penny investors now hold ${round(previousPennyEquity + parsed.proposedEquityPercent)}% — approaching 49% cap`,
+    );
+  }
+
+  if (startup.soleInvestorId && String(startup.soleInvestorId) !== investorId) {
+    await notificationQueue.add('investment-notification', {
+      userId: String(startup.soleInvestorId),
+      type: 'system' as const,
+      title: 'Cap table updated',
+      body: 'Cap table updated: new investor added',
+      link: '/dashboard/investor/portfolio',
+    });
+  }
 
   const context = await fetchDealContext(deal.toObject() as DealDocumentLike);
   return buildDetail(deal.toObject() as DealDocumentLike, context.startup, context.student, context.investor, context.investor.displayName);
 };
 
+export const createInvestment = createInvestorDealFromInterest;
+
 export const listDealsForInvestor = async (investorId: string): Promise<DealGroupView[]> => {
   await ensureInvestor(investorId);
 
-  const deals = await Deal.find({ investorId })
+  const deals = await Deal.find({ investorId, status: { $ne: 'cancelled' } })
     .sort({ updatedAt: -1, createdAt: -1 })
     .lean<DealDocumentLike[]>();
 
@@ -329,7 +582,7 @@ export const listDealsForParticipant = async (userId: string, role: UserRole): P
 
   await ensureStudent(userId);
 
-  const deals = await Deal.find({ studentId: userId })
+  const deals = await Deal.find({ studentId: userId, status: { $ne: 'cancelled' } })
     .sort({ updatedAt: -1, createdAt: -1 })
     .lean<DealDocumentLike[]>();
 
@@ -347,16 +600,16 @@ export const listDealsForParticipant = async (userId: string, role: UserRole): P
 };
 
 export const getDealForParticipant = async (userId: string, role: UserRole, dealId: string): Promise<DealDetailView> => {
-  if (role !== UserRole.INVESTOR && role !== UserRole.STUDENT) {
-    throw new ApiError(403, 'FORBIDDEN', 'Only investors and students can access deals');
+  if (role !== UserRole.INVESTOR && role !== UserRole.STUDENT && role !== UserRole.ADMIN) {
+    throw new ApiError(403, 'FORBIDDEN', 'You cannot access this deal');
   }
 
   const deal = await Deal.findOne({
     _id: dealId,
-    ...(role === UserRole.INVESTOR ? { investorId: userId } : { studentId: userId }),
+    ...(role === UserRole.ADMIN ? {} : role === UserRole.INVESTOR ? { investorId: userId } : { studentId: userId }),
   }).lean<DealDocumentLike | null>();
 
-  if (!deal) {
+  if (!deal || deal.status === 'cancelled') {
     throw new ApiError(403, 'FORBIDDEN', 'You cannot access this deal');
   }
 
@@ -372,6 +625,16 @@ export const getDealForParticipant = async (userId: string, role: UserRole, deal
   );
 };
 
+export const recordFundTransfer = async (
+  investorId: string,
+  dealId: string,
+  payload: z.infer<typeof FundTransferSchema>,
+): Promise<DealTransitionResponse> =>
+  advanceDealStage(investorId, dealId, {
+    newStage: 2,
+    stageData: { amountINR: FundTransferSchema.parse(payload).amountINR },
+  });
+
 export const advanceDealStage = async (
   investorId: string,
   dealId: string,
@@ -385,14 +648,26 @@ export const advanceDealStage = async (
     investorId,
   });
 
-  if (!deal) {
+  if (!deal || deal.status === 'cancelled') {
     throw new ApiError(404, 'DEAL_NOT_FOUND', 'Deal not found');
   }
 
   const dealDoc = deal.toObject() as DealDocumentLike;
   const activeStage = currentStage(dealDoc);
 
-  if (parsed.newStage !== activeStage + 1) {
+  if (parsed.newStage === 2) {
+    if (activeStage !== 1) {
+      throw new ApiError(400, 'INVALID_STAGE_TRANSITION', 'Stages must advance sequentially');
+    }
+  } else if (parsed.newStage === 3) {
+    if (activeStage !== 2) {
+      throw new ApiError(400, 'INVALID_STAGE_TRANSITION', 'Stages must advance sequentially');
+    }
+  } else if (parsed.newStage === 4) {
+    if (activeStage !== 3 || !deal.adminApprovedAt) {
+      throw new ApiError(400, 'ADMIN_APPROVAL_REQUIRED', 'Stage 4 requires admin approval first');
+    }
+  } else {
     throw new ApiError(400, 'INVALID_STAGE_TRANSITION', 'Stages must advance sequentially');
   }
 
@@ -403,22 +678,53 @@ export const advanceDealStage = async (
 
     deal.stage = 2;
     deal.amountINR = parsed.stageData.amountINR;
+    deal.proposedAmountINR = parsed.stageData.amountINR;
     deal.fundTransferInitiatedAt = new Date();
     deal.status = 'active';
     deal.adminApprovalRequired = false;
+    deal.adminApprovedAt = undefined;
+    deal.adminApprovedBy = undefined;
   }
 
   if (parsed.newStage === 3) {
+    const startup = await Startup.findById(deal.startupId)
+      .select('_id name tagline category stage pitchDeckUrl founderIds launchedToInvestors launchedAt innovationScoreAtLaunch traction totalShares availableShares reservedForSole maxPennyInvestors currentPennyCount hasSoleInvestor soleInvestorId')
+      .lean<LeanStartup>();
+
+    if (!startup) {
+      throw new ApiError(404, 'STARTUP_NOT_FOUND', 'Startup not found');
+    }
+
+    const nextEquityPercent = parsed.stageData?.equityPercent ?? deal.equityPercent;
+    const nextRole = parsed.stageData?.investorRole ?? deal.investorRole;
+    const sharesToAllocate = await validateInvestmentTerms({
+      startup,
+      investorType: deal.investorType,
+      equityPercent: nextEquityPercent,
+      chosenRole: nextRole,
+      excludeId: String(deal._id),
+      currentSharesAllocated: deal.sharesAllocated,
+    });
+    const authority = resolveInvestorAuthority(deal.investorType, nextEquityPercent, nextRole);
+
+    await Startup.findByIdAndUpdate(deal.startupId, {
+      $inc: { availableShares: deal.sharesAllocated - sharesToAllocate },
+    });
+
     deal.stage = 3;
     deal.adminApprovalRequired = true;
-    if (typeof parsed.stageData?.equityPercent === 'number') {
-      deal.equityPercent = parsed.stageData.equityPercent;
-    }
-    if (parsed.stageData?.investorRole) {
-      deal.investorRole = parsed.stageData.investorRole;
-    }
+    deal.equityPercent = nextEquityPercent;
+    deal.proposedEquityPercent = nextEquityPercent;
+    deal.sharesAllocated = sharesToAllocate;
+    deal.investorRole = authority.investorRole;
+    deal.votingWeight = authority.votingWeight;
+    deal.canVeto = authority.canVeto;
+    deal.canAccessFinancials = authority.canAccessFinancials;
+    deal.canRequestUpdates = authority.canRequestUpdates;
+    deal.adminApprovedAt = undefined;
+    deal.adminApprovedBy = undefined;
     await deal.save();
-    await redis.del(`investor:dashboard:${investorId}`);
+    await invalidateInvestmentCaches(String(deal.startupId), investorId);
     return {
       requiresAdminApproval: true,
       message: 'Stage 3 requires admin verification.',
@@ -426,10 +732,6 @@ export const advanceDealStage = async (
   }
 
   if (parsed.newStage === 4) {
-    if (!deal.adminApprovedAt) {
-      throw new ApiError(400, 'ADMIN_APPROVAL_REQUIRED', 'Stage 4 requires admin approval first');
-    }
-
     deal.stage = 4;
     deal.status = 'closed';
     deal.closedAt = new Date();
@@ -437,7 +739,7 @@ export const advanceDealStage = async (
   }
 
   await deal.save();
-  await redis.del(`investor:dashboard:${investorId}`);
+  await invalidateInvestmentCaches(String(deal.startupId), investorId);
 
   const context = await fetchDealContext(deal.toObject() as DealDocumentLike);
 
@@ -523,6 +825,8 @@ export const listInvestorStartups = async (
     stage?: string;
     page?: number;
     limit?: number;
+    acceptingPenny?: boolean;
+    acceptingSole?: boolean;
   },
 ) => {
   await ensureInvestor(investorId);
@@ -544,6 +848,19 @@ export const listInvestorStartups = async (
       ...(typeof filters.minScore === 'number' ? { $gte: filters.minScore } : {}),
       ...(typeof filters.maxScore === 'number' ? { $lte: filters.maxScore } : {}),
     };
+  }
+
+  const acceptingClauses: Array<Record<string, unknown>> = [];
+  if (filters.acceptingPenny) {
+    acceptingClauses.push({ $expr: { $lt: ['$currentPennyCount', '$maxPennyInvestors'] } });
+  }
+  if (filters.acceptingSole) {
+    acceptingClauses.push({ hasSoleInvestor: false });
+  }
+  if (acceptingClauses.length === 1) {
+    Object.assign(query, acceptingClauses[0]);
+  } else if (acceptingClauses.length > 1) {
+    query.$or = acceptingClauses;
   }
 
   const [total, startups] = await Promise.all([
@@ -578,6 +895,12 @@ export const listInvestorStartups = async (
       teamSize: startup.founderIds.length,
       ...(startup.pitchDeckUrl ? { pitchDeckUrl: startup.pitchDeckUrl } : {}),
       traction: startup.traction,
+      acceptsPennyInvestors: startup.currentPennyCount < startup.maxPennyInvestors,
+      acceptsSoleInvestor: !startup.hasSoleInvestor,
+      sharePool: {
+        totalShares: startup.totalShares,
+        availableShares: startup.availableShares,
+      },
       ...(founder
         ? {
             founder: {
@@ -608,7 +931,7 @@ export const getInvestorStartup = async (investorId: string, startupId: string) 
     _id: startupId,
     launchedToInvestors: true,
   })
-    .select('_id name tagline category stage pitchDeckUrl founderIds launchedToInvestors launchedAt innovationScoreAtLaunch traction')
+    .select('_id name tagline category stage pitchDeckUrl founderIds launchedToInvestors launchedAt innovationScoreAtLaunch traction totalShares availableShares reservedForSole maxPennyInvestors currentPennyCount hasSoleInvestor soleInvestorId')
     .lean<LeanStartup>();
 
   if (!startup) {
@@ -639,6 +962,12 @@ export const getInvestorStartup = async (investorId: string, startupId: string) 
       teamSize: startup.founderIds.length,
       ...(startup.pitchDeckUrl ? { pitchDeckUrl: startup.pitchDeckUrl } : {}),
       traction: startup.traction,
+      acceptsPennyInvestors: startup.currentPennyCount < startup.maxPennyInvestors,
+      acceptsSoleInvestor: !startup.hasSoleInvestor,
+      sharePool: {
+        totalShares: startup.totalShares,
+        availableShares: startup.availableShares,
+      },
       founders: founders.map((founder) => ({
         _id: String(founder._id),
         displayName: founder.displayName,
@@ -663,7 +992,7 @@ export const getInvestorStartup = async (investorId: string, startupId: string) 
       scoreBreakdown: founder.scoreBreakdown ?? {},
       ...(founder.domain ? { domain: founder.domain } : {}),
     })),
-    canExpressInterest: true,
+    canExpressInterest: startup.currentPennyCount < startup.maxPennyInvestors || !startup.hasSoleInvestor,
   };
 };
 
@@ -738,4 +1067,271 @@ export const getInvestorPortfolio = async (investorId: string) => {
       totalPortfolioCount: items.length,
     },
   };
+};
+
+export const getInvestorAuthorityPortfolio = async (investorId: string): Promise<InvestorAuthorityView[]> => {
+  await ensureInvestor(investorId);
+
+  const deals = await Deal.find({ investorId, status: { $ne: 'cancelled' } })
+    .sort({ updatedAt: -1 })
+    .lean<DealDocumentLike[]>();
+  const startupIds = [...new Set(deals.map((deal) => String(deal.startupId)))];
+  const startups =
+    startupIds.length > 0
+      ? await Startup.find({ _id: { $in: startupIds } }).select('_id name').lean<Array<{ _id: Types.ObjectId; name: string }>>()
+      : [];
+  const startupMap = new Map(startups.map((startup) => [String(startup._id), startup.name]));
+
+  return deals.map((deal) => ({
+    dealId: String(deal._id),
+    startupId: String(deal.startupId),
+    startupName: startupMap.get(String(deal.startupId)) ?? 'Startup',
+    investorType: deal.investorType,
+    equityPercent: deal.equityPercent,
+    sharesAllocated: deal.sharesAllocated,
+    stage: deal.stage,
+    investorRole: deal.investorRole,
+    votingWeight: deal.votingWeight,
+    canVeto: deal.canVeto,
+    canAccessFinancials: deal.canAccessFinancials,
+    canRequestUpdates: deal.canRequestUpdates,
+  }));
+};
+
+const getStartupAccess = async (startupId: string, userId: string, role: UserRole) => {
+  const startup = await Startup.findById(startupId)
+    .select('_id founderIds totalShares availableShares reservedForSole maxPennyInvestors currentPennyCount hasSoleInvestor soleInvestorId')
+    .lean<LeanStartup>();
+
+  if (!startup) {
+    throw new ApiError(404, 'STARTUP_NOT_FOUND', 'Startup not found');
+  }
+
+  const hasFullAccess =
+    role === UserRole.ADMIN ||
+    startup.founderIds.some((founderId) => String(founderId) === userId) ||
+    (startup.soleInvestorId ? String(startup.soleInvestorId) === userId : false);
+  const ownInvestment = await Deal.findOne({
+    startupId,
+    investorId: userId,
+    status: { $ne: 'cancelled' },
+  }).lean<DealDocumentLike | null>();
+
+  return { startup, hasFullAccess, ownInvestment };
+};
+
+export const getStartupInvestors = async (
+  startupId: string,
+  userId: string,
+  role: UserRole,
+): Promise<StartupInvestorView[]> => {
+  const access = await getStartupAccess(startupId, userId, role);
+  if (!access.hasFullAccess) {
+    throw new ApiError(403, 'FORBIDDEN', 'You cannot view the full investor list for this startup');
+  }
+
+  const deals = await Deal.find({ startupId, status: { $ne: 'cancelled' } })
+    .sort({ investorType: 1, createdAt: 1 })
+    .lean<DealDocumentLike[]>();
+  const investorIds = [...new Set(deals.map((deal) => String(deal.investorId)))];
+  const investors =
+    investorIds.length > 0
+      ? await User.find({ _id: { $in: investorIds } }).select('_id displayName').lean<Array<{ _id: Types.ObjectId; displayName: string }>>()
+      : [];
+  const investorMap = new Map(investors.map((investor) => [String(investor._id), investor.displayName]));
+
+  return deals.map((deal) => ({
+    dealId: String(deal._id),
+    investorId: String(deal.investorId),
+    name: investorMap.get(String(deal.investorId)) ?? 'Investor',
+    investorType: deal.investorType,
+    equityPercent: deal.equityPercent,
+    sharesAllocated: deal.sharesAllocated,
+    amountINR: deal.amountINR,
+    stage: deal.stage,
+    ...(deal.closedAt ? { closedAt: deal.closedAt.toISOString() } : {}),
+    investorRole: deal.investorRole,
+    votingWeight: deal.votingWeight,
+    canVeto: deal.canVeto,
+    canAccessFinancials: deal.canAccessFinancials,
+    canRequestUpdates: deal.canRequestUpdates,
+  }));
+};
+
+const getCapTableBase = async (startupId: string): Promise<CapTableResponse> => {
+  const cached = await redis.get<string>(capTableCacheKey(startupId));
+  const cachedValue = readRedisJson<CapTableResponse>(cached);
+  if (cachedValue) {
+    return cachedValue;
+  }
+
+  const startup = await Startup.findById(startupId)
+    .select('_id totalShares availableShares')
+    .lean<Pick<LeanStartup, '_id' | 'totalShares' | 'availableShares'>>();
+  if (!startup) {
+    throw new ApiError(404, 'STARTUP_NOT_FOUND', 'Startup not found');
+  }
+
+  const deals = await Deal.find({ startupId, status: { $ne: 'cancelled' } })
+    .sort({ createdAt: 1 })
+    .lean<DealDocumentLike[]>();
+  const investorIds = [...new Set(deals.map((deal) => String(deal.investorId)))];
+  const investors =
+    investorIds.length > 0
+      ? await User.find({ _id: { $in: investorIds } }).select('_id displayName').lean<Array<{ _id: Types.ObjectId; displayName: string }>>()
+      : [];
+  const investorMap = new Map(investors.map((investor) => [String(investor._id), investor.displayName]));
+  const mapRow = (deal: DealDocumentLike) => ({
+    dealId: String(deal._id),
+    investorId: String(deal.investorId),
+    name: investorMap.get(String(deal.investorId)) ?? 'Investor',
+    investorType: deal.investorType,
+    equityPercent: deal.equityPercent,
+    sharesAllocated: deal.sharesAllocated,
+    investorRole: deal.investorRole,
+    votingWeight: deal.votingWeight,
+    canVeto: deal.canVeto,
+    canAccessFinancials: deal.canAccessFinancials,
+    canRequestUpdates: deal.canRequestUpdates,
+  });
+  const soleDeal = deals.find((deal) => deal.investorType === 'sole') ?? null;
+  const pennyDeals = deals.filter((deal) => deal.investorType === 'penny');
+  const allocatedShares = deals.reduce((sum, deal) => sum + deal.sharesAllocated, 0);
+
+  const capTable: CapTableResponse = {
+    startupId: String(startup._id),
+    totalShares: startup.totalShares,
+    availableShares: startup.availableShares,
+    visibility: 'full',
+    soleInvestor: soleDeal ? mapRow(soleDeal) : null,
+    pennyInvestors: pennyDeals.map(mapRow),
+    founderRetained: {
+      sharesAllocated: Math.max(startup.totalShares - allocatedShares, 0),
+      equityPercent:
+        startup.totalShares > 0
+          ? round((Math.max(startup.totalShares - allocatedShares, 0) / startup.totalShares) * 100)
+          : 0,
+    },
+    totalInvestorEquity: round(deals.reduce((sum, deal) => sum + deal.equityPercent, 0)),
+  };
+
+  await redis.set(capTableCacheKey(startupId), JSON.stringify(capTable), { ex: 60 });
+  return capTable;
+};
+
+export const getStartupCapTable = async (
+  startupId: string,
+  userId: string,
+  role: UserRole,
+): Promise<CapTableResponse> => {
+  const access = await getStartupAccess(startupId, userId, role);
+  const capTable = await getCapTableBase(startupId);
+
+  if (access.hasFullAccess) {
+    return capTable;
+  }
+
+  if (!access.ownInvestment) {
+    throw new ApiError(403, 'FORBIDDEN', 'You cannot view this cap table');
+  }
+
+  const ownDealId = String(access.ownInvestment._id);
+  const ownPennyRow = capTable.pennyInvestors.find((row) => row.dealId === ownDealId);
+  const ownSoleRow = capTable.soleInvestor?.dealId === ownDealId ? capTable.soleInvestor : null;
+
+  return {
+    ...capTable,
+    visibility: 'limited',
+    soleInvestor: ownSoleRow
+      ? ownSoleRow
+      : capTable.soleInvestor
+        ? { ...capTable.soleInvestor, investorId: undefined, name: undefined }
+        : null,
+    pennyInvestors: ownPennyRow ? [ownPennyRow] : [],
+  };
+};
+
+export const updateInvestmentRole = async (dealId: string, investorRole: InvestorRole) => {
+  const deal = await Deal.findById(dealId);
+  if (!deal || deal.status === 'cancelled') {
+    throw new ApiError(404, 'DEAL_NOT_FOUND', 'Deal not found');
+  }
+
+  const startup = await Startup.findById(deal.startupId)
+    .select('_id founderIds totalShares availableShares reservedForSole maxPennyInvestors currentPennyCount hasSoleInvestor soleInvestorId')
+    .lean<LeanStartup>();
+  if (!startup) {
+    throw new ApiError(404, 'STARTUP_NOT_FOUND', 'Startup not found');
+  }
+
+  await validateInvestmentTerms({
+    startup,
+    investorType: deal.investorType,
+    equityPercent: deal.equityPercent,
+    chosenRole: investorRole,
+    excludeId: String(deal._id),
+    currentSharesAllocated: deal.sharesAllocated,
+  });
+  const authority = resolveInvestorAuthority(deal.investorType, deal.equityPercent, investorRole);
+
+  deal.investorRole = authority.investorRole;
+  deal.votingWeight = authority.votingWeight;
+  deal.canVeto = authority.canVeto;
+  deal.canAccessFinancials = authority.canAccessFinancials;
+  deal.canRequestUpdates = authority.canRequestUpdates;
+  await deal.save();
+
+  await invalidateInvestmentCaches(String(deal.startupId), String(deal.investorId));
+  const context = await fetchDealContext(deal.toObject() as DealDocumentLike);
+  return buildDetail(
+    deal.toObject() as DealDocumentLike,
+    context.startup,
+    context.student,
+    context.investor,
+    context.investor.displayName,
+  );
+};
+
+export const getInvestmentTypeAnalytics = async (): Promise<InvestmentTypeAnalytics> => {
+  const deals = await Deal.find({ status: { $ne: 'cancelled' } })
+    .select('investorType amountINR')
+    .lean<Array<Pick<DealDocumentLike, 'investorType' | 'amountINR'>>>();
+
+  return {
+    pennyCount: deals.filter((deal) => deal.investorType === 'penny').length,
+    soleCount: deals.filter((deal) => deal.investorType === 'sole').length,
+    pennyCapitalDeployed: deals
+      .filter((deal) => deal.investorType === 'penny')
+      .reduce((sum, deal) => sum + deal.amountINR, 0),
+    soleCapitalDeployed: deals
+      .filter((deal) => deal.investorType === 'sole')
+      .reduce((sum, deal) => sum + deal.amountINR, 0),
+  };
+};
+
+export const resetSoleInvestorForStartup = async (startupId: string) => {
+  const startup = await Startup.findById(startupId);
+  if (!startup) {
+    throw new ApiError(404, 'STARTUP_NOT_FOUND', 'Startup not found');
+  }
+
+  const soleDeals = await Deal.find({ startupId, investorType: 'sole', status: { $ne: 'cancelled' } });
+  const refundedShares = soleDeals.reduce((sum, deal) => sum + deal.sharesAllocated, 0);
+
+  await Promise.all(
+    soleDeals.map(async (deal) => {
+      deal.status = 'cancelled';
+      deal.adminApprovalRequired = false;
+      deal.canVeto = false;
+      deal.canAccessFinancials = false;
+      deal.votingWeight = 0;
+      await deal.save();
+    }),
+  );
+
+  startup.availableShares = Math.min(startup.totalShares, startup.availableShares + refundedShares);
+  startup.hasSoleInvestor = false;
+  startup.soleInvestorId = null;
+  await startup.save();
+  await invalidateInvestmentCaches(startupId);
 };

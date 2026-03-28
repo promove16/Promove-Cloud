@@ -118,7 +118,7 @@ export function DashboardLayout({ children, role }: DashboardLayoutProps) {
   const [sidebarOpen, setSidebarOpen] = useState(false);
 
   const studentMenu = [
-    { icon: Home, label: "Dashboard", path: "/student" },
+    { icon: Home, label: "Dashboard", path: "/dashboard/student" },
     { icon: Globe, label: "Problem Bank", path: "/problem-bank" },
     { icon: FileText, label: "Product Workspace", path: "/product-workspace" },
     { icon: Award, label: "Patent Support", path: "/patent-support" },
@@ -286,7 +286,7 @@ export function DashboardLayout({ children, role }: DashboardLayoutProps) {
             
             <div className="pt-4 border-t border-slate-800 mt-4">
               <Link
-                to="/student"
+                to="/dashboard/settings"
                 className="flex items-center gap-3 px-4 py-3 rounded-lg hover:bg-slate-800 text-slate-400 hover:text-white transition-colors"
               >
                 <Settings className="w-5 h-5" />

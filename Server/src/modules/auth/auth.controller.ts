@@ -2,8 +2,14 @@ import { Request, Response } from 'express';
 import { env } from '../../config/env';
 import { ApiResponse } from '../../utils/ApiResponse';
 import { ApiError } from '../../utils/ApiError';
-import { loginSchema, registerSchema } from './auth.schema';
-import { loginUser, logoutUser, refreshUserToken, registerUser } from './auth.service';
+import { loginSchema, registerSchema, submitInstitutionTokenSchema } from './auth.schema';
+import {
+  loginUser,
+  logoutUser,
+  refreshUserToken,
+  registerUser,
+  submitInstitutionToken,
+} from './auth.service';
 
 const COOKIE_NAME = 'refreshToken';
 const COOKIE_MAX_AGE = 30 * 24 * 60 * 60 * 1000;
@@ -19,22 +25,13 @@ export const register = async (req: Request, res: Response) => {
   const payload = registerSchema.parse(req.body);
   const result = await registerUser(payload);
 
-  if ('requiresVerification' in result) {
-    res.status(202).json(
-      new ApiResponse({
-        requiresVerification: true,
-        message: result.message,
-        user: result.user,
-      }),
-    );
-    return;
-  }
-
   res.cookie(COOKIE_NAME, result.refreshToken, cookieOptions);
   res.status(201).json(
     new ApiResponse({
       accessToken: result.accessToken,
       user: result.user,
+      nextStep: result.nextStep,
+      message: result.message,
     }),
   );
 };
@@ -76,4 +73,19 @@ export const logout = async (req: Request, res: Response) => {
     sameSite: 'strict',
   });
   res.status(200).json(new ApiResponse({ message: 'Logged out successfully' }));
+};
+
+export const submitInstitutionTokenAfterRegister = async (req: Request, res: Response) => {
+  if (!req.user) {
+    throw new ApiError(401, 'UNAUTHORIZED', 'Invalid or expired token');
+  }
+
+  const { institutionToken } = submitInstitutionTokenSchema.parse(req.body);
+  const result = await submitInstitutionToken(req.user._id, institutionToken);
+
+  res.status(200).json(
+    new ApiResponse({
+      message: result.message,
+    }),
+  );
 };

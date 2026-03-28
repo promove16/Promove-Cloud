@@ -9,6 +9,10 @@ const jsonwebtoken_1 = __importDefault(require("jsonwebtoken"));
 const env_1 = require("../config/env");
 const workspace_model_1 = require("../modules/workspace/workspace.model");
 const chat_model_1 = require("../modules/chat/chat.model");
+const canAccessWorkspace = async (workspaceId, userId) => workspace_model_1.Workspace.exists({
+    _id: workspaceId,
+    $or: [{ ownerId: userId }, { teamMemberIds: userId }],
+});
 const initChatSocket = (io) => {
     const chat = io.of('/chat');
     chat.use((socket, next) => {
@@ -31,10 +35,7 @@ const initChatSocket = (io) => {
                 socket.emit('chat:error', { message: 'Workspace not found' });
                 return;
             }
-            const hasAccess = await workspace_model_1.Workspace.exists({
-                _id: workspaceId,
-                $or: [{ ownerId: socket.data.userId }, { teamMemberIds: socket.data.userId }],
-            });
+            const hasAccess = await canAccessWorkspace(workspaceId, socket.data.userId);
             if (!hasAccess) {
                 socket.emit('chat:error', { message: 'Workspace not found' });
                 return;
@@ -42,6 +43,15 @@ const initChatSocket = (io) => {
             socket.join(`ws:${workspaceId}`);
         });
         socket.on('chat:message', async ({ workspaceId, message, attachmentUrl }) => {
+            if (!workspaceId || !mongoose_1.Types.ObjectId.isValid(workspaceId)) {
+                socket.emit('chat:error', { message: 'Workspace not found' });
+                return;
+            }
+            const hasAccess = await canAccessWorkspace(workspaceId, socket.data.userId);
+            if (!hasAccess) {
+                socket.emit('chat:error', { message: 'Workspace not found' });
+                return;
+            }
             const msg = await chat_model_1.ChatMessage.create({
                 workspaceId,
                 senderId: socket.data.userId,

@@ -2,6 +2,7 @@ import jwt from 'jsonwebtoken';
 import request from 'supertest';
 import app from '../../src/app';
 import { env } from '../../src/config/env';
+import { institutionVerifyQueue } from '../../src/config/bullmq';
 import { User } from '../../src/modules/user/user.model';
 
 const validRegisterPayload = {
@@ -29,45 +30,53 @@ describe('auth integration', () => {
       expect(response.body.data.accessToken).toEqual(expect.any(String));
       expect(response.body.data.user.email).toBe(validRegisterPayload.email);
       expect(response.body.data.user.accessGrantedBy).toBe('self_registered');
+      expect(response.body.data.nextStep).toBe('profile_setup');
       expect(response.headers['set-cookie']?.[0]).toContain('refreshToken=');
     });
 
-    it('creates a user, returns an access token, and sets a cookie', async () => {
-      const schoolRegistration = await request(app).post('/api/auth/register').send({
-        email: 'school@example.com',
+    it('creates a student without an institution token', async () => {
+      const response = await request(app).post('/api/auth/register').send({
+        email: 'student-without-token@example.com',
         password: 'Password123!',
-        displayName: 'Innovation Coordinator',
-        role: 'school',
-        institutionProfile: {
-          institutionName: 'Future Ready School',
-          location: 'Hyderabad',
-          totalStudentsEnrolled: 950,
-          academicYear: '2025-26',
-        },
+        displayName: 'Student User',
+        role: 'student',
       });
 
-      const tokenResponse = await request(app)
-        .post('/api/school/student-access-tokens')
-        .set('Authorization', `Bearer ${schoolRegistration.body.data.accessToken}`)
-        .send({ label: 'Class 12 innovators' });
+      expect(response.status).toBe(201);
+      expect(response.body.data.accessToken).toEqual(expect.any(String));
+      expect(response.body.data.user.registrationStage).toBe('basic');
+      expect(response.body.data.user.institutionVerificationStatus).toBe('none');
+      expect(response.body.data.user.profileSlug).toMatch(/^student-user-[a-f0-9]{4}$/);
+      expect(response.headers['set-cookie']?.[0]).toContain('refreshToken=');
+    });
+
+    it('creates a student with an institution token and queues verification without blocking sign-in', async () => {
+      const queueSpy = jest.spyOn(institutionVerifyQueue, 'add');
 
       const response = await request(app).post('/api/auth/register').send({
         email: 'student@example.com',
         password: 'Password123!',
         displayName: 'Student User',
         role: 'student',
-        institutionToken: tokenResponse.body.data.token,
+        institutionToken: 'SCH-AB12CD34',
       });
 
-      expect(response.status).toBe(202);
+      expect(response.status).toBe(201);
       expect(response.body.success).toBe(true);
-      expect(response.body.data.requiresVerification).toBe(true);
-      expect(response.body.data.accessToken).toBeUndefined();
-      expect(response.body.data.user.email).toBe('student@example.com');
-      expect(response.body.data.user.verificationStatus).toBe('pending');
-      expect(response.body.data.user.isActive).toBe(false);
+      expect(response.body.data.accessToken).toEqual(expect.any(String));
+      expect(response.body.data.user.registrationStage).toBe('institution_pending');
+      expect(response.body.data.user.institutionVerificationStatus).toBe('pending');
+      expect(response.body.data.user.accessGrantedBy).toBe('admin');
       expect(response.body.data.user.passwordHash).toBeUndefined();
-      expect(response.headers['set-cookie']).toBeUndefined();
+      expect(response.headers['set-cookie']?.[0]).toContain('refreshToken=');
+      expect(queueSpy).toHaveBeenCalledWith(
+        'verify',
+        expect.objectContaining({
+          userId: response.body.data.user._id,
+          token: 'SCH-AB12CD34',
+        }),
+        expect.any(Object),
+      );
     });
 
     it('rejects duplicate email registrations', async () => {
@@ -143,17 +152,60 @@ describe('auth integration', () => {
       expect(response.body.data.user.institutionProfile.institutionName).toBe('Future Ready College');
       expect(response.body.data.user.profileComplete).toBe(true);
     });
+  });
 
-    it('rejects student registrations without an institution token', async () => {
-      const response = await request(app).post('/api/auth/register').send({
-        email: 'student-without-token@example.com',
+  describe('POST /api/auth/submit-institution-token', () => {
+    it('submits an institution token after registration and enqueues verification', async () => {
+      const queueSpy = jest.spyOn(institutionVerifyQueue, 'add');
+      const registerResponse = await request(app).post('/api/auth/register').send({
+        email: 'late-token@example.com',
         password: 'Password123!',
-        displayName: 'Student User',
+        displayName: 'Late Token Student',
         role: 'student',
       });
 
-      expect(response.status).toBe(400);
-      expect(response.body.error.code).toBe('VALIDATION_ERROR');
+      const response = await request(app)
+        .post('/api/auth/submit-institution-token')
+        .set('Authorization', `Bearer ${registerResponse.body.data.accessToken}`)
+        .send({ institutionToken: 'COL-XYZ12345' });
+
+      expect(response.status).toBe(200);
+      expect(response.body.success).toBe(true);
+      expect(response.body.data.message).toBe('Token submitted. Verification in progress.');
+      expect(queueSpy).toHaveBeenCalledWith(
+        'verify',
+        expect.objectContaining({
+          userId: registerResponse.body.data.user._id,
+          token: 'COL-XYZ12345',
+        }),
+        expect.any(Object),
+      );
+
+      const user = await User.findById(registerResponse.body.data.user._id).lean();
+      expect(user?.institutionVerificationStatus).toBe('pending');
+      expect(user?.registrationStage).toBe('institution_pending');
+      expect(user?.institutionToken).toBe('COL-XYZ12345');
+    });
+
+    it('rejects token submission when institution is already verified', async () => {
+      const registerResponse = await request(app).post('/api/auth/register').send({
+        email: 'verified-student@example.com',
+        password: 'Password123!',
+        displayName: 'Verified Student',
+        role: 'student',
+      });
+
+      await User.findByIdAndUpdate(registerResponse.body.data.user._id, {
+        institutionVerificationStatus: 'verified',
+      });
+
+      const response = await request(app)
+        .post('/api/auth/submit-institution-token')
+        .set('Authorization', `Bearer ${registerResponse.body.data.accessToken}`)
+        .send({ institutionToken: 'SCH-READY01' });
+
+      expect(response.status).toBe(409);
+      expect(response.body.error.code).toBe('INSTITUTION_ALREADY_VERIFIED');
     });
   });
 
@@ -185,85 +237,24 @@ describe('auth integration', () => {
       expect(response.body.error.code).toBe('INVALID_CREDENTIALS');
     });
 
-    it('blocks student login while institution approval is pending', async () => {
-      const schoolRegistration = await request(app).post('/api/auth/register').send({
-        email: 'school-login@example.com',
-        password: 'Password123!',
-        displayName: 'Innovation Coordinator',
-        role: 'school',
-        institutionProfile: {
-          institutionName: 'Future Ready School',
-          location: 'Hyderabad',
-          totalStudentsEnrolled: 950,
-          academicYear: '2025-26',
-        },
-      });
-
-      const tokenResponse = await request(app)
-        .post('/api/school/student-access-tokens')
-        .set('Authorization', `Bearer ${schoolRegistration.body.data.accessToken}`)
-        .send({});
-
+    it('allows student login while institution verification is pending', async () => {
       await request(app).post('/api/auth/register').send({
         email: 'pending-student@example.com',
         password: 'Password123!',
         displayName: 'Pending Student',
         role: 'student',
-        institutionToken: tokenResponse.body.data.token,
+        institutionToken: 'SCH-PENDING1',
       });
 
       const response = await request(app).post('/api/auth/login').send({
         email: 'pending-student@example.com',
-        password: 'Password123!',
-        role: 'student',
-      });
-
-      expect(response.status).toBe(403);
-      expect(response.body.error.code).toBe('INSTITUTION_VERIFICATION_PENDING');
-    });
-
-    it('allows a student to log in after institution approval', async () => {
-      const schoolRegistration = await request(app).post('/api/auth/register').send({
-        email: 'approver-school@example.com',
-        password: 'Password123!',
-        displayName: 'Innovation Coordinator',
-        role: 'school',
-        institutionProfile: {
-          institutionName: 'Future Ready School',
-          location: 'Hyderabad',
-          totalStudentsEnrolled: 950,
-          academicYear: '2025-26',
-        },
-      });
-
-      const schoolAccessToken = schoolRegistration.body.data.accessToken as string;
-      const tokenResponse = await request(app)
-        .post('/api/school/student-access-tokens')
-        .set('Authorization', `Bearer ${schoolAccessToken}`)
-        .send({ label: 'Founders cohort' });
-
-      const registerResponse = await request(app).post('/api/auth/register').send({
-        email: 'approved-student@example.com',
-        password: 'Password123!',
-        displayName: 'Approved Student',
-        role: 'student',
-        institutionToken: tokenResponse.body.data.token,
-      });
-
-      await request(app)
-        .patch(`/api/school/student-verifications/${registerResponse.body.data.user._id}`)
-        .set('Authorization', `Bearer ${schoolAccessToken}`)
-        .send({ decision: 'approved' });
-
-      const response = await request(app).post('/api/auth/login').send({
-        email: 'approved-student@example.com',
         password: 'Password123!',
         role: 'student',
       });
 
       expect(response.status).toBe(200);
       expect(response.body.data.user.role).toBe('student');
-      expect(response.body.data.user.verificationStatus).toBe('verified');
+      expect(response.body.data.user.institutionVerificationStatus).toBe('pending');
     });
 
     it('rejects role mismatch', async () => {

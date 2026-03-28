@@ -40,24 +40,6 @@ exports.registerSchema = zod_1.z
             message: 'Institution token is required for student registrations',
         });
     }
-    if ((value.role === roles_types_1.UserRole.SCHOOL || value.role === roles_types_1.UserRole.COLLEGE) &&
-        !value.institutionProfile) {
-        ctx.addIssue({
-            code: zod_1.z.ZodIssueCode.custom,
-            path: ['institutionProfile'],
-            message: 'Institution details are required for school and college registrations',
-        });
-    }
-    if ((value.role === roles_types_1.UserRole.MENTOR ||
-        value.role === roles_types_1.UserRole.INVESTOR ||
-        value.role === roles_types_1.UserRole.RECRUITER) &&
-        !value.domain) {
-        ctx.addIssue({
-            code: zod_1.z.ZodIssueCode.custom,
-            path: ['domain'],
-            message: 'Domain or focus area is required for this role',
-        });
-    }
 });
 exports.loginSchema = zod_1.z.object({
     email: zod_1.z.string().trim().email(),

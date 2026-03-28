@@ -3,6 +3,16 @@ import { z } from 'zod';
 
 dotenv.config();
 
+const booleanFromEnv = z.preprocess((value) => {
+  if (typeof value === 'boolean') return value;
+  if (typeof value === 'string') {
+    const normalized = value.trim().toLowerCase();
+    if (normalized === 'true') return true;
+    if (normalized === 'false') return false;
+  }
+  return value;
+}, z.boolean());
+
 const envSchema = z.object({
   MONGODB_URI: z.string().min(1),
   UPSTASH_REDIS_REST_URL: z.string().min(1),
@@ -19,6 +29,7 @@ const envSchema = z.object({
   JWT_REFRESH_EXPIRES: z.string().min(1).default('30d'),
   PORT: z.coerce.number().int().positive().default(5000),
   NODE_ENV: z.enum(['development', 'test', 'production']).default('development'),
+  RATE_LIMIT_ENABLED: booleanFromEnv.default(true),
   CLIENT_URL: z.string().min(1),
   MAX_USERS_YEAR_ONE: z.coerce.number().int().positive().default(2000),
   CLOUDINARY_CLOUD_NAME: z.string().min(1),

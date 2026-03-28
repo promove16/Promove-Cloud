@@ -74,7 +74,10 @@ export const getScoreHistory = async (req: Request, res: Response) => {
     throw new ApiError(401, 'UNAUTHORIZED', 'Invalid or expired token');
   }
 
-  const events = await ScoreEvent.find({ userId: req.params.userId })
+  const requestedUserId =
+    req.params.userId === 'me' || !req.params.userId ? req.user._id : req.params.userId;
+
+  const events = await ScoreEvent.find({ userId: requestedUserId })
     .sort({ createdAt: -1 })
     .limit(100)
     .lean();

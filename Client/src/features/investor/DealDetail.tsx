@@ -14,13 +14,14 @@ type Props = {
   onOpenChange: (open: boolean) => void;
 };
 
-const investorRoles = ['Shareholder', 'Director', 'Co-Founder'] as const;
+const investorRoles = ['shareholder', 'director', 'observer'] as const;
+const formatRoleLabel = (role: (typeof investorRoles)[number]) => role.charAt(0).toUpperCase() + role.slice(1);
 
 export function DealDetail({ dealId, open, onOpenChange }: Props) {
   const queryClient = useQueryClient();
   const [amountINR, setAmountINR] = useState('20000');
   const [equityPercent, setEquityPercent] = useState('10');
-  const [investorRole, setInvestorRole] = useState<(typeof investorRoles)[number]>('Shareholder');
+  const [investorRole, setInvestorRole] = useState<(typeof investorRoles)[number]>('shareholder');
   const [error, setError] = useState('');
   const [notice, setNotice] = useState('');
   const [awaitingAdminApproval, setAwaitingAdminApproval] = useState(false);
@@ -43,7 +44,7 @@ export function DealDetail({ dealId, open, onOpenChange }: Props) {
     if (!open) {
       setAmountINR('20000');
       setEquityPercent('10');
-      setInvestorRole('Shareholder');
+      setInvestorRole('shareholder');
       setError('');
       setNotice('');
       setAwaitingAdminApproval(false);
@@ -145,6 +146,9 @@ export function DealDetail({ dealId, open, onOpenChange }: Props) {
                 </div>
                 <div className="flex flex-wrap gap-2">
                   <Badge>Stage {deal.currentStage}</Badge>
+                  <Badge className={deal.investorType === 'sole' ? 'border-amber-500/30 bg-amber-500/10 text-amber-300' : 'border-cyan-500/30 bg-cyan-500/10 text-cyan-300'}>
+                    {deal.investorType.toUpperCase()}
+                  </Badge>
                   {deal.adminApprovalRequired ? (
                     <Badge className="border-amber-500/30 bg-amber-500/10 text-amber-300">
                       Awaiting Admin Approval
@@ -217,9 +221,12 @@ export function DealDetail({ dealId, open, onOpenChange }: Props) {
                         }
                         className="w-full rounded-lg border border-slate-800 bg-slate-950 px-4 py-3 text-white"
                       >
-                        {investorRoles.map((role) => (
+                        {(deal.investorType === 'penny'
+                          ? investorRoles.filter((role) => role !== 'director')
+                          : investorRoles.filter((role) => role !== 'observer')
+                        ).map((role) => (
                           <option key={role} value={role}>
-                            {role}
+                            {formatRoleLabel(role)}
                           </option>
                         ))}
                       </select>

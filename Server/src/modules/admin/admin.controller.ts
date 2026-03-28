@@ -5,17 +5,21 @@ import { UserRole } from '../../types/roles.types';
 import { listUsersQuerySchema, milestoneVerifySchema, patentRejectSchema, awardRejectSchema } from './admin.validation';
 import {
   approveAward,
+  getAdminCapTable,
   getDealAwaitingApproval,
   approveDealStage,
   approvePatent,
   getAnalytics,
   getCapacity,
+  getInvestmentTypeBreakdown,
   listAwards,
   listDealsAwaitingApproval,
   listPatents,
   listUsers,
   rejectAward,
   rejectPatent,
+  resetStartupSoleInvestor,
+  updateDealInvestorRole,
   updateUserAccess,
   updateUserRole,
   verifyMilestone,
@@ -117,6 +121,35 @@ export const approveDealStageController = async (req: Request, res: Response) =>
   if (!dealId || !isObjectId(dealId)) throw new ApiError(400, 'INVALID_ID', 'Invalid ID format');
   await approveDealStage(req.user._id, dealId);
   res.status(200).json(new ApiResponse({ approved: true }));
+};
+
+export const updateDealInvestorRoleController = async (req: Request, res: Response) => {
+  if (!req.user) throw new ApiError(401, 'UNAUTHORIZED', 'Invalid or expired token');
+  const dealId = getParam(req.params.id);
+  if (!dealId || !isObjectId(dealId)) throw new ApiError(400, 'INVALID_ID', 'Invalid ID format');
+  const investorRole = req.body?.investorRole;
+  if (!['shareholder', 'director', 'observer'].includes(investorRole)) {
+    throw new ApiError(400, 'INVALID_ROLE', 'Invalid investor role');
+  }
+  const data = await updateDealInvestorRole(req.user._id, dealId, investorRole);
+  res.status(200).json(new ApiResponse(data));
+};
+
+export const getStartupCapTableController = async (req: Request, res: Response) => {
+  const startupId = getParam(req.params.id);
+  if (!startupId || !isObjectId(startupId)) throw new ApiError(400, 'INVALID_ID', 'Invalid ID format');
+  res.status(200).json(new ApiResponse(await getAdminCapTable(startupId)));
+};
+
+export const resetSoleInvestorController = async (req: Request, res: Response) => {
+  if (!req.user) throw new ApiError(401, 'UNAUTHORIZED', 'Invalid or expired token');
+  const startupId = getParam(req.params.id);
+  if (!startupId || !isObjectId(startupId)) throw new ApiError(400, 'INVALID_ID', 'Invalid ID format');
+  res.status(200).json(new ApiResponse(await resetStartupSoleInvestor(req.user._id, startupId)));
+};
+
+export const getInvestmentTypeAnalyticsController = async (_req: Request, res: Response) => {
+  res.status(200).json(new ApiResponse(await getInvestmentTypeBreakdown()));
 };
 
 export const getAnalyticsController = async (_req: Request, res: Response) => {

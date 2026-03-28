@@ -21,7 +21,7 @@ const startServer = async () => {
         (0, notificationWorker_1.startNotificationWorker)();
     }
     httpServer.listen(env_1.env.PORT, () => {
-        console.log(`Server listening on port ${env_1.env.PORT}`);
+        process.stdout.write(`Server listening on port ${env_1.env.PORT}\n`);
     });
 };
 process.on('uncaughtException', (error) => {

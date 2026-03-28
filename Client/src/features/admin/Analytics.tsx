@@ -42,6 +42,30 @@ export default function Analytics() {
         </div>
       ) : (
         <div className="grid gap-6 xl:grid-cols-2">
+          <Card className="p-6 xl:col-span-2">
+            <div className="mb-4 text-xs uppercase tracking-[0.3em] text-cyan-300">Investment Type Breakdown</div>
+            <div className="grid gap-4 md:grid-cols-2">
+              <div className="rounded-2xl border border-slate-800 bg-slate-900/70 p-4">
+                <div className="text-sm text-slate-400">Penny Investments</div>
+                <div className="mt-2 text-3xl font-bold text-white">
+                  {analyticsQuery.data?.investmentTypeBreakdown.pennyCount ?? 0}
+                </div>
+                <div className="mt-1 text-sm text-slate-500">
+                  ₹{analyticsQuery.data?.investmentTypeBreakdown.pennyCapitalDeployed ?? 0} deployed
+                </div>
+              </div>
+              <div className="rounded-2xl border border-slate-800 bg-slate-900/70 p-4">
+                <div className="text-sm text-slate-400">Sole Investments</div>
+                <div className="mt-2 text-3xl font-bold text-white">
+                  {analyticsQuery.data?.investmentTypeBreakdown.soleCount ?? 0}
+                </div>
+                <div className="mt-1 text-sm text-slate-500">
+                  ₹{analyticsQuery.data?.investmentTypeBreakdown.soleCapitalDeployed ?? 0} deployed
+                </div>
+              </div>
+            </div>
+          </Card>
+
           <Card className="p-6">
             <div className="mb-4 text-xs uppercase tracking-[0.3em] text-cyan-300">Score Distribution</div>
             <div className="space-y-4">

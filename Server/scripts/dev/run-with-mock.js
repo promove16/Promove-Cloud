@@ -8,9 +8,12 @@ const { MongoMemoryServer } = require('mongodb-memory-server');
         
         process.env.MONGODB_URI = uri;
         process.env.NODE_ENV = 'test';
+        process.env.TS_NODE_PREFER_TS_EXTS = 'true';
+
+        require('ts-node/register/transpile-only');
         
         // Now start the server
-        require('./src/server.js');
+        require('../../src/server.ts');
     } catch (err) {
         console.error("Failed to start mockup server", err);
     }

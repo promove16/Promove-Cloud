@@ -67,7 +67,7 @@ export const mapTalent = (
     domain?: string;
     innovationScore: number;
     scoreBreakdown: RecruiterTalentSummary['scoreBreakdown'];
-    institutionId?: Types.ObjectId;
+    institutionId?: Types.ObjectId | null;
     institutionProfile?: {
       location: string;
       academicYear: string;

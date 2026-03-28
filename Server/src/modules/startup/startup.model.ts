@@ -22,6 +22,13 @@ const startupSchema = new Schema<IStartup>(
     launchedToRecruiters: { type: Boolean, default: false },
     launchedAt: { type: Date, default: undefined },
     innovationScoreAtLaunch: { type: Number, default: 0 },
+    totalShares: { type: Number, default: 1000, min: 1 },
+    availableShares: { type: Number, default: 1000, min: 0 },
+    reservedForSole: { type: Number, default: 510, min: 0 },
+    maxPennyInvestors: { type: Number, default: 50, min: 1 },
+    currentPennyCount: { type: Number, default: 0, min: 0 },
+    hasSoleInvestor: { type: Boolean, default: false },
+    soleInvestorId: { type: Schema.Types.ObjectId, ref: 'User', default: null },
     traction: {
       patentFiled: { type: Boolean, default: false },
       mvpBuilt: { type: Boolean, default: false },

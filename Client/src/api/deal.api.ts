@@ -1,11 +1,13 @@
 import api from './axiosInstance';
 import { ApiSuccessResponse } from '../types/auth.types';
 import {
+  CapTableResponse,
   DealCollectionResponse,
   DealDetailView,
   DealGroupView,
   DealTransitionResponse,
   DealUpdateStagePayload,
+  StartupInvestorItem,
 } from '../types/deal.types';
 
 export const dealApi = {
@@ -32,5 +34,20 @@ export const dealApi = {
     );
     return response.data.data;
   },
+  async fundTransfer(dealId: string, amountINR: number) {
+    const response = await api.post<ApiSuccessResponse<DealTransitionResponse>>(`/api/deals/${dealId}/fund-transfer`, {
+      amountINR,
+    });
+    return response.data.data;
+  },
+  async getStartupInvestors(startupId: string) {
+    const response = await api.get<ApiSuccessResponse<{ items: StartupInvestorItem[] }>>(
+      `/api/startups/${startupId}/investors`,
+    );
+    return response.data.data.items;
+  },
+  async getCapTable(startupId: string) {
+    const response = await api.get<ApiSuccessResponse<CapTableResponse>>(`/api/startups/${startupId}/cap-table`);
+    return response.data.data;
+  },
 };
-

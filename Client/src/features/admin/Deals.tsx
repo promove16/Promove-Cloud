@@ -6,6 +6,8 @@ import { Button } from '../../components/ui/Button';
 import { Card } from '../../components/ui/Card';
 import { Spinner } from '../../components/ui/Spinner';
 
+const formatRoleLabel = (value?: string) => (value ? value.charAt(0).toUpperCase() + value.slice(1) : 'Shareholder');
+
 export default function Deals() {
   const queryClient = useQueryClient();
   const dealsQuery = useQuery({
@@ -44,14 +46,16 @@ export default function Deals() {
                 <div>
                   <div className="flex flex-wrap gap-2">
                     <Badge>Stage {deal.stage}</Badge>
-                    <Badge>{deal.investorRole ?? 'Shareholder'}</Badge>
+                    {deal.investorType ? <Badge>{deal.investorType.toUpperCase()}</Badge> : null}
+                    <Badge>{formatRoleLabel(deal.investorRole)}</Badge>
+                    {deal.canVeto ? <Badge className="border-red-500/30 bg-red-500/10 text-red-300">Veto</Badge> : null}
                   </div>
                   <h3 className="mt-3 text-2xl font-semibold text-white">{deal.startupName}</h3>
                   <div className="mt-2 text-sm text-slate-300">
                     Investor: {deal.investorName} - Student: {deal.studentName}
                   </div>
                   <div className="mt-2 text-sm text-slate-400">
-                    Equity {deal.equityPercent ?? 0}% - Snapshot {deal.innovationScoreSnapshot}
+                    Equity {deal.equityPercent ?? 0}% - Shares {deal.sharesAllocated ?? 0} - Voting {deal.votingWeight ?? 0}%
                   </div>
                 </div>
                 <Button

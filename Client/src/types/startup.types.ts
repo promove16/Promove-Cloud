@@ -22,6 +22,13 @@ export interface Startup {
   launchedToRecruiters?: boolean;
   launchedAt?: string;
   innovationScoreAtLaunch: number;
+  totalShares: number;
+  availableShares: number;
+  reservedForSole: number;
+  maxPennyInvestors: number;
+  currentPennyCount: number;
+  hasSoleInvestor: boolean;
+  soleInvestorId?: string | null;
   traction: StartupTraction;
   isActive: boolean;
   createdAt: string;

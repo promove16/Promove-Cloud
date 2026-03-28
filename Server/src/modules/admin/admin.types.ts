@@ -81,7 +81,11 @@ export interface AdminDealItem {
   stage: 1 | 2 | 3 | 4;
   amountINR?: number;
   equityPercent?: number;
-  investorRole?: 'Shareholder' | 'Director' | 'Co-Founder';
+  investorType?: 'penny' | 'sole';
+  investorRole?: 'shareholder' | 'director' | 'observer';
+  sharesAllocated?: number;
+  votingWeight?: number;
+  canVeto?: boolean;
   adminApprovalRequired: boolean;
   adminApprovedAt?: string;
   adminApprovedBy?: string;
@@ -115,6 +119,12 @@ export interface AdminAnalyticsData {
   }>;
   patentsPending: number;
   awardsPending: number;
+  investmentTypeBreakdown: {
+    pennyCount: number;
+    soleCount: number;
+    pennyCapitalDeployed: number;
+    soleCapitalDeployed: number;
+  };
 }
 
 export interface AdminCapacityData {

@@ -27,7 +27,7 @@ const sampleProblems = [
 export const seedProblemsIfEmpty = async () => {
   const count = await Problem.countDocuments();
   if (count > 0) {
-    return;
+    return false;
   }
 
   await Problem.insertMany(
@@ -42,16 +42,22 @@ export const seedProblemsIfEmpty = async () => {
       postedBy: index % 3 === 0 ? 'ProMove' : 'Partner Institution',
     })),
   );
+
+  return true;
 };
 
 export const listProblems = async (query: Record<string, unknown>) => {
   const page = Math.max(1, Number(query.page ?? 1));
   const limit = Math.min(20, Math.max(1, Number(query.limit ?? 10)));
   const cacheKey = `problems:${crypto.createHash('sha1').update(JSON.stringify(query)).digest('hex')}`;
-  const cached = await redis.get<string>(cacheKey);
+  const seeded = await seedProblemsIfEmpty();
+  const cached = seeded ? null : await redis.get<string>(cacheKey);
 
   if (cached) {
-    return typeof cached === 'string' ? JSON.parse(cached) : cached;
+    const parsed = typeof cached === 'string' ? JSON.parse(cached) : cached;
+    if (parsed.total > 0 || (await Problem.countDocuments()) === 0) {
+      return parsed;
+    }
   }
 
   const filter: Record<string, unknown> = {};

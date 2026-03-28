@@ -94,6 +94,30 @@ export default function Dashboard() {
 
         <div className="space-y-6">
           <Card className="p-6">
+            <div className="mb-4 text-xs uppercase tracking-[0.3em] text-cyan-300">Investment Type Breakdown</div>
+            <div className="grid gap-4 sm:grid-cols-2">
+              <div className="rounded-2xl border border-slate-800 bg-slate-900/70 p-4">
+                <div className="text-sm text-slate-400">Penny Capital</div>
+                <div className="mt-2 text-2xl font-bold text-white">
+                  ₹{analyticsQuery.data?.investmentTypeBreakdown.pennyCapitalDeployed ?? 0}
+                </div>
+                <div className="mt-1 text-sm text-slate-500">
+                  {analyticsQuery.data?.investmentTypeBreakdown.pennyCount ?? 0} investments
+                </div>
+              </div>
+              <div className="rounded-2xl border border-slate-800 bg-slate-900/70 p-4">
+                <div className="text-sm text-slate-400">Sole Capital</div>
+                <div className="mt-2 text-2xl font-bold text-white">
+                  ₹{analyticsQuery.data?.investmentTypeBreakdown.soleCapitalDeployed ?? 0}
+                </div>
+                <div className="mt-1 text-sm text-slate-500">
+                  {analyticsQuery.data?.investmentTypeBreakdown.soleCount ?? 0} investments
+                </div>
+              </div>
+            </div>
+          </Card>
+
+          <Card className="p-6">
             <div className="mb-4 text-xs uppercase tracking-[0.3em] text-cyan-300">Capacity</div>
             <div className="flex items-center gap-6">
               <div className="relative flex h-28 w-28 items-center justify-center">

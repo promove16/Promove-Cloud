@@ -18,6 +18,7 @@ import {
   Sparkles,
   Trophy,
   Server,
+  User,
   Users,
   X,
   type LucideIcon,
@@ -146,8 +147,10 @@ export const SIDEBAR_CONFIG: Record<UserRole, NavItem[]> = {
     { kind: 'link', label: 'Product Workspace', icon: Trophy, path: '/product-workspace' },
     { kind: 'link', label: 'Patent Support', icon: FileText, path: '/patent-support' },
     { kind: 'link', label: 'Startup Launch', icon: Rocket, path: '/startup-launch' },
+    { kind: 'link', label: 'Cap Table', icon: BarChart3, path: '/startup-launch/cap-table' },
     { kind: 'link', label: 'Leadership Profile', icon: Trophy, path: '/leadership-profile' },
     { kind: 'link', label: 'Marketplace', icon: Globe, path: '/marketplace' },
+    { kind: 'link', label: 'My Profile', icon: User, path: '/dashboard/profile' },
     { kind: 'link', label: 'Settings', icon: Settings, path: '/dashboard/settings' },
     { kind: 'action', label: 'Logout', icon: LogOut, action: 'logout' },
   ],
@@ -157,6 +160,7 @@ export const SIDEBAR_CONFIG: Record<UserRole, NavItem[]> = {
     { kind: 'link', label: 'Investors', icon: Globe, path: '/dashboard/school/investors' },
     { kind: 'link', label: 'Mentors', icon: GraduationCap, path: '/dashboard/school/mentors' },
     { kind: 'link', label: 'Compliance Report', icon: FileText, path: '/dashboard/school/compliance' },
+    { kind: 'link', label: 'Profile', icon: User, path: '/dashboard/profile' },
     { kind: 'link', label: 'Settings', icon: Settings, path: '/dashboard/settings' },
     { kind: 'action', label: 'Logout', icon: LogOut, action: 'logout' },
   ],
@@ -169,6 +173,7 @@ export const SIDEBAR_CONFIG: Record<UserRole, NavItem[]> = {
     { kind: 'link', label: 'Placement Tracker', icon: BarChart3, path: '/dashboard/college/placement' },
     { kind: 'link', label: 'Events', icon: Sparkles, path: '/dashboard/college/events' },
     { kind: 'link', label: 'Compliance Report', icon: FileText, path: '/dashboard/college/compliance' },
+    { kind: 'link', label: 'Profile', icon: User, path: '/dashboard/profile' },
     { kind: 'link', label: 'Settings', icon: Settings, path: '/dashboard/settings' },
     { kind: 'action', label: 'Logout', icon: LogOut, action: 'logout' },
   ],
@@ -176,6 +181,7 @@ export const SIDEBAR_CONFIG: Record<UserRole, NavItem[]> = {
     { kind: 'link', label: 'Dashboard', icon: Home, path: '/dashboard/mentor' },
     { kind: 'link', label: 'Student Feed', icon: Users, path: '/dashboard/mentor/students' },
     { kind: 'link', label: 'Sessions', icon: CalendarDays, path: '/dashboard/mentor/sessions' },
+    { kind: 'link', label: 'Profile', icon: User, path: '/dashboard/profile' },
     { kind: 'link', label: 'Settings', icon: Settings, path: '/dashboard/settings' },
     { kind: 'action', label: 'Logout', icon: LogOut, action: 'logout' },
   ],
@@ -184,6 +190,7 @@ export const SIDEBAR_CONFIG: Record<UserRole, NavItem[]> = {
     { kind: 'link', label: 'Startups', icon: Rocket, path: '/dashboard/investor/startups' },
     { kind: 'link', label: 'Institutions', icon: Building2, path: '/dashboard/investor/institutions' },
     { kind: 'link', label: 'My Portfolio', icon: BriefcaseBusiness, path: '/dashboard/investor/portfolio' },
+    { kind: 'link', label: 'Profile', icon: User, path: '/dashboard/profile' },
     { kind: 'link', label: 'Settings', icon: Settings, path: '/dashboard/settings' },
     { kind: 'action', label: 'Logout', icon: LogOut, action: 'logout' },
   ],
@@ -193,6 +200,7 @@ export const SIDEBAR_CONFIG: Record<UserRole, NavItem[]> = {
     { kind: 'link', label: 'College Connect', icon: Globe, path: '/dashboard/recruiter/colleges' },
     { kind: 'link', label: 'Active Drives', icon: BarChart3, path: '/dashboard/recruiter/drives' },
     { kind: 'link', label: 'Onboarding Tracker', icon: Trophy, path: '/dashboard/recruiter/onboarding' },
+    { kind: 'link', label: 'Profile', icon: User, path: '/dashboard/profile' },
     { kind: 'link', label: 'Settings', icon: Settings, path: '/dashboard/settings' },
     { kind: 'action', label: 'Logout', icon: LogOut, action: 'logout' },
   ],
@@ -204,6 +212,7 @@ export const SIDEBAR_CONFIG: Record<UserRole, NavItem[]> = {
     { kind: 'link', label: 'Deals', icon: BriefcaseBusiness, path: '/dashboard/admin/deals' },
     { kind: 'link', label: 'Analytics', icon: BarChart3, path: '/dashboard/admin/analytics' },
     { kind: 'link', label: 'Capacity', icon: Server, path: '/dashboard/admin/capacity' },
+    { kind: 'link', label: 'Profile', icon: User, path: '/dashboard/profile' },
     { kind: 'link', label: 'Settings', icon: Settings, path: '/dashboard/settings' },
     { kind: 'action', label: 'Logout', icon: LogOut, action: 'logout' },
   ],
@@ -326,7 +335,10 @@ export function DashboardLayout() {
 
               <div className="flex items-center gap-3">
                 <NotificationBell />
-                <div className="flex items-center gap-3 rounded-2xl border border-slate-800 bg-slate-900/70 px-4 py-2">
+                <NavLink
+                  to="/dashboard/profile"
+                  className="flex items-center gap-3 rounded-2xl border border-slate-800 bg-slate-900/70 px-4 py-2 transition hover:border-cyan-500/40 hover:bg-slate-900"
+                >
                   <div className="flex h-11 w-11 items-center justify-center rounded-full bg-gradient-to-br from-cyan-500 to-emerald-500 text-sm font-bold text-white">
                     {initials}
                   </div>
@@ -334,7 +346,7 @@ export function DashboardLayout() {
                     <div className="text-sm font-semibold text-white">{user.displayName}</div>
                     <Badge>{user.role}</Badge>
                   </div>
-                </div>
+                </NavLink>
               </div>
             </div>
           </header>

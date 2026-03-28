@@ -1,6 +1,6 @@
 import api from './axiosInstance';
 import { ApiSuccessResponse } from '../types/auth.types';
-import { DealDetailView } from '../types/deal.types';
+import { DealDetailView, InvestorAuthorityItem } from '../types/deal.types';
 import {
   InvestorDashboardStats,
   InvestorInstitutionCard,
@@ -21,6 +21,8 @@ export const investorApi = {
     stage?: string;
     page?: number;
     limit?: number;
+    acceptingPenny?: boolean;
+    acceptingSole?: boolean;
   }) {
     const response = await api.get<ApiSuccessResponse<InvestorStartupListResponse>>('/api/investor/startups', {
       params,
@@ -33,9 +35,33 @@ export const investorApi = {
     );
     return response.data.data;
   },
-  async expressInterest(startupId: string) {
+  async expressInterest(
+    startupId: string,
+    payload: {
+      investorType: 'penny' | 'sole';
+      proposedAmountINR: number;
+      proposedEquityPercent: number;
+      chosenRole?: 'shareholder' | 'director' | 'observer';
+    },
+  ) {
     const response = await api.post<ApiSuccessResponse<DealDetailView>>(
       `/api/investor/express-interest/${startupId}`,
+      payload,
+    );
+    return response.data.data;
+  },
+  async expressSoleInterest(
+    startupId: string,
+    payload: {
+      investorType: 'penny' | 'sole';
+      proposedAmountINR: number;
+      proposedEquityPercent: number;
+      chosenRole?: 'shareholder' | 'director' | 'observer';
+    },
+  ) {
+    const response = await api.post<ApiSuccessResponse<DealDetailView>>(
+      `/api/startups/${startupId}/sole-investor`,
+      { ...payload, investorType: 'sole' },
     );
     return response.data.data;
   },
@@ -48,5 +74,11 @@ export const investorApi = {
   async getPortfolio() {
     const response = await api.get<ApiSuccessResponse<InvestorPortfolioResponse>>('/api/investor/portfolio');
     return response.data.data;
+  },
+  async getAuthorityPortfolio() {
+    const response = await api.get<ApiSuccessResponse<{ items: InvestorAuthorityItem[] }>>(
+      '/api/investor/portfolio/authority',
+    );
+    return response.data.data.items;
   },
 };

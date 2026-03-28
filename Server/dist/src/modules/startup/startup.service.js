@@ -50,8 +50,12 @@ exports.createStartupProfile = createStartupProfile;
 const getMyStartup = async (userId) => startup_model_1.Startup.findOne({ founderIds: userId, isActive: true }).lean();
 exports.getMyStartup = getMyStartup;
 const getStartupForFounder = async (startupId, userId) => {
-    const startup = await startup_model_1.Startup.findOne({ _id: startupId, founderIds: userId });
+    const startup = await startup_model_1.Startup.findById(startupId);
     if (!startup) {
+        throw new ApiError_1.ApiError(403, 'FORBIDDEN', 'Only founders can access this startup.');
+    }
+    const isFounder = startup.founderIds.some((founderId) => String(founderId) === String(userId));
+    if (!isFounder) {
         throw new ApiError_1.ApiError(403, 'FORBIDDEN', 'Only founders can access this startup.');
     }
     return startup;

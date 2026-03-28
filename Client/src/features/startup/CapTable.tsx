@@ -1,0 +1,144 @@
+import { useQuery } from '@tanstack/react-query';
+import { Badge } from '../../components/ui/Badge';
+import { Card } from '../../components/ui/Card';
+import { Spinner } from '../../components/ui/Spinner';
+import { startupApi } from '../../api/startup.api';
+
+const formatRoleLabel = (value: string) => value.charAt(0).toUpperCase() + value.slice(1);
+
+export default function StartupCapTable() {
+  const startupQuery = useQuery({
+    queryKey: ['startup', 'mine'],
+    queryFn: startupApi.mine,
+  });
+
+  const capTableQuery = useQuery({
+    queryKey: ['startup', 'cap-table', startupQuery.data?._id],
+    queryFn: () => startupApi.getCapTable(startupQuery.data!._id),
+    enabled: Boolean(startupQuery.data?._id),
+  });
+
+  if (startupQuery.isLoading || capTableQuery.isLoading) {
+    return (
+      <div className="flex min-h-[40vh] items-center justify-center">
+        <Spinner />
+      </div>
+    );
+  }
+
+  if (!startupQuery.data) {
+    return (
+      <Card className="max-w-3xl p-8">
+        <h1 className="text-3xl font-bold text-white">Cap Table</h1>
+        <p className="mt-3 text-slate-400">Create your startup first to begin tracking investors and shares.</p>
+      </Card>
+    );
+  }
+
+  const capTable = capTableQuery.data;
+  const pennyRows = capTable?.pennyInvestors ?? [];
+
+  return (
+    <div className="space-y-6">
+      <div>
+        <h1 className="text-3xl font-bold text-white">Cap Table</h1>
+        <p className="mt-2 text-slate-400">Track sole and penny investors, retained founder equity, and share allocation.</p>
+      </div>
+
+      {capTable ? (
+        <>
+          <div className="grid gap-4 md:grid-cols-4">
+            <Card className="p-5">
+              <div className="text-xs uppercase tracking-[0.2em] text-slate-500">Total Shares</div>
+              <div className="mt-2 text-3xl font-bold text-white">{capTable.totalShares}</div>
+            </Card>
+            <Card className="p-5">
+              <div className="text-xs uppercase tracking-[0.2em] text-slate-500">Available Shares</div>
+              <div className="mt-2 text-3xl font-bold text-white">{capTable.availableShares}</div>
+            </Card>
+            <Card className="p-5">
+              <div className="text-xs uppercase tracking-[0.2em] text-slate-500">Investor Equity</div>
+              <div className="mt-2 text-3xl font-bold text-white">{capTable.totalInvestorEquity}%</div>
+            </Card>
+            <Card className="p-5">
+              <div className="text-xs uppercase tracking-[0.2em] text-slate-500">Founder Retained</div>
+              <div className="mt-2 text-3xl font-bold text-white">{capTable.founderRetained.equityPercent}%</div>
+            </Card>
+          </div>
+
+          <Card className="p-5">
+            <div className="flex items-center justify-between gap-3">
+              <div>
+                <div className="text-sm font-semibold uppercase tracking-[0.2em] text-slate-400">Sole Investor</div>
+                <div className="mt-1 text-sm text-slate-500">Primary owner or lead investor allocation.</div>
+              </div>
+              {capTable.soleInvestor ? (
+                <Badge className="border-amber-500/30 bg-amber-500/10 text-amber-300">SOLE</Badge>
+              ) : (
+                <Badge className="border-slate-700 bg-slate-900 text-slate-300">Open Slot</Badge>
+              )}
+            </div>
+            {capTable.soleInvestor ? (
+              <div className="mt-4 grid gap-3 md:grid-cols-5">
+                <div className="rounded-2xl border border-slate-800 bg-slate-900/80 p-4 md:col-span-2">
+                  <div className="text-xs uppercase tracking-[0.2em] text-slate-500">Investor</div>
+                  <div className="mt-2 font-semibold text-white">{capTable.soleInvestor.name ?? 'Restricted'}</div>
+                </div>
+                <div className="rounded-2xl border border-slate-800 bg-slate-900/80 p-4">
+                  <div className="text-xs uppercase tracking-[0.2em] text-slate-500">Equity</div>
+                  <div className="mt-2 font-semibold text-white">{capTable.soleInvestor.equityPercent}%</div>
+                </div>
+                <div className="rounded-2xl border border-slate-800 bg-slate-900/80 p-4">
+                  <div className="text-xs uppercase tracking-[0.2em] text-slate-500">Shares</div>
+                  <div className="mt-2 font-semibold text-white">{capTable.soleInvestor.sharesAllocated}</div>
+                </div>
+                <div className="rounded-2xl border border-slate-800 bg-slate-900/80 p-4">
+                  <div className="text-xs uppercase tracking-[0.2em] text-slate-500">Authority</div>
+                  <div className="mt-2 font-semibold text-white">{formatRoleLabel(capTable.soleInvestor.investorRole)}</div>
+                </div>
+              </div>
+            ) : null}
+          </Card>
+
+          <Card className="p-5">
+            <div className="flex items-center justify-between gap-3">
+              <div>
+                <div className="text-sm font-semibold uppercase tracking-[0.2em] text-slate-400">Penny Investors</div>
+                <div className="mt-1 text-sm text-slate-500">Crowd-style investors with minority authority and capped equity.</div>
+              </div>
+              <Badge className="border-cyan-500/30 bg-cyan-500/10 text-cyan-300">{pennyRows.length} investors</Badge>
+            </div>
+            <div className="mt-4 space-y-3">
+              {pennyRows.length === 0 ? (
+                <div className="rounded-2xl border border-dashed border-slate-800 px-4 py-6 text-sm text-slate-400">
+                  No penny investors yet.
+                </div>
+              ) : (
+                pennyRows.map((row) => (
+                  <div key={row.dealId} className="grid gap-3 rounded-2xl border border-slate-800 bg-slate-900/70 p-4 md:grid-cols-5">
+                    <div className="md:col-span-2">
+                      <div className="text-xs uppercase tracking-[0.2em] text-slate-500">Investor</div>
+                      <div className="mt-2 font-semibold text-white">{row.name ?? 'Restricted'}</div>
+                    </div>
+                    <div>
+                      <div className="text-xs uppercase tracking-[0.2em] text-slate-500">Equity</div>
+                      <div className="mt-2 font-semibold text-white">{row.equityPercent}%</div>
+                    </div>
+                    <div>
+                      <div className="text-xs uppercase tracking-[0.2em] text-slate-500">Shares</div>
+                      <div className="mt-2 font-semibold text-white">{row.sharesAllocated}</div>
+                    </div>
+                    <div>
+                      <div className="text-xs uppercase tracking-[0.2em] text-slate-500">Role</div>
+                      <div className="mt-2 font-semibold text-white">{formatRoleLabel(row.investorRole)}</div>
+                    </div>
+                  </div>
+                ))
+              )}
+            </div>
+          </Card>
+        </>
+      ) : null}
+    </div>
+  );
+}

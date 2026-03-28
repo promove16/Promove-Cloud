@@ -1,0 +1,10 @@
+node_modules/
+.env
+coverage/
+*.log
+dist/
+temp/
+docs/
+.tmp-*.json
+.postman/
+postman/

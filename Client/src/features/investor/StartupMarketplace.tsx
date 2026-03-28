@@ -18,18 +18,22 @@ export default function StartupMarketplace() {
   const [stage, setStage] = useState<string>('all');
   const [minScore, setMinScore] = useState(0);
   const [maxScore, setMaxScore] = useState(200);
+  const [acceptingPenny, setAcceptingPenny] = useState(true);
+  const [acceptingSole, setAcceptingSole] = useState(true);
   const [selectedStartupId, setSelectedStartupId] = useState<string | null>(null);
   const [viewedStartupIds, setViewedStartupIds] = useState<Set<string>>(new Set());
   const [toast, setToast] = useState('');
 
   const startupsQuery = useQuery({
-    queryKey: ['investor-startups', { category, stage, minScore, maxScore }],
+    queryKey: ['investor-startups', { category, stage, minScore, maxScore, acceptingPenny, acceptingSole }],
     queryFn: () =>
       investorApi.getStartups({
         category: category === 'all' ? undefined : category,
         stage: stage === 'all' ? undefined : stage,
         minScore,
         maxScore,
+        acceptingPenny: acceptingPenny || undefined,
+        acceptingSole: acceptingSole || undefined,
         page: 1,
         limit: 20,
       }),
@@ -37,7 +41,15 @@ export default function StartupMarketplace() {
   });
 
   const expressInterestMutation = useMutation({
-    mutationFn: (startupId: string) => investorApi.expressInterest(startupId),
+    mutationFn: (params: {
+      startupId: string;
+      payload: {
+        investorType: 'penny' | 'sole';
+        proposedAmountINR: number;
+        proposedEquityPercent: number;
+        chosenRole?: 'shareholder' | 'director' | 'observer';
+      };
+    }) => investorApi.expressInterest(params.startupId, params.payload),
     onSuccess: async () => {
       setToast('Interest sent. The student has been notified.');
       await queryClient.invalidateQueries({ queryKey: ['investor-startups'] });
@@ -138,6 +150,28 @@ export default function StartupMarketplace() {
             onChange={(event) => setMaxScore(Number(event.target.value))}
           />
         </div>
+
+        <div className="lg:col-span-4">
+          <div className="mb-2 text-xs uppercase tracking-[0.2em] text-slate-400">Show Startups Accepting</div>
+          <div className="flex flex-wrap gap-4 text-sm text-slate-300">
+            <label className="flex items-center gap-2">
+              <input
+                type="checkbox"
+                checked={acceptingPenny}
+                onChange={(event) => setAcceptingPenny(event.target.checked)}
+              />
+              Penny Investors
+            </label>
+            <label className="flex items-center gap-2">
+              <input
+                type="checkbox"
+                checked={acceptingSole}
+                onChange={(event) => setAcceptingSole(event.target.checked)}
+              />
+              Sole Investor
+            </label>
+          </div>
+        </div>
       </Card>
 
       {startupsQuery.isLoading ? (
@@ -177,6 +211,12 @@ export default function StartupMarketplace() {
                   {startup.traction.mvpBuilt ? <Badge className="border-cyan-500/30 bg-cyan-500/10 text-cyan-300">MVP ready</Badge> : null}
                   {startup.traction.revenueGenerating ? <Badge className="border-amber-500/30 bg-amber-500/10 text-amber-300">Revenue generating</Badge> : null}
                   <Badge className="border-slate-700 bg-slate-900 text-slate-300">Team {startup.teamSize}</Badge>
+                  {startup.acceptsPennyInvestors ? (
+                    <Badge className="border-cyan-500/30 bg-cyan-500/10 text-cyan-300">Accepting Penny</Badge>
+                  ) : null}
+                  {startup.acceptsSoleInvestor ? (
+                    <Badge className="border-amber-500/30 bg-amber-500/10 text-amber-300">Accepting Sole</Badge>
+                  ) : null}
                 </div>
 
                 <div className="mt-5 flex flex-wrap gap-3">
@@ -184,9 +224,9 @@ export default function StartupMarketplace() {
                     View Pitch
                   </Button>
                   <Button
-                    title="Open the full profile to enable Express Interest"
+                    title="Open the full profile to choose investor type and submit your proposal"
                     disabled={!canExpressInterest || expressInterestMutation.isPending}
-                    onClick={() => expressInterestMutation.mutate(startup._id)}
+                    onClick={() => openStartup(startup._id)}
                   >
                     Express Interest
                   </Button>
@@ -207,9 +247,9 @@ export default function StartupMarketplace() {
             setSelectedStartupId(null);
           }
         }}
-        onExpressInterest={(startupId) => {
+        onExpressInterest={(startupId, payload) => {
           setViewedStartupIds((current) => new Set(current).add(startupId));
-          expressInterestMutation.mutate(startupId);
+          expressInterestMutation.mutate({ startupId, payload });
         }}
       />
     </div>

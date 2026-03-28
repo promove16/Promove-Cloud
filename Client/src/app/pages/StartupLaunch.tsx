@@ -23,6 +23,7 @@ const emptyPayload: StartupPayload = {
 export function StartupLaunch() {
   const queryClient = useQueryClient();
   const [showLaunchModal, setShowLaunchModal] = useState(false);
+  const [launchTarget, setLaunchTarget] = useState<"investors" | "mentors" | "both">("both");
   const [toast, setToast] = useState("");
   const [form, setForm] = useState<StartupPayload>(emptyPayload);
 
@@ -301,12 +302,30 @@ export function StartupLaunch() {
                   ["mentors", "Launch to Mentors"],
                   ["both", "Launch to Both (Recommended)"],
                 ].map(([value, label]) => (
-                  <button key={value} onClick={() => launchStartup.mutate(value as "investors" | "mentors" | "both")} className="w-full text-left px-5 py-4 bg-slate-950 border border-slate-800 rounded-xl text-white hover:border-blue-500/40">
+                  <button
+                    key={value}
+                    type="button"
+                    onClick={() => setLaunchTarget(value as "investors" | "mentors" | "both")}
+                    className={`w-full text-left px-5 py-4 rounded-xl text-white transition ${
+                      launchTarget === value
+                        ? "border border-blue-500/50 bg-blue-500/10"
+                        : "border border-slate-800 bg-slate-950 hover:border-blue-500/40"
+                    }`}
+                  >
                     {label}
                   </button>
                 ))}
               </div>
-              <div className="flex justify-end"><button onClick={() => setShowLaunchModal(false)} className="px-5 py-3 bg-slate-800 text-white rounded-lg font-semibold">Cancel</button></div>
+              <div className="flex justify-end gap-3">
+                <button onClick={() => setShowLaunchModal(false)} className="px-5 py-3 bg-slate-800 text-white rounded-lg font-semibold">Cancel</button>
+                <button
+                  onClick={() => launchStartup.mutate(launchTarget)}
+                  disabled={launchStartup.isPending}
+                  className="px-5 py-3 bg-gradient-to-r from-blue-600 to-purple-600 text-white rounded-lg font-semibold disabled:opacity-60"
+                >
+                  {launchStartup.isPending ? "Launching..." : "Launch Now"}
+                </button>
+              </div>
             </div>
           </div>
         ) : null}

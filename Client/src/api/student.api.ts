@@ -1,5 +1,6 @@
 import api from './axiosInstance';
 import { ApiSuccessResponse } from '../types/auth.types';
+import { AuthUser } from '../types/auth.types';
 
 export interface StudentMentorSessionItem {
   _id: string;
@@ -25,10 +26,9 @@ export const studentApi = {
     return response.data.data;
   },
   async launchToRecruiters() {
-    const response = await api.post<ApiSuccessResponse<{ bridgesCreated: number }>>(
+    const response = await api.post<ApiSuccessResponse<{ bridgesCreated: number; user: AuthUser }>>(
       '/api/users/me/launch-to-recruiters',
     );
     return response.data.data;
   },
 };
-

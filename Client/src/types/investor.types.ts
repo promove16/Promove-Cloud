@@ -24,6 +24,12 @@ export interface InvestorStartupCard {
   innovationScoreAtLaunch: number;
   teamSize: number;
   pitchDeckUrl?: string;
+  acceptsPennyInvestors: boolean;
+  acceptsSoleInvestor: boolean;
+  sharePool: {
+    totalShares: number;
+    availableShares: number;
+  };
   traction: {
     patentFiled: boolean;
     mvpBuilt: boolean;
@@ -72,8 +78,14 @@ export interface InvestorPortfolioResponse {
     startupId: string;
     startupName: string;
     startupCategory: string;
-    investorRole?: 'Shareholder' | 'Director' | 'Co-Founder';
-    equityPercent?: number;
+    investorType: 'penny' | 'sole';
+    investorRole: 'shareholder' | 'director' | 'observer';
+    equityPercent: number;
+    sharesAllocated: number;
+    votingWeight: number;
+    canVeto: boolean;
+    canAccessFinancials: boolean;
+    canRequestUpdates: boolean;
     currentStage: 4;
     innovationScoreSnapshot: number;
     liveInnovationScore: number;

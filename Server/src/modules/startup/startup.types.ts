@@ -17,6 +17,13 @@ export interface IStartup {
   launchedToRecruiters: boolean;
   launchedAt?: Date;
   innovationScoreAtLaunch: number;
+  totalShares: number;
+  availableShares: number;
+  reservedForSole: number;
+  maxPennyInvestors: number;
+  currentPennyCount: number;
+  hasSoleInvestor: boolean;
+  soleInvestorId?: Types.ObjectId | null;
   traction: {
     patentFiled: boolean;
     mvpBuilt: boolean;

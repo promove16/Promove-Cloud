@@ -1,18 +1,6 @@
 import mongoose from 'mongoose';
-import winston from 'winston';
 import { env } from './env';
-
-const logger = winston.createLogger({
-  level: env.NODE_ENV === 'production' ? 'info' : 'debug',
-  format: winston.format.combine(
-    winston.format.timestamp(),
-    winston.format.errors({ stack: true }),
-    winston.format.printf(({ level, message, timestamp, stack }) =>
-      `${timestamp} [${level}] ${stack ?? message}`,
-    ),
-  ),
-  transports: [new winston.transports.Console()],
-});
+import { logError, logger } from './logger';
 
 const MAX_RETRIES = 5;
 const RETRY_DELAY_MS = 3000;
@@ -26,7 +14,7 @@ const registerConnectionListeners = () => {
   }
 
   mongoose.connection.on('error', (error) => {
-    logger.error(`MongoDB connection error: ${error.message}`);
+    logError('MongoDB connection error', error);
   });
 
   mongoose.connection.on('disconnected', () => {
@@ -46,11 +34,7 @@ export const connectDB = async () => {
       logger.info('MongoDB connected');
       return;
     } catch (error) {
-      logger.error(
-        `MongoDB connection attempt ${attempt} failed: ${
-          error instanceof Error ? error.message : 'Unknown error'
-        }`,
-      );
+      logError(`MongoDB connection attempt ${attempt} failed`, error);
 
       if (attempt === MAX_RETRIES) {
         throw error;

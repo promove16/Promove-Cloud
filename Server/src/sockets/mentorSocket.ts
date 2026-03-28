@@ -1,4 +1,5 @@
 import jwt from 'jsonwebtoken';
+import { Types } from 'mongoose';
 import { Server } from 'socket.io';
 import { env } from '../config/env';
 import { redis } from '../config/redis';
@@ -33,13 +34,30 @@ export const initMentorSocket = (io: Server) => {
   mentor.on('connection', (socket) => {
     socket.join(`mentor:${socket.data.userId}`);
 
+    void (async () => {
+      const watchedStudents = (await redis.smembers(`mentor:watch:${socket.data.userId}`)) as string[];
+      watchedStudents.forEach((studentId) => {
+        socket.join(`student-feed:${studentId}`);
+      });
+    })();
+
     socket.on('mentor:watch', async ({ studentId }: { studentId: string }) => {
+      if (!studentId || !Types.ObjectId.isValid(studentId)) {
+        socket.emit('mentor:error', { message: 'Invalid student id' });
+        return;
+      }
+
       socket.join(`student-feed:${studentId}`);
       await redis.sadd(`mentor:watch:${socket.data.userId}`, studentId);
       await redis.sadd(`student:watchers:${studentId}`, socket.data.userId);
     });
 
     socket.on('mentor:unwatch', async ({ studentId }: { studentId: string }) => {
+      if (!studentId || !Types.ObjectId.isValid(studentId)) {
+        socket.emit('mentor:error', { message: 'Invalid student id' });
+        return;
+      }
+
       socket.leave(`student-feed:${studentId}`);
       await redis.srem(`mentor:watch:${socket.data.userId}`, studentId);
       await redis.srem(`student:watchers:${studentId}`, socket.data.userId);

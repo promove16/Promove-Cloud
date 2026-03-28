@@ -36,12 +36,15 @@ import InvestorDashboard from '../features/investor/Dashboard';
 import InvestorStartupMarketplace from '../features/investor/StartupMarketplace';
 import InvestorInstitutions from '../features/investor/Institutions';
 import InvestorPortfolio from '../features/investor/Portfolio';
+import StartupCapTable from '../features/startup/CapTable';
+import { UserProfilePage } from '../features/profile/UserProfilePage';
 import { MentorDirectory } from '../features/institution/MentorDirectory';
 import { useProtectedRoute } from '../hooks/useProtectedRoute';
 import { useAuthStore } from '../store/authStore';
 import { UserRole } from '../types/roles.types';
 import { roleRedirect } from '../utils/roleRedirect';
 import { Dashboard as LegacyDashboard } from '../app/pages/Dashboard';
+import { StudentDashboard as LegacyStudentDashboard } from '../app/pages/dashboards/StudentDashboard';
 import { ProblemBank } from '../app/pages/ProblemBank';
 import { ProductWorkspace } from '../app/pages/ProductWorkspace';
 import { PatentSupport } from '../app/pages/PatentSupport';
@@ -146,7 +149,7 @@ export const router = createBrowserRouter([
         path: '/student',
         element: (
           <ProtectedRoleRoute role={UserRole.STUDENT}>
-            <LegacyDashboard />
+            <Navigate to="/dashboard/student" replace />
           </ProtectedRoleRoute>
         ),
       },
@@ -215,6 +218,14 @@ export const router = createBrowserRouter([
         ),
       },
       {
+        path: '/startup-launch/cap-table',
+        element: (
+          <ProtectedRoleRoute role={UserRole.STUDENT}>
+            <StartupCapTable />
+          </ProtectedRoleRoute>
+        ),
+      },
+      {
         path: '/leadership-profile',
         element: (
           <ProtectedRoleRoute role={UserRole.STUDENT}>
@@ -244,7 +255,11 @@ export const router = createBrowserRouter([
         children: [
           {
             path: 'student',
-            element: <Navigate to="/student" replace />,
+            element: (
+              <ProtectedRoleRoute role={UserRole.STUDENT}>
+                <LegacyStudentDashboard />
+              </ProtectedRoleRoute>
+            ),
           },
           {
             path: 'mentor',
@@ -294,6 +309,11 @@ export const router = createBrowserRouter([
               { path: 'analytics', element: <AdminAnalytics /> },
               { path: 'capacity', element: <AdminCapacity /> },
             ],
+          },
+          {
+            path: 'profile',
+            element: <ProtectedAnyRoute />,
+            children: [{ index: true, element: <UserProfilePage /> }],
           },
           {
             path: 'settings',

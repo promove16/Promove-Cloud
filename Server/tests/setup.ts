@@ -33,6 +33,7 @@ process.env.FROM_EMAIL = 'noreply@promovecyc.com';
 type SetOptions = { ex?: number };
 
 const redisStore = new Map<string, { value: string; expiresAt?: number }>();
+const redisLists = new Map<string, string[]>();
 const rateState = new Map<string, { count: number; reset: number }>();
 
 const parseWindow = (value: string) => {
@@ -72,7 +73,28 @@ jest.mock('@upstash/redis', () => ({
       },
       async del(key: string) {
         const existed = redisStore.delete(key);
+        redisLists.delete(key);
         return existed ? 1 : 0;
+      },
+      async zadd() {
+        return 1;
+      },
+      async lpush(key: string, value: string) {
+        const existing = redisLists.get(key) ?? [];
+        redisLists.set(key, [value, ...existing]);
+        return redisLists.get(key)?.length ?? 0;
+      },
+      async ltrim(key: string, start: number, stop: number) {
+        const existing = redisLists.get(key) ?? [];
+        const normalizedStop = stop < 0 ? existing.length + stop : stop;
+        redisLists.set(key, existing.slice(start, normalizedStop + 1));
+        return 'OK';
+      },
+      async expire() {
+        return 1;
+      },
+      async smembers() {
+        return [];
       },
     }),
   },
@@ -142,6 +164,7 @@ beforeAll(async () => {
 
 beforeEach(async () => {
   redisStore.clear();
+  redisLists.clear();
   rateState.clear();
   await mongoose.connection.db?.dropDatabase();
 });

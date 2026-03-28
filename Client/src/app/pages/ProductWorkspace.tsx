@@ -99,18 +99,22 @@ export function ProductWorkspace() {
 
   const sendMessage = async () => {
     if (!workspaceId || (!chatDraft.trim() && !chatAttachment)) return;
-    let attachmentUrl: string | undefined;
-    let attachmentType: "pdf" | "image" | undefined;
-    if (chatAttachment) {
-      const uploads = await workspaceApi.upload(workspaceId, chatAttachment, "Chat attachment");
-      const latest = uploads[uploads.length - 1];
-      attachmentUrl = latest?.fileUrl;
-      attachmentType = latest?.fileType;
-      await refresh();
+    try {
+      let attachmentUrl: string | undefined;
+      let attachmentType: "pdf" | "image" | undefined;
+      if (chatAttachment) {
+        const uploads = await workspaceApi.upload(workspaceId, chatAttachment, "Chat attachment");
+        const latest = uploads[uploads.length - 1];
+        attachmentUrl = latest?.fileUrl;
+        attachmentType = latest?.fileType;
+        await refresh();
+      }
+      chat.sendMessage({ workspaceId, message: chatDraft.trim(), attachmentUrl, attachmentType });
+      setChatDraft("");
+      setChatAttachment(null);
+    } catch (error) {
+      setToast((error as { response?: { data?: { error?: { message?: string } } } })?.response?.data?.error?.message ?? "Unable to send chat attachment.");
     }
-    chat.sendMessage({ workspaceId, message: chatDraft.trim(), attachmentUrl, attachmentType });
-    setChatDraft("");
-    setChatAttachment(null);
   };
 
   const nextMilestone = useMemo(() => workspace?.milestones.find((item) => !item.isCompleted)?.name ?? "Ready to launch", [workspace?.milestones]);
@@ -166,8 +170,8 @@ export function ProductWorkspace() {
             </div>
 
             <div className="bg-slate-900 border border-slate-800 rounded-xl p-2 flex gap-2">
-              {["tasks", "team", "uploads", "updates"].map((tab) => (
-                <button key={tab} onClick={() => setActiveTab(tab)} className={`flex-1 px-4 py-3 rounded-lg font-semibold transition-all ${activeTab === tab ? "bg-blue-600 text-white" : "text-slate-400 hover:bg-slate-800"}`}>{tab === "updates" ? "Updates" : tab.charAt(0).toUpperCase() + tab.slice(1)}</button>
+              {["tasks", "team", "uploads", "chat"].map((tab) => (
+                <button key={tab} onClick={() => setActiveTab(tab)} className={`flex-1 px-4 py-3 rounded-lg font-semibold transition-all ${activeTab === tab ? "bg-blue-600 text-white" : "text-slate-400 hover:bg-slate-800"}`}>{tab === "chat" ? "Chat" : tab.charAt(0).toUpperCase() + tab.slice(1)}</button>
               ))}
             </div>
 
@@ -263,7 +267,7 @@ export function ProductWorkspace() {
                   </div>
                 ) : null}
 
-                {activeTab === "updates" ? (
+                {activeTab === "chat" ? (
                   <div className="bg-slate-900 border border-slate-800 rounded-xl p-6">
                     <h2 className="text-xl font-bold text-white mb-6">Team Chat</h2>
                     <div className="bg-slate-950 border border-slate-800 rounded-lg p-4 mb-4 h-[420px] overflow-y-auto">
@@ -318,7 +322,7 @@ export function ProductWorkspace() {
                 <div className="bg-blue-900/20 border border-blue-800/30 rounded-xl p-6">
                   <h3 className="font-bold text-white mb-3">Workspace Focus</h3>
                   <p className="text-sm text-slate-400 mb-4">Next milestone: {nextMilestone}</p>
-                  <button onClick={() => setActiveTab("updates")} className="w-full px-4 py-3 bg-blue-600 hover:bg-blue-700 text-white text-sm font-semibold rounded-lg">Open Team Chat</button>
+                  <button onClick={() => setActiveTab("chat")} className="w-full px-4 py-3 bg-blue-600 hover:bg-blue-700 text-white text-sm font-semibold rounded-lg">Open Team Chat</button>
                 </div>
               </div>
             </div>

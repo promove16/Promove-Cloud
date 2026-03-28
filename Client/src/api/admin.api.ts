@@ -74,7 +74,11 @@ export interface AdminDealItem {
   stage: 1 | 2 | 3 | 4;
   amountINR?: number;
   equityPercent?: number;
-  investorRole?: 'Shareholder' | 'Director' | 'Co-Founder';
+  investorType?: 'penny' | 'sole';
+  investorRole?: 'shareholder' | 'director' | 'observer';
+  sharesAllocated?: number;
+  votingWeight?: number;
+  canVeto?: boolean;
   adminApprovalRequired: boolean;
   adminApprovedAt?: string;
   adminApprovedBy?: string;
@@ -108,6 +112,12 @@ export interface AdminAnalyticsData {
   }>;
   patentsPending: number;
   awardsPending: number;
+  investmentTypeBreakdown: {
+    pennyCount: number;
+    soleCount: number;
+    pennyCapitalDeployed: number;
+    soleCapitalDeployed: number;
+  };
 }
 
 export interface AdminCapacityData {
@@ -183,6 +193,33 @@ export const adminApi = {
     const response = await api.patch<ApiSuccessResponse<{ approved: true }>>(
       `/api/admin/deals/${dealId}/approve-stage`,
     );
+    return response.data.data;
+  },
+  async updateDealInvestorRole(dealId: string, investorRole: 'shareholder' | 'director' | 'observer') {
+    const response = await api.patch<ApiSuccessResponse<AdminDealItem>>(`/api/admin/deals/${dealId}/investor-role`, {
+      investorRole,
+    });
+    return response.data.data;
+  },
+  async getStartupCapTable(startupId: string) {
+    const response = await api.get<ApiSuccessResponse<unknown>>(`/api/admin/startups/${startupId}/cap-table`);
+    return response.data.data;
+  },
+  async resetSoleInvestor(startupId: string) {
+    const response = await api.post<ApiSuccessResponse<{ reset: true }>>(
+      `/api/admin/startups/${startupId}/reset-sole-investor`,
+    );
+    return response.data.data;
+  },
+  async getInvestmentTypeBreakdown() {
+    const response = await api.get<
+      ApiSuccessResponse<{
+        pennyCount: number;
+        soleCount: number;
+        pennyCapitalDeployed: number;
+        soleCapitalDeployed: number;
+      }>
+    >('/api/admin/investments/by-type');
     return response.data.data;
   },
   async getAnalytics() {

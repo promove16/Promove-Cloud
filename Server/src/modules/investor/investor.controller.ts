@@ -4,14 +4,17 @@ import { ApiError } from '../../utils/ApiError';
 import { ApiResponse } from '../../utils/ApiResponse';
 import { getDealForParticipant } from '../deal/deal.service';
 import {
+  expressInterestSchema,
   expressInterest,
   getDashboard,
   getDeals,
+  getInvestorAuthority,
   getInstitutions,
   getPortfolio,
   getStartup,
   getStartups,
   investorDealTransitionSchema,
+  investAsSole,
   updateDealStage,
 } from './investor.service';
 
@@ -38,6 +41,8 @@ export const listInvestorStartupsController = async (req: Request, res: Response
     stage: typeof req.query.stage === 'string' ? req.query.stage : undefined,
     page: parseOptionalNumber(req.query.page),
     limit: parseOptionalNumber(req.query.limit),
+    acceptingPenny: req.query.acceptingPenny === 'true',
+    acceptingSole: req.query.acceptingSole === 'true',
   });
   res.status(200).json(new ApiResponse(data));
 };
@@ -50,7 +55,13 @@ export const getInvestorStartupController = async (req: Request, res: Response) 
 
 export const expressInterestController = async (req: Request, res: Response) => {
   const startupId = objectIdSchema.parse(req.params.startupId);
-  const data = await expressInterest(req.user!._id, startupId);
+  const data = await expressInterest(req.user!._id, startupId, expressInterestSchema.parse(req.body));
+  res.status(201).json(new ApiResponse(data));
+};
+
+export const expressSoleInterestController = async (req: Request, res: Response) => {
+  const startupId = objectIdSchema.parse(req.params.id);
+  const data = await investAsSole(req.user!._id, startupId, expressInterestSchema.parse(req.body));
   res.status(201).json(new ApiResponse(data));
 };
 
@@ -81,4 +92,9 @@ export const listInvestorInstitutionsController = async (req: Request, res: Resp
 export const getInvestorPortfolioController = async (req: Request, res: Response) => {
   const data = await getPortfolio(req.user!._id);
   res.status(200).json(new ApiResponse(data));
+};
+
+export const getInvestorAuthorityController = async (req: Request, res: Response) => {
+  const data = await getInvestorAuthority(req.user!._id);
+  res.status(200).json(new ApiResponse({ items: data }));
 };

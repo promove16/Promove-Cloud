@@ -1,7 +1,9 @@
 import { useQuery } from '@tanstack/react-query';
+import { useState } from 'react';
 import { Badge } from '../../components/ui/Badge';
 import { Button } from '../../components/ui/Button';
 import { Card } from '../../components/ui/Card';
+import { Input } from '../../components/ui/Input';
 import { Spinner } from '../../components/ui/Spinner';
 import { investorApi } from '../../api/investor.api';
 import { InvestorStartupDetailResponse } from '../../types/investor.types';
@@ -12,7 +14,15 @@ type Props = {
   canExpressInterest: boolean;
   isExpressingInterest?: boolean;
   onOpenChange: (open: boolean) => void;
-  onExpressInterest: (startupId: string) => void;
+  onExpressInterest: (
+    startupId: string,
+    payload: {
+      investorType: 'penny' | 'sole';
+      proposedAmountINR: number;
+      proposedEquityPercent: number;
+      chosenRole?: 'shareholder' | 'director' | 'observer';
+    },
+  ) => void;
 };
 
 const breakdownLabels: Record<string, string> = {
@@ -35,6 +45,10 @@ export function StartupDetailDrawer({
   onOpenChange,
   onExpressInterest,
 }: Props) {
+  const [investorType, setInvestorType] = useState<'penny' | 'sole'>('penny');
+  const [proposedAmountINR, setProposedAmountINR] = useState('20000');
+  const [proposedEquityPercent, setProposedEquityPercent] = useState('2');
+  const [chosenRole, setChosenRole] = useState<'shareholder' | 'director' | 'observer'>('observer');
   const startupQuery = useQuery({
     queryKey: ['investor-startup', startupId],
     queryFn: () => investorApi.getStartup(startupId!),
@@ -95,6 +109,18 @@ export function StartupDetailDrawer({
                       <div className="mt-2 text-sm text-cyan-300">{founder.innovationScore}/200</div>
                     </div>
                   ))}
+                </div>
+
+                <div className="mt-5 flex flex-wrap gap-2">
+                  {detail.startup.acceptsPennyInvestors ? (
+                    <Badge className="border-cyan-500/30 bg-cyan-500/10 text-cyan-300">Accepting Penny Investors</Badge>
+                  ) : null}
+                  {detail.startup.acceptsSoleInvestor ? (
+                    <Badge className="border-amber-500/30 bg-amber-500/10 text-amber-300">Accepting Sole Investor</Badge>
+                  ) : null}
+                  <Badge className="border-slate-700 bg-slate-900 text-slate-300">
+                    Shares Available {detail.startup.sharePool.availableShares}/{detail.startup.sharePool.totalShares}
+                  </Badge>
                 </div>
               </Card>
 
@@ -167,17 +193,102 @@ export function StartupDetailDrawer({
               </div>
             </Card>
 
-            <div className="flex flex-wrap items-center justify-between gap-3 border-t border-slate-800 pt-4">
-              <div className="text-sm text-slate-400">
-                Express Interest is only enabled after the full profile is reviewed.
+            <Card className="space-y-4 border-t border-slate-800 p-5">
+              <div className="text-sm font-semibold uppercase tracking-[0.2em] text-slate-400">
+                Step 0: Choose Your Investor Type
               </div>
-              <Button
-                onClick={() => startupId && onExpressInterest(startupId)}
-                disabled={!canExpressInterest || isExpressingInterest}
-              >
-                {isExpressingInterest ? 'Sending...' : 'Express Interest'}
-              </Button>
-            </div>
+              <div className="grid gap-3 md:grid-cols-2">
+                <button
+                  type="button"
+                  onClick={() => {
+                    setInvestorType('penny');
+                    setChosenRole('observer');
+                  }}
+                  className={`rounded-2xl border p-4 text-left ${
+                    investorType === 'penny' ? 'border-cyan-400 bg-cyan-500/10' : 'border-slate-800 bg-slate-900/80'
+                  }`}
+                >
+                  <div className="font-semibold text-white">Penny Investor</div>
+                  <div className="mt-2 text-sm text-slate-400">Small stake, shareholder rights, ₹20k-₹5L range</div>
+                </button>
+                <button
+                  type="button"
+                  onClick={() => {
+                    setInvestorType('sole');
+                    setChosenRole('shareholder');
+                  }}
+                  className={`rounded-2xl border p-4 text-left ${
+                    investorType === 'sole' ? 'border-amber-400 bg-amber-500/10' : 'border-slate-800 bg-slate-900/80'
+                  }`}
+                >
+                  <div className="font-semibold text-white">Sole Investor</div>
+                  <div className="mt-2 text-sm text-slate-400">Lead investor, director option, negotiated authority</div>
+                </button>
+              </div>
+
+              <div className="grid gap-4 md:grid-cols-3">
+                <div>
+                  <div className="mb-2 text-xs uppercase tracking-[0.2em] text-slate-500">Amount (INR)</div>
+                  <Input
+                    type="number"
+                    min={20000}
+                    value={proposedAmountINR}
+                    onChange={(event) => setProposedAmountINR(event.target.value)}
+                  />
+                </div>
+                <div>
+                  <div className="mb-2 text-xs uppercase tracking-[0.2em] text-slate-500">Equity %</div>
+                  <Input
+                    type="number"
+                    min={0.01}
+                    max={100}
+                    step={0.01}
+                    value={proposedEquityPercent}
+                    onChange={(event) => setProposedEquityPercent(event.target.value)}
+                  />
+                </div>
+                <div>
+                  <div className="mb-2 text-xs uppercase tracking-[0.2em] text-slate-500">Role</div>
+                  <select
+                    value={chosenRole}
+                    onChange={(event) => setChosenRole(event.target.value as 'shareholder' | 'director' | 'observer')}
+                    className="w-full rounded-lg border border-slate-800 bg-slate-950 px-4 py-3 text-white"
+                  >
+                    {investorType === 'penny' ? (
+                      <>
+                        <option value="observer">Observer</option>
+                        <option value="shareholder">Shareholder</option>
+                      </>
+                    ) : (
+                      <>
+                        <option value="shareholder">Shareholder</option>
+                        <option value="director">Director</option>
+                      </>
+                    )}
+                  </select>
+                </div>
+              </div>
+
+              <div className="flex items-center justify-between gap-3">
+                <div className="text-sm text-slate-400">
+                  Express Interest is only enabled after the full profile is reviewed.
+                </div>
+                <Button
+                  onClick={() =>
+                    startupId &&
+                    onExpressInterest(startupId, {
+                      investorType,
+                      proposedAmountINR: Number(proposedAmountINR),
+                      proposedEquityPercent: Number(proposedEquityPercent),
+                      chosenRole,
+                    })
+                  }
+                  disabled={!canExpressInterest || isExpressingInterest}
+                >
+                  {isExpressingInterest ? 'Sending...' : 'Express Interest'}
+                </Button>
+              </div>
+            </Card>
           </div>
         ) : null}
       </div>

@@ -2,10 +2,12 @@ import http from 'http';
 import app from './app';
 import { startNotificationWorker } from './jobs/notificationWorker';
 import { startScoreWorker } from './jobs/scoreRecalcWorker';
+import { startInstitutionVerifyWorker } from './workers/institutionVerifyWorker';
 import { seedProblemsIfEmpty } from './modules/problemBank/problem.service';
 import { initSocket } from './config/socket';
 import { connectDB } from './config/db';
 import { env } from './config/env';
+import { logError, logger, logFile } from './config/logger';
 
 const startServer = async () => {
   await connectDB();
@@ -17,21 +19,27 @@ const startServer = async () => {
   if (env.NODE_ENV !== 'test') {
     startScoreWorker();
     startNotificationWorker();
+    startInstitutionVerifyWorker();
   }
 
   httpServer.listen(env.PORT, () => {
-    console.log(`Server listening on port ${env.PORT}`);
+    logger.info(`Server listening on port ${env.PORT}. Writing logs to ${logFile}`);
   });
 };
 
+const shutdownWithLoggedError = (type: string, error: unknown) => {
+  logError(type, error);
+  setTimeout(() => process.exit(1), 100);
+};
+
 process.on('uncaughtException', (error) => {
-  console.error('uncaughtException', error);
-  process.exit(1);
+  shutdownWithLoggedError('uncaughtException', error);
 });
 
 process.on('unhandledRejection', (error) => {
-  console.error('unhandledRejection', error);
-  process.exit(1);
+  shutdownWithLoggedError('unhandledRejection', error);
 });
 
-void startServer();
+void startServer().catch((error) => {
+  shutdownWithLoggedError('Server startup failed', error);
+});

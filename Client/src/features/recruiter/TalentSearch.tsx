@@ -98,7 +98,7 @@ export default function TalentSearch() {
             Shortlist to Connect
           </Button>
         ) : null}
-        {student.canContact ? (
+        {student.canContact && (
           <Button
             data-testid="message-btn"
             variant="secondary"
@@ -107,7 +107,7 @@ export default function TalentSearch() {
             <Mail className="mr-2 h-4 w-4" />
             Message
           </Button>
-        ) : null}
+        )}
       </div>
 
       <div className="mt-4 h-2 rounded-full bg-slate-800">

@@ -1,5 +1,6 @@
 import { Job, JobsOptions, Queue, Worker, WorkerOptions } from 'bullmq';
 import { env } from './env';
+import { logError, logger } from './logger';
 
 export const hasBullMqRedisConnection = Boolean(env.UPSTASH_REDIS_PASSWORD);
 
@@ -120,7 +121,9 @@ const createSafeQueue = <T>(queueName: string): QueueLike<T> => {
           | undefined;
 
         if (!processor) {
-          console.warn(`No local queue processor registered for "${queueName}". Skipping job "${jobName}".`);
+          logger.warn(
+            `No local queue processor registered for "${queueName}". Skipping job "${jobName}".`,
+          );
           return { id };
         }
 
@@ -128,7 +131,7 @@ const createSafeQueue = <T>(queueName: string): QueueLike<T> => {
           try {
             await processor({ id, name: jobName, data }, opts);
           } catch (error) {
-            console.error(`Local queue "${queueName}" job "${jobName}" failed:`, error);
+            logError(`Local queue "${queueName}" job "${jobName}" failed`, error);
           }
         });
 
@@ -140,7 +143,7 @@ const createSafeQueue = <T>(queueName: string): QueueLike<T> => {
   const queue = new Queue(queueName, { connection });
 
   queue.on('error', (error) => {
-    console.error(`BullMQ queue "${queueName}" connection error:`, error);
+    logError(`BullMQ queue "${queueName}" connection error`, error);
   });
 
   return {
@@ -148,7 +151,7 @@ const createSafeQueue = <T>(queueName: string): QueueLike<T> => {
       try {
         return await queue.add(jobName, data, opts);
       } catch (error) {
-        console.error(`BullMQ queue "${queueName}" add failed for job "${jobName}":`, error);
+        logError(`BullMQ queue "${queueName}" add failed for job "${jobName}"`, error);
         return { id: `skipped-${queueName}-${Date.now()}` };
       }
     },
@@ -182,7 +185,7 @@ export const createQueueWorker = <T>(
   );
 
   worker.on('error', (error) => {
-    console.error(`BullMQ worker "${queueName}" error:`, error);
+    logError(`BullMQ worker "${queueName}" error`, error);
   });
 
   return worker as QueueWorkerLike<T>;
@@ -190,3 +193,6 @@ export const createQueueWorker = <T>(
 
 export const scoreQueue = createSafeQueue('score-recalc');
 export const notificationQueue = createSafeQueue('notifications');
+export const institutionVerifyQueue = createSafeQueue<{ userId: string; token: string }>(
+  'institution-verify',
+);

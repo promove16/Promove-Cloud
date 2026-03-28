@@ -110,7 +110,7 @@ const applyScore = async ({ userId, trigger, metadata }) => {
             trigger,
             newScore,
             delta: actualDelta,
-            timestamp: new Date(),
+            timestamp: new Date().toISOString(),
         });
     }
     return newScore;

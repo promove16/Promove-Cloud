@@ -1,6 +1,8 @@
 import { Ratelimit } from '@upstash/ratelimit';
 import { NextFunction, Request, Response } from 'express';
 import { redis } from '../config/redis';
+import { env } from '../config/env';
+import { logError } from '../config/logger';
 import { ApiError } from '../utils/ApiError';
 
 export const authLimiter = new Ratelimit({
@@ -34,6 +36,10 @@ const resolveKey = (req: Request) => {
 export const withRateLimit =
   (limiter: Ratelimit) =>
   async (req: Request, res: Response, next: NextFunction) => {
+    if (!env.RATE_LIMIT_ENABLED) {
+      return next();
+    }
+
     const identifier = resolveKey(req);
     try {
       const { success, limit, reset, remaining } = await limiter.limit(identifier);
@@ -50,7 +56,7 @@ export const withRateLimit =
 
       return next();
     } catch (error) {
-      console.error('Rate limiter unavailable, allowing request through:', error);
+      logError('Rate limiter unavailable, allowing request through', error);
       return next();
     }
   };

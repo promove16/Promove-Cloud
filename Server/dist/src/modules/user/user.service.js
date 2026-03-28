@@ -11,6 +11,7 @@ const placementRecord_model_1 = require("../college/placementRecord.model");
 const notification_service_1 = require("../notification/notification.service");
 const socket_1 = require("../../config/socket");
 const recruiter_mappers_1 = require("../recruiter/recruiter.mappers");
+const sanitizeText_1 = require("../../utils/sanitizeText");
 exports.updateMeSchema = zod_1.z
     .object({
     displayName: zod_1.z.string().trim().min(2).max(100).optional(),
@@ -90,10 +91,12 @@ const getCurrentUserMentorSessions = async (studentId) => {
 };
 exports.getCurrentUserMentorSessions = getCurrentUserMentorSessions;
 const launchCurrentUserToRecruiters = async (studentId) => {
-    const student = await user_model_1.User.findById(studentId).select('_id role institutionId innovationScore displayName').lean();
+    const student = await user_model_1.User.findById(studentId);
     if (!student || student.role !== roles_types_1.UserRole.STUDENT) {
         throw new ApiError_1.ApiError(404, 'STUDENT_NOT_FOUND', 'Student not found');
     }
+    student.discoverableToRecruiters = true;
+    await student.save();
     const recruiters = await user_model_1.User.find({ role: roles_types_1.UserRole.RECRUITER, isActive: true })
         .select('_id')
         .lean();
@@ -131,13 +134,14 @@ const launchCurrentUserToRecruiters = async (studentId) => {
         type: 'system',
         title: 'Your profile is now visible to all active recruiters',
         body: 'Your profile is now visible to all active recruiters.',
-        link: '/dashboard/student/profile',
+        link: '/leadership-profile',
     });
     if (socket_1.io) {
         socket_1.io.of('/notifications').to(`user:${studentId}`).emit('notification:new', notification);
     }
     return {
         bridgesCreated: recruiters.length,
+        user: (0, exports.toSanitizedUser)(student.toObject()),
     };
 };
 exports.launchCurrentUserToRecruiters = launchCurrentUserToRecruiters;
@@ -147,16 +151,16 @@ const updateCurrentUser = async (userId, payload) => {
         throw new ApiError_1.ApiError(404, 'USER_NOT_FOUND', 'User not found');
     }
     if (payload.displayName !== undefined) {
-        user.displayName = payload.displayName;
+        user.displayName = (0, sanitizeText_1.sanitizePlainText)(payload.displayName);
     }
     if (payload.avatar !== undefined) {
         user.avatar = payload.avatar || undefined;
     }
     if (payload.bio !== undefined) {
-        user.bio = payload.bio || undefined;
+        user.bio = payload.bio ? (0, sanitizeText_1.sanitizePlainText)(payload.bio) : undefined;
     }
     if (payload.domain !== undefined) {
-        user.domain = payload.domain || undefined;
+        user.domain = payload.domain ? (0, sanitizeText_1.sanitizePlainText)(payload.domain) : undefined;
     }
     if (payload.profileComplete !== undefined) {
         user.profileComplete = payload.profileComplete;

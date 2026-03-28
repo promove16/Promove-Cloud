@@ -3,6 +3,7 @@ import multer from 'multer';
 import { ErrorRequestHandler } from 'express';
 import { ZodError } from 'zod';
 import { env } from '../config/env';
+import { logError } from '../config/logger';
 import { ApiFailure } from '../types/api.types';
 import { ApiError } from '../utils/ApiError';
 
@@ -15,7 +16,7 @@ const buildFailure = (code: string, message: string, details?: unknown[]): ApiFa
   },
 });
 
-export const errorHandler: ErrorRequestHandler = (error, _req, res, _next) => {
+export const errorHandler: ErrorRequestHandler = (error, req, res, _next) => {
   if (error instanceof ApiError) {
     return res.status(error.statusCode).json(buildFailure(error.code, error.message, error.details));
   }
@@ -67,7 +68,7 @@ export const errorHandler: ErrorRequestHandler = (error, _req, res, _next) => {
       .json(buildFailure('DUPLICATE_KEY', 'Email already registered'));
   }
 
-  console.error(error);
+  logError(`Unhandled application error on ${req.method} ${req.originalUrl}`, error);
 
   const message =
     env.NODE_ENV === 'production' ? 'Something went wrong' : 'Internal server error';

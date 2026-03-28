@@ -4,8 +4,8 @@ require('dotenv').config();
 
 const mongoose = require('mongoose');
 const bcrypt = require('bcrypt');
-const { User } = require('./src/modules/user/user.model');
-const { UserRole } = require('./src/types/roles.types');
+const { User } = require('../src/modules/user/user.model');
+const { UserRole } = require('../src/types/roles.types');
 
 const DEFAULT_PASSWORD = 'Password123!';
 const ONE_YEAR_MS = 365 * 24 * 60 * 60 * 1000;
@@ -58,7 +58,7 @@ const SEED_USERS = [
 const seedUsers = async () => {
   try {
     if (!process.env.MONGODB_URI) {
-      throw new Error('MONGODB_URI is missing from Server/.env');
+      throw new Error('MONGODB_URI is missing from .env');
     }
 
     await mongoose.connect(process.env.MONGODB_URI);

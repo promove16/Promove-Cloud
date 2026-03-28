@@ -6,12 +6,13 @@ import morgan from 'morgan';
 import path from 'path';
 import { existsSync } from 'fs';
 import { env } from './config/env';
+import { httpLogStream } from './config/logger';
 import { apiLimiter, withRateLimit } from './middleware/rateLimiter';
 import { errorHandler } from './middleware/errorHandler';
 import authRoutes from './modules/auth/auth.routes';
 import chatRoutes from './modules/chat/chat.routes';
 import collegeRoutes from './modules/college/college.routes';
-import dealRoutes from './modules/deal/deal.routes';
+import dealRoutes, { startupsInvestmentRouter } from './modules/deal/deal.routes';
 import eventRoutes from './modules/event/event.routes';
 import investorRoutes from './modules/investor/investor.routes';
 import marketplaceRoutes from './modules/marketplace/marketplace.routes';
@@ -44,7 +45,11 @@ export const createApp = () => {
   app.use(express.json({ limit: '10kb' }));
   app.use(express.urlencoded({ extended: true, limit: '10kb' }));
   app.use(cookieParser());
-  app.use(morgan(env.NODE_ENV === 'production' ? 'combined' : 'dev'));
+  app.use(
+    morgan(env.NODE_ENV === 'production' ? 'combined' : 'dev', {
+      stream: httpLogStream,
+    }),
+  );
   app.use('/api', withRateLimit(apiLimiter));
   app.use('/api/auth', authRoutes);
   app.use('/api/users', userRoutes);
@@ -58,6 +63,7 @@ export const createApp = () => {
   app.use('/api/marketplace', marketplaceRoutes);
   app.use('/api/notifications', notificationRoutes);
   app.use('/api/deals', dealRoutes);
+  app.use('/api/startups', startupsInvestmentRouter);
   app.use('/api/recruiter', recruiterRoutes);
   app.use('/api/mentor', mentorRoutes);
   app.use('/api/school', schoolRoutes);

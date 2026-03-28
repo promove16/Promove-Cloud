@@ -12,6 +12,12 @@ import { User } from '../user/user.model';
 import { UserRole } from '../../types/roles.types';
 import { Workspace } from '../workspace/workspace.model';
 import { Deal } from '../deal/deal.model';
+import {
+  getInvestmentTypeAnalytics as getDealInvestmentTypeAnalytics,
+  getStartupCapTable,
+  resetSoleInvestorForStartup,
+  updateInvestmentRole,
+} from '../deal/deal.service';
 import { AdminAuditLog } from './adminAuditLog.model';
 import { AdminAward } from './award.model';
 import {
@@ -31,6 +37,7 @@ type AuditAction =
   | 'AWARD_REJECTED'
   | 'MILESTONE_VERIFIED'
   | 'DEAL_STAGE_APPROVED'
+  | 'SOLE_INVESTOR_RESET'
   | 'USER_ROLE_CHANGED'
   | 'USER_DEACTIVATED'
   | 'USER_ACTIVATED';
@@ -93,10 +100,14 @@ const buildAdminDealItem = (
     investorId: Types.ObjectId;
     startupId: Types.ObjectId;
     studentId: Types.ObjectId;
+    investorType: 'penny' | 'sole';
     stage: number;
     amountINR?: number;
     equityPercent?: number;
-    investorRole?: 'Shareholder' | 'Director' | 'Co-Founder';
+    investorRole?: 'shareholder' | 'director' | 'observer';
+    sharesAllocated?: number;
+    votingWeight?: number;
+    canVeto?: boolean;
     adminApprovalRequired: boolean;
     adminApprovedAt?: Date | null;
     adminApprovedBy?: Types.ObjectId;
@@ -111,10 +122,14 @@ const buildAdminDealItem = (
   investorId: String(deal.investorId),
   startupId: String(deal.startupId),
   studentId: String(deal.studentId),
+  investorType: deal.investorType,
   stage: deal.stage as 1 | 2 | 3 | 4,
   ...(deal.amountINR ? { amountINR: deal.amountINR } : {}),
   ...(deal.equityPercent ? { equityPercent: deal.equityPercent } : {}),
   ...(deal.investorRole ? { investorRole: deal.investorRole } : {}),
+  ...(deal.sharesAllocated !== undefined ? { sharesAllocated: deal.sharesAllocated } : {}),
+  ...(deal.votingWeight !== undefined ? { votingWeight: deal.votingWeight } : {}),
+  ...(deal.canVeto !== undefined ? { canVeto: deal.canVeto } : {}),
   adminApprovalRequired: deal.adminApprovalRequired,
   ...(deal.adminApprovedAt ? { adminApprovedAt: toIso(deal.adminApprovedAt) } : {}),
   ...(deal.adminApprovedBy ? { adminApprovedBy: String(deal.adminApprovedBy) } : {}),
@@ -402,7 +417,8 @@ export const verifyMilestone = async (adminId: string, milestoneId: string, mile
 export const listDealsAwaitingApproval = async (): Promise<AdminDealItem[]> => {
   const deals = await Deal.find({
     adminApprovalRequired: true,
-    adminApprovedAt: null,
+    stage: 3,
+    status: { $ne: 'cancelled' },
   }).sort({ createdAt: -1 }).lean();
 
   const investorIds = [...new Set(deals.map((deal) => String(deal.investorId)))];
@@ -431,7 +447,7 @@ export const listDealsAwaitingApproval = async (): Promise<AdminDealItem[]> => {
 
 export const getDealAwaitingApproval = async (dealId: string): Promise<AdminDealItem> => {
   const deal = await Deal.findById(dealId).lean();
-  if (!deal) {
+  if (!deal || deal.status === 'cancelled') {
     throw new ApiError(404, 'DEAL_NOT_FOUND', 'Deal not found');
   }
 
@@ -451,12 +467,13 @@ export const getDealAwaitingApproval = async (dealId: string): Promise<AdminDeal
 
 export const approveDealStage = async (adminId: string, dealId: string) => {
   const deal = await Deal.findById(dealId);
-  if (!deal) throw new ApiError(404, 'DEAL_NOT_FOUND', 'Deal not found');
+  if (!deal || deal.status === 'cancelled') throw new ApiError(404, 'DEAL_NOT_FOUND', 'Deal not found');
   if (!deal.adminApprovalRequired || deal.stage !== 3) {
     throw new ApiError(400, 'DEAL_NOT_PENDING_APPROVAL', 'Deal is not awaiting admin approval');
   }
   deal.adminApprovedAt = new Date();
   deal.adminApprovedBy = new Types.ObjectId(adminId);
+  deal.adminApprovalRequired = false;
   await deal.save();
 
   const [student, investor] = await Promise.all([
@@ -487,18 +504,35 @@ export const approveDealStage = async (adminId: string, dealId: string) => {
   });
 };
 
+export const getAdminCapTable = async (startupId: string) => getStartupCapTable(startupId, '', UserRole.ADMIN);
+
+export const updateDealInvestorRole = async (adminId: string, dealId: string, investorRole: 'shareholder' | 'director' | 'observer') => {
+  const deal = await updateInvestmentRole(dealId, investorRole);
+  await createAudit(adminId, 'DEAL_STAGE_APPROVED', dealId, 'Deal', { investorRole });
+  return deal;
+};
+
+export const resetStartupSoleInvestor = async (adminId: string, startupId: string) => {
+  await resetSoleInvestorForStartup(startupId);
+  await createAudit(adminId, 'SOLE_INVESTOR_RESET', startupId, 'Startup');
+  return { reset: true };
+};
+
+export const getInvestmentTypeBreakdown = async () => getDealInvestmentTypeAnalytics();
+
 export const getAnalytics = async (): Promise<AdminAnalyticsData> => {
   const cacheKey = 'admin:analytics';
   const cached = await redis.get<string>(cacheKey);
   const cachedData = readRedisJson<AdminAnalyticsData>(cached);
   if (cachedData) return cachedData;
 
-  const [users, deals, patents, auditLogs, topInnovators] = await Promise.all([
+  const [users, deals, patents, auditLogs, topInnovators, investmentTypeBreakdown] = await Promise.all([
     User.find({}).select('_id displayName email role innovationScore isActive accessGrantedBy accessExpiresAt createdAt lastLogin').lean(),
     Deal.find({}).select('stage status').lean(),
     Patent.find({}).select('status').lean(),
     AdminAuditLog.find().sort({ createdAt: -1 }).limit(10).lean(),
     User.find({}).sort({ innovationScore: -1 }).limit(5).select('_id displayName email role innovationScore isActive accessGrantedBy accessExpiresAt createdAt').lean(),
+    getDealInvestmentTypeAnalytics(),
   ]);
 
   const totalUsers = users.length;
@@ -554,6 +588,7 @@ export const getAnalytics = async (): Promise<AdminAnalyticsData> => {
     })),
     patentsPending: patents.filter((patent) => patent.status === 'submitted' || patent.status === 'under_review').length,
     awardsPending: await AdminAward.countDocuments({ status: { $in: ['submitted', 'under_review'] } }),
+    investmentTypeBreakdown,
   };
 
   await redis.set(cacheKey, JSON.stringify(result), { ex: 60 * 30 });

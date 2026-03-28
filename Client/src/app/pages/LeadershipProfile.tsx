@@ -20,7 +20,9 @@ const eventLabel: Record<string, string> = {
 export function LeadershipProfile() {
   const queryClient = useQueryClient();
   const authUser = useAuthStore((state) => state.user);
+  const setUser = useAuthStore((state) => state.setUser);
   const [toast, setToast] = useState("");
+  const [showLaunchModal, setShowLaunchModal] = useState(false);
   const score = useInnovationScore();
   const workspaces = useQuery({ queryKey: ["workspaces"], queryFn: () => workspaceApi.list() });
   const scoreHistory = useQuery({
@@ -55,9 +57,15 @@ export function LeadershipProfile() {
           traction: { patentFiled: false, mvpBuilt: false, revenueGenerating: false },
         });
       }
-      await studentApi.launchToRecruiters();
+      const result = await studentApi.launchToRecruiters();
+      setUser(result.user);
       setToast("Your profile is now visible to recruiters matching your skill set.");
+      setShowLaunchModal(false);
       await queryClient.invalidateQueries({ queryKey: ["startup", "mine"] });
+      await queryClient.invalidateQueries({ queryKey: ["marketplace"] });
+      if (authUser?._id) {
+        await queryClient.invalidateQueries({ queryKey: ["score", "history", authUser._id] });
+      }
     } catch (error) {
       setToast((error as { response?: { data?: { error?: { message?: string } } } })?.response?.data?.error?.message ?? "Unable to launch your profile to recruiters.");
     }
@@ -82,6 +90,11 @@ export function LeadershipProfile() {
       <div className="space-y-8">
         {toast ? <div className="p-4 bg-blue-500/10 border border-blue-500/20 rounded-lg text-blue-300 text-sm">{toast}</div> : null}
 
+        <div>
+          <h1 className="text-3xl font-bold text-white">Leadership Profile</h1>
+          <p className="mt-2 text-slate-400">Your verified innovation record, timeline, and recruiter-facing profile.</p>
+        </div>
+
         <div className="flex flex-col md:flex-row md:items-start md:justify-between gap-6">
           <div className="flex items-start gap-6">
             <div className="w-24 h-24 bg-gradient-to-br from-blue-500 to-purple-500 rounded-2xl flex items-center justify-center text-4xl text-white font-bold">
@@ -104,7 +117,7 @@ export function LeadershipProfile() {
             </div>
           </div>
           <div className="flex gap-3 flex-wrap">
-            <button onClick={launchToRecruiters} className="px-6 py-3 bg-slate-800 hover:bg-slate-700 text-white rounded-lg font-semibold transition-colors flex items-center gap-2">
+            <button onClick={() => setShowLaunchModal(true)} className="px-6 py-3 bg-slate-800 hover:bg-slate-700 text-white rounded-lg font-semibold transition-colors flex items-center gap-2">
               <Share2 className="w-5 h-5" />
               Launch to Recruiters
             </button>
@@ -163,6 +176,33 @@ export function LeadershipProfile() {
             ))}
           </div>
         </div>
+
+        {showLaunchModal ? (
+          <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-950/80 p-6 backdrop-blur-sm">
+            <div className="w-full max-w-lg rounded-2xl border border-slate-800 bg-slate-900 p-6">
+              <h2 className="text-2xl font-bold text-white">Launch to Recruiters</h2>
+              <p className="mt-3 text-sm leading-6 text-slate-400">
+                Confirm to make your leadership profile visible to recruiters who match your innovation score and activity history.
+              </p>
+              <div className="mt-6 flex justify-end gap-3">
+                <button
+                  type="button"
+                  onClick={() => setShowLaunchModal(false)}
+                  className="rounded-lg bg-slate-800 px-5 py-3 font-semibold text-white"
+                >
+                  Cancel
+                </button>
+                <button
+                  type="button"
+                  onClick={() => void launchToRecruiters()}
+                  className="rounded-lg bg-gradient-to-r from-blue-600 to-purple-600 px-5 py-3 font-semibold text-white"
+                >
+                  Confirm
+                </button>
+              </div>
+            </div>
+          </div>
+        ) : null}
       </div>
     </DashboardLayout>
   );

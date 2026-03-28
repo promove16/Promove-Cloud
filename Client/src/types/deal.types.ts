@@ -1,6 +1,7 @@
 export type DealStage = 1 | 2 | 3 | 4;
 export type DealStatus = 'active' | 'closed' | 'cancelled';
-export type InvestorRole = 'Shareholder' | 'Director' | 'Co-Founder';
+export type InvestorType = 'penny' | 'sole';
+export type InvestorRole = 'shareholder' | 'director' | 'observer';
 
 export interface DealSummaryView {
   _id: string;
@@ -11,11 +12,17 @@ export interface DealSummaryView {
   startupCategory: string;
   studentDisplayName: string;
   investorDisplayName: string;
+  investorType: InvestorType;
   currentStage: DealStage;
   status: DealStatus;
-  amountINR?: number;
-  equityPercent?: number;
-  investorRole?: InvestorRole;
+  amountINR: number;
+  equityPercent: number;
+  sharesAllocated: number;
+  investorRole: InvestorRole;
+  votingWeight: number;
+  canVeto: boolean;
+  canAccessFinancials: boolean;
+  canRequestUpdates: boolean;
   adminApprovalRequired: boolean;
   adminApprovedAt?: string;
   innovationScoreSnapshot: number;
@@ -74,4 +81,64 @@ export interface DealUpdateStagePayload {
     equityPercent?: number;
     investorRole?: InvestorRole;
   };
+}
+
+export interface InvestorAuthorityItem {
+  dealId: string;
+  startupId: string;
+  startupName: string;
+  investorType: InvestorType;
+  equityPercent: number;
+  sharesAllocated: number;
+  stage: DealStage;
+  investorRole: InvestorRole;
+  votingWeight: number;
+  canVeto: boolean;
+  canAccessFinancials: boolean;
+  canRequestUpdates: boolean;
+}
+
+export interface StartupInvestorItem {
+  dealId: string;
+  investorId: string;
+  name: string;
+  investorType: InvestorType;
+  equityPercent: number;
+  sharesAllocated: number;
+  amountINR: number;
+  stage: DealStage;
+  investorRole: InvestorRole;
+  votingWeight: number;
+  canVeto: boolean;
+  canAccessFinancials: boolean;
+  canRequestUpdates: boolean;
+  closedAt?: string;
+}
+
+export interface CapTableInvestorRow {
+  dealId: string;
+  investorId?: string;
+  name?: string;
+  investorType: InvestorType;
+  equityPercent: number;
+  sharesAllocated: number;
+  investorRole: InvestorRole;
+  votingWeight: number;
+  canVeto: boolean;
+  canAccessFinancials: boolean;
+  canRequestUpdates: boolean;
+}
+
+export interface CapTableResponse {
+  startupId: string;
+  totalShares: number;
+  availableShares: number;
+  visibility: 'full' | 'limited';
+  soleInvestor: CapTableInvestorRow | null;
+  pennyInvestors: CapTableInvestorRow[];
+  founderRetained: {
+    equityPercent: number;
+    sharesAllocated: number;
+  };
+  totalInvestorEquity: number;
 }

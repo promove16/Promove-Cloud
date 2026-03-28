@@ -52,10 +52,16 @@ export const createStartupProfile = async (userId: string, payload: z.infer<type
 export const getMyStartup = async (userId: string) => Startup.findOne({ founderIds: userId, isActive: true }).lean();
 
 export const getStartupForFounder = async (startupId: string, userId: string) => {
-  const startup = await Startup.findOne({ _id: startupId, founderIds: userId });
+  const startup = await Startup.findById(startupId);
   if (!startup) {
     throw new ApiError(403, 'FORBIDDEN', 'Only founders can access this startup.');
   }
+
+  const isFounder = startup.founderIds.some((founderId) => String(founderId) === String(userId));
+  if (!isFounder) {
+    throw new ApiError(403, 'FORBIDDEN', 'Only founders can access this startup.');
+  }
+
   return startup;
 };
 

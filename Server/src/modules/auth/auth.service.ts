@@ -1,17 +1,15 @@
 import bcrypt from 'bcrypt';
 import jwt, { SignOptions } from 'jsonwebtoken';
-import { randomUUID } from 'crypto';
+import { randomBytes, randomUUID } from 'crypto';
 import { redis } from '../../config/redis';
 import { env } from '../../config/env';
+import { institutionVerifyQueue } from '../../config/bullmq';
 import { User } from '../user/user.model';
 import { AccessGrantedBy, SanitizedUser } from '../user/user.types';
 import { UserRole } from '../../types/roles.types';
 import { ApiError } from '../../utils/ApiError';
 import { toSanitizedUser } from '../user/user.service';
-import {
-  registerTokenUsage,
-  resolveInstitutionToken,
-} from '../institution/institutionAccess.service';
+import { sanitizePlainText } from '../../utils/sanitizeText';
 
 const REFRESH_TTL_SECONDS = 30 * 24 * 60 * 60;
 const MS_IN_YEAR = 365 * 24 * 60 * 60 * 1000;
@@ -22,10 +20,9 @@ interface AuthResult {
   user: SanitizedUser;
 }
 
-interface PendingStudentRegistrationResult {
-  requiresVerification: true;
+interface RegisterResult extends AuthResult {
+  nextStep: 'profile_setup';
   message: string;
-  user: SanitizedUser;
 }
 
 interface RefreshPayload extends jwt.JwtPayload {
@@ -35,6 +32,20 @@ interface RefreshPayload extends jwt.JwtPayload {
   tokenId: string;
   type: 'refresh';
 }
+
+const getAcademicYear = () => {
+  const today = new Date();
+  const startYear = today.getMonth() >= 3 ? today.getFullYear() : today.getFullYear() - 1;
+  return `${startYear}-${String((startYear + 1) % 100).padStart(2, '0')}`;
+};
+
+const buildDefaultInstitutionProfile = (displayName: string) => ({
+  institutionName: displayName,
+  location: 'India',
+  totalStudentsEnrolled: 0,
+  academicYear: getAcademicYear(),
+  iicStarRating: 0,
+});
 
 const signToken = (
   payload: Record<string, string>,
@@ -78,11 +89,62 @@ const createTokenPair = async (user: SanitizedUser) => {
   );
 
   await redis.set(`refresh:${refreshTokenId}`, user._id, { ex: REFRESH_TTL_SECONDS });
+  await redis.set(
+    `session:${user._id}:${refreshTokenId}`,
+    JSON.stringify({
+      userId: user._id,
+      role: user.role,
+      issuedAt: new Date().toISOString(),
+    }),
+    { ex: REFRESH_TTL_SECONDS },
+  );
 
   return {
     accessToken,
     refreshToken,
   };
+};
+
+const slugifyDisplayName = (displayName: string) => {
+  const normalized = displayName
+    .normalize('NFKD')
+    .replace(/[^\w\s-]/g, '')
+    .trim()
+    .toLowerCase()
+    .replace(/[\s_-]+/g, '-')
+    .replace(/^-+|-+$/g, '');
+
+  return normalized || 'user';
+};
+
+const generateProfileSlug = async (displayName: string) => {
+  const baseSlug = slugifyDisplayName(displayName);
+
+  for (let attempt = 0; attempt < 10; attempt += 1) {
+    const suffix = randomBytes(2).toString('hex');
+    const candidate = `${baseSlug}-${suffix}`;
+    const existing = await User.exists({ profileSlug: candidate });
+
+    if (!existing) {
+      return candidate;
+    }
+  }
+
+  throw new ApiError(500, 'PROFILE_SLUG_GENERATION_FAILED', 'Unable to generate a unique profile URL');
+};
+
+const enqueueInstitutionVerification = async (userId: string, institutionToken: string) => {
+  await institutionVerifyQueue.add(
+    'verify',
+    {
+      userId,
+      token: institutionToken,
+    },
+    {
+      attempts: 3,
+      backoff: { type: 'exponential', delay: 1000 },
+    },
+  );
 };
 
 export const registerUser = async (payload: {
@@ -101,7 +163,7 @@ export const registerUser = async (payload: {
     academicYear: string;
     iicStarRating?: number;
   };
-}): Promise<AuthResult | PendingStudentRegistrationResult> => {
+}): Promise<RegisterResult> => {
   const activeUsers = await User.countDocuments({ isActive: true });
 
   if (activeUsers >= env.MAX_USERS_YEAR_ONE) {
@@ -120,27 +182,43 @@ export const registerUser = async (payload: {
 
   const passwordHash = await bcrypt.hash(payload.password, 12);
   const isStudent = payload.role === UserRole.STUDENT;
-  const institutionTokenValue = payload.institutionToken ?? payload.accessCode;
-  const tokenRecord = isStudent
-    ? await resolveInstitutionToken(institutionTokenValue ?? '')
-    : undefined;
-  const accessGrantedBy: AccessGrantedBy = isStudent ? 'institution_token' : 'self_registered';
+  const institutionTokenValue = payload.institutionToken?.trim() || payload.accessCode?.trim() || undefined;
+  const accessGrantedBy: AccessGrantedBy = isStudent ? 'admin' : 'self_registered';
+  const fallbackDomain = payload.domain ?? payload.accessCode?.trim();
+  const sanitizedDisplayName = sanitizePlainText(payload.displayName);
+  const sanitizedBio = payload.bio ? sanitizePlainText(payload.bio) : undefined;
+  const institutionProfile =
+    payload.institutionProfile ??
+    (payload.role === UserRole.SCHOOL || payload.role === UserRole.COLLEGE
+      ? buildDefaultInstitutionProfile(sanitizedDisplayName)
+      : undefined);
+  const profileSlug =
+    payload.role === UserRole.STUDENT ? await generateProfileSlug(sanitizedDisplayName) : null;
+  const registrationStage =
+    payload.role === UserRole.SCHOOL || payload.role === UserRole.COLLEGE
+      ? 'complete'
+      : isStudent && institutionTokenValue
+        ? 'institution_pending'
+        : 'basic';
+  const institutionVerificationStatus =
+    isStudent && institutionTokenValue ? 'pending' : 'none';
 
   const createdUser = await User.create({
     email: payload.email.toLowerCase(),
     passwordHash,
     role: payload.role,
-    displayName: payload.displayName,
-    ...(payload.domain ? { domain: payload.domain } : {}),
-    ...(payload.bio ? { bio: payload.bio } : {}),
-    ...(payload.institutionProfile
+    displayName: sanitizedDisplayName,
+    ...(profileSlug ? { profileSlug } : {}),
+    ...(fallbackDomain ? { domain: sanitizePlainText(fallbackDomain) } : {}),
+    ...(sanitizedBio ? { bio: sanitizedBio } : {}),
+    ...(institutionProfile
       ? {
           institutionProfile: {
-            institutionName: payload.institutionProfile.institutionName,
-            location: payload.institutionProfile.location,
-            totalStudentsEnrolled: payload.institutionProfile.totalStudentsEnrolled,
-            academicYear: payload.institutionProfile.academicYear,
-            iicStarRating: payload.institutionProfile.iicStarRating ?? 0,
+            institutionName: institutionProfile.institutionName,
+            location: institutionProfile.location,
+            totalStudentsEnrolled: institutionProfile.totalStudentsEnrolled,
+            academicYear: institutionProfile.academicYear,
+            iicStarRating: institutionProfile.iicStarRating ?? 0,
             policies: [],
             stats: {
               totalInnovationActivities: 0,
@@ -152,37 +230,61 @@ export const registerUser = async (payload: {
           },
         }
       : {}),
-    ...(tokenRecord ? { institutionId: tokenRecord.institutionId } : {}),
+    institutionToken: institutionTokenValue ?? null,
     profileComplete:
       payload.role === UserRole.SCHOOL || payload.role === UserRole.COLLEGE
-        ? Boolean(payload.institutionProfile)
-        : Boolean(payload.domain || payload.bio),
+        ? Boolean(institutionProfile)
+        : Boolean(fallbackDomain || payload.bio),
+    registrationStage,
     accessGrantedBy,
     accessExpiresAt: new Date(Date.now() + MS_IN_YEAR),
-    isActive: isStudent ? false : true,
-    verificationStatus: isStudent ? 'pending' : 'not_required',
-    ...(isStudent ? { verificationRequestedAt: new Date() } : {}),
+    isActive: true,
+    institutionVerificationStatus,
+    verificationStatus: isStudent ? 'verified' : 'not_required',
+    ...(isStudent
+      ? {
+          verificationRequestedAt: institutionTokenValue ? new Date() : undefined,
+          verifiedAt: new Date(),
+        }
+      : {}),
   });
 
-  if (tokenRecord) {
-    await registerTokenUsage(String(tokenRecord._id));
-  }
-
   const user = toSanitizedUser(createdUser.toObject());
-  if (isStudent) {
-    return {
-      requiresVerification: true,
-      message:
-        'Your account has been created and is waiting for school or college approval before sign-in.',
-      user,
-    };
-  }
-
   const tokens = await createTokenPair(user);
+
+  if (isStudent && institutionTokenValue) {
+    await enqueueInstitutionVerification(user._id, institutionTokenValue);
+  }
 
   return {
     ...tokens,
     user,
+    nextStep: 'profile_setup',
+    message: 'Account created! Complete your profile to unlock all features.',
+  };
+};
+
+export const submitInstitutionToken = async (userId: string, institutionToken: string) => {
+  const user = await User.findById(userId);
+
+  if (!user || user.role !== UserRole.STUDENT) {
+    throw new ApiError(404, 'USER_NOT_FOUND', 'Student account not found');
+  }
+
+  if (user.institutionVerificationStatus === 'verified') {
+    throw new ApiError(409, 'INSTITUTION_ALREADY_VERIFIED', 'Institution already verified');
+  }
+
+  user.institutionToken = institutionToken.trim().toUpperCase();
+  user.institutionVerificationStatus = 'pending';
+  user.registrationStage = 'institution_pending';
+  user.verificationRequestedAt = new Date();
+  await user.save();
+
+  await enqueueInstitutionVerification(userId, user.institutionToken);
+
+  return {
+    message: 'Token submitted. Verification in progress.',
   };
 };
 
@@ -201,24 +303,16 @@ export const loginUser = async (payload: {
     throw new ApiError(401, 'ROLE_MISMATCH', 'Selected role does not match your account.');
   }
 
-  if (!user.isActive) {
-    if (user.role === UserRole.STUDENT && user.verificationStatus === 'pending') {
-      throw new ApiError(
-        403,
-        'INSTITUTION_VERIFICATION_PENDING',
-        'Your school or college still needs to verify your account before you can sign in.',
-      );
-    }
+  if (user.role === UserRole.STUDENT && user.verificationStatus === 'rejected') {
+    throw new ApiError(
+      403,
+      'INSTITUTION_VERIFICATION_REJECTED',
+      user.verificationRejectedReason ||
+        'Your institution could not verify your account. Please contact them for support.',
+    );
+  }
 
-    if (user.role === UserRole.STUDENT && user.verificationStatus === 'rejected') {
-      throw new ApiError(
-        403,
-        'INSTITUTION_VERIFICATION_REJECTED',
-        user.verificationRejectedReason ||
-          'Your institution could not verify your account. Please contact them for support.',
-      );
-    }
-
+  if (!user.isActive && user.role !== UserRole.STUDENT) {
     throw new ApiError(403, 'ACCESS_DISABLED', 'Your account is currently inactive');
   }
 
@@ -263,6 +357,7 @@ export const refreshUserToken = async (refreshToken: string | undefined): Promis
   }
 
   await redis.del(key);
+  await redis.del(`session:${decoded._id}:${decoded.tokenId}`);
 
   const user = await User.findById(decoded._id);
 
@@ -294,6 +389,7 @@ export const logoutUser = async (refreshToken: string | undefined) => {
     }) as RefreshPayload;
 
     await redis.del(`refresh:${decoded.tokenId}`);
+    await redis.del(`session:${decoded._id}:${decoded.tokenId}`);
   } catch (_error) {
     return;
   }

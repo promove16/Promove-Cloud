@@ -1,5 +1,5 @@
-import { connectDB } from './src/config/db';
-import { Problem } from './src/modules/problemBank/problem.model';
+import { connectDB } from '../src/config/db';
+import { Problem } from '../src/modules/problemBank/problem.model';
 
 async function buildIndexes() {
   await connectDB();

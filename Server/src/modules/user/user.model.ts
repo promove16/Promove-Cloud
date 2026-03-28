@@ -119,6 +119,367 @@ const institutionProfileSchema = new Schema<NonNullable<IUser['institutionProfil
   { _id: false },
 );
 
+const oauthAccountSchema = new Schema<IUser['connectedAccounts']['github']>(
+  {
+    userId: {
+      type: String,
+      default: null,
+    },
+    username: {
+      type: String,
+      default: null,
+    },
+    accessToken: {
+      type: String,
+      default: null,
+      select: false,
+    },
+    connectedAt: {
+      type: Date,
+      default: null,
+    },
+    lastSyncedAt: {
+      type: Date,
+      default: null,
+    },
+  },
+  { _id: false },
+);
+
+const skillSchema = new Schema<IUser['skills'][number]>(
+  {
+    name: {
+      type: String,
+      required: true,
+      trim: true,
+      maxlength: 100,
+    },
+    category: {
+      type: String,
+      enum: ['programming', 'design', 'business', 'research', 'other'],
+      default: 'other',
+    },
+    source: {
+      type: String,
+      enum: ['platform', 'github', 'linkedin', 'manual'],
+      required: true,
+    },
+    level: {
+      type: String,
+      enum: ['beginner', 'intermediate', 'advanced', 'expert'],
+      default: 'beginner',
+    },
+    endorsements: {
+      type: Number,
+      default: 0,
+      min: 0,
+    },
+    addedAt: {
+      type: Date,
+      default: Date.now,
+    },
+  },
+  { _id: false },
+);
+
+const experienceSchema = new Schema<IUser['experience'][number]>(
+  {
+    title: {
+      type: String,
+      required: true,
+      trim: true,
+      maxlength: 120,
+    },
+    company: {
+      type: String,
+      required: true,
+      trim: true,
+      maxlength: 160,
+    },
+    type: {
+      type: String,
+      enum: ['full_time', 'part_time', 'internship', 'freelance', 'volunteer'],
+      default: 'internship',
+    },
+    location: {
+      type: String,
+      default: '',
+      maxlength: 100,
+    },
+    startDate: {
+      type: Date,
+      required: true,
+    },
+    endDate: {
+      type: Date,
+      default: null,
+    },
+    isCurrent: {
+      type: Boolean,
+      default: false,
+    },
+    description: {
+      type: String,
+      maxlength: 1000,
+      default: '',
+    },
+    skills: {
+      type: [String],
+      default: [],
+    },
+    source: {
+      type: String,
+      enum: ['manual', 'linkedin'],
+      default: 'manual',
+    },
+    linkedinId: {
+      type: String,
+      default: null,
+    },
+  },
+  { _id: true },
+);
+
+const educationSchema = new Schema<IUser['education'][number]>(
+  {
+    institution: {
+      type: String,
+      required: true,
+      trim: true,
+      maxlength: 160,
+    },
+    degree: {
+      type: String,
+      default: '',
+      maxlength: 160,
+    },
+    fieldOfStudy: {
+      type: String,
+      default: '',
+      maxlength: 160,
+    },
+    startYear: {
+      type: Number,
+      min: 1900,
+      max: 3000,
+      default: undefined,
+    },
+    endYear: {
+      type: Number,
+      min: 1900,
+      max: 3000,
+      default: null,
+    },
+    isCurrent: {
+      type: Boolean,
+      default: false,
+    },
+    grade: {
+      type: String,
+      default: '',
+      maxlength: 80,
+    },
+    activities: {
+      type: String,
+      default: '',
+      maxlength: 500,
+    },
+    description: {
+      type: String,
+      default: '',
+      maxlength: 1000,
+    },
+    source: {
+      type: String,
+      enum: ['manual', 'linkedin'],
+      default: 'manual',
+    },
+  },
+  { _id: true },
+);
+
+const certificationSchema = new Schema<IUser['certifications'][number]>(
+  {
+    name: {
+      type: String,
+      required: true,
+      trim: true,
+      maxlength: 160,
+    },
+    issuingOrganization: {
+      type: String,
+      required: true,
+      trim: true,
+      maxlength: 160,
+    },
+    issueDate: {
+      type: Date,
+      default: null,
+    },
+    expiryDate: {
+      type: Date,
+      default: null,
+    },
+    credentialId: {
+      type: String,
+      default: '',
+      maxlength: 120,
+    },
+    credentialUrl: {
+      type: String,
+      default: '',
+      maxlength: 500,
+    },
+    source: {
+      type: String,
+      enum: ['manual', 'linkedin'],
+      default: 'manual',
+    },
+  },
+  { _id: true },
+);
+
+const portfolioProjectSchema = new Schema<IUser['portfolioProjects'][number]>(
+  {
+    title: {
+      type: String,
+      required: true,
+      trim: true,
+      maxlength: 160,
+    },
+    description: {
+      type: String,
+      maxlength: 1000,
+      default: '',
+    },
+    techStack: {
+      type: [String],
+      default: [],
+    },
+    repoUrl: {
+      type: String,
+      default: null,
+    },
+    liveUrl: {
+      type: String,
+      default: null,
+    },
+    coverImageUrl: {
+      type: String,
+      default: null,
+    },
+    startDate: {
+      type: Date,
+      default: null,
+    },
+    endDate: {
+      type: Date,
+      default: null,
+    },
+    isCurrent: {
+      type: Boolean,
+      default: false,
+    },
+    source: {
+      type: String,
+      enum: ['manual', 'github'],
+      default: 'manual',
+    },
+    githubRepoId: {
+      type: String,
+      default: null,
+    },
+    stars: {
+      type: Number,
+      default: 0,
+      min: 0,
+    },
+    forks: {
+      type: Number,
+      default: 0,
+      min: 0,
+    },
+    languages: {
+      type: [String],
+      default: [],
+    },
+  },
+  { _id: true },
+);
+
+const resumeSchema = new Schema<IUser['resume']>(
+  {
+    fileUrl: {
+      type: String,
+      default: null,
+    },
+    fileName: {
+      type: String,
+      default: null,
+    },
+    uploadedAt: {
+      type: Date,
+      default: null,
+    },
+    isPublic: {
+      type: Boolean,
+      default: false,
+    },
+  },
+  { _id: false },
+);
+
+const githubLanguageStatSchema = new Schema<IUser['githubStats']['topLanguages'][number]>(
+  {
+    language: {
+      type: String,
+      required: true,
+      trim: true,
+    },
+    percentage: {
+      type: Number,
+      required: true,
+      min: 0,
+      max: 100,
+    },
+  },
+  { _id: false },
+);
+
+const githubStatsSchema = new Schema<IUser['githubStats']>(
+  {
+    totalRepos: {
+      type: Number,
+      default: 0,
+      min: 0,
+    },
+    totalStars: {
+      type: Number,
+      default: 0,
+      min: 0,
+    },
+    totalForks: {
+      type: Number,
+      default: 0,
+      min: 0,
+    },
+    topLanguages: {
+      type: [githubLanguageStatSchema],
+      default: [],
+    },
+    contributionsLastYear: {
+      type: Number,
+      default: 0,
+      min: 0,
+    },
+    lastSyncedAt: {
+      type: Date,
+      default: null,
+    },
+  },
+  { _id: false },
+);
+
 const userSchema = new Schema<IUser>(
   {
     email: {
@@ -150,8 +511,30 @@ const userSchema = new Schema<IUser>(
     },
     bio: {
       type: String,
-      default: undefined,
+      default: '',
       maxlength: 500,
+    },
+    headline: {
+      type: String,
+      default: '',
+      maxlength: 120,
+    },
+    location: {
+      type: String,
+      default: '',
+      maxlength: 100,
+    },
+    websiteUrl: {
+      type: String,
+      default: null,
+    },
+    githubUrl: {
+      type: String,
+      default: null,
+    },
+    linkedinUrl: {
+      type: String,
+      default: null,
     },
     domain: {
       type: String,
@@ -163,6 +546,11 @@ const userSchema = new Schema<IUser>(
       type: Boolean,
       default: false,
     },
+    registrationStage: {
+      type: String,
+      enum: ['basic', 'profile_setup', 'institution_pending', 'institution_verified', 'complete'],
+      default: 'basic',
+    },
     innovationScore: {
       type: Number,
       default: 0,
@@ -173,7 +561,7 @@ const userSchema = new Schema<IUser>(
     },
     accessGrantedBy: {
       type: String,
-      enum: ['self_registered', 'institution_token'],
+      enum: ['self_registered', 'institution_token', 'admin', 'startup_school', 'skill_dev'],
       required: true,
     },
     accessExpiresAt: {
@@ -184,6 +572,15 @@ const userSchema = new Schema<IUser>(
       type: Boolean,
       default: true,
     },
+    isProfilePublic: {
+      type: Boolean,
+      default: true,
+    },
+    profileSlug: {
+      type: String,
+      default: null,
+      trim: true,
+    },
     lastLogin: {
       type: Date,
       default: undefined,
@@ -192,13 +589,27 @@ const userSchema = new Schema<IUser>(
       type: Boolean,
       default: false,
     },
+    institutionToken: {
+      type: String,
+      default: null,
+    },
     institutionId: {
       type: Schema.Types.ObjectId,
-      default: undefined,
+      ref: 'User',
+      default: null,
     },
     institutionProfile: {
       type: institutionProfileSchema,
       default: undefined,
+    },
+    institutionVerifiedAt: {
+      type: Date,
+      default: null,
+    },
+    institutionVerificationStatus: {
+      type: String,
+      enum: ['none', 'pending', 'verified', 'failed'],
+      default: 'none',
     },
     verificationStatus: {
       type: String,
@@ -222,6 +633,97 @@ const userSchema = new Schema<IUser>(
       default: undefined,
       maxlength: 300,
     },
+    connectedAccounts: {
+      type: new Schema<IUser['connectedAccounts']>(
+        {
+          github: {
+            type: oauthAccountSchema,
+            default: () => ({
+              userId: null,
+              username: null,
+              accessToken: null,
+              connectedAt: null,
+              lastSyncedAt: null,
+            }),
+          },
+          linkedin: {
+            type: oauthAccountSchema,
+            default: () => ({
+              userId: null,
+              username: null,
+              accessToken: null,
+              connectedAt: null,
+              lastSyncedAt: null,
+            }),
+          },
+        },
+        { _id: false },
+      ),
+      default: () => ({
+        github: {
+          userId: null,
+          username: null,
+          accessToken: null,
+          connectedAt: null,
+          lastSyncedAt: null,
+        },
+        linkedin: {
+          userId: null,
+          username: null,
+          accessToken: null,
+          connectedAt: null,
+          lastSyncedAt: null,
+        },
+      }),
+    },
+    skills: {
+      type: [skillSchema],
+      default: [],
+    },
+    experience: {
+      type: [experienceSchema],
+      default: [],
+    },
+    education: {
+      type: [educationSchema],
+      default: [],
+    },
+    certifications: {
+      type: [certificationSchema],
+      default: [],
+    },
+    portfolioProjects: {
+      type: [portfolioProjectSchema],
+      default: [],
+    },
+    resume: {
+      type: resumeSchema,
+      default: () => ({
+        fileUrl: null,
+        fileName: null,
+        uploadedAt: null,
+        isPublic: false,
+      }),
+    },
+    githubStats: {
+      type: githubStatsSchema,
+      default: () => ({
+        totalRepos: 0,
+        totalStars: 0,
+        totalForks: 0,
+        topLanguages: [],
+        contributionsLastYear: 0,
+        lastSyncedAt: null,
+      }),
+    },
+    teamRequestsSent: {
+      type: [{ type: Schema.Types.ObjectId, ref: 'TeamRequest' }],
+      default: [],
+    },
+    teamRequestsReceived: {
+      type: [{ type: Schema.Types.ObjectId, ref: 'TeamRequest' }],
+      default: [],
+    },
   },
   {
     timestamps: true,
@@ -231,6 +733,11 @@ const userSchema = new Schema<IUser>(
 userSchema.index({ role: 1, innovationScore: -1 });
 userSchema.index({ institutionId: 1 });
 userSchema.index({ role: 1, isActive: 1 });
+userSchema.index({ profileSlug: 1 }, { unique: true, sparse: true });
+userSchema.index({ 'connectedAccounts.github.username': 1 }, { sparse: true });
+userSchema.index({ 'skills.name': 1 });
+userSchema.index({ isProfilePublic: 1, role: 1 });
+userSchema.index({ registrationStage: 1 });
 
 export type UserDocument = HydratedDocument<IUser>;
 export const User = model<IUser>('User', userSchema);

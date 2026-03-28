@@ -1,5 +1,6 @@
 import api from './axiosInstance';
 import { ApiSuccessResponse } from '../types/auth.types';
+import { CapTableResponse } from '../types/deal.types';
 import { Startup } from '../types/startup.types';
 
 export interface StartupPayload {
@@ -37,6 +38,10 @@ export const startupApi = {
     const response = await api.post<ApiSuccessResponse<Startup>>(`/api/startup/${startupId}/upload-pitch`, body, {
       headers: { 'Content-Type': 'multipart/form-data' },
     });
+    return response.data.data;
+  },
+  async getCapTable(startupId: string) {
+    const response = await api.get<ApiSuccessResponse<CapTableResponse>>(`/api/startups/${startupId}/cap-table`);
     return response.data.data;
   },
 };

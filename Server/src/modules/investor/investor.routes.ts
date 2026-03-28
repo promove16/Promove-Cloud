@@ -7,6 +7,8 @@ import { asyncHandler } from '../../utils/asyncHandler';
 import { ApiError } from '../../utils/ApiError';
 import {
   expressInterestController,
+  expressSoleInterestController,
+  getInvestorAuthorityController,
   getInvestorDashboardController,
   getInvestorDealController,
   getInvestorPortfolioController,
@@ -50,6 +52,8 @@ router.post(
   connectionGuard(UserRole.STUDENT),
   asyncHandler(expressInterestController),
 );
+router.get('/portfolio/authority', authorize(UserRole.INVESTOR), asyncHandler(getInvestorAuthorityController));
+router.post('/startups/:id/sole-investor', authorize(UserRole.INVESTOR), asyncHandler(expressSoleInterestController));
 router.get('/deals', authorize(UserRole.INVESTOR), asyncHandler(listInvestorDealsController));
 router.get('/deals/:id', authorize(UserRole.INVESTOR), asyncHandler(getInvestorDealController));
 router.patch('/deals/:id/stage', authorize(UserRole.INVESTOR), asyncHandler(updateInvestorDealStageController));
@@ -62,4 +66,3 @@ router.get(
 router.get('/portfolio', authorize(UserRole.INVESTOR), asyncHandler(getInvestorPortfolioController));
 
 export default router;
-

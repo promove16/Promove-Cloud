@@ -1,8 +1,8 @@
-import { connectDB } from './src/config/db';
-import { listProblems, claimProblem } from './src/modules/problemBank/problem.service';
-import { Workspace } from './src/modules/workspace/workspace.model';
-import { Problem } from './src/modules/problemBank/problem.model';
-import { User } from './src/modules/user/user.model';
+import { connectDB } from '../../src/config/db';
+import { listProblems, claimProblem } from '../../src/modules/problemBank/problem.service';
+import { Workspace } from '../../src/modules/workspace/workspace.model';
+import { Problem } from '../../src/modules/problemBank/problem.model';
+import { User } from '../../src/modules/user/user.model';
 import mongoose from 'mongoose';
 
 async function test() {
