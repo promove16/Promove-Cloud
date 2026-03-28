@@ -49,11 +49,7 @@ router.use(authenticate, authorize(UserRole.SCHOOL), rejectRecruiterTargets);
 
 router.get('/dashboard', asyncHandler(getSchoolDashboardController));
 router.get('/students', asyncHandler(listSchoolStudentsController));
-router.get(
-  '/students/:id/journey',
-  connectionGuard(UserRole.STUDENT),
-  asyncHandler(getSchoolStudentJourneyController),
-);
+router.get('/students/:id/journey', asyncHandler(getSchoolStudentJourneyController));
 router.get(
   '/investors',
   connectionGuard(UserRole.INVESTOR),
