@@ -1,5 +1,5 @@
 import { PropsWithChildren } from 'react';
-import { Navigate, Outlet, createBrowserRouter } from 'react-router-dom';
+import { Link, Navigate, Outlet, createBrowserRouter, isRouteErrorResponse, useRouteError } from 'react-router-dom';
 import { AuthLayout } from '../components/layouts/AuthLayout';
 import { DashboardLayout } from '../components/layouts/DashboardLayout';
 import { Card } from '../components/ui/Card';
@@ -54,6 +54,45 @@ import { Marketplace } from '../features/student/Marketplace';
 
 function RootLayout() {
   return <Outlet />;
+}
+
+function RouteErrorPage() {
+  const error = useRouteError();
+  const title = isRouteErrorResponse(error)
+    ? `${error.status} ${error.statusText}`
+    : 'Something went wrong';
+  const description = isRouteErrorResponse(error)
+    ? typeof error.data === 'string'
+      ? error.data
+      : 'The page could not be loaded.'
+    : error instanceof Error
+      ? error.message
+      : 'An unexpected error interrupted this page.';
+
+  return (
+    <div className="flex min-h-screen items-center justify-center bg-slate-950 px-4">
+      <Card className="w-full max-w-2xl p-8">
+        <div className="text-xs uppercase tracking-[0.3em] text-cyan-300">Route Error</div>
+        <h1 className="mt-4 text-3xl font-bold text-white">{title}</h1>
+        <p className="mt-3 text-slate-400">{description}</p>
+        <div className="mt-6 flex flex-wrap gap-3">
+          <Link
+            to="/login"
+            className="inline-flex items-center justify-center rounded-2xl bg-cyan-500 px-5 py-3 text-sm font-semibold text-slate-950 transition hover:bg-cyan-400"
+          >
+            Go to Login
+          </Link>
+          <button
+            type="button"
+            onClick={() => window.location.reload()}
+            className="inline-flex items-center justify-center rounded-2xl border border-slate-700 px-5 py-3 text-sm font-semibold text-slate-200 transition hover:border-slate-500 hover:text-white"
+          >
+            Reload Page
+          </button>
+        </div>
+      </Card>
+    </div>
+  );
 }
 
 function PublicOnlyRoute() {
@@ -128,6 +167,7 @@ export const router = createBrowserRouter([
   {
     path: '/',
     element: <RootLayout />,
+    errorElement: <RouteErrorPage />,
     children: [
       {
         index: true,

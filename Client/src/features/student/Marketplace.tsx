@@ -196,6 +196,8 @@ function MarketplaceProfileDrawer({
     queryFn: () => marketplaceApi.getProfile(profileId!),
     enabled: open && Boolean(profileId),
   });
+  const profile = profileQuery.data;
+  const counts = profile ? getInsightCounts(profile) : null;
 
   if (!open) {
     return null;
@@ -205,31 +207,26 @@ function MarketplaceProfileDrawer({
     <div className="fixed inset-0 z-50 flex justify-end bg-slate-950/80 backdrop-blur-sm">
       <button type="button" aria-label="Close profile" className="flex-1" onClick={onClose} />
       <aside className="h-full w-full max-w-2xl overflow-y-auto border-l border-slate-800 bg-slate-950 px-6 py-6 shadow-2xl shadow-black/40">
-        {profileQuery.isLoading || !profileQuery.data ? (
+        {profileQuery.isLoading || !profile || !counts ? (
           <div className="flex h-full items-center justify-center">
             <Spinner />
           </div>
         ) : (
           <div className="space-y-6">
-            {(() => {
-              const counts = getInsightCounts(profileQuery.data);
-
-              return (
-                <>
             <div className="flex items-start justify-between gap-4">
               <div className="flex items-center gap-4">
-                <ProfileAvatar profile={profileQuery.data} />
+                <ProfileAvatar profile={profile} />
                 <div>
                   <div className="text-xs uppercase tracking-[0.25em] text-cyan-300">Marketplace Profile</div>
-                  <h2 className="mt-2 text-2xl font-bold text-white">{profileQuery.data.displayName}</h2>
-                  <div className="mt-2 text-sm capitalize text-slate-400">{profileQuery.data.role}</div>
-                  {profileQuery.data.headline ? (
-                    <p className="mt-3 max-w-xl text-sm text-slate-300">{profileQuery.data.headline}</p>
+                  <h2 className="mt-2 text-2xl font-bold text-white">{profile.displayName}</h2>
+                  <div className="mt-2 text-sm capitalize text-slate-400">{profile.role}</div>
+                  {profile.headline ? (
+                    <p className="mt-3 max-w-xl text-sm text-slate-300">{profile.headline}</p>
                   ) : null}
-                  {profileQuery.data.location ? (
+                  {profile.location ? (
                     <div className="mt-3 inline-flex items-center gap-2 text-sm text-slate-400">
                       <MapPin className="h-4 w-4 text-cyan-300" />
-                      <span>{profileQuery.data.location}</span>
+                      <span>{profile.location}</span>
                     </div>
                   ) : null}
                 </div>
@@ -267,24 +264,24 @@ function MarketplaceProfileDrawer({
                 <div>
                   <div className="text-xs uppercase tracking-[0.2em] text-slate-400">Domain</div>
                   <div className="mt-2 text-lg font-semibold text-white">
-                    {profileQuery.data.domain ?? 'General innovation support'}
+                    {profile.domain ?? 'General innovation support'}
                   </div>
                 </div>
                 <div>
                   <div className="text-xs uppercase tracking-[0.2em] text-slate-400">About</div>
                   <p className="mt-2 leading-7 text-slate-300">
-                    {profileQuery.data.bio ??
+                    {profile.bio ??
                       'This member has not added a public bio yet, but their profile is active in the marketplace.'}
                   </p>
                 </div>
-                <ProfileLinkChips profile={profileQuery.data} />
+                <ProfileLinkChips profile={profile} />
               </div>
             </ProfileSection>
 
-            {(profileQuery.data.skills ?? []).length > 0 ? (
+            {(profile.skills ?? []).length > 0 ? (
               <ProfileSection title="Skills" icon={<Code2 className="h-4 w-4" />}>
                 <div className="flex flex-wrap gap-2">
-                  {profileQuery.data.skills?.map((skill) => (
+                  {profile.skills?.map((skill) => (
                     <span
                       key={`${skill.name}-${skill.level}`}
                       className="rounded-full border border-cyan-500/20 bg-cyan-500/10 px-3 py-1.5 text-sm text-cyan-100"
@@ -297,10 +294,10 @@ function MarketplaceProfileDrawer({
               </ProfileSection>
             ) : null}
 
-            {(profileQuery.data.experienceHighlights ?? []).length > 0 ? (
+            {(profile.experienceHighlights ?? []).length > 0 ? (
               <ProfileSection title="Experience Highlights" icon={<BriefcaseBusiness className="h-4 w-4" />}>
                 <div className="space-y-3">
-                  {profileQuery.data.experienceHighlights?.map((experience) => (
+                  {profile.experienceHighlights?.map((experience) => (
                     <div
                       key={`${experience.title}-${experience.company}`}
                       className="rounded-2xl border border-slate-800 bg-slate-900/60 p-4"
@@ -339,10 +336,10 @@ function MarketplaceProfileDrawer({
               </ProfileSection>
             ) : null}
 
-            {(profileQuery.data.educationHighlights ?? []).length > 0 ? (
+            {(profile.educationHighlights ?? []).length > 0 ? (
               <ProfileSection title="Education" icon={<GraduationCap className="h-4 w-4" />}>
                 <div className="space-y-3">
-                  {profileQuery.data.educationHighlights?.map((education) => (
+                  {profile.educationHighlights?.map((education) => (
                     <div
                       key={`${education.institution}-${education.degree ?? ''}`}
                       className="rounded-2xl border border-slate-800 bg-slate-900/60 p-4"
@@ -361,10 +358,10 @@ function MarketplaceProfileDrawer({
               </ProfileSection>
             ) : null}
 
-            {(profileQuery.data.portfolioHighlights ?? []).length > 0 ? (
+            {(profile.portfolioHighlights ?? []).length > 0 ? (
               <ProfileSection title="Projects" icon={<FolderKanban className="h-4 w-4" />}>
                 <div className="space-y-3">
-                  {profileQuery.data.portfolioHighlights?.map((project) => (
+                  {profile.portfolioHighlights?.map((project) => (
                     <div key={project.title} className="rounded-2xl border border-slate-800 bg-slate-900/60 p-4">
                       <div className="flex flex-col gap-3 md:flex-row md:items-start md:justify-between">
                         <div>
@@ -427,31 +424,29 @@ function MarketplaceProfileDrawer({
               </ProfileSection>
             ) : null}
 
-            {profileQuery.data.githubStats ? (
+            {profile.githubStats ? (
               <ProfileSection title="GitHub Footprint" icon={<Github className="h-4 w-4" />}>
                 <div className="grid gap-3 md:grid-cols-4">
                   <div className="rounded-2xl border border-slate-800 bg-slate-900/60 p-4">
                     <div className="text-xs uppercase tracking-[0.18em] text-slate-400">Repos</div>
-                    <div className="mt-2 text-xl font-semibold text-white">{profileQuery.data.githubStats.totalRepos}</div>
+                    <div className="mt-2 text-xl font-semibold text-white">{profile.githubStats.totalRepos}</div>
                   </div>
                   <div className="rounded-2xl border border-slate-800 bg-slate-900/60 p-4">
                     <div className="text-xs uppercase tracking-[0.18em] text-slate-400">Stars</div>
-                    <div className="mt-2 text-xl font-semibold text-white">{profileQuery.data.githubStats.totalStars}</div>
+                    <div className="mt-2 text-xl font-semibold text-white">{profile.githubStats.totalStars}</div>
                   </div>
                   <div className="rounded-2xl border border-slate-800 bg-slate-900/60 p-4">
                     <div className="text-xs uppercase tracking-[0.18em] text-slate-400">Forks</div>
-                    <div className="mt-2 text-xl font-semibold text-white">{profileQuery.data.githubStats.totalForks}</div>
+                    <div className="mt-2 text-xl font-semibold text-white">{profile.githubStats.totalForks}</div>
                   </div>
                   <div className="rounded-2xl border border-slate-800 bg-slate-900/60 p-4">
                     <div className="text-xs uppercase tracking-[0.18em] text-slate-400">1Y Contributions</div>
-                    <div className="mt-2 text-xl font-semibold text-white">
-                      {profileQuery.data.githubStats.contributionsLastYear}
-                    </div>
+                    <div className="mt-2 text-xl font-semibold text-white">{profile.githubStats.contributionsLastYear}</div>
                   </div>
                 </div>
-                {profileQuery.data.githubStats.topLanguages.length > 0 ? (
+                {profile.githubStats.topLanguages.length > 0 ? (
                   <div className="mt-4 flex flex-wrap gap-2">
-                    {profileQuery.data.githubStats.topLanguages.map((language) => (
+                    {profile.githubStats.topLanguages.map((language) => (
                       <span
                         key={language.language}
                         className="rounded-full border border-cyan-500/20 bg-cyan-500/10 px-3 py-1.5 text-sm text-cyan-100"
@@ -470,9 +465,6 @@ function MarketplaceProfileDrawer({
                 Close
               </Button>
             </div>
-                </>
-              );
-            })()}
           </div>
         )}
       </aside>
@@ -632,80 +624,80 @@ export function Marketplace() {
                 const counts = getInsightCounts(profile);
 
                 return (
-                <Card key={profile._id} className="p-6">
-                  <div className="flex items-start justify-between gap-4">
-                    <div className="flex items-start gap-4">
-                      <ProfileAvatar profile={profile} size="small" />
-                      <div className="max-w-3xl">
-                        <h3 className="text-xl font-semibold text-white">{profile.displayName}</h3>
-                        <div className="mt-1 text-sm text-cyan-300 capitalize">{profile.role}</div>
-                        {profile.headline ? <div className="mt-2 text-sm text-slate-200">{profile.headline}</div> : null}
-                        <div className="mt-3 flex flex-wrap gap-2 text-sm text-slate-400">
-                          <span className="rounded-full border border-slate-800 bg-slate-900/70 px-3 py-1.5">
-                            {profile.domain ?? 'General innovation support'}
-                          </span>
-                          {profile.location ? (
-                            <span className="inline-flex items-center gap-1 rounded-full border border-slate-800 bg-slate-900/70 px-3 py-1.5">
-                              <MapPin className="h-4 w-4 text-cyan-300" />
-                              {profile.location}
+                  <Card key={profile._id} className="p-6">
+                    <div className="flex items-start justify-between gap-4">
+                      <div className="flex items-start gap-4">
+                        <ProfileAvatar profile={profile} size="small" />
+                        <div className="max-w-3xl">
+                          <h3 className="text-xl font-semibold text-white">{profile.displayName}</h3>
+                          <div className="mt-1 text-sm text-cyan-300 capitalize">{profile.role}</div>
+                          {profile.headline ? <div className="mt-2 text-sm text-slate-200">{profile.headline}</div> : null}
+                          <div className="mt-3 flex flex-wrap gap-2 text-sm text-slate-400">
+                            <span className="rounded-full border border-slate-800 bg-slate-900/70 px-3 py-1.5">
+                              {profile.domain ?? 'General innovation support'}
                             </span>
-                          ) : null}
-                          <span className="rounded-full border border-slate-800 bg-slate-900/70 px-3 py-1.5">
-                            {counts.experience} experience items
-                          </span>
-                          <span className="rounded-full border border-slate-800 bg-slate-900/70 px-3 py-1.5">
-                            {counts.portfolioProjects} projects
-                          </span>
-                        </div>
-                        <p className="mt-3 max-w-2xl text-sm text-slate-300">
-                          {profile.bio ?? 'Public profile details will appear here as more marketplace members complete their profiles.'}
-                        </p>
-                        {(profile.skills ?? []).length > 0 ? (
-                          <div className="mt-4 flex flex-wrap gap-2">
-                            {profile.skills?.map((skill) => (
-                              <span
-                                key={`${profile._id}-${skill.name}`}
-                                className="rounded-full border border-cyan-500/20 bg-cyan-500/10 px-3 py-1 text-xs text-cyan-100"
-                              >
-                                {skill.name}
+                            {profile.location ? (
+                              <span className="inline-flex items-center gap-1 rounded-full border border-slate-800 bg-slate-900/70 px-3 py-1.5">
+                                <MapPin className="h-4 w-4 text-cyan-300" />
+                                {profile.location}
                               </span>
-                            ))}
+                            ) : null}
+                            <span className="rounded-full border border-slate-800 bg-slate-900/70 px-3 py-1.5">
+                              {counts.experience} experience items
+                            </span>
+                            <span className="rounded-full border border-slate-800 bg-slate-900/70 px-3 py-1.5">
+                              {counts.portfolioProjects} projects
+                            </span>
                           </div>
-                        ) : null}
-                        <div className="mt-4">
-                          <ProfileLinkChips profile={profile} />
+                          <p className="mt-3 max-w-2xl text-sm text-slate-300">
+                            {profile.bio ?? 'Public profile details will appear here as more marketplace members complete their profiles.'}
+                          </p>
+                          {(profile.skills ?? []).length > 0 ? (
+                            <div className="mt-4 flex flex-wrap gap-2">
+                              {profile.skills?.map((skill) => (
+                                <span
+                                  key={`${profile._id}-${skill.name}`}
+                                  className="rounded-full border border-cyan-500/20 bg-cyan-500/10 px-3 py-1 text-xs text-cyan-100"
+                                >
+                                  {skill.name}
+                                </span>
+                              ))}
+                            </div>
+                          ) : null}
+                          <div className="mt-4">
+                            <ProfileLinkChips profile={profile} />
+                          </div>
                         </div>
                       </div>
-                    </div>
-                    <div className="flex items-center gap-2">
-                      {role === 'recruiter' ? (
-                        <Button
-                          variant="secondary"
-                          onClick={() => setExpandedRecruiterId(expandedRecruiterId === profile._id ? null : profile._id)}
-                        >
-                          {expandedRecruiterId === profile._id ? (
-                            <ChevronUp className="mr-2 h-4 w-4" />
-                          ) : (
-                            <ChevronDown className="mr-2 h-4 w-4" />
-                          )}
-                          {expandedRecruiterId === profile._id ? 'Hide Jobs' : 'View Jobs'}
+                      <div className="flex items-center gap-2">
+                        {role === 'recruiter' ? (
+                          <Button
+                            variant="secondary"
+                            onClick={() => setExpandedRecruiterId(expandedRecruiterId === profile._id ? null : profile._id)}
+                          >
+                            {expandedRecruiterId === profile._id ? (
+                              <ChevronUp className="mr-2 h-4 w-4" />
+                            ) : (
+                              <ChevronDown className="mr-2 h-4 w-4" />
+                            )}
+                            {expandedRecruiterId === profile._id ? 'Hide Jobs' : 'View Jobs'}
+                          </Button>
+                        ) : null}
+                        <Button onClick={() => setSelectedProfileId(profile._id)}>
+                          <Eye className="mr-2 h-4 w-4" />
+                          View Profile
                         </Button>
-                      ) : null}
-                      <Button onClick={() => setSelectedProfileId(profile._id)}>
-                        <Eye className="mr-2 h-4 w-4" />
-                        View Profile
-                      </Button>
+                      </div>
                     </div>
-                  </div>
 
-                  {role === 'recruiter' && expandedRecruiterId === profile._id ? (
-                    <RecruiterJobCard
-                      recruiterId={profile._id}
-                      recruiterName={profile.displayName}
-                      onApplyFeedback={showBanner}
-                    />
-                  ) : null}
-                </Card>
+                    {role === 'recruiter' && expandedRecruiterId === profile._id ? (
+                      <RecruiterJobCard
+                        recruiterId={profile._id}
+                        recruiterName={profile.displayName}
+                        onApplyFeedback={showBanner}
+                      />
+                    ) : null}
+                  </Card>
                 );
               })
             )}
