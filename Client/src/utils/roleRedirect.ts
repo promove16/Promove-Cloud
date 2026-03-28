@@ -1,12 +1,13 @@
-import { UserRole } from '../types/roles.types';
+import { UserRole } from "../types/roles.types";
 
-export const roleRedirect = (role: UserRole): string =>
+export const roleRedirect = (role: UserRole | "company"): string =>
   ({
-    [UserRole.STUDENT]: '/dashboard/student',
-    [UserRole.SCHOOL]: '/dashboard/school',
-    [UserRole.COLLEGE]: '/dashboard/college',
-    [UserRole.MENTOR]: '/dashboard/mentor',
-    [UserRole.INVESTOR]: '/dashboard/investor',
-    [UserRole.RECRUITER]: '/dashboard/recruiter',
-    [UserRole.ADMIN]: '/dashboard/admin',
-  })[role];
+    [UserRole.STUDENT]: "/student",
+    [UserRole.SCHOOL]: "/school",
+    [UserRole.COLLEGE]: "/college",
+    [UserRole.MENTOR]: "/mentor",
+    [UserRole.INVESTOR]: "/investor",
+    [UserRole.RECRUITER]: "/recruiter",
+    [UserRole.ADMIN]: "/admin",
+    company: "/recruiter",
+  })[role] ?? "/dashboard";

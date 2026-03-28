@@ -1,6 +1,7 @@
-import { create } from 'zustand';
-import { persist, createJSONStorage } from 'zustand/middleware';
-import { AuthUser } from '../types/auth.types';
+import { create } from "zustand";
+import { persist, createJSONStorage } from "zustand/middleware";
+import { AuthUser } from "../types/auth.types";
+import { UserRole } from "../types/roles.types";
 
 interface AuthState {
   user: AuthUser | null;
@@ -13,6 +14,14 @@ interface AuthState {
   setLoading: (value: boolean) => void;
 }
 
+const normalizeUser = (user: AuthUser): AuthUser => ({
+  ...user,
+  role:
+    (user.role as unknown as string) === "company"
+      ? UserRole.RECRUITER
+      : user.role,
+});
+
 export const useAuthStore = create<AuthState>()(
   persist(
     (set) => ({
@@ -22,7 +31,7 @@ export const useAuthStore = create<AuthState>()(
       isLoading: true,
       setAuth: (user, token) =>
         set({
-          user,
+          user: normalizeUser(user),
           accessToken: token,
           isAuthenticated: true,
           isLoading: false,
@@ -44,7 +53,7 @@ export const useAuthStore = create<AuthState>()(
       setLoading: (value) => set({ isLoading: value }),
     }),
     {
-      name: 'promove-auth-user',
+      name: "promove-auth-user",
       storage: createJSONStorage(() => sessionStorage),
       partialize: (state) => ({
         user: state.user,
@@ -53,7 +62,7 @@ export const useAuthStore = create<AuthState>()(
         const persisted = persistedState as Partial<AuthState> | undefined;
         return {
           ...currentState,
-          user: persisted?.user ?? null,
+          user: persisted?.user ? normalizeUser(persisted.user) : null,
           accessToken: null,
           isAuthenticated: false,
           isLoading: true,
