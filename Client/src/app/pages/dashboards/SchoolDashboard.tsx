@@ -1,17 +1,28 @@
+import { useQuery } from "@tanstack/react-query";
 import { 
   Users, Target, Award, TrendingUp, Download, Trophy, Handshake, 
   CheckCircle, AlertCircle, Clock, Star, Lightbulb, FileText, 
-  MessageSquare, Building2, Shield
+  MessageSquare, Building2, Shield, Loader2
 } from "lucide-react";
+import { schoolApi } from "../../../api/school.api";
+import type { SchoolDashboardData } from "../../../types/school.types";
 
 export function SchoolDashboard() {
+  const dashboardQuery = useQuery<SchoolDashboardData>({
+    queryKey: ['school-dashboard'],
+    queryFn: () => schoolApi.getDashboard(),
+  });
+
+  const data = dashboardQuery.data;
+  const s = data?.stats;
+
   const stats = [
-    { label: "Total Students Enrolled", value: "248", icon: Users, color: "from-blue-500 to-cyan-500", trend: "+12 this month" },
-    { label: "Innovation Activities", value: "124", icon: Lightbulb, color: "from-purple-500 to-pink-500", trend: "+18 this quarter" },
-    { label: "Patents Filed", value: "18", icon: Award, color: "from-yellow-500 to-orange-500", trend: "+5 this quarter" },
-    { label: "Mentoring Sessions", value: "156", icon: MessageSquare, color: "from-green-500 to-emerald-500", trend: "89% completion" },
-    { label: "Startups Launched", value: "12", icon: TrendingUp, color: "from-pink-500 to-rose-500", trend: "+4 this year" },
-    { label: "Industry Collaborations", value: "23", icon: Handshake, color: "from-indigo-500 to-blue-500", trend: "8 active MOUs" },
+    { label: "Total Students Enrolled", value: s?.totalStudents?.toString() ?? "—", icon: Users, color: "from-blue-500 to-cyan-500", trend: "" },
+    { label: "Innovation Activities", value: s?.totalInnovationActivities?.toString() ?? "—", icon: Lightbulb, color: "from-purple-500 to-pink-500", trend: "" },
+    { label: "Patents Filed", value: s?.patentsFiled?.toString() ?? "—", icon: Award, color: "from-yellow-500 to-orange-500", trend: data?.recentActivityCounts ? `+${data.recentActivityCounts.patentsLast30Days} this month` : "" },
+    { label: "Mentoring Hours", value: s?.totalMentoringHours?.toString() ?? "—", icon: MessageSquare, color: "from-green-500 to-emerald-500", trend: "" },
+    { label: "Startups Launched", value: s?.startupsLaunched?.toString() ?? "—", icon: TrendingUp, color: "from-pink-500 to-rose-500", trend: data?.recentActivityCounts ? `+${data.recentActivityCounts.startupsLast30Days} this month` : "" },
+    { label: "Industry Collaborations", value: s?.industryCollaborations?.toString() ?? "—", icon: Handshake, color: "from-indigo-500 to-blue-500", trend: "" },
   ];
 
   const complianceFrameworks = [

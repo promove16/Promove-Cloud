@@ -1,6 +1,7 @@
 import api from './axiosInstance';
 import { ApiSuccessResponse } from '../types/auth.types';
 import {
+  PatentDocumentCategory,
   PatentFilingDocuments,
   PatentQuestionnaire,
   PatentSubmission,
@@ -10,7 +11,7 @@ export const patentApi = {
   async submit(payload: {
     projectTitle: string;
     workspaceId: string;
-    supportingUploadIds: string[];
+    documentUploads: { uploadId: string; category: PatentDocumentCategory }[];
     questionnaire: PatentQuestionnaire;
     filingDocuments: PatentFilingDocuments;
   }) {

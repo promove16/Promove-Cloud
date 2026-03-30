@@ -19,7 +19,7 @@ const tabs: Array<{ key: TabKey; label: string }> = [
   { key: 'rejected', label: 'Rejected' },
 ];
 
-const INVENTION_CATEGORY_LABELS: Record<AdminPatentItem['filingDocuments']['inventionCategory'], string> = {
+const INVENTION_CATEGORY_LABELS: Record<NonNullable<AdminPatentItem['filingDocuments']>['inventionCategory'], string> = {
   mobile_app_backend: 'Mobile app with unique backend',
   iot_hardware_interface: 'IoT and hardware interface',
   mechanical_improvement: 'Mechanical improvement',
@@ -27,12 +27,12 @@ const INVENTION_CATEGORY_LABELS: Record<AdminPatentItem['filingDocuments']['inve
   other: 'Other invention type',
 };
 
-const SPECIFICATION_TYPE_LABELS: Record<AdminPatentItem['filingDocuments']['specificationType'], string> = {
+const SPECIFICATION_TYPE_LABELS: Record<NonNullable<AdminPatentItem['filingDocuments']>['specificationType'], string> = {
   provisional: 'Provisional specification',
   complete: 'Complete specification',
 };
 
-const PROTOTYPE_STATUS_LABELS: Record<AdminPatentItem['filingDocuments']['prototypeStatus'], string> = {
+const PROTOTYPE_STATUS_LABELS: Record<NonNullable<AdminPatentItem['filingDocuments']>['prototypeStatus'], string> = {
   concept_only: 'Concept only',
   partial_prototype: 'Partial prototype',
   working_prototype: 'Working prototype',

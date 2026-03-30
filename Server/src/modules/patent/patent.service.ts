@@ -26,7 +26,7 @@ const filingDocumentsSchema = z
       'validated_prototype',
     ]),
     specificationDraft: z.string().trim().min(80),
-    abstractDraft: z.string().trim().min(30).max(300),
+    abstractDraft: z.string().trim().min(30),
     claimsDraft: z.string().trim().min(50),
     drawingsPrepared: z.boolean(),
     drawingsNotes: z.string().trim().min(20),

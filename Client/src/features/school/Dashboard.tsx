@@ -162,6 +162,29 @@ export default function Dashboard() {
         ))}
       </div>
 
+      {/* Patent Activity Summary */}
+      <Card className="p-5">
+        <div className="flex items-center justify-between gap-4">
+          <div className="flex items-center gap-4">
+            <div className="flex h-12 w-12 items-center justify-center rounded-2xl bg-yellow-500/10">
+              <Award className="h-6 w-6 text-yellow-300" />
+            </div>
+            <div>
+              <div className="text-xs uppercase tracking-[0.3em] text-yellow-300">Patent Activity</div>
+              <div className="mt-1 text-sm text-slate-400">
+                {data?.stats.patentsFiled ?? 0} total patents filed by students
+              </div>
+            </div>
+          </div>
+          {data?.recentActivityCounts && (
+            <div className="text-right">
+              <div className="text-2xl font-bold text-yellow-300">+{data.recentActivityCounts.patentsLast30Days}</div>
+              <div className="text-xs text-slate-400">Last 30 days</div>
+            </div>
+          )}
+        </div>
+      </Card>
+
       <div className="grid gap-6 xl:grid-cols-[1fr,1.4fr]">
         <Card className="p-6">
           <div className="text-xs uppercase tracking-[0.3em] text-cyan-300">IIC Rating</div>

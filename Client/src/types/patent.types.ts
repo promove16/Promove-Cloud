@@ -70,7 +70,7 @@ export interface PatentSubmission {
   workspaceId?: string;
   projectTitle: string;
   questionnaire: PatentQuestionnaire;
-  filingDocuments: PatentFilingDocuments;
+  filingDocuments?: PatentFilingDocuments;
   supportingDocuments: PatentSupportingDocument[];
   status: 'submitted' | 'under_review' | 'approved' | 'rejected';
   submittedAt: string;

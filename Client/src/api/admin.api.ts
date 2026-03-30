@@ -74,7 +74,7 @@ export interface AdminPatentItem {
     marketUseCase: string;
     priorArtAwareness: string;
   };
-  filingDocuments: PatentFilingDocuments;
+  filingDocuments?: PatentFilingDocuments;
   supportingDocuments: PatentSupportingDocument[];
 }
 

@@ -297,9 +297,46 @@ export function InvestorDashboard() {
     inst.city.toLowerCase().includes(searchQuery.toLowerCase()) ||
     inst.state.toLowerCase().includes(searchQuery.toLowerCase())
   );
+  // Patent insights from loaded startups
+  const patentFiledCount = apiStartups.length > 0
+    ? apiStartups.filter(s => s.traction?.patentFiled).length
+    : startups.filter(s => s.patentStatus === 'Filed' || s.patentStatus === 'Granted').length;
+  const patentGrantedCount = apiStartups.length > 0
+    ? 0 // API startups use traction.patentFiled boolean only
+    : startups.filter(s => s.patentStatus === 'Granted').length;
 
   const renderDealFlow = () => (
     <div className="space-y-6">
+      {/* Patent Insights Banner */}
+      <div className="bg-gradient-to-r from-yellow-900/20 via-slate-900 to-orange-900/20 border border-yellow-500/30 rounded-xl p-5">
+        <div className="flex items-center gap-4">
+          <div className="w-12 h-12 bg-gradient-to-br from-yellow-500 to-orange-500 rounded-xl flex items-center justify-center">
+            <Shield className="w-6 h-6 text-white" />
+          </div>
+          <div className="flex-1">
+            <h3 className="text-lg font-bold text-white">Patent Insights</h3>
+            <p className="text-sm text-slate-400">IP protection status across startups in your deal flow</p>
+          </div>
+          <div className="flex gap-6">
+            <div className="text-center">
+              <div className="text-2xl font-bold text-yellow-400">{patentFiledCount}</div>
+              <div className="text-xs text-slate-400">Patents Filed</div>
+            </div>
+            {patentGrantedCount > 0 && (
+              <div className="text-center">
+                <div className="text-2xl font-bold text-green-400">{patentGrantedCount}</div>
+                <div className="text-xs text-slate-400">Patents Granted</div>
+              </div>
+            )}
+            <div className="text-center">
+              <div className="text-2xl font-bold text-slate-300">
+                {apiStartups.length > 0 ? apiStartups.length : startups.length}
+              </div>
+              <div className="text-xs text-slate-400">Total Startups</div>
+            </div>
+          </div>
+        </div>
+      </div>
       {/* Filter Bar */}
       <div className="bg-slate-900 border border-slate-800 rounded-xl p-6">
         <div className="flex flex-wrap items-center gap-4">

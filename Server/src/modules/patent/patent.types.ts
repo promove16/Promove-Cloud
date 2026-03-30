@@ -66,8 +66,8 @@ export interface IPatent {
     whatIsYourInnovation: string;
     noveltyExplanation: string;
     technicalDetails: string;
-      marketUseCase: string;
-      priorArtAwareness: string;
+    marketUseCase: string;
+    priorArtAwareness: string;
   };
   filingDocuments: PatentFilingDocuments;
   supportingDocuments: PatentSupportingDocument[];
@@ -77,6 +77,124 @@ export interface IPatent {
   adminReviewedBy?: Types.ObjectId;
   adminNotes?: string;
   scoreAwarded: boolean;
+  createdAt: Date;
+  updatedAt: Date;
+}
+
+// ─── Assisted Filing (ProMove files for the student) ─────────────────────────
+
+export type PatentRequestStatus =
+  | 'draft'
+  | 'submitted'
+  | 'documents_review'
+  | 'filing_in_progress'
+  | 'filed_with_ipo'
+  | 'examination_requested'
+  | 'granted'
+  | 'rejected';
+
+export type PatentRequestExaminationType = 'normal' | 'expedited';
+
+export type PatentApplicantEntityType = 'individual' | 'startup' | 'institution' | 'small_entity';
+
+export interface PatentRequestInventor {
+  fullName: string;
+  address: string;
+  nationality: string;
+  contribution: string;
+}
+
+export interface PatentRequestApplicant {
+  fullName: string;
+  address: string;
+  entityType: PatentApplicantEntityType;
+  dpiitNumber?: string;
+  institutionName?: string;
+}
+
+export type PatentRequestDocCategory =
+  | 'form1_application'
+  | 'form2_specification'
+  | 'form3_foreign_filing'
+  | 'form5_inventorship'
+  | 'form26_power_of_attorney'
+  | 'form28_startup_status'
+  | 'drawings'
+  | 'prior_art_report'
+  | 'assignment_deed'
+  | 'priority_document'
+  | 'other';
+
+export interface PatentRequestDocument {
+  uploadId?: Types.ObjectId;
+  fileUrl: string;
+  fileType: 'pdf' | 'image';
+  fileName: string;
+  fileSizeBytes: number;
+  note?: string;
+  documentCategory: PatentRequestDocCategory;
+}
+
+export interface IPatentRequest {
+  _id: Types.ObjectId;
+  studentId: Types.ObjectId;
+  workspaceId?: Types.ObjectId;
+
+  // ── Form 1 — Application for grant of patent ──────────────────────────────
+  inventionTitle: string;
+  inventionCategory: PatentInventionCategory;
+  applicantDetails: PatentRequestApplicant;
+  inventors: PatentRequestInventor[];
+
+  // ── Form 2 — Specification ──────────────────────────────────────────────
+  specificationType: PatentSpecificationType;
+  technicalField: string;
+  backgroundArt: string;
+  inventionDescription: string;
+  abstractText: string;
+  claimsText: string;
+  drawingsDescription?: string;
+  bestMode: string;
+
+  // ── Form 3 — Foreign filing statement ────────────────────────────────────
+  hasFiledAbroad: boolean;
+  foreignFilingCountries?: string;
+  foreignApplicationNumbers?: string;
+
+  // ── Form 5 — Declaration of inventorship ─────────────────────────────────
+  inventorDeclarationConfirmed: boolean;
+
+  // ── Form 26 — Power of attorney ──────────────────────────────────────────
+  powerOfAttorneyGranted: boolean;
+  attorneyDetails?: string;
+
+  // ── Form 28 — Startup / small entity / institution status ─────────────────
+  claimingFeeReduction: boolean;
+  feeReductionEntityType?: PatentApplicantEntityType;
+  dpiitRecognitionNumber?: string;
+
+  // ── Prior art & novelty ──────────────────────────────────────────────────
+  priorArtSearchSummary: string;
+  priorArtReferences?: string;
+  noveltyStatement: string;
+
+  // ── Examination plan ──────────────────────────────────────────────────────
+  proposedExaminationType: PatentRequestExaminationType;
+  publicDisclosureStatus: boolean;
+
+  // ── Uploaded documents ──────────────────────────────────────────────────
+  documents: PatentRequestDocument[];
+
+  // ── Status & tracking ─────────────────────────────────────────────────────
+  status: PatentRequestStatus;
+  submittedAt?: Date;
+  ipoApplicationNumber?: string;
+  ipoFilingDate?: Date;
+  ipoPriorityDate?: Date;
+  adminAssignedTo?: Types.ObjectId;
+  adminNotes?: string;
+  scoreAwarded: boolean;
+
   createdAt: Date;
   updatedAt: Date;
 }

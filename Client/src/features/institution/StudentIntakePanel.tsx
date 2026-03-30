@@ -1,5 +1,5 @@
 import { ChangeEvent, ElementType, FormEvent, useMemo, useState } from 'react';
-import { AlertCircle, Copy, FileSpreadsheet, ShieldCheck, Upload, UserPlus, X, Users } from 'lucide-react';
+import { AlertCircle, ChevronDown, Copy, Download, FileSpreadsheet, Info, ShieldCheck, Upload, UserPlus, X, Users } from 'lucide-react';
 import { Button } from '../../components/ui/Button';
 import { BulkCredentialImportResult, TemporaryStudentCredentials, StudentRosterEntry } from '../../types/school.types';
 
@@ -80,6 +80,7 @@ export function StudentIntakePanel({
 }: StudentIntakePanelProps) {
   const [isOpen, setIsOpen] = useState(false);
   const [activeTab, setActiveTab] = useState<Tab>('add');
+  const [isHelperOpen, setIsHelperOpen] = useState(false);
   const [manualForm, setManualForm] = useState({
     displayName: '',
     email: '',
@@ -144,6 +145,60 @@ export function StudentIntakePanel({
       ...(temporaryForm.notes.trim() ? { notes: temporaryForm.notes.trim() } : {}),
     });
     setTemporaryForm({ displayName: '', email: '', domain: '', bio: '', secondaryLabel: '', rollNumber: '', notes: '' });
+  };
+
+  const fieldGuide = [
+    {
+      label: 'Display Name',
+      required: true,
+      accepted: ['displayName', 'name', 'studentName', 'student_name', 'fullName', 'full_name'],
+      description: 'Full name of the student (2–120 characters)',
+    },
+    {
+      label: 'Email',
+      required: true,
+      accepted: ['email', 'emailAddress', 'email_address', 'studentEmail', 'student_email', 'gmail'],
+      description: withCredentials
+        ? `Institutional email. Must end with your institution's domain (e.g. @school.edu)`
+        : 'Student email address',
+    },
+    {
+      label: secondaryFieldLabel,
+      required: false,
+      accepted: ['grade', 'program', 'course', 'class', 'department', 'gradeOrProgram'],
+      description: `Class, year, or program — e.g. "Class 10", "B.Tech CSE" (optional, max 120 chars)`,
+    },
+    {
+      label: 'Roll Number',
+      required: false,
+      accepted: ['rollNumber', 'roll_number', 'rollNo', 'rollno', 'studentId', 'student_id'],
+      description: 'Student roll number, ID, or registration number (optional, max 80 chars)',
+    },
+    {
+      label: 'Notes',
+      required: false,
+      accepted: ['notes', 'remarks', 'comment', 'comments'],
+      description: 'Optional section info or onboarding remarks (max 300 chars)',
+    },
+  ];
+
+  const handleDownloadTemplate = () => {
+    const header = ['displayName', 'email', secondaryFieldLabel.toLowerCase().replace(/\s+/g, ''), 'rollNumber', 'notes'];
+    const sampleRow = [
+      'Arjun Sharma',
+      withCredentials && institutionDomainHint ? `arjun@${institutionDomainHint}` : 'arjun@school.edu',
+      secondaryFieldLabel === 'Grade / Class' ? 'Class 10' : 'B.Tech CSE',
+      'SCH2024001',
+      'Section A',
+    ];
+    const csv = [header.join(','), sampleRow.join(',')].join('\n');
+    const blob = new Blob([csv], { type: 'text/csv' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = 'student_roster_template.csv';
+    a.click();
+    URL.revokeObjectURL(url);
   };
 
   const tabs: { id: Tab; label: string; icon: ElementType }[] = [
@@ -275,12 +330,101 @@ export function StudentIntakePanel({
               {/* Import Roster */}
               {activeTab === 'import' && (
                 <div className="space-y-4">
-                  <p className="text-xs text-slate-500">
-                    Import a CSV or Excel spreadsheet with columns: <span className="text-slate-300">displayName</span>,{' '}
-                    <span className="text-slate-300">email</span>,{' '}
-                    <span className="text-slate-300">{secondaryFieldLabel.toLowerCase()}</span>,{' '}
-                    <span className="text-slate-300">rollNumber</span>.
-                  </p>
+
+                  {/* Column Name Guide */}
+                  <div className="overflow-hidden rounded-xl border border-slate-700/60 bg-slate-900/40">
+                    <button
+                      type="button"
+                      onClick={() => setIsHelperOpen((v) => !v)}
+                      className="flex w-full items-center justify-between px-4 py-3 text-left transition hover:bg-slate-800/40"
+                    >
+                      <div className="flex items-center gap-2 text-xs font-medium text-slate-300">
+                        <Info className="h-3.5 w-3.5 text-cyan-400" />
+                        Excel / CSV Column Guide
+                      </div>
+                      <ChevronDown
+                        className={`h-4 w-4 text-slate-500 transition-transform ${isHelperOpen ? 'rotate-180' : ''}`}
+                      />
+                    </button>
+
+                    {isHelperOpen && (
+                      <div className="space-y-4 border-t border-slate-800 px-4 pb-4 pt-3">
+                        <p className="text-xs text-slate-500">
+                          Name your spreadsheet columns using any of the accepted names below. Column
+                          matching is case-insensitive and ignores spaces or underscores.
+                        </p>
+
+                        {fieldGuide.map((field) => (
+                          <div key={field.label} className="space-y-1.5">
+                            <div className="flex items-center gap-2">
+                              <span className="text-xs font-semibold text-white">{field.label}</span>
+                              {field.required ? (
+                                <span className="rounded-full bg-rose-500/15 px-1.5 py-0.5 text-[10px] font-medium text-rose-400">
+                                  Required
+                                </span>
+                              ) : (
+                                <span className="rounded-full bg-slate-700/50 px-1.5 py-0.5 text-[10px] text-slate-500">
+                                  Optional
+                                </span>
+                              )}
+                            </div>
+                            <div className="flex flex-wrap gap-1">
+                              {field.accepted.map((col) => (
+                                <code
+                                  key={col}
+                                  className="rounded bg-slate-800 px-1.5 py-0.5 font-mono text-[11px] text-cyan-300"
+                                >
+                                  {col}
+                                </code>
+                              ))}
+                            </div>
+                            <p className="text-[11px] text-slate-500">{field.description}</p>
+                          </div>
+                        ))}
+
+                        <div className="rounded-lg border border-slate-700/50 bg-slate-950/50 px-3 py-2.5">
+                          <div className="mb-1.5 text-[10px] font-semibold uppercase tracking-widest text-slate-500">
+                            Sample row
+                          </div>
+                          <div className="overflow-x-auto">
+                            <table className="w-full text-[11px]">
+                              <thead>
+                                <tr className="border-b border-slate-800">
+                                  {['displayName', 'email', 'grade', 'rollNumber', 'notes'].map((h) => (
+                                    <th key={h} className="pb-1 pr-3 text-left font-mono text-cyan-300">
+                                      {h}
+                                    </th>
+                                  ))}
+                                </tr>
+                              </thead>
+                              <tbody>
+                                <tr>
+                                  <td className="pr-3 pt-1 text-slate-300">Arjun Sharma</td>
+                                  <td className="pr-3 pt-1 text-slate-300">
+                                    {institutionDomainHint
+                                      ? `arjun@${institutionDomainHint}`
+                                      : 'arjun@school.edu'}
+                                  </td>
+                                  <td className="pr-3 pt-1 text-slate-300">Class 10</td>
+                                  <td className="pr-3 pt-1 text-slate-300">SCH2024001</td>
+                                  <td className="pt-1 text-slate-300">Section A</td>
+                                </tr>
+                              </tbody>
+                            </table>
+                          </div>
+                        </div>
+
+                        <button
+                          type="button"
+                          onClick={handleDownloadTemplate}
+                          className="flex items-center gap-1.5 text-xs text-cyan-400 transition hover:text-cyan-300"
+                        >
+                          <Download className="h-3.5 w-3.5" />
+                          Download sample template (.csv)
+                        </button>
+                      </div>
+                    )}
+                  </div>
 
                   {/* Toggle: with or without credentials */}
                   <label className="flex cursor-pointer items-start gap-3 rounded-xl border border-slate-700 bg-slate-900/60 p-4">

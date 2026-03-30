@@ -348,7 +348,7 @@ export default function UserManagement() {
       </div>
 
       <Card className="overflow-hidden">
-        <div className="grid grid-cols-[minmax(180px,1.1fr)_minmax(240px,1.5fr)_88px_72px_132px_108px_96px_72px] border-b border-slate-800 bg-slate-900/70 px-5 py-4 text-xs uppercase tracking-[0.3em] text-slate-400">
+        <div className="grid grid-cols-[minmax(180px,1.1fr)_minmax(240px,1.5fr)_88px_72px_132px_108px_96px_72px] gap-4 border-b border-slate-800 bg-slate-900/70 px-5 py-4 text-xs uppercase tracking-[0.3em] text-slate-400">
           <div>Name</div>
           <div>Email</div>
           <div>Role</div>

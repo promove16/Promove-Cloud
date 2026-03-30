@@ -119,6 +119,52 @@ export default function MentorDashboard() {
           </div>
         )}
       </Card>
+
+      {/* Patent Activity Section */}
+      <Card className="p-6">
+        <div className="mb-4 flex items-center justify-between gap-4">
+          <div>
+            <div className="text-xs uppercase tracking-[0.3em] text-yellow-300">Patent Activity</div>
+            <h2 className="mt-2 text-2xl font-semibold text-white">Student patent submissions</h2>
+          </div>
+        </div>
+
+        {(() => {
+          const patentActivities = liveActivities.filter(
+            (a) => a.trigger === 'PATENT_SUBMITTED' || a.trigger === 'PATENT_APPROVED'
+          );
+          if (patentActivities.length === 0) {
+            return (
+              <div className="rounded-2xl border border-dashed border-slate-800 px-5 py-10 text-center text-slate-400">
+                No recent patent activity from your students.
+              </div>
+            );
+          }
+          return (
+            <div className="space-y-3">
+              {patentActivities.map((activity) => (
+                <div
+                  key={`patent-${activity.studentId}-${activity.timestamp}`}
+                  className="flex items-start gap-4 rounded-2xl border border-yellow-500/20 bg-yellow-500/5 p-4"
+                >
+                  <div className="flex h-11 w-11 items-center justify-center rounded-full bg-gradient-to-br from-yellow-500 to-orange-500 text-sm font-bold text-white">
+                    {activity.studentName.slice(0, 1).toUpperCase()}
+                  </div>
+                  <div className="flex-1">
+                    <div className="font-semibold text-white">{activity.studentName}</div>
+                    <div className="mt-1 text-sm text-slate-400">
+                      {activity.trigger === 'PATENT_APPROVED' ? 'Patent approved' : 'Submitted a patent'}
+                      {activity.delta > 0 ? ` (+${activity.delta} pts)` : ''}
+                    </div>
+                    <div className="mt-1 text-xs text-slate-500">{new Date(activity.timestamp).toLocaleString('en-IN')}</div>
+                  </div>
+                  <Badge>{activity.trigger === 'PATENT_APPROVED' ? 'Approved' : 'Submitted'}</Badge>
+                </div>
+              ))}
+            </div>
+          );
+        })()}
+      </Card>
     </div>
   );
 }

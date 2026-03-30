@@ -30,7 +30,7 @@ export function RequestAccessPage() {
   const [error, setError] = useState("");
   const [notice, setNotice] = useState("");
 
-  const updateField = (key, value) => {
+  const updateField = (key: keyof typeof initialFormState, value: string) => {
     setFormData((current) => ({ ...current, [key]: value }));
   };
 
@@ -43,7 +43,7 @@ export function RequestAccessPage() {
       setError("Passwords do not match");
       return;
     }
-    if (!formData.role || !NON_STUDENT_ROLES.includes(formData.role)) {
+    if (!formData.role || !NON_STUDENT_ROLES.includes(formData.role as UserRole)) {
       setError("Please select a valid role.");
       return;
     }
@@ -52,7 +52,7 @@ export function RequestAccessPage() {
         displayName: formData.displayName.trim(),
         email: formData.email.trim(),
         password: formData.password,
-        role: formData.role,
+        role: formData.role as UserRole,
         domain: formData.domain.trim(),
         bio: formData.bio.trim(),
       });
