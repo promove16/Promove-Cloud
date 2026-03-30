@@ -11,6 +11,9 @@ import { Event } from '../event/event.model';
 import { Workspace } from '../workspace/workspace.model';
 import { ComplianceReport } from '../institution/complianceReport.model';
 import {
+  bulkCreateManagedStudentCredentials,
+  createManagedStudentCredentials,
+  createManagedStudentCredentialsSchema,
   createStudentAccessToken,
   createStudentAccessTokenSchema,
   listPendingStudentVerifications,
@@ -19,6 +22,7 @@ import {
   reviewStudentVerificationSchema,
 } from '../institution/institutionAccess.service';
 import {
+  cancelStudentRosterInvite,
   createStudentRosterEntry,
   importStudentRosterEntries,
   listStudentRosterEntries,
@@ -35,6 +39,7 @@ import {
   StudentAccessTokenView,
   StudentJourneyPayload,
   StudentLeaderboardItem,
+  TemporaryStudentCredentialsView,
   StudentVerificationReviewResult,
 } from './school.types';
 import { UserRole } from '../../types/roles.types';
@@ -456,11 +461,29 @@ export const createSchoolStudentRosterEntry = (
   payload: z.infer<typeof manualStudentRosterEntrySchema>,
 ) => createStudentRosterEntry(schoolId, UserRole.SCHOOL, actorId, payload);
 
+export const cancelSchoolStudentRosterInvite = (
+  schoolId: string,
+  rosterEntryId: string,
+) => cancelStudentRosterInvite(schoolId, UserRole.SCHOOL, rosterEntryId);
+
+export const createSchoolManagedStudentCredentials = (
+  schoolId: string,
+  actorId: string,
+  payload: z.infer<typeof createManagedStudentCredentialsSchema>,
+): Promise<TemporaryStudentCredentialsView> =>
+  createManagedStudentCredentials(schoolId, UserRole.SCHOOL, actorId, payload);
+
 export const importSchoolStudentRosterEntries = (
   schoolId: string,
   actorId: string,
   file: { originalname: string; buffer: Buffer },
 ) => importStudentRosterEntries(schoolId, UserRole.SCHOOL, actorId, file);
+
+export const importSchoolStudentCredentials = (
+  schoolId: string,
+  actorId: string,
+  file: { originalname: string; buffer: Buffer },
+) => bulkCreateManagedStudentCredentials(schoolId, UserRole.SCHOOL, actorId, file);
 
 export const getSchoolStudentRoster = (
   schoolId: string,
@@ -468,6 +491,7 @@ export const getSchoolStudentRoster = (
 ) => listStudentRosterEntries(schoolId, UserRole.SCHOOL, search);
 
 export {
+  createManagedStudentCredentialsSchema,
   createStudentAccessTokenSchema,
   listStudentRosterQuerySchema,
   manualStudentRosterEntrySchema,

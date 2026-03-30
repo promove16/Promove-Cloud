@@ -1,4 +1,37 @@
 "use strict";
+var __createBinding = (this && this.__createBinding) || (Object.create ? (function(o, m, k, k2) {
+    if (k2 === undefined) k2 = k;
+    var desc = Object.getOwnPropertyDescriptor(m, k);
+    if (!desc || ("get" in desc ? !m.__esModule : desc.writable || desc.configurable)) {
+      desc = { enumerable: true, get: function() { return m[k]; } };
+    }
+    Object.defineProperty(o, k2, desc);
+}) : (function(o, m, k, k2) {
+    if (k2 === undefined) k2 = k;
+    o[k2] = m[k];
+}));
+var __setModuleDefault = (this && this.__setModuleDefault) || (Object.create ? (function(o, v) {
+    Object.defineProperty(o, "default", { enumerable: true, value: v });
+}) : function(o, v) {
+    o["default"] = v;
+});
+var __importStar = (this && this.__importStar) || (function () {
+    var ownKeys = function(o) {
+        ownKeys = Object.getOwnPropertyNames || function (o) {
+            var ar = [];
+            for (var k in o) if (Object.prototype.hasOwnProperty.call(o, k)) ar[ar.length] = k;
+            return ar;
+        };
+        return ownKeys(o);
+    };
+    return function (mod) {
+        if (mod && mod.__esModule) return mod;
+        var result = {};
+        if (mod != null) for (var k = ownKeys(mod), i = 0; i < k.length; i++) if (k[i] !== "default") __createBinding(result, mod, k[i]);
+        __setModuleDefault(result, mod);
+        return result;
+    };
+})();
 var __importDefault = (this && this.__importDefault) || function (mod) {
     return (mod && mod.__esModule) ? mod : { "default": mod };
 };
@@ -12,12 +45,13 @@ const morgan_1 = __importDefault(require("morgan"));
 const path_1 = __importDefault(require("path"));
 const fs_1 = require("fs");
 const env_1 = require("./config/env");
+const logger_1 = require("./config/logger");
 const rateLimiter_1 = require("./middleware/rateLimiter");
 const errorHandler_1 = require("./middleware/errorHandler");
 const auth_routes_1 = __importDefault(require("./modules/auth/auth.routes"));
 const chat_routes_1 = __importDefault(require("./modules/chat/chat.routes"));
 const college_routes_1 = __importDefault(require("./modules/college/college.routes"));
-const deal_routes_1 = __importDefault(require("./modules/deal/deal.routes"));
+const deal_routes_1 = __importStar(require("./modules/deal/deal.routes"));
 const event_routes_1 = __importDefault(require("./modules/event/event.routes"));
 const investor_routes_1 = __importDefault(require("./modules/investor/investor.routes"));
 const marketplace_routes_1 = __importDefault(require("./modules/marketplace/marketplace.routes"));
@@ -46,7 +80,9 @@ const createApp = () => {
     app.use(express_1.default.json({ limit: '10kb' }));
     app.use(express_1.default.urlencoded({ extended: true, limit: '10kb' }));
     app.use((0, cookie_parser_1.default)());
-    app.use((0, morgan_1.default)(env_1.env.NODE_ENV === 'production' ? 'combined' : 'dev'));
+    app.use((0, morgan_1.default)(env_1.env.NODE_ENV === 'production' ? 'combined' : 'dev', {
+        stream: logger_1.httpLogStream,
+    }));
     app.use('/api', (0, rateLimiter_1.withRateLimit)(rateLimiter_1.apiLimiter));
     app.use('/api/auth', auth_routes_1.default);
     app.use('/api/users', user_routes_1.default);
@@ -60,6 +96,7 @@ const createApp = () => {
     app.use('/api/marketplace', marketplace_routes_1.default);
     app.use('/api/notifications', notification_routes_1.default);
     app.use('/api/deals', deal_routes_1.default);
+    app.use('/api/startups', deal_routes_1.startupsInvestmentRouter);
     app.use('/api/recruiter', recruiter_routes_1.default);
     app.use('/api/mentor', mentor_routes_1.default);
     app.use('/api/school', school_routes_1.default);

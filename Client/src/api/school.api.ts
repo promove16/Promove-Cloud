@@ -1,6 +1,7 @@
 import api from './axiosInstance';
 import { ApiSuccessResponse } from '../types/auth.types';
 import {
+  BulkCredentialImportResult,
   ComplianceReportRecord,
   DirectoryInvestor,
   LeaderboardPage,
@@ -10,6 +11,7 @@ import {
   StudentJourney,
   StudentRosterEntry,
   StudentRosterImportResult,
+  TemporaryStudentCredentials,
   StudentVerificationReviewResponse,
 } from '../types/school.types';
 
@@ -59,6 +61,21 @@ export const schoolApi = {
     );
     return response.data.data;
   },
+  async createTemporaryStudentCredentials(payload: {
+    displayName: string;
+    email: string;
+    domain?: string;
+    bio?: string;
+    gradeOrProgram?: string;
+    rollNumber?: string;
+    notes?: string;
+  }) {
+    const response = await api.post<ApiSuccessResponse<TemporaryStudentCredentials>>(
+      '/api/school/student-temp-credentials',
+      payload,
+    );
+    return response.data.data;
+  },
   async getPendingStudentVerifications() {
     const response = await api.get<ApiSuccessResponse<PendingStudentVerification[]>>(
       '/api/school/student-verifications',
@@ -94,17 +111,29 @@ export const schoolApi = {
     );
     return response.data.data;
   },
+  async cancelStudentInvite(rosterEntryId: string) {
+    const response = await api.delete<ApiSuccessResponse<{ _id: string; cancelled: true; cancelledAt: string }>>(
+      `/api/school/student-roster/${rosterEntryId}`,
+    );
+    return response.data.data;
+  },
   async importStudentRoster(file: File) {
     const formData = new FormData();
     formData.append('file', file);
     const response = await api.post<ApiSuccessResponse<StudentRosterImportResult>>(
       '/api/school/student-roster/import',
       formData,
-      {
-        headers: {
-          'Content-Type': 'multipart/form-data',
-        },
-      },
+      { headers: { 'Content-Type': 'multipart/form-data' } },
+    );
+    return response.data.data;
+  },
+  async importStudentRosterWithCredentials(file: File) {
+    const formData = new FormData();
+    formData.append('file', file);
+    const response = await api.post<ApiSuccessResponse<BulkCredentialImportResult>>(
+      '/api/school/student-roster/import-credentials',
+      formData,
+      { headers: { 'Content-Type': 'multipart/form-data' } },
     );
     return response.data.data;
   },

@@ -39,6 +39,27 @@ export interface IWorkspace {
     note?: string;
     cloudinaryPublicId?: string;
   }>;
+  repoSubmissions: Array<{
+    _id: Types.ObjectId;
+    provider: 'github';
+    repoUrl: string;
+    displayName: string;
+    branch?: string;
+    commitHash?: string;
+    note?: string;
+    uploadedBy: Types.ObjectId;
+    uploadedAt: Date;
+  }>;
+  codeSubmissions: Array<{
+    _id: Types.ObjectId;
+    title: string;
+    language: string;
+    summary?: string;
+    codeSnippet: string;
+    lineCount: number;
+    uploadedBy: Types.ObjectId;
+    uploadedAt: Date;
+  }>;
   progressUpdates: Array<{
     _id: Types.ObjectId;
     submittedBy: Types.ObjectId;

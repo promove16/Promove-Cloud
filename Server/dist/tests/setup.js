@@ -1,37 +1,4 @@
 "use strict";
-var __createBinding = (this && this.__createBinding) || (Object.create ? (function(o, m, k, k2) {
-    if (k2 === undefined) k2 = k;
-    var desc = Object.getOwnPropertyDescriptor(m, k);
-    if (!desc || ("get" in desc ? !m.__esModule : desc.writable || desc.configurable)) {
-      desc = { enumerable: true, get: function() { return m[k]; } };
-    }
-    Object.defineProperty(o, k2, desc);
-}) : (function(o, m, k, k2) {
-    if (k2 === undefined) k2 = k;
-    o[k2] = m[k];
-}));
-var __setModuleDefault = (this && this.__setModuleDefault) || (Object.create ? (function(o, v) {
-    Object.defineProperty(o, "default", { enumerable: true, value: v });
-}) : function(o, v) {
-    o["default"] = v;
-});
-var __importStar = (this && this.__importStar) || (function () {
-    var ownKeys = function(o) {
-        ownKeys = Object.getOwnPropertyNames || function (o) {
-            var ar = [];
-            for (var k in o) if (Object.prototype.hasOwnProperty.call(o, k)) ar[ar.length] = k;
-            return ar;
-        };
-        return ownKeys(o);
-    };
-    return function (mod) {
-        if (mod && mod.__esModule) return mod;
-        var result = {};
-        if (mod != null) for (var k = ownKeys(mod), i = 0; i < k.length; i++) if (k[i] !== "default") __createBinding(result, mod, k[i]);
-        __setModuleDefault(result, mod);
-        return result;
-    };
-})();
 var __importDefault = (this && this.__importDefault) || function (mod) {
     return (mod && mod.__esModule) ? mod : { "default": mod };
 };
@@ -39,6 +6,7 @@ Object.defineProperty(exports, "__esModule", { value: true });
 const crypto_1 = require("crypto");
 const mongoose_1 = __importDefault(require("mongoose"));
 const mongodb_memory_server_1 = require("mongodb-memory-server");
+jest.setTimeout(180_000);
 const { privateKey: accessPrivateKey } = (0, crypto_1.generateKeyPairSync)('rsa', {
     modulusLength: 2048,
 });
@@ -48,6 +16,7 @@ const { privateKey: refreshPrivateKey } = (0, crypto_1.generateKeyPairSync)('rsa
 process.env.NODE_ENV = 'test';
 process.env.PORT = '5000';
 process.env.CLIENT_URL = 'http://localhost:5173';
+process.env.RATE_LIMIT_ENABLED = 'true';
 process.env.UPSTASH_REDIS_REST_URL = 'https://example.upstash.io';
 process.env.UPSTASH_REDIS_REST_TOKEN = 'token';
 process.env.UPSTASH_REDIS_HOST = 'example.upstash.io';
@@ -58,6 +27,10 @@ process.env.JWT_REFRESH_SECRET = refreshPrivateKey
 process.env.JWT_ACCESS_EXPIRES = '15m';
 process.env.JWT_REFRESH_EXPIRES = '30d';
 process.env.MAX_USERS_YEAR_ONE = '2000';
+process.env.GOOGLE_OAUTH_CLIENT_ID = 'google-client-id';
+process.env.GOOGLE_OAUTH_CLIENT_SECRET = 'google-client-secret';
+process.env.LINKEDIN_OAUTH_CLIENT_ID = 'linkedin-client-id';
+process.env.LINKEDIN_OAUTH_CLIENT_SECRET = 'linkedin-client-secret';
 process.env.CLOUDINARY_CLOUD_NAME = 'test-cloud';
 process.env.CLOUDINARY_API_KEY = 'test-key';
 process.env.CLOUDINARY_API_SECRET = 'test-secret';
@@ -66,6 +39,7 @@ process.env.AWS_ACCESS_KEY_ID = 'test-access-key';
 process.env.AWS_SECRET_ACCESS_KEY = 'test-secret-key';
 process.env.FROM_EMAIL = 'noreply@promovecyc.com';
 const redisStore = new Map();
+const redisLists = new Map();
 const rateState = new Map();
 const parseWindow = (value) => {
     const match = /^(\d+)([mh])$/.exec(value);
@@ -98,7 +72,28 @@ jest.mock('@upstash/redis', () => ({
             },
             async del(key) {
                 const existed = redisStore.delete(key);
+                redisLists.delete(key);
                 return existed ? 1 : 0;
+            },
+            async zadd() {
+                return 1;
+            },
+            async lpush(key, value) {
+                const existing = redisLists.get(key) ?? [];
+                redisLists.set(key, [value, ...existing]);
+                return redisLists.get(key)?.length ?? 0;
+            },
+            async ltrim(key, start, stop) {
+                const existing = redisLists.get(key) ?? [];
+                const normalizedStop = stop < 0 ? existing.length + stop : stop;
+                redisLists.set(key, existing.slice(start, normalizedStop + 1));
+                return 'OK';
+            },
+            async expire() {
+                return 1;
+            },
+            async smembers() {
+                return [];
             },
         }),
     },
@@ -146,20 +141,35 @@ jest.mock('@upstash/ratelimit', () => {
     return { Ratelimit: MockRatelimit };
 });
 let mongoServer;
-let connectDB;
-let disconnectDB;
+const wait = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
+const dropDatabaseWithRetry = async (attempts = 5) => {
+    for (let attempt = 0; attempt < attempts; attempt += 1) {
+        try {
+            await mongoose_1.default.connection.db?.dropDatabase();
+            return;
+        }
+        catch (error) {
+            const message = error instanceof Error ? error.message : '';
+            if (!message.includes('currently being dropped') || attempt === attempts - 1) {
+                throw error;
+            }
+            await wait(50 * (attempt + 1));
+        }
+    }
+};
 beforeAll(async () => {
     mongoServer = await mongodb_memory_server_1.MongoMemoryServer.create();
-    process.env.MONGODB_URI = mongoServer.getUri();
-    ({ connectDB, disconnectDB } = await Promise.resolve().then(() => __importStar(require('../src/config/db'))));
-    await connectDB();
+    await mongoose_1.default.connect(mongoServer.getUri());
 });
 beforeEach(async () => {
     redisStore.clear();
+    redisLists.clear();
     rateState.clear();
-    await mongoose_1.default.connection.db?.dropDatabase();
+    await dropDatabaseWithRetry();
 });
 afterAll(async () => {
-    await disconnectDB();
+    if (mongoose_1.default.connection.readyState !== 0) {
+        await mongoose_1.default.disconnect();
+    }
     await mongoServer.stop();
 });

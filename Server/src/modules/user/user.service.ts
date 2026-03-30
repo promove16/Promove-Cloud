@@ -47,6 +47,14 @@ const toSanitizedConnectedAccounts = (connectedAccounts: IUser['connectedAccount
     connectedAt: connectedAccounts.github.connectedAt ?? null,
     lastSyncedAt: connectedAccounts.github.lastSyncedAt ?? null,
   },
+  google: {
+    userId: connectedAccounts.google.userId ?? null,
+    ...(connectedAccounts.google.username !== undefined
+      ? { username: connectedAccounts.google.username ?? null }
+      : {}),
+    connectedAt: connectedAccounts.google.connectedAt ?? null,
+    lastSyncedAt: connectedAccounts.google.lastSyncedAt ?? null,
+  },
   linkedin: {
     userId: connectedAccounts.linkedin.userId ?? null,
     ...(connectedAccounts.linkedin.username !== undefined
@@ -81,6 +89,7 @@ export const toSanitizedUser = (user: UserLike): SanitizedUser => ({
   isActive: user.isActive,
   ...(user.lastLogin ? { lastLogin: user.lastLogin } : {}),
   discoverableToRecruiters: user.discoverableToRecruiters ?? false,
+  mustChangePasswordOnNextLogin: user.mustChangePasswordOnNextLogin ?? false,
   ...(user.institutionToken !== undefined ? { institutionToken: user.institutionToken ?? null } : {}),
   ...(user.institutionId ? { institutionId: user.institutionId.toString() } : { institutionId: null }),
   ...(user.institutionProfile ? { institutionProfile: user.institutionProfile } : {}),
@@ -92,6 +101,18 @@ export const toSanitizedUser = (user: UserLike): SanitizedUser => ({
   ...(user.verificationRejectedAt ? { verificationRejectedAt: user.verificationRejectedAt } : {}),
   ...(user.verificationRejectedReason
     ? { verificationRejectedReason: user.verificationRejectedReason }
+    : {}),
+  adminApprovalStatus: user.adminApprovalStatus,
+  ...(user.adminApprovalRequestedAt
+    ? { adminApprovalRequestedAt: user.adminApprovalRequestedAt }
+    : {}),
+  ...(user.adminApprovedAt ? { adminApprovedAt: user.adminApprovedAt } : {}),
+  ...(user.adminApprovedBy ? { adminApprovedBy: user.adminApprovedBy.toString() } : { adminApprovedBy: null }),
+  ...(user.adminApprovalRejectedAt
+    ? { adminApprovalRejectedAt: user.adminApprovalRejectedAt }
+    : {}),
+  ...(user.adminApprovalRejectedReason
+    ? { adminApprovalRejectedReason: user.adminApprovalRejectedReason }
     : {}),
   connectedAccounts: toSanitizedConnectedAccounts(user.connectedAccounts),
   skills: user.skills ?? [],

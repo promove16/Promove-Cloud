@@ -1,6 +1,6 @@
 import { useMemo, useState, type ReactNode } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
-import { Eye, Search } from 'lucide-react';
+import { Eye, MoreHorizontal, Search, ShieldCheck, ShieldOff, UserCog } from 'lucide-react';
 import { adminApi, AdminUserListItem } from '../../api/admin.api';
 import { scoreApi } from '../../api/score.api';
 import { UserRole } from '../../types/roles.types';
@@ -9,6 +9,14 @@ import { Button } from '../../components/ui/Button';
 import { Card } from '../../components/ui/Card';
 import { Input } from '../../components/ui/Input';
 import { Spinner } from '../../components/ui/Spinner';
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuLabel,
+  DropdownMenuSeparator,
+  DropdownMenuTrigger,
+} from '../../app/components/ui/dropdown-menu';
 
 type ModalMode = 'role' | 'access' | null;
 
@@ -99,6 +107,54 @@ function ActivityDrawer({
   );
 }
 
+function UserActionMenu({
+  user,
+  onViewActivity,
+  onChangeRole,
+  onToggleAccess,
+}: {
+  user: AdminUserListItem;
+  onViewActivity: () => void;
+  onChangeRole: () => void;
+  onToggleAccess: () => void;
+}) {
+  return (
+    <DropdownMenu>
+      <DropdownMenuTrigger asChild>
+        <Button
+          variant="secondary"
+          className="h-10 w-10 rounded-full border-slate-700 p-0"
+          aria-label={`Open actions for ${user.displayName}`}
+        >
+          <MoreHorizontal className="h-4 w-4" />
+        </Button>
+      </DropdownMenuTrigger>
+      <DropdownMenuContent align="end" className="w-52 border-slate-800 bg-slate-950 text-white">
+        <DropdownMenuLabel className="text-xs uppercase tracking-[0.2em] text-slate-400">
+          Actions
+        </DropdownMenuLabel>
+        <DropdownMenuSeparator className="bg-slate-800" />
+        <DropdownMenuItem className="cursor-pointer rounded-lg px-3 py-2 focus:bg-slate-900" onSelect={onViewActivity}>
+          <Eye className="h-4 w-4 text-slate-400" />
+          View Activity
+        </DropdownMenuItem>
+        <DropdownMenuItem className="cursor-pointer rounded-lg px-3 py-2 focus:bg-slate-900" onSelect={onChangeRole}>
+          <UserCog className="h-4 w-4 text-slate-400" />
+          Change Role
+        </DropdownMenuItem>
+        <DropdownMenuItem className="cursor-pointer rounded-lg px-3 py-2 focus:bg-slate-900" onSelect={onToggleAccess}>
+          {user.isActive ? (
+            <ShieldOff className="h-4 w-4 text-rose-300" />
+          ) : (
+            <ShieldCheck className="h-4 w-4 text-emerald-300" />
+          )}
+          {user.isActive ? 'Deactivate User' : 'Activate User'}
+        </DropdownMenuItem>
+      </DropdownMenuContent>
+    </DropdownMenu>
+  );
+}
+
 export default function UserManagement() {
   const queryClient = useQueryClient();
   const [search, setSearch] = useState('');
@@ -139,12 +195,39 @@ export default function UserManagement() {
     },
   });
 
+  const reviewRequestMutation = useMutation({
+    mutationFn: ({
+      userId,
+      decision,
+      reason,
+    }: {
+      userId: string;
+      decision: 'approved' | 'rejected';
+      reason?: string;
+    }) => adminApi.reviewRegistrationRequest(userId, { decision, reason }),
+    onSuccess: async () => {
+      await Promise.all([
+        queryClient.invalidateQueries({ queryKey: ['admin-users'] }),
+        queryClient.invalidateQueries({ queryKey: ['admin-analytics'] }),
+      ]);
+    },
+  });
+
   const users = useMemo(
     () =>
       (usersQuery.data?.items ?? []).filter((user) =>
         `${user.displayName} ${user.email} ${user.role}`.toLowerCase().includes(search.toLowerCase()),
       ),
     [search, usersQuery.data?.items],
+  );
+  const pendingRequests = useMemo(
+    () =>
+      users.filter(
+        (user) =>
+          user.adminApprovalStatus === 'pending' &&
+          ![UserRole.STUDENT].includes(user.role),
+      ),
+    [users],
   );
 
   return (
@@ -160,6 +243,85 @@ export default function UserManagement() {
           <Input className="pl-11" value={search} onChange={(event) => setSearch(event.target.value)} placeholder="Search name or email" />
         </div>
       </div>
+
+      <Card className="p-6">
+        <div className="flex items-start justify-between gap-4">
+          <div>
+            <div className="text-xs uppercase tracking-[0.3em] text-cyan-300">Registration Requests</div>
+            <h2 className="mt-2 text-2xl font-bold text-white">Approve public sign-up requests</h2>
+            <p className="mt-2 text-slate-400">
+              Students complete public signup with an institution token. All other roles wait here for admin approval.
+            </p>
+          </div>
+          <Badge>{pendingRequests.length} pending</Badge>
+        </div>
+
+        <div className="mt-6 space-y-3">
+          {usersQuery.isLoading ? (
+            <div className="flex items-center justify-center py-12">
+              <Spinner />
+            </div>
+          ) : pendingRequests.length === 0 ? (
+            <div className="rounded-2xl border border-dashed border-slate-800 px-5 py-10 text-sm text-slate-400">
+              No registration requests are waiting right now.
+            </div>
+          ) : (
+            pendingRequests.map((request) => (
+              <div key={request._id} className="rounded-2xl border border-slate-800 bg-slate-900/70 px-5 py-5">
+                <div className="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
+                  <div className="space-y-3">
+                    <div className="flex flex-wrap items-center gap-3">
+                      <div className="text-lg font-semibold text-white">{request.displayName}</div>
+                      <Badge className="border-amber-500/30 bg-amber-500/10 text-amber-300">
+                        pending
+                      </Badge>
+                      <Badge className="border-slate-700 bg-slate-800 text-slate-200 capitalize">
+                        {request.role}
+                      </Badge>
+                    </div>
+                    <div className="text-sm text-slate-300">{request.email}</div>
+                    {request.adminApprovalRequestedAt ? (
+                      <div className="text-xs uppercase tracking-[0.25em] text-slate-500">
+                        Requested {new Date(request.adminApprovalRequestedAt).toLocaleString('en-IN')}
+                      </div>
+                    ) : null}
+                    <div className="text-sm text-slate-400">
+                      Access will stay disabled until this request is approved.
+                    </div>
+                  </div>
+                  <div className="flex flex-wrap gap-2">
+                    <Button
+                      onClick={() =>
+                        reviewRequestMutation.mutate({
+                          userId: request._id,
+                          decision: 'approved',
+                        })
+                      }
+                      disabled={reviewRequestMutation.isPending}
+                    >
+                      Approve
+                    </Button>
+                    <Button
+                      variant="secondary"
+                      onClick={() => {
+                        const reason = window.prompt('Add a short rejection reason (optional):')?.trim();
+                        reviewRequestMutation.mutate({
+                          userId: request._id,
+                          decision: 'rejected',
+                          ...(reason ? { reason } : {}),
+                        });
+                      }}
+                      disabled={reviewRequestMutation.isPending}
+                    >
+                      Reject
+                    </Button>
+                  </div>
+                </div>
+              </div>
+            ))
+          )}
+        </div>
+      </Card>
 
       <div className="flex flex-wrap gap-3">
         <select
@@ -186,7 +348,7 @@ export default function UserManagement() {
       </div>
 
       <Card className="overflow-hidden">
-        <div className="grid grid-cols-[1.2fr,1.6fr,120px,140px,120px,120px,110px,200px] border-b border-slate-800 bg-slate-900/70 px-5 py-4 text-xs uppercase tracking-[0.3em] text-slate-400">
+        <div className="grid grid-cols-[minmax(180px,1.1fr)_minmax(240px,1.5fr)_88px_72px_132px_108px_96px_72px] border-b border-slate-800 bg-slate-900/70 px-5 py-4 text-xs uppercase tracking-[0.3em] text-slate-400">
           <div>Name</div>
           <div>Email</div>
           <div>Role</div>
@@ -205,42 +367,38 @@ export default function UserManagement() {
             <div className="px-5 py-12 text-sm text-slate-400">No users found.</div>
           ) : (
             users.map((user) => (
-              <div key={user._id} className="grid grid-cols-[1.2fr,1.6fr,120px,140px,120px,120px,110px,200px] items-center gap-4 px-5 py-5">
-                <div className="font-semibold text-white">{user.displayName}</div>
-                <div className="text-sm text-slate-300">{user.email}</div>
+              <div key={user._id} className="grid grid-cols-[minmax(180px,1.1fr)_minmax(240px,1.5fr)_88px_72px_132px_108px_96px_72px] items-center gap-4 px-5 py-4">
+                <div className="min-w-0">
+                  <div className="truncate font-semibold text-white">{user.displayName}</div>
+                </div>
+                <div className="min-w-0 text-sm text-slate-300">
+                  <div className="truncate">{user.email}</div>
+                </div>
                 <div className="text-sm text-slate-300 capitalize">{user.role}</div>
                 <div className="text-sm text-slate-300">{user.innovationScore}</div>
-                <div className="text-sm text-slate-300">{user.accessGrantedBy}</div>
+                <div className="min-w-0 text-sm text-slate-300">
+                  <div className="truncate">{user.accessGrantedBy}</div>
+                </div>
                 <div className="text-sm text-slate-400">{new Date(user.accessExpiresAt).toLocaleDateString('en-IN')}</div>
                 <div>
                   <Badge className={user.isActive ? 'border-emerald-500/30 bg-emerald-500/10 text-emerald-300' : 'border-rose-500/30 bg-rose-500/10 text-rose-300'}>
                     {user.isActive ? 'Active' : 'Inactive'}
                   </Badge>
                 </div>
-                <div className="flex flex-wrap gap-2">
-                  <Button
-                    variant="secondary"
-                    onClick={() => {
+                <div className="flex justify-end">
+                  <UserActionMenu
+                    user={user}
+                    onViewActivity={() => setSelectedUser(user)}
+                    onChangeRole={() => {
                       setSelectedUser(user);
                       setRoleDraft(user.role);
                       setModalMode('role');
                     }}
-                  >
-                    Change Role
-                  </Button>
-                  <Button
-                    variant="secondary"
-                    onClick={() => {
+                    onToggleAccess={() => {
                       setSelectedUser(user);
                       setModalMode('access');
                     }}
-                  >
-                    {user.isActive ? 'Deactivate' : 'Activate'}
-                  </Button>
-                  <Button variant="secondary" onClick={() => setSelectedUser(user)}>
-                    <Eye className="mr-2 h-4 w-4" />
-                    View Activity
-                  </Button>
+                  />
                 </div>
               </div>
             ))

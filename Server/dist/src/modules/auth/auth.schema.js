@@ -1,6 +1,6 @@
 "use strict";
 Object.defineProperty(exports, "__esModule", { value: true });
-exports.loginSchema = exports.registerSchema = void 0;
+exports.loginSchema = exports.oauthCallbackQuerySchema = exports.oauthProviderSchema = exports.submitInstitutionTokenSchema = exports.registrationRequestSchema = exports.registerSchema = void 0;
 const zod_1 = require("zod");
 const roles_types_1 = require("../../types/roles.types");
 const optionalProfileString = (max) => zod_1.z
@@ -23,26 +23,80 @@ const institutionProfileInputSchema = zod_1.z.object({
 exports.registerSchema = zod_1.z
     .object({
     email: zod_1.z.string().trim().email(),
-    password: zod_1.z.string().min(8),
-    displayName: zod_1.z.string().trim().min(2).max(100),
-    role: zod_1.z.nativeEnum(roles_types_1.UserRole),
-    institutionToken: zod_1.z.string().trim().min(1).optional(),
-    accessCode: zod_1.z.string().trim().min(1).optional(),
+    password: zod_1.z.string().min(8).max(72),
+    displayName: zod_1.z.string().trim().min(2).max(60),
+    role: zod_1.z.literal(roles_types_1.UserRole.STUDENT),
+    institutionToken: zod_1.z.string().trim().min(6).max(64).optional(),
+    domain: optionalProfileString(120),
+    bio: optionalProfileString(500),
+});
+const registrationRequestRoleSchema = zod_1.z.enum([
+    roles_types_1.UserRole.SCHOOL,
+    roles_types_1.UserRole.COLLEGE,
+    roles_types_1.UserRole.MENTOR,
+    roles_types_1.UserRole.INVESTOR,
+    roles_types_1.UserRole.RECRUITER,
+]);
+exports.registrationRequestSchema = zod_1.z
+    .object({
+    email: zod_1.z.string().trim().email(),
+    password: zod_1.z.string().min(8).max(72),
+    displayName: zod_1.z.string().trim().min(2).max(60),
+    role: registrationRequestRoleSchema,
     domain: optionalProfileString(120),
     bio: optionalProfileString(500),
     institutionProfile: institutionProfileInputSchema.optional(),
 })
     .superRefine((value, ctx) => {
-    if (value.role === roles_types_1.UserRole.STUDENT && !(value.institutionToken || value.accessCode)) {
+    if ((value.role === roles_types_1.UserRole.SCHOOL || value.role === roles_types_1.UserRole.COLLEGE) &&
+        !value.institutionProfile) {
         ctx.addIssue({
             code: zod_1.z.ZodIssueCode.custom,
-            path: ['institutionToken'],
-            message: 'Institution token is required for student registrations',
+            path: ['institutionProfile'],
+            message: 'Institution details are required for this role',
+        });
+    }
+    if ([roles_types_1.UserRole.MENTOR, roles_types_1.UserRole.INVESTOR, roles_types_1.UserRole.RECRUITER].includes(value.role) &&
+        !value.domain) {
+        ctx.addIssue({
+            code: zod_1.z.ZodIssueCode.custom,
+            path: ['domain'],
+            message: 'Domain or focus area is required for this role',
+        });
+    }
+});
+exports.submitInstitutionTokenSchema = zod_1.z.object({
+    institutionToken: zod_1.z.string().trim().min(6).max(64),
+});
+exports.oauthProviderSchema = zod_1.z.enum(['google', 'linkedin']);
+exports.oauthCallbackQuerySchema = zod_1.z
+    .object({
+    code: zod_1.z.string().trim().min(1).optional(),
+    state: zod_1.z.string().trim().min(1).optional(),
+    error: zod_1.z.string().trim().min(1).optional(),
+    error_description: zod_1.z.string().trim().min(1).optional(),
+})
+    .superRefine((value, ctx) => {
+    if (value.error) {
+        return;
+    }
+    if (!value.code) {
+        ctx.addIssue({
+            code: zod_1.z.ZodIssueCode.custom,
+            path: ['code'],
+            message: 'Authorization code is required',
+        });
+    }
+    if (!value.state) {
+        ctx.addIssue({
+            code: zod_1.z.ZodIssueCode.custom,
+            path: ['state'],
+            message: 'State is required',
         });
     }
 });
 exports.loginSchema = zod_1.z.object({
     email: zod_1.z.string().trim().email(),
     password: zod_1.z.string().min(1),
-    role: zod_1.z.nativeEnum(roles_types_1.UserRole),
+    role: zod_1.z.nativeEnum(roles_types_1.UserRole).optional(),
 });

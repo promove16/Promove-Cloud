@@ -81,9 +81,13 @@ export function ProblemBank() {
             <h1 className="text-3xl font-bold text-white mb-2">Problem Bank</h1>
             <p className="text-slate-400">Global repository of real-world problems waiting to be solved</p>
           </div>
-          <button className="px-6 py-3 bg-gradient-to-r from-blue-600 to-purple-600 text-white rounded-xl font-semibold transition-all flex items-center gap-2 opacity-80">
+          <button
+            type="button"
+            disabled
+            className="px-6 py-3 bg-slate-800 text-slate-400 rounded-xl font-semibold transition-all flex items-center gap-2 cursor-not-allowed border border-slate-700"
+          >
             <Plus className="w-5 h-5" />
-            Submit Problem
+            Admin-curated only
           </button>
         </div>
 
@@ -149,6 +153,11 @@ export function ProblemBank() {
                       {isClaimedByOther ? (
                         <div className="px-2 py-1 bg-slate-800 rounded text-xs text-slate-300">Claimed</div>
                       ) : null}
+                      {problem.sponsorName ? (
+                        <div className="px-2 py-1 bg-cyan-500/10 rounded text-xs text-cyan-300">
+                          {problem.sponsorName}
+                        </div>
+                      ) : null}
                     </div>
                     <p className="text-slate-400 mb-4">
                       {problem.description.length > 180 ? `${problem.description.slice(0, 180)}...` : problem.description}
@@ -182,6 +191,7 @@ export function ProblemBank() {
                         <span className="text-slate-500">by</span> {problem.postedBy}
                       </div>
                       <div>{problem.domain}</div>
+                      {problem.geography ? <div>{problem.geography}</div> : null}
                     </div>
                   </div>
                 </div>
@@ -257,12 +267,82 @@ export function ProblemBank() {
                 </button>
               </div>
               <p className="text-slate-300 leading-7 mb-6">{selectedProblem.description}</p>
+              <div className="grid gap-4 md:grid-cols-2 mb-6">
+                {selectedProblem.expectedOutcome ? (
+                  <div className="rounded-xl border border-slate-800 bg-slate-950 p-4">
+                    <div className="text-xs uppercase tracking-[0.25em] text-slate-500 mb-2">Expected Outcome</div>
+                    <div className="text-sm text-slate-300">{selectedProblem.expectedOutcome}</div>
+                  </div>
+                ) : null}
+                {selectedProblem.impactGoal ? (
+                  <div className="rounded-xl border border-slate-800 bg-slate-950 p-4">
+                    <div className="text-xs uppercase tracking-[0.25em] text-slate-500 mb-2">Impact Goal</div>
+                    <div className="text-sm text-slate-300">{selectedProblem.impactGoal}</div>
+                  </div>
+                ) : null}
+              </div>
               <div className="flex flex-wrap gap-2 mb-6">
                 {selectedProblem.tags.map((tag) => (
                   <span key={tag} className="px-3 py-1 bg-slate-800 rounded-full text-xs text-slate-300">
                     {tag}
                   </span>
                 ))}
+              </div>
+              <div className="grid gap-4 md:grid-cols-2 mb-6">
+                <div className="rounded-xl border border-slate-800 bg-slate-950 p-4">
+                  <div className="text-xs uppercase tracking-[0.25em] text-slate-500 mb-3">Problem Details</div>
+                  <div className="space-y-2 text-sm text-slate-300">
+                    <div><span className="text-slate-500">Domain:</span> {selectedProblem.domain}</div>
+                    <div><span className="text-slate-500">Category:</span> {selectedProblem.category}</div>
+                    <div><span className="text-slate-500">Difficulty:</span> {selectedProblem.difficulty}</div>
+                    {selectedProblem.geography ? <div><span className="text-slate-500">Geography:</span> {selectedProblem.geography}</div> : null}
+                    {selectedProblem.sponsorName ? <div><span className="text-slate-500">Sponsor:</span> {selectedProblem.sponsorName}</div> : null}
+                  </div>
+                </div>
+                <div className="rounded-xl border border-slate-800 bg-slate-950 p-4">
+                  <div className="text-xs uppercase tracking-[0.25em] text-slate-500 mb-3">Submission Policy</div>
+                  <div className="space-y-2 text-sm text-slate-300">
+                    <div>Documents: {selectedProblem.submissionConfig.allowDocuments ? "Allowed" : "Not allowed"}</div>
+                    <div>Images: {selectedProblem.submissionConfig.allowImages ? "Allowed" : "Not allowed"}</div>
+                    <div>GitHub repos: {selectedProblem.submissionConfig.allowGithubRepos ? `Up to ${selectedProblem.submissionConfig.maxRepoLinks}` : "Not allowed"}</div>
+                    <div>Code snippets: {selectedProblem.submissionConfig.allowCodeSnippets ? `Up to ${selectedProblem.submissionConfig.maxCodeSnippets}` : "Not allowed"}</div>
+                    <div>Max file size: {selectedProblem.submissionConfig.maxFileSizeMb} MB</div>
+                  </div>
+                </div>
+              </div>
+              {selectedProblem.targetBeneficiaries.length > 0 ? (
+                <div className="mb-6 rounded-xl border border-slate-800 bg-slate-950 p-4">
+                  <div className="text-xs uppercase tracking-[0.25em] text-slate-500 mb-3">Target Beneficiaries</div>
+                  <div className="flex flex-wrap gap-2">
+                    {selectedProblem.targetBeneficiaries.map((item) => (
+                      <span key={item} className="px-3 py-1 rounded-full bg-slate-800 text-xs text-slate-300">{item}</span>
+                    ))}
+                  </div>
+                </div>
+              ) : null}
+              {selectedProblem.deliverables.length > 0 ? (
+                <div className="mb-6 rounded-xl border border-slate-800 bg-slate-950 p-4">
+                  <div className="text-xs uppercase tracking-[0.25em] text-slate-500 mb-3">Expected Deliverables</div>
+                  <ul className="space-y-2 text-sm text-slate-300">
+                    {selectedProblem.deliverables.map((item) => (
+                      <li key={item}>- {item}</li>
+                    ))}
+                  </ul>
+                </div>
+              ) : null}
+              {selectedProblem.acceptanceCriteria.length > 0 ? (
+                <div className="mb-6 rounded-xl border border-slate-800 bg-slate-950 p-4">
+                  <div className="text-xs uppercase tracking-[0.25em] text-slate-500 mb-3">Acceptance Criteria</div>
+                  <ul className="space-y-2 text-sm text-slate-300">
+                    {selectedProblem.acceptanceCriteria.map((item) => (
+                      <li key={item}>- {item}</li>
+                    ))}
+                  </ul>
+                </div>
+              ) : null}
+              <div className="mb-6 rounded-xl border border-amber-500/20 bg-amber-500/5 p-4">
+                <div className="text-xs uppercase tracking-[0.25em] text-amber-300 mb-2">Security Notice</div>
+                <div className="text-sm text-slate-300">{selectedProblem.securityNotice}</div>
               </div>
               <div className="flex justify-end gap-3">
                 <button onClick={() => setSelectedProblem(null)} className="px-5 py-3 bg-slate-800 hover:bg-slate-700 text-white rounded-lg font-semibold">

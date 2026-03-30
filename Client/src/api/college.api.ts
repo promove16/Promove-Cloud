@@ -13,7 +13,14 @@ import {
   StudentLeaderboardItem,
   StudentVerificationReviewResponse,
 } from '../types/college.types';
-import { ComplianceReportRecord, DirectoryInvestor, LeaderboardPage, StudentJourney } from '../types/school.types';
+import { BulkCredentialImportResult } from '../types/school.types';
+import {
+  ComplianceReportRecord,
+  DirectoryInvestor,
+  LeaderboardPage,
+  StudentJourney,
+  TemporaryStudentCredentials,
+} from '../types/school.types';
 import { PlacementTrackerData, PlacementStatus } from '../types/placement.types';
 
 export const collegeApi = {
@@ -99,6 +106,21 @@ export const collegeApi = {
     );
     return response.data.data;
   },
+  async createTemporaryStudentCredentials(payload: {
+    displayName: string;
+    email: string;
+    domain?: string;
+    bio?: string;
+    gradeOrProgram?: string;
+    rollNumber?: string;
+    notes?: string;
+  }) {
+    const response = await api.post<ApiSuccessResponse<TemporaryStudentCredentials>>(
+      '/api/college/student-temp-credentials',
+      payload,
+    );
+    return response.data.data;
+  },
   async getPendingStudentVerifications() {
     const response = await api.get<ApiSuccessResponse<PendingStudentVerification[]>>(
       '/api/college/student-verifications',
@@ -134,17 +156,29 @@ export const collegeApi = {
     );
     return response.data.data;
   },
+  async cancelStudentInvite(rosterEntryId: string) {
+    const response = await api.delete<ApiSuccessResponse<{ _id: string; cancelled: true; cancelledAt: string }>>(
+      `/api/college/student-roster/${rosterEntryId}`,
+    );
+    return response.data.data;
+  },
   async importStudentRoster(file: File) {
     const formData = new FormData();
     formData.append('file', file);
     const response = await api.post<ApiSuccessResponse<StudentRosterImportResult>>(
       '/api/college/student-roster/import',
       formData,
-      {
-        headers: {
-          'Content-Type': 'multipart/form-data',
-        },
-      },
+      { headers: { 'Content-Type': 'multipart/form-data' } },
+    );
+    return response.data.data;
+  },
+  async importStudentRosterWithCredentials(file: File) {
+    const formData = new FormData();
+    formData.append('file', file);
+    const response = await api.post<ApiSuccessResponse<BulkCredentialImportResult>>(
+      '/api/college/student-roster/import-credentials',
+      formData,
+      { headers: { 'Content-Type': 'multipart/form-data' } },
     );
     return response.data.data;
   },

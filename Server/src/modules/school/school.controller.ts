@@ -1,6 +1,9 @@
 import { Request, Response } from 'express';
 import { ApiResponse } from '../../utils/ApiResponse';
 import {
+  cancelSchoolStudentRosterInvite,
+  createManagedStudentCredentialsSchema,
+  createSchoolManagedStudentCredentials,
   createSchoolStudentAccessToken,
   createSchoolStudentRosterEntry,
   createStudentAccessTokenSchema,
@@ -12,6 +15,7 @@ import {
   getSchoolDashboard,
   getStudentJourney,
   getStudentLeaderboard,
+  importSchoolStudentCredentials,
   importSchoolStudentRosterEntries,
   listStudentRosterQuerySchema,
   manualStudentRosterEntrySchema,
@@ -95,12 +99,38 @@ export const createSchoolStudentRosterEntryController = async (req: Request, res
   res.status(201).json(new ApiResponse(data));
 };
 
+export const cancelSchoolStudentRosterInviteController = async (req: Request, res: Response) => {
+  const data = await cancelSchoolStudentRosterInvite(req.user!._id, String(req.params.rosterEntryId));
+  res.status(200).json(new ApiResponse(data));
+};
+
+export const createSchoolManagedStudentCredentialsController = async (
+  req: Request,
+  res: Response,
+) => {
+  const payload = createManagedStudentCredentialsSchema.parse(req.body);
+  const data = await createSchoolManagedStudentCredentials(req.user!._id, req.user!._id, payload);
+  res.status(201).json(new ApiResponse(data));
+};
+
 export const importSchoolStudentRosterController = async (req: Request, res: Response) => {
   if (!req.file?.buffer) {
     throw new ApiError(400, 'FILE_REQUIRED', 'An Excel or CSV file is required.');
   }
 
   const data = await importSchoolStudentRosterEntries(req.user!._id, req.user!._id, {
+    originalname: req.file.originalname,
+    buffer: req.file.buffer,
+  });
+  res.status(200).json(new ApiResponse(data));
+};
+
+export const importSchoolStudentCredentialsController = async (req: Request, res: Response) => {
+  if (!req.file?.buffer) {
+    throw new ApiError(400, 'FILE_REQUIRED', 'An Excel or CSV file is required.');
+  }
+
+  const data = await importSchoolStudentCredentials(req.user!._id, req.user!._id, {
     originalname: req.file.originalname,
     buffer: req.file.buffer,
   });

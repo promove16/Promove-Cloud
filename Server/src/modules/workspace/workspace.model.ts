@@ -77,6 +77,41 @@ const workspaceSchema = new Schema(
       ],
       default: [],
     },
+    repoSubmissions: {
+      type: [
+        new Schema(
+          {
+            provider: { type: String, enum: ['github'], required: true },
+            repoUrl: { type: String, required: true, trim: true, maxlength: 300 },
+            displayName: { type: String, required: true, trim: true, maxlength: 160 },
+            branch: { type: String, default: undefined, trim: true, maxlength: 120 },
+            commitHash: { type: String, default: undefined, trim: true, maxlength: 40 },
+            note: { type: String, default: undefined, trim: true, maxlength: 300 },
+            uploadedBy: { type: Schema.Types.ObjectId, required: true },
+            uploadedAt: { type: Date, default: () => new Date() },
+          },
+          { _id: true },
+        ),
+      ],
+      default: [],
+    },
+    codeSubmissions: {
+      type: [
+        new Schema(
+          {
+            title: { type: String, required: true, trim: true, maxlength: 120 },
+            language: { type: String, required: true, trim: true, maxlength: 60 },
+            summary: { type: String, default: undefined, trim: true, maxlength: 300 },
+            codeSnippet: { type: String, required: true, maxlength: 8000 },
+            lineCount: { type: Number, required: true, min: 1, max: 500 },
+            uploadedBy: { type: Schema.Types.ObjectId, required: true },
+            uploadedAt: { type: Date, default: () => new Date() },
+          },
+          { _id: true },
+        ),
+      ],
+      default: [],
+    },
     progressUpdates: {
       type: [
         new Schema(

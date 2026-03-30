@@ -2,7 +2,14 @@ import { Request, Response } from 'express';
 import { ApiError } from '../../utils/ApiError';
 import { ApiResponse } from '../../utils/ApiResponse';
 import { UserRole } from '../../types/roles.types';
-import { listUsersQuerySchema, milestoneVerifySchema, patentRejectSchema, awardRejectSchema } from './admin.validation';
+import {
+  awardRejectSchema,
+  listRegistrationRequestsQuerySchema,
+  listUsersQuerySchema,
+  milestoneVerifySchema,
+  patentRejectSchema,
+  registrationRequestReviewSchema,
+} from './admin.validation';
 import {
   approveAward,
   getAdminCapTable,
@@ -15,7 +22,9 @@ import {
   listAwards,
   listDealsAwaitingApproval,
   listPatents,
+  listRegistrationRequests,
   listUsers,
+  reviewRegistrationRequest,
   rejectAward,
   rejectPatent,
   resetStartupSoleInvestor,
@@ -41,6 +50,15 @@ export const getUsersController = async (req: Request, res: Response) => {
   res.status(200).json(new ApiResponse(data));
 };
 
+export const getRegistrationRequestsController = async (req: Request, res: Response) => {
+  const query = listRegistrationRequestsQuerySchema.parse(req.query);
+  const data = await listRegistrationRequests({
+    status: query.status,
+    role: query.role,
+  });
+  res.status(200).json(new ApiResponse(data));
+};
+
 export const updateUserRoleController = async (req: Request, res: Response) => {
   if (!req.user) throw new ApiError(401, 'UNAUTHORIZED', 'Invalid or expired token');
   const userId = getParam(req.params.id);
@@ -60,6 +78,45 @@ export const updateUserAccessController = async (req: Request, res: Response) =>
     throw new ApiError(400, 'INVALID_BODY', 'isActive must be a boolean');
   }
   res.status(200).json(new ApiResponse(await updateUserAccess(req.user._id, userId, req.body.isActive)));
+};
+
+export const reviewRegistrationRequestController = async (req: Request, res: Response) => {
+  if (!req.user) throw new ApiError(401, 'UNAUTHORIZED', 'Invalid or expired token');
+  const userId = getParam(req.params.id);
+  if (!userId || !isObjectId(userId)) throw new ApiError(400, 'INVALID_ID', 'Invalid ID format');
+  const payload = registrationRequestReviewSchema.parse(req.body);
+  res.status(200).json(new ApiResponse(await reviewRegistrationRequest(req.user._id, userId, payload)));
+};
+
+export const approveRegistrationRequestController = async (req: Request, res: Response) => {
+  if (!req.user) throw new ApiError(401, 'UNAUTHORIZED', 'Invalid or expired token');
+  const userId = getParam(req.params.id);
+  if (!userId || !isObjectId(userId)) throw new ApiError(400, 'INVALID_ID', 'Invalid ID format');
+  res.status(200).json(
+    new ApiResponse(
+      await reviewRegistrationRequest(req.user._id, userId, { decision: 'approved' }),
+    ),
+  );
+};
+
+export const rejectRegistrationRequestController = async (req: Request, res: Response) => {
+  if (!req.user) throw new ApiError(401, 'UNAUTHORIZED', 'Invalid or expired token');
+  const userId = getParam(req.params.id);
+  if (!userId || !isObjectId(userId)) throw new ApiError(400, 'INVALID_ID', 'Invalid ID format');
+  const rejectionReason =
+    typeof req.body?.rejectionReason === 'string' ? req.body.rejectionReason.trim() : '';
+  if (!rejectionReason) {
+    throw new ApiError(400, 'INVALID_BODY', 'rejectionReason is required');
+  }
+
+  res.status(200).json(
+    new ApiResponse(
+      await reviewRegistrationRequest(req.user._id, userId, {
+        decision: 'rejected',
+        reason: rejectionReason,
+      }),
+    ),
+  );
 };
 
 export const getPatentsController = async (req: Request, res: Response) => {

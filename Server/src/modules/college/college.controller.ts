@@ -1,6 +1,9 @@
 import { Request, Response } from 'express';
 import { ApiResponse } from '../../utils/ApiResponse';
 import {
+  cancelCollegeStudentRosterInvite,
+  createCollegeManagedStudentCredentials,
+  createManagedStudentCredentialsSchema,
   createCollegeStudentAccessToken,
   createCollegeStudentRosterEntry,
   createStudentAccessTokenSchema,
@@ -16,6 +19,7 @@ import {
   getCollegeStudentLeaderboard,
   getLatestCollegeComplianceReport,
   getRecruiterDirectory,
+  importCollegeStudentCredentials,
   importCollegeStudentRosterEntries,
   listStudentRosterQuerySchema,
   listCollegeEvents,
@@ -148,12 +152,38 @@ export const createCollegeStudentRosterEntryController = async (req: Request, re
   res.status(201).json(new ApiResponse(data));
 };
 
+export const cancelCollegeStudentRosterInviteController = async (req: Request, res: Response) => {
+  const data = await cancelCollegeStudentRosterInvite(req.user!._id, String(req.params.rosterEntryId));
+  res.status(200).json(new ApiResponse(data));
+};
+
+export const createCollegeManagedStudentCredentialsController = async (
+  req: Request,
+  res: Response,
+) => {
+  const payload = createManagedStudentCredentialsSchema.parse(req.body);
+  const data = await createCollegeManagedStudentCredentials(req.user!._id, req.user!._id, payload);
+  res.status(201).json(new ApiResponse(data));
+};
+
 export const importCollegeStudentRosterController = async (req: Request, res: Response) => {
   if (!req.file?.buffer) {
     throw new ApiError(400, 'FILE_REQUIRED', 'An Excel or CSV file is required.');
   }
 
   const data = await importCollegeStudentRosterEntries(req.user!._id, req.user!._id, {
+    originalname: req.file.originalname,
+    buffer: req.file.buffer,
+  });
+  res.status(200).json(new ApiResponse(data));
+};
+
+export const importCollegeStudentCredentialsController = async (req: Request, res: Response) => {
+  if (!req.file?.buffer) {
+    throw new ApiError(400, 'FILE_REQUIRED', 'An Excel or CSV file is required.');
+  }
+
+  const data = await importCollegeStudentCredentials(req.user!._id, req.user!._id, {
     originalname: req.file.originalname,
     buffer: req.file.buffer,
   });

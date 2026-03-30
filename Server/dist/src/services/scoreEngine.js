@@ -5,6 +5,8 @@ const user_model_1 = require("../modules/user/user.model");
 const redis_1 = require("../config/redis");
 const bullmq_1 = require("../config/bullmq");
 const socket_1 = require("../config/socket");
+const logger_1 = require("../config/logger");
+const score_model_1 = require("../modules/innovationScore/score.model");
 exports.SCORE_DELTAS = {
     PROBLEM_CLAIMED: 5,
     SKILL_COMPLETED: 8,
@@ -16,6 +18,10 @@ exports.SCORE_DELTAS = {
     STARTUP_LAUNCHED: 10,
     AWARD_SUBMITTED: 0,
     AWARD_APPROVED: 15,
+    GITHUB_CONNECTED: 5,
+    LINKEDIN_CONNECTED: 5,
+    RESUME_UPLOADED: 3,
+    PROFILE_COMPLETE: 10,
 };
 const BREAKDOWN_FIELD_MAP = {
     PROBLEM_CLAIMED: 'problemsClaimed',
@@ -28,7 +34,17 @@ const BREAKDOWN_FIELD_MAP = {
     STARTUP_LAUNCHED: 'startupsLaunched',
     AWARD_SUBMITTED: null,
     AWARD_APPROVED: 'awardsApproved',
+    GITHUB_CONNECTED: null,
+    LINKEDIN_CONNECTED: null,
+    RESUME_UPLOADED: null,
+    PROFILE_COMPLETE: null,
 };
+const ONE_TIME_SCORE_TRIGGERS = [
+    'GITHUB_CONNECTED',
+    'LINKEDIN_CONNECTED',
+    'RESUME_UPLOADED',
+    'PROFILE_COMPLETE',
+];
 const MAX_TIEBREAKER_EPOCH = 9999999999999;
 const getInstitutionLeaderboardScore = (score, createdAt) => {
     const tiebreaker = (MAX_TIEBREAKER_EPOCH - createdAt.getTime()) / 1_000_000_000_000_000;
@@ -38,6 +54,13 @@ const applyScore = async ({ userId, trigger, metadata }) => {
     const delta = exports.SCORE_DELTAS[trigger];
     if (delta === 0)
         return 0;
+    if (ONE_TIME_SCORE_TRIGGERS.includes(trigger)) {
+        const alreadyAwarded = await score_model_1.ScoreEvent.exists({ userId, trigger });
+        if (alreadyAwarded) {
+            const existingUser = await user_model_1.User.findById(userId).select('innovationScore').lean();
+            return existingUser?.innovationScore ?? 0;
+        }
+    }
     const breakdownField = BREAKDOWN_FIELD_MAP[trigger];
     const user = await user_model_1.User.findById(userId).select('innovationScore institutionId createdAt').lean();
     if (!user)
@@ -86,17 +109,16 @@ const applyScore = async ({ userId, trigger, metadata }) => {
         }));
     }
     try {
-        const { ScoreEvent } = require('../modules/innovationScore/score.model');
-        await ScoreEvent.create({
+        await score_model_1.ScoreEvent.create({
             userId,
             trigger,
             delta: actualDelta,
             scoreAfter: newScore,
-            metadata
+            metadata,
         });
     }
     catch (err) {
-        console.error('Failed to create ScoreEvent log:', err);
+        (0, logger_1.logError)('Failed to create ScoreEvent log', err);
     }
     if (socket_1.io) {
         socket_1.io.of('/score').to(`user:${userId}`).emit('score:updated', {

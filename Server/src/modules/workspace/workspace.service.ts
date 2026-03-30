@@ -36,6 +36,24 @@ export const addTaskSchema = z.object({
   dueDate: z.string().datetime().optional(),
 });
 
+export const addRepoSubmissionSchema = z.object({
+  repoUrl: z.string().trim().url().max(300),
+  branch: z.string().trim().max(120).optional(),
+  commitHash: z
+    .string()
+    .trim()
+    .regex(/^[a-f0-9]{7,40}$/i, 'Commit hash must be 7 to 40 hex characters')
+    .optional(),
+  note: z.string().trim().max(300).optional(),
+});
+
+export const addCodeSubmissionSchema = z.object({
+  title: z.string().trim().min(2).max(120),
+  language: z.string().trim().min(1).max(60),
+  summary: z.string().trim().max(300).optional(),
+  codeSnippet: z.string().trim().min(10).max(8000),
+});
+
 export const inviteMemberSchema = z
   .object({
     email: z.string().email().optional(),
@@ -44,6 +62,61 @@ export const inviteMemberSchema = z
   .refine((value) => value.email || value.userId, {
     message: 'Email or userId is required',
   });
+
+const HIGH_CONFIDENCE_SECRET_PATTERNS: Array<{ pattern: RegExp; message: string }> = [
+  { pattern: /-----BEGIN [A-Z ]*PRIVATE KEY-----/, message: 'Private keys are not allowed in code submissions.' },
+  { pattern: /gh[pousr]_[A-Za-z0-9_]{20,}/, message: 'GitHub tokens are not allowed in code submissions.' },
+  { pattern: /github_pat_[A-Za-z0-9_]{20,}/, message: 'GitHub personal access tokens are not allowed in code submissions.' },
+  { pattern: /AKIA[0-9A-Z]{16}/, message: 'AWS access keys are not allowed in code submissions.' },
+  { pattern: /AIza[0-9A-Za-z\-_]{35}/, message: 'Google API keys are not allowed in code submissions.' },
+  { pattern: /xox[baprs]-[A-Za-z0-9-]{10,}/, message: 'Slack tokens are not allowed in code submissions.' },
+  { pattern: /mongodb(?:\+srv)?:\/\/[^/\s:@]+:[^/\s@]+@/i, message: 'Database credentials are not allowed in code submissions.' },
+];
+
+const countLines = (value: string) => value.split(/\r\n|\r|\n/).length;
+
+const assertCodeSubmissionIsSafe = (codeSnippet: string) => {
+  for (const rule of HIGH_CONFIDENCE_SECRET_PATTERNS) {
+    if (rule.pattern.test(codeSnippet)) {
+      throw new ApiError(400, 'SENSITIVE_CODE_BLOCKED', rule.message);
+    }
+  }
+};
+
+const normalizeGithubRepoUrl = (repoUrl: string) => {
+  let parsed: URL;
+
+  try {
+    parsed = new URL(repoUrl);
+  } catch (_error) {
+    throw new ApiError(400, 'INVALID_REPOSITORY_URL', 'Enter a valid GitHub repository URL.');
+  }
+
+  const hostname = parsed.hostname.toLowerCase();
+  if (!['github.com', 'www.github.com'].includes(hostname)) {
+    throw new ApiError(400, 'INVALID_REPOSITORY_URL', 'Only GitHub repository links are allowed.');
+  }
+  if (parsed.protocol !== 'https:') {
+    throw new ApiError(400, 'INVALID_REPOSITORY_URL', 'Repository links must use HTTPS.');
+  }
+  if (parsed.username || parsed.password) {
+    throw new ApiError(400, 'INVALID_REPOSITORY_URL', 'Repository links cannot include embedded credentials.');
+  }
+
+  const parts = parsed.pathname.split('/').filter(Boolean);
+  if (parts.length < 2) {
+    throw new ApiError(400, 'INVALID_REPOSITORY_URL', 'Use a full GitHub repository URL like https://github.com/org/repo.');
+  }
+
+  const owner = parts[0];
+  const repo = parts[1].replace(/\.git$/i, '');
+  const normalized = `https://github.com/${owner}/${repo}`;
+
+  return {
+    repoUrl: normalized,
+    displayName: `${owner}/${repo}`,
+  };
+};
 
 const recalcProgressPercent = (workspace: { milestones: Array<{ completionPercent: number }> }) => {
   const total = workspace.milestones.reduce((sum, milestone) => sum + milestone.completionPercent, 0);
@@ -243,6 +316,86 @@ export const deleteWorkspaceUpload = async (workspaceId: string, uploadId: strin
   workspace.uploads = workspace.uploads.filter((item) => String(item._id) !== uploadId);
   await workspace.save();
   return workspace.uploads;
+};
+
+export const addRepoSubmission = async (
+  workspaceId: string,
+  userId: string,
+  payload: z.infer<typeof addRepoSubmissionSchema>,
+) => {
+  const workspace = await getWorkspaceForMember(workspaceId, userId);
+  const normalizedRepo = normalizeGithubRepoUrl(payload.repoUrl);
+
+  if (workspace.repoSubmissions.length >= 10) {
+    throw new ApiError(400, 'REPO_SUBMISSION_LIMIT_REACHED', 'You cannot attach more repository links to this workspace.');
+  }
+
+  workspace.repoSubmissions.push({
+    _id: new Types.ObjectId(),
+    provider: 'github',
+    repoUrl: normalizedRepo.repoUrl,
+    displayName: normalizedRepo.displayName,
+    branch: payload.branch,
+    commitHash: payload.commitHash,
+    note: payload.note,
+    uploadedBy: objectId(userId),
+    uploadedAt: new Date(),
+  });
+
+  await workspace.save();
+  return serializeWorkspace(workspace);
+};
+
+export const deleteRepoSubmission = async (workspaceId: string, repoId: string, userId: string) => {
+  const workspace = await getWorkspaceForMember(workspaceId, userId);
+  const repo = workspace.repoSubmissions.find((item) => String(item._id) === repoId);
+  if (!repo) {
+    throw new ApiError(404, 'REPOSITORY_NOT_FOUND', 'Repository submission not found');
+  }
+
+  workspace.repoSubmissions = workspace.repoSubmissions.filter((item) => String(item._id) !== repoId);
+  await workspace.save();
+  return serializeWorkspace(workspace);
+};
+
+export const addCodeSubmission = async (
+  workspaceId: string,
+  userId: string,
+  payload: z.infer<typeof addCodeSubmissionSchema>,
+) => {
+  const workspace = await getWorkspaceForMember(workspaceId, userId);
+  assertCodeSubmissionIsSafe(payload.codeSnippet);
+
+  const lineCount = countLines(payload.codeSnippet);
+  if (lineCount > 500) {
+    throw new ApiError(400, 'CODE_SUBMISSION_TOO_LARGE', 'Code submissions must be 500 lines or fewer.');
+  }
+
+  workspace.codeSubmissions.push({
+    _id: new Types.ObjectId(),
+    title: payload.title,
+    language: payload.language,
+    summary: payload.summary,
+    codeSnippet: payload.codeSnippet,
+    lineCount,
+    uploadedBy: objectId(userId),
+    uploadedAt: new Date(),
+  });
+
+  await workspace.save();
+  return serializeWorkspace(workspace);
+};
+
+export const deleteCodeSubmission = async (workspaceId: string, codeId: string, userId: string) => {
+  const workspace = await getWorkspaceForMember(workspaceId, userId);
+  const submission = workspace.codeSubmissions.find((item) => String(item._id) === codeId);
+  if (!submission) {
+    throw new ApiError(404, 'CODE_SUBMISSION_NOT_FOUND', 'Code submission not found');
+  }
+
+  workspace.codeSubmissions = workspace.codeSubmissions.filter((item) => String(item._id) !== codeId);
+  await workspace.save();
+  return serializeWorkspace(workspace);
 };
 
 export const addTask = async (

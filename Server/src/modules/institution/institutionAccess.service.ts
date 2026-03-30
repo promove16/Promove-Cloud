@@ -1,15 +1,23 @@
+import bcrypt from 'bcrypt';
 import { randomBytes } from 'crypto';
 import { z } from 'zod';
 import { redis } from '../../config/redis';
 import { UserRole } from '../../types/roles.types';
 import { ApiError } from '../../utils/ApiError';
+import { sanitizePlainText } from '../../utils/sanitizeText';
 import { NotificationService } from '../notification/notification.service';
-import { syncStudentRosterVerificationStatus } from './studentRoster.service';
+import {
+  createStudentRosterEntry,
+  syncStudentRosterVerificationStatus,
+  studentRosterEntrySchema,
+  workbookRowsToPayloads,
+} from './studentRoster.service';
 import { StudentVerificationReviewResult } from '../school/school.types';
 import { User } from '../user/user.model';
 import { StudentAccessToken } from './studentAccessToken.model';
 
 const TOKEN_TTL_DAYS = 90;
+const MS_IN_YEAR = 365 * 24 * 60 * 60 * 1000;
 
 export const createStudentAccessTokenSchema = z.object({
   label: z.string().trim().min(2).max(80).optional(),
@@ -21,11 +29,53 @@ export const reviewStudentVerificationSchema = z.object({
   reason: z.string().trim().max(300).optional(),
 });
 
+export const createManagedStudentCredentialsSchema = z.object({
+  displayName: z.string().trim().min(2).max(120),
+  email: z.string().trim().email(),
+  domain: z.string().trim().max(120).optional(),
+  bio: z.string().trim().max(500).optional(),
+  gradeOrProgram: z.string().trim().max(120).optional(),
+  rollNumber: z.string().trim().max(80).optional(),
+  notes: z.string().trim().max(300).optional(),
+});
+
+const slugifyDisplayName = (displayName: string) => {
+  const normalized = displayName
+    .normalize('NFKD')
+    .replace(/[^\w\s-]/g, '')
+    .trim()
+    .toLowerCase()
+    .replace(/[\s_-]+/g, '-')
+    .replace(/^-+|-+$/g, '');
+
+  return normalized || 'student';
+};
+
+const generateProfileSlug = async (displayName: string) => {
+  const baseSlug = slugifyDisplayName(displayName);
+
+  for (let attempt = 0; attempt < 10; attempt += 1) {
+    const suffix = randomBytes(2).toString('hex');
+    const candidate = `${baseSlug}-${suffix}`;
+    const existing = await User.exists({ profileSlug: candidate });
+
+    if (!existing) {
+      return candidate;
+    }
+  }
+
+  throw new ApiError(500, 'PROFILE_SLUG_GENERATION_FAILED', 'Unable to generate a unique profile URL');
+};
+
+const extractEmailDomain = (email: string) => email.trim().toLowerCase().split('@')[1] ?? '';
+
+const generateTemporaryPassword = () => randomBytes(6).toString('base64url');
+
 const assertInstitutionRole = async (
   institutionId: string,
   institutionRole: UserRole.SCHOOL | UserRole.COLLEGE,
 ) => {
-  const institution = await User.findById(institutionId).select('_id role displayName').lean();
+  const institution = await User.findById(institutionId).select('_id role displayName email').lean();
 
   if (!institution || institution.role !== institutionRole) {
     throw new ApiError(404, 'INSTITUTION_NOT_FOUND', 'Institution account not found');
@@ -252,4 +302,151 @@ export const reviewStudentVerification = async (
       ? { reason: student.verificationRejectedReason }
       : {}),
   };
+};
+
+export const createManagedStudentCredentials = async (
+  institutionId: string,
+  institutionRole: UserRole.SCHOOL | UserRole.COLLEGE,
+  createdBy: string,
+  payload: z.infer<typeof createManagedStudentCredentialsSchema>,
+) => {
+  const institution = await assertInstitutionRole(institutionId, institutionRole);
+  const institutionDomain = extractEmailDomain(institution.email);
+  const studentDomain = extractEmailDomain(payload.email);
+
+  if (!institutionDomain || institutionDomain !== studentDomain) {
+    throw new ApiError(
+      400,
+      'INSTITUTION_EMAIL_DOMAIN_REQUIRED',
+      'Student email must use the same email domain as your institution account.',
+    );
+  }
+
+  const existingUser = await User.findOne({ email: payload.email.toLowerCase() }).lean();
+  if (existingUser) {
+    throw new ApiError(409, 'DUPLICATE_KEY', 'Email already registered');
+  }
+
+  const sanitizedDisplayName = sanitizePlainText(payload.displayName);
+  const sanitizedBio = payload.bio ? sanitizePlainText(payload.bio) : undefined;
+  const sanitizedDomain = payload.domain ? sanitizePlainText(payload.domain) : undefined;
+  const temporaryPassword = generateTemporaryPassword();
+  const passwordHash = await bcrypt.hash(temporaryPassword, 12);
+  const profileSlug = await generateProfileSlug(sanitizedDisplayName);
+  const verifiedAt = new Date();
+
+  const createdStudent = await User.create({
+    email: payload.email.toLowerCase(),
+    passwordHash,
+    role: UserRole.STUDENT,
+    displayName: sanitizedDisplayName,
+    profileSlug,
+    ...(sanitizedDomain ? { domain: sanitizedDomain } : {}),
+    ...(sanitizedBio ? { bio: sanitizedBio } : {}),
+    profileComplete: Boolean(sanitizedDomain || sanitizedBio),
+    registrationStage: 'institution_verified',
+    accessGrantedBy: 'institution_admin',
+    accessExpiresAt: new Date(Date.now() + MS_IN_YEAR),
+    isActive: true,
+    institutionToken: null,
+    institutionId: institution._id,
+    institutionVerifiedAt: verifiedAt,
+    institutionVerificationStatus: 'verified',
+    verificationStatus: 'verified',
+    verificationRequestedAt: verifiedAt,
+    verifiedAt,
+    adminApprovalStatus: 'not_required',
+    mustChangePasswordOnNextLogin: true,
+  });
+
+  await createStudentRosterEntry(institutionId, institutionRole, createdBy, {
+    displayName: sanitizedDisplayName,
+    email: payload.email,
+    ...(payload.gradeOrProgram ? { gradeOrProgram: payload.gradeOrProgram } : {}),
+    ...(payload.rollNumber ? { rollNumber: payload.rollNumber } : {}),
+    ...(payload.notes ? { notes: payload.notes } : {}),
+  });
+
+  await invalidateInstitutionCaches(institutionId);
+
+  await NotificationService.create({
+    userId: String(createdStudent._id),
+    type: 'system',
+    title: 'Temporary credentials created',
+    body: `Your ${institution.role} created a student account for you. Sign in and update your password after your first login.`,
+    link: '/login',
+  });
+
+  return {
+    student: {
+      _id: String(createdStudent._id),
+      displayName: createdStudent.displayName,
+      email: createdStudent.email,
+      profileSlug: createdStudent.profileSlug,
+    },
+    temporaryPassword,
+    institutionDomain,
+    createdAt: createdStudent.createdAt,
+  };
+};
+
+export type BulkCredentialResult = {
+  results: Array<{
+    row: number;
+    student: { _id: string; displayName: string; email: string };
+    temporaryPassword: string;
+  }>;
+  errors: Array<{ row: number; email?: string; message: string }>;
+};
+
+export const bulkCreateManagedStudentCredentials = async (
+  institutionId: string,
+  institutionRole: UserRole.SCHOOL | UserRole.COLLEGE,
+  createdBy: string,
+  file: { originalname: string; buffer: Buffer },
+): Promise<BulkCredentialResult> => {
+  await assertInstitutionRole(institutionId, institutionRole);
+
+  const rows = workbookRowsToPayloads(file.buffer);
+
+  if (rows.length === 0) {
+    throw new ApiError(400, 'EMPTY_STUDENT_ROSTER_FILE', 'The uploaded file has no student rows.');
+  }
+
+  const results: BulkCredentialResult['results'] = [];
+  const errors: BulkCredentialResult['errors'] = [];
+
+  for (const row of rows) {
+    try {
+      const parsed = studentRosterEntrySchema.parse(row);
+      const credential = await createManagedStudentCredentials(institutionId, institutionRole, createdBy, {
+        displayName: parsed.displayName,
+        email: parsed.email,
+        ...(parsed.gradeOrProgram ? { gradeOrProgram: parsed.gradeOrProgram } : {}),
+        ...(parsed.rollNumber ? { rollNumber: parsed.rollNumber } : {}),
+        ...(parsed.notes ? { notes: parsed.notes } : {}),
+      });
+
+      results.push({
+        row: row.__rowNumber,
+        student: credential.student,
+        temporaryPassword: credential.temporaryPassword,
+      });
+    } catch (error) {
+      const message =
+        error instanceof ApiError
+          ? error.message
+          : error instanceof Error
+            ? error.message
+            : 'Unable to create credentials for this row';
+
+      errors.push({
+        row: row.__rowNumber,
+        ...(row.email ? { email: String(row.email) } : {}),
+        message,
+      });
+    }
+  }
+
+  return { results, errors };
 };

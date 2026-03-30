@@ -4,11 +4,13 @@ import { authorize } from '../../middleware/authorize';
 import { UserRole } from '../../types/roles.types';
 import { asyncHandler } from '../../utils/asyncHandler';
 import {
+  approveRegistrationRequestController,
   approveAwardController,
   approveDealStageController,
   approvePatentController,
   getAnalyticsController,
   getInvestmentTypeAnalyticsController,
+  getRegistrationRequestsController,
   getStartupCapTableController,
   getAwardsController,
   getCapacityController,
@@ -16,22 +18,36 @@ import {
   getDealsController,
   getPatentsController,
   getUsersController,
+  rejectRegistrationRequestController,
   rejectAwardController,
   rejectPatentController,
+  reviewRegistrationRequestController,
   resetSoleInvestorController,
   updateDealInvestorRoleController,
   updateUserAccessController,
   updateUserRoleController,
   verifyMilestoneController,
 } from './admin.controller';
+import {
+  createAdminProblemController,
+  listAdminProblemsController,
+  updateAdminProblemController,
+} from '../problemBank/problem.controller';
 
 const router = Router();
 
 router.use(authenticate, authorize(UserRole.ADMIN));
 
 router.get('/users', asyncHandler(getUsersController));
+router.get('/problems', asyncHandler(listAdminProblemsController));
+router.post('/problems', asyncHandler(createAdminProblemController));
+router.patch('/problems/:id', asyncHandler(updateAdminProblemController));
+router.get('/registration-requests', asyncHandler(getRegistrationRequestsController));
+router.patch('/registration-requests/:id/approve', asyncHandler(approveRegistrationRequestController));
+router.patch('/registration-requests/:id/reject', asyncHandler(rejectRegistrationRequestController));
 router.patch('/users/:id/role', asyncHandler(updateUserRoleController));
 router.patch('/users/:id/access', asyncHandler(updateUserAccessController));
+router.patch('/users/:id/registration-request', asyncHandler(reviewRegistrationRequestController));
 router.get('/patents', asyncHandler(getPatentsController));
 router.patch('/patents/:id/approve', asyncHandler(approvePatentController));
 router.patch('/patents/:id/reject', asyncHandler(rejectPatentController));

@@ -5,7 +5,7 @@ const mongoose_1 = require("mongoose");
 const chatMessageSchema = new mongoose_1.Schema({
     workspaceId: { type: mongoose_1.Schema.Types.ObjectId, required: true, index: true },
     senderId: { type: mongoose_1.Schema.Types.ObjectId, required: true },
-    message: { type: String, required: true, trim: true },
+    message: { type: String, default: '', trim: true },
     attachmentUrl: { type: String, default: undefined },
     attachmentType: { type: String, enum: ['pdf', 'image'], default: undefined },
     sentAt: { type: Date, default: () => new Date() },

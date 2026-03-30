@@ -9,6 +9,7 @@ import { NotificationService } from '../notification/notification.service';
 import { Patent } from '../patent/patent.model';
 import { Startup } from '../startup/startup.model';
 import { User } from '../user/user.model';
+import { RegistrationStage } from '../user/user.types';
 import { UserRole } from '../../types/roles.types';
 import { Workspace } from '../workspace/workspace.model';
 import { Deal } from '../deal/deal.model';
@@ -26,6 +27,7 @@ import {
   AdminCapacityData,
   AdminDealItem,
   AdminPatentItem,
+  AdminRegistrationRequestItem,
   AdminUserListItem,
   AdminUsersResponse,
 } from './admin.types';
@@ -37,10 +39,51 @@ type AuditAction =
   | 'AWARD_REJECTED'
   | 'MILESTONE_VERIFIED'
   | 'DEAL_STAGE_APPROVED'
+  | 'REGISTRATION_REQUEST_APPROVED'
+  | 'REGISTRATION_REQUEST_REJECTED'
   | 'SOLE_INVESTOR_RESET'
   | 'USER_ROLE_CHANGED'
   | 'USER_DEACTIVATED'
   | 'USER_ACTIVATED';
+
+const NON_STUDENT_REGISTRATION_ROLES = new Set<UserRole>([
+  UserRole.SCHOOL,
+  UserRole.COLLEGE,
+  UserRole.MENTOR,
+  UserRole.INVESTOR,
+  UserRole.RECRUITER,
+]);
+const MAX_ADMIN_CREDENTIALS = 3;
+
+const assertAdminCapacityAvailable = async () => {
+  const adminCount = await User.countDocuments({ role: UserRole.ADMIN });
+
+  if (adminCount >= MAX_ADMIN_CREDENTIALS) {
+    throw new ApiError(
+      409,
+      'ADMIN_CREDENTIAL_LIMIT_REACHED',
+      `Only ${MAX_ADMIN_CREDENTIALS} admin credentials are allowed.`,
+    );
+  }
+};
+
+const deriveApprovedRegistrationStage = (user: {
+  role: UserRole;
+  profileComplete: boolean;
+  registrationStage?: string;
+}): RegistrationStage => {
+  if (user.role === UserRole.SCHOOL || user.role === UserRole.COLLEGE) {
+    return 'complete' as const;
+  }
+
+  if (user.profileComplete) {
+    return 'profile_setup' as const;
+  }
+
+  return user.registrationStage === 'institution_pending' || user.registrationStage === 'institution_verified'
+    ? 'basic'
+    : ((user.registrationStage as RegistrationStage | undefined) ?? 'basic');
+};
 
 const toIso = (value: Date | string) => new Date(value).toISOString();
 
@@ -51,6 +94,13 @@ const userListItem = (user: {
   role: UserRole;
   innovationScore: number;
   isActive: boolean;
+  profileComplete: boolean;
+  registrationStage: string;
+  adminApprovalStatus: 'not_required' | 'pending' | 'approved' | 'rejected';
+  adminApprovalRequestedAt?: Date;
+  adminApprovedAt?: Date;
+  adminApprovalRejectedAt?: Date;
+  adminApprovalRejectedReason?: string;
   accessGrantedBy: string;
   accessExpiresAt: Date;
   createdAt: Date;
@@ -61,9 +111,62 @@ const userListItem = (user: {
   role: user.role,
   innovationScore: user.innovationScore ?? 0,
   isActive: user.isActive,
+  profileComplete: user.profileComplete,
+  registrationStage: user.registrationStage,
+  adminApprovalStatus: user.adminApprovalStatus,
+  ...(user.adminApprovalRequestedAt
+    ? { adminApprovalRequestedAt: toIso(user.adminApprovalRequestedAt) }
+    : {}),
+  ...(user.adminApprovedAt ? { adminApprovedAt: toIso(user.adminApprovedAt) } : {}),
+  ...(user.adminApprovalRejectedAt
+    ? { adminApprovalRejectedAt: toIso(user.adminApprovalRejectedAt) }
+    : {}),
+  ...(user.adminApprovalRejectedReason
+    ? { adminApprovalRejectedReason: user.adminApprovalRejectedReason }
+    : {}),
   accessGrantedBy: user.accessGrantedBy,
   accessExpiresAt: toIso(user.accessExpiresAt),
   createdAt: toIso(user.createdAt),
+});
+
+const registrationRequestItem = (user: {
+  _id: { toString(): string };
+  displayName: string;
+  email: string;
+  role: UserRole;
+  adminApprovalStatus: 'not_required' | 'pending' | 'approved' | 'rejected';
+  isActive: boolean;
+  createdAt: Date;
+  adminApprovalRequestedAt?: Date;
+  adminApprovedAt?: Date;
+  adminApprovalRejectedAt?: Date;
+  adminApprovalRejectedReason?: string;
+  domain?: string;
+  bio?: string;
+  institutionProfile?: {
+    institutionName: string;
+    location: string;
+    totalStudentsEnrolled: number;
+    academicYear: string;
+    iicStarRating: number;
+  };
+}): AdminRegistrationRequestItem => ({
+  _id: user._id.toString(),
+  displayName: user.displayName,
+  email: user.email,
+  role: user.role as AdminRegistrationRequestItem['role'],
+  status: user.adminApprovalStatus as AdminRegistrationRequestItem['status'],
+  isActive: user.isActive,
+  createdAt: toIso(user.createdAt),
+  requestedAt: toIso(user.adminApprovalRequestedAt ?? user.createdAt),
+  ...(user.domain ? { domain: user.domain } : {}),
+  ...(user.bio ? { bio: user.bio } : {}),
+  ...(user.institutionProfile ? { institutionProfile: user.institutionProfile } : {}),
+  ...(user.adminApprovedAt ? { reviewedAt: toIso(user.adminApprovedAt) } : {}),
+  ...(user.adminApprovalRejectedAt ? { reviewedAt: toIso(user.adminApprovalRejectedAt) } : {}),
+  ...(user.adminApprovalRejectedReason
+    ? { rejectionReason: user.adminApprovalRejectedReason }
+    : {}),
 });
 
 const pushNotification = async (
@@ -71,13 +174,14 @@ const pushNotification = async (
   type: Parameters<typeof NotificationService.create>[0]['type'],
   title: string,
   body: string,
+  link = '/dashboard/admin',
 ) => {
   const notification = await NotificationService.create({
     userId,
     type,
     title,
     body,
-    link: '/dashboard/admin',
+    link,
   });
 
   if (io) {
@@ -142,11 +246,19 @@ const buildAdminDealItem = (
 });
 
 const deleteRefreshTokensForUser = async (userId: string) => {
+  const scan = (redis as unknown as {
+    scan?: (cursor: string) => Promise<[string, string[]]>;
+  }).scan;
+
+  if (typeof scan !== 'function') {
+    return;
+  }
+
   let cursor = '0';
   const keysToDelete: string[] = [];
 
   do {
-    const [nextCursor, keys] = await redis.scan(cursor);
+    const [nextCursor, keys] = await scan(cursor);
     cursor = nextCursor;
     for (const key of keys) {
       if (!key.startsWith('refresh:')) continue;
@@ -164,7 +276,7 @@ const deleteRefreshTokensForUser = async (userId: string) => {
 
 const findUser = async (userId: string) => {
   const user = await User.findById(userId).select(
-    '_id displayName email role innovationScore isActive accessGrantedBy accessExpiresAt createdAt avatar scoreBreakdown institutionProfile',
+    '_id displayName email role innovationScore isActive profileComplete registrationStage adminApprovalStatus adminApprovalRequestedAt adminApprovedAt adminApprovedBy adminApprovalRejectedAt adminApprovalRejectedReason accessGrantedBy accessExpiresAt createdAt avatar scoreBreakdown institutionProfile',
   );
   if (!user) throw new ApiError(404, 'USER_NOT_FOUND', 'User not found');
   return user;
@@ -177,7 +289,9 @@ export const listUsers = async (params: { role?: UserRole; isActive?: boolean; p
 
   const [items, total] = await Promise.all([
     User.find(filter)
-      .select('_id displayName email role innovationScore isActive accessGrantedBy accessExpiresAt createdAt')
+      .select(
+        '_id displayName email role innovationScore isActive profileComplete registrationStage adminApprovalStatus adminApprovalRequestedAt adminApprovedAt adminApprovalRejectedAt adminApprovalRejectedReason accessGrantedBy accessExpiresAt createdAt',
+      )
       .sort({ createdAt: -1 })
       .skip((params.page - 1) * params.limit)
       .limit(params.limit)
@@ -193,9 +307,40 @@ export const listUsers = async (params: { role?: UserRole; isActive?: boolean; p
   };
 };
 
+export const listRegistrationRequests = async (params: {
+  status: 'pending' | 'approved' | 'rejected';
+  role?: UserRole;
+}): Promise<{ items: AdminRegistrationRequestItem[]; total: number }> => {
+  const filter: Record<string, unknown> = {
+    role: { $in: Array.from(NON_STUDENT_REGISTRATION_ROLES) },
+    adminApprovalStatus: params.status,
+  };
+
+  if (params.role) {
+    filter.role = params.role;
+  }
+
+  const items = await User.find(filter)
+    .select(
+      '_id displayName email role isActive createdAt adminApprovalStatus adminApprovalRequestedAt adminApprovedAt adminApprovalRejectedAt adminApprovalRejectedReason domain bio institutionProfile',
+    )
+    .sort({ adminApprovalRequestedAt: -1, createdAt: -1 })
+    .lean();
+
+  return {
+    items: items.map((user) => registrationRequestItem(user)),
+    total: items.length,
+  };
+};
+
 export const updateUserRole = async (adminId: string, userId: string, role: UserRole) => {
   const user = await findUser(userId);
   const previousRole = user.role;
+
+  if (previousRole !== UserRole.ADMIN && role === UserRole.ADMIN) {
+    await assertAdminCapacityAvailable();
+  }
+
   user.role = role;
   await user.save();
   await redis.del(`session:${userId}`);
@@ -213,6 +358,79 @@ export const updateUserAccess = async (adminId: string, userId: string, isActive
     await deleteRefreshTokensForUser(userId);
   }
   await createAudit(adminId, isActive ? 'USER_ACTIVATED' : 'USER_DEACTIVATED', userId, 'User', { isActive });
+  return userListItem(user.toObject());
+};
+
+export const reviewRegistrationRequest = async (
+  adminId: string,
+  userId: string,
+  payload: { decision: 'approved' | 'rejected'; reason?: string },
+) => {
+  const user = await findUser(userId);
+
+  if (!NON_STUDENT_REGISTRATION_ROLES.has(user.role)) {
+    throw new ApiError(
+      400,
+      'REGISTRATION_REQUEST_NOT_SUPPORTED',
+      'Only non-student registration requests can be reviewed here.',
+    );
+  }
+
+  if (user.adminApprovalStatus !== 'pending') {
+    throw new ApiError(
+      400,
+      'REGISTRATION_REQUEST_ALREADY_REVIEWED',
+      'This registration request has already been reviewed.',
+    );
+  }
+
+  if (payload.decision === 'approved') {
+    user.adminApprovalStatus = 'approved';
+    user.adminApprovedAt = new Date();
+    user.adminApprovedBy = new Types.ObjectId(adminId);
+    user.adminApprovalRejectedAt = undefined;
+    user.adminApprovalRejectedReason = undefined;
+    user.isActive = true;
+    user.registrationStage = deriveApprovedRegistrationStage(user);
+  } else {
+    user.adminApprovalStatus = 'rejected';
+    user.adminApprovalRejectedAt = new Date();
+    user.adminApprovalRejectedReason =
+      payload.reason?.trim() || 'Registration request rejected by admin';
+    user.adminApprovedAt = undefined;
+    user.adminApprovedBy = null;
+    user.isActive = false;
+  }
+
+  await user.save();
+
+  if (payload.decision === 'approved') {
+    await createAudit(adminId, 'REGISTRATION_REQUEST_APPROVED', userId, 'User', {
+      role: user.role,
+    });
+    await pushNotification(
+      userId,
+      'system',
+      'Registration approved',
+      'Your ProMove registration request has been approved. You can now sign in.',
+      '/login',
+    );
+  } else {
+    await deleteRefreshTokensForUser(userId);
+    await createAudit(adminId, 'REGISTRATION_REQUEST_REJECTED', userId, 'User', {
+      role: user.role,
+      reason: user.adminApprovalRejectedReason,
+    });
+    await pushNotification(
+      userId,
+      'system',
+      'Registration request reviewed',
+      user.adminApprovalRejectedReason ||
+        'Your ProMove registration request was rejected. Please contact support.',
+      '/login',
+    );
+  }
+
   return userListItem(user.toObject());
 };
 

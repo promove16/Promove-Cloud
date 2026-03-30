@@ -58,12 +58,17 @@ const roleOptions = [
 interface RoleSelectorProps {
   value: UserRole | null;
   onChange: (role: UserRole) => void;
+  allowedRoles?: UserRole[];
 }
 
-export function RoleSelector({ value, onChange }: RoleSelectorProps) {
+export function RoleSelector({ value, onChange, allowedRoles }: RoleSelectorProps) {
+  const visibleOptions = allowedRoles
+    ? roleOptions.filter((option) => allowedRoles.includes(option.role))
+    : roleOptions;
+
   return (
     <div className="grid gap-4 md:grid-cols-3">
-      {roleOptions.map((option) => (
+      {visibleOptions.map((option) => (
         <button
           key={option.role}
           type="button"

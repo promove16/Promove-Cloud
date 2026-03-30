@@ -1,8 +1,9 @@
 "use strict";
 Object.defineProperty(exports, "__esModule", { value: true });
-exports.notificationQueue = exports.scoreQueue = exports.createQueueWorker = exports.bullmqConnection = exports.hasBullMqRedisConnection = void 0;
+exports.institutionVerifyQueue = exports.notificationQueue = exports.scoreQueue = exports.createQueueWorker = exports.bullmqConnection = exports.hasBullMqRedisConnection = void 0;
 const bullmq_1 = require("bullmq");
 const env_1 = require("./env");
+const logger_1 = require("./logger");
 exports.hasBullMqRedisConnection = Boolean(env_1.env.UPSTASH_REDIS_PASSWORD);
 const connection = {
     host: env_1.env.UPSTASH_REDIS_HOST,
@@ -82,7 +83,7 @@ const createSafeQueue = (queueName) => {
                 const id = `${queueName}-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
                 const processor = localProcessors.get(queueName);
                 if (!processor) {
-                    console.warn(`No local queue processor registered for "${queueName}". Skipping job "${jobName}".`);
+                    logger_1.logger.warn(`No local queue processor registered for "${queueName}". Skipping job "${jobName}".`);
                     return { id };
                 }
                 void Promise.resolve().then(async () => {
@@ -90,7 +91,7 @@ const createSafeQueue = (queueName) => {
                         await processor({ id, name: jobName, data }, opts);
                     }
                     catch (error) {
-                        console.error(`Local queue "${queueName}" job "${jobName}" failed:`, error);
+                        (0, logger_1.logError)(`Local queue "${queueName}" job "${jobName}" failed`, error);
                     }
                 });
                 return { id };
@@ -99,7 +100,7 @@ const createSafeQueue = (queueName) => {
     }
     const queue = new bullmq_1.Queue(queueName, { connection });
     queue.on('error', (error) => {
-        console.error(`BullMQ queue "${queueName}" connection error:`, error);
+        (0, logger_1.logError)(`BullMQ queue "${queueName}" connection error`, error);
     });
     return {
         add: async (jobName, data, opts) => {
@@ -107,7 +108,7 @@ const createSafeQueue = (queueName) => {
                 return await queue.add(jobName, data, opts);
             }
             catch (error) {
-                console.error(`BullMQ queue "${queueName}" add failed for job "${jobName}":`, error);
+                (0, logger_1.logError)(`BullMQ queue "${queueName}" add failed for job "${jobName}"`, error);
                 return { id: `skipped-${queueName}-${Date.now()}` };
             }
         },
@@ -128,10 +129,11 @@ const createQueueWorker = (queueName, processor, options) => {
         ...options,
     });
     worker.on('error', (error) => {
-        console.error(`BullMQ worker "${queueName}" error:`, error);
+        (0, logger_1.logError)(`BullMQ worker "${queueName}" error`, error);
     });
     return worker;
 };
 exports.createQueueWorker = createQueueWorker;
 exports.scoreQueue = createSafeQueue('score-recalc');
 exports.notificationQueue = createSafeQueue('notifications');
+exports.institutionVerifyQueue = createSafeQueue('institution-verify');

@@ -22,3 +22,22 @@ export const awardRejectSchema = z.object({
 export const milestoneVerifySchema = z.object({
   milestoneType: z.enum(['MVP', 'PROTOTYPE', 'MARKET_READY']),
 });
+
+export const registrationRequestReviewSchema = z.object({
+  decision: z.enum(['approved', 'rejected']),
+  reason: z.string().trim().max(300).optional(),
+});
+
+export const listRegistrationRequestsQuerySchema = z.object({
+  status: z.enum(['pending', 'approved', 'rejected']).default('pending'),
+  role: z
+    .enum([
+      UserRole.SCHOOL,
+      UserRole.COLLEGE,
+      UserRole.MENTOR,
+      UserRole.INVESTOR,
+      UserRole.RECRUITER,
+      UserRole.ADMIN,
+    ])
+    .optional(),
+});

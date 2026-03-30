@@ -7,6 +7,13 @@ export interface AdminUserListItem {
   role: UserRole;
   innovationScore: number;
   isActive: boolean;
+  profileComplete: boolean;
+  registrationStage: string;
+  adminApprovalStatus: 'not_required' | 'pending' | 'approved' | 'rejected';
+  adminApprovalRequestedAt?: string;
+  adminApprovedAt?: string;
+  adminApprovalRejectedAt?: string;
+  adminApprovalRejectedReason?: string;
   accessGrantedBy: string;
   accessExpiresAt: string;
   createdAt: string;
@@ -17,6 +24,28 @@ export interface AdminUsersResponse {
   total: number;
   page: number;
   limit: number;
+}
+
+export interface AdminRegistrationRequestItem {
+  _id: string;
+  displayName: string;
+  email: string;
+  role: Exclude<UserRole, UserRole.STUDENT>;
+  status: 'pending' | 'approved' | 'rejected';
+  isActive: boolean;
+  createdAt: string;
+  requestedAt: string;
+  domain?: string;
+  bio?: string;
+  institutionProfile?: {
+    institutionName: string;
+    location: string;
+    totalStudentsEnrolled: number;
+    academicYear: string;
+    iicStarRating: number;
+  };
+  reviewedAt?: string;
+  rejectionReason?: string;
 }
 
 export interface AdminPatentItem {

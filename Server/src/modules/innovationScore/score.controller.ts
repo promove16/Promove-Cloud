@@ -5,6 +5,7 @@ import { ApiResponse } from '../../utils/ApiResponse';
 import { readRedisJson } from '../../utils/redisJson';
 import { User } from '../user/user.model';
 import { ScoreEvent } from './score.model';
+import { applyScore, SCORE_DELTAS, ScoreTrigger } from '../../services/scoreEngine';
 
 const percentileFromRank = (rank: number | null, total: number) => {
   if (rank === null || total <= 1) {
@@ -83,4 +84,60 @@ export const getScoreHistory = async (req: Request, res: Response) => {
     .lean();
 
   res.json(new ApiResponse(events));
+};
+
+export const getScoreEvents = async (req: Request, res: Response) => {
+  if (!req.user) {
+    throw new ApiError(401, 'UNAUTHORIZED', 'Invalid or expired token');
+  }
+
+  const userId = req.params.userId;
+  if (!userId) {
+    throw new ApiError(400, 'USER_ID_REQUIRED', 'userId parameter is required');
+  }
+
+  const events = await ScoreEvent.find({ userId })
+    .sort({ createdAt: -1 })
+    .limit(200)
+    .lean();
+
+  const user = await User.findById(userId)
+    .select('innovationScore scoreBreakdown displayName')
+    .lean();
+
+  res.json(new ApiResponse({
+    user: user ? { _id: userId, displayName: user.displayName, innovationScore: user.innovationScore, scoreBreakdown: user.scoreBreakdown } : null,
+    events,
+    total: events.length,
+  }));
+};
+
+export const testScoreTrigger = async (req: Request, res: Response) => {
+  if (!req.user) {
+    throw new ApiError(401, 'UNAUTHORIZED', 'Invalid or expired token');
+  }
+
+  const { userId, trigger } = req.body as { userId?: string; trigger?: string };
+
+  if (!userId || !trigger) {
+    throw new ApiError(400, 'MISSING_FIELDS', 'userId and trigger are required');
+  }
+
+  const validTriggers = Object.keys(SCORE_DELTAS);
+  if (!validTriggers.includes(trigger)) {
+    throw new ApiError(400, 'INVALID_TRIGGER', `Valid triggers: ${validTriggers.join(', ')}`);
+  }
+
+  const newScore = await applyScore({
+    userId,
+    trigger: trigger as ScoreTrigger,
+    metadata: { triggeredBy: req.user._id, testMode: true },
+  });
+
+  res.json(new ApiResponse({
+    userId,
+    trigger,
+    delta: SCORE_DELTAS[trigger as ScoreTrigger],
+    newScore,
+  }));
 };

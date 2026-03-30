@@ -9,6 +9,7 @@ const user_controller_1 = require("./user.controller");
 const router = (0, express_1.Router)();
 router.get('/me', authenticate_1.authenticate, (0, asyncHandler_1.asyncHandler)(user_controller_1.getMe));
 router.patch('/me', authenticate_1.authenticate, (0, asyncHandler_1.asyncHandler)(user_controller_1.patchMe));
+router.post('/me/social-enrich', authenticate_1.authenticate, (0, asyncHandler_1.asyncHandler)(user_controller_1.enrichMeFromSocialLinks));
 router.get('/me/sessions', authenticate_1.authenticate, (0, authorize_1.authorize)(roles_types_1.UserRole.STUDENT), (0, asyncHandler_1.asyncHandler)(user_controller_1.getMySessions));
 router.post('/me/launch-to-recruiters', authenticate_1.authenticate, (0, authorize_1.authorize)(roles_types_1.UserRole.STUDENT), (0, asyncHandler_1.asyncHandler)(user_controller_1.launchToRecruiters));
 exports.default = router;

@@ -42,13 +42,13 @@ export function Homepage() {
         </p>
         <div className="flex gap-4 justify-center flex-wrap">
           <Link
-            to="/login?role=student"
+            to="/login"
             className="px-8 py-4 bg-gradient-to-r from-blue-600 to-purple-600 hover:from-blue-700 hover:to-purple-700 text-white rounded-xl font-semibold transition-all transform hover:scale-105"
           >
             Join as Student
           </Link>
           <Link
-            to="/login?role=institution"
+            to="/login"
             className="px-8 py-4 bg-slate-800 hover:bg-slate-700 text-white rounded-xl font-semibold border border-slate-700 transition-all"
           >
             Partner as Institution

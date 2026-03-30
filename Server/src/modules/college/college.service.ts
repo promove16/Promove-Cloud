@@ -7,6 +7,9 @@ import { User } from '../user/user.model';
 import { UserRole } from '../../types/roles.types';
 import { Event } from '../event/event.model';
 import {
+  bulkCreateManagedStudentCredentials,
+  createManagedStudentCredentials,
+  createManagedStudentCredentialsSchema,
   createStudentAccessToken,
   createStudentAccessTokenSchema,
   listPendingStudentVerifications,
@@ -15,6 +18,7 @@ import {
   reviewStudentVerificationSchema,
 } from '../institution/institutionAccess.service';
 import {
+  cancelStudentRosterInvite,
   createStudentRosterEntry,
   importStudentRosterEntries,
   listStudentRosterEntries,
@@ -28,6 +32,7 @@ import {
   getStudentJourney,
   getStudentLeaderboard,
 } from '../school/school.service';
+import { TemporaryStudentCredentialsView } from '../school/school.types';
 import { PlacementRecord } from './placementRecord.model';
 import {
   CollegeDashboardPayload,
@@ -389,11 +394,29 @@ export const createCollegeStudentRosterEntry = (
   payload: z.infer<typeof manualStudentRosterEntrySchema>,
 ) => createStudentRosterEntry(collegeId, UserRole.COLLEGE, actorId, payload);
 
+export const cancelCollegeStudentRosterInvite = (
+  collegeId: string,
+  rosterEntryId: string,
+) => cancelStudentRosterInvite(collegeId, UserRole.COLLEGE, rosterEntryId);
+
+export const createCollegeManagedStudentCredentials = (
+  collegeId: string,
+  actorId: string,
+  payload: z.infer<typeof createManagedStudentCredentialsSchema>,
+): Promise<TemporaryStudentCredentialsView> =>
+  createManagedStudentCredentials(collegeId, UserRole.COLLEGE, actorId, payload);
+
 export const importCollegeStudentRosterEntries = (
   collegeId: string,
   actorId: string,
   file: { originalname: string; buffer: Buffer },
 ) => importStudentRosterEntries(collegeId, UserRole.COLLEGE, actorId, file);
+
+export const importCollegeStudentCredentials = (
+  collegeId: string,
+  actorId: string,
+  file: { originalname: string; buffer: Buffer },
+) => bulkCreateManagedStudentCredentials(collegeId, UserRole.COLLEGE, actorId, file);
 
 export const getCollegeStudentRoster = (
   collegeId: string,
@@ -401,6 +424,7 @@ export const getCollegeStudentRoster = (
 ) => listStudentRosterEntries(collegeId, UserRole.COLLEGE, search);
 
 export {
+  createManagedStudentCredentialsSchema,
   createStudentAccessTokenSchema,
   listStudentRosterQuerySchema,
   manualStudentRosterEntrySchema,

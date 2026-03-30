@@ -8,5 +8,7 @@ const asyncHandler_1 = require("../../utils/asyncHandler");
 const score_controller_1 = require("./score.controller");
 const router = (0, express_1.Router)();
 router.get('/me', authenticate_1.authenticate, (0, authorize_1.authorize)(roles_types_1.UserRole.STUDENT), (0, asyncHandler_1.asyncHandler)(score_controller_1.getMyScore));
-router.get('/history/:userId', authenticate_1.authenticate, (0, authorize_1.authorize)(roles_types_1.UserRole.STUDENT), (0, asyncHandler_1.asyncHandler)(score_controller_1.getScoreHistory));
+router.get('/history/:userId', authenticate_1.authenticate, (0, authorize_1.authorize)(roles_types_1.UserRole.STUDENT, roles_types_1.UserRole.ADMIN), (0, asyncHandler_1.asyncHandler)(score_controller_1.getScoreHistory));
+router.get('/events/:userId', authenticate_1.authenticate, (0, authorize_1.authorize)(roles_types_1.UserRole.ADMIN), (0, asyncHandler_1.asyncHandler)(score_controller_1.getScoreEvents));
+router.post('/test-trigger', authenticate_1.authenticate, (0, authorize_1.authorize)(roles_types_1.UserRole.ADMIN), (0, asyncHandler_1.asyncHandler)(score_controller_1.testScoreTrigger));
 exports.default = router;

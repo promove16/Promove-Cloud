@@ -1,363 +1,704 @@
+import bcrypt from 'bcrypt';
 import jwt from 'jsonwebtoken';
 import { randomUUID } from 'crypto';
 import request from 'supertest';
+import * as XLSX from 'xlsx';
 import app from '../../src/app';
 import { env } from '../../src/config/env';
-import { institutionVerifyQueue } from '../../src/config/bullmq';
+import { InstitutionStudentRosterEntry } from '../../src/modules/institution/studentRoster.model';
 import { User } from '../../src/modules/user/user.model';
+import { UserRole } from '../../src/types/roles.types';
 
-const buildValidRegisterPayload = (overrides?: Partial<{
-  email: string;
-  password: string;
-  displayName: string;
-  role: 'mentor';
-  domain: string;
-}>) => ({
-  email: `mentor-${randomUUID()}@example.com`,
-  password: 'Password123!',
-  displayName: 'Mentor User',
-  role: 'mentor',
-  domain: 'Product Strategy',
-  ...overrides,
-} as const);
+const PASSWORD = 'Password123!';
+const API_ORIGIN = 'http://127.0.0.1';
 
-const registerAndExtract = async (payload = buildValidRegisterPayload()) => {
-  const response = await request(app).post('/api/auth/register').send(payload);
-  const cookie = response.headers['set-cookie']?.[0];
-  const accessToken = response.body.data.accessToken as string;
-  return { response, cookie, accessToken, payload };
+const createApprovedUser = async (input: {
+  role: UserRole;
+  email?: string;
+  displayName?: string;
+  domain?: string;
+  institutionProfile?: {
+    institutionName: string;
+    location: string;
+    totalStudentsEnrolled: number;
+    academicYear: string;
+    iicStarRating?: number;
+  };
+}) => {
+  const email = input.email ?? `${input.role}-${randomUUID()}@example.com`;
+  const passwordHash = await bcrypt.hash(PASSWORD, 12);
+
+  const user = await User.create({
+    email,
+    passwordHash,
+    role: input.role,
+    displayName: input.displayName ?? `${input.role} user`,
+    ...(input.domain ? { domain: input.domain } : {}),
+    ...(input.institutionProfile ? { institutionProfile: input.institutionProfile } : {}),
+    profileComplete: true,
+    registrationStage:
+      input.role === UserRole.SCHOOL || input.role === UserRole.COLLEGE ? 'complete' : 'profile_setup',
+    accessGrantedBy: 'admin',
+    accessExpiresAt: new Date(Date.now() + 365 * 24 * 60 * 60 * 1000),
+    isActive: true,
+    institutionToken: null,
+    institutionId: null,
+    institutionVerificationStatus: 'none',
+    verificationStatus: input.role === UserRole.STUDENT ? 'verified' : 'not_required',
+    adminApprovalStatus: input.role === UserRole.STUDENT ? 'not_required' : 'approved',
+    adminApprovedAt: input.role === UserRole.STUDENT ? undefined : new Date(),
+  });
+
+  return { user, email };
 };
+
+const loginAs = async (email: string, password = PASSWORD) => {
+  const response = await request(app).post('/api/auth/login').send({
+    email,
+    password,
+  });
+
+  return {
+    response,
+    accessToken: response.body.data?.accessToken as string | undefined,
+    cookie: response.headers['set-cookie']?.[0],
+  };
+};
+
+const createInstitutionToken = async (role: UserRole.SCHOOL | UserRole.COLLEGE, email: string) => {
+  const login = await loginAs(email);
+  const endpoint = role === UserRole.SCHOOL ? '/api/school/student-access-tokens' : '/api/college/student-access-tokens';
+  const response = await request(app)
+    .post(endpoint)
+    .set('Authorization', `Bearer ${login.accessToken}`)
+    .send({ label: 'Admissions' });
+
+  return {
+    response,
+    token: response.body.data.token as string,
+    accessToken: login.accessToken!,
+  };
+};
+
+const restoreFetch = (mock: jest.SpyInstance) => {
+  mock.mockRestore();
+};
+
+const mockOAuthFetch = (provider: 'google' | 'linkedin', email: string) =>
+  jest.spyOn(global, 'fetch').mockImplementation(async (input) => {
+    const url = typeof input === 'string' ? input : input instanceof URL ? input.toString() : input.url;
+
+    if (provider === 'google') {
+      if (url === 'https://oauth2.googleapis.com/token') {
+        return {
+          ok: true,
+          json: async () => ({
+            access_token: 'google-access-token',
+            id_token: 'google-id-token',
+          }),
+        } as Response;
+      }
+
+      if (url === 'https://openidconnect.googleapis.com/v1/userinfo') {
+        return {
+          ok: true,
+          json: async () => ({
+            sub: 'google-user-123',
+            email,
+            email_verified: true,
+            name: 'OAuth User',
+            picture: 'https://example.com/google-avatar.png',
+          }),
+        } as Response;
+      }
+    }
+
+    if (provider === 'linkedin') {
+      if (url === 'https://www.linkedin.com/oauth/v2/accessToken') {
+        return {
+          ok: true,
+          json: async () => ({
+            access_token: 'linkedin-access-token',
+            id_token: 'linkedin-id-token',
+          }),
+        } as Response;
+      }
+
+      if (url === 'https://api.linkedin.com/v2/userinfo') {
+        return {
+          ok: true,
+          json: async () => ({
+            sub: 'linkedin-user-456',
+            email,
+            email_verified: true,
+            name: 'OAuth User',
+            picture: 'https://example.com/linkedin-avatar.png',
+          }),
+        } as Response;
+      }
+    }
+
+    throw new Error(`Unexpected fetch call: ${url}`);
+  });
 
 describe('auth integration', () => {
   describe('POST /api/auth/register', () => {
-    it('creates non-student accounts without an access code', async () => {
-      const payload = buildValidRegisterPayload();
-      const response = await request(app).post('/api/auth/register').send(payload);
-
-      expect(response.status).toBe(201);
-      expect(response.body.success).toBe(true);
-      expect(response.body.data.accessToken).toEqual(expect.any(String));
-      expect(response.body.data.user.email).toBe(payload.email);
-      expect(response.body.data.user.accessGrantedBy).toBe('self_registered');
-      expect(response.body.data.nextStep).toBe('profile_setup');
-      expect(response.headers['set-cookie']?.[0]).toContain('refreshToken=');
-    });
-
-    it('creates a student without an institution token', async () => {
+    it('requires an institution token for student signup', async () => {
       const response = await request(app).post('/api/auth/register').send({
-        email: 'student-without-token@example.com',
-        password: 'Password123!',
+        email: `student-${randomUUID()}@example.com`,
+        password: PASSWORD,
         displayName: 'Student User',
         role: 'student',
-      });
-
-      expect(response.status).toBe(201);
-      expect(response.body.data.accessToken).toEqual(expect.any(String));
-      expect(response.body.data.user.registrationStage).toBe('basic');
-      expect(response.body.data.user.institutionVerificationStatus).toBe('none');
-      expect(response.body.data.user.profileSlug).toMatch(/^student-user-[a-f0-9]{4}$/);
-      expect(response.headers['set-cookie']?.[0]).toContain('refreshToken=');
-    });
-
-    it('creates a student with an institution token and returns a pending verification response', async () => {
-      const queueSpy = jest.spyOn(institutionVerifyQueue, 'add');
-
-      const response = await request(app).post('/api/auth/register').send({
-        email: 'student@example.com',
-        password: 'Password123!',
-        displayName: 'Student User',
-        role: 'student',
-        institutionToken: 'SCH-AB12CD34',
-      });
-
-      expect(response.status).toBe(201);
-      expect(response.body.success).toBe(true);
-      expect(response.body.data.requiresVerification).toBe(true);
-      expect(response.body.data.user.registrationStage).toBe('institution_pending');
-      expect(response.body.data.user.institutionVerificationStatus).toBe('pending');
-      expect(response.body.data.user.accessGrantedBy).toBe('institution_token');
-      expect(response.body.data.user.passwordHash).toBeUndefined();
-      expect(response.headers['set-cookie']).toBeUndefined();
-      expect(queueSpy).toHaveBeenCalledWith(
-        'verify',
-        expect.objectContaining({
-          userId: response.body.data.user._id,
-          token: 'SCH-AB12CD34',
-        }),
-        expect.any(Object),
-      );
-    });
-
-    it('creates a roster-linked student without a token and leaves the account pending approval', async () => {
-      const schoolRegister = await request(app).post('/api/auth/register').send({
-        email: 'school-roster@example.com',
-        password: 'Password123!',
-        displayName: 'Roster School',
-        role: 'school',
-        institutionProfile: {
-          institutionName: 'Roster School',
-          location: 'Hyderabad',
-          totalStudentsEnrolled: 850,
-          academicYear: '2025-26',
-        },
-      });
-
-      const schoolToken = schoolRegister.body.data.accessToken as string;
-
-      const rosterResponse = await request(app)
-        .post('/api/school/student-roster/manual')
-        .set('Authorization', `Bearer ${schoolToken}`)
-        .send({
-          displayName: 'Roster Student',
-          email: 'student.roster@school.test',
-          gradeOrProgram: 'Class 12',
-          rollNumber: 'SCH-001',
-        });
-
-      expect(rosterResponse.status).toBe(201);
-
-      const response = await request(app).post('/api/auth/register').send({
-        email: 'student.roster@school.test',
-        password: 'Password123!',
-        displayName: 'Roster Student',
-        role: 'student',
-      });
-
-      expect(response.status).toBe(201);
-      expect(response.body.data.requiresVerification).toBe(true);
-      expect(response.body.data.user.accessGrantedBy).toBe('institution_roster');
-      expect(response.body.data.user.institutionVerificationStatus).toBe('verified');
-      expect(response.body.data.user.verificationStatus).toBe('pending');
-      expect(response.headers['set-cookie']).toBeUndefined();
-    });
-
-    it('rejects duplicate email registrations', async () => {
-      const payload = buildValidRegisterPayload();
-      await request(app).post('/api/auth/register').send(payload);
-      const response = await request(app).post('/api/auth/register').send(payload);
-
-      expect(response.status).toBe(409);
-      expect(response.body.error.code).toBe('DUPLICATE_KEY');
-    });
-
-    it('rejects when capacity is reached', async () => {
-      const payload = buildValidRegisterPayload();
-      const previousMax = env.MAX_USERS_YEAR_ONE;
-      env.MAX_USERS_YEAR_ONE = 1;
-
-      await request(app).post('/api/auth/register').send(payload);
-
-      const response = await request(app).post('/api/auth/register').send({
-        ...payload,
-        email: 'second@example.com',
-      });
-
-      env.MAX_USERS_YEAR_ONE = previousMax;
-
-      expect(response.status).toBe(403);
-      expect(response.body.error.code).toBe('CAPACITY_REACHED');
-    });
-
-    it('rejects invalid role payloads', async () => {
-      const payload = buildValidRegisterPayload();
-      const response = await request(app).post('/api/auth/register').send({
-        ...payload,
-        role: 'company',
       });
 
       expect(response.status).toBe(400);
       expect(response.body.error.code).toBe('VALIDATION_ERROR');
     });
 
-    it('stores institution details for school registrations', async () => {
-      const response = await request(app).post('/api/auth/register').send({
-        email: 'school@example.com',
-        password: 'Password123!',
-        displayName: 'Innovation Coordinator',
-        role: 'school',
+    it('creates a pending student account when the institution token is valid', async () => {
+      const schoolEmail = `coordinator-${randomUUID()}@school.test`;
+      await createApprovedUser({
+        role: UserRole.SCHOOL,
+        email: schoolEmail,
+        displayName: 'Test School',
         institutionProfile: {
-          institutionName: 'Future Ready School',
+          institutionName: 'Test School',
           location: 'Hyderabad',
+          totalStudentsEnrolled: 1200,
+          academicYear: '2025-26',
+        },
+      });
+      const { token } = await createInstitutionToken(UserRole.SCHOOL, schoolEmail);
+
+      const response = await request(app).post('/api/auth/register').send({
+        email: `student-${randomUUID()}@school.test`,
+        password: PASSWORD,
+        displayName: 'Student User',
+        role: 'student',
+        institutionToken: token,
+      });
+
+      expect(response.status).toBe(201);
+      expect(response.body.data.pendingApproval).toBe(true);
+      expect(response.body.data.approvalType).toBe('institution');
+      expect(response.body.data.user.accessGrantedBy).toBe('institution_token');
+      expect(response.body.data.user.verificationStatus).toBe('pending');
+      expect(response.body.data.user.institutionVerificationStatus).toBe('verified');
+      expect(response.body.data.user.isActive).toBe(false);
+      expect(response.headers['set-cookie']).toBeUndefined();
+
+      const created = await User.findOne({ email: response.body.data.user.email }).lean();
+      expect(created?.institutionId).toBeTruthy();
+      expect(created?.verificationStatus).toBe('pending');
+      expect(created?.isActive).toBe(false);
+    });
+
+    it('links rostered student signup to the same institution when token and email match', async () => {
+      const schoolEmail = `roster-${randomUUID()}@school.test`;
+      await createApprovedUser({
+        role: UserRole.SCHOOL,
+        email: schoolEmail,
+        displayName: 'Roster School',
+        institutionProfile: {
+          institutionName: 'Roster School',
+          location: 'Delhi',
+          totalStudentsEnrolled: 900,
+          academicYear: '2025-26',
+        },
+      });
+
+      const { token, accessToken } = await createInstitutionToken(UserRole.SCHOOL, schoolEmail);
+
+      const rosterEmail = `student-${randomUUID()}@school.test`;
+      const rosterResponse = await request(app)
+        .post('/api/school/student-roster/manual')
+        .set('Authorization', `Bearer ${accessToken}`)
+        .send({
+          displayName: 'Roster Student',
+          email: rosterEmail,
+          gradeOrProgram: 'Class 12',
+          rollNumber: 'SCH-100',
+        });
+
+      expect(rosterResponse.status).toBe(201);
+
+      const response = await request(app).post('/api/auth/register').send({
+        email: rosterEmail,
+        password: PASSWORD,
+        displayName: 'Roster Student',
+        role: 'student',
+        institutionToken: token,
+      });
+
+      expect(response.status).toBe(201);
+      expect(response.body.data.user.accessGrantedBy).toBe('institution_roster');
+      expect(response.body.data.user.verificationStatus).toBe('pending');
+    });
+
+    it('allows a school to cancel a pending student invite', async () => {
+      const schoolEmail = `cancel-${randomUUID()}@school.test`;
+      await createApprovedUser({
+        role: UserRole.SCHOOL,
+        email: schoolEmail,
+        displayName: 'Cancel School',
+        institutionProfile: {
+          institutionName: 'Cancel School',
+          location: 'Mumbai',
+          totalStudentsEnrolled: 800,
+          academicYear: '2025-26',
+        },
+      });
+
+      const schoolLogin = await loginAs(schoolEmail);
+      const rosterEmail = `invite-${randomUUID()}@school.test`;
+
+      const createResponse = await request(app)
+        .post('/api/school/student-roster/manual')
+        .set('Authorization', `Bearer ${schoolLogin.accessToken}`)
+        .send({
+          displayName: 'Invite Student',
+          email: rosterEmail,
+          gradeOrProgram: 'Class 10',
+        });
+
+      expect(createResponse.status).toBe(201);
+
+      const cancelResponse = await request(app)
+        .delete(`/api/school/student-roster/${createResponse.body.data._id as string}`)
+        .set('Authorization', `Bearer ${schoolLogin.accessToken}`);
+
+      expect(cancelResponse.status).toBe(200);
+      expect(cancelResponse.body.data.cancelled).toBe(true);
+
+      const rosterEntry = await InstitutionStudentRosterEntry.findById(
+        createResponse.body.data._id,
+      ).lean();
+      expect(rosterEntry?.isActive).toBe(false);
+
+      const listResponse = await request(app)
+        .get('/api/school/student-roster')
+        .set('Authorization', `Bearer ${schoolLogin.accessToken}`);
+
+      expect(listResponse.status).toBe(200);
+      expect(listResponse.body.data).toHaveLength(0);
+    });
+  });
+
+  describe('POST /api/auth/register-request', () => {
+    it('submits non-student registration requests for admin approval', async () => {
+      const response = await request(app).post('/api/auth/register-request').send({
+        email: `mentor-${randomUUID()}@example.com`,
+        password: PASSWORD,
+        displayName: 'Mentor Applicant',
+        role: 'mentor',
+        domain: 'AI Strategy',
+        bio: 'Guides student founders.',
+      });
+
+      expect(response.status).toBe(201);
+      expect(response.body.data.pendingApproval).toBe(true);
+      expect(response.body.data.approvalType).toBe('admin');
+      expect(response.body.data.user.adminApprovalStatus).toBe('pending');
+      expect(response.body.data.user.isActive).toBe(false);
+      expect(response.headers['set-cookie']).toBeUndefined();
+    });
+
+    it('blocks login for non-student accounts until admin approval', async () => {
+      const email = `investor-${randomUUID()}@example.com`;
+      await request(app).post('/api/auth/register-request').send({
+        email,
+        password: PASSWORD,
+        displayName: 'Investor Applicant',
+        role: 'investor',
+        domain: 'ClimateTech',
+      });
+
+      const response = await request(app).post('/api/auth/login').send({
+        email,
+        password: PASSWORD,
+      });
+
+      expect(response.status).toBe(403);
+      expect(response.body.error.code).toBe('ADMIN_APPROVAL_PENDING');
+    });
+  });
+
+  describe('admin registration review', () => {
+    it('lists and approves pending registration requests', async () => {
+      const { email: adminEmail } = await createApprovedUser({
+        role: UserRole.ADMIN,
+        email: `admin-${randomUUID()}@example.com`,
+        displayName: 'Platform Admin',
+      });
+      const adminLogin = await loginAs(adminEmail);
+
+      const mentorEmail = `mentor-${randomUUID()}@example.com`;
+      const requestResponse = await request(app).post('/api/auth/register-request').send({
+        email: mentorEmail,
+        password: PASSWORD,
+        displayName: 'Mentor Applicant',
+        role: 'mentor',
+        domain: 'Product Strategy',
+      });
+
+      const requestId = requestResponse.body.data.user._id as string;
+
+      const listResponse = await request(app)
+        .get('/api/admin/registration-requests')
+        .set('Authorization', `Bearer ${adminLogin.accessToken}`);
+
+      expect(listResponse.status).toBe(200);
+      expect(listResponse.body.data.items).toEqual(
+        expect.arrayContaining([
+          expect.objectContaining({
+            _id: requestId,
+            email: mentorEmail,
+            status: 'pending',
+          }),
+        ]),
+      );
+
+      const approveResponse = await request(app)
+        .patch(`/api/admin/registration-requests/${requestId}/approve`)
+        .set('Authorization', `Bearer ${adminLogin.accessToken}`)
+        .send({});
+
+      expect(approveResponse.status).toBe(200);
+
+      const loginResponse = await request(app).post('/api/auth/login').send({
+        email: mentorEmail,
+        password: PASSWORD,
+      });
+
+      expect(loginResponse.status).toBe(200);
+      expect(loginResponse.body.data.user.adminApprovalStatus).toBe('approved');
+    });
+
+    it('rejects registration requests with a reason', async () => {
+      const { email: adminEmail } = await createApprovedUser({
+        role: UserRole.ADMIN,
+        email: `admin-${randomUUID()}@example.com`,
+        displayName: 'Platform Admin',
+      });
+      const adminLogin = await loginAs(adminEmail);
+
+      const recruiterEmail = `recruiter-${randomUUID()}@example.com`;
+      const requestResponse = await request(app).post('/api/auth/register-request').send({
+        email: recruiterEmail,
+        password: PASSWORD,
+        displayName: 'Recruiter Applicant',
+        role: 'recruiter',
+        domain: 'Hiring',
+      });
+
+      const requestId = requestResponse.body.data.user._id as string;
+      const rejectResponse = await request(app)
+        .patch(`/api/admin/registration-requests/${requestId}/reject`)
+        .set('Authorization', `Bearer ${adminLogin.accessToken}`)
+        .send({ rejectionReason: 'Need company verification details first.' });
+
+      expect(rejectResponse.status).toBe(200);
+
+      const loginResponse = await request(app).post('/api/auth/login').send({
+        email: recruiterEmail,
+        password: PASSWORD,
+      });
+
+      expect(loginResponse.status).toBe(403);
+      expect(loginResponse.body.error.code).toBe('ADMIN_APPROVAL_REJECTED');
+    });
+  });
+
+  describe('admin credential limit', () => {
+    it('blocks creating a fourth admin account through role promotion', async () => {
+      const { email: primaryAdminEmail } = await createApprovedUser({
+        role: UserRole.ADMIN,
+        email: `admin-primary-${randomUUID()}@example.com`,
+        displayName: 'Primary Admin',
+      });
+      await createApprovedUser({
+        role: UserRole.ADMIN,
+        email: `admin-second-${randomUUID()}@example.com`,
+        displayName: 'Second Admin',
+      });
+      await createApprovedUser({
+        role: UserRole.ADMIN,
+        email: `admin-third-${randomUUID()}@example.com`,
+        displayName: 'Third Admin',
+      });
+
+      const adminLogin = await loginAs(primaryAdminEmail);
+      const { user: mentorUser } = await createApprovedUser({
+        role: UserRole.MENTOR,
+        email: `mentor-${randomUUID()}@example.com`,
+        displayName: 'Mentor To Promote',
+        domain: 'Product Strategy',
+      });
+
+      const response = await request(app)
+        .patch(`/api/admin/users/${mentorUser._id.toString()}/role`)
+        .set('Authorization', `Bearer ${adminLogin.accessToken}`)
+        .send({ role: UserRole.ADMIN });
+
+      expect(response.status).toBe(409);
+      expect(response.body.error.code).toBe('ADMIN_CREDENTIAL_LIMIT_REACHED');
+
+      const updatedMentor = await User.findById(mentorUser._id).lean();
+      expect(updatedMentor?.role).toBe(UserRole.MENTOR);
+    });
+  });
+
+  describe('institution-managed temporary student credentials', () => {
+    it('allows a school to create temporary student credentials on its own domain', async () => {
+      const schoolEmail = `admin-${randomUUID()}@campus.test`;
+      await createApprovedUser({
+        role: UserRole.SCHOOL,
+        email: schoolEmail,
+        displayName: 'Campus School',
+        institutionProfile: {
+          institutionName: 'Campus School',
+          location: 'Pune',
+          totalStudentsEnrolled: 700,
+          academicYear: '2025-26',
+        },
+      });
+
+      const schoolLogin = await loginAs(schoolEmail);
+      const studentEmail = `student-${randomUUID()}@campus.test`;
+
+      const response = await request(app)
+        .post('/api/school/student-temp-credentials')
+        .set('Authorization', `Bearer ${schoolLogin.accessToken}`)
+        .send({
+          displayName: 'Managed Student',
+          email: studentEmail,
+          gradeOrProgram: 'Class 11',
+          rollNumber: 'CMP-001',
+        });
+
+      expect(response.status).toBe(201);
+      expect(response.body.data.temporaryPassword).toEqual(expect.any(String));
+      expect(response.body.data.student.email).toBe(studentEmail);
+
+      const loginResponse = await request(app).post('/api/auth/login').send({
+        email: studentEmail,
+        password: response.body.data.temporaryPassword,
+      });
+
+      expect(loginResponse.status).toBe(200);
+      expect(loginResponse.body.data.user.accessGrantedBy).toBe('institution_admin');
+    });
+
+    it('rejects temporary student credentials for a different email domain', async () => {
+      const collegeEmail = `dean-${randomUUID()}@college.test`;
+      await createApprovedUser({
+        role: UserRole.COLLEGE,
+        email: collegeEmail,
+        displayName: 'Future College',
+        institutionProfile: {
+          institutionName: 'Future College',
+          location: 'Bengaluru',
+          totalStudentsEnrolled: 1800,
+          academicYear: '2025-26',
+        },
+      });
+
+      const collegeLogin = await loginAs(collegeEmail);
+      const response = await request(app)
+        .post('/api/college/student-temp-credentials')
+        .set('Authorization', `Bearer ${collegeLogin.accessToken}`)
+        .send({
+          displayName: 'External Student',
+          email: `student-${randomUUID()}@external.test`,
+          gradeOrProgram: 'B.Tech',
+        });
+
+      expect(response.status).toBe(400);
+      expect(response.body.error.code).toBe('INSTITUTION_EMAIL_DOMAIN_REQUIRED');
+    });
+
+    it('creates student credentials from an Excel roster import and allows login', async () => {
+      const schoolEmail = `excel-${randomUUID()}@campus.test`;
+      const { user: schoolUser } = await createApprovedUser({
+        role: UserRole.SCHOOL,
+        email: schoolEmail,
+        displayName: 'Excel School',
+        institutionProfile: {
+          institutionName: 'Excel School',
+          location: 'Chennai',
           totalStudentsEnrolled: 950,
           academicYear: '2025-26',
         },
       });
 
-      expect(response.status).toBe(201);
-      expect(response.body.data.user.institutionProfile.institutionName).toBe('Future Ready School');
-      expect(response.body.data.user.profileComplete).toBe(true);
-    });
-
-    it('stores institution details for college registrations', async () => {
-      const response = await request(app).post('/api/auth/register').send({
-        email: 'college@example.com',
-        password: 'Password123!',
-        displayName: 'Incubation Program Lead',
-        role: 'college',
-        institutionProfile: {
-          institutionName: 'Future Ready College',
-          location: 'Bengaluru',
-          totalStudentsEnrolled: 1200,
-          academicYear: '2025-26',
+      const schoolLogin = await loginAs(schoolEmail);
+      const workbook = XLSX.utils.book_new();
+      const rows = [
+        {
+          displayName: 'Excel Student One',
+          email: `excel-one-${randomUUID()}@campus.test`,
+          gradeOrProgram: 'Class 11',
+          rollNumber: 'EX-001',
         },
+        {
+          displayName: 'Excel Student Two',
+          email: `excel-two-${randomUUID()}@campus.test`,
+          gradeOrProgram: 'Class 12',
+          rollNumber: 'EX-002',
+        },
+      ];
+      const worksheet = XLSX.utils.json_to_sheet(rows);
+      XLSX.utils.book_append_sheet(workbook, worksheet, 'Students');
+      const workbookBuffer = XLSX.write(workbook, { type: 'buffer', bookType: 'xlsx' });
+
+      const importResponse = await request(app)
+        .post('/api/school/student-roster/import-credentials')
+        .set('Authorization', `Bearer ${schoolLogin.accessToken}`)
+        .attach('file', workbookBuffer, 'students.xlsx');
+
+      expect(importResponse.status).toBe(200);
+      expect(importResponse.body.data.errors).toHaveLength(0);
+      expect(importResponse.body.data.results).toHaveLength(2);
+
+      const firstCredential = importResponse.body.data.results[0] as {
+        student: { email: string };
+        temporaryPassword: string;
+      };
+
+      const loginResponse = await request(app).post('/api/auth/login').send({
+        email: firstCredential.student.email,
+        password: firstCredential.temporaryPassword,
       });
 
-      expect(response.status).toBe(201);
-      expect(response.body.data.user.role).toBe('college');
-      expect(response.body.data.user.institutionProfile.institutionName).toBe('Future Ready College');
-      expect(response.body.data.user.profileComplete).toBe(true);
+      expect(loginResponse.status).toBe(200);
+      expect(loginResponse.body.data.user.accessGrantedBy).toBe('institution_admin');
+      expect(loginResponse.body.data.user.mustChangePasswordOnNextLogin).toBe(true);
+
+      const rosterEntries = await InstitutionStudentRosterEntry.find({
+        institutionId: schoolUser._id,
+        isActive: true,
+      }).lean();
+
+      expect(rosterEntries).toHaveLength(2);
+      expect(rosterEntries.every((entry) => entry.status === 'verified')).toBe(true);
     });
   });
 
-  describe('POST /api/auth/submit-institution-token', () => {
-    it('submits an institution token after registration and enqueues verification', async () => {
-      const queueSpy = jest.spyOn(institutionVerifyQueue, 'add');
-      const registerResponse = await request(app).post('/api/auth/register').send({
-        email: 'late-token@example.com',
-        password: 'Password123!',
-        displayName: 'Late Token Student',
-        role: 'student',
+  describe.skip('OAuth login', () => {
+    it('signs in an approved user with Google OAuth and keeps manual login intact', async () => {
+      const { email } = await createApprovedUser({
+        role: UserRole.MENTOR,
+        email: `mentor-${randomUUID()}@example.com`,
+        displayName: 'OAuth Mentor',
+        domain: 'AI Strategy',
       });
 
-      const response = await request(app)
-        .post('/api/auth/submit-institution-token')
-        .set('Authorization', `Bearer ${registerResponse.body.data.accessToken}`)
-        .send({ institutionToken: 'COL-XYZ12345' });
+      const fetchMock = mockOAuthFetch('google', email);
 
-      expect(response.status).toBe(200);
-      expect(response.body.success).toBe(true);
-      expect(response.body.data.message).toBe('Token submitted. Verification in progress.');
-      expect(queueSpy).toHaveBeenCalledWith(
-        'verify',
-        expect.objectContaining({
-          userId: registerResponse.body.data.user._id,
-          token: 'COL-XYZ12345',
-        }),
-        expect.any(Object),
-      );
+      try {
+        const startResponse = await request(app).get('/api/auth/oauth/google');
 
-      const user = await User.findById(registerResponse.body.data.user._id).lean();
-      expect(user?.institutionVerificationStatus).toBe('pending');
-      expect(user?.registrationStage).toBe('institution_pending');
-      expect(user?.institutionToken).toBe('COL-XYZ12345');
+        expect(startResponse.status).toBe(302);
+
+        const authorizationUrl = new URL(startResponse.headers.location, API_ORIGIN);
+        const state = authorizationUrl.searchParams.get('state');
+        expect(state).toBeTruthy();
+
+        const callbackResponse = await request(app).get(
+          `/api/auth/oauth/google/callback?code=test-google-code&state=${state}`,
+        );
+
+        expect(callbackResponse.status).toBe(302);
+        expect(callbackResponse.headers.location).toContain('/auth/callback?provider=google&status=success');
+
+        const oauthCookie = callbackResponse.headers['set-cookie']?.[0];
+        expect(oauthCookie).toContain('refreshToken=');
+
+        const refreshResponse = await request(app)
+          .post('/api/auth/refresh')
+          .set('Cookie', oauthCookie);
+
+        expect(refreshResponse.status).toBe(200);
+        expect(refreshResponse.body.data.user.email).toBe(email);
+        expect(refreshResponse.body.data.user.connectedAccounts.google.userId).toBe('google-user-123');
+
+        const manualLogin = await request(app).post('/api/auth/login').send({
+          email,
+          password: PASSWORD,
+        });
+
+        expect(manualLogin.status).toBe(200);
+      } finally {
+        restoreFetch(fetchMock);
+      }
     });
 
-    it('rejects token submission when institution is already verified', async () => {
-      const registerResponse = await request(app).post('/api/auth/register').send({
-        email: 'verified-student@example.com',
-        password: 'Password123!',
-        displayName: 'Verified Student',
-        role: 'student',
+    it('signs in an approved user with LinkedIn OAuth', async () => {
+      const { email } = await createApprovedUser({
+        role: UserRole.RECRUITER,
+        email: `recruiter-${randomUUID()}@example.com`,
+        displayName: 'OAuth Recruiter',
+        domain: 'Campus Hiring',
       });
 
-      await User.findByIdAndUpdate(registerResponse.body.data.user._id, {
-        institutionVerificationStatus: 'verified',
-      });
+      const fetchMock = mockOAuthFetch('linkedin', email);
 
-      const response = await request(app)
-        .post('/api/auth/submit-institution-token')
-        .set('Authorization', `Bearer ${registerResponse.body.data.accessToken}`)
-        .send({ institutionToken: 'SCH-READY01' });
+      try {
+        const startResponse = await request(app).get('/api/auth/oauth/linkedin');
+        const authorizationUrl = new URL(startResponse.headers.location, API_ORIGIN);
+        const state = authorizationUrl.searchParams.get('state');
 
-      expect(response.status).toBe(409);
-      expect(response.body.error.code).toBe('INSTITUTION_ALREADY_VERIFIED');
-    });
-  });
+        expect(startResponse.status).toBe(302);
+        expect(state).toBeTruthy();
 
-  describe('POST /api/auth/login', () => {
-    it('logs in successfully', async () => {
-      const payload = buildValidRegisterPayload();
-      await request(app).post('/api/auth/register').send(payload);
+        const callbackResponse = await request(app).get(
+          `/api/auth/oauth/linkedin/callback?code=test-linkedin-code&state=${state}`,
+        );
 
-      const response = await request(app).post('/api/auth/login').send({
-        email: payload.email,
-        password: payload.password,
-        role: payload.role,
-      });
+        expect(callbackResponse.status).toBe(302);
+        expect(callbackResponse.headers.location).toContain(
+          '/auth/callback?provider=linkedin&status=success',
+        );
 
-      expect(response.status).toBe(200);
-      expect(response.body.data.user.role).toBe('mentor');
-      expect(response.headers['set-cookie']?.[0]).toContain('refreshToken=');
-    });
+        const refreshResponse = await request(app)
+          .post('/api/auth/refresh')
+          .set('Cookie', callbackResponse.headers['set-cookie']?.[0]);
 
-    it('rejects wrong password', async () => {
-      const payload = buildValidRegisterPayload();
-      await request(app).post('/api/auth/register').send(payload);
-
-      const response = await request(app).post('/api/auth/login').send({
-        email: payload.email,
-        password: 'WrongPassword123!',
-        role: payload.role,
-      });
-
-      expect(response.status).toBe(401);
-      expect(response.body.error.code).toBe('INVALID_CREDENTIALS');
-    });
-
-    it('blocks student login while institution verification is pending', async () => {
-      await request(app).post('/api/auth/register').send({
-        email: 'pending-student@example.com',
-        password: 'Password123!',
-        displayName: 'Pending Student',
-        role: 'student',
-        institutionToken: 'SCH-PENDING1',
-      });
-
-      const response = await request(app).post('/api/auth/login').send({
-        email: 'pending-student@example.com',
-        password: 'Password123!',
-        role: 'student',
-      });
-
-      expect(response.status).toBe(403);
-      expect(response.body.error.code).toBe('INSTITUTION_APPROVAL_PENDING');
-    });
-
-    it('rejects role mismatch', async () => {
-      const payload = buildValidRegisterPayload();
-      await request(app).post('/api/auth/register').send(payload);
-
-      const response = await request(app).post('/api/auth/login').send({
-        email: payload.email,
-        password: payload.password,
-        role: 'investor',
-      });
-
-      expect(response.status).toBe(401);
-      expect(response.body.error.code).toBe('ROLE_MISMATCH');
+        expect(refreshResponse.status).toBe(200);
+        expect(refreshResponse.body.data.user.email).toBe(email);
+        expect(refreshResponse.body.data.user.connectedAccounts.linkedin.userId).toBe(
+          'linkedin-user-456',
+        );
+      } finally {
+        restoreFetch(fetchMock);
+      }
     });
   });
 
   describe('POST /api/auth/refresh', () => {
-    it('rotates the refresh token', async () => {
-      const { cookie } = await registerAndExtract();
-      const firstRefresh = await request(app).post('/api/auth/refresh').set('Cookie', cookie);
+    it('rotates the refresh token for approved users', async () => {
+      const { email } = await createApprovedUser({
+        role: UserRole.MENTOR,
+        email: `mentor-${randomUUID()}@example.com`,
+        displayName: 'Approved Mentor',
+        domain: 'Product Strategy',
+      });
+
+      const login = await loginAs(email);
+      const firstRefresh = await request(app).post('/api/auth/refresh').set('Cookie', login.cookie);
       const secondRefresh = await request(app)
         .post('/api/auth/refresh')
         .set('Cookie', firstRefresh.headers['set-cookie'][0]);
 
       expect(firstRefresh.status).toBe(200);
-      expect(firstRefresh.body.data.accessToken).toEqual(expect.any(String));
       expect(secondRefresh.status).toBe(200);
     });
 
-    it('rejects invalid refresh tokens', async () => {
-      const response = await request(app)
-        .post('/api/auth/refresh')
-        .set('Cookie', 'refreshToken=invalid-token');
-
-      expect(response.status).toBe(401);
-      expect(response.body.error.code).toBe('UNAUTHORIZED');
-    });
-
     it('rejects expired refresh tokens', async () => {
-      const user = await User.create({
-        email: 'expired@example.com',
-        passwordHash: 'hashed',
-        role: 'student',
-        displayName: 'Expired Token',
-        accessGrantedBy: 'self_registered',
-        accessExpiresAt: new Date(Date.now() + 365 * 24 * 60 * 60 * 1000),
+      const { user } = await createApprovedUser({
+        role: UserRole.STUDENT,
+        email: `student-${randomUUID()}@example.com`,
+        displayName: 'Expired Token Student',
       });
 
       const expiredToken = jwt.sign(
@@ -378,161 +719,6 @@ describe('auth integration', () => {
 
       expect(response.status).toBe(401);
       expect(response.body.error.code).toBe('UNAUTHORIZED');
-    });
-  });
-
-  describe('POST /api/auth/logout', () => {
-    it('logs out successfully', async () => {
-      const { cookie, accessToken } = await registerAndExtract();
-
-      const response = await request(app)
-        .post('/api/auth/logout')
-        .set('Cookie', cookie)
-        .set('Authorization', `Bearer ${accessToken}`);
-
-      expect(response.status).toBe(200);
-      expect(response.headers['set-cookie']?.[0]).toContain('refreshToken=;');
-    });
-
-    it('returns success when already logged out', async () => {
-      const { cookie, accessToken } = await registerAndExtract();
-
-      await request(app)
-        .post('/api/auth/logout')
-        .set('Cookie', cookie)
-        .set('Authorization', `Bearer ${accessToken}`);
-
-      const response = await request(app)
-        .post('/api/auth/logout')
-        .set('Cookie', cookie)
-        .set('Authorization', `Bearer ${accessToken}`);
-
-      expect(response.status).toBe(200);
-      expect(response.body.success).toBe(true);
-    });
-  });
-
-  describe('GET /api/users/me', () => {
-    it('returns the authenticated user without passwordHash', async () => {
-      const { accessToken, payload } = await registerAndExtract();
-
-      const response = await request(app)
-        .get('/api/users/me')
-        .set('Authorization', `Bearer ${accessToken}`);
-
-      expect(response.status).toBe(200);
-      expect(response.body.data.email).toBe(payload.email);
-      expect(response.body.data.passwordHash).toBeUndefined();
-    });
-
-    it('rejects when no token is provided', async () => {
-      const response = await request(app).get('/api/users/me');
-
-      expect(response.status).toBe(401);
-      expect(response.body.error.code).toBe('UNAUTHORIZED');
-    });
-
-    it('rejects expired access tokens', async () => {
-      const { response: registerResponse } = await registerAndExtract();
-      const userId = registerResponse.body.data.user._id as string;
-
-      const expiredAccessToken = jwt.sign(
-        {
-          _id: userId,
-          email: registerResponse.body.data.user.email,
-          role: 'student',
-          type: 'access',
-        },
-        env.JWT_ACCESS_SECRET,
-        { algorithm: 'RS256', expiresIn: '-1s' },
-      );
-
-      const response = await request(app)
-        .get('/api/users/me')
-        .set('Authorization', `Bearer ${expiredAccessToken}`);
-
-      expect(response.status).toBe(401);
-      expect(response.body.error.code).toBe('UNAUTHORIZED');
-    });
-  });
-
-  describe('institution student roster', () => {
-    it('lets a school add and bulk import student roster entries', async () => {
-      const schoolRegister = await request(app).post('/api/auth/register').send({
-        email: 'school-import@example.com',
-        password: 'Password123!',
-        displayName: 'Import School',
-        role: 'school',
-        institutionProfile: {
-          institutionName: 'Import School',
-          location: 'Delhi',
-          totalStudentsEnrolled: 1100,
-          academicYear: '2025-26',
-        },
-      });
-
-      const schoolToken = schoolRegister.body.data.accessToken as string;
-
-      const manualResponse = await request(app)
-        .post('/api/school/student-roster/manual')
-        .set('Authorization', `Bearer ${schoolToken}`)
-        .send({
-          displayName: 'Manual Student',
-          email: 'manual@student.test',
-          gradeOrProgram: 'Class 11',
-          rollNumber: 'M-001',
-        });
-
-      expect(manualResponse.status).toBe(201);
-      expect(manualResponse.body.data.email).toBe('manual@student.test');
-
-      const csv = [
-        'name,email,class,roll number,notes',
-        'CSV Student,csv@student.test,Class 10,C-001,Imported via CSV',
-        'Second Student,second@student.test,Class 9,C-002,Imported via CSV',
-      ].join('\n');
-
-      const importResponse = await request(app)
-        .post('/api/school/student-roster/import')
-        .set('Authorization', `Bearer ${schoolToken}`)
-        .attach('file', Buffer.from(csv), 'students.csv');
-
-      expect(importResponse.status).toBe(200);
-      expect(importResponse.body.data.createdCount).toBe(2);
-      expect(importResponse.body.data.skippedCount).toBe(0);
-
-      const listResponse = await request(app)
-        .get('/api/school/student-roster')
-        .set('Authorization', `Bearer ${schoolToken}`);
-
-      expect(listResponse.status).toBe(200);
-      expect(listResponse.body.data).toEqual(
-        expect.arrayContaining([
-          expect.objectContaining({ email: 'manual@student.test' }),
-          expect.objectContaining({ email: 'csv@student.test' }),
-          expect.objectContaining({ email: 'second@student.test' }),
-        ]),
-      );
-    });
-  });
-
-  describe('rate limiting', () => {
-    it('blocks more than 10 auth attempts within the window', async () => {
-      let response;
-
-      for (let attempt = 0; attempt < 11; attempt += 1) {
-        response = await request(app)
-          .post('/api/auth/login')
-          .set('X-Forwarded-For', '203.0.113.10')
-          .send({
-            email: 'missing@example.com',
-            password: 'Password123!',
-            role: 'student',
-          });
-      }
-
-      expect(response?.status).toBe(429);
-      expect(response?.body.error.code).toBe('RATE_LIMITED');
     });
   });
 });

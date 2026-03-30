@@ -7,6 +7,18 @@ exports.env = void 0;
 const dotenv_1 = __importDefault(require("dotenv"));
 const zod_1 = require("zod");
 dotenv_1.default.config();
+const booleanFromEnv = zod_1.z.preprocess((value) => {
+    if (typeof value === "boolean")
+        return value;
+    if (typeof value === "string") {
+        const normalized = value.trim().toLowerCase();
+        if (normalized === "true")
+            return true;
+        if (normalized === "false")
+            return false;
+    }
+    return value;
+}, zod_1.z.boolean());
 const envSchema = zod_1.z.object({
     MONGODB_URI: zod_1.z.string().min(1),
     UPSTASH_REDIS_REST_URL: zod_1.z.string().min(1),
@@ -19,11 +31,20 @@ const envSchema = zod_1.z.object({
     BULLMQ_COMMAND_TIMEOUT_MS: zod_1.z.coerce.number().int().positive().default(5000),
     JWT_ACCESS_SECRET: zod_1.z.string().min(1),
     JWT_REFRESH_SECRET: zod_1.z.string().min(1),
-    JWT_ACCESS_EXPIRES: zod_1.z.string().min(1).default('15m'),
-    JWT_REFRESH_EXPIRES: zod_1.z.string().min(1).default('30d'),
+    JWT_ACCESS_EXPIRES: zod_1.z.string().min(1).default("15m"),
+    JWT_REFRESH_EXPIRES: zod_1.z.string().min(1).default("30d"),
     PORT: zod_1.z.coerce.number().int().positive().default(5000),
-    NODE_ENV: zod_1.z.enum(['development', 'test', 'production']).default('development'),
+    NODE_ENV: zod_1.z
+        .enum(["development", "test", "production"])
+        .default("development"),
+    RATE_LIMIT_ENABLED: booleanFromEnv.default(true),
     CLIENT_URL: zod_1.z.string().min(1),
+    // GOOGLE_OAUTH_CLIENT_ID: z.string().min(1).optional(),
+    // GOOGLE_OAUTH_CLIENT_SECRET: z.string().min(1).optional(),
+    // GOOGLE_OAUTH_REDIRECT_URI: z.string().url().optional(),
+    // LINKEDIN_OAUTH_CLIENT_ID: z.string().min(1).optional(),
+    // LINKEDIN_OAUTH_CLIENT_SECRET: z.string().min(1).optional(),
+    // LINKEDIN_OAUTH_REDIRECT_URI: z.string().url().optional(),
     MAX_USERS_YEAR_ONE: zod_1.z.coerce.number().int().positive().default(2000),
     CLOUDINARY_CLOUD_NAME: zod_1.z.string().min(1),
     CLOUDINARY_API_KEY: zod_1.z.string().min(1),
@@ -38,7 +59,7 @@ if (!parsed.success) {
     const missing = parsed.error.flatten().fieldErrors;
     throw new Error(`Invalid environment variables: ${JSON.stringify(missing)}`);
 }
-const normalizeMultiline = (value) => value.replace(/\\n/g, '\n');
+const normalizeMultiline = (value) => value.replace(/\\n/g, "\n");
 exports.env = {
     ...parsed.data,
     JWT_ACCESS_SECRET: normalizeMultiline(parsed.data.JWT_ACCESS_SECRET),

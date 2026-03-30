@@ -35,6 +35,29 @@ export interface WorkspaceUpload {
   note?: string;
 }
 
+export interface WorkspaceRepoSubmission {
+  _id: string;
+  provider: 'github';
+  repoUrl: string;
+  displayName: string;
+  branch?: string;
+  commitHash?: string;
+  note?: string;
+  uploadedBy: string;
+  uploadedAt: string;
+}
+
+export interface WorkspaceCodeSubmission {
+  _id: string;
+  title: string;
+  language: string;
+  summary?: string;
+  codeSnippet: string;
+  lineCount: number;
+  uploadedBy: string;
+  uploadedAt: string;
+}
+
 export interface WorkspaceProgressUpdate {
   _id: string;
   submittedBy: string;
@@ -55,6 +78,8 @@ export interface Workspace {
   milestones: WorkspaceMilestone[];
   tasks: WorkspaceTask[];
   uploads: WorkspaceUpload[];
+  repoSubmissions: WorkspaceRepoSubmission[];
+  codeSubmissions: WorkspaceCodeSubmission[];
   progressUpdates: WorkspaceProgressUpdate[];
   teamMembers?: Array<{
     _id: string;

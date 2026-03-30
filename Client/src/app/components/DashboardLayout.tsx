@@ -147,10 +147,10 @@ export function DashboardLayout({ children, role }: DashboardLayoutProps) {
   ];
 
   const investorMenu = [
-    { icon: Home, label: "Deal Flow", path: "/investor" },
-    { icon: TrendingUp, label: "Startups", path: "/investor" },
-    { icon: Building2, label: "Institutions", path: "/investor" },
-    { icon: Briefcase, label: "My Portfolio", path: "/investor" },
+    { icon: Home, label: "Deal Flow", path: "/investor?view=dealflow" },
+    { icon: TrendingUp, label: "Startups", path: "/investor?view=startups" },
+    { icon: Building2, label: "Institutions", path: "/investor?view=institutions" },
+    { icon: Briefcase, label: "My Portfolio", path: "/investor?view=portfolio" },
   ];
 
   const mentorMenu = [

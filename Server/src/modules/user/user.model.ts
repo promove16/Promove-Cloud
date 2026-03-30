@@ -561,7 +561,15 @@ const userSchema = new Schema<IUser>(
     },
     accessGrantedBy: {
       type: String,
-      enum: ['self_registered', 'institution_token', 'institution_roster', 'admin', 'startup_school', 'skill_dev'],
+      enum: [
+        'self_registered',
+        'institution_token',
+        'institution_roster',
+        'institution_admin',
+        'admin',
+        'startup_school',
+        'skill_dev',
+      ],
       required: true,
     },
     accessExpiresAt: {
@@ -586,6 +594,10 @@ const userSchema = new Schema<IUser>(
       default: undefined,
     },
     discoverableToRecruiters: {
+      type: Boolean,
+      default: false,
+    },
+    mustChangePasswordOnNextLogin: {
       type: Boolean,
       default: false,
     },
@@ -633,10 +645,47 @@ const userSchema = new Schema<IUser>(
       default: undefined,
       maxlength: 300,
     },
+    adminApprovalStatus: {
+      type: String,
+      enum: ['not_required', 'pending', 'approved', 'rejected'],
+      default: 'not_required',
+    },
+    adminApprovalRequestedAt: {
+      type: Date,
+      default: undefined,
+    },
+    adminApprovedAt: {
+      type: Date,
+      default: undefined,
+    },
+    adminApprovedBy: {
+      type: Schema.Types.ObjectId,
+      ref: 'User',
+      default: null,
+    },
+    adminApprovalRejectedAt: {
+      type: Date,
+      default: undefined,
+    },
+    adminApprovalRejectedReason: {
+      type: String,
+      default: undefined,
+      maxlength: 300,
+    },
     connectedAccounts: {
       type: new Schema<IUser['connectedAccounts']>(
         {
           github: {
+            type: oauthAccountSchema,
+            default: () => ({
+              userId: null,
+              username: null,
+              accessToken: null,
+              connectedAt: null,
+              lastSyncedAt: null,
+            }),
+          },
+          google: {
             type: oauthAccountSchema,
             default: () => ({
               userId: null,
@@ -661,6 +710,13 @@ const userSchema = new Schema<IUser>(
       ),
       default: () => ({
         github: {
+          userId: null,
+          username: null,
+          accessToken: null,
+          connectedAt: null,
+          lastSyncedAt: null,
+        },
+        google: {
           userId: null,
           username: null,
           accessToken: null,
@@ -735,9 +791,12 @@ userSchema.index({ institutionId: 1 });
 userSchema.index({ role: 1, isActive: 1 });
 userSchema.index({ profileSlug: 1 }, { unique: true, sparse: true });
 userSchema.index({ 'connectedAccounts.github.username': 1 }, { sparse: true });
+userSchema.index({ 'connectedAccounts.google.userId': 1 }, { sparse: true });
+userSchema.index({ 'connectedAccounts.linkedin.userId': 1 }, { sparse: true });
 userSchema.index({ 'skills.name': 1 });
 userSchema.index({ isProfilePublic: 1, role: 1 });
 userSchema.index({ registrationStage: 1 });
+userSchema.index({ adminApprovalStatus: 1, createdAt: -1 });
 
 export type UserDocument = HydratedDocument<IUser>;
 export const User = model<IUser>('User', userSchema);

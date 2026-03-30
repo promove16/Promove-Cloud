@@ -7,12 +7,15 @@ import { UserRole } from '../../types/roles.types';
 import { ApiError } from '../../utils/ApiError';
 import { asyncHandler } from '../../utils/asyncHandler';
 import {
+  cancelSchoolStudentRosterInviteController,
+  createSchoolManagedStudentCredentialsController,
   createSchoolStudentAccessTokenController,
   createSchoolStudentRosterEntryController,
   createSchoolComplianceReportController,
   getLatestSchoolComplianceReportController,
   getSchoolDashboardController,
   getSchoolStudentJourneyController,
+  importSchoolStudentCredentialsController,
   importSchoolStudentRosterController,
   listSchoolStudentRosterController,
   listSchoolPendingStudentVerificationsController,
@@ -64,10 +67,20 @@ router.get('/student-access-tokens', asyncHandler(listSchoolStudentAccessTokensC
 router.post('/student-access-tokens', asyncHandler(createSchoolStudentAccessTokenController));
 router.get('/student-roster', asyncHandler(listSchoolStudentRosterController));
 router.post('/student-roster/manual', asyncHandler(createSchoolStudentRosterEntryController));
+router.delete('/student-roster/:rosterEntryId', asyncHandler(cancelSchoolStudentRosterInviteController));
+router.post(
+  '/student-temp-credentials',
+  asyncHandler(createSchoolManagedStudentCredentialsController),
+);
 router.post(
   '/student-roster/import',
   rosterUpload.single('file'),
   asyncHandler(importSchoolStudentRosterController),
+);
+router.post(
+  '/student-roster/import-credentials',
+  rosterUpload.single('file'),
+  asyncHandler(importSchoolStudentCredentialsController),
 );
 router.get(
   '/student-verifications',

@@ -27,20 +27,91 @@ export const registerSchema = z
     email: z.string().trim().email(),
     password: z.string().min(8).max(72),
     displayName: z.string().trim().min(2).max(60),
-    role: z.nativeEnum(UserRole),
-    institutionToken: z.string().trim().min(1).optional(),
-    accessCode: z.string().trim().min(1).optional(),
+    role: z.literal(UserRole.STUDENT),
+    institutionToken: z.string().trim().min(6).max(64).optional(),
+    domain: optionalProfileString(120),
+    bio: optionalProfileString(500),
+  });
+
+const registrationRequestRoleSchema = z.enum([
+  UserRole.SCHOOL,
+  UserRole.COLLEGE,
+  UserRole.MENTOR,
+  UserRole.INVESTOR,
+  UserRole.RECRUITER,
+]);
+
+export const registrationRequestSchema = z
+  .object({
+    email: z.string().trim().email(),
+    password: z.string().min(8).max(72),
+    displayName: z.string().trim().min(2).max(60),
+    role: registrationRequestRoleSchema,
     domain: optionalProfileString(120),
     bio: optionalProfileString(500),
     institutionProfile: institutionProfileInputSchema.optional(),
+  })
+  .superRefine((value, ctx) => {
+    if (
+      (value.role === UserRole.SCHOOL || value.role === UserRole.COLLEGE) &&
+      !value.institutionProfile
+    ) {
+      ctx.addIssue({
+        code: z.ZodIssueCode.custom,
+        path: ['institutionProfile'],
+        message: 'Institution details are required for this role',
+      });
+    }
+
+    if (
+      [UserRole.MENTOR, UserRole.INVESTOR, UserRole.RECRUITER].includes(value.role) &&
+      !value.domain
+    ) {
+      ctx.addIssue({
+        code: z.ZodIssueCode.custom,
+        path: ['domain'],
+        message: 'Domain or focus area is required for this role',
+      });
+    }
   });
 
 export const submitInstitutionTokenSchema = z.object({
   institutionToken: z.string().trim().min(6).max(64),
 });
 
+export const oauthProviderSchema = z.enum(['google', 'linkedin']);
+
+export const oauthCallbackQuerySchema = z
+  .object({
+    code: z.string().trim().min(1).optional(),
+    state: z.string().trim().min(1).optional(),
+    error: z.string().trim().min(1).optional(),
+    error_description: z.string().trim().min(1).optional(),
+  })
+  .superRefine((value, ctx) => {
+    if (value.error) {
+      return;
+    }
+
+    if (!value.code) {
+      ctx.addIssue({
+        code: z.ZodIssueCode.custom,
+        path: ['code'],
+        message: 'Authorization code is required',
+      });
+    }
+
+    if (!value.state) {
+      ctx.addIssue({
+        code: z.ZodIssueCode.custom,
+        path: ['state'],
+        message: 'State is required',
+      });
+    }
+  });
+
 export const loginSchema = z.object({
   email: z.string().trim().email(),
   password: z.string().min(1),
-  role: z.nativeEnum(UserRole),
+  role: z.nativeEnum(UserRole).optional(),
 });

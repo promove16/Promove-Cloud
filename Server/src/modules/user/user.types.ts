@@ -5,11 +5,13 @@ export type AccessGrantedBy =
   | 'self_registered'
   | 'institution_token'
   | 'institution_roster'
+  | 'institution_admin'
   | 'admin'
   | 'startup_school'
   | 'skill_dev';
 
 export type StudentVerificationStatus = 'not_required' | 'pending' | 'verified' | 'rejected';
+export type AdminApprovalStatus = 'not_required' | 'pending' | 'approved' | 'rejected';
 export type RegistrationStage =
   | 'basic'
   | 'profile_setup'
@@ -17,7 +19,7 @@ export type RegistrationStage =
   | 'institution_verified'
   | 'complete';
 export type InstitutionVerificationStatus = 'none' | 'pending' | 'verified' | 'failed';
-export type ConnectedAccountProvider = 'github' | 'linkedin';
+export type ConnectedAccountProvider = 'github' | 'google' | 'linkedin';
 export type SkillCategory = 'programming' | 'design' | 'business' | 'research' | 'other';
 export type SkillSource = 'platform' | 'github' | 'linkedin' | 'manual';
 export type SkillLevel = 'beginner' | 'intermediate' | 'advanced' | 'expert';
@@ -85,6 +87,7 @@ export interface OAuthConnection {
 
 export interface ConnectedAccounts {
   github: OAuthConnection;
+  google: OAuthConnection;
   linkedin: OAuthConnection;
 }
 
@@ -97,6 +100,7 @@ export interface SanitizedOAuthConnection {
 
 export interface SanitizedConnectedAccounts {
   github: SanitizedOAuthConnection;
+  google: SanitizedOAuthConnection;
   linkedin: SanitizedOAuthConnection;
 }
 
@@ -213,6 +217,7 @@ export interface IUser {
   profileSlug?: string | null;
   lastLogin?: Date;
   discoverableToRecruiters?: boolean;
+  mustChangePasswordOnNextLogin?: boolean;
   institutionToken: string | null;
   institutionId?: Types.ObjectId | null;
   institutionProfile?: InstitutionProfile;
@@ -223,6 +228,12 @@ export interface IUser {
   verifiedAt?: Date;
   verificationRejectedAt?: Date;
   verificationRejectedReason?: string;
+  adminApprovalStatus: AdminApprovalStatus;
+  adminApprovalRequestedAt?: Date;
+  adminApprovedAt?: Date;
+  adminApprovedBy?: Types.ObjectId | null;
+  adminApprovalRejectedAt?: Date;
+  adminApprovalRejectedReason?: string;
   connectedAccounts: ConnectedAccounts;
   skills: SkillEntry[];
   experience: ExperienceEntry[];
@@ -261,6 +272,7 @@ export interface SanitizedUser {
   isActive: boolean;
   lastLogin?: Date;
   discoverableToRecruiters?: boolean;
+  mustChangePasswordOnNextLogin?: boolean;
   institutionToken?: string | null;
   institutionId?: string | null;
   institutionProfile?: InstitutionProfile;
@@ -271,6 +283,12 @@ export interface SanitizedUser {
   verifiedAt?: Date;
   verificationRejectedAt?: Date;
   verificationRejectedReason?: string;
+  adminApprovalStatus: AdminApprovalStatus;
+  adminApprovalRequestedAt?: Date;
+  adminApprovedAt?: Date;
+  adminApprovedBy?: string | null;
+  adminApprovalRejectedAt?: Date;
+  adminApprovalRejectedReason?: string;
   connectedAccounts: SanitizedConnectedAccounts;
   skills: SkillEntry[];
   experience: ExperienceEntry[];

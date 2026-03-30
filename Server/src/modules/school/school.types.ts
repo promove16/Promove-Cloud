@@ -93,6 +93,18 @@ export interface StudentVerificationReviewResult {
   reason?: string;
 }
 
+export interface TemporaryStudentCredentialsView {
+  student: {
+    _id: string;
+    displayName: string;
+    email: string;
+    profileSlug?: string | null;
+  };
+  temporaryPassword: string;
+  institutionDomain: string;
+  createdAt: Date;
+}
+
 export interface DashboardEventView {
   _id: string;
   title: string;

@@ -42,23 +42,36 @@ const initChatSocket = (io) => {
             }
             socket.join(`ws:${workspaceId}`);
         });
-        socket.on('chat:message', async ({ workspaceId, message, attachmentUrl }) => {
-            if (!workspaceId || !mongoose_1.Types.ObjectId.isValid(workspaceId)) {
-                socket.emit('chat:error', { message: 'Workspace not found' });
-                return;
+        socket.on('chat:message', async ({ workspaceId, message, attachmentUrl, attachmentType }) => {
+            try {
+                if (!workspaceId || !mongoose_1.Types.ObjectId.isValid(workspaceId)) {
+                    socket.emit('chat:error', { message: 'Workspace not found' });
+                    return;
+                }
+                const hasAccess = await canAccessWorkspace(workspaceId, socket.data.userId);
+                if (!hasAccess) {
+                    socket.emit('chat:error', { message: 'Workspace not found' });
+                    return;
+                }
+                const normalizedMessage = typeof message === 'string'
+                    ? message.trim()
+                    : '';
+                if (!normalizedMessage && !attachmentUrl) {
+                    socket.emit('chat:error', { message: 'Message or attachment is required' });
+                    return;
+                }
+                const msg = await chat_model_1.ChatMessage.create({
+                    workspaceId,
+                    senderId: socket.data.userId,
+                    message: normalizedMessage,
+                    ...(attachmentUrl ? { attachmentUrl } : {}),
+                    ...(attachmentType ? { attachmentType } : {}),
+                });
+                chat.to(`ws:${workspaceId}`).emit('chat:message', msg);
             }
-            const hasAccess = await canAccessWorkspace(workspaceId, socket.data.userId);
-            if (!hasAccess) {
-                socket.emit('chat:error', { message: 'Workspace not found' });
-                return;
+            catch (_error) {
+                socket.emit('chat:error', { message: 'Unable to send message right now' });
             }
-            const msg = await chat_model_1.ChatMessage.create({
-                workspaceId,
-                senderId: socket.data.userId,
-                message,
-                attachmentUrl,
-            });
-            chat.to(`ws:${workspaceId}`).emit('chat:message', msg);
         });
         socket.on('chat:leave', ({ workspaceId }) => {
             socket.leave(`ws:${workspaceId}`);

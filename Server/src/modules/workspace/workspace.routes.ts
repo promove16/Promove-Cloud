@@ -6,7 +6,9 @@ import { UserRole } from '../../types/roles.types';
 import { asyncHandler } from '../../utils/asyncHandler';
 import { ApiError } from '../../utils/ApiError';
 import {
+  addWorkspaceCodeSubmission,
   addWorkspaceProgress,
+  addWorkspaceRepoSubmission,
   addWorkspaceTask,
   createWorkspaceController,
   getWorkspace,
@@ -17,7 +19,9 @@ import {
   patchWorkspaceTask,
   removeWorkspace,
   removeWorkspaceAsset,
+  removeWorkspaceCodeSubmission,
   removeWorkspaceMember,
+  removeWorkspaceRepoSubmission,
   removeWorkspaceTask,
   uploadWorkspaceAsset,
 } from './workspace.controller';
@@ -54,6 +58,10 @@ router.delete('/:id', asyncHandler(removeWorkspace));
 router.post('/:id/progress', asyncHandler(addWorkspaceProgress));
 router.post('/:id/upload', upload.single('file'), asyncHandler(uploadWorkspaceAsset));
 router.delete('/:id/upload/:uploadId', asyncHandler(removeWorkspaceAsset));
+router.post('/:id/repos', asyncHandler(addWorkspaceRepoSubmission));
+router.delete('/:id/repos/:repoId', asyncHandler(removeWorkspaceRepoSubmission));
+router.post('/:id/code', asyncHandler(addWorkspaceCodeSubmission));
+router.delete('/:id/code/:codeId', asyncHandler(removeWorkspaceCodeSubmission));
 router.post('/:id/tasks', asyncHandler(addWorkspaceTask));
 router.patch('/:id/tasks/:taskId', asyncHandler(patchWorkspaceTask));
 router.delete('/:id/tasks/:taskId', asyncHandler(removeWorkspaceTask));

@@ -8,6 +8,7 @@ const mongoose_1 = __importDefault(require("mongoose"));
 const multer_1 = __importDefault(require("multer"));
 const zod_1 = require("zod");
 const env_1 = require("../config/env");
+const logger_1 = require("../config/logger");
 const ApiError_1 = require("../utils/ApiError");
 const buildFailure = (code, message, details) => ({
     success: false,
@@ -17,7 +18,7 @@ const buildFailure = (code, message, details) => ({
         ...(details ? { details } : {}),
     },
 });
-const errorHandler = (error, _req, res, _next) => {
+const errorHandler = (error, req, res, _next) => {
     if (error instanceof ApiError_1.ApiError) {
         return res.status(error.statusCode).json(buildFailure(error.code, error.message, error.details));
     }
@@ -45,11 +46,30 @@ const errorHandler = (error, _req, res, _next) => {
         error !== null &&
         'code' in error &&
         error.code === 11000) {
+        const duplicateField = ('keyPattern' in error &&
+            typeof error.keyPattern === 'object' &&
+            error.keyPattern !== null &&
+            Object.keys(error.keyPattern).length > 0
+            ? Object.keys(error.keyPattern)[0]
+            : undefined) ||
+            ('keyValue' in error &&
+                typeof error.keyValue === 'object' &&
+                error.keyValue !== null &&
+                Object.keys(error.keyValue).length > 0
+                ? Object.keys(error.keyValue)[0]
+                : undefined);
+        if (duplicateField === 'email') {
+            return res
+                .status(409)
+                .json(buildFailure('DUPLICATE_KEY', 'Email already registered'));
+        }
         return res
             .status(409)
-            .json(buildFailure('DUPLICATE_KEY', 'Email already registered'));
+            .json(buildFailure('DUPLICATE_KEY', duplicateField
+            ? `Duplicate value for ${duplicateField}`
+            : 'Duplicate value already exists'));
     }
-    console.error(error);
+    (0, logger_1.logError)(`Unhandled application error on ${req.method} ${req.originalUrl}`, error);
     const message = env_1.env.NODE_ENV === 'production' ? 'Something went wrong' : 'Internal server error';
     return res.status(500).json(buildFailure('INTERNAL_SERVER_ERROR', message));
 };

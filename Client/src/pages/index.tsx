@@ -1,56 +1,64 @@
-import { PropsWithChildren } from 'react';
-import { Link, Navigate, Outlet, createBrowserRouter, isRouteErrorResponse, useRouteError } from 'react-router-dom';
-import { AuthLayout } from '../components/layouts/AuthLayout';
-import { DashboardLayout } from '../components/layouts/DashboardLayout';
-import { Card } from '../components/ui/Card';
-import { Spinner } from '../components/ui/Spinner';
-import { LoginPage } from '../features/auth/LoginPage';
-import { SignupPage } from '../features/auth/SignupPage';
-import SchoolDashboard from '../features/school/Dashboard';
-import SchoolStudentLeaderboard from '../features/school/StudentLeaderboard';
-import SchoolInvestorDirectory from '../features/school/InvestorDirectory';
-import SchoolComplianceReport from '../features/school/ComplianceReport';
-import CollegeDashboard from '../features/college/Dashboard';
-import CollegeStudentLeaderboard from '../features/college/StudentLeaderboard';
-import CollegeInvestorDirectory from '../features/college/InvestorDirectory';
-import RecruiterDirectory from '../features/college/RecruiterDirectory';
-import PlacementTracker from '../features/college/PlacementTracker';
-import EventManager from '../features/college/EventManager';
-import CollegeComplianceReport from '../features/college/ComplianceReport';
-import MentorDashboard from '../features/mentor/Dashboard';
-import MentorStudentFeed from '../features/mentor/StudentFeed';
-import MentorSessions from '../features/mentor/Sessions';
-import AdminDashboard from '../features/admin/Dashboard';
-import AdminUserManagement from '../features/admin/UserManagement';
-import AdminPatents from '../features/admin/Patents';
-import AdminAwards from '../features/admin/Awards';
-import AdminDeals from '../features/admin/Deals';
-import AdminAnalytics from '../features/admin/Analytics';
-import AdminCapacity from '../features/admin/Capacity';
-import RecruiterDashboard from '../features/recruiter/Dashboard';
-import RecruiterTalentSearch from '../features/recruiter/TalentSearch';
-import RecruiterCollegeConnect from '../features/recruiter/CollegeConnect';
-import RecruiterActiveDrives from '../features/recruiter/ActiveDrives';
-import RecruiterOnboardingTracker from '../features/recruiter/OnboardingTracker';
-import InvestorDashboard from '../features/investor/Dashboard';
-import InvestorStartupMarketplace from '../features/investor/StartupMarketplace';
-import InvestorInstitutions from '../features/investor/Institutions';
-import InvestorPortfolio from '../features/investor/Portfolio';
-import StartupCapTable from '../features/startup/CapTable';
-import { UserProfilePage } from '../features/profile/UserProfilePage';
-import { MentorDirectory } from '../features/institution/MentorDirectory';
-import { useProtectedRoute } from '../hooks/useProtectedRoute';
-import { useAuthStore } from '../store/authStore';
-import { UserRole } from '../types/roles.types';
-import { roleRedirect } from '../utils/roleRedirect';
-import { Dashboard as LegacyDashboard } from '../app/pages/Dashboard';
-import { StudentDashboard as LegacyStudentDashboard } from '../app/pages/dashboards/StudentDashboard';
-import { ProblemBank } from '../app/pages/ProblemBank';
-import { ProductWorkspace } from '../app/pages/ProductWorkspace';
-import { PatentSupport } from '../app/pages/PatentSupport';
-import { StartupLaunch } from '../app/pages/StartupLaunch';
-import { LeadershipProfile } from '../app/pages/LeadershipProfile';
-import { Marketplace } from '../features/student/Marketplace';
+import { PropsWithChildren } from "react";
+import { RequestAccessPage } from "../features/auth/RequestAccessPage";
+import { ChangePasswordPage } from "../features/auth/ChangePasswordPage";
+import {
+  Link,
+  Navigate,
+  Outlet,
+  createBrowserRouter,
+  isRouteErrorResponse,
+  useRouteError,
+} from "react-router-dom";
+import { AuthLayout } from "../components/layouts/AuthLayout";
+import { DashboardLayout } from "../components/layouts/DashboardLayout";
+import { Card } from "../components/ui/Card";
+import { Spinner } from "../components/ui/Spinner";
+import { LoginPage } from "../features/auth/LoginPage";
+import { SignupPage } from "../features/auth/SignupPage";
+import SchoolDashboard from "../features/school/Dashboard";
+import SchoolStudentLeaderboard from "../features/school/StudentLeaderboard";
+import SchoolInvestorDirectory from "../features/school/InvestorDirectory";
+import SchoolComplianceReport from "../features/school/ComplianceReport";
+import CollegeDashboard from "../features/college/Dashboard";
+import CollegeStudentLeaderboard from "../features/college/StudentLeaderboard";
+import CollegeInvestorDirectory from "../features/college/InvestorDirectory";
+import RecruiterDirectory from "../features/college/RecruiterDirectory";
+import PlacementTracker from "../features/college/PlacementTracker";
+import EventManager from "../features/college/EventManager";
+import CollegeComplianceReport from "../features/college/ComplianceReport";
+import MentorDashboard from "../features/mentor/Dashboard";
+import MentorStudentFeed from "../features/mentor/StudentFeed";
+import MentorSessions from "../features/mentor/Sessions";
+import AdminDashboard from "../features/admin/Dashboard";
+import AdminUserManagement from "../features/admin/UserManagement";
+import AdminPatents from "../features/admin/Patents";
+import AdminAwards from "../features/admin/Awards";
+import AdminDeals from "../features/admin/Deals";
+import AdminAnalytics from "../features/admin/Analytics";
+import AdminCapacity from "../features/admin/Capacity";
+import RecruiterDashboard from "../features/recruiter/Dashboard";
+import RecruiterTalentSearch from "../features/recruiter/TalentSearch";
+import RecruiterCollegeConnect from "../features/recruiter/CollegeConnect";
+import RecruiterActiveDrives from "../features/recruiter/ActiveDrives";
+import RecruiterOnboardingTracker from "../features/recruiter/OnboardingTracker";
+import InvestorDashboard from "../features/investor/Dashboard";
+import InvestorStartupMarketplace from "../features/investor/StartupMarketplace";
+import InvestorInstitutions from "../features/investor/Institutions";
+import InvestorPortfolio from "../features/investor/Portfolio";
+import StartupCapTable from "../features/startup/CapTable";
+import { UserProfilePage } from "../features/profile/UserProfilePage";
+import { MentorDirectory } from "../features/institution/MentorDirectory";
+import { useProtectedRoute } from "../hooks/useProtectedRoute";
+import { useAuthStore } from "../store/authStore";
+import { UserRole } from "../types/roles.types";
+import { roleRedirect } from "../utils/roleRedirect";
+import { StudentDashboard as LegacyStudentDashboard } from "../app/pages/dashboards/StudentDashboard";
+import { ProblemBank } from "../app/pages/ProblemBank";
+import { ProductWorkspace } from "../app/pages/ProductWorkspace";
+import { PatentSupport } from "../app/pages/PatentSupport";
+import { StartupLaunch } from "../app/pages/StartupLaunch";
+import { LeadershipProfile } from "../app/pages/LeadershipProfile";
+import { Marketplace } from "../features/student/Marketplace";
 
 function RootLayout() {
   return <Outlet />;
@@ -60,19 +68,21 @@ function RouteErrorPage() {
   const error = useRouteError();
   const title = isRouteErrorResponse(error)
     ? `${error.status} ${error.statusText}`
-    : 'Something went wrong';
+    : "Something went wrong";
   const description = isRouteErrorResponse(error)
-    ? typeof error.data === 'string'
+    ? typeof error.data === "string"
       ? error.data
-      : 'The page could not be loaded.'
+      : "The page could not be loaded."
     : error instanceof Error
       ? error.message
-      : 'An unexpected error interrupted this page.';
+      : "An unexpected error interrupted this page.";
 
   return (
     <div className="flex min-h-screen items-center justify-center bg-slate-950 px-4">
       <Card className="w-full max-w-2xl p-8">
-        <div className="text-xs uppercase tracking-[0.3em] text-cyan-300">Route Error</div>
+        <div className="text-xs uppercase tracking-[0.3em] text-cyan-300">
+          Route Error
+        </div>
         <h1 className="mt-4 text-3xl font-bold text-white">{title}</h1>
         <p className="mt-3 text-slate-400">{description}</p>
         <div className="mt-6 flex flex-wrap gap-3">
@@ -119,7 +129,7 @@ function ProtectedRoleRoute({
 }: PropsWithChildren<{ role: UserRole }>) {
   const route = useProtectedRoute([role]);
 
-  if (route.status === 'loading') {
+  if (route.status === "loading") {
     return (
       <div className="flex min-h-[40vh] items-center justify-center">
         <Spinner />
@@ -127,7 +137,7 @@ function ProtectedRoleRoute({
     );
   }
 
-  if (route.status !== 'authorized') {
+  if (route.status !== "authorized") {
     return <Navigate to={route.redirectTo} replace />;
   }
 
@@ -137,7 +147,7 @@ function ProtectedRoleRoute({
 function ProtectedAnyRoute({ children }: PropsWithChildren) {
   const route = useProtectedRoute();
 
-  if (route.status === 'loading') {
+  if (route.status === "loading") {
     return (
       <div className="flex min-h-[40vh] items-center justify-center">
         <Spinner />
@@ -145,7 +155,7 @@ function ProtectedAnyRoute({ children }: PropsWithChildren) {
     );
   }
 
-  if (route.status !== 'authorized') {
+  if (route.status !== "authorized") {
     return <Navigate to={route.redirectTo} replace />;
   }
 
@@ -157,7 +167,8 @@ function SettingsPage() {
     <Card className="mx-auto max-w-3xl p-8">
       <h1 className="text-3xl font-bold text-white">Settings</h1>
       <p className="mt-3 text-slate-400">
-        Account and institution settings stay role-aware and will expand in later phases.
+        Account and institution settings stay role-aware and will expand in
+        later phases.
       </p>
     </Card>
   );
@@ -165,7 +176,7 @@ function SettingsPage() {
 
 export const router = createBrowserRouter([
   {
-    path: '/',
+    path: "/",
     element: <RootLayout />,
     errorElement: <RouteErrorPage />,
     children: [
@@ -179,14 +190,18 @@ export const router = createBrowserRouter([
           {
             element: <AuthLayout />,
             children: [
-              { path: '/login', element: <LoginPage /> },
-              { path: '/signup', element: <SignupPage /> },
+              { path: "/login", element: <LoginPage /> },
+              { path: "/signup", element: <SignupPage /> },
+              {
+                path: "/request-access",
+                element: <RequestAccessPage />,
+              },
             ],
           },
         ],
       },
       {
-        path: '/student',
+        path: "/student",
         element: (
           <ProtectedRoleRoute role={UserRole.STUDENT}>
             <Navigate to="/dashboard/student" replace />
@@ -194,23 +209,23 @@ export const router = createBrowserRouter([
         ),
       },
       {
-        path: '/mentor',
+        path: "/mentor",
         element: (
           <ProtectedRoleRoute role={UserRole.MENTOR}>
-            <LegacyDashboard />
+            <Navigate to="/dashboard/mentor" replace />
           </ProtectedRoleRoute>
         ),
       },
       {
-        path: '/investor',
+        path: "/investor",
         element: (
           <ProtectedRoleRoute role={UserRole.INVESTOR}>
-            <LegacyDashboard />
+            <Navigate to="/dashboard/investor" replace />
           </ProtectedRoleRoute>
         ),
       },
       {
-        path: '/recruiter',
+        path: "/recruiter",
         element: (
           <ProtectedRoleRoute role={UserRole.RECRUITER}>
             <Navigate to="/dashboard/recruiter" replace />
@@ -218,15 +233,15 @@ export const router = createBrowserRouter([
         ),
       },
       {
-        path: '/admin',
+        path: "/admin",
         element: (
           <ProtectedRoleRoute role={UserRole.ADMIN}>
-            <LegacyDashboard />
+            <Navigate to="/dashboard/admin" replace />
           </ProtectedRoleRoute>
         ),
       },
       {
-        path: '/problem-bank',
+        path: "/problem-bank",
         element: (
           <ProtectedRoleRoute role={UserRole.STUDENT}>
             <ProblemBank />
@@ -234,7 +249,7 @@ export const router = createBrowserRouter([
         ),
       },
       {
-        path: '/product-workspace/:projectId?',
+        path: "/product-workspace/:projectId?",
         element: (
           <ProtectedRoleRoute role={UserRole.STUDENT}>
             <ProductWorkspace />
@@ -242,7 +257,7 @@ export const router = createBrowserRouter([
         ),
       },
       {
-        path: '/patent-support/:innovationId?',
+        path: "/patent-support/:innovationId?",
         element: (
           <ProtectedRoleRoute role={UserRole.STUDENT}>
             <PatentSupport />
@@ -250,7 +265,7 @@ export const router = createBrowserRouter([
         ),
       },
       {
-        path: '/startup-launch/:startupId?',
+        path: "/startup-launch/:startupId?",
         element: (
           <ProtectedRoleRoute role={UserRole.STUDENT}>
             <StartupLaunch />
@@ -258,7 +273,7 @@ export const router = createBrowserRouter([
         ),
       },
       {
-        path: '/startup-launch/cap-table',
+        path: "/startup-launch/cap-table",
         element: (
           <ProtectedRoleRoute role={UserRole.STUDENT}>
             <StartupCapTable />
@@ -266,7 +281,7 @@ export const router = createBrowserRouter([
         ),
       },
       {
-        path: '/leadership-profile',
+        path: "/leadership-profile",
         element: (
           <ProtectedRoleRoute role={UserRole.STUDENT}>
             <LeadershipProfile />
@@ -274,7 +289,7 @@ export const router = createBrowserRouter([
         ),
       },
       {
-        path: '/marketplace',
+        path: "/marketplace",
         element: (
           <ProtectedRoleRoute role={UserRole.STUDENT}>
             <Marketplace />
@@ -282,15 +297,15 @@ export const router = createBrowserRouter([
         ),
       },
       {
-        path: '/school',
+        path: "/school",
         element: <Navigate to="/dashboard/school" replace />,
       },
       {
-        path: '/college',
+        path: "/college",
         element: <Navigate to="/dashboard/college" replace />,
       },
       {
-        path: '/dashboard',
+        path: "/dashboard",
         element: (
           <ProtectedAnyRoute>
             <DashboardLayout />
@@ -298,7 +313,7 @@ export const router = createBrowserRouter([
         ),
         children: [
           {
-            path: 'student',
+            path: "student",
             element: (
               <ProtectedRoleRoute role={UserRole.STUDENT}>
                 <LegacyStudentDashboard />
@@ -306,95 +321,99 @@ export const router = createBrowserRouter([
             ),
           },
           {
-            path: 'mentor',
+            path: "mentor",
             element: <ProtectedRoleRoute role={UserRole.MENTOR} />,
             children: [
               { index: true, element: <MentorDashboard /> },
-              { path: 'students', element: <MentorStudentFeed /> },
-              { path: 'students/:id', element: <MentorStudentFeed /> },
-              { path: 'sessions', element: <MentorSessions /> },
+              { path: "students", element: <MentorStudentFeed /> },
+              { path: "students/:id", element: <MentorStudentFeed /> },
+              { path: "sessions", element: <MentorSessions /> },
             ],
           },
           {
-            path: 'investor',
+            path: "investor",
             element: <ProtectedRoleRoute role={UserRole.INVESTOR} />,
             children: [
               { index: true, element: <InvestorDashboard /> },
-              { path: 'startups', element: <InvestorStartupMarketplace /> },
-              { path: 'institutions', element: <InvestorInstitutions /> },
-              { path: 'portfolio', element: <InvestorPortfolio /> },
+              { path: "startups", element: <InvestorStartupMarketplace /> },
+              { path: "institutions", element: <InvestorInstitutions /> },
+              { path: "portfolio", element: <InvestorPortfolio /> },
               {
-                path: 'settings',
+                path: "settings",
                 element: <ProtectedAnyRoute />,
                 children: [{ index: true, element: <SettingsPage /> }],
               },
             ],
           },
           {
-            path: 'recruiter',
+            path: "recruiter",
             element: <ProtectedRoleRoute role={UserRole.RECRUITER} />,
             children: [
               { index: true, element: <RecruiterDashboard /> },
-              { path: 'talent', element: <RecruiterTalentSearch /> },
-              { path: 'colleges', element: <RecruiterCollegeConnect /> },
-              { path: 'drives', element: <RecruiterActiveDrives /> },
-              { path: 'onboarding', element: <RecruiterOnboardingTracker /> },
+              { path: "talent", element: <RecruiterTalentSearch /> },
+              { path: "colleges", element: <RecruiterCollegeConnect /> },
+              { path: "drives", element: <RecruiterActiveDrives /> },
+              { path: "onboarding", element: <RecruiterOnboardingTracker /> },
             ],
           },
           {
-            path: 'admin',
+            path: "admin",
             element: <ProtectedRoleRoute role={UserRole.ADMIN} />,
             children: [
               { index: true, element: <AdminDashboard /> },
-              { path: 'users', element: <AdminUserManagement /> },
-              { path: 'patents', element: <AdminPatents /> },
-              { path: 'awards', element: <AdminAwards /> },
-              { path: 'deals', element: <AdminDeals /> },
-              { path: 'analytics', element: <AdminAnalytics /> },
-              { path: 'capacity', element: <AdminCapacity /> },
+              { path: "users", element: <AdminUserManagement /> },
+              { path: "patents", element: <AdminPatents /> },
+              { path: "awards", element: <AdminAwards /> },
+              { path: "deals", element: <AdminDeals /> },
+              { path: "analytics", element: <AdminAnalytics /> },
+              { path: "capacity", element: <AdminCapacity /> },
             ],
           },
           {
-            path: 'profile',
+            path: "profile",
             element: <ProtectedAnyRoute />,
             children: [{ index: true, element: <UserProfilePage /> }],
           },
           {
-            path: 'settings',
+            path: "settings",
             element: <ProtectedAnyRoute />,
             children: [{ index: true, element: <SettingsPage /> }],
           },
           {
-            path: 'school',
+            path: "school",
             element: <ProtectedRoleRoute role={UserRole.SCHOOL} />,
             children: [
               { index: true, element: <SchoolDashboard /> },
-              { path: 'students', element: <SchoolStudentLeaderboard /> },
-              { path: 'students/:id', element: <SchoolStudentLeaderboard /> },
-              { path: 'investors', element: <SchoolInvestorDirectory /> },
-              { path: 'mentors', element: <MentorDirectory /> },
-              { path: 'compliance', element: <SchoolComplianceReport /> },
+              { path: "students", element: <SchoolStudentLeaderboard /> },
+              { path: "students/:id", element: <SchoolStudentLeaderboard /> },
+              { path: "investors", element: <SchoolInvestorDirectory /> },
+              { path: "mentors", element: <MentorDirectory /> },
+              { path: "compliance", element: <SchoolComplianceReport /> },
             ],
           },
           {
-            path: 'college',
+            path: "college",
             element: <ProtectedRoleRoute role={UserRole.COLLEGE} />,
             children: [
               { index: true, element: <CollegeDashboard /> },
-              { path: 'students', element: <CollegeStudentLeaderboard /> },
-              { path: 'students/:id', element: <CollegeStudentLeaderboard /> },
-              { path: 'recruiters', element: <RecruiterDirectory /> },
-              { path: 'investors', element: <CollegeInvestorDirectory /> },
-              { path: 'mentors', element: <MentorDirectory /> },
-              { path: 'placement', element: <PlacementTracker /> },
-              { path: 'events', element: <EventManager /> },
-              { path: 'compliance', element: <CollegeComplianceReport /> },
+              { path: "students", element: <CollegeStudentLeaderboard /> },
+              { path: "students/:id", element: <CollegeStudentLeaderboard /> },
+              { path: "recruiters", element: <RecruiterDirectory /> },
+              { path: "investors", element: <CollegeInvestorDirectory /> },
+              { path: "mentors", element: <MentorDirectory /> },
+              { path: "placement", element: <PlacementTracker /> },
+              { path: "events", element: <EventManager /> },
+              { path: "compliance", element: <CollegeComplianceReport /> },
             ],
           },
         ],
       },
       {
-        path: '*',
+        path: "/change-password",
+        element: <ChangePasswordPage />,
+      },
+      {
+        path: "*",
         element: <Navigate to="/login" replace />,
       },
     ],

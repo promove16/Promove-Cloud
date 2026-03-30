@@ -1,10 +1,13 @@
-import { useState } from "react";
-import { 
-  Search, Filter, TrendingUp, Users, Award, FileText, 
-  MapPin, Building2, Star, CheckCircle, Eye, Heart, 
+import { useState, useEffect } from "react";
+import { useSearchParams } from "react-router-dom";
+import {
+  Search, Filter, TrendingUp, Users, Award, FileText,
+  MapPin, Building2, Star, CheckCircle, Eye, Heart,
   Calendar, ArrowRight, ChevronDown, X, Briefcase,
   Target, Lightbulb, MessageSquare, Shield, Clock, BadgeCheck
 } from "lucide-react";
+import { investorApi } from '../../../api/investor.api';
+import type { InvestorStartupCard } from '../../../types/investor.types';
 
 type ViewType = "dealflow" | "startups" | "institutions" | "portfolio";
 type StageType = "Ideation" | "Prototype" | "MVP" | "Launch-Ready";
@@ -41,6 +44,7 @@ interface Institution {
 }
 
 export function InvestorDashboard() {
+  const [searchParams] = useSearchParams();
   const [currentView, setCurrentView] = useState<ViewType>("dealflow");
   const [selectedStartup, setSelectedStartup] = useState<number | null>(null);
   const [selectedInstitution, setSelectedInstitution] = useState<number | null>(null);
@@ -48,6 +52,63 @@ export function InvestorDashboard() {
   const [filterStage, setFilterStage] = useState("All");
   const [filterLocation, setFilterLocation] = useState("All");
   const [searchQuery, setSearchQuery] = useState("");
+  const [apiStartups, setApiStartups] = useState<InvestorStartupCard[]>([]);
+  const [loadingStartups, setLoadingStartups] = useState(false);
+  const [expressInterestTarget, setExpressInterestTarget] = useState<InvestorStartupCard | null>(null);
+  const [eiType, setEiType] = useState<'penny' | 'sole'>('penny');
+  const [eiAmount, setEiAmount] = useState(20000);
+  const [eiEquity, setEiEquity] = useState(5);
+  const [eiRole, setEiRole] = useState<'shareholder' | 'director' | 'observer' | ''>('');
+  const [eiSubmitting, setEiSubmitting] = useState(false);
+  const [eiDone, setEiDone] = useState(false);
+  const [eiError, setEiError] = useState('');
+
+  // Sync view from URL query param so sidebar links work
+  useEffect(() => {
+    const viewParam = searchParams.get("view") as ViewType | null;
+    if (viewParam && ["dealflow", "startups", "institutions", "portfolio"].includes(viewParam)) {
+      setCurrentView(viewParam);
+      setSelectedStartup(null);
+      setSelectedInstitution(null);
+    }
+  }, [searchParams]);
+
+  useEffect(() => {
+    setLoadingStartups(true);
+    investorApi.getStartups({ limit: 50 })
+      .then((res) => setApiStartups(res.items))
+      .catch(() => {}) // silently fall back to mock data
+      .finally(() => setLoadingStartups(false));
+  }, []);
+
+  const handleExpressInterest = async () => {
+    if (!expressInterestTarget) return;
+    setEiSubmitting(true);
+    setEiError('');
+    try {
+      await investorApi.expressInterest(expressInterestTarget._id, {
+        investorType: eiType,
+        proposedAmountINR: eiAmount,
+        proposedEquityPercent: eiEquity,
+        ...(eiRole ? { chosenRole: eiRole as 'shareholder' | 'director' | 'observer' } : {}),
+      });
+      setEiDone(true);
+    } catch (err: any) {
+      setEiError(err?.response?.data?.message || 'Failed to express interest. Please try again.');
+    } finally {
+      setEiSubmitting(false);
+    }
+  };
+
+  const openExpressInterest = (startup: InvestorStartupCard) => {
+    setExpressInterestTarget(startup);
+    setEiType('penny');
+    setEiAmount(20000);
+    setEiEquity(5);
+    setEiRole('');
+    setEiDone(false);
+    setEiError('');
+  };
 
   const startups: Startup[] = [
     {
@@ -309,7 +370,111 @@ export function InvestorDashboard() {
 
       {/* Startup Cards */}
       <div className="grid gap-6">
-        {filteredStartups.map((startup) => (
+        {loadingStartups ? (
+          <div className="text-center py-12 text-slate-400">Loading startups from server...</div>
+        ) : apiStartups.length > 0 ? apiStartups.map((startup) => (
+          <div
+            key={startup._id}
+            className="bg-slate-900 border border-slate-800 rounded-xl p-6 hover:border-slate-700 transition-all"
+          >
+            <div className="flex items-start justify-between mb-4">
+              <div className="flex-1">
+                <div className="flex items-center gap-3 mb-2">
+                  <h3 className="text-2xl font-bold text-white">{startup.name}</h3>
+                  <span className="px-3 py-1 bg-blue-500/10 text-blue-400 rounded-full text-xs font-semibold">
+                    {startup.category}
+                  </span>
+                  <span className={`px-3 py-1 rounded-full text-xs font-semibold ${
+                    startup.stage === "launch-ready" ? "bg-green-500/10 text-green-400" :
+                    startup.stage === "mvp" ? "bg-blue-500/10 text-blue-400" :
+                    startup.stage === "prototype" ? "bg-purple-500/10 text-purple-400" :
+                    "bg-slate-700 text-slate-300"
+                  }`}>
+                    {startup.stage}
+                  </span>
+                </div>
+                <p className="text-slate-300 text-lg mb-4">{startup.tagline}</p>
+              </div>
+              <div className="flex flex-col items-end gap-2">
+                <div className="px-4 py-2 bg-gradient-to-br from-yellow-500/20 to-orange-500/20 border border-yellow-500/30 rounded-lg">
+                  <div className="text-xs text-slate-400 mb-1">Innovation Score</div>
+                  <div className="text-2xl font-bold text-white text-center">{startup.innovationScoreAtLaunch}</div>
+                </div>
+              </div>
+            </div>
+
+            <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-4">
+              <div className="flex items-center gap-2 text-slate-400">
+                <Users className="w-4 h-4" />
+                <span className="text-sm">{startup.teamSize} members</span>
+              </div>
+              <div className="flex items-center gap-2 text-slate-400">
+                <Award className="w-4 h-4" />
+                <span className="text-sm">{startup.sharePool.availableShares} shares available</span>
+              </div>
+              <div className="flex items-center gap-2 text-slate-400">
+                <TrendingUp className="w-4 h-4" />
+                <span className="text-sm">
+                  {[startup.acceptsPennyInvestors && 'Penny', startup.acceptsSoleInvestor && 'Sole'].filter(Boolean).join(' & ') || 'Closed'}
+                </span>
+              </div>
+              <div className="flex items-center gap-2">
+                {startup.traction.patentFiled ? (
+                  <>
+                    <Clock className="w-4 h-4 text-yellow-400" />
+                    <span className="text-sm text-yellow-400">Patent Filed</span>
+                  </>
+                ) : (
+                  <span className="text-sm text-slate-500">No Patent</span>
+                )}
+              </div>
+            </div>
+
+            <div className="flex items-center justify-between pt-4 border-t border-slate-800">
+              <div className="flex gap-2 flex-wrap">
+                {startup.traction.mvpBuilt && (
+                  <span className="px-3 py-1 bg-slate-800 rounded-full text-xs text-slate-300">MVP Built</span>
+                )}
+                {startup.traction.revenueGenerating && (
+                  <span className="px-3 py-1 bg-green-500/10 rounded-full text-xs text-green-400">Revenue Generating</span>
+                )}
+                {startup.founder?.displayName && (
+                  <span className="px-3 py-1 bg-slate-800 rounded-full text-xs text-slate-400">
+                    by {startup.founder.displayName}
+                  </span>
+                )}
+              </div>
+              <div className="flex gap-3">
+                {startup.pitchDeckUrl ? (
+                  <a
+                    href={startup.pitchDeckUrl}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="px-6 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-lg font-semibold text-sm transition-all flex items-center gap-2"
+                  >
+                    <Eye className="w-4 h-4" />
+                    View Pitch
+                  </a>
+                ) : (
+                  <button
+                    disabled
+                    className="px-6 py-2 bg-blue-600/40 text-white/50 rounded-lg font-semibold text-sm flex items-center gap-2 cursor-not-allowed"
+                  >
+                    <Eye className="w-4 h-4" />
+                    No Pitch Deck
+                  </button>
+                )}
+                <button
+                  onClick={() => openExpressInterest(startup)}
+                  className="px-6 py-2 bg-gradient-to-r from-purple-600 to-pink-600 hover:from-purple-700 hover:to-pink-700 text-white rounded-lg font-semibold text-sm transition-all flex items-center gap-2"
+                >
+                  <Heart className="w-4 h-4" />
+                  Express Interest
+                </button>
+              </div>
+            </div>
+          </div>
+        )) : filteredStartups.map((startup) => (
           <div
             key={startup.id}
             className="bg-slate-900 border border-slate-800 rounded-xl p-6 hover:border-slate-700 transition-all"
@@ -687,6 +852,188 @@ export function InvestorDashboard() {
     </div>
   );
 
+  const renderInstitutionDetail = () => {
+    const institution = institutions.find((inst) => inst.id === selectedInstitution);
+    if (!institution) return null;
+
+    // Get startups from this institution
+    const institutionStartups = startups.filter((s) => s.college === institution.name);
+
+    return (
+      <div className="space-y-6">
+        {/* Back Button */}
+        <button
+          onClick={() => setSelectedInstitution(null)}
+          className="text-blue-400 hover:text-blue-300 flex items-center gap-2 transition-colors"
+        >
+          ← Back to Institutions
+        </button>
+
+        {/* Header */}
+        <div className="bg-gradient-to-r from-slate-900 to-slate-800 border border-slate-700 rounded-xl p-8">
+          <div className="flex items-start justify-between">
+            <div>
+              <div className="flex items-center gap-3 mb-3">
+                <h1 className="text-4xl font-bold text-white">{institution.name}</h1>
+                <span className="px-4 py-2 bg-green-500/10 text-green-400 rounded-full text-sm font-semibold">
+                  NAAC {institution.naacGrade}
+                </span>
+              </div>
+              <div className="flex items-center gap-4 mb-4">
+                <div className="flex items-center gap-2 text-slate-400">
+                  <MapPin className="w-5 h-5" />
+                  <span>{institution.city}, {institution.state}</span>
+                </div>
+                <div className="flex items-center gap-1">
+                  {[...Array(5)].map((_, i) => (
+                    <Star
+                      key={i}
+                      className={`w-5 h-5 ${
+                        i < institution.iicStars ? "text-yellow-500 fill-yellow-500" : "text-slate-600"
+                      }`}
+                    />
+                  ))}
+                  <span className="text-sm text-slate-400 ml-2">IIC Rating</span>
+                </div>
+              </div>
+            </div>
+            <div className="text-right">
+              {institution.nirfRank && (
+                <div className="px-6 py-4 bg-gradient-to-br from-blue-500/20 to-cyan-500/20 border-2 border-blue-500/30 rounded-xl mb-4">
+                  <div className="text-sm text-slate-400 mb-1">NIRF Ranking</div>
+                  <div className="text-4xl font-bold text-white">#{institution.nirfRank}</div>
+                </div>
+              )}
+              <button className="w-full px-6 py-3 bg-gradient-to-r from-blue-600 to-cyan-600 hover:from-blue-700 hover:to-cyan-700 text-white rounded-lg font-semibold transition-all flex items-center justify-center gap-2">
+                <Briefcase className="w-5 h-5" />
+                Request Partnership
+              </button>
+            </div>
+          </div>
+        </div>
+
+        {/* Stats Grid */}
+        <div className="grid md:grid-cols-3 gap-6">
+          <div className="bg-slate-900 border border-slate-800 rounded-xl p-6 text-center">
+            <div className="w-12 h-12 mx-auto mb-3 bg-blue-500/10 rounded-xl flex items-center justify-center">
+              <Users className="w-6 h-6 text-blue-500" />
+            </div>
+            <div className="text-3xl font-bold text-white mb-1">{institution.studentsOnProMove}</div>
+            <div className="text-sm text-slate-400">Students on ProMove</div>
+          </div>
+          <div className="bg-slate-900 border border-slate-800 rounded-xl p-6 text-center">
+            <div className="w-12 h-12 mx-auto mb-3 bg-green-500/10 rounded-xl flex items-center justify-center">
+              <Lightbulb className="w-6 h-6 text-green-500" />
+            </div>
+            <div className="text-3xl font-bold text-white mb-1">{institution.activeProjects}</div>
+            <div className="text-sm text-slate-400">Active Projects</div>
+          </div>
+          <div className="bg-slate-900 border border-slate-800 rounded-xl p-6 text-center">
+            <div className="w-12 h-12 mx-auto mb-3 bg-yellow-500/10 rounded-xl flex items-center justify-center">
+              <Shield className="w-6 h-6 text-yellow-500" />
+            </div>
+            <div className="text-3xl font-bold text-white mb-1">{institution.patentsFiled}</div>
+            <div className="text-sm text-slate-400">Patents Filed</div>
+          </div>
+        </div>
+
+        {/* Startups from this Institution */}
+        <div className="bg-slate-900 border border-slate-800 rounded-xl p-6">
+          <h2 className="text-xl font-bold text-white mb-4 flex items-center gap-2">
+            <Lightbulb className="w-6 h-6 text-purple-500" />
+            Startups from {institution.name}
+          </h2>
+          {institutionStartups.length > 0 ? (
+            <div className="space-y-4">
+              {institutionStartups.map((startup) => (
+                <div
+                  key={startup.id}
+                  className="bg-slate-950 border border-slate-800 rounded-lg p-5 hover:border-slate-700 transition-all"
+                >
+                  <div className="flex items-center justify-between">
+                    <div>
+                      <div className="flex items-center gap-3 mb-2">
+                        <h3 className="text-lg font-bold text-white">{startup.name}</h3>
+                        <span className="px-3 py-1 bg-blue-500/10 text-blue-400 rounded-full text-xs font-semibold">
+                          {startup.domain}
+                        </span>
+                        <span className={`px-3 py-1 rounded-full text-xs font-semibold ${
+                          startup.stage === "Launch-Ready" ? "bg-green-500/10 text-green-400" :
+                          startup.stage === "MVP" ? "bg-blue-500/10 text-blue-400" :
+                          startup.stage === "Prototype" ? "bg-purple-500/10 text-purple-400" :
+                          "bg-slate-700 text-slate-300"
+                        }`}>
+                          {startup.stage}
+                        </span>
+                      </div>
+                      <p className="text-sm text-slate-400">{startup.problem}</p>
+                    </div>
+                    <div className="flex items-center gap-4">
+                      <div className="px-4 py-2 bg-gradient-to-br from-yellow-500/20 to-orange-500/20 border border-yellow-500/30 rounded-lg text-center">
+                        <div className="text-xs text-slate-400">Score</div>
+                        <div className="text-xl font-bold text-white">{startup.innovationScore}</div>
+                      </div>
+                      <button
+                        onClick={() => {
+                          setSelectedInstitution(null);
+                          setSelectedStartup(startup.id);
+                        }}
+                        className="px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-lg text-sm font-semibold transition-all flex items-center gap-2"
+                      >
+                        <Eye className="w-4 h-4" />
+                        View Pitch
+                      </button>
+                    </div>
+                  </div>
+                </div>
+              ))}
+            </div>
+          ) : (
+            <p className="text-slate-400 text-sm py-4">No startups listed from this institution yet.</p>
+          )}
+        </div>
+
+        {/* Partnership Benefits */}
+        <div className="bg-slate-900 border border-slate-800 rounded-xl p-6">
+          <h2 className="text-xl font-bold text-white mb-4 flex items-center gap-2">
+            <Award className="w-6 h-6 text-cyan-500" />
+            Partnership Benefits
+          </h2>
+          <div className="grid md:grid-cols-2 gap-4">
+            <div className="bg-slate-950 border border-slate-800 rounded-lg p-4">
+              <div className="flex items-center gap-3 mb-2">
+                <CheckCircle className="w-5 h-5 text-green-400" />
+                <h3 className="font-semibold text-white">Early Deal Flow Access</h3>
+              </div>
+              <p className="text-sm text-slate-400">Get first access to high-potential startups emerging from this institution's innovation ecosystem.</p>
+            </div>
+            <div className="bg-slate-950 border border-slate-800 rounded-lg p-4">
+              <div className="flex items-center gap-3 mb-2">
+                <CheckCircle className="w-5 h-5 text-green-400" />
+                <h3 className="font-semibold text-white">Innovation Lab Collaboration</h3>
+              </div>
+              <p className="text-sm text-slate-400">Partner with research labs to co-develop solutions and validate technologies before market entry.</p>
+            </div>
+            <div className="bg-slate-950 border border-slate-800 rounded-lg p-4">
+              <div className="flex items-center gap-3 mb-2">
+                <CheckCircle className="w-5 h-5 text-green-400" />
+                <h3 className="font-semibold text-white">Talent Pipeline</h3>
+              </div>
+              <p className="text-sm text-slate-400">Access top-tier student innovators for mentorship programs and potential portfolio company hires.</p>
+            </div>
+            <div className="bg-slate-950 border border-slate-800 rounded-lg p-4">
+              <div className="flex items-center gap-3 mb-2">
+                <CheckCircle className="w-5 h-5 text-green-400" />
+                <h3 className="font-semibold text-white">Patent Co-Ownership</h3>
+              </div>
+              <p className="text-sm text-slate-400">Explore joint IP development opportunities and patent co-ownership for breakthrough innovations.</p>
+            </div>
+          </div>
+        </div>
+      </div>
+    );
+  };
+
   const renderPortfolio = () => (
     <div className="space-y-6">
       {/* Backed Startups */}
@@ -848,12 +1195,159 @@ export function InvestorDashboard() {
       {/* Content */}
       {selectedStartup ? (
         renderStartupDetail()
+      ) : selectedInstitution ? (
+        renderInstitutionDetail()
       ) : currentView === "dealflow" || currentView === "startups" ? (
         renderDealFlow()
       ) : currentView === "institutions" ? (
         renderInstitutions()
       ) : (
         renderPortfolio()
+      )}
+
+      {/* Express Interest Modal */}
+      {expressInterestTarget && (
+        <div className="fixed inset-0 bg-black/70 backdrop-blur-sm flex items-center justify-center z-50 p-4">
+          <div className="bg-slate-900 border border-slate-700 rounded-2xl p-8 w-full max-w-lg">
+            {eiDone ? (
+              <div className="text-center space-y-4">
+                <div className="w-16 h-16 bg-green-500/20 rounded-full flex items-center justify-center mx-auto">
+                  <CheckCircle className="w-8 h-8 text-green-400" />
+                </div>
+                <h2 className="text-2xl font-bold text-white">Interest Expressed!</h2>
+                <p className="text-slate-300">
+                  Your interest in{' '}
+                  <span className="text-white font-semibold">{expressInterestTarget.name}</span>{' '}
+                  has been submitted.
+                </p>
+                <div className="bg-slate-800 rounded-xl p-4 text-left space-y-2">
+                  <p className="text-sm font-semibold text-blue-400">What happens next?</p>
+                  <ul className="text-sm text-slate-300 space-y-1 list-disc list-inside">
+                    <li>The student founder is notified of your interest</li>
+                    <li>A deal is created and appears in your Deal Flow</li>
+                    <li>The student can accept and initiate contact through the platform</li>
+                    <li>Track progress under My Portfolio once the deal advances</li>
+                  </ul>
+                </div>
+                <button
+                  onClick={() => setExpressInterestTarget(null)}
+                  className="w-full px-6 py-3 bg-blue-600 hover:bg-blue-700 text-white rounded-lg font-semibold transition-all"
+                >
+                  Close
+                </button>
+              </div>
+            ) : (
+              <>
+                <div className="flex items-center justify-between mb-6">
+                  <h2 className="text-xl font-bold text-white">Express Interest</h2>
+                  <button onClick={() => setExpressInterestTarget(null)} className="text-slate-400 hover:text-white">
+                    <X className="w-5 h-5" />
+                  </button>
+                </div>
+                <p className="text-slate-400 mb-6">
+                  You are expressing interest in{' '}
+                  <span className="text-white font-semibold">{expressInterestTarget.name}</span>
+                </p>
+
+                <div className="space-y-4">
+                  <div>
+                    <label className="block text-sm font-semibold text-slate-300 mb-2">Investor Type</label>
+                    <div className="grid grid-cols-2 gap-3">
+                      <button
+                        onClick={() => setEiType('penny')}
+                        className={`px-4 py-3 rounded-lg border text-sm font-semibold transition-all ${
+                          eiType === 'penny'
+                            ? 'bg-blue-500/20 border-blue-500 text-blue-400'
+                            : 'bg-slate-800 border-slate-700 text-slate-300'
+                        }`}
+                      >
+                        Penny Investor
+                        {!expressInterestTarget.acceptsPennyInvestors && (
+                          <span className="block text-xs text-red-400 mt-1">Not accepting</span>
+                        )}
+                      </button>
+                      <button
+                        onClick={() => setEiType('sole')}
+                        className={`px-4 py-3 rounded-lg border text-sm font-semibold transition-all ${
+                          eiType === 'sole'
+                            ? 'bg-purple-500/20 border-purple-500 text-purple-400'
+                            : 'bg-slate-800 border-slate-700 text-slate-300'
+                        }`}
+                      >
+                        Sole Investor
+                        {!expressInterestTarget.acceptsSoleInvestor && (
+                          <span className="block text-xs text-red-400 mt-1">Not accepting</span>
+                        )}
+                      </button>
+                    </div>
+                  </div>
+
+                  <div>
+                    <label className="block text-sm font-semibold text-slate-300 mb-2">
+                      Proposed Amount (INR){' '}
+                      <span className="text-slate-500 font-normal">min ₹20,000</span>
+                    </label>
+                    <input
+                      type="number"
+                      min={20000}
+                      value={eiAmount}
+                      onChange={(e) => setEiAmount(Number(e.target.value))}
+                      className="w-full px-4 py-3 bg-slate-800 border border-slate-700 rounded-lg text-white focus:outline-none focus:border-blue-500"
+                    />
+                  </div>
+
+                  <div>
+                    <label className="block text-sm font-semibold text-slate-300 mb-2">
+                      Proposed Equity %{' '}
+                      <span className="text-slate-500 font-normal">0.01 – 100</span>
+                    </label>
+                    <input
+                      type="number"
+                      min={0.01}
+                      max={100}
+                      step={0.01}
+                      value={eiEquity}
+                      onChange={(e) => setEiEquity(Number(e.target.value))}
+                      className="w-full px-4 py-3 bg-slate-800 border border-slate-700 rounded-lg text-white focus:outline-none focus:border-blue-500"
+                    />
+                  </div>
+
+                  <div>
+                    <label className="block text-sm font-semibold text-slate-300 mb-2">
+                      Your Role{' '}
+                      <span className="text-slate-500 font-normal">(optional)</span>
+                    </label>
+                    <select
+                      value={eiRole}
+                      onChange={(e) => setEiRole(e.target.value as 'shareholder' | 'director' | 'observer' | '')}
+                      className="w-full px-4 py-3 bg-slate-800 border border-slate-700 rounded-lg text-white focus:outline-none focus:border-blue-500"
+                    >
+                      <option value="">Select a role</option>
+                      <option value="shareholder">Shareholder</option>
+                      <option value="director">Director</option>
+                      <option value="observer">Observer</option>
+                    </select>
+                  </div>
+
+                  {eiError && (
+                    <p className="text-red-400 text-sm bg-red-500/10 border border-red-500/30 rounded-lg px-4 py-3">
+                      {eiError}
+                    </p>
+                  )}
+
+                  <button
+                    onClick={handleExpressInterest}
+                    disabled={eiSubmitting}
+                    className="w-full px-6 py-3 bg-gradient-to-r from-purple-600 to-pink-600 hover:from-purple-700 hover:to-pink-700 disabled:opacity-50 text-white rounded-lg font-semibold transition-all flex items-center justify-center gap-2"
+                  >
+                    <Heart className="w-5 h-5" />
+                    {eiSubmitting ? 'Submitting...' : 'Express Interest'}
+                  </button>
+                </div>
+              </>
+            )}
+          </div>
+        </div>
       )}
     </div>
   );

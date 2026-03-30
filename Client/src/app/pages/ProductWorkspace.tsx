@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useNavigate, useParams } from "react-router-dom";
-import { CheckCircle, Circle, Clock, Download, MessageSquare, Paperclip, Plus, Rocket, Send, Trash2, Upload, UserPlus, Users, X } from "lucide-react";
+import { CheckCircle, Circle, Clock, Code2, Download, Github, MessageSquare, Paperclip, Plus, Rocket, Send, Trash2, Upload, UserPlus, Users, X } from "lucide-react";
 import { DashboardLayout } from "../components/DashboardLayout";
 import { workspaceApi } from "../../api/workspace.api";
 import { useWorkspaceChat } from "../../hooks/useWorkspaceChat";
@@ -25,6 +25,8 @@ export function ProductWorkspace() {
   const [taskForm, setTaskForm] = useState({ title: "", priority: "Medium" as WorkspaceTask["priority"], assignedTo: "", dueDate: "" });
   const [inviteEmail, setInviteEmail] = useState("");
   const [uploadNote, setUploadNote] = useState("");
+  const [repoForm, setRepoForm] = useState({ repoUrl: "", branch: "", commitHash: "", note: "" });
+  const [codeForm, setCodeForm] = useState({ title: "", language: "", summary: "", codeSnippet: "" });
   const [chatDraft, setChatDraft] = useState("");
   const [chatAttachment, setChatAttachment] = useState<File | null>(null);
   const [progressForm, setProgressForm] = useState({ note: "", milestoneRef: "", completionPercent: "", file: null as File | null });
@@ -70,6 +72,26 @@ export function ProductWorkspace() {
   });
   const removeMember = useMutation({ mutationFn: (userId: string) => workspaceApi.removeMember(workspaceId!, userId), onSuccess: async () => { setToast("Team member removed."); await refresh(); } });
   const deleteUpload = useMutation({ mutationFn: (uploadId: string) => workspaceApi.removeUpload(workspaceId!, uploadId), onSuccess: async () => { setToast("Upload removed."); await refresh(); } });
+  const addRepo = useMutation({
+    mutationFn: () => workspaceApi.addRepoSubmission(workspaceId!, { repoUrl: repoForm.repoUrl, branch: repoForm.branch || undefined, commitHash: repoForm.commitHash || undefined, note: repoForm.note || undefined }),
+    onSuccess: async () => {
+      setRepoForm({ repoUrl: "", branch: "", commitHash: "", note: "" });
+      setToast("Repository link attached.");
+      await refresh();
+    },
+    onError: (error) => setToast((error as { response?: { data?: { error?: { message?: string } } } })?.response?.data?.error?.message ?? "Unable to attach repository."),
+  });
+  const deleteRepo = useMutation({ mutationFn: (repoId: string) => workspaceApi.removeRepoSubmission(workspaceId!, repoId), onSuccess: async () => { setToast("Repository link removed."); await refresh(); } });
+  const addCode = useMutation({
+    mutationFn: () => workspaceApi.addCodeSubmission(workspaceId!, codeForm),
+    onSuccess: async () => {
+      setCodeForm({ title: "", language: "", summary: "", codeSnippet: "" });
+      setToast("Code snippet saved securely.");
+      await refresh();
+    },
+    onError: (error) => setToast((error as { response?: { data?: { error?: { message?: string } } } })?.response?.data?.error?.message ?? "Unable to save code snippet."),
+  });
+  const deleteCode = useMutation({ mutationFn: (codeId: string) => workspaceApi.removeCodeSubmission(workspaceId!, codeId), onSuccess: async () => { setToast("Code snippet removed."); await refresh(); } });
   const progress = useMutation({
     mutationFn: async () => {
       if (progressForm.file) await workspaceApi.upload(workspaceId!, progressForm.file, progressForm.note);
@@ -247,13 +269,48 @@ export function ProductWorkspace() {
 
                 {activeTab === "uploads" ? (
                   <div className="bg-slate-900 border border-slate-800 rounded-xl p-6">
-                    <h2 className="text-xl font-bold text-white mb-6">Workspace Uploads</h2>
+                    <h2 className="text-xl font-bold text-white mb-6">Evidence & Submissions</h2>
                     <div className="border-2 border-dashed border-slate-700 rounded-xl p-6 text-center bg-slate-950 mb-6">
                       <input id="workspace-upload" type="file" accept=".pdf,image/*" className="hidden" onChange={(event) => void onFile(event.target.files?.[0] ?? null)} />
                       <label htmlFor="workspace-upload" className="cursor-pointer block"><Upload className="w-8 h-8 text-blue-400 mx-auto mb-3" /><div className="text-white font-semibold mb-2">Drag-and-drop or click to upload</div><div className="text-sm text-slate-400 mb-4">PDF and image files only, up to 10MB</div></label>
                       <input value={uploadNote} onChange={(event) => setUploadNote(event.target.value)} placeholder="Optional note for this upload" className="w-full max-w-xl mx-auto px-4 py-3 bg-slate-900 border border-slate-800 rounded-lg text-white" />
                     </div>
-                    <div className="space-y-3">
+                    <div className="grid gap-6 xl:grid-cols-2 mb-6">
+                      <div className="rounded-xl border border-slate-800 bg-slate-950 p-5">
+                        <div className="flex items-center gap-2 mb-4">
+                          <Github className="w-5 h-5 text-slate-300" />
+                          <h3 className="font-semibold text-white">Attach GitHub Repository</h3>
+                        </div>
+                        <div className="space-y-3">
+                          <input value={repoForm.repoUrl} onChange={(event) => setRepoForm((current) => ({ ...current, repoUrl: event.target.value }))} placeholder="https://github.com/org/repo" className="w-full px-4 py-3 bg-slate-900 border border-slate-800 rounded-lg text-white" />
+                          <div className="grid grid-cols-2 gap-3">
+                            <input value={repoForm.branch} onChange={(event) => setRepoForm((current) => ({ ...current, branch: event.target.value }))} placeholder="Branch (optional)" className="w-full px-4 py-3 bg-slate-900 border border-slate-800 rounded-lg text-white" />
+                            <input value={repoForm.commitHash} onChange={(event) => setRepoForm((current) => ({ ...current, commitHash: event.target.value }))} placeholder="Commit hash (optional)" className="w-full px-4 py-3 bg-slate-900 border border-slate-800 rounded-lg text-white" />
+                          </div>
+                          <textarea value={repoForm.note} onChange={(event) => setRepoForm((current) => ({ ...current, note: event.target.value }))} placeholder="What should reviewers look at in this repo?" className="w-full min-h-24 px-4 py-3 bg-slate-900 border border-slate-800 rounded-lg text-white" />
+                          <button onClick={() => addRepo.mutate()} disabled={!repoForm.repoUrl.trim() || addRepo.isPending} className="w-full px-4 py-3 bg-slate-800 hover:bg-slate-700 text-white rounded-lg font-semibold disabled:opacity-60">Attach Repository</button>
+                          <p className="text-xs text-slate-500">Only HTTPS GitHub links are accepted. Embedded credentials and access tokens are blocked.</p>
+                        </div>
+                      </div>
+                      <div className="rounded-xl border border-slate-800 bg-slate-950 p-5">
+                        <div className="flex items-center gap-2 mb-4">
+                          <Code2 className="w-5 h-5 text-slate-300" />
+                          <h3 className="font-semibold text-white">Save Code Snippet Safely</h3>
+                        </div>
+                        <div className="space-y-3">
+                          <div className="grid grid-cols-2 gap-3">
+                            <input value={codeForm.title} onChange={(event) => setCodeForm((current) => ({ ...current, title: event.target.value }))} placeholder="Snippet title" className="w-full px-4 py-3 bg-slate-900 border border-slate-800 rounded-lg text-white" />
+                            <input value={codeForm.language} onChange={(event) => setCodeForm((current) => ({ ...current, language: event.target.value }))} placeholder="Language" className="w-full px-4 py-3 bg-slate-900 border border-slate-800 rounded-lg text-white" />
+                          </div>
+                          <input value={codeForm.summary} onChange={(event) => setCodeForm((current) => ({ ...current, summary: event.target.value }))} placeholder="Short summary (optional)" className="w-full px-4 py-3 bg-slate-900 border border-slate-800 rounded-lg text-white" />
+                          <textarea value={codeForm.codeSnippet} onChange={(event) => setCodeForm((current) => ({ ...current, codeSnippet: event.target.value }))} placeholder="Paste only non-sensitive code. Secrets, keys, and credentials are blocked automatically." className="w-full min-h-40 px-4 py-3 bg-slate-900 border border-slate-800 rounded-lg text-white font-mono text-sm" />
+                          <button onClick={() => addCode.mutate()} disabled={!codeForm.title.trim() || !codeForm.language.trim() || !codeForm.codeSnippet.trim() || addCode.isPending} className="w-full px-4 py-3 bg-slate-800 hover:bg-slate-700 text-white rounded-lg font-semibold disabled:opacity-60">Save Code Snippet</button>
+                          <p className="text-xs text-slate-500">Code is stored as text only. It is never executed server-side.</p>
+                        </div>
+                      </div>
+                    </div>
+                    <div className="space-y-3 mb-6">
+                      <h3 className="font-semibold text-white">Uploaded Files</h3>
                       {workspace.uploads.map((upload) => {
                         const uploader = teamMembers.find((member) => member._id === upload.uploadedBy);
                         return (
@@ -263,6 +320,48 @@ export function ProductWorkspace() {
                           </div>
                         );
                       })}
+                      {workspace.uploads.length === 0 ? <div className="text-sm text-slate-500">No documents or images uploaded yet.</div> : null}
+                    </div>
+                    <div className="space-y-3 mb-6">
+                      <h3 className="font-semibold text-white">Repository Links</h3>
+                      {workspace.repoSubmissions.map((repo) => {
+                        const uploader = teamMembers.find((member) => member._id === repo.uploadedBy);
+                        return (
+                          <div key={repo._id} className="bg-slate-950 border border-slate-800 rounded-lg p-4 flex items-center justify-between gap-4">
+                            <div>
+                              <div className="font-semibold text-white">{repo.displayName}</div>
+                              <div className="text-sm text-slate-400">GitHub • {uploader?.displayName ?? "Team member"} • {dt(repo.uploadedAt)}</div>
+                              {(repo.branch || repo.commitHash) ? <div className="text-xs text-slate-500 mt-1">{repo.branch ? `Branch: ${repo.branch}` : ""} {repo.commitHash ? `Commit: ${repo.commitHash}` : ""}</div> : null}
+                              {repo.note ? <div className="text-xs text-blue-300 mt-1">{repo.note}</div> : null}
+                            </div>
+                            <div className="flex items-center gap-2">
+                              <a href={repo.repoUrl} target="_blank" rel="noreferrer" className="px-3 py-2 bg-slate-800 hover:bg-slate-700 text-white rounded-lg flex items-center gap-2 text-sm"><Github className="w-4 h-4" />Open</a>
+                              <button onClick={() => deleteRepo.mutate(repo._id)} className="px-3 py-2 bg-slate-800 hover:bg-red-900/40 text-white rounded-lg text-sm">Delete</button>
+                            </div>
+                          </div>
+                        );
+                      })}
+                      {workspace.repoSubmissions.length === 0 ? <div className="text-sm text-slate-500">No repository links attached yet.</div> : null}
+                    </div>
+                    <div className="space-y-3">
+                      <h3 className="font-semibold text-white">Code Snippets</h3>
+                      {workspace.codeSubmissions.map((snippet) => {
+                        const uploader = teamMembers.find((member) => member._id === snippet.uploadedBy);
+                        return (
+                          <div key={snippet._id} className="bg-slate-950 border border-slate-800 rounded-lg p-4">
+                            <div className="flex items-start justify-between gap-4 mb-3">
+                              <div>
+                                <div className="font-semibold text-white">{snippet.title}</div>
+                                <div className="text-sm text-slate-400">{snippet.language} • {snippet.lineCount} lines • {uploader?.displayName ?? "Team member"} • {dt(snippet.uploadedAt)}</div>
+                                {snippet.summary ? <div className="text-xs text-blue-300 mt-1">{snippet.summary}</div> : null}
+                              </div>
+                              <button onClick={() => deleteCode.mutate(snippet._id)} className="px-3 py-2 bg-slate-800 hover:bg-red-900/40 text-white rounded-lg text-sm">Delete</button>
+                            </div>
+                            <pre className="overflow-x-auto rounded-lg bg-slate-900 p-4 text-xs text-slate-200"><code>{snippet.codeSnippet}</code></pre>
+                          </div>
+                        );
+                      })}
+                      {workspace.codeSubmissions.length === 0 ? <div className="text-sm text-slate-500">No code snippets saved yet.</div> : null}
                     </div>
                   </div>
                 ) : null}
@@ -304,7 +403,7 @@ export function ProductWorkspace() {
                       <div className="bg-slate-950 rounded-lg p-3 text-center"><div className="text-2xl font-bold text-white mb-1">{workspace.tasks.filter((task) => task.done).length}</div><div className="text-xs text-slate-400">Tasks Done</div></div>
                       <div className="bg-slate-950 rounded-lg p-3 text-center"><div className="text-2xl font-bold text-white mb-1">{workspace.tasks.filter((task) => !task.done).length}</div><div className="text-xs text-slate-400">Open Tasks</div></div>
                       <div className="bg-slate-950 rounded-lg p-3 text-center"><div className="text-2xl font-bold text-white mb-1">{teamMembers.length}</div><div className="text-xs text-slate-400">Team Members</div></div>
-                      <div className="bg-slate-950 rounded-lg p-3 text-center"><div className="text-2xl font-bold text-white mb-1">{workspace.uploads.length}</div><div className="text-xs text-slate-400">Files</div></div>
+                      <div className="bg-slate-950 rounded-lg p-3 text-center"><div className="text-2xl font-bold text-white mb-1">{workspace.uploads.length + workspace.repoSubmissions.length + workspace.codeSubmissions.length}</div><div className="text-xs text-slate-400">Evidence Items</div></div>
                     </div>
                   </div>
                 </div>

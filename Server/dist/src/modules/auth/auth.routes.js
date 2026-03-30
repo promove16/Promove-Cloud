@@ -2,12 +2,20 @@
 Object.defineProperty(exports, "__esModule", { value: true });
 const express_1 = require("express");
 const authenticate_1 = require("../../middleware/authenticate");
+const authorize_1 = require("../../middleware/authorize");
 const rateLimiter_1 = require("../../middleware/rateLimiter");
 const asyncHandler_1 = require("../../utils/asyncHandler");
+const roles_types_1 = require("../../types/roles.types");
 const auth_controller_1 = require("./auth.controller");
 const router = (0, express_1.Router)();
 router.post('/register', (0, asyncHandler_1.asyncHandler)(auth_controller_1.register));
+router.post('/register-request', (0, asyncHandler_1.asyncHandler)(auth_controller_1.registerRequest));
 router.post('/login', (0, rateLimiter_1.withRateLimit)(rateLimiter_1.authLimiter), (0, asyncHandler_1.asyncHandler)(auth_controller_1.login));
+// OAuth routes are temporarily disabled. Manual credential login remains active.
+// router.get('/oauth/:provider', withRateLimit(authLimiter), asyncHandler(startOAuth));
+// router.get('/oauth/:provider/callback', asyncHandler(oauthCallback));
 router.post('/refresh', (0, asyncHandler_1.asyncHandler)(auth_controller_1.refresh));
 router.post('/logout', authenticate_1.authenticate, (0, asyncHandler_1.asyncHandler)(auth_controller_1.logout));
+router.put('/change-password', authenticate_1.authenticate, (0, asyncHandler_1.asyncHandler)(auth_controller_1.changePasswordController));
+router.post('/submit-institution-token', authenticate_1.authenticate, (0, authorize_1.authorize)(roles_types_1.UserRole.STUDENT), (0, asyncHandler_1.asyncHandler)(auth_controller_1.submitInstitutionTokenAfterRegister));
 exports.default = router;

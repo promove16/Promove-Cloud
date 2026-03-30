@@ -103,6 +103,331 @@ const institutionProfileSchema = new mongoose_1.Schema({
         }),
     },
 }, { _id: false });
+const oauthAccountSchema = new mongoose_1.Schema({
+    userId: {
+        type: String,
+        default: null,
+    },
+    username: {
+        type: String,
+        default: null,
+    },
+    accessToken: {
+        type: String,
+        default: null,
+        select: false,
+    },
+    connectedAt: {
+        type: Date,
+        default: null,
+    },
+    lastSyncedAt: {
+        type: Date,
+        default: null,
+    },
+}, { _id: false });
+const skillSchema = new mongoose_1.Schema({
+    name: {
+        type: String,
+        required: true,
+        trim: true,
+        maxlength: 100,
+    },
+    category: {
+        type: String,
+        enum: ['programming', 'design', 'business', 'research', 'other'],
+        default: 'other',
+    },
+    source: {
+        type: String,
+        enum: ['platform', 'github', 'linkedin', 'manual'],
+        required: true,
+    },
+    level: {
+        type: String,
+        enum: ['beginner', 'intermediate', 'advanced', 'expert'],
+        default: 'beginner',
+    },
+    endorsements: {
+        type: Number,
+        default: 0,
+        min: 0,
+    },
+    addedAt: {
+        type: Date,
+        default: Date.now,
+    },
+}, { _id: false });
+const experienceSchema = new mongoose_1.Schema({
+    title: {
+        type: String,
+        required: true,
+        trim: true,
+        maxlength: 120,
+    },
+    company: {
+        type: String,
+        required: true,
+        trim: true,
+        maxlength: 160,
+    },
+    type: {
+        type: String,
+        enum: ['full_time', 'part_time', 'internship', 'freelance', 'volunteer'],
+        default: 'internship',
+    },
+    location: {
+        type: String,
+        default: '',
+        maxlength: 100,
+    },
+    startDate: {
+        type: Date,
+        required: true,
+    },
+    endDate: {
+        type: Date,
+        default: null,
+    },
+    isCurrent: {
+        type: Boolean,
+        default: false,
+    },
+    description: {
+        type: String,
+        maxlength: 1000,
+        default: '',
+    },
+    skills: {
+        type: [String],
+        default: [],
+    },
+    source: {
+        type: String,
+        enum: ['manual', 'linkedin'],
+        default: 'manual',
+    },
+    linkedinId: {
+        type: String,
+        default: null,
+    },
+}, { _id: true });
+const educationSchema = new mongoose_1.Schema({
+    institution: {
+        type: String,
+        required: true,
+        trim: true,
+        maxlength: 160,
+    },
+    degree: {
+        type: String,
+        default: '',
+        maxlength: 160,
+    },
+    fieldOfStudy: {
+        type: String,
+        default: '',
+        maxlength: 160,
+    },
+    startYear: {
+        type: Number,
+        min: 1900,
+        max: 3000,
+        default: undefined,
+    },
+    endYear: {
+        type: Number,
+        min: 1900,
+        max: 3000,
+        default: null,
+    },
+    isCurrent: {
+        type: Boolean,
+        default: false,
+    },
+    grade: {
+        type: String,
+        default: '',
+        maxlength: 80,
+    },
+    activities: {
+        type: String,
+        default: '',
+        maxlength: 500,
+    },
+    description: {
+        type: String,
+        default: '',
+        maxlength: 1000,
+    },
+    source: {
+        type: String,
+        enum: ['manual', 'linkedin'],
+        default: 'manual',
+    },
+}, { _id: true });
+const certificationSchema = new mongoose_1.Schema({
+    name: {
+        type: String,
+        required: true,
+        trim: true,
+        maxlength: 160,
+    },
+    issuingOrganization: {
+        type: String,
+        required: true,
+        trim: true,
+        maxlength: 160,
+    },
+    issueDate: {
+        type: Date,
+        default: null,
+    },
+    expiryDate: {
+        type: Date,
+        default: null,
+    },
+    credentialId: {
+        type: String,
+        default: '',
+        maxlength: 120,
+    },
+    credentialUrl: {
+        type: String,
+        default: '',
+        maxlength: 500,
+    },
+    source: {
+        type: String,
+        enum: ['manual', 'linkedin'],
+        default: 'manual',
+    },
+}, { _id: true });
+const portfolioProjectSchema = new mongoose_1.Schema({
+    title: {
+        type: String,
+        required: true,
+        trim: true,
+        maxlength: 160,
+    },
+    description: {
+        type: String,
+        maxlength: 1000,
+        default: '',
+    },
+    techStack: {
+        type: [String],
+        default: [],
+    },
+    repoUrl: {
+        type: String,
+        default: null,
+    },
+    liveUrl: {
+        type: String,
+        default: null,
+    },
+    coverImageUrl: {
+        type: String,
+        default: null,
+    },
+    startDate: {
+        type: Date,
+        default: null,
+    },
+    endDate: {
+        type: Date,
+        default: null,
+    },
+    isCurrent: {
+        type: Boolean,
+        default: false,
+    },
+    source: {
+        type: String,
+        enum: ['manual', 'github'],
+        default: 'manual',
+    },
+    githubRepoId: {
+        type: String,
+        default: null,
+    },
+    stars: {
+        type: Number,
+        default: 0,
+        min: 0,
+    },
+    forks: {
+        type: Number,
+        default: 0,
+        min: 0,
+    },
+    languages: {
+        type: [String],
+        default: [],
+    },
+}, { _id: true });
+const resumeSchema = new mongoose_1.Schema({
+    fileUrl: {
+        type: String,
+        default: null,
+    },
+    fileName: {
+        type: String,
+        default: null,
+    },
+    uploadedAt: {
+        type: Date,
+        default: null,
+    },
+    isPublic: {
+        type: Boolean,
+        default: false,
+    },
+}, { _id: false });
+const githubLanguageStatSchema = new mongoose_1.Schema({
+    language: {
+        type: String,
+        required: true,
+        trim: true,
+    },
+    percentage: {
+        type: Number,
+        required: true,
+        min: 0,
+        max: 100,
+    },
+}, { _id: false });
+const githubStatsSchema = new mongoose_1.Schema({
+    totalRepos: {
+        type: Number,
+        default: 0,
+        min: 0,
+    },
+    totalStars: {
+        type: Number,
+        default: 0,
+        min: 0,
+    },
+    totalForks: {
+        type: Number,
+        default: 0,
+        min: 0,
+    },
+    topLanguages: {
+        type: [githubLanguageStatSchema],
+        default: [],
+    },
+    contributionsLastYear: {
+        type: Number,
+        default: 0,
+        min: 0,
+    },
+    lastSyncedAt: {
+        type: Date,
+        default: null,
+    },
+}, { _id: false });
 const userSchema = new mongoose_1.Schema({
     email: {
         type: String,
@@ -133,8 +458,30 @@ const userSchema = new mongoose_1.Schema({
     },
     bio: {
         type: String,
-        default: undefined,
+        default: '',
         maxlength: 500,
+    },
+    headline: {
+        type: String,
+        default: '',
+        maxlength: 120,
+    },
+    location: {
+        type: String,
+        default: '',
+        maxlength: 100,
+    },
+    websiteUrl: {
+        type: String,
+        default: null,
+    },
+    githubUrl: {
+        type: String,
+        default: null,
+    },
+    linkedinUrl: {
+        type: String,
+        default: null,
     },
     domain: {
         type: String,
@@ -146,6 +493,11 @@ const userSchema = new mongoose_1.Schema({
         type: Boolean,
         default: false,
     },
+    registrationStage: {
+        type: String,
+        enum: ['basic', 'profile_setup', 'institution_pending', 'institution_verified', 'complete'],
+        default: 'basic',
+    },
     innovationScore: {
         type: Number,
         default: 0,
@@ -156,7 +508,15 @@ const userSchema = new mongoose_1.Schema({
     },
     accessGrantedBy: {
         type: String,
-        enum: ['self_registered', 'institution_token'],
+        enum: [
+            'self_registered',
+            'institution_token',
+            'institution_roster',
+            'institution_admin',
+            'admin',
+            'startup_school',
+            'skill_dev',
+        ],
         required: true,
     },
     accessExpiresAt: {
@@ -167,6 +527,15 @@ const userSchema = new mongoose_1.Schema({
         type: Boolean,
         default: true,
     },
+    isProfilePublic: {
+        type: Boolean,
+        default: true,
+    },
+    profileSlug: {
+        type: String,
+        default: undefined,
+        trim: true,
+    },
     lastLogin: {
         type: Date,
         default: undefined,
@@ -175,13 +544,31 @@ const userSchema = new mongoose_1.Schema({
         type: Boolean,
         default: false,
     },
+    mustChangePasswordOnNextLogin: {
+        type: Boolean,
+        default: false,
+    },
+    institutionToken: {
+        type: String,
+        default: null,
+    },
     institutionId: {
         type: mongoose_1.Schema.Types.ObjectId,
-        default: undefined,
+        ref: 'User',
+        default: null,
     },
     institutionProfile: {
         type: institutionProfileSchema,
         default: undefined,
+    },
+    institutionVerifiedAt: {
+        type: Date,
+        default: null,
+    },
+    institutionVerificationStatus: {
+        type: String,
+        enum: ['none', 'pending', 'verified', 'failed'],
+        default: 'none',
     },
     verificationStatus: {
         type: String,
@@ -205,10 +592,150 @@ const userSchema = new mongoose_1.Schema({
         default: undefined,
         maxlength: 300,
     },
+    adminApprovalStatus: {
+        type: String,
+        enum: ['not_required', 'pending', 'approved', 'rejected'],
+        default: 'not_required',
+    },
+    adminApprovalRequestedAt: {
+        type: Date,
+        default: undefined,
+    },
+    adminApprovedAt: {
+        type: Date,
+        default: undefined,
+    },
+    adminApprovedBy: {
+        type: mongoose_1.Schema.Types.ObjectId,
+        ref: 'User',
+        default: null,
+    },
+    adminApprovalRejectedAt: {
+        type: Date,
+        default: undefined,
+    },
+    adminApprovalRejectedReason: {
+        type: String,
+        default: undefined,
+        maxlength: 300,
+    },
+    connectedAccounts: {
+        type: new mongoose_1.Schema({
+            github: {
+                type: oauthAccountSchema,
+                default: () => ({
+                    userId: null,
+                    username: null,
+                    accessToken: null,
+                    connectedAt: null,
+                    lastSyncedAt: null,
+                }),
+            },
+            google: {
+                type: oauthAccountSchema,
+                default: () => ({
+                    userId: null,
+                    username: null,
+                    accessToken: null,
+                    connectedAt: null,
+                    lastSyncedAt: null,
+                }),
+            },
+            linkedin: {
+                type: oauthAccountSchema,
+                default: () => ({
+                    userId: null,
+                    username: null,
+                    accessToken: null,
+                    connectedAt: null,
+                    lastSyncedAt: null,
+                }),
+            },
+        }, { _id: false }),
+        default: () => ({
+            github: {
+                userId: null,
+                username: null,
+                accessToken: null,
+                connectedAt: null,
+                lastSyncedAt: null,
+            },
+            google: {
+                userId: null,
+                username: null,
+                accessToken: null,
+                connectedAt: null,
+                lastSyncedAt: null,
+            },
+            linkedin: {
+                userId: null,
+                username: null,
+                accessToken: null,
+                connectedAt: null,
+                lastSyncedAt: null,
+            },
+        }),
+    },
+    skills: {
+        type: [skillSchema],
+        default: [],
+    },
+    experience: {
+        type: [experienceSchema],
+        default: [],
+    },
+    education: {
+        type: [educationSchema],
+        default: [],
+    },
+    certifications: {
+        type: [certificationSchema],
+        default: [],
+    },
+    portfolioProjects: {
+        type: [portfolioProjectSchema],
+        default: [],
+    },
+    resume: {
+        type: resumeSchema,
+        default: () => ({
+            fileUrl: null,
+            fileName: null,
+            uploadedAt: null,
+            isPublic: false,
+        }),
+    },
+    githubStats: {
+        type: githubStatsSchema,
+        default: () => ({
+            totalRepos: 0,
+            totalStars: 0,
+            totalForks: 0,
+            topLanguages: [],
+            contributionsLastYear: 0,
+            lastSyncedAt: null,
+        }),
+    },
+    teamRequestsSent: {
+        type: [{ type: mongoose_1.Schema.Types.ObjectId, ref: 'TeamRequest' }],
+        default: [],
+    },
+    teamRequestsReceived: {
+        type: [{ type: mongoose_1.Schema.Types.ObjectId, ref: 'TeamRequest' }],
+        default: [],
+    },
 }, {
     timestamps: true,
 });
 userSchema.index({ role: 1, innovationScore: -1 });
 userSchema.index({ institutionId: 1 });
 userSchema.index({ role: 1, isActive: 1 });
+userSchema.index({ profileSlug: 1 }, { unique: true, sparse: true });
+userSchema.index({ 'connectedAccounts.github.username': 1 }, { sparse: true });
+userSchema.index({ 'connectedAccounts.google.userId': 1 }, { sparse: true });
+userSchema.index({ 'connectedAccounts.linkedin.userId': 1 }, { sparse: true });
+userSchema.index({ 'skills.name': 1 });
+userSchema.index({ isProfilePublic: 1, role: 1 });
+userSchema.index({ registrationStage: 1 });
+userSchema.index({ adminApprovalStatus: 1, createdAt: -1 });
 exports.User = (0, mongoose_1.model)('User', userSchema);

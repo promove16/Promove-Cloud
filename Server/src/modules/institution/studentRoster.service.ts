@@ -79,6 +79,12 @@ export type StudentRosterImportSummary = {
   }>;
 };
 
+export type CancelStudentRosterInviteResult = {
+  _id: string;
+  cancelled: true;
+  cancelledAt: Date;
+};
+
 const assertInstitutionRole = async (
   institutionId: string,
   institutionRole: UserRole.SCHOOL | UserRole.COLLEGE,
@@ -277,7 +283,7 @@ const pickColumn = (row: Record<string, unknown>, candidates: string[]) => {
   return match?.[1];
 };
 
-const workbookRowsToPayloads = (buffer: Buffer): Array<Partial<StudentRosterInput> & { __rowNumber: number }> => {
+export const workbookRowsToPayloads = (buffer: Buffer): Array<Partial<StudentRosterInput> & { __rowNumber: number }> => {
   let workbook: XLSX.WorkBook;
 
   try {
@@ -447,6 +453,41 @@ export const importStudentRosterEntries = async (
 };
 
 export const importStudentRoster = importStudentRosterEntries;
+
+export const cancelStudentRosterInvite = async (
+  institutionId: string,
+  institutionRole: UserRole.SCHOOL | UserRole.COLLEGE,
+  rosterEntryId: string,
+): Promise<CancelStudentRosterInviteResult> => {
+  await assertInstitutionRole(institutionId, institutionRole);
+
+  const entry = await InstitutionStudentRosterEntry.findOne({
+    _id: rosterEntryId,
+    institutionId,
+    isActive: true,
+  });
+
+  if (!entry) {
+    throw new ApiError(404, 'STUDENT_ROSTER_ENTRY_NOT_FOUND', 'Student roster entry not found');
+  }
+
+  if (entry.linkedUserId || entry.status !== 'invited') {
+    throw new ApiError(
+      400,
+      'STUDENT_ROSTER_INVITE_NOT_CANCELLABLE',
+      'Only pending student invites can be cancelled',
+    );
+  }
+
+  entry.isActive = false;
+  await entry.save();
+
+  return {
+    _id: String(entry._id),
+    cancelled: true,
+    cancelledAt: entry.updatedAt,
+  };
+};
 
 export const findInstitutionRosterMatchByEmail = async (email: string) => {
   const normalizedEmail = normalizeEmail(email);

@@ -3,3 +3,13 @@
 coverage/
 *.log
 dist/
+scripts/
+script_check.js
+script_check.ts
+test_upload.js
+test_local.js
+temp/
+docs/docs/
+.tmp-*.json
+.postman/
+postman/

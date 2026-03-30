@@ -3,6 +3,8 @@ Object.defineProperty(exports, "__esModule", { value: true });
 exports.withRateLimit = exports.apiLimiter = exports.authLimiter = void 0;
 const ratelimit_1 = require("@upstash/ratelimit");
 const redis_1 = require("../config/redis");
+const env_1 = require("../config/env");
+const logger_1 = require("../config/logger");
 const ApiError_1 = require("../utils/ApiError");
 exports.authLimiter = new ratelimit_1.Ratelimit({
     redis: redis_1.redis,
@@ -27,6 +29,9 @@ const resolveKey = (req) => {
     return req.ip || 'anonymous';
 };
 const withRateLimit = (limiter) => async (req, res, next) => {
+    if (!env_1.env.RATE_LIMIT_ENABLED) {
+        return next();
+    }
     const identifier = resolveKey(req);
     try {
         const { success, limit, reset, remaining } = await limiter.limit(identifier);
@@ -39,7 +44,7 @@ const withRateLimit = (limiter) => async (req, res, next) => {
         return next();
     }
     catch (error) {
-        console.error('Rate limiter unavailable, allowing request through:', error);
+        (0, logger_1.logError)('Rate limiter unavailable, allowing request through', error);
         return next();
     }
 };

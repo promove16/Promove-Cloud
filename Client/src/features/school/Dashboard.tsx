@@ -1,4 +1,5 @@
 import { FormEvent, useState } from 'react';
+import { isAxiosError } from 'axios';
 import { Link } from 'react-router-dom';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { Award, ClipboardCheck, KeyRound, Sparkles, UserCheck, Users } from 'lucide-react';
@@ -6,6 +7,9 @@ import { Card } from '../../components/ui/Card';
 import { Button } from '../../components/ui/Button';
 import { schoolApi } from '../../api/school.api';
 import { StudentIntakePanel } from '../institution/StudentIntakePanel';
+import { ApiErrorResponse } from '../../types/auth.types';
+import { BulkCredentialImportResult, TemporaryStudentCredentials } from '../../types/school.types';
+import { useAuthStore } from '../../store/authStore';
 
 const statusTone: Record<string, string> = {
   Active: 'text-emerald-300 bg-emerald-500/10 border-emerald-500/30',
@@ -16,7 +20,11 @@ const statusTone: Record<string, string> = {
 
 export default function Dashboard() {
   const queryClient = useQueryClient();
+  const authUser = useAuthStore((state) => state.user);
   const [tokenLabel, setTokenLabel] = useState('');
+  const [latestTemporaryCredential, setLatestTemporaryCredential] = useState<TemporaryStudentCredentials | null>(null);
+  const [bulkCredentialResult, setBulkCredentialResult] = useState<BulkCredentialImportResult | null>(null);
+  const [rosterNotice, setRosterNotice] = useState('');
   const dashboardQuery = useQuery({
     queryKey: ['school-dashboard'],
     queryFn: schoolApi.getDashboard,
@@ -49,6 +57,42 @@ export default function Dashboard() {
       ]);
     },
   });
+  const cancelInviteMutation = useMutation({
+    mutationFn: schoolApi.cancelStudentInvite,
+    onSuccess: () => {
+      setRosterNotice('Student invite cancelled.');
+      void queryClient.invalidateQueries({ queryKey: ['school-student-roster'] });
+    },
+    onError: (error) => {
+      const message =
+        isAxiosError<ApiErrorResponse>(error) && error.response?.data?.error?.message
+          ? error.response.data.error.message
+          : 'Unable to cancel this invite.';
+      setRosterNotice(message);
+      void queryClient.invalidateQueries({ queryKey: ['school-student-roster'] });
+    },
+  });
+  const createTemporaryCredentialMutation = useMutation({
+    mutationFn: schoolApi.createTemporaryStudentCredentials,
+    onSuccess: (credential) => {
+      setLatestTemporaryCredential(credential);
+      void Promise.all([
+        queryClient.invalidateQueries({ queryKey: ['school-student-roster'] }),
+        queryClient.invalidateQueries({ queryKey: ['school-dashboard'] }),
+        queryClient.invalidateQueries({ queryKey: ['school-student-verifications'] }),
+      ]);
+    },
+  });
+  const importRosterWithCredentialsMutation = useMutation({
+    mutationFn: schoolApi.importStudentRosterWithCredentials,
+    onSuccess: (result) => {
+      setBulkCredentialResult(result);
+      void Promise.all([
+        queryClient.invalidateQueries({ queryKey: ['school-student-roster'] }),
+        queryClient.invalidateQueries({ queryKey: ['school-dashboard'] }),
+      ]);
+    },
+  });
   const importRosterMutation = useMutation({
     mutationFn: schoolApi.importStudentRoster,
     onSuccess: () => {
@@ -71,6 +115,7 @@ export default function Dashboard() {
   });
 
   const data = dashboardQuery.data;
+  const institutionDomainHint = authUser?.email?.split('@')[1];
 
   const handleCreateToken = (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault();
@@ -225,16 +270,34 @@ export default function Dashboard() {
 
       <StudentIntakePanel
         heading="Feed student data manually or from Excel"
-        description="Create a school-managed student roster, then let students sign up using the exact institution email you seeded. Shared tokens still work for open cohorts."
+        description="Create a school-managed roster, generate temporary credentials for managed student accounts, or issue tokens for self-service student signup."
         secondaryFieldLabel="Class / Section"
         secondaryFieldPlaceholder="Grade 12 - A"
         roster={rosterQuery.data ?? []}
+        institutionDomainHint={institutionDomainHint}
         isRosterLoading={rosterQuery.isLoading}
         isManualSubmitting={createRosterEntryMutation.isPending}
         isImportSubmitting={importRosterMutation.isPending}
+        isImportWithCredentialsSubmitting={importRosterWithCredentialsMutation.isPending}
+        isTemporaryCredentialSubmitting={createTemporaryCredentialMutation.isPending}
+        temporaryCredential={latestTemporaryCredential}
+        bulkCredentialResult={bulkCredentialResult}
         onCreateManualEntry={(payload) => createRosterEntryMutation.mutate(payload)}
+        onCancelInvite={(rosterEntryId) => {
+          if (window.confirm('Cancel this student invite?')) {
+            cancelInviteMutation.mutate(rosterEntryId);
+          }
+        }}
+        cancellingInviteId={cancelInviteMutation.isPending ? cancelInviteMutation.variables : null}
         onImportFile={(file) => importRosterMutation.mutate(file)}
+        onImportFileWithCredentials={(file) => importRosterWithCredentialsMutation.mutate(file)}
+        onCreateTemporaryCredentials={(payload) => createTemporaryCredentialMutation.mutate(payload)}
       />
+      {rosterNotice ? (
+        <div className="rounded-2xl border border-cyan-500/30 bg-cyan-500/10 px-4 py-3 text-sm text-cyan-200">
+          {rosterNotice}
+        </div>
+      ) : null}
 
       <div className="grid gap-6 xl:grid-cols-2">
         <Card className="p-6">
@@ -243,7 +306,7 @@ export default function Dashboard() {
               <div className="text-xs uppercase tracking-[0.3em] text-cyan-300">Student Token Desk</div>
               <h2 className="mt-2 text-xl font-semibold text-white">Issue institution tokens</h2>
               <p className="mt-2 text-sm text-slate-400">
-                Students can use a shared token during signup, or register with a preloaded institution email from your roster.
+                Students must use one of these shared tokens during public signup. Institution-created temporary credentials are managed from the intake panel.
               </p>
             </div>
             <div className="flex h-12 w-12 items-center justify-center rounded-2xl bg-slate-900">
@@ -299,7 +362,7 @@ export default function Dashboard() {
               <div className="text-xs uppercase tracking-[0.3em] text-cyan-300">Pending Approval</div>
               <h2 className="mt-2 text-xl font-semibold text-white">Review new student signups</h2>
               <p className="mt-2 text-sm text-slate-400">
-                Approve students to activate their login, whether they came through a shared token or a preloaded school roster entry.
+                Approve students to activate token-based signups. Institution-created temporary accounts are already active.
               </p>
             </div>
             <div className="flex h-12 w-12 items-center justify-center rounded-2xl bg-slate-900">

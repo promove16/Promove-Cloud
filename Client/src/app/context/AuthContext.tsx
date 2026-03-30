@@ -7,7 +7,8 @@ import {
   ApiErrorResponse,
   ApiSuccessResponse,
   AuthPayload,
-  LoginInput,
+  InstitutionProfileInput,
+  PendingSignupPayload,
   SignupResponse,
 } from '../../types/auth.types';
 import { UserRole } from '../../types/roles.types';
@@ -23,14 +24,17 @@ interface AuthContextType {
   login: (
     email: string,
     password: string,
-    role: string,
   ) => Promise<{ success: boolean; error?: string; code?: string; redirectTo?: string }>;
   signup: (userData: {
     email: string;
     password: string;
     name: string;
     role: string;
-  }) => Promise<{ success: boolean; error?: string; code?: string; redirectTo?: string }>;
+    institutionToken?: string;
+    domain?: string;
+    bio?: string;
+    institutionProfile?: InstitutionProfileInput;
+  }) => Promise<{ success: boolean; error?: string; code?: string; redirectTo?: string; message?: string }>;
   logout: () => Promise<void>;
   isAuthenticated: boolean;
   isLoading: boolean;
@@ -62,12 +66,11 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       }
     : null;
 
-  const login = async (email: string, password: string, role: string) => {
+  const login = async (email: string, password: string) => {
     try {
       const response = await api.post<ApiSuccessResponse<AuthPayload>>('/api/auth/login', {
         email,
         password,
-        role: role as LoginInput['role'],
       });
 
       const payload = response.data.data;
@@ -75,7 +78,9 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
       return {
         success: true,
-        redirectTo: roleHome[payload.user.role] ?? '/dashboard',
+        redirectTo: payload.user.mustChangePasswordOnNextLogin
+          ? '/change-password'
+          : (roleHome[payload.user.role] ?? '/dashboard'),
       };
     } catch (error) {
       const apiError = (error as { response?: { data?: ApiErrorResponse } })?.response?.data?.error;
@@ -92,39 +97,76 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     password: string;
     name: string;
     role: string;
+    institutionToken?: string;
+    domain?: string;
+    bio?: string;
+    institutionProfile?: InstitutionProfileInput;
   }) => {
     const normalizedRole = userData.role === 'company' ? 'recruiter' : userData.role;
 
     if (normalizedRole === UserRole.STUDENT) {
-      return {
-        success: false,
-        error: 'Student signup now requires an institution token from a school or college.',
-        code: 'INSTITUTION_TOKEN_REQUIRED',
-      };
+      if (!userData.institutionToken?.trim()) {
+        return {
+          success: false,
+          error: 'Student signup requires an institution token.',
+          code: 'INSTITUTION_TOKEN_REQUIRED',
+        };
+      }
+
+      try {
+        const response = await api.post<ApiSuccessResponse<SignupResponse>>('/api/auth/register', {
+          email: userData.email,
+          password: userData.password,
+          displayName: userData.name,
+          role: normalizedRole as UserRole,
+          institutionToken: userData.institutionToken.trim(),
+          ...(userData.domain?.trim() ? { domain: userData.domain.trim() } : {}),
+          ...(userData.bio?.trim() ? { bio: userData.bio.trim() } : {}),
+        });
+
+        const payload = response.data.data;
+
+        if ('accessToken' in payload) {
+          setAuth(payload.user, payload.accessToken);
+
+          return {
+            success: true,
+            redirectTo: roleHome[payload.user.role] ?? '/dashboard',
+          };
+        }
+
+        return {
+          success: true,
+          message: payload.message,
+          redirectTo: '/login',
+        };
+      } catch (error) {
+        const apiError = (error as { response?: { data?: ApiErrorResponse } })?.response?.data?.error;
+        return {
+          success: false,
+          error: apiError?.message ?? 'Failed to create account. Please try again.',
+          code: apiError?.code,
+        };
+      }
     }
 
     try {
-      const response = await api.post<ApiSuccessResponse<SignupResponse>>('/api/auth/register', {
+      const response = await api.post<ApiSuccessResponse<SignupResponse>>('/api/auth/register-request', {
         email: userData.email,
         password: userData.password,
         displayName: userData.name,
         role: normalizedRole as UserRole,
+        ...(userData.domain?.trim() ? { domain: userData.domain.trim() } : {}),
+        ...(userData.bio?.trim() ? { bio: userData.bio.trim() } : {}),
+        ...(userData.institutionProfile ? { institutionProfile: userData.institutionProfile } : {}),
       });
 
-      const payload = response.data.data;
-      if (!('accessToken' in payload)) {
-        return {
-          success: false,
-          error: payload.message,
-          code: 'INSTITUTION_VERIFICATION_PENDING',
-        };
-      }
-
-      setAuth(payload.user, payload.accessToken);
+      const payload = response.data.data as PendingSignupPayload;
 
       return {
         success: true,
-        redirectTo: roleHome[payload.user.role] ?? '/dashboard',
+        message: payload.message,
+        redirectTo: '/login',
       };
     } catch (error) {
       const apiError = (error as { response?: { data?: ApiErrorResponse } })?.response?.data?.error;

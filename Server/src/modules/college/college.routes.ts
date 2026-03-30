@@ -6,6 +6,8 @@ import { connectionGuard } from '../../middleware/connectionGuard';
 import { UserRole } from '../../types/roles.types';
 import { asyncHandler } from '../../utils/asyncHandler';
 import {
+  cancelCollegeStudentRosterInviteController,
+  createCollegeManagedStudentCredentialsController,
   createCollegeStudentAccessTokenController,
   createCollegeStudentRosterEntryController,
   createCollegeComplianceReportController,
@@ -15,6 +17,7 @@ import {
   getCollegePlacementController,
   getCollegeStudentJourneyController,
   getLatestCollegeComplianceReportController,
+  importCollegeStudentCredentialsController,
   importCollegeStudentRosterController,
   listCollegePendingStudentVerificationsController,
   listCollegeStudentRosterController,
@@ -93,16 +96,32 @@ router.get(
   authorize(UserRole.COLLEGE),
   asyncHandler(listCollegeStudentRosterController),
 );
+router.delete(
+  '/student-roster/:rosterEntryId',
+  authorize(UserRole.COLLEGE),
+  asyncHandler(cancelCollegeStudentRosterInviteController),
+);
 router.post(
   '/student-roster/manual',
   authorize(UserRole.COLLEGE),
   asyncHandler(createCollegeStudentRosterEntryController),
 );
 router.post(
+  '/student-temp-credentials',
+  authorize(UserRole.COLLEGE),
+  asyncHandler(createCollegeManagedStudentCredentialsController),
+);
+router.post(
   '/student-roster/import',
   authorize(UserRole.COLLEGE),
   rosterUpload.single('file'),
   asyncHandler(importCollegeStudentRosterController),
+);
+router.post(
+  '/student-roster/import-credentials',
+  authorize(UserRole.COLLEGE),
+  rosterUpload.single('file'),
+  asyncHandler(importCollegeStudentCredentialsController),
 );
 router.get(
   '/student-verifications',

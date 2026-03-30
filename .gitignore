@@ -8,3 +8,11 @@ docs/docs/
 .tmp-*.json
 .postman/
 postman/
+
+# One-off test scripts and results
+Server/scripts/verify-*.mjs
+Server/scripts/phase*-output.txt
+Server/scripts/phase*-results.json
+
+# Raw PRD extract scratchpads
+docs/*.txt

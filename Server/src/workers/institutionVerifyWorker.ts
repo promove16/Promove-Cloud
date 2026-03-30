@@ -79,7 +79,7 @@ export const startInstitutionVerifyWorker = () => {
         institutionVerificationStatus: 'verified',
         institutionVerifiedAt: verifiedAt,
         registrationStage: 'institution_pending',
-        accessGrantedBy: institution.role === UserRole.SCHOOL ? 'startup_school' : 'skill_dev',
+        accessGrantedBy: 'institution_token',
         accessExpiresAt: new Date(Date.now() + 365 * 24 * 60 * 60 * 1000),
         verificationStatus: 'pending',
         verificationRejectedAt: undefined,

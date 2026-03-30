@@ -1,5 +1,5 @@
 import api from './axiosInstance';
-import { ApiSuccessResponse } from '../types/auth.types';
+import { ApiSuccessResponse, InstitutionProfileInput, RegistrationRequestStatus } from '../types/auth.types';
 import { UserRole } from '../types/roles.types';
 import { MentorStudentProfile } from './mentor.api';
 
@@ -10,6 +10,13 @@ export interface AdminUserListItem {
   role: UserRole;
   innovationScore: number;
   isActive: boolean;
+  profileComplete: boolean;
+  registrationStage: string;
+  adminApprovalStatus: 'not_required' | 'pending' | 'approved' | 'rejected';
+  adminApprovalRequestedAt?: string;
+  adminApprovedAt?: string;
+  adminApprovalRejectedAt?: string;
+  adminApprovalRejectedReason?: string;
   accessGrantedBy: string;
   accessExpiresAt: string;
   createdAt: string;
@@ -20,6 +27,26 @@ export interface AdminUsersResponse {
   total: number;
   page: number;
   limit: number;
+}
+
+export interface AdminRegistrationRequestItem {
+  _id: string;
+  email: string;
+  displayName: string;
+  role: UserRole;
+  status: RegistrationRequestStatus;
+  domain?: string;
+  bio?: string;
+  institutionProfile?: InstitutionProfileInput;
+  requestedAt: string;
+  reviewedAt?: string;
+  reviewedBy?: string;
+  rejectionReason?: string;
+}
+
+export interface AdminRegistrationRequestsResponse {
+  items: AdminRegistrationRequestItem[];
+  total: number;
 }
 
 export interface AdminPatentItem {
@@ -133,6 +160,26 @@ export const adminApi = {
     const response = await api.get<ApiSuccessResponse<AdminUsersResponse>>('/api/admin/users', { params });
     return response.data.data;
   },
+  async getRegistrationRequests(params?: { status?: RegistrationRequestStatus; role?: UserRole }) {
+    const response = await api.get<ApiSuccessResponse<AdminRegistrationRequestsResponse>>(
+      '/api/admin/registration-requests',
+      { params },
+    );
+    return response.data.data;
+  },
+  async approveRegistrationRequest(requestId: string) {
+    const response = await api.patch<ApiSuccessResponse<AdminRegistrationRequestItem>>(
+      `/api/admin/registration-requests/${requestId}/approve`,
+    );
+    return response.data.data;
+  },
+  async rejectRegistrationRequest(requestId: string, rejectionReason: string) {
+    const response = await api.patch<ApiSuccessResponse<AdminRegistrationRequestItem>>(
+      `/api/admin/registration-requests/${requestId}/reject`,
+      { rejectionReason },
+    );
+    return response.data.data;
+  },
   async updateUserRole(userId: string, role: UserRole) {
     const response = await api.patch<ApiSuccessResponse<AdminUserListItem>>(`/api/admin/users/${userId}/role`, {
       role,
@@ -143,6 +190,16 @@ export const adminApi = {
     const response = await api.patch<ApiSuccessResponse<AdminUserListItem>>(`/api/admin/users/${userId}/access`, {
       isActive,
     });
+    return response.data.data;
+  },
+  async reviewRegistrationRequest(
+    userId: string,
+    payload: { decision: 'approved' | 'rejected'; reason?: string },
+  ) {
+    const response = await api.patch<ApiSuccessResponse<AdminUserListItem>>(
+      `/api/admin/users/${userId}/registration-request`,
+      payload,
+    );
     return response.data.data;
   },
   async getPatents(status?: string) {

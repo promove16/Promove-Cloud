@@ -1,6 +1,11 @@
 import api from './axiosInstance';
 import { ApiSuccessResponse } from '../types/auth.types';
-import { ChatMessage, Workspace, WorkspaceTask, WorkspaceUpload } from '../types/workspace.types';
+import {
+  ChatMessage,
+  Workspace,
+  WorkspaceTask,
+  WorkspaceUpload,
+} from '../types/workspace.types';
 
 export interface WorkspacePayload {
   title: string;
@@ -19,6 +24,20 @@ export interface WorkspaceTaskPayload {
   priority: 'High' | 'Medium' | 'Low';
   assignedTo?: string;
   dueDate?: string;
+}
+
+export interface WorkspaceRepoSubmissionPayload {
+  repoUrl: string;
+  branch?: string;
+  commitHash?: string;
+  note?: string;
+}
+
+export interface WorkspaceCodeSubmissionPayload {
+  title: string;
+  language: string;
+  summary?: string;
+  codeSnippet: string;
 }
 
 export const workspaceApi = {
@@ -64,6 +83,22 @@ export const workspaceApi = {
     const response = await api.delete<ApiSuccessResponse<WorkspaceUpload[]>>(
       `/api/workspace/${workspaceId}/upload/${uploadId}`,
     );
+    return response.data.data;
+  },
+  async addRepoSubmission(workspaceId: string, payload: WorkspaceRepoSubmissionPayload) {
+    const response = await api.post<ApiSuccessResponse<Workspace>>(`/api/workspace/${workspaceId}/repos`, payload);
+    return response.data.data;
+  },
+  async removeRepoSubmission(workspaceId: string, repoId: string) {
+    const response = await api.delete<ApiSuccessResponse<Workspace>>(`/api/workspace/${workspaceId}/repos/${repoId}`);
+    return response.data.data;
+  },
+  async addCodeSubmission(workspaceId: string, payload: WorkspaceCodeSubmissionPayload) {
+    const response = await api.post<ApiSuccessResponse<Workspace>>(`/api/workspace/${workspaceId}/code`, payload);
+    return response.data.data;
+  },
+  async removeCodeSubmission(workspaceId: string, codeId: string) {
+    const response = await api.delete<ApiSuccessResponse<Workspace>>(`/api/workspace/${workspaceId}/code/${codeId}`);
     return response.data.data;
   },
   async addTask(workspaceId: string, payload: WorkspaceTaskPayload) {

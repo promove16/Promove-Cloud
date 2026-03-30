@@ -2,12 +2,18 @@ import { Request, Response } from 'express';
 import { ApiError } from '../../utils/ApiError';
 import { ApiResponse } from '../../utils/ApiResponse';
 import {
+  addCodeSubmission,
+  addCodeSubmissionSchema,
   addProgress,
   addProgressSchema,
+  addRepoSubmission,
+  addRepoSubmissionSchema,
   addTask,
   addTaskSchema,
   createWorkspace,
   createWorkspaceSchema,
+  deleteCodeSubmission,
+  deleteRepoSubmission,
   deleteTask,
   deleteWorkspace,
   deleteWorkspaceUpload,
@@ -95,6 +101,36 @@ export const removeWorkspaceAsset = async (req: Request, res: Response) => {
   const uploadId = getParam(req.params.uploadId, 'UPLOAD_REQUIRED', 'Upload id is required');
   const uploads = await deleteWorkspaceUpload(workspaceId, uploadId, userId);
   res.json(new ApiResponse(uploads));
+};
+
+export const addWorkspaceRepoSubmission = async (req: Request, res: Response) => {
+  const userId = ensureUserId(req);
+  const workspaceId = getParam(req.params.id, 'WORKSPACE_REQUIRED', 'Workspace id is required');
+  const workspace = await addRepoSubmission(workspaceId, userId, addRepoSubmissionSchema.parse(req.body));
+  res.status(201).json(new ApiResponse(workspace));
+};
+
+export const removeWorkspaceRepoSubmission = async (req: Request, res: Response) => {
+  const userId = ensureUserId(req);
+  const workspaceId = getParam(req.params.id, 'WORKSPACE_REQUIRED', 'Workspace id is required');
+  const repoId = getParam(req.params.repoId, 'REPOSITORY_REQUIRED', 'Repository id is required');
+  const workspace = await deleteRepoSubmission(workspaceId, repoId, userId);
+  res.json(new ApiResponse(workspace));
+};
+
+export const addWorkspaceCodeSubmission = async (req: Request, res: Response) => {
+  const userId = ensureUserId(req);
+  const workspaceId = getParam(req.params.id, 'WORKSPACE_REQUIRED', 'Workspace id is required');
+  const workspace = await addCodeSubmission(workspaceId, userId, addCodeSubmissionSchema.parse(req.body));
+  res.status(201).json(new ApiResponse(workspace));
+};
+
+export const removeWorkspaceCodeSubmission = async (req: Request, res: Response) => {
+  const userId = ensureUserId(req);
+  const workspaceId = getParam(req.params.id, 'WORKSPACE_REQUIRED', 'Workspace id is required');
+  const codeId = getParam(req.params.codeId, 'CODE_REQUIRED', 'Code submission id is required');
+  const workspace = await deleteCodeSubmission(workspaceId, codeId, userId);
+  res.json(new ApiResponse(workspace));
 };
 
 export const addWorkspaceTask = async (req: Request, res: Response) => {

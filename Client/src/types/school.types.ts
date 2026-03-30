@@ -147,6 +147,18 @@ export interface StudentAccessToken {
   createdAt: string;
 }
 
+export interface TemporaryStudentCredential {
+  _id: string;
+  email: string;
+  displayName: string;
+  temporaryPassword: string;
+  mustChangePasswordOnNextLogin: boolean;
+  institutionId: string;
+  institutionName?: string;
+  expiresAt?: string;
+  createdAt: string;
+}
+
 export interface PendingStudentVerification {
   _id: string;
   displayName: string;
@@ -165,6 +177,18 @@ export interface StudentVerificationReviewResponse {
   reason?: string;
 }
 
+export interface TemporaryStudentCredentials {
+  student: {
+    _id: string;
+    displayName: string;
+    email: string;
+    profileSlug?: string | null;
+  };
+  temporaryPassword: string;
+  institutionDomain: string;
+  createdAt: string;
+}
+
 export interface StudentRosterEntry {
   _id: string;
   displayName: string;
@@ -180,6 +204,15 @@ export interface StudentRosterEntry {
   linkedUserId?: string;
   registeredAt?: string;
   reviewedAt?: string;
+}
+
+export interface BulkCredentialImportResult {
+  results: Array<{
+    row: number;
+    student: { _id: string; displayName: string; email: string };
+    temporaryPassword: string;
+  }>;
+  errors: Array<{ row: number; email?: string; message: string }>;
 }
 
 export interface StudentRosterImportResult {
