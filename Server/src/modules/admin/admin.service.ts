@@ -474,6 +474,8 @@ export const listPatents = async (status?: string): Promise<AdminPatentItem[]> =
         },
       },
       questionnaire: patent.questionnaire,
+      filingDocuments: patent.filingDocuments,
+      supportingDocuments: patent.supportingDocuments ?? [],
     };
   });
 };

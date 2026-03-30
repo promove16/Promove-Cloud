@@ -82,6 +82,40 @@ export interface AdminPatentItem {
     marketUseCase: string;
     priorArtAwareness: string;
   };
+  filingDocuments: {
+    inventionCategory:
+      | 'mobile_app_backend'
+      | 'iot_hardware_interface'
+      | 'mechanical_improvement'
+      | 'software_hardware_integration'
+      | 'other';
+    specificationType: 'provisional' | 'complete';
+    inventorJournalSummary: string;
+    priorArtSearchSummary: string;
+    prototypeStatus: 'concept_only' | 'partial_prototype' | 'working_prototype' | 'validated_prototype';
+    specificationDraft: string;
+    abstractDraft: string;
+    claimsDraft: string;
+    drawingsPrepared: boolean;
+    drawingsNotes: string;
+    form1ApplicantDetailsConfirmed: boolean;
+    form3ForeignFilingDetails?: string;
+    form5InventorshipConfirmed: boolean;
+    form26PowerOfAttorneyRequired: boolean;
+    form26PowerOfAttorneyDetails?: string;
+    examinationRequestPlan: string;
+    publicDisclosureChecked: boolean;
+    professionalSupportNeeded: boolean;
+    costManagementNotes?: string;
+  };
+  supportingDocuments: Array<{
+    fileUrl: string;
+    fileType: 'pdf' | 'image';
+    fileName: string;
+    fileSizeBytes: number;
+    note?: string;
+    documentCategory?: string;
+  }>;
 }
 
 export interface AdminAwardItem {

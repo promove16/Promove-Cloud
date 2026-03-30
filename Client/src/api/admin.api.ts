@@ -1,5 +1,6 @@
 import api from './axiosInstance';
 import { ApiSuccessResponse, InstitutionProfileInput, RegistrationRequestStatus } from '../types/auth.types';
+import { PatentFilingDocuments, PatentSupportingDocument } from '../types/patent.types';
 import { UserRole } from '../types/roles.types';
 import { MentorStudentProfile } from './mentor.api';
 
@@ -73,6 +74,8 @@ export interface AdminPatentItem {
     marketUseCase: string;
     priorArtAwareness: string;
   };
+  filingDocuments: PatentFilingDocuments;
+  supportingDocuments: PatentSupportingDocument[];
 }
 
 export interface AdminAwardItem {

@@ -215,7 +215,7 @@ export function ProductWorkspace() {
                       </div>
                     ) : null}
                     <div className="space-y-3">
-                      {workspace.tasks.map((task) => {
+                      {(workspace.tasks || []).map((task) => {
                         const assignee = teamMembers.find((member) => member._id === task.assignedTo);
                         return (
                           <div key={task._id} className="bg-slate-950 border border-slate-800 rounded-lg p-4">
@@ -311,7 +311,7 @@ export function ProductWorkspace() {
                     </div>
                     <div className="space-y-3 mb-6">
                       <h3 className="font-semibold text-white">Uploaded Files</h3>
-                      {workspace.uploads.map((upload) => {
+                      {(workspace.uploads || []).map((upload) => {
                         const uploader = teamMembers.find((member) => member._id === upload.uploadedBy);
                         return (
                           <div key={upload._id} className="bg-slate-950 border border-slate-800 rounded-lg p-4 flex items-center justify-between gap-4">
@@ -320,11 +320,11 @@ export function ProductWorkspace() {
                           </div>
                         );
                       })}
-                      {workspace.uploads.length === 0 ? <div className="text-sm text-slate-500">No documents or images uploaded yet.</div> : null}
+                      {(workspace.uploads || []).length === 0 ? <div className="text-sm text-slate-500">No documents or images uploaded yet.</div> : null}
                     </div>
                     <div className="space-y-3 mb-6">
                       <h3 className="font-semibold text-white">Repository Links</h3>
-                      {workspace.repoSubmissions.map((repo) => {
+                      {(workspace.repoSubmissions || []).map((repo) => {
                         const uploader = teamMembers.find((member) => member._id === repo.uploadedBy);
                         return (
                           <div key={repo._id} className="bg-slate-950 border border-slate-800 rounded-lg p-4 flex items-center justify-between gap-4">
@@ -341,11 +341,11 @@ export function ProductWorkspace() {
                           </div>
                         );
                       })}
-                      {workspace.repoSubmissions.length === 0 ? <div className="text-sm text-slate-500">No repository links attached yet.</div> : null}
+                      {(workspace.repoSubmissions || []).length === 0 ? <div className="text-sm text-slate-500">No repository links attached yet.</div> : null}
                     </div>
                     <div className="space-y-3">
                       <h3 className="font-semibold text-white">Code Snippets</h3>
-                      {workspace.codeSubmissions.map((snippet) => {
+                      {(workspace.codeSubmissions || []).map((snippet) => {
                         const uploader = teamMembers.find((member) => member._id === snippet.uploadedBy);
                         return (
                           <div key={snippet._id} className="bg-slate-950 border border-slate-800 rounded-lg p-4">
@@ -361,7 +361,7 @@ export function ProductWorkspace() {
                           </div>
                         );
                       })}
-                      {workspace.codeSubmissions.length === 0 ? <div className="text-sm text-slate-500">No code snippets saved yet.</div> : null}
+                      {(workspace.codeSubmissions || []).length === 0 ? <div className="text-sm text-slate-500">No code snippets saved yet.</div> : null}
                     </div>
                   </div>
                 ) : null}
@@ -398,12 +398,12 @@ export function ProductWorkspace() {
                 <div className="bg-slate-900 border border-slate-800 rounded-xl p-6">
                   <h3 className="font-bold text-white mb-4">Project Stats</h3>
                   <div className="space-y-4">
-                    <div><div className="flex justify-between text-sm mb-1"><span className="text-slate-400">Overall Progress</span><span className="text-white font-bold">{workspace.progressPercent}%</span></div><div className="h-2 bg-slate-800 rounded-full overflow-hidden"><div className="h-full bg-gradient-to-r from-blue-500 to-purple-500" style={{ width: `${workspace.progressPercent}%` }} /></div></div>
+                    <div><div className="flex justify-between text-sm mb-1"><span className="text-slate-400">Overall Progress</span><span className="text-white font-bold">{workspace.progressPercent || 0}%</span></div><div className="h-2 bg-slate-800 rounded-full overflow-hidden"><div className="h-full bg-gradient-to-r from-blue-500 to-purple-500" style={{ width: `${workspace.progressPercent || 0}%` }} /></div></div>
                     <div className="grid grid-cols-2 gap-3">
-                      <div className="bg-slate-950 rounded-lg p-3 text-center"><div className="text-2xl font-bold text-white mb-1">{workspace.tasks.filter((task) => task.done).length}</div><div className="text-xs text-slate-400">Tasks Done</div></div>
-                      <div className="bg-slate-950 rounded-lg p-3 text-center"><div className="text-2xl font-bold text-white mb-1">{workspace.tasks.filter((task) => !task.done).length}</div><div className="text-xs text-slate-400">Open Tasks</div></div>
+                      <div className="bg-slate-950 rounded-lg p-3 text-center"><div className="text-2xl font-bold text-white mb-1">{(workspace.tasks || []).filter((task) => task.done).length}</div><div className="text-xs text-slate-400">Tasks Done</div></div>
+                      <div className="bg-slate-950 rounded-lg p-3 text-center"><div className="text-2xl font-bold text-white mb-1">{(workspace.tasks || []).filter((task) => !task.done).length}</div><div className="text-xs text-slate-400">Open Tasks</div></div>
                       <div className="bg-slate-950 rounded-lg p-3 text-center"><div className="text-2xl font-bold text-white mb-1">{teamMembers.length}</div><div className="text-xs text-slate-400">Team Members</div></div>
-                      <div className="bg-slate-950 rounded-lg p-3 text-center"><div className="text-2xl font-bold text-white mb-1">{workspace.uploads.length + workspace.repoSubmissions.length + workspace.codeSubmissions.length}</div><div className="text-xs text-slate-400">Evidence Items</div></div>
+                      <div className="bg-slate-950 rounded-lg p-3 text-center"><div className="text-2xl font-bold text-white mb-1">{(workspace.uploads || []).length + (workspace.repoSubmissions || []).length + (workspace.codeSubmissions || []).length}</div><div className="text-xs text-slate-400">Evidence Items</div></div>
                     </div>
                   </div>
                 </div>
@@ -411,7 +411,7 @@ export function ProductWorkspace() {
                 <div className="bg-slate-900 border border-slate-800 rounded-xl p-6">
                   <h3 className="font-bold text-white mb-4">Recent Updates</h3>
                   <div className="space-y-4">
-                    {workspace.progressUpdates.length > 0 ? workspace.progressUpdates.slice(-4).reverse().map((update) => {
+                    {(workspace.progressUpdates || []).length > 0 ? (workspace.progressUpdates || []).slice(-4).reverse().map((update) => {
                       const author = teamMembers.find((member) => member._id === update.submittedBy);
                       return <div key={update._id} className="text-sm"><div className="text-white font-semibold">{author?.displayName ?? "Team member"}</div><div className="text-slate-400">{update.note}</div><div className="text-xs text-slate-500 mt-1">{dt(update.submittedAt)}</div></div>;
                     }) : <div className="text-sm text-slate-400">Progress updates will appear here after your first upload.</div>}

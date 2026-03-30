@@ -1,9 +1,19 @@
 import api from './axiosInstance';
 import { ApiSuccessResponse } from '../types/auth.types';
-import { PatentQuestionnaire, PatentSubmission } from '../types/patent.types';
+import {
+  PatentFilingDocuments,
+  PatentQuestionnaire,
+  PatentSubmission,
+} from '../types/patent.types';
 
 export const patentApi = {
-  async submit(payload: { projectTitle: string; workspaceId?: string; questionnaire: PatentQuestionnaire }) {
+  async submit(payload: {
+    projectTitle: string;
+    workspaceId: string;
+    supportingUploadIds: string[];
+    questionnaire: PatentQuestionnaire;
+    filingDocuments: PatentFilingDocuments;
+  }) {
     const response = await api.post<ApiSuccessResponse<PatentSubmission>>('/api/patents/submit', payload);
     return response.data.data;
   },

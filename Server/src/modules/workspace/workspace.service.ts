@@ -124,13 +124,14 @@ const recalcProgressPercent = (workspace: { milestones: Array<{ completionPercen
 };
 
 type WorkspaceSnapshot = {
-  toObject?: () => WorkspaceSnapshot;
+  toObject?: () => any;
   ownerId: unknown;
   teamMemberIds: unknown[];
+  [key: string]: any;
 };
 
 export const serializeWorkspace = async (workspace: WorkspaceSnapshot) => {
-  const baseWorkspace: WorkspaceSnapshot =
+  const baseWorkspace: any =
     typeof workspace.toObject === 'function' ? workspace.toObject() : workspace;
   const memberIds = Array.from(
     new Set([
@@ -144,6 +145,12 @@ export const serializeWorkspace = async (workspace: WorkspaceSnapshot) => {
 
   return {
     ...baseWorkspace,
+    tasks: baseWorkspace.tasks || [],
+    uploads: baseWorkspace.uploads || [],
+    repoSubmissions: baseWorkspace.repoSubmissions || [],
+    codeSubmissions: baseWorkspace.codeSubmissions || [],
+    progressUpdates: baseWorkspace.progressUpdates || [],
+    milestones: baseWorkspace.milestones || [],
     teamMembers: teamMembers.map((member) => ({
       _id: String(member._id),
       displayName: member.displayName,

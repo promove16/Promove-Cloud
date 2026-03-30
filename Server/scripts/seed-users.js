@@ -20,6 +20,12 @@ const Team = require('../src/models/Team');
 const Ticket = require('../src/models/Ticket');
 const StudentProfile = require('../src/models/StudentProfile');
 const { UserRole } = require('../src/types/roles.types');
+const { Workspace } = require('../src/modules/workspace/workspace.model');
+const { MentorSession } = require('../src/modules/mentor/mentorSession.model');
+const { MentorFeedback } = require('../src/modules/mentor/mentorFeedback.model');
+const { Problem } = require('../src/modules/problemBank/problem.model');
+const { JobPost } = require('../src/modules/recruiter/jobPost.model');
+const { CampusDrive } = require('../src/modules/recruiter/campusDrive.model');
 
 const DEFAULT_PASSWORD = 'Password@123';
 const ADMIN_PASSWORD = 'Admin@ProMove1';
@@ -814,6 +820,7 @@ const STARTUP_SEEDS = [
 const PATENT_SEEDS = [
   {
     studentKey: 'arjun',
+    workspaceKey: 'arjun_agrisense',
     projectTitle: 'AgriSense Edge Disease Detection Kit',
     questionnaire: {
       whatIsYourInnovation: 'An edge-AI kit that detects early crop disease from leaf images without depending on continuous internet access.',
@@ -822,6 +829,34 @@ const PATENT_SEEDS = [
       marketUseCase: 'Farmer producer organizations and agri-input partners can use it to reduce crop loss and improve treatment turnaround times.',
       priorArtAwareness: 'Reviewed public agri-vision tools and positioned the novelty around offline deployment and advisory localization.',
     },
+    filingDocuments: {
+      inventionCategory: 'iot_hardware_interface',
+      specificationType: 'complete',
+      inventorJournalSummary: 'Documented 6 months of field prototype testing across 3 farm clusters in Telangana. Logs include sensor accuracy measurements, network reliability in low-signal zones, and farmer feedback on advisory UI.',
+      priorArtSearchSummary: 'Reviewed Google Patents and existing agri-vision tools. No existing solution combines offline-first CNN inference with localized advisory prompts on an embedded device at this price point.',
+      prototypeStatus: 'validated_prototype',
+      specificationDraft: 'The invention relates to an embedded edge-AI device for early-stage crop disease detection. The device integrates a camera module, on-device inference engine, and a mobile advisory interface capable of operating in zero-connectivity environments.',
+      abstractDraft: 'An IoT-enabled crop disease detection kit that performs real-time leaf analysis using on-device machine learning, without requiring internet connectivity, and delivers localized treatment recommendations via a companion mobile application.',
+      claimsDraft: '1. A portable device for crop disease detection comprising an embedded camera, an offline CNN inference module, and a mobile dashboard. 2. The device as in claim 1, wherein the inference model is updated via batch sync when connectivity is available.',
+      drawingsPrepared: true,
+      drawingsNotes: 'Five technical drawings prepared: system block diagram, hardware assembly layout, mobile app wireframes, data flow diagram, and field deployment topology.',
+      form1ApplicantDetailsConfirmed: true,
+      form5InventorshipConfirmed: true,
+      form26PowerOfAttorneyRequired: false,
+      examinationRequestPlan: 'Requesting examination within 48 months from the filing date. Inventor will self-represent at provisional stage and engage a registered patent agent for complete specification.',
+      publicDisclosureChecked: true,
+      professionalSupportNeeded: false,
+      costManagementNotes: 'Filing fees estimated under INR 4,000 for educational institution category. No agent fees at provisional stage.',
+    },
+    supportingDocuments: [
+      {
+        fileUrl: 'https://res.cloudinary.com/demo/raw/upload/agrisense_spec_draft.pdf',
+        fileType: 'pdf',
+        fileName: 'AgriSense_Specification_Draft.pdf',
+        fileSizeBytes: 245760,
+        note: 'Complete specification draft including claims, abstract, and drawings reference.',
+      },
+    ],
     status: 'approved',
     submittedAt: new Date('2026-02-18T10:00:00.000Z'),
     adminReviewedAt: new Date('2026-03-04T09:00:00.000Z'),
@@ -829,6 +864,7 @@ const PATENT_SEEDS = [
   },
   {
     studentKey: 'priya',
+    workspaceKey: 'priya_soilmesh',
     projectTitle: 'Mesh-Based Soil Monitoring Node',
     questionnaire: {
       whatIsYourInnovation: 'A low-cost IoT node network that measures moisture, pH, and ambient conditions across distributed plots.',
@@ -837,12 +873,33 @@ const PATENT_SEEDS = [
       marketUseCase: 'Suitable for precision irrigation pilots in educational institutions and small agricultural research programs.',
       priorArtAwareness: 'Benchmarked existing precision irrigation devices and differentiated on modularity, repairability, and mesh-first design.',
     },
+    filingDocuments: {
+      inventionCategory: 'iot_hardware_interface',
+      specificationType: 'provisional',
+      inventorJournalSummary: 'Lab journal entries from September 2025 to February 2026 documenting sensor calibration trials, mesh routing experiments, and battery performance under partial shade conditions.',
+      priorArtSearchSummary: 'Searched public filings and academic literature. Identified 3 relevant patents in the precision agriculture space but none with modular mesh-node architecture targeting sub-1-acre plot monitoring.',
+      prototypeStatus: 'working_prototype',
+      specificationDraft: 'The invention relates to a mesh-networked soil monitoring system comprising low-power sensor nodes capable of measuring soil moisture, temperature, and pH, communicating via a self-healing mesh protocol.',
+      abstractDraft: 'A modular, solar-powered IoT node system for distributed soil monitoring that uses mesh networking to relay field data without a central gateway, enabling resilient monitoring in low-infrastructure farm environments.',
+      claimsDraft: '1. A soil monitoring node comprising a moisture sensor, pH probe, temperature sensor, and a mesh radio transceiver. 2. A network of nodes as in claim 1, configured to route data through adjacent nodes when a direct uplink is unavailable.',
+      drawingsPrepared: true,
+      drawingsNotes: 'Three drawings ready: node PCB layout, mesh topology diagram, and mobile dashboard wireframes. Technical illustrations to be finalized before complete specification.',
+      form1ApplicantDetailsConfirmed: true,
+      form5InventorshipConfirmed: true,
+      form26PowerOfAttorneyRequired: false,
+      examinationRequestPlan: 'Will convert provisional to complete specification within 12 months. Examination request to be filed with complete specification filing.',
+      publicDisclosureChecked: false,
+      professionalSupportNeeded: true,
+      costManagementNotes: 'Seeking guidance on institution-subsidized filing. Mentor advised exploring TIFAC student patent scheme.',
+    },
+    supportingDocuments: [],
     status: 'under_review',
     submittedAt: new Date('2026-03-08T11:30:00.000Z'),
     scoreAwarded: false,
   },
   {
     studentKey: 'arjun',
+    workspaceKey: 'arjun_agrisense',
     projectTitle: 'Localized Crop Recovery Recommendation Engine',
     questionnaire: {
       whatIsYourInnovation: 'A recommendation engine that maps detected crop conditions to localized recovery workflows.',
@@ -851,12 +908,32 @@ const PATENT_SEEDS = [
       marketUseCase: 'Useful for agri advisors, FPOs, and rural incubation programs running crop support pilots.',
       priorArtAwareness: 'Compared existing advisory engines and focused novelty on localized remediation logic tied to edge diagnostics.',
     },
+    filingDocuments: {
+      inventionCategory: 'software_hardware_integration',
+      specificationType: 'provisional',
+      inventorJournalSummary: 'Research journal from October 2025 to March 2026. Includes treatment catalog design, regional input availability mapping logic, and workflow testing across 2 states.',
+      priorArtSearchSummary: 'Reviewed public agri-advisory tools. Differentiation is in the tight coupling between edge-derived disease confidence scores and localized remediation paths based on region-specific input availability.',
+      prototypeStatus: 'partial_prototype',
+      specificationDraft: 'The invention relates to a software system for generating localized crop recovery recommendations by integrating disease detection outputs with region-specific treatment availability data.',
+      abstractDraft: 'A crop recovery recommendation engine that processes edge-generated disease confidence scores and maps them to actionable, location-specific remediation workflows, accounting for input availability and advisor capacity.',
+      claimsDraft: '1. A method for generating crop recovery recommendations comprising receiving a disease classification output, querying a regional treatment catalog, and returning a ranked remediation workflow. 2. The method as in claim 1, wherein the catalog is updated from a central server via periodic sync.',
+      drawingsPrepared: false,
+      drawingsNotes: 'System architecture diagrams in progress. Workflow flowcharts to be prepared once the recommendation API is stabilized.',
+      form1ApplicantDetailsConfirmed: true,
+      form5InventorshipConfirmed: true,
+      form26PowerOfAttorneyRequired: false,
+      examinationRequestPlan: 'Provisional filing to establish priority date. Complete specification to follow within 12 months pending software finalization.',
+      publicDisclosureChecked: true,
+      professionalSupportNeeded: false,
+    },
+    supportingDocuments: [],
     status: 'submitted',
     submittedAt: new Date('2026-03-14T09:20:00.000Z'),
     scoreAwarded: false,
   },
   {
     studentKey: 'priya',
+    workspaceKey: 'priya_soilmesh',
     projectTitle: 'Adaptive Valve Controller for Shared Irrigation Lines',
     questionnaire: {
       whatIsYourInnovation: 'A controller that balances irrigation timings across shared pipeline constraints in small farm clusters.',
@@ -865,6 +942,35 @@ const PATENT_SEEDS = [
       marketUseCase: 'Designed for community irrigation pilots and campus agri research plots.',
       priorArtAwareness: 'Reviewed smart valve products and differentiated on shared-line coordination for clustered small farms.',
     },
+    filingDocuments: {
+      inventionCategory: 'iot_hardware_interface',
+      specificationType: 'complete',
+      inventorJournalSummary: 'Eight months of development logs covering relay driver circuits, time-window scheduling algorithm design, and field test results from a 4-farm pilot in Pune district.',
+      priorArtSearchSummary: 'Searched Indian Patent Office database and international equivalents. Existing smart valve patents target single-farm setups; none address shared-pipeline fairness scheduling across multiple independent land holdings.',
+      prototypeStatus: 'validated_prototype',
+      specificationDraft: 'The invention relates to an adaptive irrigation valve controller that coordinates water distribution across shared pipelines serving multiple small farm plots using a time-window fairness algorithm.',
+      abstractDraft: 'An embedded controller for shared irrigation pipelines that schedules valve open/close cycles to ensure equitable water distribution across clustered farm plots, using telemetry-based usage estimation and a fairness-weighted scheduling algorithm.',
+      claimsDraft: '1. A valve controller comprising a relay driver, a scheduling module, and a telemetry unit, configured to manage water distribution across a shared irrigation pipeline. 2. The controller as in claim 1, wherein scheduling is computed using a fairness-weighted time-window algorithm.',
+      drawingsPrepared: true,
+      drawingsNotes: 'Six technical drawings: controller circuit schematic, pipeline topology, scheduling algorithm flowchart, mobile monitoring interface, field installation guide, and usage telemetry dashboard.',
+      form1ApplicantDetailsConfirmed: true,
+      form5InventorshipConfirmed: true,
+      form26PowerOfAttorneyRequired: true,
+      form26PowerOfAttorneyDetails: 'Power of attorney granted to patent agent registered with the Indian Patent Office. Form 26 signed and notarized on 2026-02-08.',
+      examinationRequestPlan: 'Request for examination to be filed simultaneously with complete specification. Expedited examination to be considered if prior art search reveals critical conflicts.',
+      publicDisclosureChecked: true,
+      professionalSupportNeeded: true,
+      costManagementNotes: 'Agent fees to be covered under the college innovation fund grant. Filing fee category: educational institution.',
+    },
+    supportingDocuments: [
+      {
+        fileUrl: 'https://res.cloudinary.com/demo/raw/upload/valve_controller_spec.pdf',
+        fileType: 'pdf',
+        fileName: 'ValveController_CompleteSpec.pdf',
+        fileSizeBytes: 312320,
+        note: 'Complete specification with all claims, drawings, and abstract as submitted to the patent agent.',
+      },
+    ],
     status: 'approved',
     submittedAt: new Date('2026-02-11T11:00:00.000Z'),
     adminReviewedAt: new Date('2026-03-05T09:10:00.000Z'),
@@ -872,6 +978,7 @@ const PATENT_SEEDS = [
   },
   {
     studentKey: 'rohit',
+    workspaceKey: 'rohit_solarnest',
     projectTitle: 'Compact Solar Tilt Learning Rig',
     questionnaire: {
       whatIsYourInnovation: 'A classroom rig that demonstrates how panel tilt changes power output over time.',
@@ -880,6 +987,26 @@ const PATENT_SEEDS = [
       marketUseCase: 'Useful for school science labs and innovation clubs teaching clean energy concepts.',
       priorArtAwareness: 'Compared school lab kits and focused on data visibility and repeatable experimentation.',
     },
+    filingDocuments: {
+      inventionCategory: 'mechanical_improvement',
+      specificationType: 'provisional',
+      inventorJournalSummary: 'Development notes from November 2025 to March 2026. Covers tilt mechanism iterations, power measurement circuit design, and student usability testing in two school science sessions.',
+      priorArtSearchSummary: 'Searched existing educational science kits. Existing solar lab kits offer static setups; none provide an integrated adjustable tilt mechanism with live power analytics at the sub-INR-2000 target price.',
+      prototypeStatus: 'working_prototype',
+      specificationDraft: 'The invention relates to a compact solar energy learning rig with an adjustable panel tilt mechanism and a real-time power output analytics display, designed for use in school and college science laboratories.',
+      abstractDraft: 'A low-cost, portable solar tilt demonstration rig that allows students to experimentally measure the effect of panel angle on power output, with real-time visualisation on an integrated display unit.',
+      claimsDraft: '1. A solar demonstration rig comprising at least one miniature solar panel, an adjustable tilt rail, a power measurement circuit, and an output display. 2. The rig as in claim 1, wherein the tilt rail allows incremental angle adjustment from 0 to 90 degrees.',
+      drawingsPrepared: true,
+      drawingsNotes: 'Exploded assembly drawing and circuit schematic prepared. Dashboard UI screenshots included as supplementary reference.',
+      form1ApplicantDetailsConfirmed: true,
+      form5InventorshipConfirmed: true,
+      form26PowerOfAttorneyRequired: false,
+      examinationRequestPlan: 'Filing provisional to secure priority date. Complete specification to be filed within 12 months after finalizing the analytics firmware.',
+      publicDisclosureChecked: false,
+      professionalSupportNeeded: false,
+      costManagementNotes: 'Self-filing at student rate. Mentor has reviewed the claims draft for completeness.',
+    },
+    supportingDocuments: [],
     status: 'submitted',
     submittedAt: new Date('2026-03-19T08:40:00.000Z'),
     scoreAwarded: false,
@@ -1001,6 +1128,347 @@ const DEAL_SEEDS = [
     adminApprovalRequired: false,
     innovationScoreSnapshot: 125,
     status: 'active',
+  },
+];
+
+const WORKSPACE_SEEDS = [
+  {
+    key: 'arjun_agrisense',
+    ownerKey: 'arjun',
+    teamMemberKeys: ['priya'],
+    title: 'AgriSense AI — Edge Disease Detection',
+    category: 'AgriTech',
+    stage: 'Patent',
+    progressPercent: 82,
+    milestones: [
+      { name: 'Research & Planning', isCompleted: true, completionPercent: 100 },
+      { name: 'Design & Prototyping', isCompleted: true, completionPercent: 100 },
+      { name: 'Development', isCompleted: true, completionPercent: 100 },
+      { name: 'Testing & Validation', isCompleted: false, completionPercent: 65 },
+      { name: 'Final Delivery', isCompleted: false, completionPercent: 10 },
+    ],
+    tasks: [
+      { title: 'Finalize CNN model quantization for Raspberry Pi', priority: 'High', done: true, createdAt: new Date('2026-01-10T09:00:00.000Z') },
+      { title: 'Write technical spec for patent filing', priority: 'High', done: true, createdAt: new Date('2026-01-20T10:00:00.000Z') },
+      { title: 'Run field accuracy validation — second round', priority: 'High', done: false, createdAt: new Date('2026-03-01T09:00:00.000Z') },
+      { title: 'Prepare mentor review deck', priority: 'Medium', done: false, createdAt: new Date('2026-03-10T11:00:00.000Z') },
+    ],
+    repoSubmissions: [
+      { provider: 'github', repoUrl: 'https://github.com/arjun-promove/agrisense-edge', displayName: 'agrisense-edge', branch: 'main', commitHash: 'a3c1f8d', note: 'Main development branch — all milestones through Development complete.' },
+    ],
+    codeSubmissions: [
+      { title: 'Disease classifier inference wrapper', language: 'Python', summary: 'Wraps the TFLite model for on-device inference and formats results for the advisory API.', codeSnippet: 'def classify(image_path):\n    model = load_tflite_model()\n    input_data = preprocess(image_path)\n    output = model.run(input_data)\n    return parse_output(output)', lineCount: 28 },
+    ],
+    progressUpdates: [
+      { note: 'Completed field validation round 1 across 3 farm clusters. Accuracy at 84% on test dataset.', milestoneRef: 'Testing & Validation', submittedAt: new Date('2026-02-28T10:00:00.000Z') },
+      { note: 'Patent provisional filed. Admin review in progress.', submittedAt: new Date('2026-03-05T09:00:00.000Z') },
+    ],
+  },
+  {
+    key: 'priya_soilmesh',
+    ownerKey: 'priya',
+    teamMemberKeys: [],
+    title: 'SoilMesh — Distributed Soil Monitoring Network',
+    category: 'AgriTech',
+    stage: 'Build',
+    progressPercent: 60,
+    milestones: [
+      { name: 'Research & Planning', isCompleted: true, completionPercent: 100 },
+      { name: 'Design & Prototyping', isCompleted: true, completionPercent: 100 },
+      { name: 'Development', isCompleted: false, completionPercent: 70 },
+      { name: 'Testing & Validation', isCompleted: false, completionPercent: 10 },
+      { name: 'Final Delivery', isCompleted: false, completionPercent: 0 },
+    ],
+    tasks: [
+      { title: 'Finalize ESP32 mesh routing logic', priority: 'High', done: true, createdAt: new Date('2026-01-15T09:00:00.000Z') },
+      { title: 'Calibrate pH sensor readings', priority: 'High', done: false, createdAt: new Date('2026-02-10T10:00:00.000Z') },
+      { title: 'Build farmer mobile app MVP', priority: 'Medium', done: false, createdAt: new Date('2026-02-20T11:00:00.000Z') },
+      { title: 'Write provisional patent specification', priority: 'High', done: true, createdAt: new Date('2026-03-01T09:00:00.000Z') },
+    ],
+    repoSubmissions: [
+      { provider: 'github', repoUrl: 'https://github.com/priya-promove/soilmesh-node', displayName: 'soilmesh-node', branch: 'dev', note: 'Node firmware repository — mesh routing module complete.' },
+    ],
+    codeSubmissions: [
+      { title: 'Mesh routing table update logic', language: 'C++', summary: 'Updates routing table when a neighbouring node becomes unreachable and selects the next best path.', codeSnippet: 'void updateRoute(NodeId failed) {\n  routes.erase(failed);\n  for (auto& node : knownNodes) {\n    if (node.reachable && node.id != failed) {\n      routes[failed] = node.id;\n      break;\n    }\n  }\n}', lineCount: 22 },
+    ],
+    progressUpdates: [
+      { note: 'Mesh routing tested across 5 nodes in lab. Failover working correctly.', milestoneRef: 'Development', submittedAt: new Date('2026-02-15T10:00:00.000Z') },
+    ],
+  },
+  {
+    key: 'rohit_solarnest',
+    ownerKey: 'rohit',
+    teamMemberKeys: [],
+    title: 'SolarNest — Clean Energy Platform',
+    category: 'CleanTech',
+    stage: 'Launch',
+    progressPercent: 90,
+    milestones: [
+      { name: 'Research & Planning', isCompleted: true, completionPercent: 100 },
+      { name: 'Design & Prototyping', isCompleted: true, completionPercent: 100 },
+      { name: 'Development', isCompleted: true, completionPercent: 100 },
+      { name: 'Testing & Validation', isCompleted: true, completionPercent: 100 },
+      { name: 'Final Delivery', isCompleted: false, completionPercent: 50 },
+    ],
+    tasks: [
+      { title: 'Finalize investor pitch deck', priority: 'High', done: true, createdAt: new Date('2026-01-05T09:00:00.000Z') },
+      { title: 'Complete regulatory compliance checklist', priority: 'High', done: true, createdAt: new Date('2026-02-01T09:00:00.000Z') },
+      { title: 'Onboard beta users for marketplace', priority: 'Medium', done: false, createdAt: new Date('2026-03-01T09:00:00.000Z') },
+      { title: 'Submit patent for solar tilt rig', priority: 'Low', done: false, createdAt: new Date('2026-03-18T10:00:00.000Z') },
+    ],
+    repoSubmissions: [
+      { provider: 'github', repoUrl: 'https://github.com/rohit-promove/solarnest-platform', displayName: 'solarnest-platform', branch: 'main', commitHash: 'f7a2b9c', note: 'Production-ready platform repository.' },
+    ],
+    codeSubmissions: [
+      { title: 'Solar yield estimator', language: 'TypeScript', summary: 'Calculates expected annual yield in kWh given panel spec, tilt angle, and location coordinates.', codeSnippet: 'function estimateYield(panelKw: number, tilt: number, lat: number): number {\n  const irradiance = getAnnualIrradiance(lat, tilt);\n  return panelKw * irradiance * 0.85;\n}', lineCount: 18 },
+    ],
+    progressUpdates: [
+      { note: 'Platform launched to mentor cohort. 28 active users in the first two weeks.', milestoneRef: 'Final Delivery', submittedAt: new Date('2026-03-20T09:00:00.000Z') },
+    ],
+  },
+];
+
+const PROBLEM_SEEDS = [
+  {
+    title: 'Early Crop Disease Detection in Low-Connectivity Rural Zones',
+    description: 'Smallholder farms in Telangana and Andhra Pradesh lose 15-25% of crop yield annually due to delayed disease identification. Agri-extension workers have limited bandwidth and cannot monitor every farm plot. An offline-capable, low-cost diagnostic tool that can be operated by farmers without specialist training is needed.',
+    category: 'Agriculture',
+    difficulty: 'Hard',
+    domain: 'AgriTech / Edge AI',
+    tags: ['crop-disease', 'edge-ai', 'rural', 'offline-first'],
+    isVerified: true,
+    postedByKey: 'college',
+    sponsorName: 'Telangana Agri-Innovation Cell',
+    geography: 'Telangana, India',
+    targetBeneficiaries: 'Smallholder farmers and farmer producer organizations operating in low-connectivity zones.',
+    impactGoal: 'Reduce crop loss due to late disease detection by 40% across 500 farms within 18 months of deployment.',
+    expectedOutcome: 'A validated prototype that can detect at least 5 common crop diseases from leaf images with >80% accuracy and operate without internet access.',
+    deliverables: 'Hardware prototype, inference model, farmer-facing mobile UI, and a field validation report covering at least 3 farm clusters.',
+    acceptanceCriteria: 'Prototype passes field accuracy validation, operates in zero-connectivity mode, and receives positive usability scores from at least 10 farmers.',
+    constraints: 'Device cost must remain under INR 5,000. Must be operable by a non-technical farmer after 30 minutes of training.',
+    publicationStatus: 'published',
+    claimStatus: 'claimed',
+    claimedByKey: 'arjun',
+    claimedAt: new Date('2025-10-12T09:00:00.000Z'),
+  },
+  {
+    title: 'Shared Irrigation Scheduling for Small Farm Clusters',
+    description: 'In Pune and Nashik districts, groups of 3-8 smallholders share irrigation pipelines fed by a common borewell. Manual scheduling leads to disputes, water waste, and under-irrigation for downstream plots. An automated, fair-scheduling valve controller is needed to optimize distribution without farmer conflict.',
+    category: 'Agriculture',
+    difficulty: 'Medium',
+    domain: 'IoT / Water Management',
+    tags: ['irrigation', 'iot', 'fairness', 'shared-infrastructure'],
+    isVerified: true,
+    postedByKey: 'college',
+    sponsorName: 'Maharashtra Jal Pradhikaran Innovation Fund',
+    geography: 'Maharashtra, India',
+    targetBeneficiaries: 'Farm clusters sharing borewell-fed irrigation pipelines.',
+    impactGoal: 'Eliminate scheduling disputes and reduce water waste by 30% across 20 pilot farm clusters.',
+    expectedOutcome: 'An embedded controller that manages shared valve timing using a fairness algorithm, with telemetry accessible via mobile.',
+    deliverables: 'Controller prototype, scheduling firmware, mobile monitoring app, and a 6-month pilot report.',
+    acceptanceCriteria: 'Controller operates reliably for 6 months without manual intervention. All member farms receive scheduled access within ±5 minutes of planned time.',
+    constraints: 'Solution must work without a stable internet connection. Hardware must survive outdoor monsoon conditions.',
+    publicationStatus: 'published',
+    claimStatus: 'claimed',
+    claimedByKey: 'priya',
+    claimedAt: new Date('2025-11-03T10:00:00.000Z'),
+  },
+  {
+    title: 'Rooftop Solar Yield Prediction for Urban Residential Buildings',
+    description: 'Urban households in Tier-2 cities are interested in rooftop solar but cannot reliably estimate ROI without expensive assessments. A web-based tool that uses building metadata, satellite irradiance data, and local net-metering tariffs to estimate yield and payback period would accelerate adoption.',
+    category: 'Environment',
+    difficulty: 'Medium',
+    domain: 'CleanTech / SaaS',
+    tags: ['solar', 'rooftop', 'urban', 'yield-prediction'],
+    isVerified: true,
+    postedByKey: 'college',
+    sponsorName: 'MNRE Student Innovation Program',
+    geography: 'India — Tier 2 cities',
+    targetBeneficiaries: 'Urban homeowners and housing societies evaluating rooftop solar installations.',
+    impactGoal: 'Enable 1,000 households to make informed solar adoption decisions in the first year of platform availability.',
+    expectedOutcome: 'A web platform that generates a solar yield estimate and payback analysis from basic building and location inputs within 2 minutes.',
+    deliverables: 'Web application, yield calculation engine, irradiance data integration, and a user testing report.',
+    acceptanceCriteria: 'Yield estimates are within 10% of actual measurements for 80% of test cases using publicly available irradiance benchmarks.',
+    constraints: 'Must be free to use for individual households. API call costs must remain under INR 2 per estimate.',
+    publicationStatus: 'published',
+    claimStatus: 'open',
+  },
+  {
+    title: 'Student Innovation Portfolio Verification for Campus Placements',
+    description: 'Recruiters visiting campuses cannot efficiently verify the authenticity or depth of student innovation portfolios. A system that records verifiable innovation milestones (hackathon wins, patents filed, prototype demos) with institutional endorsement would help recruiters make faster, more confident shortlisting decisions.',
+    category: 'Education',
+    difficulty: 'Easy',
+    domain: 'EdTech / HR Tech',
+    tags: ['portfolio', 'verification', 'recruitment', 'innovation'],
+    isVerified: false,
+    postedByKey: 'school',
+    geography: 'India',
+    targetBeneficiaries: 'Campus recruiters, placement officers, and students seeking innovation-track placements.',
+    impactGoal: 'Reduce recruiter shortlisting time by 50% for innovation-track candidates at participating institutions.',
+    expectedOutcome: 'A platform feature that lets institutions endorse student innovation records and lets recruiters filter by verified milestones.',
+    deliverables: 'Endorsement workflow, recruiter filter UI, and audit trail for endorsed records.',
+    acceptanceCriteria: 'Recruiters can filter and shortlist candidates by innovation score and verified milestones in under 5 minutes per cohort.',
+    constraints: 'Must integrate with existing institution onboarding flow. No additional login for students.',
+    publicationStatus: 'published',
+    claimStatus: 'open',
+  },
+  {
+    title: 'Low-Cost Renewable Energy Lab Kit for School Science Programs',
+    description: 'Most school science labs in government and semi-urban schools cannot afford commercial lab kits that demonstrate renewable energy concepts. A sub-INR-2000 DIY-style kit covering solar, wind, and basic energy storage demonstrations is needed, with curriculum-aligned activity guides.',
+    category: 'Education',
+    difficulty: 'Easy',
+    domain: 'CleanTech / Education',
+    tags: ['school', 'lab-kit', 'renewable-energy', 'low-cost'],
+    isVerified: false,
+    postedByKey: 'school',
+    geography: 'India',
+    targetBeneficiaries: 'Government and semi-urban school science teachers and students.',
+    impactGoal: 'Provide 500 schools with an affordable, curriculum-aligned renewable energy lab kit within 2 years.',
+    expectedOutcome: 'A reproducible kit design with sourcing guide, assembly instructions, and 5 curriculum-aligned activity modules.',
+    deliverables: 'Kit prototype, bill of materials, sourcing guide, activity guide, and teacher training materials.',
+    acceptanceCriteria: 'Kit can be fully assembled by a teacher with basic electronics familiarity in under 45 minutes. All activities align with NCERT Class 8-10 science curriculum.',
+    constraints: 'Total component cost must remain under INR 1,500. Components must be available from local electronics distributors.',
+    publicationStatus: 'draft',
+    claimStatus: 'open',
+  },
+];
+
+const MENTOR_SESSION_SEEDS = [
+  {
+    mentorKey: 'mentor',
+    studentKey: 'arjun',
+    workspaceKey: 'arjun_agrisense',
+    title: 'Patent Strategy Review — AgriSense',
+    scheduledAt: new Date('2026-02-20T10:00:00.000Z'),
+    durationMinutes: 45,
+    meetLink: 'https://meet.google.com/demo-agrisense-patent',
+    status: 'Completed',
+    mentorNotes: 'Reviewed the provisional specification draft. Claims are well-scoped for a provisional. Suggested Arjun clarify the offline inference claim to distinguish from existing mobile vision tools. Recommended converting to complete specification within 10 months. Score looks strong — innovation breakdown is above peer median.',
+    studentFeedback: 'Very useful session. The claim differentiation advice helped a lot. Will revise the novelty section before the next review.',
+  },
+  {
+    mentorKey: 'mentor',
+    studentKey: 'arjun',
+    workspaceKey: 'arjun_agrisense',
+    title: 'Field Validation Debrief and Startup Readiness',
+    scheduledAt: new Date('2026-03-06T11:00:00.000Z'),
+    durationMinutes: 60,
+    meetLink: 'https://meet.google.com/demo-agrisense-startup',
+    status: 'Completed',
+    mentorNotes: 'Field validation results are promising. 84% accuracy is competitive for this deployment context. Advised Arjun to document the failure cases clearly for the admin review. Also discussed the AgriSense startup launch checklist — pitch deck needs a stronger market sizing section.',
+    studentFeedback: 'Appreciated the detailed feedback on the failure case documentation. Will update the validation report before submitting to admin.',
+  },
+  {
+    mentorKey: 'mentor',
+    studentKey: 'priya',
+    workspaceKey: 'priya_soilmesh',
+    title: 'Mesh Routing Architecture Review',
+    scheduledAt: new Date('2026-02-25T14:00:00.000Z'),
+    durationMinutes: 45,
+    meetLink: 'https://meet.google.com/demo-soilmesh-arch',
+    status: 'Completed',
+    mentorNotes: 'Priya has a solid understanding of the mesh protocol. Suggested increasing the test node count to 8 before field deployment. Discussed the provisional patent timeline — filing within the next 2 weeks is advisable given the upcoming college innovation showcase.',
+    studentFeedback: 'The node count suggestion is actionable. Will also add a redundancy test case to the test suite before the showcase.',
+  },
+  {
+    mentorKey: 'mentor',
+    studentKey: 'rohit',
+    workspaceKey: 'rohit_solarnest',
+    title: 'Investor Pitch Preparation',
+    scheduledAt: new Date('2026-04-05T15:00:00.000Z'),
+    durationMinutes: 60,
+    meetLink: 'https://meet.google.com/demo-solarnest-pitch',
+    status: 'Scheduled',
+    mentorNotes: undefined,
+    studentFeedback: undefined,
+  },
+];
+
+const MENTOR_FEEDBACK_SEEDS = [
+  {
+    mentorKey: 'mentor',
+    studentKey: 'arjun',
+    workspaceKey: 'arjun_agrisense',
+    feedbackText: 'Arjun has demonstrated exceptional technical depth throughout the AgriSense project. His approach to the edge inference problem is well-reasoned and the field validation methodology is rigorous. The patent draft shows clear novelty scoping. Key area for growth: market sizing and commercial narrative in pitch materials.',
+    rating: 5,
+  },
+  {
+    mentorKey: 'mentor',
+    studentKey: 'priya',
+    workspaceKey: 'priya_soilmesh',
+    feedbackText: 'Priya has built a technically sound prototype and shown good instincts for hardware-software integration. The mesh routing implementation handles failure cases better than similar student projects I have reviewed. She would benefit from more structured testing documentation before the patent filing.',
+    rating: 4,
+  },
+  {
+    mentorKey: 'mentor',
+    studentKey: 'rohit',
+    workspaceKey: 'rohit_solarnest',
+    feedbackText: 'Rohit has taken SolarNest from concept to a live platform with real users in under 9 months, which is an impressive execution pace for a student founder. The platform architecture is clean and investor-ready. Main feedback: the traction metrics slide needs to be sharper before the next pitch round.',
+    rating: 5,
+  },
+];
+
+const JOB_POST_SEEDS = [
+  {
+    recruiterKey: 'recruiter',
+    title: 'AgriTech Product Intern — Embedded Systems',
+    company: 'GreenField Innovations Pvt Ltd',
+    description: 'We are building the next generation of precision agriculture hardware for smallholder farms. Looking for a motivated intern with experience in embedded systems, sensor interfacing, and IoT protocols. You will work directly with our product team on field-ready hardware for the Kharif 2026 season.',
+    domain: 'AgriTech',
+    minimumInnovationScore: 80,
+    type: 'Internship',
+    location: 'Hyderabad (Hybrid)',
+    isActive: true,
+    expiresAt: new Date('2026-05-31T23:59:59.000Z'),
+  },
+  {
+    recruiterKey: 'recruiter',
+    title: 'Full-Stack Engineer — CleanTech Platform',
+    company: 'SunBridge Energy Technologies',
+    description: 'SunBridge is scaling its B2C rooftop solar marketplace across 12 Indian cities. We are hiring a full-stack engineer to own the consumer-facing yield estimation and order management modules. Strong preference for candidates with prior startup or innovation project experience.',
+    domain: 'CleanTech',
+    minimumInnovationScore: 100,
+    type: 'Full-time',
+    location: 'Pune (On-site)',
+    isActive: true,
+    expiresAt: new Date('2026-06-30T23:59:59.000Z'),
+  },
+  {
+    recruiterKey: 'recruiter',
+    title: 'Hardware Prototype Engineer — Innovation Track',
+    company: 'Bharat Lab Works',
+    description: 'Bharat Lab Works designs and manufactures low-cost science lab kits for government school programs across India. We are looking for an engineer with hands-on prototype experience to join our kit design team. Projects include electronics, mechanical assembly, and curriculum integration.',
+    domain: 'Education / Hardware',
+    minimumInnovationScore: 60,
+    type: 'Full-time',
+    location: 'Bengaluru (On-site)',
+    isActive: true,
+    expiresAt: new Date('2026-07-15T23:59:59.000Z'),
+  },
+];
+
+const CAMPUS_DRIVE_SEEDS = [
+  {
+    recruiterKey: 'recruiter',
+    institutionKey: 'college',
+    title: 'GreenField Innovations Campus Placement Drive 2026',
+    description: 'GreenField Innovations is conducting on-campus interviews for embedded systems and IoT roles. Shortlisted candidates will be invited for a technical round followed by a product design interview. Innovation score is a key shortlisting criterion alongside technical assessment.',
+    type: 'Placement Drive',
+    scheduledAt: new Date('2026-04-20T09:00:00.000Z'),
+    minimumInnovationScore: 80,
+    isActive: true,
+    registeredStudentKeys: ['arjun', 'priya'],
+  },
+  {
+    recruiterKey: 'recruiter',
+    institutionKey: 'college',
+    title: 'SunBridge Energy Hackathon — CleanTech Innovation Challenge',
+    description: 'A 24-hour hackathon organized by SunBridge Energy Technologies for students with demonstrated CleanTech project experience. Participants will prototype a solar energy access solution for a rural or semi-urban context. Top 3 teams will receive funding and mentorship.',
+    type: 'Hackathon',
+    scheduledAt: new Date('2026-05-10T08:00:00.000Z'),
+    minimumInnovationScore: 50,
+    isActive: true,
+    registeredStudentKeys: ['rohit', 'priya'],
   },
 ];
 
@@ -1325,7 +1793,7 @@ const seedEventArtifacts = async (institutionsByKey, usersByKey, studentsByKey) 
   }
 };
 
-const seedStartupArtifacts = async (studentsByKey, usersByKey) => {
+const seedStartupArtifacts = async (studentsByKey, usersByKey, workspacesByKey) => {
   const startupsByKey = {};
 
   for (const startupSeed of STARTUP_SEEDS) {
@@ -1367,12 +1835,16 @@ const seedStartupArtifacts = async (studentsByKey, usersByKey) => {
 
   for (const patentSeed of PATENT_SEEDS) {
     const student = studentsByKey[patentSeed.studentKey];
+    const workspace = workspacesByKey[patentSeed.workspaceKey] ?? null;
     await Patent.findOneAndUpdate(
       { studentId: student._id, projectTitle: patentSeed.projectTitle },
       {
         studentId: student._id,
+        workspaceId: workspace?._id ?? undefined,
         projectTitle: patentSeed.projectTitle,
         questionnaire: clone(patentSeed.questionnaire),
+        filingDocuments: clone(patentSeed.filingDocuments),
+        supportingDocuments: clone(patentSeed.supportingDocuments ?? []),
         status: patentSeed.status,
         submittedAt: patentSeed.submittedAt,
         adminReviewedAt: patentSeed.adminReviewedAt ?? undefined,
@@ -1429,6 +1901,213 @@ const seedStartupArtifacts = async (studentsByKey, usersByKey) => {
         closedAt: dealSeed.closedAt,
         innovationScoreSnapshot: dealSeed.innovationScoreSnapshot,
         status: dealSeed.status,
+      },
+      { upsert: true, new: true, setDefaultsOnInsert: true, runValidators: true },
+    );
+  }
+};
+
+const seedWorkspaceArtifacts = async (studentsByKey, problemsByKey) => {
+  const workspacesByKey = {};
+
+  for (const wsSeed of WORKSPACE_SEEDS) {
+    const owner = studentsByKey[wsSeed.ownerKey];
+    const teamMemberIds = (wsSeed.teamMemberKeys ?? []).map((k) => studentsByKey[k]._id);
+
+    const wsDoc = await Workspace.findOneAndUpdate(
+      { ownerId: owner._id, title: wsSeed.title },
+      {
+        ownerId: owner._id,
+        teamMemberIds,
+        title: wsSeed.title,
+        category: wsSeed.category,
+        stage: wsSeed.stage,
+        progressPercent: wsSeed.progressPercent,
+        milestones: wsSeed.milestones.map((m) => ({
+          name: m.name,
+          isCompleted: m.isCompleted,
+          completionPercent: m.completionPercent,
+          completedAt: m.isCompleted ? new Date() : undefined,
+          completedBy: m.isCompleted ? owner._id : undefined,
+        })),
+        tasks: wsSeed.tasks.map((t) => ({
+          title: t.title,
+          priority: t.priority,
+          done: t.done,
+          assignedTo: owner._id,
+          createdAt: t.createdAt,
+        })),
+        repoSubmissions: wsSeed.repoSubmissions.map((r) => ({
+          ...r,
+          uploadedBy: owner._id,
+          uploadedAt: new Date('2026-01-20T10:00:00.000Z'),
+        })),
+        codeSubmissions: wsSeed.codeSubmissions.map((c) => ({
+          ...c,
+          uploadedBy: owner._id,
+          uploadedAt: new Date('2026-02-01T10:00:00.000Z'),
+        })),
+        progressUpdates: wsSeed.progressUpdates.map((u) => ({
+          note: u.note,
+          milestoneRef: u.milestoneRef ?? undefined,
+          submittedBy: owner._id,
+          submittedAt: u.submittedAt,
+        })),
+        isActive: true,
+      },
+      { upsert: true, new: true, setDefaultsOnInsert: true, runValidators: true },
+    );
+
+    workspacesByKey[wsSeed.key] = wsDoc;
+  }
+
+  // Wire claimedProblemId after both workspaces and problems exist
+  for (const problemSeed of PROBLEM_SEEDS) {
+    if (problemSeed.claimedByKey && problemSeed.claimStatus === 'claimed') {
+      const problem = problemsByKey[problemSeed.title];
+      if (!problem) continue;
+      const workspaceKey = WORKSPACE_SEEDS.find((ws) => ws.ownerKey === problemSeed.claimedByKey)?.key;
+      if (!workspaceKey) continue;
+      const ws = workspacesByKey[workspaceKey];
+      if (!ws) continue;
+      await Workspace.updateOne({ _id: ws._id }, { claimedProblemId: problem._id });
+    }
+  }
+
+  return workspacesByKey;
+};
+
+const seedProblemBankArtifacts = async (usersByKey) => {
+  const problemsByKey = {};
+
+  for (const problemSeed of PROBLEM_SEEDS) {
+    const postedBy = usersByKey[problemSeed.postedByKey];
+    const claimedBy = problemSeed.claimedByKey ? usersByKey[problemSeed.claimedByKey] : undefined;
+
+    // postedBy is a String field in the schema (display name or label)
+    const postedByLabel = postedBy.displayName ?? postedBy.email;
+
+    const problemDoc = await Problem.findOneAndUpdate(
+      { title: problemSeed.title, postedBy: postedByLabel },
+      {
+        title: problemSeed.title,
+        description: problemSeed.description,
+        category: problemSeed.category,
+        difficulty: problemSeed.difficulty,
+        domain: problemSeed.domain,
+        tags: clone(problemSeed.tags ?? []),
+        isVerified: problemSeed.isVerified,
+        postedBy: postedByLabel,
+        createdByAdminId: undefined,
+        sponsorName: problemSeed.sponsorName ?? undefined,
+        geography: problemSeed.geography ?? undefined,
+        // targetBeneficiaries, deliverables, acceptanceCriteria, constraints are [String] arrays
+        targetBeneficiaries: problemSeed.targetBeneficiaries ? [problemSeed.targetBeneficiaries] : [],
+        impactGoal: problemSeed.impactGoal ?? undefined,
+        expectedOutcome: problemSeed.expectedOutcome ?? undefined,
+        deliverables: problemSeed.deliverables ? [problemSeed.deliverables] : [],
+        acceptanceCriteria: problemSeed.acceptanceCriteria ? [problemSeed.acceptanceCriteria] : [],
+        constraints: problemSeed.constraints ? [problemSeed.constraints] : [],
+        publicationStatus: problemSeed.publicationStatus,
+        claimStatus: problemSeed.claimStatus,
+        claimedBy: claimedBy?._id ?? undefined,
+        claimedAt: problemSeed.claimedAt ?? undefined,
+      },
+      { upsert: true, new: true, setDefaultsOnInsert: true, runValidators: true },
+    );
+
+    problemsByKey[problemSeed.title] = problemDoc;
+  }
+
+  return problemsByKey;
+};
+
+const seedMentorArtifacts = async (usersByKey, studentsByKey, workspacesByKey) => {
+  for (const sessionSeed of MENTOR_SESSION_SEEDS) {
+    const mentor = usersByKey[sessionSeed.mentorKey];
+    const student = studentsByKey[sessionSeed.studentKey];
+    const workspace = workspacesByKey[sessionSeed.workspaceKey] ?? null;
+
+    await MentorSession.findOneAndUpdate(
+      { mentorId: mentor._id, studentId: student._id, title: sessionSeed.title, scheduledAt: sessionSeed.scheduledAt },
+      {
+        mentorId: mentor._id,
+        studentId: student._id,
+        workspaceId: workspace?._id ?? undefined,
+        title: sessionSeed.title,
+        scheduledAt: sessionSeed.scheduledAt,
+        durationMinutes: sessionSeed.durationMinutes,
+        meetLink: sessionSeed.meetLink,
+        status: sessionSeed.status,
+        mentorNotes: sessionSeed.mentorNotes ?? undefined,
+        studentFeedback: sessionSeed.studentFeedback ?? undefined,
+      },
+      { upsert: true, new: true, setDefaultsOnInsert: true, runValidators: true },
+    );
+  }
+
+  for (const feedbackSeed of MENTOR_FEEDBACK_SEEDS) {
+    const mentor = usersByKey[feedbackSeed.mentorKey];
+    const student = studentsByKey[feedbackSeed.studentKey];
+    const workspace = workspacesByKey[feedbackSeed.workspaceKey] ?? null;
+
+    await MentorFeedback.findOneAndUpdate(
+      { mentorId: mentor._id, studentId: student._id },
+      {
+        mentorId: mentor._id,
+        studentId: student._id,
+        workspaceId: workspace?._id ?? undefined,
+        feedbackText: feedbackSeed.feedbackText,
+        rating: feedbackSeed.rating,
+      },
+      { upsert: true, new: true, setDefaultsOnInsert: true, runValidators: true },
+    );
+  }
+};
+
+const seedRecruiterArtifacts = async (usersByKey, studentsByKey, institutionsByKey) => {
+  for (const jobSeed of JOB_POST_SEEDS) {
+    const recruiter = usersByKey[jobSeed.recruiterKey];
+
+    await JobPost.findOneAndUpdate(
+      { recruiterId: recruiter._id, title: jobSeed.title },
+      {
+        recruiterId: recruiter._id,
+        title: jobSeed.title,
+        company: jobSeed.company,
+        description: jobSeed.description,
+        domain: jobSeed.domain,
+        minimumInnovationScore: jobSeed.minimumInnovationScore,
+        type: jobSeed.type,
+        location: jobSeed.location,
+        isActive: jobSeed.isActive,
+        expiresAt: jobSeed.expiresAt,
+        applicantIds: [],
+        shortlistedIds: [],
+      },
+      { upsert: true, new: true, setDefaultsOnInsert: true, runValidators: true },
+    );
+  }
+
+  for (const driveSeed of CAMPUS_DRIVE_SEEDS) {
+    const recruiter = usersByKey[driveSeed.recruiterKey];
+    const institution = institutionsByKey[driveSeed.institutionKey];
+
+    await CampusDrive.findOneAndUpdate(
+      { recruiterId: recruiter._id, title: driveSeed.title },
+      {
+        recruiterId: recruiter._id,
+        collegeId: institution._id,
+        title: driveSeed.title,
+        description: driveSeed.description,
+        type: driveSeed.type,
+        scheduledAt: driveSeed.scheduledAt,
+        minimumInnovationScore: driveSeed.minimumInnovationScore,
+        isActive: driveSeed.isActive,
+        registeredStudents: (driveSeed.registeredStudentKeys ?? []).map((k) => ({
+          studentId: studentsByKey[k]._id,
+          registeredAt: new Date('2026-03-25T10:00:00.000Z'),
+        })),
       },
       { upsert: true, new: true, setDefaultsOnInsert: true, runValidators: true },
     );
@@ -1495,8 +2174,20 @@ const seedUsers = async () => {
     await seedEventArtifacts(institutionsByKey, usersByKey, studentsByKey);
     console.log('OK [artifacts ] Demo events and rankings');
 
-    await seedStartupArtifacts(studentsByKey, usersByKey);
+    const problemsByKey = await seedProblemBankArtifacts({ ...usersByKey, ...institutionsByKey });
+    console.log('OK [artifacts ] Demo problem bank entries');
+
+    const workspacesByKey = await seedWorkspaceArtifacts(studentsByKey, problemsByKey);
+    console.log('OK [artifacts ] Demo workspaces with milestones, tasks, and submissions');
+
+    await seedStartupArtifacts(studentsByKey, usersByKey, workspacesByKey);
     console.log('OK [artifacts ] Demo patents, awards, startups, and deals');
+
+    await seedMentorArtifacts(usersByKey, studentsByKey, workspacesByKey);
+    console.log('OK [artifacts ] Demo mentor sessions and feedback');
+
+    await seedRecruiterArtifacts(usersByKey, studentsByKey, institutionsByKey);
+    console.log('OK [artifacts ] Demo job posts and campus drives');
 
     printSummary([adminDoc, ...seededNonStudents, ...seededStudents]);
   } catch (error) {
