@@ -3,7 +3,6 @@ import { NavLink, Outlet, useLocation, useNavigate } from 'react-router-dom';
 import {
   Bell,
   Menu,
-  Rocket,
   X,
 } from 'lucide-react';
 import { Button } from '../ui/Button';
@@ -25,6 +24,7 @@ import {
   DropdownMenuTrigger,
 } from '../../app/components/ui/dropdown-menu';
 import { DashboardNavItem, SIDEBAR_CONFIG } from './dashboardNavigation';
+import { BusinessLogo } from '../branding/BusinessLogo';
 
 interface DashboardLayoutProps {
   role?: UserRole;
@@ -214,15 +214,12 @@ export function DashboardLayout({ children, role }: PropsWithChildren<DashboardL
           }`}
         >
           <div className="mb-8 flex items-center justify-between">
-            <div className="flex items-center gap-3">
-              <div className="flex h-12 w-12 items-center justify-center rounded-2xl bg-gradient-to-br from-cyan-500 via-sky-500 to-emerald-500">
-                <Rocket className="h-6 w-6 text-white" />
-              </div>
-              <div>
-                <div className="text-lg font-bold">ProMove</div>
-                <div className="text-xs uppercase tracking-[0.25em] text-slate-500">Innovation Cloud</div>
-              </div>
-            </div>
+            <BusinessLogo
+              to="/dashboard"
+              imageWrapperClassName="h-12 w-12 rounded-2xl"
+              titleClassName="text-lg text-white"
+              subtitleClassName="text-slate-500"
+            />
             <Button variant="ghost" className="lg:hidden" onClick={() => setSidebarOpen(false)}>
               <X className="h-5 w-5" />
             </Button>

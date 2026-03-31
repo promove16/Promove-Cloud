@@ -1,6 +1,6 @@
 import { ReactNode } from 'react';
 import { ArrowRight, LucideIcon } from 'lucide-react';
-import { Link } from 'react-router-dom';
+import { BusinessLogo } from '../../components/branding/BusinessLogo';
 
 type AuthMetric = {
   label: string;
@@ -54,21 +54,12 @@ export function AuthShell({
             <div className="absolute inset-0 bg-[radial-gradient(circle_at_top_right,_rgba(45,212,191,0.22),_transparent_30%),radial-gradient(circle_at_bottom_left,_rgba(96,165,250,0.24),_transparent_34%)]" />
             <div className="relative flex h-full flex-col justify-between gap-12 rounded-[36px] bg-[linear-gradient(160deg,_#07111f_0%,_#0b1b31_55%,_#10345b_100%)] px-8 py-8 sm:px-10 sm:py-10 lg:px-12">
               <div>
-                <Link to="/" className="inline-flex items-center gap-3">
-                  <span className="flex h-11 w-11 items-center justify-center overflow-hidden rounded-2xl bg-white shadow-[0_12px_32px_rgba(37,99,235,0.22)] ring-1 ring-white/20">
-                    <img
-                      src="/image/promoveLogo.png"
-                      alt="ProMove logo"
-                      className="h-full w-full object-cover"
-                    />
-                  </span>
-                  <span>
-                    <span className="block text-[1.7rem] font-black tracking-[-0.04em]">ProMove</span>
-                    <span className="block text-xs uppercase tracking-[0.34em] text-cyan-100/75">
-                      Innovation Cloud
-                    </span>
-                  </span>
-                </Link>
+                <BusinessLogo
+                  to="/"
+                  imageWrapperClassName="h-11 w-11"
+                  titleClassName="text-[1.7rem] text-white"
+                  subtitleClassName="text-cyan-100/75"
+                />
 
                 <div className="mt-10 inline-flex border-b border-cyan-200/25 pb-2 text-xs font-semibold uppercase tracking-[0.34em] text-cyan-100">
                   {panelBadge}

@@ -2,6 +2,7 @@ import { FormEvent, useState } from 'react';
 import { isAxiosError } from 'axios';
 import { Lock, Mail } from 'lucide-react';
 import { Link, useNavigate } from 'react-router-dom';
+import { BusinessLogo } from '../../components/branding/BusinessLogo';
 import { RoleSelector } from './RoleSelector';
 import { useLoginMutation } from './useAuth';
 import { UserRole } from '../../types/roles.types';
@@ -68,6 +69,12 @@ export function LoginPage() {
     <div className="min-h-screen bg-gradient-to-br from-slate-950 via-slate-900 to-slate-950 px-6 py-10">
       <div className="mx-auto w-full max-w-6xl">
         <div className="mb-12 text-center">
+          <BusinessLogo
+            to="/"
+            className="mb-6"
+            titleClassName="text-3xl text-white"
+            subtitleClassName="text-slate-400"
+          />
           <h1 className="text-5xl font-bold tracking-tight text-white">Welcome Back</h1>
           <p className="mt-3 text-xl text-slate-400">Sign in to your account</p>
         </div>

@@ -1,5 +1,6 @@
 import { Link } from "react-router-dom";
 import { Lightbulb, Rocket, Award, Globe, TrendingUp, Users, Building2, GraduationCap } from "lucide-react";
+import { BusinessLogo } from "../../components/branding/BusinessLogo";
 
 export function Homepage() {
   return (
@@ -7,15 +8,13 @@ export function Homepage() {
       {/* Navigation */}
       <nav className="border-b border-slate-800 bg-slate-950/50 backdrop-blur-xl sticky top-0 z-50">
         <div className="max-w-7xl mx-auto px-6 py-4 flex items-center justify-between">
-          <div className="flex items-center gap-2">
-            <div className="w-10 h-10 bg-gradient-to-br from-blue-500 to-purple-600 rounded-lg flex items-center justify-center">
-              <Rocket className="w-6 h-6 text-white" />
-            </div>
-            <div>
-              <div className="font-bold text-xl text-white">ProMove</div>
-              <div className="text-xs text-slate-400">Craft Your Careers</div>
-            </div>
-          </div>
+          <BusinessLogo
+            to="/"
+            imageWrapperClassName="h-10 w-10 rounded-lg"
+            titleClassName="text-xl text-white"
+            subtitle="Craft Your Career"
+            subtitleClassName="text-slate-400"
+          />
           <Link
             to="/login"
             className="px-6 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-lg transition-colors"
@@ -175,13 +174,14 @@ export function Homepage() {
         <div className="max-w-7xl mx-auto px-6 py-12">
           <div className="grid md:grid-cols-4 gap-8">
             <div>
-              <div className="flex items-center gap-2 mb-4">
-                <div className="w-8 h-8 bg-gradient-to-br from-blue-500 to-purple-600 rounded-lg flex items-center justify-center">
-                  <Rocket className="w-5 h-5 text-white" />
-                </div>
-                <div className="font-bold text-lg text-white">ProMove</div>
-              </div>
-              <p className="text-slate-400 text-sm">Craft Your Careers</p>
+              <BusinessLogo
+                to="/"
+                className="mb-4"
+                imageWrapperClassName="h-8 w-8 rounded-lg"
+                titleClassName="text-lg text-white"
+                subtitle="Craft Your Career"
+                subtitleClassName="text-slate-400"
+              />
             </div>
             <div>
               <h4 className="text-white font-semibold mb-4">Platform</h4>

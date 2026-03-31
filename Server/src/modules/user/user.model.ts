@@ -108,7 +108,7 @@ const institutionProfileSchema = new Schema<NonNullable<IUser['institutionProfil
   { _id: false },
 );
 
-const oauthAccountSchema = new Schema<IUser['connectedAccounts']['github']>(
+const connectedAccountSchema = new Schema<IUser['connectedAccounts']['github']>(
   {
     userId: {
       type: String,
@@ -665,7 +665,7 @@ const userSchema = new Schema<IUser>(
       type: new Schema<IUser['connectedAccounts']>(
         {
           github: {
-            type: oauthAccountSchema,
+            type: connectedAccountSchema,
             default: () => ({
               userId: null,
               username: null,
@@ -675,7 +675,7 @@ const userSchema = new Schema<IUser>(
             }),
           },
           google: {
-            type: oauthAccountSchema,
+            type: connectedAccountSchema,
             default: () => ({
               userId: null,
               username: null,
@@ -685,7 +685,7 @@ const userSchema = new Schema<IUser>(
             }),
           },
           linkedin: {
-            type: oauthAccountSchema,
+            type: connectedAccountSchema,
             default: () => ({
               userId: null,
               username: null,

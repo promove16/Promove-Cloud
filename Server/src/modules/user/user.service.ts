@@ -389,7 +389,7 @@ export const enrichCurrentUserFromSocialLinks = async (
   if (linkedinUrl) {
     extractLinkedInHandle(linkedinUrl);
     warnings.push(
-      'LinkedIn official profile import requires OAuth-based member authorization. Your LinkedIn URL was saved, but profile extraction is not enabled yet.',
+      'LinkedIn profile import is not enabled yet. Your LinkedIn URL was saved successfully.',
     );
   }
 

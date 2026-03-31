@@ -5,11 +5,11 @@ import {
   Lock,
   Mail,
   NotebookPen,
-  Rocket,
   Ticket,
   UserCircle,
 } from "lucide-react";
 import { Link, useNavigate } from "react-router-dom";
+import { BusinessLogo } from "../../components/branding/BusinessLogo";
 import { useSignupMutation } from "./useAuth";
 import { UserRole } from "../../types/roles.types";
 import { roleRedirect } from "../../utils/roleRedirect";
@@ -119,18 +119,12 @@ export function SignupPage() {
     <div className="min-h-screen bg-gradient-to-br from-slate-950 via-slate-900 to-slate-950 p-6">
       <div className="mx-auto w-full max-w-4xl py-8">
         <div className="mb-8 text-center">
-          <Link
+          <BusinessLogo
             to="/"
-            className="mb-6 inline-flex items-center justify-center gap-3"
-          >
-            <div className="flex h-12 w-12 items-center justify-center rounded-lg bg-gradient-to-br from-blue-500 to-purple-600">
-              <Rocket className="h-7 w-7 text-white" />
-            </div>
-            <div>
-              <div className="text-2xl font-bold text-white">ProMove</div>
-              <div className="text-xs text-slate-400">Innovation Cloud</div>
-            </div>
-          </Link>
+            className="mb-6"
+            titleClassName="text-2xl text-white"
+            subtitleClassName="text-slate-400"
+          />
           <h1 className="mb-2 text-3xl font-bold text-white">
             Create Your Account
           </h1>

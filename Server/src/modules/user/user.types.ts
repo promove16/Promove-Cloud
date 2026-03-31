@@ -77,7 +77,7 @@ export interface InstitutionProfile {
   stats: InstitutionStats;
 }
 
-export interface OAuthConnection {
+export interface ConnectedAccount {
   userId: string | null;
   username?: string | null;
   accessToken?: string | null;
@@ -86,12 +86,12 @@ export interface OAuthConnection {
 }
 
 export interface ConnectedAccounts {
-  github: OAuthConnection;
-  google: OAuthConnection;
-  linkedin: OAuthConnection;
+  github: ConnectedAccount;
+  google: ConnectedAccount;
+  linkedin: ConnectedAccount;
 }
 
-export interface SanitizedOAuthConnection {
+export interface SanitizedConnectedAccount {
   userId: string | null;
   username?: string | null;
   connectedAt: Date | null;
@@ -99,9 +99,9 @@ export interface SanitizedOAuthConnection {
 }
 
 export interface SanitizedConnectedAccounts {
-  github: SanitizedOAuthConnection;
-  google: SanitizedOAuthConnection;
-  linkedin: SanitizedOAuthConnection;
+  github: SanitizedConnectedAccount;
+  google: SanitizedConnectedAccount;
+  linkedin: SanitizedConnectedAccount;
 }
 
 export interface SkillEntry {

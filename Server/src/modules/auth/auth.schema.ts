@@ -79,37 +79,6 @@ export const submitInstitutionTokenSchema = z.object({
   institutionToken: z.string().trim().min(6).max(64),
 });
 
-export const oauthProviderSchema = z.enum(['google', 'linkedin']);
-
-export const oauthCallbackQuerySchema = z
-  .object({
-    code: z.string().trim().min(1).optional(),
-    state: z.string().trim().min(1).optional(),
-    error: z.string().trim().min(1).optional(),
-    error_description: z.string().trim().min(1).optional(),
-  })
-  .superRefine((value, ctx) => {
-    if (value.error) {
-      return;
-    }
-
-    if (!value.code) {
-      ctx.addIssue({
-        code: z.ZodIssueCode.custom,
-        path: ['code'],
-        message: 'Authorization code is required',
-      });
-    }
-
-    if (!value.state) {
-      ctx.addIssue({
-        code: z.ZodIssueCode.custom,
-        path: ['state'],
-        message: 'State is required',
-      });
-    }
-  });
-
 export const loginSchema = z.object({
   email: z.string().trim().email(),
   password: z.string().min(1),
