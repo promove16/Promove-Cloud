@@ -32,7 +32,7 @@ The platform is designed around a simple product idea: every user role should in
 | Mentor | Student feed, sessions, profile/workspace guidance, feedback |
 | Investor | Startup discovery, express interest, deal stage progression, portfolio, institution browsing |
 | Recruiter | Talent search, jobs, drives, messaging, shortlist/hire flows, onboarding tracker |
-| Admin | User/role/access control, patent and award review, deal approvals, analytics, capacity |
+| Admin | User/role/access control, patent and award review, deal approvals, analytics |
 
 ## High-Level Architecture
 
@@ -111,7 +111,7 @@ Mounted domains:
 - `school` - student leaderboard, journeys, investors, compliance, tokens, verifications
 - `college` - student leaderboard, journeys, investors, recruiters, placement, events, compliance, tokens, verifications
 - `event` - join event, score submission, ranking computation, ranking retrieval
-- `admin` - users, patents, awards, deals, milestone verification, analytics, capacity
+- `admin` - users, patents, awards, deals, milestone verification, analytics
 
 Supporting but important:
 - `institution` services handle access tokens, verification, and compliance helpers.
@@ -193,7 +193,6 @@ The active router is `Client/src/pages/index.tsx`.
 - `/dashboard/admin/awards`
 - `/dashboard/admin/deals`
 - `/dashboard/admin/analytics`
-- `/dashboard/admin/capacity`
 
 ## Frontend Structure
 

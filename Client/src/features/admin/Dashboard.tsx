@@ -1,6 +1,6 @@
 import { useMemo } from 'react';
 import { useQuery } from '@tanstack/react-query';
-import { BarChart3, CircleGauge, ShieldCheck, Trophy, Users, type LucideIcon } from 'lucide-react';
+import { BarChart3, ShieldCheck, Trophy, Users, type LucideIcon } from 'lucide-react';
 import { adminApi } from '../../api/admin.api';
 import { Button } from '../../components/ui/Button';
 import { Card } from '../../components/ui/Card';
@@ -15,11 +15,6 @@ export default function Dashboard() {
   const analyticsQuery = useQuery({
     queryKey: ['admin-analytics'],
     queryFn: adminApi.getAnalytics,
-    refetchInterval: 60_000,
-  });
-  const capacityQuery = useQuery({
-    queryKey: ['admin-capacity'],
-    queryFn: adminApi.getCapacity,
     refetchInterval: 60_000,
   });
 
@@ -113,35 +108,6 @@ export default function Dashboard() {
                 <div className="mt-1 text-sm text-slate-500">
                   {analyticsQuery.data?.investmentTypeBreakdown.soleCount ?? 0} investments
                 </div>
-              </div>
-            </div>
-          </Card>
-
-          <Card className="p-6">
-            <div className="mb-4 text-xs uppercase tracking-[0.3em] text-cyan-300">Capacity</div>
-            <div className="flex items-center gap-6">
-              <div className="relative flex h-28 w-28 items-center justify-center">
-                <svg viewBox="0 0 100 100" className="h-28 w-28 -rotate-90">
-                  <circle cx="50" cy="50" r="40" className="fill-none stroke-slate-800" strokeWidth="12" />
-                  <circle
-                    cx="50"
-                    cy="50"
-                    r="40"
-                    className="fill-none stroke-cyan-400"
-                    strokeWidth="12"
-                    strokeLinecap="round"
-                    strokeDasharray="251.2"
-                    strokeDashoffset={251.2 - ((capacityQuery.data?.percentUsed ?? 0) / 100) * 251.2}
-                  />
-                </svg>
-                <div className="absolute text-center">
-                  <div className="text-2xl font-bold text-white">{capacityQuery.data?.percentUsed ?? 0}%</div>
-                </div>
-              </div>
-              <div className="space-y-2 text-sm text-slate-300">
-                <div>{capacityQuery.data?.current ?? 0} used</div>
-                <div>{capacityQuery.data?.remainingSlots ?? 0} remaining</div>
-                <div>Max {capacityQuery.data?.max ?? 0}</div>
               </div>
             </div>
           </Card>

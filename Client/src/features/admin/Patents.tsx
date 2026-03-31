@@ -7,6 +7,7 @@ import { Badge } from '../../components/ui/Badge';
 import { Button } from '../../components/ui/Button';
 import { Card } from '../../components/ui/Card';
 import { Spinner } from '../../components/ui/Spinner';
+import { getApiErrorMessage } from '../../utils/apiError';
 
 const PATENT_APPROVAL_SCORE = 25;
 
@@ -187,9 +188,7 @@ function ReviewModal({
       await queryClient.invalidateQueries({ queryKey: ['admin-analytics'] });
     },
     onError: (err: unknown) => {
-      type ApiErr = { response?: { data?: { error?: { message?: string } } } };
-      const msg = (err as ApiErr)?.response?.data?.error?.message ?? 'Failed to approve patent. Please try again.';
-      setActionError(msg);
+      setActionError(getApiErrorMessage(err, 'Failed to approve patent. Please try again.'));
     },
   });
 
@@ -203,9 +202,7 @@ function ReviewModal({
       await queryClient.invalidateQueries({ queryKey: ['admin-analytics'] });
     },
     onError: (err: unknown) => {
-      type ApiErr = { response?: { data?: { error?: { message?: string } } } };
-      const msg = (err as ApiErr)?.response?.data?.error?.message ?? 'Failed to reject patent. Please try again.';
-      setActionError(msg);
+      setActionError(getApiErrorMessage(err, 'Failed to reject patent. Please try again.'));
     },
   });
 

@@ -47,7 +47,6 @@ const studentRoster_model_1 = require("../../src/modules/institution/studentRost
 const user_model_1 = require("../../src/modules/user/user.model");
 const roles_types_1 = require("../../src/types/roles.types");
 const PASSWORD = 'Password123!';
-const API_ORIGIN = 'http://127.0.0.1';
 const createApprovedUser = async (input) => {
     const email = input.email ?? `${input.role}-${(0, crypto_1.randomUUID)()}@example.com`;
     const passwordHash = await bcrypt_1.default.hash(PASSWORD, 12);
@@ -96,59 +95,6 @@ const createInstitutionToken = async (role, email) => {
         accessToken: login.accessToken,
     };
 };
-const restoreFetch = (mock) => {
-    mock.mockRestore();
-};
-const mockOAuthFetch = (provider, email) => jest.spyOn(global, 'fetch').mockImplementation(async (input) => {
-    const url = typeof input === 'string' ? input : input instanceof URL ? input.toString() : input.url;
-    if (provider === 'google') {
-        if (url === 'https://oauth2.googleapis.com/token') {
-            return {
-                ok: true,
-                json: async () => ({
-                    access_token: 'google-access-token',
-                    id_token: 'google-id-token',
-                }),
-            };
-        }
-        if (url === 'https://openidconnect.googleapis.com/v1/userinfo') {
-            return {
-                ok: true,
-                json: async () => ({
-                    sub: 'google-user-123',
-                    email,
-                    email_verified: true,
-                    name: 'OAuth User',
-                    picture: 'https://example.com/google-avatar.png',
-                }),
-            };
-        }
-    }
-    if (provider === 'linkedin') {
-        if (url === 'https://www.linkedin.com/oauth/v2/accessToken') {
-            return {
-                ok: true,
-                json: async () => ({
-                    access_token: 'linkedin-access-token',
-                    id_token: 'linkedin-id-token',
-                }),
-            };
-        }
-        if (url === 'https://api.linkedin.com/v2/userinfo') {
-            return {
-                ok: true,
-                json: async () => ({
-                    sub: 'linkedin-user-456',
-                    email,
-                    email_verified: true,
-                    name: 'OAuth User',
-                    picture: 'https://example.com/linkedin-avatar.png',
-                }),
-            };
-        }
-    }
-    throw new Error(`Unexpected fetch call: ${url}`);
-});
 describe('auth integration', () => {
     describe('POST /api/auth/register', () => {
         it('requires an institution token for student signup', async () => {
@@ -519,71 +465,6 @@ describe('auth integration', () => {
             }).lean();
             expect(rosterEntries).toHaveLength(2);
             expect(rosterEntries.every((entry) => entry.status === 'verified')).toBe(true);
-        });
-    });
-    describe.skip('OAuth login', () => {
-        it('signs in an approved user with Google OAuth and keeps manual login intact', async () => {
-            const { email } = await createApprovedUser({
-                role: roles_types_1.UserRole.MENTOR,
-                email: `mentor-${(0, crypto_1.randomUUID)()}@example.com`,
-                displayName: 'OAuth Mentor',
-                domain: 'AI Strategy',
-            });
-            const fetchMock = mockOAuthFetch('google', email);
-            try {
-                const startResponse = await (0, supertest_1.default)(app_1.default).get('/api/auth/oauth/google');
-                expect(startResponse.status).toBe(302);
-                const authorizationUrl = new URL(startResponse.headers.location, API_ORIGIN);
-                const state = authorizationUrl.searchParams.get('state');
-                expect(state).toBeTruthy();
-                const callbackResponse = await (0, supertest_1.default)(app_1.default).get(`/api/auth/oauth/google/callback?code=test-google-code&state=${state}`);
-                expect(callbackResponse.status).toBe(302);
-                expect(callbackResponse.headers.location).toContain('/auth/callback?provider=google&status=success');
-                const oauthCookie = callbackResponse.headers['set-cookie']?.[0];
-                expect(oauthCookie).toContain('refreshToken=');
-                const refreshResponse = await (0, supertest_1.default)(app_1.default)
-                    .post('/api/auth/refresh')
-                    .set('Cookie', oauthCookie);
-                expect(refreshResponse.status).toBe(200);
-                expect(refreshResponse.body.data.user.email).toBe(email);
-                expect(refreshResponse.body.data.user.connectedAccounts.google.userId).toBe('google-user-123');
-                const manualLogin = await (0, supertest_1.default)(app_1.default).post('/api/auth/login').send({
-                    email,
-                    password: PASSWORD,
-                });
-                expect(manualLogin.status).toBe(200);
-            }
-            finally {
-                restoreFetch(fetchMock);
-            }
-        });
-        it('signs in an approved user with LinkedIn OAuth', async () => {
-            const { email } = await createApprovedUser({
-                role: roles_types_1.UserRole.RECRUITER,
-                email: `recruiter-${(0, crypto_1.randomUUID)()}@example.com`,
-                displayName: 'OAuth Recruiter',
-                domain: 'Campus Hiring',
-            });
-            const fetchMock = mockOAuthFetch('linkedin', email);
-            try {
-                const startResponse = await (0, supertest_1.default)(app_1.default).get('/api/auth/oauth/linkedin');
-                const authorizationUrl = new URL(startResponse.headers.location, API_ORIGIN);
-                const state = authorizationUrl.searchParams.get('state');
-                expect(startResponse.status).toBe(302);
-                expect(state).toBeTruthy();
-                const callbackResponse = await (0, supertest_1.default)(app_1.default).get(`/api/auth/oauth/linkedin/callback?code=test-linkedin-code&state=${state}`);
-                expect(callbackResponse.status).toBe(302);
-                expect(callbackResponse.headers.location).toContain('/auth/callback?provider=linkedin&status=success');
-                const refreshResponse = await (0, supertest_1.default)(app_1.default)
-                    .post('/api/auth/refresh')
-                    .set('Cookie', callbackResponse.headers['set-cookie']?.[0]);
-                expect(refreshResponse.status).toBe(200);
-                expect(refreshResponse.body.data.user.email).toBe(email);
-                expect(refreshResponse.body.data.user.connectedAccounts.linkedin.userId).toBe('linkedin-user-456');
-            }
-            finally {
-                restoreFetch(fetchMock);
-            }
         });
     });
     describe('POST /api/auth/refresh', () => {

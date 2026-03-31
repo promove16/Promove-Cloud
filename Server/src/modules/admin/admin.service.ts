@@ -1,6 +1,5 @@
 import { Types } from 'mongoose';
 import { redis } from '../../config/redis';
-import { env } from '../../config/env';
 import { io } from '../../config/socket';
 import { ApiError } from '../../utils/ApiError';
 import { readRedisJson } from '../../utils/redisJson';
@@ -24,8 +23,8 @@ import { AdminAward } from './award.model';
 import {
   AdminAnalyticsData,
   AdminAwardItem,
-  AdminCapacityData,
   AdminDealItem,
+  AdminDealReviewItem,
   AdminPatentItem,
   AdminRegistrationRequestItem,
   AdminUserListItem,
@@ -243,6 +242,87 @@ const buildAdminDealItem = (
   investorName,
   startupName,
   studentName,
+});
+
+const buildAdminDealReviewItem = (
+  deal: {
+    _id: Types.ObjectId;
+    investorId: Types.ObjectId;
+    startupId: Types.ObjectId;
+    studentId: Types.ObjectId;
+    investorType: 'penny' | 'sole';
+    stage: number;
+    amountINR?: number;
+    equityPercent?: number;
+    investorRole?: 'shareholder' | 'director' | 'observer';
+    sharesAllocated?: number;
+    votingWeight?: number;
+    canVeto?: boolean;
+    adminApprovalRequired: boolean;
+    adminApprovedAt?: Date | null;
+    adminApprovedBy?: Types.ObjectId;
+    innovationScoreSnapshot: number;
+    status: 'active' | 'closed' | 'cancelled';
+    createdAt: Date;
+    updatedAt: Date;
+    fundTransferInitiatedAt?: Date | null;
+    closedAt?: Date | null;
+  },
+  startup: {
+    _id: Types.ObjectId;
+    name: string;
+    tagline?: string;
+    category: string;
+    stage: string;
+    pitchDeckUrl?: string;
+  } | null,
+  student: {
+    _id: Types.ObjectId;
+    displayName: string;
+    avatar?: string;
+    role: UserRole;
+    innovationScore: number;
+  } | null,
+  investor: {
+    _id: Types.ObjectId;
+    displayName: string;
+    avatar?: string;
+    role: UserRole;
+    innovationScore: number;
+  } | null,
+): AdminDealReviewItem => ({
+  ...buildAdminDealItem(
+    deal,
+    investor?.displayName ?? 'Investor',
+    startup?.name ?? 'Startup',
+    student?.displayName ?? 'Student',
+  ),
+  createdAt: toIso(deal.createdAt),
+  updatedAt: toIso(deal.updatedAt),
+  ...(deal.fundTransferInitiatedAt ? { fundTransferInitiatedAt: toIso(deal.fundTransferInitiatedAt) } : {}),
+  ...(deal.closedAt ? { closedAt: toIso(deal.closedAt) } : {}),
+  startup: {
+    _id: startup ? String(startup._id) : String(deal.startupId),
+    name: startup?.name ?? 'Startup',
+    tagline: startup?.tagline ?? 'No startup summary available.',
+    category: startup?.category ?? 'Category pending',
+    stage: startup?.stage ?? 'Stage pending',
+    ...(startup?.pitchDeckUrl ? { pitchDeckUrl: startup.pitchDeckUrl } : {}),
+  },
+  student: {
+    _id: student ? String(student._id) : String(deal.studentId),
+    displayName: student?.displayName ?? 'Student',
+    ...(student?.avatar ? { avatar: student.avatar } : {}),
+    role: student?.role ?? UserRole.STUDENT,
+    innovationScore: student?.innovationScore ?? 0,
+  },
+  investor: {
+    _id: investor ? String(investor._id) : String(deal.investorId),
+    displayName: investor?.displayName ?? 'Investor',
+    ...(investor?.avatar ? { avatar: investor.avatar } : {}),
+    role: investor?.role ?? UserRole.INVESTOR,
+    innovationScore: investor?.innovationScore ?? 0,
+  },
 });
 
 const deleteRefreshTokensForUser = async (userId: string) => {
@@ -487,11 +567,23 @@ export const approvePatent = async (adminId: string, patentId: string, trigger: 
     throw new ApiError(400, 'PATENT_NOT_REVIEWABLE', 'Patent cannot be approved in its current state');
   }
 
-  patent.status = 'approved';
-  patent.adminReviewedAt = new Date();
-  patent.adminReviewedBy = new Types.ObjectId(adminId);
-  patent.scoreAwarded = true;
-  await patent.save();
+  const reviewedAt = new Date();
+  const reviewedBy = new Types.ObjectId(adminId);
+  const updateResult = await Patent.updateOne(
+    { _id: patent._id, status: { $in: ['submitted', 'under_review'] } },
+    {
+      $set: {
+        status: 'approved',
+        adminReviewedAt: reviewedAt,
+        adminReviewedBy: reviewedBy,
+        scoreAwarded: true,
+      },
+    },
+  );
+
+  if (updateResult.matchedCount === 0) {
+    throw new ApiError(400, 'PATENT_NOT_REVIEWABLE', 'Patent cannot be approved in its current state');
+  }
 
   const newScore = await applyScore({
     userId: String(patent.studentId),
@@ -517,11 +609,23 @@ export const rejectPatent = async (adminId: string, patentId: string, adminNotes
     throw new ApiError(400, 'PATENT_NOT_REVIEWABLE', 'Patent cannot be rejected in its current state');
   }
 
-  patent.status = 'rejected';
-  patent.adminReviewedAt = new Date();
-  patent.adminReviewedBy = new Types.ObjectId(adminId);
-  patent.adminNotes = adminNotes;
-  await patent.save();
+  const reviewedAt = new Date();
+  const reviewedBy = new Types.ObjectId(adminId);
+  const updateResult = await Patent.updateOne(
+    { _id: patent._id, status: { $in: ['submitted', 'under_review'] } },
+    {
+      $set: {
+        status: 'rejected',
+        adminReviewedAt: reviewedAt,
+        adminReviewedBy: reviewedBy,
+        adminNotes,
+      },
+    },
+  );
+
+  if (updateResult.matchedCount === 0) {
+    throw new ApiError(400, 'PATENT_NOT_REVIEWABLE', 'Patent cannot be rejected in its current state');
+  }
 
   await pushNotification(String(patent.studentId), 'patent_status', 'Patent Review Complete', adminNotes);
   await createAudit(adminId, 'PATENT_REJECTED', String(patent._id), 'Patent', { studentId: String(patent.studentId) });
@@ -665,23 +769,23 @@ export const listDealsAwaitingApproval = async (): Promise<AdminDealItem[]> => {
   );
 };
 
-export const getDealAwaitingApproval = async (dealId: string): Promise<AdminDealItem> => {
+export const getDealAwaitingApproval = async (dealId: string): Promise<AdminDealReviewItem> => {
   const deal = await Deal.findById(dealId).lean();
   if (!deal || deal.status === 'cancelled') {
     throw new ApiError(404, 'DEAL_NOT_FOUND', 'Deal not found');
   }
 
   const [investor, startup, student] = await Promise.all([
-    User.findById(deal.investorId).select('displayName').lean(),
-    Startup.findById(deal.startupId).select('name').lean(),
-    User.findById(deal.studentId).select('displayName').lean(),
+    User.findById(deal.investorId).select('_id displayName avatar role innovationScore').lean(),
+    Startup.findById(deal.startupId).select('_id name tagline category stage pitchDeckUrl').lean(),
+    User.findById(deal.studentId).select('_id displayName avatar role innovationScore').lean(),
   ]);
 
-  return buildAdminDealItem(
+  return buildAdminDealReviewItem(
     deal,
-    investor?.displayName ?? 'Investor',
-    startup?.name ?? 'Startup',
-    student?.displayName ?? 'Student',
+    startup,
+    student,
+    investor,
   );
 };
 
@@ -813,18 +917,6 @@ export const getAnalytics = async (): Promise<AdminAnalyticsData> => {
 
   await redis.set(cacheKey, JSON.stringify(result), { ex: 60 * 30 });
   return result;
-};
-
-export const getCapacity = async (): Promise<AdminCapacityData> => {
-  const max = env.MAX_USERS_YEAR_ONE;
-  const current = await User.countDocuments({});
-  return {
-    current,
-    max,
-    percentUsed: max > 0 ? Number(((current / max) * 100).toFixed(2)) : 0,
-    remainingSlots: Math.max(max - current, 0),
-    waitlistCount: Math.max(current - max, 0),
-  };
 };
 
 export const validateUserAccessQuery = () => undefined;

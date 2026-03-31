@@ -203,7 +203,7 @@ FR-44. The system shall allow admins to approve deal stage transitions at the ve
 
 FR-45. The system shall allow admins to verify milestones and update score records accordingly.
 
-FR-46. The system shall allow admins to view analytics and capacity dashboards.
+FR-46. The system shall allow admins to view analytics dashboards.
 
 ### 3.8 Notifications, Chat, and Realtime Updates
 FR-47. The system shall provide notifications for relevant workflow events.

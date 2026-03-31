@@ -314,7 +314,7 @@ const enrichCurrentUserFromSocialLinks = async (userId, payload) => {
     }
     if (linkedinUrl) {
         extractLinkedInHandle(linkedinUrl);
-        warnings.push('LinkedIn official profile import requires OAuth-based member authorization. Your LinkedIn URL was saved, but profile extraction is not enabled yet.');
+        warnings.push('LinkedIn profile import is not enabled yet. Your LinkedIn URL was saved successfully.');
     }
     user.profileComplete = Boolean(user.displayName?.trim() &&
         ((user.bio && user.bio.trim()) ||

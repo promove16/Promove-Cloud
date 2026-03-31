@@ -24,7 +24,6 @@ process.env.JWT_REFRESH_SECRET = refreshPrivateKey
   .toString();
 process.env.JWT_ACCESS_EXPIRES = '15m';
 process.env.JWT_REFRESH_EXPIRES = '30d';
-process.env.MAX_USERS_YEAR_ONE = '2000';
 process.env.CLOUDINARY_CLOUD_NAME = 'test-cloud';
 process.env.CLOUDINARY_API_KEY = 'test-key';
 process.env.CLOUDINARY_API_SECRET = 'test-secret';

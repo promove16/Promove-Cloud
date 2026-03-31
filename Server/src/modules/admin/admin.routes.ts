@@ -13,7 +13,6 @@ import {
   getRegistrationRequestsController,
   getStartupCapTableController,
   getAwardsController,
-  getCapacityController,
   getDealController,
   getDealsController,
   getPatentsController,
@@ -63,6 +62,5 @@ router.post('/startups/:id/reset-sole-investor', asyncHandler(resetSoleInvestorC
 router.get('/investments/by-type', asyncHandler(getInvestmentTypeAnalyticsController));
 router.patch('/milestones/:id/verify', asyncHandler(verifyMilestoneController));
 router.get('/analytics', asyncHandler(getAnalyticsController));
-router.get('/capacity', asyncHandler(getCapacityController));
 
 export default router;

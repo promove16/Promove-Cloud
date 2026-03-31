@@ -11,9 +11,6 @@ const router = (0, express_1.Router)();
 router.post('/register', (0, asyncHandler_1.asyncHandler)(auth_controller_1.register));
 router.post('/register-request', (0, asyncHandler_1.asyncHandler)(auth_controller_1.registerRequest));
 router.post('/login', (0, rateLimiter_1.withRateLimit)(rateLimiter_1.authLimiter), (0, asyncHandler_1.asyncHandler)(auth_controller_1.login));
-// OAuth routes are temporarily disabled. Manual credential login remains active.
-// router.get('/oauth/:provider', withRateLimit(authLimiter), asyncHandler(startOAuth));
-// router.get('/oauth/:provider/callback', asyncHandler(oauthCallback));
 router.post('/refresh', (0, asyncHandler_1.asyncHandler)(auth_controller_1.refresh));
 router.post('/logout', authenticate_1.authenticate, (0, asyncHandler_1.asyncHandler)(auth_controller_1.logout));
 router.put('/change-password', authenticate_1.authenticate, (0, asyncHandler_1.asyncHandler)(auth_controller_1.changePasswordController));

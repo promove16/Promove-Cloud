@@ -6,11 +6,13 @@ import { Badge } from '../../components/ui/Badge';
 import { Button } from '../../components/ui/Button';
 import { Card } from '../../components/ui/Card';
 import { Spinner } from '../../components/ui/Spinner';
+import { getApiErrorMessage } from '../../utils/apiError';
 
 export default function Awards() {
   const queryClient = useQueryClient();
   const [selectedAward, setSelectedAward] = useState<AdminAwardItem | null>(null);
   const [notes, setNotes] = useState('');
+  const [actionError, setActionError] = useState('');
 
   const awardsQuery = useQuery({
     queryKey: ['admin-awards'],
@@ -22,8 +24,12 @@ export default function Awards() {
     mutationFn: () => adminApi.approveAward(selectedAward!._id),
     onSuccess: async () => {
       setSelectedAward(null);
+      setActionError('');
       await queryClient.invalidateQueries({ queryKey: ['admin-awards'] });
       await queryClient.invalidateQueries({ queryKey: ['admin-analytics'] });
+    },
+    onError: (error: unknown) => {
+      setActionError(getApiErrorMessage(error, 'Failed to approve award. Please try again.'));
     },
   });
 
@@ -32,8 +38,12 @@ export default function Awards() {
     onSuccess: async () => {
       setSelectedAward(null);
       setNotes('');
+      setActionError('');
       await queryClient.invalidateQueries({ queryKey: ['admin-awards'] });
       await queryClient.invalidateQueries({ queryKey: ['admin-analytics'] });
+    },
+    onError: (error: unknown) => {
+      setActionError(getApiErrorMessage(error, 'Failed to reject award. Please try again.'));
     },
   });
 
@@ -66,7 +76,14 @@ export default function Awards() {
                 <div className="text-slate-400">{new Date(award.submittedAt).toLocaleDateString('en-IN')}</div>
                 <div><Badge>{award.status}</Badge></div>
                 <div>
-                  <Button variant="secondary" onClick={() => setSelectedAward(award)}>
+                  <Button
+                    variant="secondary"
+                    onClick={() => {
+                      setSelectedAward(award);
+                      setNotes('');
+                      setActionError('');
+                    }}
+                  >
                     <Trophy className="mr-2 h-4 w-4" />
                     Review
                   </Button>
@@ -85,7 +102,14 @@ export default function Awards() {
                 <div className="text-xs uppercase tracking-[0.3em] text-cyan-300">Award Review</div>
                 <h3 className="mt-2 text-2xl font-bold text-white">{selectedAward.title}</h3>
               </div>
-              <Button variant="ghost" onClick={() => setSelectedAward(null)}>
+              <Button
+                variant="ghost"
+                onClick={() => {
+                  setSelectedAward(null);
+                  setNotes('');
+                  setActionError('');
+                }}
+              >
                 <X className="h-4 w-4" />
               </Button>
             </div>
@@ -106,6 +130,12 @@ export default function Awards() {
                 Approve (+15 pts)
               </Button>
             </div>
+
+            {actionError ? (
+              <div className="mt-4 rounded-2xl border border-red-500/20 bg-red-500/10 px-4 py-3 text-sm text-red-300">
+                {actionError}
+              </div>
+            ) : null}
 
             <textarea
               value={notes}

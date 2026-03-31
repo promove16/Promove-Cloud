@@ -3,12 +3,12 @@ var __importDefault = (this && this.__importDefault) || function (mod) {
     return (mod && mod.__esModule) ? mod : { "default": mod };
 };
 Object.defineProperty(exports, "__esModule", { value: true });
-exports.logoutUser = exports.refreshUserToken = exports.loginWithOAuth = exports.loginUser = exports.changePassword = exports.submitInstitutionToken = exports.submitRegistrationRequest = exports.registerUser = exports.createOAuthAuthorizationUrl = exports.buildFrontendOAuthRedirectUrl = void 0;
+exports.logoutUser = exports.refreshUserToken = exports.loginUser = exports.changePassword = exports.submitInstitutionToken = exports.submitRegistrationRequest = exports.registerUser = void 0;
 const bcrypt_1 = __importDefault(require("bcrypt"));
 const jsonwebtoken_1 = __importDefault(require("jsonwebtoken"));
 const crypto_1 = require("crypto");
-const redis_1 = require("../../config/redis");
 const env_1 = require("../../config/env");
+const redis_1 = require("../../config/redis");
 const user_model_1 = require("../user/user.model");
 const roles_types_1 = require("../../types/roles.types");
 const ApiError_1 = require("../../utils/ApiError");
@@ -17,7 +17,6 @@ const sanitizeText_1 = require("../../utils/sanitizeText");
 const institutionAccess_service_1 = require("../institution/institutionAccess.service");
 const studentRoster_service_1 = require("../institution/studentRoster.service");
 const REFRESH_TTL_SECONDS = 30 * 24 * 60 * 60;
-const OAUTH_STATE_TTL_SECONDS = 10 * 60;
 const MS_IN_YEAR = 365 * 24 * 60 * 60 * 1000;
 const getAcademicYear = () => {
     const today = new Date();
@@ -101,147 +100,6 @@ const resolveStudentInstitutionContext = async (institutionToken) => {
         institution,
     };
 };
-const getOAuthStateKey = (state) => `oauth:state:${state}`;
-const getOAuthProviderDisplayName = (provider) => provider === 'google' ? 'Google' : 'LinkedIn';
-const getOAuthProviderConfig = (provider) => {
-    if (provider === 'google') {
-        return {
-            clientId: env_1.env.GOOGLE_OAUTH_CLIENT_ID,
-            clientSecret: env_1.env.GOOGLE_OAUTH_CLIENT_SECRET,
-            authorizationEndpoint: 'https://accounts.google.com/o/oauth2/v2/auth',
-            tokenEndpoint: 'https://oauth2.googleapis.com/token',
-            userInfoEndpoint: 'https://openidconnect.googleapis.com/v1/userinfo',
-            scopes: ['openid', 'email', 'profile'],
-            extraAuthorizeParams: {
-                access_type: 'offline',
-                prompt: 'select_account',
-            },
-        };
-    }
-    return {
-        clientId: env_1.env.LINKEDIN_OAUTH_CLIENT_ID,
-        clientSecret: env_1.env.LINKEDIN_OAUTH_CLIENT_SECRET,
-        authorizationEndpoint: 'https://www.linkedin.com/oauth/v2/authorization',
-        tokenEndpoint: 'https://www.linkedin.com/oauth/v2/accessToken',
-        userInfoEndpoint: 'https://api.linkedin.com/v2/userinfo',
-        scopes: ['openid', 'profile', 'email'],
-        extraAuthorizeParams: {},
-    };
-};
-const assertOAuthProviderConfigured = (provider) => {
-    const config = getOAuthProviderConfig(provider);
-    if (!config.clientId || !config.clientSecret) {
-        throw new ApiError_1.ApiError(503, `${provider.toUpperCase()}_OAUTH_NOT_CONFIGURED`, `${getOAuthProviderDisplayName(provider)} sign-in is not configured yet.`);
-    }
-    return {
-        ...config,
-        clientId: config.clientId,
-        clientSecret: config.clientSecret,
-    };
-};
-const buildFrontendOAuthRedirectUrl = (provider, status, params) => {
-    const callbackUrl = new URL('/auth/callback', env_1.env.CLIENT_URL);
-    callbackUrl.searchParams.set('provider', provider);
-    callbackUrl.searchParams.set('status', status);
-    if (params?.code) {
-        callbackUrl.searchParams.set('code', params.code);
-    }
-    if (params?.message) {
-        callbackUrl.searchParams.set('message', params.message);
-    }
-    return callbackUrl.toString();
-};
-exports.buildFrontendOAuthRedirectUrl = buildFrontendOAuthRedirectUrl;
-const buildOAuthCallbackUrl = (requestOrigin, provider) => {
-    if (provider === 'google' && env_1.env.GOOGLE_OAUTH_REDIRECT_URI) {
-        return env_1.env.GOOGLE_OAUTH_REDIRECT_URI;
-    }
-    if (provider === 'linkedin' && env_1.env.LINKEDIN_OAUTH_REDIRECT_URI) {
-        return env_1.env.LINKEDIN_OAUTH_REDIRECT_URI;
-    }
-    return `${requestOrigin}/api/auth/oauth/${provider}/callback`;
-};
-const createOAuthAuthorizationUrl = async (provider, requestOrigin) => {
-    const config = assertOAuthProviderConfigured(provider);
-    const state = (0, crypto_1.randomUUID)();
-    const redirectUri = buildOAuthCallbackUrl(requestOrigin, provider);
-    const statePayload = { provider };
-    await redis_1.redis.set(getOAuthStateKey(state), JSON.stringify(statePayload), {
-        ex: OAUTH_STATE_TTL_SECONDS,
-    });
-    const authorizationUrl = new URL(config.authorizationEndpoint);
-    authorizationUrl.searchParams.set('client_id', config.clientId);
-    authorizationUrl.searchParams.set('redirect_uri', redirectUri);
-    authorizationUrl.searchParams.set('response_type', 'code');
-    authorizationUrl.searchParams.set('scope', config.scopes.join(' '));
-    authorizationUrl.searchParams.set('state', state);
-    Object.entries(config.extraAuthorizeParams).forEach(([key, value]) => {
-        authorizationUrl.searchParams.set(key, value);
-    });
-    return authorizationUrl.toString();
-};
-exports.createOAuthAuthorizationUrl = createOAuthAuthorizationUrl;
-const exchangeOAuthCode = async (provider, code, redirectUri) => {
-    const config = assertOAuthProviderConfigured(provider);
-    const response = await fetch(config.tokenEndpoint, {
-        method: 'POST',
-        headers: {
-            Accept: 'application/json',
-            'Content-Type': 'application/x-www-form-urlencoded',
-        },
-        body: new URLSearchParams({
-            grant_type: 'authorization_code',
-            code,
-            redirect_uri: redirectUri,
-            client_id: config.clientId,
-            client_secret: config.clientSecret,
-        }).toString(),
-    });
-    if (!response.ok) {
-        throw new ApiError_1.ApiError(502, `${provider.toUpperCase()}_TOKEN_EXCHANGE_FAILED`, `Unable to complete ${getOAuthProviderDisplayName(provider)} sign-in right now.`);
-    }
-    const payload = (await response.json());
-    if (!payload.access_token) {
-        throw new ApiError_1.ApiError(502, `${provider.toUpperCase()}_TOKEN_EXCHANGE_FAILED`, `Unable to complete ${getOAuthProviderDisplayName(provider)} sign-in right now.`);
-    }
-    return payload;
-};
-const fetchOAuthUserProfile = async (provider, accessToken) => {
-    const config = assertOAuthProviderConfigured(provider);
-    const response = await fetch(config.userInfoEndpoint, {
-        headers: {
-            Accept: 'application/json',
-            Authorization: `Bearer ${accessToken}`,
-        },
-    });
-    if (!response.ok) {
-        throw new ApiError_1.ApiError(502, `${provider.toUpperCase()}_USERINFO_FAILED`, `Unable to read your ${getOAuthProviderDisplayName(provider)} profile right now.`);
-    }
-    if (provider === 'google') {
-        const profile = (await response.json());
-        return {
-            providerUserId: profile.sub,
-            email: profile.email?.toLowerCase() ?? null,
-            emailVerified: profile.email_verified === true,
-            displayName: profile.name?.trim() || profile.email?.trim() || 'Google User',
-            ...(profile.picture ? { avatar: profile.picture } : {}),
-            ...(profile.email ? { username: profile.email.toLowerCase() } : {}),
-        };
-    }
-    const profile = (await response.json());
-    const displayName = profile.name?.trim() ||
-        [profile.given_name, profile.family_name].filter(Boolean).join(' ').trim() ||
-        profile.email?.trim() ||
-        'LinkedIn User';
-    return {
-        providerUserId: profile.sub,
-        email: profile.email?.toLowerCase() ?? null,
-        emailVerified: profile.email_verified === true,
-        displayName,
-        ...(profile.picture ? { avatar: profile.picture } : {}),
-        ...(profile.email ? { username: profile.email.toLowerCase() } : {}),
-    };
-};
 const assertUserCanAuthenticate = (user) => {
     if (user.role === roles_types_1.UserRole.STUDENT && user.verificationStatus === 'rejected') {
         throw new ApiError_1.ApiError(403, 'INSTITUTION_VERIFICATION_REJECTED', user.verificationRejectedReason ||
@@ -271,53 +129,7 @@ const issueAuthResultForUser = async (user) => {
         user: sanitizedUser,
     };
 };
-const resolveOAuthUser = async (provider, profile) => {
-    const linkedUser = await user_model_1.User.findOne({
-        [`connectedAccounts.${provider}.userId`]: profile.providerUserId,
-    });
-    if (linkedUser) {
-        return linkedUser;
-    }
-    if (!profile.email || !profile.emailVerified) {
-        throw new ApiError_1.ApiError(403, 'OAUTH_EMAIL_NOT_VERIFIED', `${getOAuthProviderDisplayName(provider)} did not return a verified email address for this account.`);
-    }
-    const emailMatchedUser = await user_model_1.User.findOne({ email: profile.email });
-    if (!emailMatchedUser) {
-        throw new ApiError_1.ApiError(404, 'OAUTH_ACCOUNT_NOT_REGISTERED', 'No ProMove account exists for this email yet. Please complete registration first.');
-    }
-    return emailMatchedUser;
-};
-const syncOAuthAccount = async (user, provider, profile) => {
-    const existingLinkedUser = await user_model_1.User.findOne({
-        [`connectedAccounts.${provider}.userId`]: profile.providerUserId,
-        _id: { $ne: user._id },
-    })
-        .select('_id')
-        .lean();
-    if (existingLinkedUser) {
-        throw new ApiError_1.ApiError(409, 'OAUTH_ACCOUNT_ALREADY_LINKED', `This ${getOAuthProviderDisplayName(provider)} account is already linked to another ProMove user.`);
-    }
-    const currentAccount = user.connectedAccounts[provider];
-    if (currentAccount.userId && currentAccount.userId !== profile.providerUserId) {
-        throw new ApiError_1.ApiError(409, 'OAUTH_PROVIDER_MISMATCH', `This ProMove account is already linked to a different ${getOAuthProviderDisplayName(provider)} identity.`);
-    }
-    user.connectedAccounts[provider] = {
-        ...currentAccount,
-        userId: profile.providerUserId,
-        username: profile.username ?? profile.email ?? currentAccount.username ?? null,
-        accessToken: null,
-        connectedAt: currentAccount.connectedAt ?? new Date(),
-        lastSyncedAt: new Date(),
-    };
-    if (!user.avatar && profile.avatar) {
-        user.avatar = profile.avatar;
-    }
-};
 const registerUser = async (payload) => {
-    const activeUsers = await user_model_1.User.countDocuments({ isActive: true });
-    if (activeUsers >= env_1.env.MAX_USERS_YEAR_ONE) {
-        throw new ApiError_1.ApiError(403, 'CAPACITY_REACHED', 'Platform is at capacity for Year 1. Please join the waitlist.');
-    }
     const existingUser = await user_model_1.User.findOne({ email: payload.email.toLowerCase() });
     if (existingUser) {
         throw new ApiError_1.ApiError(409, 'DUPLICATE_KEY', 'Email already registered');
@@ -551,32 +363,6 @@ const loginUser = async (payload) => {
     return issueAuthResultForUser(user);
 };
 exports.loginUser = loginUser;
-const loginWithOAuth = async (payload) => {
-    const stateKey = getOAuthStateKey(payload.state);
-    const rawState = await redis_1.redis.get(stateKey);
-    if (!rawState) {
-        throw new ApiError_1.ApiError(400, 'INVALID_OAUTH_STATE', 'This sign-in session has expired. Please try again.');
-    }
-    await redis_1.redis.del(stateKey);
-    let statePayload;
-    try {
-        statePayload = JSON.parse(rawState);
-    }
-    catch (_error) {
-        throw new ApiError_1.ApiError(400, 'INVALID_OAUTH_STATE', 'This sign-in session has expired. Please try again.');
-    }
-    if (statePayload.provider !== payload.provider) {
-        throw new ApiError_1.ApiError(400, 'INVALID_OAUTH_STATE', 'This sign-in session has expired. Please try again.');
-    }
-    const redirectUri = buildOAuthCallbackUrl(payload.requestOrigin, payload.provider);
-    const tokenResponse = await exchangeOAuthCode(payload.provider, payload.code, redirectUri);
-    const profile = await fetchOAuthUserProfile(payload.provider, tokenResponse.access_token);
-    const user = await resolveOAuthUser(payload.provider, profile);
-    await syncOAuthAccount(user, payload.provider, profile);
-    assertUserCanAuthenticate(user);
-    return issueAuthResultForUser(user);
-};
-exports.loginWithOAuth = loginWithOAuth;
 const refreshUserToken = async (refreshToken) => {
     if (!refreshToken) {
         throw new ApiError_1.ApiError(401, 'UNAUTHORIZED', 'Invalid or expired token');

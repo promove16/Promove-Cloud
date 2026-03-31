@@ -199,7 +199,7 @@ This document is a navigation index for the repo. It focuses on the active TypeS
 ### `Server/src/modules/admin/`
 - `admin.controller.ts`: admin user, patent, award, deal, milestone, and analytics endpoints.
 - `admin.routes.ts`: admin route wiring.
-- `admin.service.ts`: admin review, audit, approvals, capacity, and analytics logic.
+- `admin.service.ts`: admin review, audit, approvals, and analytics logic.
 - `admin.types.ts`: admin DTO definitions.
 - `admin.validation.ts`: admin payload validation.
 - `adminAuditLog.model.ts`: admin audit trail persistence.
@@ -305,7 +305,6 @@ This document is a navigation index for the repo. It focuses on the active TypeS
 - `Awards.tsx`: award moderation queue.
 - `Deals.tsx`: deal approval queue.
 - `Analytics.tsx`: admin analytics screen.
-- `Capacity.tsx`: admin capacity and export screen.
 
 ### `Client/src/features/profile/`
 - `UserProfilePage.tsx`: self-service profile editing and enrichment.
@@ -425,7 +424,7 @@ This document is a navigation index for the repo. It focuses on the active TypeS
 - `11 School - *.request.yaml`: school dashboard, investors, tokens, verifications, and compliance.
 - `12 College - *.request.yaml`: college dashboard, investors, recruiters, events, placement, tokens, verifications, and compliance.
 - `13 Events - *.request.yaml`: join, score submission, compute rankings, and read rankings.
-- `14 Admin - *.request.yaml`: users, patents, awards, deals, analytics, capacity, and milestone verification.
+- `14 Admin - *.request.yaml`: users, patents, awards, deals, analytics, and milestone verification.
 
 ### `postman/environments/`
 - `ProMove Local Backend.environment.yaml`: main local environment.

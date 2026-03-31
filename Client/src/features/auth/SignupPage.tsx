@@ -92,9 +92,7 @@ export function SignupPage() {
           : undefined;
 
         setError(
-          apiError?.code === "CAPACITY_REACHED"
-            ? "Platform is at capacity for Year 1. Please join the waitlist."
-            : apiError?.code === "INSTITUTION_TOKEN_EXPIRED"
+          apiError?.code === "INSTITUTION_TOKEN_EXPIRED"
               ? "That institution token has expired. Please ask your school or college for a fresh one."
               : apiError?.code === "INSTITUTION_TOKEN_REQUIRED"
                 ? "Student signup requires an institution token."

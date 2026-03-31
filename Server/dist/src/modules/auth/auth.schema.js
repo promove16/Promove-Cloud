@@ -1,6 +1,6 @@
 "use strict";
 Object.defineProperty(exports, "__esModule", { value: true });
-exports.loginSchema = exports.oauthCallbackQuerySchema = exports.oauthProviderSchema = exports.submitInstitutionTokenSchema = exports.registrationRequestSchema = exports.registerSchema = void 0;
+exports.loginSchema = exports.submitInstitutionTokenSchema = exports.registrationRequestSchema = exports.registerSchema = void 0;
 const zod_1 = require("zod");
 const roles_types_1 = require("../../types/roles.types");
 const optionalProfileString = (max) => zod_1.z
@@ -67,33 +67,6 @@ exports.registrationRequestSchema = zod_1.z
 });
 exports.submitInstitutionTokenSchema = zod_1.z.object({
     institutionToken: zod_1.z.string().trim().min(6).max(64),
-});
-exports.oauthProviderSchema = zod_1.z.enum(['google', 'linkedin']);
-exports.oauthCallbackQuerySchema = zod_1.z
-    .object({
-    code: zod_1.z.string().trim().min(1).optional(),
-    state: zod_1.z.string().trim().min(1).optional(),
-    error: zod_1.z.string().trim().min(1).optional(),
-    error_description: zod_1.z.string().trim().min(1).optional(),
-})
-    .superRefine((value, ctx) => {
-    if (value.error) {
-        return;
-    }
-    if (!value.code) {
-        ctx.addIssue({
-            code: zod_1.z.ZodIssueCode.custom,
-            path: ['code'],
-            message: 'Authorization code is required',
-        });
-    }
-    if (!value.state) {
-        ctx.addIssue({
-            code: zod_1.z.ZodIssueCode.custom,
-            path: ['state'],
-            message: 'State is required',
-        });
-    }
 });
 exports.loginSchema = zod_1.z.object({
     email: zod_1.z.string().trim().email(),

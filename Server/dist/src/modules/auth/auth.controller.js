@@ -1,6 +1,6 @@
 "use strict";
 Object.defineProperty(exports, "__esModule", { value: true });
-exports.submitInstitutionTokenAfterRegister = exports.changePasswordController = exports.logout = exports.refresh = exports.oauthCallback = exports.startOAuth = exports.login = exports.registerRequest = exports.register = void 0;
+exports.submitInstitutionTokenAfterRegister = exports.changePasswordController = exports.logout = exports.refresh = exports.login = exports.registerRequest = exports.register = void 0;
 const env_1 = require("../../config/env");
 const ApiResponse_1 = require("../../utils/ApiResponse");
 const ApiError_1 = require("../../utils/ApiError");
@@ -14,7 +14,6 @@ const cookieOptions = {
     sameSite: 'strict',
     maxAge: COOKIE_MAX_AGE,
 };
-const getRequestOrigin = (req) => `${req.protocol}://${req.get('host')}`;
 const register = async (req, res) => {
     const payload = auth_schema_1.registerSchema.parse(req.body);
     const result = await (0, auth_service_1.registerUser)(payload);
@@ -42,56 +41,6 @@ const login = async (req, res) => {
     }));
 };
 exports.login = login;
-const startOAuth = async (req, res) => {
-    const provider = auth_schema_1.oauthProviderSchema.parse(req.params.provider);
-    try {
-        const authorizationUrl = await (0, auth_service_1.createOAuthAuthorizationUrl)(provider, getRequestOrigin(req));
-        res.redirect(302, authorizationUrl);
-    }
-    catch (error) {
-        if (error instanceof ApiError_1.ApiError) {
-            res.redirect(302, (0, auth_service_1.buildFrontendOAuthRedirectUrl)(provider, 'error', {
-                code: error.code,
-                message: error.message,
-            }));
-            return;
-        }
-        throw error;
-    }
-};
-exports.startOAuth = startOAuth;
-const oauthCallback = async (req, res) => {
-    const provider = auth_schema_1.oauthProviderSchema.parse(req.params.provider);
-    const callbackQuery = auth_schema_1.oauthCallbackQuerySchema.parse(req.query);
-    if (callbackQuery.error) {
-        res.redirect(302, (0, auth_service_1.buildFrontendOAuthRedirectUrl)(provider, 'error', {
-            code: 'OAUTH_ACCESS_DENIED',
-            message: callbackQuery.error_description ?? 'Sign-in was cancelled or denied.',
-        }));
-        return;
-    }
-    try {
-        const result = await (0, auth_service_1.loginWithOAuth)({
-            provider,
-            code: callbackQuery.code,
-            state: callbackQuery.state,
-            requestOrigin: getRequestOrigin(req),
-        });
-        res.cookie(COOKIE_NAME, result.refreshToken, cookieOptions);
-        res.redirect(302, (0, auth_service_1.buildFrontendOAuthRedirectUrl)(provider, 'success'));
-    }
-    catch (error) {
-        if (error instanceof ApiError_1.ApiError) {
-            res.redirect(302, (0, auth_service_1.buildFrontendOAuthRedirectUrl)(provider, 'error', {
-                code: error.code,
-                message: error.message,
-            }));
-            return;
-        }
-        throw error;
-    }
-};
-exports.oauthCallback = oauthCallback;
 const refresh = async (req, res) => {
     const result = await (0, auth_service_1.refreshUserToken)(req.cookies?.[COOKIE_NAME]);
     res.cookie(COOKIE_NAME, result.refreshToken, cookieOptions);

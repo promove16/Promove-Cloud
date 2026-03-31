@@ -1,5 +1,6 @@
 import { useQuery, useQueryClient, useMutation } from '@tanstack/react-query';
 import { ArrowRight } from 'lucide-react';
+import { useNavigate } from 'react-router-dom';
 import { adminApi } from '../../api/admin.api';
 import { Badge } from '../../components/ui/Badge';
 import { Button } from '../../components/ui/Button';
@@ -9,6 +10,7 @@ import { Spinner } from '../../components/ui/Spinner';
 const formatRoleLabel = (value?: string) => (value ? value.charAt(0).toUpperCase() + value.slice(1) : 'Shareholder');
 
 export default function Deals() {
+  const navigate = useNavigate();
   const queryClient = useQueryClient();
   const dealsQuery = useQuery({
     queryKey: ['admin-deals'],
@@ -58,13 +60,18 @@ export default function Deals() {
                     Equity {deal.equityPercent ?? 0}% - Shares {deal.sharesAllocated ?? 0} - Voting {deal.votingWeight ?? 0}%
                   </div>
                 </div>
-                <Button
-                  onClick={() => approveMutation.mutate(deal._id)}
-                  disabled={approveMutation.isPending}
-                >
-                  Approve Equity Transfer
-                  <ArrowRight className="ml-2 h-4 w-4" />
-                </Button>
+                <div className="flex flex-wrap gap-3">
+                  <Button variant="secondary" onClick={() => navigate(`/dashboard/admin/deals/${deal._id}`)}>
+                    Review Transaction
+                  </Button>
+                  <Button
+                    onClick={() => approveMutation.mutate(deal._id)}
+                    disabled={approveMutation.isPending}
+                  >
+                    Approve Equity Transfer
+                    <ArrowRight className="ml-2 h-4 w-4" />
+                  </Button>
+                </div>
               </div>
             </div>
           ))

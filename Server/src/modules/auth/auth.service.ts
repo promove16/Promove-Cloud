@@ -1,8 +1,8 @@
 import bcrypt from 'bcrypt';
 import jwt, { SignOptions } from 'jsonwebtoken';
 import { randomBytes, randomUUID } from 'crypto';
-import { redis } from '../../config/redis';
 import { env } from '../../config/env';
+import { redis } from '../../config/redis';
 import { User, UserDocument } from '../user/user.model';
 import { AccessGrantedBy, SanitizedUser } from '../user/user.types';
 import { UserRole } from '../../types/roles.types';
@@ -233,16 +233,6 @@ export const registerUser = async (payload: {
   domain?: string;
   bio?: string;
 }): Promise<RegisterResult | PendingRegisterResult> => {
-  const activeUsers = await User.countDocuments({ isActive: true });
-
-  if (activeUsers >= env.MAX_USERS_YEAR_ONE) {
-    throw new ApiError(
-      403,
-      'CAPACITY_REACHED',
-      'Platform is at capacity for Year 1. Please join the waitlist.',
-    );
-  }
-
   const existingUser = await User.findOne({ email: payload.email.toLowerCase() });
 
   if (existingUser) {

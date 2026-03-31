@@ -33,7 +33,6 @@ const envSchema = z.object({
     .default("development"),
   RATE_LIMIT_ENABLED: booleanFromEnv.default(true),
   CLIENT_URL: z.string().min(1),
-  MAX_USERS_YEAR_ONE: z.coerce.number().int().positive().default(2000),
   CLOUDINARY_CLOUD_NAME: z.string().min(1),
   CLOUDINARY_API_KEY: z.string().min(1),
   CLOUDINARY_API_SECRET: z.string().min(1),

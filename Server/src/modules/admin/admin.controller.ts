@@ -17,7 +17,6 @@ import {
   approveDealStage,
   approvePatent,
   getAnalytics,
-  getCapacity,
   getInvestmentTypeBreakdown,
   listAwards,
   listDealsAwaitingApproval,
@@ -211,10 +210,6 @@ export const getInvestmentTypeAnalyticsController = async (_req: Request, res: R
 
 export const getAnalyticsController = async (_req: Request, res: Response) => {
   res.status(200).json(new ApiResponse(await getAnalytics()));
-};
-
-export const getCapacityController = async (_req: Request, res: Response) => {
-  res.status(200).json(new ApiResponse(await getCapacity()));
 };
 
 export const verifyMilestoneController = async (req: Request, res: Response) => {

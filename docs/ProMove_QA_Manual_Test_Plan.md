@@ -75,7 +75,7 @@ The main business areas to cover are:
 - mentor sessions and feedback
 - investor discovery and deal progression
 - recruiter talent, jobs, drives, and onboarding
-- admin approvals, governance, analytics, and capacity
+- admin approvals, governance, and analytics
 - events and rankings
 
 ## 5. Environment Prerequisites
@@ -531,7 +531,7 @@ Note:
 
 - [ ] `ADM-01` Open `/dashboard/admin`
 - [ ] `ADM-02` Verify analytics summary loads
-- [ ] `ADM-03` Verify capacity summary loads
+- [ ] `ADM-03` Verify admin dashboard summary cards load
 - [ ] `ADM-04` Open `/dashboard/admin/users`
 - [ ] `ADM-05` Search users by name or email
 - [ ] `ADM-06` Change user role
@@ -557,8 +557,6 @@ Note:
 - [ ] `ADM-26` Verify milestone
 - [ ] `ADM-27` Open `/dashboard/admin/analytics`
 - [ ] `ADM-28` Verify charts and summary cards load
-- [ ] `ADM-29` Open `/dashboard/admin/capacity`
-- [ ] `ADM-30` Verify capacity metrics and export behavior
 
 ## 22. Phase 11 - Notifications, Chat, Realtime, Uploads, and Reporting
 

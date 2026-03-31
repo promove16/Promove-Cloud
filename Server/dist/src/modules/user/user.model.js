@@ -93,7 +93,7 @@ const institutionProfileSchema = new mongoose_1.Schema({
         }),
     },
 }, { _id: false });
-const oauthAccountSchema = new mongoose_1.Schema({
+const connectedAccountSchema = new mongoose_1.Schema({
     userId: {
         type: String,
         default: null,
@@ -612,7 +612,7 @@ const userSchema = new mongoose_1.Schema({
     connectedAccounts: {
         type: new mongoose_1.Schema({
             github: {
-                type: oauthAccountSchema,
+                type: connectedAccountSchema,
                 default: () => ({
                     userId: null,
                     username: null,
@@ -622,7 +622,7 @@ const userSchema = new mongoose_1.Schema({
                 }),
             },
             google: {
-                type: oauthAccountSchema,
+                type: connectedAccountSchema,
                 default: () => ({
                     userId: null,
                     username: null,
@@ -632,7 +632,7 @@ const userSchema = new mongoose_1.Schema({
                 }),
             },
             linkedin: {
-                type: oauthAccountSchema,
+                type: connectedAccountSchema,
                 default: () => ({
                     userId: null,
                     username: null,

@@ -34,8 +34,8 @@ import AdminUserManagement from "../features/admin/UserManagement";
 import AdminPatents from "../features/admin/Patents";
 import AdminAwards from "../features/admin/Awards";
 import AdminDeals from "../features/admin/Deals";
+import AdminDealReview from "../features/admin/DealReview";
 import AdminAnalytics from "../features/admin/Analytics";
-import AdminCapacity from "../features/admin/Capacity";
 import RecruiterDashboard from "../features/recruiter/Dashboard";
 import RecruiterTalentSearch from "../features/recruiter/TalentSearch";
 import RecruiterCollegeConnect from "../features/recruiter/CollegeConnect";
@@ -367,8 +367,8 @@ export const router = createBrowserRouter([
               { path: "patents", element: <AdminPatents /> },
               { path: "awards", element: <AdminAwards /> },
               { path: "deals", element: <AdminDeals /> },
+              { path: "deals/:dealId", element: <AdminDealReview /> },
               { path: "analytics", element: <AdminAnalytics /> },
-              { path: "capacity", element: <AdminCapacity /> },
             ],
           },
           {

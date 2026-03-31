@@ -1,5 +1,6 @@
 import api from './axiosInstance';
 import { ApiSuccessResponse, InstitutionProfileInput, RegistrationRequestStatus } from '../types/auth.types';
+import { CapTableResponse } from '../types/deal.types';
 import { PatentFilingDocuments, PatentSupportingDocument } from '../types/patent.types';
 import { UserRole } from '../types/roles.types';
 import { MentorStudentProfile } from './mentor.api';
@@ -120,6 +121,35 @@ export interface AdminDealItem {
   studentName: string;
 }
 
+export interface AdminDealReviewItem extends AdminDealItem {
+  createdAt: string;
+  updatedAt: string;
+  fundTransferInitiatedAt?: string;
+  closedAt?: string;
+  startup: {
+    _id: string;
+    name: string;
+    tagline: string;
+    category: string;
+    stage: string;
+    pitchDeckUrl?: string;
+  };
+  student: {
+    _id: string;
+    displayName: string;
+    avatar?: string;
+    role: UserRole;
+    innovationScore: number;
+  };
+  investor: {
+    _id: string;
+    displayName: string;
+    avatar?: string;
+    role: UserRole;
+    innovationScore: number;
+  };
+}
+
 export interface AdminAnalyticsData {
   totalUsers: number;
   usersByRole: Record<UserRole, number>;
@@ -148,14 +178,6 @@ export interface AdminAnalyticsData {
     pennyCapitalDeployed: number;
     soleCapitalDeployed: number;
   };
-}
-
-export interface AdminCapacityData {
-  current: number;
-  max: number;
-  percentUsed: number;
-  remainingSlots: number;
-  waitlistCount: number;
 }
 
 export const adminApi = {
@@ -246,7 +268,7 @@ export const adminApi = {
     return response.data.data;
   },
   async getDeal(dealId: string) {
-    const response = await api.get<ApiSuccessResponse<AdminDealItem>>(`/api/admin/deals/${dealId}`);
+    const response = await api.get<ApiSuccessResponse<AdminDealReviewItem>>(`/api/admin/deals/${dealId}`);
     return response.data.data;
   },
   async approveDealStage(dealId: string) {
@@ -262,7 +284,7 @@ export const adminApi = {
     return response.data.data;
   },
   async getStartupCapTable(startupId: string) {
-    const response = await api.get<ApiSuccessResponse<unknown>>(`/api/admin/startups/${startupId}/cap-table`);
+    const response = await api.get<ApiSuccessResponse<CapTableResponse>>(`/api/admin/startups/${startupId}/cap-table`);
     return response.data.data;
   },
   async resetSoleInvestor(startupId: string) {
@@ -284,10 +306,6 @@ export const adminApi = {
   },
   async getAnalytics() {
     const response = await api.get<ApiSuccessResponse<AdminAnalyticsData>>('/api/admin/analytics');
-    return response.data.data;
-  },
-  async getCapacity() {
-    const response = await api.get<ApiSuccessResponse<AdminCapacityData>>('/api/admin/capacity');
     return response.data.data;
   },
 };

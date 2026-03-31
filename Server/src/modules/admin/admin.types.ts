@@ -160,6 +160,35 @@ export interface AdminDealItem {
   studentName: string;
 }
 
+export interface AdminDealReviewItem extends AdminDealItem {
+  createdAt: string;
+  updatedAt: string;
+  fundTransferInitiatedAt?: string;
+  closedAt?: string;
+  startup: {
+    _id: string;
+    name: string;
+    tagline: string;
+    category: string;
+    stage: string;
+    pitchDeckUrl?: string;
+  };
+  student: {
+    _id: string;
+    displayName: string;
+    avatar?: string;
+    role: UserRole;
+    innovationScore: number;
+  };
+  investor: {
+    _id: string;
+    displayName: string;
+    avatar?: string;
+    role: UserRole;
+    innovationScore: number;
+  };
+}
+
 export interface AdminAnalyticsData {
   totalUsers: number;
   usersByRole: Record<UserRole, number>;
@@ -188,12 +217,4 @@ export interface AdminAnalyticsData {
     pennyCapitalDeployed: number;
     soleCapitalDeployed: number;
   };
-}
-
-export interface AdminCapacityData {
-  current: number;
-  max: number;
-  percentUsed: number;
-  remainingSlots: number;
-  waitlistCount: number;
 }
