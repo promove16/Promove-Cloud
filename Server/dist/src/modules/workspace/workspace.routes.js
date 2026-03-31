@@ -39,10 +39,16 @@ router.delete('/:id', (0, asyncHandler_1.asyncHandler)(workspace_controller_1.re
 router.post('/:id/progress', (0, asyncHandler_1.asyncHandler)(workspace_controller_1.addWorkspaceProgress));
 router.post('/:id/upload', upload.single('file'), (0, asyncHandler_1.asyncHandler)(workspace_controller_1.uploadWorkspaceAsset));
 router.delete('/:id/upload/:uploadId', (0, asyncHandler_1.asyncHandler)(workspace_controller_1.removeWorkspaceAsset));
+router.post('/:id/repos', (0, asyncHandler_1.asyncHandler)(workspace_controller_1.addWorkspaceRepoSubmission));
+router.delete('/:id/repos/:repoId', (0, asyncHandler_1.asyncHandler)(workspace_controller_1.removeWorkspaceRepoSubmission));
+router.post('/:id/code', (0, asyncHandler_1.asyncHandler)(workspace_controller_1.addWorkspaceCodeSubmission));
+router.delete('/:id/code/:codeId', (0, asyncHandler_1.asyncHandler)(workspace_controller_1.removeWorkspaceCodeSubmission));
 router.post('/:id/tasks', (0, asyncHandler_1.asyncHandler)(workspace_controller_1.addWorkspaceTask));
 router.patch('/:id/tasks/:taskId', (0, asyncHandler_1.asyncHandler)(workspace_controller_1.patchWorkspaceTask));
 router.delete('/:id/tasks/:taskId', (0, asyncHandler_1.asyncHandler)(workspace_controller_1.removeWorkspaceTask));
 router.post('/:id/invite', (0, asyncHandler_1.asyncHandler)(workspace_controller_1.inviteWorkspaceMember));
 router.delete('/:id/members/:userId', (0, asyncHandler_1.asyncHandler)(workspace_controller_1.removeWorkspaceMember));
+router.post('/:id/chat-participants', (0, asyncHandler_1.asyncHandler)(workspace_controller_1.addWorkspaceChatParticipant));
+router.delete('/:id/chat-participants/:userId', (0, asyncHandler_1.asyncHandler)(workspace_controller_1.removeWorkspaceChatParticipant));
 router.get('/:id/chat', (0, asyncHandler_1.asyncHandler)(workspace_controller_1.getWorkspaceChat));
 exports.default = router;

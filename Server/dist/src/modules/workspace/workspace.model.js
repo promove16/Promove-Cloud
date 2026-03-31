@@ -61,7 +61,37 @@ const workspaceSchema = new mongoose_1.Schema({
                 uploadedBy: { type: mongoose_1.Schema.Types.ObjectId, required: true },
                 uploadedAt: { type: Date, default: () => new Date() },
                 note: { type: String, default: undefined },
+                category: { type: String, enum: ['bug_report', 'error_log', 'screenshot', 'test_result', 'design_mockup', 'other'], default: 'other' },
                 cloudinaryPublicId: { type: String, default: undefined },
+            }, { _id: true }),
+        ],
+        default: [],
+    },
+    repoSubmissions: {
+        type: [
+            new mongoose_1.Schema({
+                provider: { type: String, enum: ['github'], required: true },
+                repoUrl: { type: String, required: true, trim: true, maxlength: 300 },
+                displayName: { type: String, required: true, trim: true, maxlength: 160 },
+                branch: { type: String, default: undefined, trim: true, maxlength: 120 },
+                commitHash: { type: String, default: undefined, trim: true, maxlength: 40 },
+                note: { type: String, default: undefined, trim: true, maxlength: 300 },
+                uploadedBy: { type: mongoose_1.Schema.Types.ObjectId, required: true },
+                uploadedAt: { type: Date, default: () => new Date() },
+            }, { _id: true }),
+        ],
+        default: [],
+    },
+    codeSubmissions: {
+        type: [
+            new mongoose_1.Schema({
+                title: { type: String, required: true, trim: true, maxlength: 120 },
+                language: { type: String, required: true, trim: true, maxlength: 60 },
+                summary: { type: String, default: undefined, trim: true, maxlength: 300 },
+                codeSnippet: { type: String, required: true, maxlength: 8000 },
+                lineCount: { type: Number, required: true, min: 1, max: 500 },
+                uploadedBy: { type: mongoose_1.Schema.Types.ObjectId, required: true },
+                uploadedAt: { type: Date, default: () => new Date() },
             }, { _id: true }),
         ],
         default: [],
@@ -73,6 +103,17 @@ const workspaceSchema = new mongoose_1.Schema({
                 note: { type: String, required: true, trim: true },
                 milestoneRef: { type: String, default: undefined },
                 submittedAt: { type: Date, default: () => new Date() },
+            }, { _id: true }),
+        ],
+        default: [],
+    },
+    chatParticipants: {
+        type: [
+            new mongoose_1.Schema({
+                userId: { type: mongoose_1.Schema.Types.ObjectId, required: true },
+                role: { type: String, enum: ['mentor', 'investor'], required: true },
+                addedBy: { type: mongoose_1.Schema.Types.ObjectId, required: true },
+                addedAt: { type: Date, default: () => new Date() },
             }, { _id: true }),
         ],
         default: [],

@@ -1,6 +1,6 @@
 "use strict";
 Object.defineProperty(exports, "__esModule", { value: true });
-exports.getWorkspaceChat = exports.removeWorkspaceMember = exports.inviteWorkspaceMember = exports.removeWorkspaceTask = exports.patchWorkspaceTask = exports.addWorkspaceTask = exports.removeWorkspaceAsset = exports.uploadWorkspaceAsset = exports.addWorkspaceProgress = exports.removeWorkspace = exports.patchWorkspace = exports.getWorkspace = exports.createWorkspaceController = exports.listWorkspaces = void 0;
+exports.removeWorkspaceChatParticipant = exports.addWorkspaceChatParticipant = exports.getWorkspaceChat = exports.removeWorkspaceMember = exports.inviteWorkspaceMember = exports.removeWorkspaceTask = exports.patchWorkspaceTask = exports.addWorkspaceTask = exports.removeWorkspaceCodeSubmission = exports.addWorkspaceCodeSubmission = exports.removeWorkspaceRepoSubmission = exports.addWorkspaceRepoSubmission = exports.removeWorkspaceAsset = exports.uploadWorkspaceAsset = exports.addWorkspaceProgress = exports.removeWorkspace = exports.patchWorkspace = exports.getWorkspace = exports.createWorkspaceController = exports.listWorkspaces = void 0;
 const ApiError_1 = require("../../utils/ApiError");
 const ApiResponse_1 = require("../../utils/ApiResponse");
 const workspace_service_1 = require("./workspace.service");
@@ -63,7 +63,7 @@ const uploadWorkspaceAsset = async (req, res) => {
         throw new ApiError_1.ApiError(400, 'FILE_REQUIRED', 'A file is required');
     }
     const workspaceId = getParam(req.params.id, 'WORKSPACE_REQUIRED', 'Workspace id is required');
-    const uploads = await (0, workspace_service_1.uploadWorkspaceFile)(workspaceId, userId, req.file, req.body.note);
+    const uploads = await (0, workspace_service_1.uploadWorkspaceFile)(workspaceId, userId, req.file, req.body.note, req.body.category);
     res.json(new ApiResponse_1.ApiResponse(uploads));
 };
 exports.uploadWorkspaceAsset = uploadWorkspaceAsset;
@@ -75,6 +75,36 @@ const removeWorkspaceAsset = async (req, res) => {
     res.json(new ApiResponse_1.ApiResponse(uploads));
 };
 exports.removeWorkspaceAsset = removeWorkspaceAsset;
+const addWorkspaceRepoSubmission = async (req, res) => {
+    const userId = ensureUserId(req);
+    const workspaceId = getParam(req.params.id, 'WORKSPACE_REQUIRED', 'Workspace id is required');
+    const workspace = await (0, workspace_service_1.addRepoSubmission)(workspaceId, userId, workspace_service_1.addRepoSubmissionSchema.parse(req.body));
+    res.status(201).json(new ApiResponse_1.ApiResponse(workspace));
+};
+exports.addWorkspaceRepoSubmission = addWorkspaceRepoSubmission;
+const removeWorkspaceRepoSubmission = async (req, res) => {
+    const userId = ensureUserId(req);
+    const workspaceId = getParam(req.params.id, 'WORKSPACE_REQUIRED', 'Workspace id is required');
+    const repoId = getParam(req.params.repoId, 'REPOSITORY_REQUIRED', 'Repository id is required');
+    const workspace = await (0, workspace_service_1.deleteRepoSubmission)(workspaceId, repoId, userId);
+    res.json(new ApiResponse_1.ApiResponse(workspace));
+};
+exports.removeWorkspaceRepoSubmission = removeWorkspaceRepoSubmission;
+const addWorkspaceCodeSubmission = async (req, res) => {
+    const userId = ensureUserId(req);
+    const workspaceId = getParam(req.params.id, 'WORKSPACE_REQUIRED', 'Workspace id is required');
+    const workspace = await (0, workspace_service_1.addCodeSubmission)(workspaceId, userId, workspace_service_1.addCodeSubmissionSchema.parse(req.body));
+    res.status(201).json(new ApiResponse_1.ApiResponse(workspace));
+};
+exports.addWorkspaceCodeSubmission = addWorkspaceCodeSubmission;
+const removeWorkspaceCodeSubmission = async (req, res) => {
+    const userId = ensureUserId(req);
+    const workspaceId = getParam(req.params.id, 'WORKSPACE_REQUIRED', 'Workspace id is required');
+    const codeId = getParam(req.params.codeId, 'CODE_REQUIRED', 'Code submission id is required');
+    const workspace = await (0, workspace_service_1.deleteCodeSubmission)(workspaceId, codeId, userId);
+    res.json(new ApiResponse_1.ApiResponse(workspace));
+};
+exports.removeWorkspaceCodeSubmission = removeWorkspaceCodeSubmission;
 const addWorkspaceTask = async (req, res) => {
     const userId = ensureUserId(req);
     const workspaceId = getParam(req.params.id, 'WORKSPACE_REQUIRED', 'Workspace id is required');
@@ -122,3 +152,18 @@ const getWorkspaceChat = async (req, res) => {
     res.json(new ApiResponse_1.ApiResponse(messages));
 };
 exports.getWorkspaceChat = getWorkspaceChat;
+const addWorkspaceChatParticipant = async (req, res) => {
+    const userId = ensureUserId(req);
+    const workspaceId = getParam(req.params.id, 'WORKSPACE_REQUIRED', 'Workspace id is required');
+    const workspace = await (0, workspace_service_1.addChatParticipant)(workspaceId, userId, workspace_service_1.addChatParticipantSchema.parse(req.body));
+    res.status(201).json(new ApiResponse_1.ApiResponse(workspace));
+};
+exports.addWorkspaceChatParticipant = addWorkspaceChatParticipant;
+const removeWorkspaceChatParticipant = async (req, res) => {
+    const userId = ensureUserId(req);
+    const workspaceId = getParam(req.params.id, 'WORKSPACE_REQUIRED', 'Workspace id is required');
+    const participantUserId = getParam(req.params.userId, 'PARTICIPANT_REQUIRED', 'Participant user id is required');
+    const workspace = await (0, workspace_service_1.removeChatParticipant)(workspaceId, userId, participantUserId);
+    res.json(new ApiResponse_1.ApiResponse(workspace));
+};
+exports.removeWorkspaceChatParticipant = removeWorkspaceChatParticipant;

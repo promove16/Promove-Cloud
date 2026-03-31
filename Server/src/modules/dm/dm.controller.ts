@@ -75,11 +75,11 @@ export const getThread = async (req: Request, res: Response) => {
   const myId = new Types.ObjectId(req.user!._id);
   const { userId } = req.params;
 
-  if (!Types.ObjectId.isValid(userId)) {
+  if (!Types.ObjectId.isValid(userId as string)) {
     throw new ApiError(400, 'INVALID_ID', 'Invalid user ID');
   }
 
-  const partnerId = new Types.ObjectId(userId);
+  const partnerId = new Types.ObjectId(userId as string);
 
   // Mark messages from partner as read
   await DirectMessage.updateMany(
@@ -105,11 +105,11 @@ export const sendMessage = async (req: Request, res: Response) => {
   const myId = new Types.ObjectId(req.user!._id);
   const { userId } = req.params;
 
-  if (!Types.ObjectId.isValid(userId)) {
+  if (!Types.ObjectId.isValid(userId as string)) {
     throw new ApiError(400, 'INVALID_ID', 'Invalid user ID');
   }
 
-  const recipientId = new Types.ObjectId(userId);
+  const recipientId = new Types.ObjectId(userId as string);
   const { message, messageType, scheduledAt, meetLink, attachmentUrl, attachmentType } = req.body as {
     message?: string;
     messageType?: 'text' | 'interview_request';

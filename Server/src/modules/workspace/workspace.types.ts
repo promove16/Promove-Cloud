@@ -37,6 +37,7 @@ export interface IWorkspace {
     uploadedBy: Types.ObjectId;
     uploadedAt: Date;
     note?: string;
+    category: string;
     cloudinaryPublicId?: string;
   }>;
   repoSubmissions: Array<{

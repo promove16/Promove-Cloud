@@ -1,4 +1,37 @@
 "use strict";
+var __createBinding = (this && this.__createBinding) || (Object.create ? (function(o, m, k, k2) {
+    if (k2 === undefined) k2 = k;
+    var desc = Object.getOwnPropertyDescriptor(m, k);
+    if (!desc || ("get" in desc ? !m.__esModule : desc.writable || desc.configurable)) {
+      desc = { enumerable: true, get: function() { return m[k]; } };
+    }
+    Object.defineProperty(o, k2, desc);
+}) : (function(o, m, k, k2) {
+    if (k2 === undefined) k2 = k;
+    o[k2] = m[k];
+}));
+var __setModuleDefault = (this && this.__setModuleDefault) || (Object.create ? (function(o, v) {
+    Object.defineProperty(o, "default", { enumerable: true, value: v });
+}) : function(o, v) {
+    o["default"] = v;
+});
+var __importStar = (this && this.__importStar) || (function () {
+    var ownKeys = function(o) {
+        ownKeys = Object.getOwnPropertyNames || function (o) {
+            var ar = [];
+            for (var k in o) if (Object.prototype.hasOwnProperty.call(o, k)) ar[ar.length] = k;
+            return ar;
+        };
+        return ownKeys(o);
+    };
+    return function (mod) {
+        if (mod && mod.__esModule) return mod;
+        var result = {};
+        if (mod != null) for (var k = ownKeys(mod), i = 0; i < k.length; i++) if (k[i] !== "default") __createBinding(result, mod, k[i]);
+        __setModuleDefault(result, mod);
+        return result;
+    };
+})();
 var __importDefault = (this && this.__importDefault) || function (mod) {
     return (mod && mod.__esModule) ? mod : { "default": mod };
 };
@@ -7,8 +40,10 @@ const bcrypt_1 = __importDefault(require("bcrypt"));
 const jsonwebtoken_1 = __importDefault(require("jsonwebtoken"));
 const crypto_1 = require("crypto");
 const supertest_1 = __importDefault(require("supertest"));
+const XLSX = __importStar(require("xlsx"));
 const app_1 = __importDefault(require("../../src/app"));
 const env_1 = require("../../src/config/env");
+const studentRoster_model_1 = require("../../src/modules/institution/studentRoster.model");
 const user_model_1 = require("../../src/modules/user/user.model");
 const roles_types_1 = require("../../src/types/roles.types");
 const PASSWORD = 'Password123!';
@@ -195,6 +230,43 @@ describe('auth integration', () => {
             expect(response.status).toBe(201);
             expect(response.body.data.user.accessGrantedBy).toBe('institution_roster');
             expect(response.body.data.user.verificationStatus).toBe('pending');
+        });
+        it('allows a school to cancel a pending student invite', async () => {
+            const schoolEmail = `cancel-${(0, crypto_1.randomUUID)()}@school.test`;
+            await createApprovedUser({
+                role: roles_types_1.UserRole.SCHOOL,
+                email: schoolEmail,
+                displayName: 'Cancel School',
+                institutionProfile: {
+                    institutionName: 'Cancel School',
+                    location: 'Mumbai',
+                    totalStudentsEnrolled: 800,
+                    academicYear: '2025-26',
+                },
+            });
+            const schoolLogin = await loginAs(schoolEmail);
+            const rosterEmail = `invite-${(0, crypto_1.randomUUID)()}@school.test`;
+            const createResponse = await (0, supertest_1.default)(app_1.default)
+                .post('/api/school/student-roster/manual')
+                .set('Authorization', `Bearer ${schoolLogin.accessToken}`)
+                .send({
+                displayName: 'Invite Student',
+                email: rosterEmail,
+                gradeOrProgram: 'Class 10',
+            });
+            expect(createResponse.status).toBe(201);
+            const cancelResponse = await (0, supertest_1.default)(app_1.default)
+                .delete(`/api/school/student-roster/${createResponse.body.data._id}`)
+                .set('Authorization', `Bearer ${schoolLogin.accessToken}`);
+            expect(cancelResponse.status).toBe(200);
+            expect(cancelResponse.body.data.cancelled).toBe(true);
+            const rosterEntry = await studentRoster_model_1.InstitutionStudentRosterEntry.findById(createResponse.body.data._id).lean();
+            expect(rosterEntry?.isActive).toBe(false);
+            const listResponse = await (0, supertest_1.default)(app_1.default)
+                .get('/api/school/student-roster')
+                .set('Authorization', `Bearer ${schoolLogin.accessToken}`);
+            expect(listResponse.status).toBe(200);
+            expect(listResponse.body.data).toHaveLength(0);
         });
     });
     describe('POST /api/auth/register-request', () => {
@@ -393,6 +465,60 @@ describe('auth integration', () => {
             });
             expect(response.status).toBe(400);
             expect(response.body.error.code).toBe('INSTITUTION_EMAIL_DOMAIN_REQUIRED');
+        });
+        it('creates student credentials from an Excel roster import and allows login', async () => {
+            const schoolEmail = `excel-${(0, crypto_1.randomUUID)()}@campus.test`;
+            const { user: schoolUser } = await createApprovedUser({
+                role: roles_types_1.UserRole.SCHOOL,
+                email: schoolEmail,
+                displayName: 'Excel School',
+                institutionProfile: {
+                    institutionName: 'Excel School',
+                    location: 'Chennai',
+                    totalStudentsEnrolled: 950,
+                    academicYear: '2025-26',
+                },
+            });
+            const schoolLogin = await loginAs(schoolEmail);
+            const workbook = XLSX.utils.book_new();
+            const rows = [
+                {
+                    displayName: 'Excel Student One',
+                    email: `excel-one-${(0, crypto_1.randomUUID)()}@campus.test`,
+                    gradeOrProgram: 'Class 11',
+                    rollNumber: 'EX-001',
+                },
+                {
+                    displayName: 'Excel Student Two',
+                    email: `excel-two-${(0, crypto_1.randomUUID)()}@campus.test`,
+                    gradeOrProgram: 'Class 12',
+                    rollNumber: 'EX-002',
+                },
+            ];
+            const worksheet = XLSX.utils.json_to_sheet(rows);
+            XLSX.utils.book_append_sheet(workbook, worksheet, 'Students');
+            const workbookBuffer = XLSX.write(workbook, { type: 'buffer', bookType: 'xlsx' });
+            const importResponse = await (0, supertest_1.default)(app_1.default)
+                .post('/api/school/student-roster/import-credentials')
+                .set('Authorization', `Bearer ${schoolLogin.accessToken}`)
+                .attach('file', workbookBuffer, 'students.xlsx');
+            expect(importResponse.status).toBe(200);
+            expect(importResponse.body.data.errors).toHaveLength(0);
+            expect(importResponse.body.data.results).toHaveLength(2);
+            const firstCredential = importResponse.body.data.results[0];
+            const loginResponse = await (0, supertest_1.default)(app_1.default).post('/api/auth/login').send({
+                email: firstCredential.student.email,
+                password: firstCredential.temporaryPassword,
+            });
+            expect(loginResponse.status).toBe(200);
+            expect(loginResponse.body.data.user.accessGrantedBy).toBe('institution_admin');
+            expect(loginResponse.body.data.user.mustChangePasswordOnNextLogin).toBe(true);
+            const rosterEntries = await studentRoster_model_1.InstitutionStudentRosterEntry.find({
+                institutionId: schoolUser._id,
+                isActive: true,
+            }).lean();
+            expect(rosterEntries).toHaveLength(2);
+            expect(rosterEntries.every((entry) => entry.status === 'verified')).toBe(true);
         });
     });
     describe.skip('OAuth login', () => {

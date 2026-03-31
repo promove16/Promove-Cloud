@@ -11,8 +11,14 @@ const workspace_model_1 = require("../modules/workspace/workspace.model");
 const chat_model_1 = require("../modules/chat/chat.model");
 const canAccessWorkspace = async (workspaceId, userId) => workspace_model_1.Workspace.exists({
     _id: workspaceId,
-    $or: [{ ownerId: userId }, { teamMemberIds: userId }],
+    $or: [
+        { ownerId: userId },
+        { teamMemberIds: userId },
+        { 'chatParticipants.userId': userId },
+    ],
 });
+// userId -> Set of socketIds for online presence
+const onlineUsers = new Map();
 const initChatSocket = (io) => {
     const chat = io.of('/chat');
     chat.use((socket, next) => {
@@ -30,6 +36,12 @@ const initChatSocket = (io) => {
         }
     });
     chat.on('connection', (socket) => {
+        const userId = socket.data.userId;
+        // Track presence
+        if (!onlineUsers.has(userId)) {
+            onlineUsers.set(userId, new Set());
+        }
+        onlineUsers.get(userId).add(socket.id);
         socket.on('chat:join', async ({ workspaceId }) => {
             if (!workspaceId || !mongoose_1.Types.ObjectId.isValid(workspaceId)) {
                 socket.emit('chat:error', { message: 'Workspace not found' });
@@ -41,6 +53,12 @@ const initChatSocket = (io) => {
                 return;
             }
             socket.join(`ws:${workspaceId}`);
+            // Broadcast presence to room
+            chat.to(`ws:${workspaceId}`).emit('presence:update', { userId, online: true });
+            // Send current online list to the joining socket
+            const room = await chat.in(`ws:${workspaceId}`).fetchSockets();
+            const onlineInRoom = [...new Set(room.map((s) => s.data.userId))];
+            socket.emit('presence:list', { onlineUserIds: onlineInRoom });
         });
         socket.on('chat:message', async ({ workspaceId, message, attachmentUrl, attachmentType }) => {
             try {
@@ -73,8 +91,24 @@ const initChatSocket = (io) => {
                 socket.emit('chat:error', { message: 'Unable to send message right now' });
             }
         });
+        // Typing indicator: broadcast to room excluding sender
+        socket.on('chat:typing', ({ workspaceId, isTyping }) => {
+            if (!workspaceId || !mongoose_1.Types.ObjectId.isValid(workspaceId))
+                return;
+            socket.to(`ws:${workspaceId}`).emit('chat:typing', { userId, isTyping });
+        });
         socket.on('chat:leave', ({ workspaceId }) => {
             socket.leave(`ws:${workspaceId}`);
+            chat.to(`ws:${workspaceId}`).emit('presence:update', { userId, online: false });
+        });
+        socket.on('disconnect', () => {
+            const sockets = onlineUsers.get(userId);
+            if (sockets) {
+                sockets.delete(socket.id);
+                if (sockets.size === 0) {
+                    onlineUsers.delete(userId);
+                }
+            }
         });
     });
 };
