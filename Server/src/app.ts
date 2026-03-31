@@ -27,6 +27,7 @@ import startupRoutes from './modules/startup/startup.routes';
 import userRoutes from './modules/user/user.routes';
 import workspaceRoutes from './modules/workspace/workspace.routes';
 import adminRoutes from './modules/admin/admin.routes';
+import dmRoutes from './modules/dm/dm.routes';
 import { ApiError } from './utils/ApiError';
 
 export const createApp = () => {
@@ -70,6 +71,7 @@ export const createApp = () => {
   app.use('/api/college', collegeRoutes);
   app.use('/api/events', eventRoutes);
   app.use('/api/admin', adminRoutes);
+  app.use('/api/dm', dmRoutes);
   app.get('/api/health', (_req, res) => {
     res.status(200).json({ success: true, data: { status: 'ok' } });
   });

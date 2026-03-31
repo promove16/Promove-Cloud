@@ -61,6 +61,8 @@ import { PatentSupport } from "../app/pages/PatentSupport";
 import { StartupLaunch } from "../app/pages/StartupLaunch";
 import { LeadershipProfile } from "../app/pages/LeadershipProfile";
 import { Marketplace } from "../features/student/Marketplace";
+import { MessagesPage } from "../app/pages/Messages";
+import { RecruiterMessagesPage } from "../app/pages/RecruiterMessages";
 
 function RootLayout() {
   return <Outlet />;
@@ -357,6 +359,13 @@ export const router = createBrowserRouter([
               { path: "colleges", element: <RecruiterCollegeConnect /> },
               { path: "drives", element: <RecruiterActiveDrives /> },
               { path: "onboarding", element: <RecruiterOnboardingTracker /> },
+              {
+                path: "messages",
+                children: [
+                  { index: true, element: <RecruiterMessagesPage /> },
+                  { path: ":partnerId", element: <RecruiterMessagesPage /> },
+                ],
+              },
             ],
           },
           {
@@ -381,6 +390,14 @@ export const router = createBrowserRouter([
             path: "settings",
             element: <ProtectedAnyRoute />,
             children: [{ index: true, element: <SettingsPage /> }],
+          },
+          {
+            path: "messages",
+            element: <ProtectedAnyRoute />,
+            children: [
+              { index: true, element: <MessagesPage /> },
+              { path: ":partnerId", element: <MessagesPage /> },
+            ],
           },
           {
             path: "school",

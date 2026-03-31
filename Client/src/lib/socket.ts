@@ -7,6 +7,7 @@ let scoreSocket: Socket | null = null;
 let chatSocket: Socket | null = null;
 let notifSocket: Socket | null = null;
 let mentorSocket: Socket | null = null;
+let dmSocket: Socket | null = null;
 
 const getToken = () => useAuthStore.getState().accessToken;
 
@@ -60,13 +61,26 @@ export const getMentorSocket = () => {
   return mentorSocket;
 };
 
+export const getDmSocket = () => {
+  if (!dmSocket) {
+    dmSocket = io(`${SOCKET_URL}/dm`, {
+      withCredentials: true,
+      autoConnect: false,
+    });
+  }
+  applyAuth(dmSocket);
+  return dmSocket;
+};
+
 export const disconnectAll = () => {
   scoreSocket?.disconnect();
   chatSocket?.disconnect();
   notifSocket?.disconnect();
   mentorSocket?.disconnect();
+  dmSocket?.disconnect();
   scoreSocket = null;
   chatSocket = null;
   notifSocket = null;
   mentorSocket = null;
+  dmSocket = null;
 };

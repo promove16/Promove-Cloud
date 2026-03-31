@@ -5,6 +5,7 @@ import { initScoreSocket } from '../sockets/scoreSocket';
 import { initChatSocket } from '../sockets/chatSocket';
 import { initNotificationSocket } from '../sockets/notificationSocket';
 import { initMentorSocket } from '../sockets/mentorSocket';
+import { initDmSocket } from '../sockets/dmSocket';
 
 export let io: SocketServer;
 
@@ -22,6 +23,7 @@ export const initSocket = (httpServer: HttpServer): SocketServer => {
   initChatSocket(io);
   initNotificationSocket(io);
   initMentorSocket(io);
+  initDmSocket(io);
 
   return io;
 };

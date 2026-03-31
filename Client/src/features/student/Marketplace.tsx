@@ -1,4 +1,5 @@
 import { useMemo, useState, type ReactNode } from 'react';
+import { DashboardLayout } from '../../app/components/DashboardLayout';
 import { useQuery } from '@tanstack/react-query';
 import {
   BriefcaseBusiness,
@@ -557,7 +558,8 @@ export function Marketplace() {
   };
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-slate-950 via-slate-950 to-cyan-950 px-4 py-6 text-white">
+    <DashboardLayout role="student">
+    <div className="space-y-6 text-white">
       <div className="mx-auto max-w-7xl space-y-6">
         <div className="flex flex-col gap-4 lg:flex-row lg:items-end lg:justify-between">
           <div>
@@ -721,5 +723,6 @@ export function Marketplace() {
         </div>
       ) : null}
     </div>
+    </DashboardLayout>
   );
 }
