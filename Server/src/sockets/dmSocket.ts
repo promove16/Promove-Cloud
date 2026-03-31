@@ -3,6 +3,7 @@ import jwt from 'jsonwebtoken';
 import { Types } from 'mongoose';
 import { env } from '../config/env';
 import { DirectMessage } from '../modules/dm/dm.model';
+import { onlineUsers } from '../modules/dm/dm.controller';
 
 export const initDmSocket = (io: Server) => {
   const dm = io.of('/dm');
@@ -24,6 +25,10 @@ export const initDmSocket = (io: Server) => {
 
     // Each user joins their own room named by their userId
     socket.join(`user:${userId}`);
+
+    // Track online presence
+    onlineUsers.add(userId);
+    dm.emit('dm:presence', { userId, isOnline: true });
 
     // Send a DM
     socket.on('dm:send', async ({ recipientId, message, messageType, scheduledAt, meetLink }) => {
@@ -64,10 +69,41 @@ export const initDmSocket = (io: Server) => {
       }
     });
 
+    // Mark messages as read & notify sender
+    socket.on('dm:read', async ({ partnerId }: { partnerId: string }) => {
+      if (!partnerId || !Types.ObjectId.isValid(partnerId)) return;
+
+      const now = new Date();
+      await DirectMessage.updateMany(
+        {
+          senderId: new Types.ObjectId(partnerId),
+          recipientId: new Types.ObjectId(userId),
+          readAt: null,
+        },
+        { $set: { readAt: now } },
+      );
+
+      // Notify the original sender that their messages were read
+      dm.to(`user:${partnerId}`).emit('dm:messages-read', {
+        readBy: userId,
+        readAt: now.toISOString(),
+      });
+    });
+
     // Typing indicator
     socket.on('dm:typing', ({ recipientId, isTyping }: { recipientId: string; isTyping: boolean }) => {
       if (!recipientId) return;
       dm.to(`user:${recipientId}`).emit('dm:typing', { senderId: userId, isTyping });
+    });
+
+    // Handle disconnect — remove from online set
+    socket.on('disconnect', () => {
+      // Only mark offline if no other sockets for this user
+      const rooms = dm.adapter.rooms.get(`user:${userId}`);
+      if (!rooms || rooms.size === 0) {
+        onlineUsers.delete(userId);
+        dm.emit('dm:presence', { userId, isOnline: false });
+      }
     });
   });
 };

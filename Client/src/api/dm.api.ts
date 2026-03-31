@@ -11,20 +11,24 @@ export interface DMMessage {
   meetLink?: string;
   attachmentUrl?: string;
   attachmentType?: 'image' | 'pdf';
-  readAt?: string;
+  readAt?: string | null;
   sentAt: string;
+}
+
+export interface DMPartner {
+  _id: string;
+  displayName: string;
+  avatar?: string;
+  role: string;
+  isOnline?: boolean;
 }
 
 export interface DMConversation {
   partnerId: string;
-  partner: {
-    _id: string;
-    displayName: string;
-    avatar?: string;
-    role: string;
-  } | null;
-  lastMessage: Pick<DMMessage, '_id' | 'message' | 'messageType' | 'sentAt' | 'senderId'>;
+  partner: DMPartner | null;
+  lastMessage: Pick<DMMessage, '_id' | 'message' | 'messageType' | 'sentAt' | 'senderId' | 'readAt'>;
   unreadCount: number;
+  isOnline?: boolean;
 }
 
 export const dmApi = {
@@ -36,6 +40,10 @@ export const dmApi = {
     const response = await api.get<ApiSuccessResponse<DMMessage[]>>(`/api/dm/${userId}`);
     return response.data.data;
   },
+  async getPartnerProfile(userId: string) {
+    const response = await api.get<ApiSuccessResponse<DMPartner>>(`/api/dm/partner/${userId}`);
+    return response.data.data;
+  },
   async send(userId: string, payload: {
     message?: string;
     messageType?: 'text' | 'interview_request';
@@ -43,6 +51,19 @@ export const dmApi = {
     meetLink?: string;
   }) {
     const response = await api.post<ApiSuccessResponse<DMMessage>>(`/api/dm/${userId}`, payload);
+    return response.data.data;
+  },
+  async markAsRead(userId: string) {
+    const response = await api.patch<ApiSuccessResponse<{ modifiedCount: number }>>(`/api/dm/${userId}/read`);
+    return response.data.data;
+  },
+  async searchUsers(query: string) {
+    const response = await api.get<ApiSuccessResponse<Array<{
+      _id: string;
+      displayName: string;
+      avatar?: string;
+      role: string;
+    }>>>(`/api/users/search`, { params: { q: query } });
     return response.data.data;
   },
 };

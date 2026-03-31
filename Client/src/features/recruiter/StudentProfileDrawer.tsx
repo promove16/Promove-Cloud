@@ -1,4 +1,5 @@
 import { useQuery } from '@tanstack/react-query';
+import { useNavigate } from 'react-router-dom';
 import { Mail, ShieldCheck, Sparkles, X } from 'lucide-react';
 import { recruiterApi } from '../../api/recruiter.api';
 import { Badge } from '../../components/ui/Badge';
@@ -26,6 +27,7 @@ const scoreFields = [
 ] as const;
 
 export function StudentProfileDrawer({ studentId, open, onClose, onChanged }: Props) {
+  const navigate = useNavigate();
   const profileQuery = useQuery({
     queryKey: ['recruiter', 'student-profile', studentId],
     queryFn: () => recruiterApi.getTalentProfile(studentId!),
@@ -38,10 +40,9 @@ export function StudentProfileDrawer({ studentId, open, onClose, onChanged }: Pr
 
   const profile = profileQuery.data;
 
-  const handleMessage = async () => {
+  const handleMessage = () => {
     if (!studentId) return;
-    await recruiterApi.sendMessage(studentId, 'Thanks for connecting on ProMove.');
-    onChanged?.();
+    navigate(`/dashboard/recruiter/messages/${studentId}`);
   };
 
   const handleShortlist = async () => {

@@ -9,10 +9,12 @@ import {
   getMySessions,
   launchToRecruiters,
   patchMe,
+  searchUsers,
 } from './user.controller';
 
 const router = Router();
 
+router.get('/search', authenticate, asyncHandler(searchUsers));
 router.get('/me', authenticate, asyncHandler(getMe));
 router.patch('/me', authenticate, asyncHandler(patchMe));
 router.post('/me/social-enrich', authenticate, asyncHandler(enrichMeFromSocialLinks));

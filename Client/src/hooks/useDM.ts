@@ -1,12 +1,13 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
-import { dmApi, DMMessage } from '../api/dm.api';
+import { dmApi, DMMessage, DMPartner } from '../api/dm.api';
 import { getDmSocket } from '../lib/socket';
 
 export const useDM = (partnerId?: string) => {
   const queryClient = useQueryClient();
   const [liveMessages, setLiveMessages] = useState<DMMessage[]>([]);
   const [typingFromPartner, setTypingFromPartner] = useState(false);
+  const [onlineUsers, setOnlineUsers] = useState<Set<string>>(new Set());
   const typingTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
   const typingDebounce = useRef<ReturnType<typeof setTimeout> | null>(null);
 
@@ -17,7 +18,15 @@ export const useDM = (partnerId?: string) => {
     enabled: Boolean(partnerId),
   });
 
-  // Connect socket once per session
+  // Fetch partner profile (for new conversations not in the list)
+  const partnerQuery = useQuery({
+    queryKey: ['dm', 'partner', partnerId],
+    queryFn: () => dmApi.getPartnerProfile(partnerId!),
+    enabled: Boolean(partnerId),
+    staleTime: 60_000,
+  });
+
+  // Connect socket and handle events
   useEffect(() => {
     const socket = getDmSocket();
     if (!socket.connected) socket.connect();
@@ -46,14 +55,57 @@ export const useDM = (partnerId?: string) => {
       }
     };
 
+    // Online/offline presence
+    const handlePresence = ({ userId, isOnline }: { userId: string; isOnline: boolean }) => {
+      setOnlineUsers((prev) => {
+        const next = new Set(prev);
+        if (isOnline) next.add(userId);
+        else next.delete(userId);
+        return next;
+      });
+      // Also refresh partner query and conversations
+      queryClient.invalidateQueries({ queryKey: ['dm', 'partner'] });
+      queryClient.invalidateQueries({ queryKey: ['dm', 'conversations'] });
+    };
+
+    // Messages read notification from partner
+    const handleMessagesRead = ({ readBy, readAt }: { readBy: string; readAt: string }) => {
+      if (readBy !== partnerId) return;
+      // Update live messages that were sent by current user to mark them as read
+      setLiveMessages((cur) =>
+        cur.map((m) =>
+          m.recipientId === readBy && !m.readAt
+            ? { ...m, readAt }
+            : m,
+        ),
+      );
+      // Refresh thread to get updated readAt from server
+      queryClient.invalidateQueries({ queryKey: ['dm', 'thread', partnerId] });
+    };
+
     socket.on('dm:message', handleMessage);
     socket.on('dm:typing', handleTyping);
+    socket.on('dm:presence', handlePresence);
+    socket.on('dm:messages-read', handleMessagesRead);
 
     return () => {
       socket.off('dm:message', handleMessage);
       socket.off('dm:typing', handleTyping);
+      socket.off('dm:presence', handlePresence);
+      socket.off('dm:messages-read', handleMessagesRead);
     };
   }, [partnerId, queryClient]);
+
+  // Auto-mark messages as read when thread is opened
+  useEffect(() => {
+    if (!partnerId) return;
+    const socket = getDmSocket();
+    if (socket.connected) {
+      socket.emit('dm:read', { partnerId });
+    }
+    // Also mark via REST for reliability
+    dmApi.markAsRead(partnerId).catch(() => {});
+  }, [partnerId, threadQuery.data]);
 
   // Merge history + live, deduplicate
   const messages = (() => {
@@ -91,6 +143,10 @@ export const useDM = (partnerId?: string) => {
 
   const clearLive = useCallback(() => setLiveMessages([]), []);
 
+  const isPartnerOnline = partnerId
+    ? onlineUsers.has(partnerId) || partnerQuery.data?.isOnline === true
+    : false;
+
   return {
     ...threadQuery,
     messages,
@@ -98,5 +154,8 @@ export const useDM = (partnerId?: string) => {
     sendTyping,
     typingFromPartner,
     clearLive,
+    partner: partnerQuery.data as DMPartner | undefined,
+    isPartnerOnline,
+    onlineUsers,
   };
 };

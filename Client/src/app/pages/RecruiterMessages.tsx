@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from 'react';
+import { useEffect, useRef, useState, useCallback } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import {
@@ -11,6 +11,10 @@ import {
   Clock,
   Video,
   X,
+  PenSquare,
+  Users,
+  Check,
+  CheckCheck,
 } from 'lucide-react';
 import { dmApi, DMConversation } from '../../api/dm.api';
 import { useDM } from '../../hooks/useDM';
@@ -42,6 +46,27 @@ const initials = (name: string) =>
     .slice(0, 2)
     .toUpperCase();
 
+function OnlineDot({ className = '' }: { className?: string }) {
+  return (
+    <span className={`absolute bottom-0 right-0 block h-3 w-3 rounded-full border-2 border-slate-900 bg-emerald-400 ${className}`} />
+  );
+}
+
+function OfflineDot({ className = '' }: { className?: string }) {
+  return (
+    <span className={`absolute bottom-0 right-0 block h-3 w-3 rounded-full border-2 border-slate-900 bg-slate-500 ${className}`} />
+  );
+}
+
+function ReadReceipt({ readAt, isMine }: { readAt?: string | null; isMine: boolean }) {
+  if (!isMine) return null;
+  return readAt ? (
+    <CheckCheck className="inline h-3.5 w-3.5 text-purple-400" title={`Read ${dt(readAt)}`} />
+  ) : (
+    <Check className="inline h-3.5 w-3.5 text-slate-500" title="Sent" />
+  );
+}
+
 /* ─── Conversation sidebar item ─── */
 function ConversationItem({
   convo,
@@ -57,6 +82,7 @@ function ConversationItem({
   const partner = convo.partner;
   const name = partner?.displayName ?? 'Unknown';
   const isMine = convo.lastMessage.senderId === currentUserId;
+  const isOnline = convo.isOnline || partner?.isOnline;
 
   return (
     <button
@@ -80,6 +106,7 @@ function ConversationItem({
             initials(name)
           )}
         </div>
+        {isOnline ? <OnlineDot /> : <OfflineDot />}
         {convo.unreadCount > 0 ? (
           <span className="absolute -right-0.5 -top-0.5 flex h-4 w-4 items-center justify-center rounded-full bg-purple-500 text-[10px] font-bold text-white">
             {convo.unreadCount > 9 ? '9+' : convo.unreadCount}
@@ -97,14 +124,21 @@ function ConversationItem({
             {timeAgo(convo.lastMessage.sentAt)}
           </span>
         </div>
-        <p
-          className={`truncate text-xs ${convo.unreadCount > 0 ? 'font-semibold text-slate-300' : 'text-slate-500'}`}
-        >
-          {isMine ? 'You: ' : ''}
-          {convo.lastMessage.messageType === 'interview_request'
-            ? '📅 Interview request'
-            : convo.lastMessage.message || '…'}
-        </p>
+        <div className="flex items-center gap-1">
+          <p
+            className={`truncate text-xs ${convo.unreadCount > 0 ? 'font-semibold text-slate-300' : 'text-slate-500'}`}
+          >
+            {isMine ? 'You: ' : ''}
+            {convo.lastMessage.messageType === 'interview_request'
+              ? '📅 Interview request'
+              : convo.lastMessage.message || '…'}
+          </p>
+          {isMine && (
+            <span className="flex-shrink-0">
+              <ReadReceipt readAt={convo.lastMessage.readAt} isMine={true} />
+            </span>
+          )}
+        </div>
       </div>
     </button>
   );
@@ -182,6 +216,7 @@ function ScheduleInterviewModal({
               value={date}
               min={minDate}
               onChange={(e) => setDate(e.target.value)}
+              style={{ colorScheme: 'dark' }}
               className="w-full rounded-xl border border-slate-700 bg-slate-950 px-4 py-2.5 text-sm text-white outline-none transition focus:border-purple-500"
             />
           </div>
@@ -195,6 +230,7 @@ function ScheduleInterviewModal({
               type="time"
               value={time}
               onChange={(e) => setTime(e.target.value)}
+              style={{ colorScheme: 'dark' }}
               className="w-full rounded-xl border border-slate-700 bg-slate-950 px-4 py-2.5 text-sm text-white outline-none transition focus:border-purple-500"
             />
           </div>
@@ -259,9 +295,11 @@ function ScheduleInterviewModal({
 function ChatPanel({
   partnerId,
   partnerName,
+  onOpenSchedule,
 }: {
   partnerId: string;
   partnerName: string;
+  onOpenSchedule: () => void;
 }) {
   const currentUser = useAuthStore((s) => s.user);
   const { messages, sendMessage, sendTyping, typingFromPartner, isLoading } =
@@ -347,9 +385,10 @@ function ChatPanel({
                           <ExternalLink className="h-3 w-3" />
                         </a>
                       ) : null}
-                      <p className="mt-2 text-[11px] text-slate-500">
-                        {dt(msg.sentAt)}
-                      </p>
+                      <div className="mt-2 flex items-center gap-1.5">
+                        <span className="text-[11px] text-slate-500">{dt(msg.sentAt)}</span>
+                        <ReadReceipt readAt={msg.readAt} isMine={isMine} />
+                      </div>
                     </div>
                   </div>
                 );
@@ -374,11 +413,12 @@ function ChatPanel({
                     }`}
                   >
                     <p className="text-sm leading-relaxed">{msg.message}</p>
-                    <p
-                      className={`mt-1 text-[11px] ${isMine ? 'text-right text-purple-300/60' : 'text-slate-500'}`}
-                    >
-                      {dt(msg.sentAt)}
-                    </p>
+                    <div className={`mt-1 flex items-center gap-1.5 ${isMine ? 'justify-end' : ''}`}>
+                      <span className={`text-[11px] ${isMine ? 'text-purple-300/60' : 'text-slate-500'}`}>
+                        {dt(msg.sentAt)}
+                      </span>
+                      <ReadReceipt readAt={msg.readAt} isMine={isMine} />
+                    </div>
                   </div>
                 </div>
               );
@@ -472,6 +512,13 @@ export function RecruiterMessagesPage() {
   const currentUser = useAuthStore((s) => s.user);
   const queryClient = useQueryClient();
   const [search, setSearch] = useState('');
+  const [showHeaderSchedule, setShowHeaderSchedule] = useState(false);
+  const [userSearchResults, setUserSearchResults] = useState<Array<{ _id: string; displayName: string; avatar?: string; role: string }>>([]);
+  const [isSearchingUsers, setIsSearchingUsers] = useState(false);
+  const searchTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  // Fetch partner profile for header when navigating to a new user
+  const dmHook = useDM(partnerId ?? '');
 
   const conversationsQuery = useQuery({
     queryKey: ['dm', 'conversations'],
@@ -487,12 +534,48 @@ export function RecruiterMessagesPage() {
   });
 
   const activeConvo = conversations.find((c) => c.partnerId === partnerId);
-  const partnerName = activeConvo?.partner?.displayName ?? 'Unknown';
+  // Use partner profile from API if not in conversation list (new chat)
+  const partnerName = activeConvo?.partner?.displayName
+    ?? dmHook.partner?.displayName
+    ?? (partnerId ? 'Loading...' : 'Unknown');
+  const partnerRole = activeConvo?.partner?.role ?? dmHook.partner?.role ?? 'candidate';
+  const partnerAvatar = activeConvo?.partner?.avatar ?? dmHook.partner?.avatar;
+  const partnerOnline = activeConvo?.isOnline || dmHook.isPartnerOnline;
 
   const handleSelect = (pid: string) => {
     navigate(`/dashboard/recruiter/messages/${pid}`);
     queryClient.invalidateQueries({ queryKey: ['dm', 'thread', pid] });
+    setSearch('');
+    setUserSearchResults([]);
   };
+
+  // Debounced user search
+  const handleSearchChange = useCallback((value: string) => {
+    setSearch(value);
+    if (searchTimerRef.current) clearTimeout(searchTimerRef.current);
+
+    if (value.trim().length < 2) {
+      setUserSearchResults([]);
+      setIsSearchingUsers(false);
+      return;
+    }
+
+    searchTimerRef.current = setTimeout(async () => {
+      setIsSearchingUsers(true);
+      try {
+        const results = await dmApi.searchUsers(value.trim());
+        setUserSearchResults(results);
+      } catch {
+        setUserSearchResults([]);
+      } finally {
+        setIsSearchingUsers(false);
+      }
+    }, 400);
+  }, []);
+
+  // Filter out users who already have a conversation
+  const existingPartnerIds = new Set((conversationsQuery.data ?? []).map((c) => c.partnerId));
+  const newUsers = userSearchResults.filter((u) => !existingPartnerIds.has(u._id));
 
   return (
     <div className="flex h-[calc(100vh-120px)] overflow-hidden rounded-2xl border border-slate-800 bg-slate-950">
@@ -505,16 +588,30 @@ export function RecruiterMessagesPage() {
         }`}
       >
         <div className="border-b border-slate-800 p-4">
-          <h2 className="mb-3 flex items-center gap-2 text-lg font-bold text-white">
-            <MessageCircle className="h-5 w-5 text-purple-400" />
-            Recruiter Messages
-          </h2>
+          <div className="mb-3 flex items-center justify-between">
+            <h2 className="flex items-center gap-2 text-lg font-bold text-white">
+              <MessageCircle className="h-5 w-5 text-purple-400" />
+              Recruiter Messages
+            </h2>
+            <button
+              type="button"
+              onClick={() => {
+                const input = document.querySelector<HTMLInputElement>('#recruiter-msg-search');
+                input?.focus();
+              }}
+              className="flex h-8 w-8 items-center justify-center rounded-lg text-slate-400 transition hover:bg-slate-800 hover:text-white"
+              title="New message"
+            >
+              <PenSquare className="h-4 w-4" />
+            </button>
+          </div>
           <div className="relative">
             <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-500" />
             <input
+              id="recruiter-msg-search"
               value={search}
-              onChange={(e) => setSearch(e.target.value)}
-              placeholder="Search candidates"
+              onChange={(e) => handleSearchChange(e.target.value)}
+              placeholder="Search candidates or users"
               className="w-full rounded-xl border border-slate-700 bg-slate-950 py-2 pl-9 pr-3 text-sm text-white outline-none focus:border-purple-500 placeholder:text-slate-500"
             />
           </div>
@@ -525,24 +622,67 @@ export function RecruiterMessagesPage() {
             <div className="py-8 text-center text-sm text-slate-500">
               Loading...
             </div>
-          ) : conversations.length === 0 ? (
+          ) : conversations.length === 0 && !search ? (
             <div className="flex flex-col items-center gap-3 py-12 text-center">
               <MessageCircle className="h-10 w-10 text-slate-700" />
               <p className="text-sm text-slate-500">No conversations yet.</p>
               <p className="text-xs text-slate-600">
-                Search talent or start a campus drive to connect with candidates.
+                Search for a user above, or search talent to connect with candidates.
               </p>
             </div>
           ) : (
-            conversations.map((convo) => (
-              <ConversationItem
-                key={convo.partnerId}
-                convo={convo}
-                isActive={convo.partnerId === partnerId}
-                currentUserId={currentUser?._id ?? ''}
-                onClick={() => handleSelect(convo.partnerId)}
-              />
-            ))
+            <>
+              {conversations.map((convo) => (
+                <ConversationItem
+                  key={convo.partnerId}
+                  convo={convo}
+                  isActive={convo.partnerId === partnerId}
+                  currentUserId={currentUser?._id ?? ''}
+                  onClick={() => handleSelect(convo.partnerId)}
+                />
+              ))}
+
+              {/* User search results — new conversations */}
+              {search.trim().length >= 2 && (newUsers.length > 0 || isSearchingUsers) ? (
+                <div className="mt-3 border-t border-slate-800 pt-3">
+                  <div className="mb-2 flex items-center gap-2 px-3 text-xs uppercase tracking-widest text-slate-500">
+                    <Users className="h-3 w-3" />
+                    All users
+                  </div>
+                  {isSearchingUsers ? (
+                    <div className="px-3 py-2 text-xs text-slate-500">Searching...</div>
+                  ) : (
+                    newUsers.map((user) => (
+                      <button
+                        key={user._id}
+                        type="button"
+                        onClick={() => handleSelect(user._id)}
+                        className="flex w-full items-center gap-3 rounded-2xl px-4 py-3 text-left transition-all hover:bg-slate-800/60"
+                      >
+                        <div className="flex h-11 w-11 items-center justify-center rounded-full bg-gradient-to-br from-purple-500 to-pink-500 text-sm font-bold text-white">
+                          {user.avatar ? (
+                            <img src={user.avatar} alt={user.displayName} className="h-11 w-11 rounded-full object-cover" />
+                          ) : (
+                            initials(user.displayName)
+                          )}
+                        </div>
+                        <div className="min-w-0 flex-1">
+                          <div className="text-sm font-semibold text-white">{user.displayName}</div>
+                          <div className="text-xs capitalize text-slate-500">{user.role}</div>
+                        </div>
+                        <span className="rounded-full border border-purple-500/30 bg-purple-500/10 px-2 py-0.5 text-[10px] font-semibold text-purple-300">
+                          New
+                        </span>
+                      </button>
+                    ))
+                  )}
+                </div>
+              ) : null}
+
+              {search.trim().length >= 2 && conversations.length === 0 && newUsers.length === 0 && !isSearchingUsers ? (
+                <div className="px-3 py-6 text-center text-xs text-slate-500">No users found matching &ldquo;{search}&rdquo;</div>
+              ) : null}
+            </>
           )}
         </div>
       </div>
@@ -560,37 +700,59 @@ export function RecruiterMessagesPage() {
               >
                 <ArrowLeft className="h-4 w-4" />
               </button>
-              <div className="flex h-9 w-9 items-center justify-center rounded-full bg-gradient-to-br from-purple-500 to-pink-500 text-xs font-bold text-white">
-                {activeConvo?.partner?.avatar ? (
-                  <img
-                    src={activeConvo.partner.avatar}
-                    alt={partnerName}
-                    className="h-9 w-9 rounded-full object-cover"
-                  />
+              <div className="relative">
+                <div className="flex h-9 w-9 items-center justify-center rounded-full bg-gradient-to-br from-purple-500 to-pink-500 text-xs font-bold text-white">
+                  {partnerAvatar ? (
+                    <img
+                      src={partnerAvatar}
+                      alt={partnerName}
+                      className="h-9 w-9 rounded-full object-cover"
+                    />
+                  ) : (
+                    initials(partnerName)
+                  )}
+                </div>
+                {partnerOnline ? (
+                  <span className="absolute -bottom-0.5 -right-0.5 block h-3 w-3 rounded-full border-2 border-slate-950 bg-emerald-400" />
                 ) : (
-                  initials(partnerName)
+                  <span className="absolute -bottom-0.5 -right-0.5 block h-3 w-3 rounded-full border-2 border-slate-950 bg-slate-500" />
                 )}
               </div>
               <div className="flex-1">
                 <div className="text-sm font-semibold text-white">
                   {partnerName}
                 </div>
-                <div className="text-xs capitalize text-slate-500">
-                  {activeConvo?.partner?.role ?? 'candidate'}
+                <div className="flex items-center gap-1.5 text-xs">
+                  <span className={partnerOnline ? 'text-emerald-400' : 'text-slate-500'}>
+                    {partnerOnline ? 'Online' : 'Offline'}
+                  </span>
+                  <span className="text-slate-600">·</span>
+                  <span className="capitalize text-slate-500">{partnerRole}</span>
                 </div>
               </div>
               <button
                 type="button"
-                onClick={() => {
-                  /* Would open schedule modal from header too */
-                }}
+                onClick={() => setShowHeaderSchedule(true)}
                 className="flex items-center gap-1.5 rounded-xl border border-purple-500/30 px-3 py-1.5 text-xs font-semibold text-purple-300 transition hover:bg-purple-500/10"
               >
                 <Calendar className="h-3.5 w-3.5" />
                 Schedule
               </button>
             </div>
-            <ChatPanel partnerId={partnerId} partnerName={partnerName} />
+            <ChatPanel
+              partnerId={partnerId}
+              partnerName={partnerName}
+              onOpenSchedule={() => setShowHeaderSchedule(true)}
+            />
+
+            {/* Header-triggered schedule modal */}
+            {showHeaderSchedule ? (
+              <ScheduleInterviewModal
+                partnerName={partnerName}
+                onSend={(payload) => dmHook.sendMessage(payload)}
+                onClose={() => setShowHeaderSchedule(false)}
+              />
+            ) : null}
           </>
         ) : (
           <div className="flex flex-1 flex-col items-center justify-center gap-4 text-center">

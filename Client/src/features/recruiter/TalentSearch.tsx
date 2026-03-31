@@ -1,4 +1,5 @@
 import { useMemo, useState } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { useQuery } from '@tanstack/react-query';
 import { Eye, Mail, ShieldCheck, Search, Sparkles } from 'lucide-react';
 import { recruiterApi } from '../../api/recruiter.api';
@@ -12,6 +13,7 @@ import { StudentProfileDrawer } from './StudentProfileDrawer';
 const scoreMarks = [0, 50, 100, 150, 200];
 
 export default function TalentSearch() {
+  const navigate = useNavigate();
   const [search, setSearch] = useState('');
   const [domain, setDomain] = useState('');
   const [institution, setInstitution] = useState('');
@@ -102,7 +104,7 @@ export default function TalentSearch() {
           <Button
             data-testid="message-btn"
             variant="secondary"
-            onClick={() => recruiterApi.sendMessage(student._id, 'Thanks for connecting on ProMove.')}
+            onClick={() => navigate(`/dashboard/recruiter/messages/${student._id}`)}
           >
             <Mail className="mr-2 h-4 w-4" />
             Message
