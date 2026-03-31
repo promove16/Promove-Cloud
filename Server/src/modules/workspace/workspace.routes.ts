@@ -6,6 +6,7 @@ import { UserRole } from '../../types/roles.types';
 import { asyncHandler } from '../../utils/asyncHandler';
 import { ApiError } from '../../utils/ApiError';
 import {
+  addWorkspaceChatParticipant,
   addWorkspaceCodeSubmission,
   addWorkspaceProgress,
   addWorkspaceRepoSubmission,
@@ -23,6 +24,7 @@ import {
   removeWorkspaceMember,
   removeWorkspaceRepoSubmission,
   removeWorkspaceTask,
+  removeWorkspaceChatParticipant,
   uploadWorkspaceAsset,
 } from './workspace.controller';
 
@@ -67,6 +69,8 @@ router.patch('/:id/tasks/:taskId', asyncHandler(patchWorkspaceTask));
 router.delete('/:id/tasks/:taskId', asyncHandler(removeWorkspaceTask));
 router.post('/:id/invite', asyncHandler(inviteWorkspaceMember));
 router.delete('/:id/members/:userId', asyncHandler(removeWorkspaceMember));
+router.post('/:id/chat-participants', asyncHandler(addWorkspaceChatParticipant));
+router.delete('/:id/chat-participants/:userId', asyncHandler(removeWorkspaceChatParticipant));
 router.get('/:id/chat', asyncHandler(getWorkspaceChat));
 
 export default router;

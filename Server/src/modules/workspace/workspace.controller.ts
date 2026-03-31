@@ -2,6 +2,8 @@ import { Request, Response } from 'express';
 import { ApiError } from '../../utils/ApiError';
 import { ApiResponse } from '../../utils/ApiResponse';
 import {
+  addChatParticipant,
+  addChatParticipantSchema,
   addCodeSubmission,
   addCodeSubmissionSchema,
   addProgress,
@@ -23,6 +25,7 @@ import {
   serializeWorkspace,
   inviteMember,
   inviteMemberSchema,
+  removeChatParticipant,
   removeMember,
   updateTask,
   updateWorkspace,
@@ -91,7 +94,7 @@ export const uploadWorkspaceAsset = async (req: Request, res: Response) => {
     throw new ApiError(400, 'FILE_REQUIRED', 'A file is required');
   }
   const workspaceId = getParam(req.params.id, 'WORKSPACE_REQUIRED', 'Workspace id is required');
-  const uploads = await uploadWorkspaceFile(workspaceId, userId, req.file, req.body.note);
+  const uploads = await uploadWorkspaceFile(workspaceId, userId, req.file, req.body.note, req.body.category);
   res.json(new ApiResponse(uploads));
 };
 
@@ -178,4 +181,19 @@ export const getWorkspaceChat = async (req: Request, res: Response) => {
   const limit = Number(req.query.limit ?? 50);
   const messages = await getWorkspaceChatHistory(workspaceId, userId, before, limit);
   res.json(new ApiResponse(messages));
+};
+
+export const addWorkspaceChatParticipant = async (req: Request, res: Response) => {
+  const userId = ensureUserId(req);
+  const workspaceId = getParam(req.params.id, 'WORKSPACE_REQUIRED', 'Workspace id is required');
+  const workspace = await addChatParticipant(workspaceId, userId, addChatParticipantSchema.parse(req.body));
+  res.status(201).json(new ApiResponse(workspace));
+};
+
+export const removeWorkspaceChatParticipant = async (req: Request, res: Response) => {
+  const userId = ensureUserId(req);
+  const workspaceId = getParam(req.params.id, 'WORKSPACE_REQUIRED', 'Workspace id is required');
+  const participantUserId = getParam(req.params.userId, 'PARTICIPANT_REQUIRED', 'Participant user id is required');
+  const workspace = await removeChatParticipant(workspaceId, userId, participantUserId);
+  res.json(new ApiResponse(workspace));
 };

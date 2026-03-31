@@ -24,6 +24,8 @@ export interface WorkspaceTask {
   createdAt: string;
 }
 
+export type WorkspaceUploadCategory = 'bug_report' | 'error_log' | 'screenshot' | 'test_result' | 'design_mockup' | 'other';
+
 export interface WorkspaceUpload {
   _id: string;
   fileUrl: string;
@@ -33,6 +35,7 @@ export interface WorkspaceUpload {
   uploadedBy: string;
   uploadedAt: string;
   note?: string;
+  category?: WorkspaceUploadCategory;
 }
 
 export interface WorkspaceRepoSubmission {
@@ -66,6 +69,16 @@ export interface WorkspaceProgressUpdate {
   submittedAt: string;
 }
 
+export interface WorkspaceChatParticipant {
+  _id: string;
+  userId: string;
+  role: 'mentor' | 'investor';
+  addedBy: string;
+  addedAt: string;
+  displayName: string | null;
+  avatar: string | null;
+}
+
 export interface Workspace {
   _id: string;
   ownerId: string;
@@ -87,6 +100,7 @@ export interface Workspace {
     role: string;
     avatar?: string;
   }>;
+  chatParticipants?: WorkspaceChatParticipant[];
   isActive: boolean;
   createdAt: string;
   updatedAt: string;

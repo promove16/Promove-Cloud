@@ -70,6 +70,7 @@ const workspaceSchema = new Schema(
             uploadedBy: { type: Schema.Types.ObjectId, required: true },
             uploadedAt: { type: Date, default: () => new Date() },
             note: { type: String, default: undefined },
+            category: { type: String, enum: ['bug_report', 'error_log', 'screenshot', 'test_result', 'design_mockup', 'other'], default: 'other' },
             cloudinaryPublicId: { type: String, default: undefined },
           },
           { _id: true },
@@ -120,6 +121,20 @@ const workspaceSchema = new Schema(
             note: { type: String, required: true, trim: true },
             milestoneRef: { type: String, default: undefined },
             submittedAt: { type: Date, default: () => new Date() },
+          },
+          { _id: true },
+        ),
+      ],
+      default: [],
+    },
+    chatParticipants: {
+      type: [
+        new Schema(
+          {
+            userId: { type: Schema.Types.ObjectId, required: true },
+            role: { type: String, enum: ['mentor', 'investor'], required: true },
+            addedBy: { type: Schema.Types.ObjectId, required: true },
+            addedAt: { type: Date, default: () => new Date() },
           },
           { _id: true },
         ),

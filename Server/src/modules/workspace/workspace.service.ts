@@ -63,6 +63,16 @@ export const inviteMemberSchema = z
     message: 'Email or userId is required',
   });
 
+export const addChatParticipantSchema = z
+  .object({
+    email: z.string().email().optional(),
+    userId: z.string().optional(),
+    role: z.enum(['mentor', 'investor']),
+  })
+  .refine((value) => value.email || value.userId, {
+    message: 'Email or userId is required',
+  });
+
 const HIGH_CONFIDENCE_SECRET_PATTERNS: Array<{ pattern: RegExp; message: string }> = [
   { pattern: /-----BEGIN [A-Z ]*PRIVATE KEY-----/, message: 'Private keys are not allowed in code submissions.' },
   { pattern: /gh[pousr]_[A-Za-z0-9_]{20,}/, message: 'GitHub tokens are not allowed in code submissions.' },
@@ -143,6 +153,19 @@ export const serializeWorkspace = async (workspace: WorkspaceSnapshot) => {
     .select('_id displayName role avatar')
     .lean();
 
+  const chatParticipantUserIds = (baseWorkspace.chatParticipants || []).map(
+    (p: any) => String(p.userId),
+  );
+  const chatParticipantUsers =
+    chatParticipantUserIds.length > 0
+      ? await User.find({ _id: { $in: chatParticipantUserIds } })
+          .select('_id displayName role avatar')
+          .lean()
+      : [];
+  const chatParticipantUserMap = new Map(
+    chatParticipantUsers.map((u) => [String(u._id), u]),
+  );
+
   return {
     ...baseWorkspace,
     tasks: baseWorkspace.tasks || [],
@@ -157,6 +180,18 @@ export const serializeWorkspace = async (workspace: WorkspaceSnapshot) => {
       role: member.role,
       ...(member.avatar ? { avatar: member.avatar } : {}),
     })),
+    chatParticipants: (baseWorkspace.chatParticipants || []).map((p: any) => {
+      const user = chatParticipantUserMap.get(String(p.userId));
+      return {
+        _id: String(p._id),
+        userId: String(p.userId),
+        role: p.role,
+        addedBy: String(p.addedBy),
+        addedAt: p.addedAt,
+        displayName: user?.displayName ?? null,
+        avatar: user?.avatar ?? null,
+      };
+    }),
   };
 };
 
@@ -197,6 +232,25 @@ export const getWorkspaceForOwner = async (workspaceId: string, userId: string) 
 
   if (String(workspace.ownerId) !== String(userId)) {
     throw new ApiError(403, 'FORBIDDEN', 'Only the workspace owner can do that.');
+  }
+
+  return workspace;
+};
+
+export const getWorkspaceForChatAccess = async (workspaceId: string, userId: string) => {
+  const workspace = await Workspace.findById(workspaceId);
+
+  if (!workspace) {
+    throw new ApiError(404, 'WORKSPACE_NOT_FOUND', 'Workspace not found');
+  }
+
+  const isMember =
+    String(workspace.ownerId) === String(userId) ||
+    workspace.teamMemberIds.some((id) => String(id) === String(userId)) ||
+    workspace.chatParticipants.some((p) => String(p.userId) === String(userId));
+
+  if (!isMember) {
+    throw new ApiError(404, 'WORKSPACE_NOT_FOUND', 'Workspace not found');
   }
 
   return workspace;
@@ -282,6 +336,7 @@ export const uploadWorkspaceFile = async (
   userId: string,
   file: Express.Multer.File,
   note?: string,
+  category?: string,
 ) => {
   const workspace = await getWorkspaceForMember(workspaceId, userId);
   const fileType = file.mimetype === 'application/pdf' ? 'pdf' : 'image';
@@ -290,6 +345,9 @@ export const uploadWorkspaceFile = async (
     'promove/workspaces',
     fileType === 'pdf' ? 'raw' : 'image',
   );
+
+  const allowedCategories = ['bug_report', 'error_log', 'screenshot', 'test_result', 'design_mockup', 'other'];
+  const safeCategory = category && allowedCategories.includes(category) ? category : 'other';
 
   workspace.uploads.push({
     _id: new Types.ObjectId(),
@@ -300,6 +358,7 @@ export const uploadWorkspaceFile = async (
     uploadedBy: objectId(userId),
     uploadedAt: new Date(),
     note,
+    category: safeCategory,
     cloudinaryPublicId: upload.public_id,
   });
   await workspace.save();
@@ -514,10 +573,88 @@ export const removeMember = async (workspaceId: string, memberId: string, ownerI
 };
 
 export const getWorkspaceChatHistory = async (workspaceId: string, userId: string, before?: string, limit = 50) => {
-  await getWorkspaceForMember(workspaceId, userId);
+  await getWorkspaceForChatAccess(workspaceId, userId);
   const filter: Record<string, unknown> = { workspaceId };
   if (before) {
     filter._id = { $lt: before };
   }
   return ChatMessage.find(filter).sort({ sentAt: -1 }).limit(limit).lean();
+};
+
+export const addChatParticipant = async (
+  workspaceId: string,
+  ownerId: string,
+  payload: z.infer<typeof addChatParticipantSchema>,
+) => {
+  const workspace = await getWorkspaceForOwner(workspaceId, ownerId);
+
+  let user = payload.userId ? await User.findById(payload.userId) : null;
+  if (!user && payload.email) {
+    user = await User.findOne({ email: payload.email.toLowerCase() });
+  }
+
+  if (!user) {
+    throw new ApiError(404, 'USER_NOT_FOUND', 'User not found');
+  }
+
+  if (user.role !== payload.role && user.role !== 'mentor' && user.role !== 'investor') {
+    throw new ApiError(400, 'INVALID_ROLE', `Only users with role mentor or investor can be added as chat participants.`);
+  }
+
+  if (user.role !== payload.role) {
+    throw new ApiError(400, 'ROLE_MISMATCH', `User's role is '${user.role}', but '${payload.role}' was specified.`);
+  }
+
+  const alreadyParticipant = workspace.chatParticipants.some(
+    (p) => String(p.userId) === String(user!._id),
+  );
+  if (alreadyParticipant) {
+    throw new ApiError(400, 'PARTICIPANT_ALREADY_EXISTS', 'That user is already a chat participant.');
+  }
+
+  const alreadyMember = workspace.teamMemberIds.some(
+    (id) => String(id) === String(user!._id),
+  );
+  if (alreadyMember) {
+    throw new ApiError(400, 'MEMBER_ALREADY_EXISTS', 'That user is already a team member.');
+  }
+
+  workspace.chatParticipants.push({
+    _id: new Types.ObjectId(),
+    userId: user._id,
+    role: payload.role,
+    addedBy: objectId(ownerId),
+    addedAt: new Date(),
+  });
+  await workspace.save();
+
+  await notificationQueue.add('chat-participant-invite', {
+    userId: String(user._id),
+    type: 'chat_invite',
+    title: 'You have been invited to a workspace chat',
+    body: `You were granted chat access to ${workspace.title}.`,
+    link: `/product-workspace/${workspaceId}`,
+  });
+
+  return serializeWorkspace(workspace);
+};
+
+export const removeChatParticipant = async (
+  workspaceId: string,
+  ownerId: string,
+  participantUserId: string,
+) => {
+  const workspace = await getWorkspaceForOwner(workspaceId, ownerId);
+  const exists = workspace.chatParticipants.some(
+    (p) => String(p.userId) === participantUserId,
+  );
+  if (!exists) {
+    throw new ApiError(404, 'PARTICIPANT_NOT_FOUND', 'Chat participant not found');
+  }
+
+  workspace.chatParticipants = workspace.chatParticipants.filter(
+    (p) => String(p.userId) !== participantUserId,
+  );
+  await workspace.save();
+  return serializeWorkspace(workspace);
 };

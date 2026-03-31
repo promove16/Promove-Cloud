@@ -148,6 +148,8 @@ export const SIDEBAR_CONFIG: Record<UserRole, NavItem[]> = {
     { kind: 'link', label: 'Patent Support', icon: FileText, path: '/patent-support' },
     { kind: 'link', label: 'Startup Launch', icon: Rocket, path: '/startup-launch' },
     { kind: 'link', label: 'Cap Table', icon: BarChart3, path: '/startup-launch/cap-table' },
+    { kind: 'link', label: 'Mentor Sessions', icon: CalendarDays, path: '/dashboard/student/mentor-sessions' },
+    { kind: 'link', label: 'Investor Deals', icon: BriefcaseBusiness, path: '/dashboard/student/investor-deals' },
     { kind: 'link', label: 'Leadership Profile', icon: Trophy, path: '/leadership-profile' },
     { kind: 'link', label: 'Marketplace', icon: Globe, path: '/marketplace' },
     { kind: 'link', label: 'My Profile', icon: User, path: '/dashboard/profile' },

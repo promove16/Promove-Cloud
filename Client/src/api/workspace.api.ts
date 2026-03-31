@@ -7,6 +7,12 @@ import {
   WorkspaceUpload,
 } from '../types/workspace.types';
 
+export interface AddChatParticipantPayload {
+  email?: string;
+  userId?: string;
+  role: 'mentor' | 'investor';
+}
+
 export interface WorkspacePayload {
   title: string;
   category: string;
@@ -61,11 +67,14 @@ export const workspaceApi = {
     const response = await api.post<ApiSuccessResponse<Workspace>>(`/api/workspace/${workspaceId}/progress`, payload);
     return response.data.data;
   },
-  async upload(workspaceId: string, file: File, note?: string) {
+  async upload(workspaceId: string, file: File, note?: string, category?: string) {
     const body = new FormData();
     body.append('file', file);
     if (note) {
       body.append('note', note);
+    }
+    if (category) {
+      body.append('category', category);
     }
 
     const response = await api.post<ApiSuccessResponse<WorkspaceUpload[]>>(
@@ -132,6 +141,19 @@ export const workspaceApi = {
     const response = await api.get<ApiSuccessResponse<ChatMessage[]>>(`/api/workspace/${workspaceId}/chat`, {
       params: { before, limit },
     });
+    return response.data.data;
+  },
+  async addChatParticipant(workspaceId: string, payload: AddChatParticipantPayload) {
+    const response = await api.post<ApiSuccessResponse<Workspace>>(
+      `/api/workspace/${workspaceId}/chat-participants`,
+      payload,
+    );
+    return response.data.data;
+  },
+  async removeChatParticipant(workspaceId: string, participantUserId: string) {
+    const response = await api.delete<ApiSuccessResponse<Workspace>>(
+      `/api/workspace/${workspaceId}/chat-participants/${participantUserId}`,
+    );
     return response.data.data;
   },
 };

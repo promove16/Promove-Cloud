@@ -8,8 +8,15 @@ import { ChatMessage } from '../modules/chat/chat.model';
 const canAccessWorkspace = async (workspaceId: string, userId: string) =>
   Workspace.exists({
     _id: workspaceId,
-    $or: [{ ownerId: userId }, { teamMemberIds: userId }],
+    $or: [
+      { ownerId: userId },
+      { teamMemberIds: userId },
+      { 'chatParticipants.userId': userId },
+    ],
   });
+
+// userId -> Set of socketIds for online presence
+const onlineUsers = new Map<string, Set<string>>();
 
 export const initChatSocket = (io: Server) => {
   const chat = io.of('/chat');
@@ -28,6 +35,14 @@ export const initChatSocket = (io: Server) => {
   });
 
   chat.on('connection', (socket) => {
+    const userId: string = socket.data.userId;
+
+    // Track presence
+    if (!onlineUsers.has(userId)) {
+      onlineUsers.set(userId, new Set());
+    }
+    onlineUsers.get(userId)!.add(socket.id);
+
     socket.on('chat:join', async ({ workspaceId }) => {
       if (!workspaceId || !Types.ObjectId.isValid(workspaceId)) {
         socket.emit('chat:error', { message: 'Workspace not found' });
@@ -42,6 +57,14 @@ export const initChatSocket = (io: Server) => {
       }
 
       socket.join(`ws:${workspaceId}`);
+
+      // Broadcast presence to room
+      chat.to(`ws:${workspaceId}`).emit('presence:update', { userId, online: true });
+
+      // Send current online list to the joining socket
+      const room = await chat.in(`ws:${workspaceId}`).fetchSockets();
+      const onlineInRoom = [...new Set(room.map((s) => s.data.userId as string))];
+      socket.emit('presence:list', { onlineUserIds: onlineInRoom });
     });
 
     socket.on('chat:message', async ({ workspaceId, message, attachmentUrl, attachmentType }) => {
@@ -81,8 +104,25 @@ export const initChatSocket = (io: Server) => {
       }
     });
 
+    // Typing indicator: broadcast to room excluding sender
+    socket.on('chat:typing', ({ workspaceId, isTyping }: { workspaceId: string; isTyping: boolean }) => {
+      if (!workspaceId || !Types.ObjectId.isValid(workspaceId)) return;
+      socket.to(`ws:${workspaceId}`).emit('chat:typing', { userId, isTyping });
+    });
+
     socket.on('chat:leave', ({ workspaceId }) => {
       socket.leave(`ws:${workspaceId}`);
+      chat.to(`ws:${workspaceId}`).emit('presence:update', { userId, online: false });
+    });
+
+    socket.on('disconnect', () => {
+      const sockets = onlineUsers.get(userId);
+      if (sockets) {
+        sockets.delete(socket.id);
+        if (sockets.size === 0) {
+          onlineUsers.delete(userId);
+        }
+      }
     });
   });
 };

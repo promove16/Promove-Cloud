@@ -559,8 +559,20 @@ export function PatentSupport() {
             </div>
 
             {/* ── Government Filing Documents ───────────────────────── */}
-            <div className="rounded-3xl border border-slate-800 bg-slate-900/90 p-5">
-              <div className="mb-1 text-xs uppercase tracking-[0.3em] text-cyan-300">Government Filing Documents</div>
+            <div className="rounded-3xl border border-cyan-800/40 bg-slate-900/90 p-5">
+              <div className="mb-1 text-xs uppercase tracking-[0.3em] text-cyan-300">Official Government Filing Documents</div>
+
+              {/* Security notice */}
+              <div className="mb-5 flex items-start gap-3 rounded-2xl border border-cyan-500/20 bg-cyan-500/8 px-4 py-3">
+                <ShieldCheck className="mt-0.5 h-5 w-5 shrink-0 text-cyan-400" />
+                <div>
+                  <div className="text-sm font-semibold text-cyan-200">Secure Document Vault — Official & Government Docs Only</div>
+                  <p className="mt-0.5 text-xs text-slate-400">
+                    This section is exclusively for official patent-related documents: prior art search reports, specification drafts, government forms, and IPR filings. Do <span className="text-white font-medium">not</span> upload work-in-progress files, screenshots, or bug reports here — use the <span className="text-orange-300 font-medium">Work Logs</span> section in your Project Workspace for those.
+                  </p>
+                </div>
+              </div>
+
               <p className="mb-5 text-sm text-slate-400">
                 Upload each official document as a PDF or image. The 4 marked <span className="text-red-400">*</span> are required before submission.
               </p>

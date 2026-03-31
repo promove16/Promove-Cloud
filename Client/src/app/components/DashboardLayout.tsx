@@ -123,8 +123,12 @@ export function DashboardLayout({ children, role }: DashboardLayoutProps) {
     { icon: FileText, label: "Product Workspace", path: "/product-workspace" },
     { icon: Award, label: "Patent Support", path: "/patent-support" },
     { icon: TrendingUp, label: "Startup Launch", path: "/startup-launch" },
+    { icon: Layers, label: "Cap Table", path: "/startup-launch/cap-table" },
+    { icon: Calendar, label: "Mentor Sessions", path: "/dashboard/student/mentor-sessions" },
+    { icon: Briefcase, label: "Investor Deals", path: "/dashboard/student/investor-deals" },
     { icon: Trophy, label: "Leadership Profile", path: "/leadership-profile" },
     { icon: ShoppingCart, label: "Marketplace", path: "/marketplace" },
+    { icon: User, label: "My Profile", path: "/dashboard/profile" },
   ];
 
   const schoolMenu = [

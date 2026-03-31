@@ -53,6 +53,8 @@ import { useAuthStore } from "../store/authStore";
 import { UserRole } from "../types/roles.types";
 import { roleRedirect } from "../utils/roleRedirect";
 import { StudentDashboard as LegacyStudentDashboard } from "../app/pages/dashboards/StudentDashboard";
+import { StudentMentorSessions } from "../app/pages/dashboards/StudentMentorSessions";
+import { StudentInvestorDeals } from "../app/pages/dashboards/StudentInvestorDeals";
 import { ProblemBank } from "../app/pages/ProblemBank";
 import { ProductWorkspace } from "../app/pages/ProductWorkspace";
 import { PatentSupport } from "../app/pages/PatentSupport";
@@ -314,11 +316,12 @@ export const router = createBrowserRouter([
         children: [
           {
             path: "student",
-            element: (
-              <ProtectedRoleRoute role={UserRole.STUDENT}>
-                <LegacyStudentDashboard />
-              </ProtectedRoleRoute>
-            ),
+            element: <ProtectedRoleRoute role={UserRole.STUDENT} />,
+            children: [
+              { index: true, element: <LegacyStudentDashboard /> },
+              { path: "mentor-sessions", element: <StudentMentorSessions /> },
+              { path: "investor-deals", element: <StudentInvestorDeals /> },
+            ],
           },
           {
             path: "mentor",

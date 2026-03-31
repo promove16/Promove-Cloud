@@ -67,6 +67,13 @@ export interface IWorkspace {
     milestoneRef?: string;
     submittedAt: Date;
   }>;
+  chatParticipants: Array<{
+    _id: Types.ObjectId;
+    userId: Types.ObjectId;
+    role: 'mentor' | 'investor';
+    addedBy: Types.ObjectId;
+    addedAt: Date;
+  }>;
   isActive: boolean;
   createdAt: Date;
   updatedAt: Date;

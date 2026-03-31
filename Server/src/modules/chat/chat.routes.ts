@@ -10,7 +10,7 @@ const router = Router();
 router.get(
   '/workspace/:workspaceId',
   authenticate,
-  authorize(UserRole.STUDENT),
+  authorize(UserRole.STUDENT, UserRole.MENTOR, UserRole.INVESTOR),
   asyncHandler(getChatHistory),
 );
 

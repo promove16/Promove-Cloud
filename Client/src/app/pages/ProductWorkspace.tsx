@@ -1,7 +1,8 @@
 import { useEffect, useMemo, useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useNavigate, useParams } from "react-router-dom";
-import { CheckCircle, Circle, Clock, Code2, Download, Github, MessageSquare, Paperclip, Plus, Rocket, Send, Trash2, Upload, UserPlus, Users, X } from "lucide-react";
+import { AlertTriangle, Bug, CheckCircle, Circle, Clock, Code2, Download, Github, Image, Paperclip, Plus, Rocket, Send, ShieldAlert, Trash2, Upload, UserPlus, Users2, X } from "lucide-react";
+import type { WorkspaceUploadCategory } from "../../types/workspace.types";
 import { DashboardLayout } from "../components/DashboardLayout";
 import { workspaceApi } from "../../api/workspace.api";
 import { useWorkspaceChat } from "../../hooks/useWorkspaceChat";
@@ -25,11 +26,14 @@ export function ProductWorkspace() {
   const [taskForm, setTaskForm] = useState({ title: "", priority: "Medium" as WorkspaceTask["priority"], assignedTo: "", dueDate: "" });
   const [inviteEmail, setInviteEmail] = useState("");
   const [uploadNote, setUploadNote] = useState("");
+  const [uploadCategory, setUploadCategory] = useState<WorkspaceUploadCategory>("other");
   const [repoForm, setRepoForm] = useState({ repoUrl: "", branch: "", commitHash: "", note: "" });
   const [codeForm, setCodeForm] = useState({ title: "", language: "", summary: "", codeSnippet: "" });
   const [chatDraft, setChatDraft] = useState("");
   const [chatAttachment, setChatAttachment] = useState<File | null>(null);
   const [progressForm, setProgressForm] = useState({ note: "", milestoneRef: "", completionPercent: "", file: null as File | null });
+  const [showNegotiationPanel, setShowNegotiationPanel] = useState(false);
+  const [participantForm, setParticipantForm] = useState({ email: "", role: "mentor" as "mentor" | "investor" });
 
   const listQuery = useQuery({ queryKey: ["workspaces"], queryFn: () => workspaceApi.list() });
   const workspaceId = projectId ?? listQuery.data?.[0]?._id;
@@ -92,6 +96,12 @@ export function ProductWorkspace() {
     onError: (error) => setToast((error as { response?: { data?: { error?: { message?: string } } } })?.response?.data?.error?.message ?? "Unable to save code snippet."),
   });
   const deleteCode = useMutation({ mutationFn: (codeId: string) => workspaceApi.removeCodeSubmission(workspaceId!, codeId), onSuccess: async () => { setToast("Code snippet removed."); await refresh(); } });
+  const addParticipant = useMutation({
+    mutationFn: () => workspaceApi.addChatParticipant(workspaceId!, { email: participantForm.email, role: participantForm.role }),
+    onSuccess: async () => { setParticipantForm({ email: "", role: "mentor" }); setToast(`${participantForm.role === "mentor" ? "Mentor" : "Investor"} added to chat.`); await refresh(); },
+    onError: (error) => setToast((error as { response?: { data?: { error?: { message?: string } } } })?.response?.data?.error?.message ?? "Unable to add participant."),
+  });
+  const removeParticipant = useMutation({ mutationFn: (userId: string) => workspaceApi.removeChatParticipant(workspaceId!, userId), onSuccess: async () => { setToast("Chat participant removed."); await refresh(); } });
   const progress = useMutation({
     mutationFn: async () => {
       if (progressForm.file) await workspaceApi.upload(workspaceId!, progressForm.file, progressForm.note);
@@ -110,8 +120,9 @@ export function ProductWorkspace() {
     if (file.size > 10 * 1024 * 1024) return setToast("File size must be 10MB or less.");
     if (file.type !== "application/pdf" && !file.type.startsWith("image/")) return setToast("Only PDF and image files are allowed");
     try {
-      await workspaceApi.upload(workspaceId!, file, uploadNote || undefined);
+      await workspaceApi.upload(workspaceId!, file, uploadNote || undefined, uploadCategory);
       setUploadNote("");
+      setUploadCategory("other");
       setToast("File uploaded.");
       await refresh();
     } catch (error) {
@@ -269,11 +280,25 @@ export function ProductWorkspace() {
 
                 {activeTab === "uploads" ? (
                   <div className="bg-slate-900 border border-slate-800 rounded-xl p-6">
-                    <h2 className="text-xl font-bold text-white mb-6">Evidence & Submissions</h2>
+                    <div className="flex items-center gap-3 mb-2">
+                      <Bug className="w-5 h-5 text-orange-400" />
+                      <h2 className="text-xl font-bold text-white">Work Logs & Bug Reports</h2>
+                    </div>
+                    <p className="text-sm text-slate-400 mb-6">Upload screenshots of errors, bug reports, test results, and in-progress work evidence for your team and mentors to review.</p>
                     <div className="border-2 border-dashed border-slate-700 rounded-xl p-6 text-center bg-slate-950 mb-6">
                       <input id="workspace-upload" type="file" accept=".pdf,image/*" className="hidden" onChange={(event) => void onFile(event.target.files?.[0] ?? null)} />
-                      <label htmlFor="workspace-upload" className="cursor-pointer block"><Upload className="w-8 h-8 text-blue-400 mx-auto mb-3" /><div className="text-white font-semibold mb-2">Drag-and-drop or click to upload</div><div className="text-sm text-slate-400 mb-4">PDF and image files only, up to 10MB</div></label>
-                      <input value={uploadNote} onChange={(event) => setUploadNote(event.target.value)} placeholder="Optional note for this upload" className="w-full max-w-xl mx-auto px-4 py-3 bg-slate-900 border border-slate-800 rounded-lg text-white" />
+                      <label htmlFor="workspace-upload" className="cursor-pointer block"><Upload className="w-8 h-8 text-orange-400 mx-auto mb-3" /><div className="text-white font-semibold mb-2">Drag-and-drop or click to upload</div><div className="text-sm text-slate-400 mb-4">Error screenshots, bug reports, test results — PDF or image, up to 10MB</div></label>
+                      <div className="flex flex-col sm:flex-row gap-3 max-w-xl mx-auto">
+                        <select value={uploadCategory} onChange={(event) => setUploadCategory(event.target.value as WorkspaceUploadCategory)} className="flex-shrink-0 px-4 py-3 bg-slate-900 border border-slate-800 rounded-lg text-white text-sm">
+                          <option value="bug_report">Bug Report</option>
+                          <option value="error_log">Error Log</option>
+                          <option value="screenshot">Screenshot</option>
+                          <option value="test_result">Test Result</option>
+                          <option value="design_mockup">Design Mockup</option>
+                          <option value="other">Other</option>
+                        </select>
+                        <input value={uploadNote} onChange={(event) => setUploadNote(event.target.value)} placeholder="Optional description of the issue or context" className="flex-1 px-4 py-3 bg-slate-900 border border-slate-800 rounded-lg text-white" />
+                      </div>
                     </div>
                     <div className="grid gap-6 xl:grid-cols-2 mb-6">
                       <div className="rounded-xl border border-slate-800 bg-slate-950 p-5">
@@ -310,17 +335,34 @@ export function ProductWorkspace() {
                       </div>
                     </div>
                     <div className="space-y-3 mb-6">
-                      <h3 className="font-semibold text-white">Uploaded Files</h3>
+                      <h3 className="font-semibold text-white">Uploaded Work Logs</h3>
                       {(workspace.uploads || []).map((upload) => {
                         const uploader = teamMembers.find((member) => member._id === upload.uploadedBy);
+                        const categoryLabels: Record<string, { label: string; className: string }> = {
+                          bug_report: { label: "Bug Report", className: "bg-red-500/10 text-red-400" },
+                          error_log: { label: "Error Log", className: "bg-orange-500/10 text-orange-400" },
+                          screenshot: { label: "Screenshot", className: "bg-blue-500/10 text-blue-400" },
+                          test_result: { label: "Test Result", className: "bg-yellow-500/10 text-yellow-400" },
+                          design_mockup: { label: "Design Mockup", className: "bg-purple-500/10 text-purple-400" },
+                          other: { label: "Other", className: "bg-slate-700 text-slate-300" },
+                        };
+                        const cat = categoryLabels[upload.category ?? "other"] ?? categoryLabels.other;
                         return (
-                          <div key={upload._id} className="bg-slate-950 border border-slate-800 rounded-lg p-4 flex items-center justify-between gap-4">
-                            <div><div className="font-semibold text-white">{upload.fileName}</div><div className="text-sm text-slate-400">{upload.fileType.toUpperCase()} • {(upload.fileSizeBytes / 1024 / 1024).toFixed(2)} MB • {uploader?.displayName ?? "Team member"} • {dt(upload.uploadedAt)}</div>{upload.note ? <div className="text-xs text-blue-300 mt-1">{upload.note}</div> : null}</div>
-                            <div className="flex items-center gap-2"><a href={upload.fileUrl} target="_blank" rel="noreferrer" className="px-3 py-2 bg-slate-800 hover:bg-slate-700 text-white rounded-lg flex items-center gap-2 text-sm"><Download className="w-4 h-4" />Open</a><button onClick={() => deleteUpload.mutate(upload._id)} className="px-3 py-2 bg-slate-800 hover:bg-red-900/40 text-white rounded-lg text-sm">Delete</button></div>
+                          <div key={upload._id} className="bg-slate-950 border border-slate-800 rounded-lg p-4 flex items-start justify-between gap-4">
+                            <div className="flex-1 min-w-0">
+                              <div className="flex items-center gap-2 mb-1 flex-wrap">
+                                <span className={`px-2 py-0.5 rounded text-xs font-semibold ${cat.className}`}>{cat.label}</span>
+                                <span className="font-semibold text-white truncate">{upload.fileName}</span>
+                              </div>
+                              <div className="text-sm text-slate-400">{upload.fileType.toUpperCase()} • {(upload.fileSizeBytes / 1024 / 1024).toFixed(2)} MB • {uploader?.displayName ?? "Team member"} • {dt(upload.uploadedAt)}</div>
+                              {upload.note ? <div className="text-xs text-blue-300 mt-1">{upload.note}</div> : null}
+                              {upload.fileType === "image" ? <img src={upload.fileUrl} alt={upload.fileName} className="mt-3 max-h-48 rounded-lg border border-slate-800 object-contain" /> : null}
+                            </div>
+                            <div className="flex items-center gap-2 flex-shrink-0"><a href={upload.fileUrl} target="_blank" rel="noreferrer" className="px-3 py-2 bg-slate-800 hover:bg-slate-700 text-white rounded-lg flex items-center gap-2 text-sm"><Download className="w-4 h-4" />Open</a><button onClick={() => deleteUpload.mutate(upload._id)} className="px-3 py-2 bg-slate-800 hover:bg-red-900/40 text-white rounded-lg text-sm">Delete</button></div>
                           </div>
                         );
                       })}
-                      {(workspace.uploads || []).length === 0 ? <div className="text-sm text-slate-500">No documents or images uploaded yet.</div> : null}
+                      {(workspace.uploads || []).length === 0 ? <div className="text-sm text-slate-500 flex items-center gap-2"><AlertTriangle className="w-4 h-4 text-slate-600" />No work logs uploaded yet. Upload error screenshots or bug reports to keep your team aligned.</div> : null}
                     </div>
                     <div className="space-y-3 mb-6">
                       <h3 className="font-semibold text-white">Repository Links</h3>
@@ -368,28 +410,116 @@ export function ProductWorkspace() {
 
                 {activeTab === "chat" ? (
                   <div className="bg-slate-900 border border-slate-800 rounded-xl p-6">
-                    <h2 className="text-xl font-bold text-white mb-6">Team Chat</h2>
-                    <div className="bg-slate-950 border border-slate-800 rounded-lg p-4 mb-4 h-[420px] overflow-y-auto">
-                      <div className="space-y-4">
-                        {chat.messages.map((message) => {
-                          const sender = teamMembers.find((member) => member._id === message.senderId);
+                    <div className="mb-6 flex items-center justify-between">
+                      <h2 className="text-xl font-bold text-white">Team Chat</h2>
+                      {/* Online participants */}
+                      <div className="flex items-center gap-2">
+                        {[...teamMembers, ...(workspace.chatParticipants ?? []).map((p) => ({ _id: p.userId, displayName: p.displayName ?? p.userId, avatar: p.avatar }))].map((member) => {
+                          const isOnline = chat.onlineUserIds.has(member._id);
                           return (
-                            <div key={message._id} className="flex gap-3">
-                              <div className="w-9 h-9 bg-gradient-to-br from-blue-500 to-purple-500 rounded-full flex items-center justify-center text-white text-xs font-bold flex-shrink-0">{initials(sender?.displayName ?? "User")}</div>
-                              <div className="flex-1 bg-slate-900 rounded-lg p-3"><div className="flex items-center justify-between mb-1"><span className="text-sm font-semibold text-white">{sender?.displayName ?? "Team member"}</span><span className="text-xs text-slate-500">{dt(message.sentAt)}</span></div>{message.message ? <p className="text-sm text-slate-300">{message.message}</p> : null}{message.attachmentUrl ? <a href={message.attachmentUrl} target="_blank" rel="noreferrer" className="inline-flex mt-3 px-3 py-2 bg-slate-800 text-blue-300 rounded-lg text-sm">{message.attachmentType === "pdf" ? "Open PDF attachment" : "Open image attachment"}</a> : null}</div>
+                            <div key={member._id} className="relative" title={`${member.displayName ?? "Member"} — ${isOnline ? "online" : "offline"}`}>
+                              <div className="w-8 h-8 bg-gradient-to-br from-blue-500 to-purple-500 rounded-full flex items-center justify-center text-white text-xs font-bold">
+                                {initials(member.displayName ?? "M")}
+                              </div>
+                              <span className={`absolute -bottom-0.5 -right-0.5 h-2.5 w-2.5 rounded-full border-2 border-slate-900 ${isOnline ? "bg-emerald-400" : "bg-slate-600"}`} />
                             </div>
                           );
                         })}
                       </div>
                     </div>
+                    <div className="bg-slate-950 border border-slate-800 rounded-lg p-4 mb-2 h-[420px] overflow-y-auto">
+                      <div className="space-y-4">
+                        {chat.messages.map((message) => {
+                          const sender = teamMembers.find((member) => member._id === message.senderId) ?? (workspace.chatParticipants ?? []).find((p) => p.userId === message.senderId);
+                          const senderName = sender?.displayName ?? "Member";
+                          const isOwn = message.senderId === currentUser?._id;
+                          return (
+                            <div key={message._id} className={`flex gap-3 ${isOwn ? "flex-row-reverse" : ""}`}>
+                              <div className="w-9 h-9 bg-gradient-to-br from-blue-500 to-purple-500 rounded-full flex items-center justify-center text-white text-xs font-bold flex-shrink-0">{initials(senderName)}</div>
+                              <div className={`max-w-[75%] rounded-2xl p-3 ${isOwn ? "bg-blue-600/20 border border-blue-500/20" : "bg-slate-900 border border-slate-800"}`}>
+                                <div className={`flex items-center gap-2 mb-1 ${isOwn ? "flex-row-reverse" : ""}`}>
+                                  <span className="text-sm font-semibold text-white">{isOwn ? "You" : senderName}</span>
+                                  <span className="text-xs text-slate-500">{dt(message.sentAt)}</span>
+                                </div>
+                                {message.message ? <p className="text-sm text-slate-300">{message.message}</p> : null}
+                                {message.attachmentUrl && message.attachmentType === "image" ? (<div className="mt-2"><img src={message.attachmentUrl} alt="Shared image" className="max-w-xs max-h-64 rounded-lg border border-slate-700 object-contain" /><a href={message.attachmentUrl} target="_blank" rel="noreferrer" className="inline-flex items-center gap-1 mt-1 text-xs text-slate-400 hover:text-blue-300"><Image className="w-3 h-3" />Open full size</a></div>) : message.attachmentUrl && message.attachmentType === "pdf" ? (<a href={message.attachmentUrl} target="_blank" rel="noreferrer" className="inline-flex mt-3 px-3 py-2 bg-slate-800 text-blue-300 rounded-lg text-sm">Open PDF attachment</a>) : null}
+                              </div>
+                            </div>
+                          );
+                        })}
+                      </div>
+                    </div>
+                    {/* Typing indicator */}
+                    <div className="mb-3 h-5 px-1">
+                      {chat.typingUsers.size > 0 ? (
+                        <div className="flex items-center gap-2 text-xs text-slate-400">
+                          <span className="inline-flex gap-1">
+                            <span className="animate-bounce" style={{ animationDelay: "0ms" }}>●</span>
+                            <span className="animate-bounce" style={{ animationDelay: "150ms" }}>●</span>
+                            <span className="animate-bounce" style={{ animationDelay: "300ms" }}>●</span>
+                          </span>
+                          {[...chat.typingUsers].map((uid) => {
+                            const m = teamMembers.find((t) => t._id === uid) ?? (workspace.chatParticipants ?? []).find((p) => p.userId === uid);
+                            return m?.displayName ?? "Someone";
+                          }).join(", ")} {chat.typingUsers.size === 1 ? "is" : "are"} typing...
+                        </div>
+                      ) : null}
+                    </div>
                     <div className="flex flex-col gap-3">
-                      <textarea value={chatDraft} onChange={(event) => setChatDraft(event.target.value)} placeholder="Share an update with your team..." className="w-full min-h-24 px-4 py-3 bg-slate-950 border border-slate-800 rounded-lg text-white" />
+                      <textarea value={chatDraft} onChange={(event) => { setChatDraft(event.target.value); chat.sendTyping(); }} placeholder="Share an update with your team..." className="w-full min-h-24 px-4 py-3 bg-slate-950 border border-slate-800 rounded-lg text-white" />
                       <div className="flex flex-wrap items-center gap-3">
-                        <label className="px-4 py-3 bg-slate-800 hover:bg-slate-700 text-white rounded-lg font-semibold cursor-pointer flex items-center gap-2"><Paperclip className="w-4 h-4" />Attach PDF/Image<input type="file" accept=".pdf,image/*" className="hidden" onChange={(event) => setChatAttachment(event.target.files?.[0] ?? null)} /></label>
-                        {chatAttachment ? <span className="text-sm text-slate-400">{chatAttachment.name}</span> : null}
+                        <label className="px-4 py-3 bg-slate-800 hover:bg-slate-700 text-white rounded-lg font-semibold cursor-pointer flex items-center gap-2"><Paperclip className="w-4 h-4" />Attach Image/PDF<input type="file" accept="image/*,.pdf" className="hidden" onChange={(event) => setChatAttachment(event.target.files?.[0] ?? null)} /></label>
+                        {chatAttachment ? <span className="text-sm text-slate-400 flex items-center gap-1">{chatAttachment.type.startsWith("image/") ? <Image className="w-3 h-3" /> : null}{chatAttachment.name}</span> : null}
                         <button onClick={() => void sendMessage()} className="ml-auto px-6 py-3 bg-blue-600 hover:bg-blue-700 text-white rounded-lg font-semibold flex items-center gap-2"><Send className="w-4 h-4" />Send</button>
                       </div>
                     </div>
+
+                    {isOwner ? (
+                      <div className="mt-6 border-t border-slate-800 pt-5">
+                        <button onClick={() => setShowNegotiationPanel(!showNegotiationPanel)} className="flex items-center gap-2 text-sm font-semibold text-amber-400 hover:text-amber-300 transition-colors">
+                          <Users2 className="w-4 h-4" />
+                          Confirm Negotiation — Invite Mentor / Investor to Chat
+                          <span className="text-slate-500 text-xs font-normal">({showNegotiationPanel ? "hide" : "show"})</span>
+                        </button>
+                        {showNegotiationPanel ? (
+                          <div className="mt-4 space-y-5">
+                            <div className="bg-amber-900/10 border border-amber-800/30 rounded-lg px-4 py-3 text-xs text-amber-300">
+                              Chat-only access — Mentors and Investors added here can read and send messages but cannot access tasks, uploads, or code submissions.
+                            </div>
+                            {(workspace.chatParticipants ?? []).length > 0 ? (
+                              <div className="space-y-2">
+                                <p className="text-xs font-semibold text-slate-400 uppercase tracking-wide">Current Participants</p>
+                                {(workspace.chatParticipants ?? []).map((participant) => (
+                                  <div key={participant._id} className="flex items-center justify-between bg-slate-950 border border-slate-800 rounded-lg px-4 py-3">
+                                    <div className="flex items-center gap-3">
+                                      <div className="w-8 h-8 bg-gradient-to-br from-amber-500 to-orange-500 rounded-full flex items-center justify-center text-white text-xs font-bold">{initials(participant.displayName ?? participant.userId)}</div>
+                                      <div>
+                                        <div className="text-sm font-semibold text-white">{participant.displayName ?? participant.userId}</div>
+                                        <div className="text-xs text-slate-400 capitalize">{participant.role}</div>
+                                      </div>
+                                    </div>
+                                    <button onClick={() => removeParticipant.mutate(participant.userId)} className="px-3 py-1.5 bg-slate-800 hover:bg-red-900/40 text-slate-300 hover:text-white rounded-lg text-xs flex items-center gap-1"><X className="w-3 h-3" />Remove</button>
+                                  </div>
+                                ))}
+                              </div>
+                            ) : (
+                              <p className="text-sm text-slate-500">No mentor or investor added yet.</p>
+                            )}
+                            <div className="space-y-3">
+                              <p className="text-xs font-semibold text-slate-400 uppercase tracking-wide">Add by Email</p>
+                              <div className="flex flex-col sm:flex-row gap-3">
+                                <input value={participantForm.email} onChange={(event) => setParticipantForm((current) => ({ ...current, email: event.target.value }))} placeholder="mentor@example.com" type="email" className="flex-1 px-4 py-2.5 bg-slate-950 border border-slate-800 rounded-lg text-white text-sm" />
+                                <select value={participantForm.role} onChange={(event) => setParticipantForm((current) => ({ ...current, role: event.target.value as "mentor" | "investor" }))} className="px-4 py-2.5 bg-slate-950 border border-slate-800 rounded-lg text-white text-sm">
+                                  <option value="mentor">Mentor</option>
+                                  <option value="investor">Investor</option>
+                                </select>
+                                <button onClick={() => addParticipant.mutate()} disabled={!participantForm.email.trim() || addParticipant.isPending} className="px-5 py-2.5 bg-amber-600 hover:bg-amber-700 text-white rounded-lg text-sm font-semibold flex items-center gap-2 disabled:opacity-60"><UserPlus className="w-4 h-4" />Add</button>
+                              </div>
+                            </div>
+                          </div>
+                        ) : null}
+                      </div>
+                    ) : null}
                   </div>
                 ) : null}
               </div>
