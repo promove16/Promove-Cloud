@@ -13,11 +13,13 @@ import {
   uploadPitchController,
 } from './startup.controller';
 
+const pdfFileNamePattern = /\.pdf$/i;
+
 const upload = multer({
   storage: multer.memoryStorage(),
   limits: { fileSize: 10 * 1024 * 1024 },
   fileFilter: (_req, file, cb) => {
-    if (file.mimetype !== 'application/pdf') {
+    if (file.mimetype !== 'application/pdf' && !pdfFileNamePattern.test(file.originalname)) {
       cb(new ApiError(400, 'INVALID_FILE_TYPE', 'Only PDF files are allowed'));
       return;
     }

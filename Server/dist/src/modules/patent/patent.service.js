@@ -1,6 +1,6 @@
 "use strict";
 Object.defineProperty(exports, "__esModule", { value: true });
-exports.getMyPatents = exports.submitPatent = exports.patentSubmissionSchema = void 0;
+exports.getShowcasedPatents = exports.togglePatentShowcase = exports.getMyPatents = exports.submitPatent = exports.patentSubmissionSchema = void 0;
 const zod_1 = require("zod");
 const bullmq_1 = require("../../config/bullmq");
 const scoreEngine_1 = require("../../services/scoreEngine");
@@ -139,3 +139,49 @@ const submitPatent = async (userId, payload) => {
 exports.submitPatent = submitPatent;
 const getMyPatents = async (userId) => patent_model_1.Patent.find({ studentId: userId }).sort({ createdAt: -1 }).lean();
 exports.getMyPatents = getMyPatents;
+const togglePatentShowcase = async (userId, patentId) => {
+    const patent = await patent_model_1.Patent.findOne({ _id: patentId, studentId: userId });
+    if (!patent)
+        throw new ApiError_1.ApiError(404, 'PATENT_NOT_FOUND', 'Patent not found');
+    if (patent.status !== 'approved') {
+        throw new ApiError_1.ApiError(400, 'NOT_APPROVED', 'Only approved patents can be showcased in the marketplace.');
+    }
+    patent.showcasedInMarketplace = !patent.showcasedInMarketplace;
+    await patent.save();
+    return { showcasedInMarketplace: patent.showcasedInMarketplace };
+};
+exports.togglePatentShowcase = togglePatentShowcase;
+const getShowcasedPatents = async () => {
+    const patents = await patent_model_1.Patent.find({ status: 'approved', showcasedInMarketplace: true })
+        .sort({ adminReviewedAt: -1 })
+        .lean();
+    const studentIds = patents.map((p) => String(p.studentId));
+    const students = studentIds.length > 0
+        ? await user_model_1.User.find({ _id: { $in: studentIds } })
+            .select('_id displayName avatar domain bio headline')
+            .lean()
+        : [];
+    const studentMap = new Map(students.map((s) => [String(s._id), s]));
+    return patents.map((p) => {
+        const student = studentMap.get(String(p.studentId));
+        return {
+            _id: String(p._id),
+            studentId: String(p.studentId),
+            projectTitle: p.projectTitle,
+            inventionCategory: p.filingDocuments?.inventionCategory,
+            specificationType: p.filingDocuments?.specificationType,
+            abstract: p.filingDocuments?.abstractDraft,
+            submittedAt: p.submittedAt,
+            adminReviewedAt: p.adminReviewedAt,
+            student: {
+                _id: String(p.studentId),
+                displayName: student?.displayName ?? 'Student',
+                ...(student?.avatar ? { avatar: student.avatar } : {}),
+                ...(student?.domain ? { domain: student.domain } : {}),
+                ...(student?.bio ? { bio: student.bio } : {}),
+                ...(student?.headline ? { headline: student.headline } : {}),
+            },
+        };
+    });
+};
+exports.getShowcasedPatents = getShowcasedPatents;

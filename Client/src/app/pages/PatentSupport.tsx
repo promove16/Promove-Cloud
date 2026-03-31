@@ -5,15 +5,16 @@ import {
   Award,
   CheckCircle,
   Clock,
+  Eye,
+  EyeOff,
   FileText,
   Files,
   ImageIcon,
+  Loader2,
   Send,
   ShieldCheck,
   Upload,
   X,
-  Eye,
-  Loader2,
 } from 'lucide-react';
 import { patentApi } from '../../api/patent.api';
 import { workspaceApi } from '../../api/workspace.api';
@@ -363,8 +364,23 @@ export function PatentSupport() {
 
   const fileInputRefs = useRef<Record<string, HTMLInputElement | null>>({});
 
+  const [showcaseError, setShowcaseError] = useState('');
+
   const workspacesQuery = useQuery({ queryKey: ['workspaces'], queryFn: () => workspaceApi.list() });
   const patentsQuery = useQuery({ queryKey: ['patents', 'mine'], queryFn: () => patentApi.mine() });
+
+  const showcaseMutation = useMutation({
+    mutationFn: (patentId: string) => patentApi.toggleShowcase(patentId),
+    onSuccess: async () => {
+      setShowcaseError('');
+      await queryClient.invalidateQueries({ queryKey: ['patents', 'mine'] });
+    },
+    onError: (err: unknown) => {
+      type ApiErr = { response?: { data?: { error?: { message?: string } } } };
+      const msg = (err as ApiErr)?.response?.data?.error?.message ?? 'Unable to update showcase status.';
+      setShowcaseError(msg);
+    },
+  });
 
   const selectedWorkspaceId = workspaceId || workspacesQuery.data?.[0]?._id || '';
   const activeWorkspace = useMemo(
@@ -917,13 +933,25 @@ export function PatentSupport() {
               </div>
             ) : (
               <div className="space-y-3">
+                {showcaseError && (
+                  <div className="rounded-2xl border border-red-500/20 bg-red-500/10 px-4 py-3 text-sm text-red-300">
+                    {showcaseError}
+                  </div>
+                )}
                 {(patentsQuery.data ?? []).map((patent) => (
                   <div
                     key={patent._id}
                     className="flex items-center justify-between gap-4 rounded-2xl border border-slate-800 bg-slate-950/80 p-4"
                   >
                     <div>
-                      <div className="font-semibold text-white">{patent.projectTitle}</div>
+                      <div className="flex items-center gap-2">
+                        <span className="font-semibold text-white">{patent.projectTitle}</span>
+                        {patent.showcasedInMarketplace && (
+                          <span className="rounded-full bg-cyan-500/15 px-2 py-0.5 text-xs font-medium text-cyan-300">
+                            Showcased
+                          </span>
+                        )}
+                      </div>
                       <div className="text-sm text-slate-400">
                         Submitted {new Date(patent.submittedAt).toLocaleDateString('en-IN')}
                       </div>
@@ -940,6 +968,25 @@ export function PatentSupport() {
                       >
                         {patent.status.replace(/_/g, ' ')}
                       </span>
+                      {patent.status === 'approved' && (
+                        <button
+                          onClick={() => showcaseMutation.mutate(patent._id)}
+                          disabled={showcaseMutation.isPending}
+                          className={`flex items-center gap-1.5 rounded-xl border px-3 py-1.5 text-xs font-medium transition-colors disabled:opacity-50 ${
+                            patent.showcasedInMarketplace
+                              ? 'border-cyan-500/50 bg-cyan-500/10 text-cyan-300 hover:bg-cyan-500/20'
+                              : 'border-slate-700 bg-slate-800/60 text-slate-300 hover:border-cyan-500/50 hover:text-cyan-300'
+                          }`}
+                          title={patent.showcasedInMarketplace ? 'Remove from marketplace showcase' : 'Showcase in marketplace'}
+                        >
+                          {patent.showcasedInMarketplace ? (
+                            <EyeOff className="h-3.5 w-3.5" />
+                          ) : (
+                            <Eye className="h-3.5 w-3.5" />
+                          )}
+                          {patent.showcasedInMarketplace ? 'Unshowcase' : 'Showcase'}
+                        </button>
+                      )}
                       <button
                         onClick={() => setViewPatent(patent)}
                         className="flex items-center gap-1.5 rounded-xl border border-slate-700 bg-slate-800/60 px-3 py-1.5 text-xs font-medium text-slate-300 hover:border-cyan-500/50 hover:text-cyan-300 transition-colors"

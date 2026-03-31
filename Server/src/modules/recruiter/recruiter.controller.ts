@@ -1,4 +1,5 @@
 import { Request, Response } from 'express';
+import { UserRole } from '../../types/roles.types';
 import { ApiResponse } from '../../utils/ApiResponse';
 import {
   applyToRecruiterJob,
@@ -78,7 +79,8 @@ export const getJobsController = async (req: Request, res: Response) => {
 
 export const getPublicJobsController = async (req: Request, res: Response) => {
   const { recruiterId } = publicJobsQuerySchema.parse(req.params);
-  const data = await getPublicRecruiterJobs(recruiterId);
+  const studentId = req.user?.role === UserRole.STUDENT ? req.user._id : undefined;
+  const data = await getPublicRecruiterJobs(recruiterId, studentId);
   res.status(200).json(new ApiResponse(data));
 };
 

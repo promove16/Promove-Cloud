@@ -41,7 +41,33 @@ type SetOptions = { ex?: number };
 
 const redisStore = new Map<string, { value: string; expiresAt?: number }>();
 const redisLists = new Map<string, string[]>();
+const redisSortedSets = new Map<string, Map<string, number>>();
 const rateState = new Map<string, { count: number; reset: number }>();
+
+const getSortedSet = (key: string) => {
+  const existing = redisSortedSets.get(key);
+  if (existing) {
+    return existing;
+  }
+
+  const created = new Map<string, number>();
+  redisSortedSets.set(key, created);
+  return created;
+};
+
+const sortedEntries = (key: string, direction: 'asc' | 'desc' = 'asc') => {
+  const entries = Array.from((redisSortedSets.get(key) ?? new Map<string, number>()).entries()).sort(
+    ([leftMember, leftScore], [rightMember, rightScore]) => {
+      if (leftScore === rightScore) {
+        return leftMember.localeCompare(rightMember);
+      }
+
+      return direction === 'asc' ? leftScore - rightScore : rightScore - leftScore;
+    },
+  );
+
+  return entries;
+};
 
 const parseWindow = (value: string) => {
   const match = /^(\d+)([mh])$/.exec(value);
@@ -81,10 +107,36 @@ jest.mock('@upstash/redis', () => ({
       async del(key: string) {
         const existed = redisStore.delete(key);
         redisLists.delete(key);
+        redisSortedSets.delete(key);
         return existed ? 1 : 0;
       },
-      async zadd() {
-        return 1;
+      async zadd(key: string, ...members: Array<{ score: number; member: string }>) {
+        const sortedSet = getSortedSet(key);
+        members.forEach(({ score, member }) => {
+          sortedSet.set(member, score);
+        });
+        return members.length;
+      },
+      async zcard(key: string) {
+        return redisSortedSets.get(key)?.size ?? 0;
+      },
+      async zrank(key: string, member: string) {
+        const rank = sortedEntries(key, 'asc').findIndex(([entryMember]) => entryMember === member);
+        return rank === -1 ? null : rank;
+      },
+      async zrevrank(key: string, member: string) {
+        const rank = sortedEntries(key, 'desc').findIndex(([entryMember]) => entryMember === member);
+        return rank === -1 ? null : rank;
+      },
+      async zrange<T extends string[]>(
+        key: string,
+        start: number,
+        stop: number,
+        options?: { rev?: boolean },
+      ) {
+        const entries = sortedEntries(key, options?.rev ? 'desc' : 'asc');
+        const normalizedStop = stop < 0 ? entries.length + stop : stop;
+        return entries.slice(start, normalizedStop + 1).map(([member]) => member) as T;
       },
       async lpush(key: string, value: string) {
         const existing = redisLists.get(key) ?? [];
@@ -187,6 +239,7 @@ beforeAll(async () => {
 beforeEach(async () => {
   redisStore.clear();
   redisLists.clear();
+  redisSortedSets.clear();
   rateState.clear();
   await dropDatabaseWithRetry();
 });

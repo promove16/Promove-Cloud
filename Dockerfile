@@ -1,4 +1,4 @@
-FROM node:20.20.0-alpine3.22 AS server-build
+FROM node:20.20.2-alpine3.22 AS server-build
 
 WORKDIR /app
 
@@ -8,7 +8,7 @@ RUN npm ci
 COPY Server/ ./
 RUN npm run build && npm prune --omit=dev
 
-FROM node:20.20.0-alpine3.22 AS client-build
+FROM node:20.20.2-alpine3.22 AS client-build
 
 WORKDIR /app
 
@@ -18,7 +18,7 @@ RUN npm ci
 COPY Client/ ./
 RUN npm run build
 
-FROM node:20.20.0-alpine3.22 AS runtime
+FROM node:20.20.2-alpine3.22 AS runtime
 
 WORKDIR /app
 

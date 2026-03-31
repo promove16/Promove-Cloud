@@ -30,7 +30,11 @@ export interface ScoreEvent {
     | 'MARKET_READY_VERIFIED'
     | 'STARTUP_LAUNCHED'
     | 'AWARD_SUBMITTED'
-    | 'AWARD_APPROVED';
+    | 'AWARD_APPROVED'
+    | 'GITHUB_CONNECTED'
+    | 'LINKEDIN_CONNECTED'
+    | 'RESUME_UPLOADED'
+    | 'PROFILE_COMPLETE';
   delta: number;
   scoreAfter: number;
   metadata?: Record<string, unknown>;

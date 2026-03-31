@@ -1,15 +1,37 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
-import { dmApi, DMMessage, DMPartner } from '../api/dm.api';
+import { dmApi, DMMessage, DMPartner, QueryType } from '../api/dm.api';
 import { getDmSocket } from '../lib/socket';
+import { useAuthStore } from '../store/authStore';
+
+const normalizeQueryType = (queryType?: QueryType) => queryType ?? 'general';
+
+const isSameOutgoingMessage = (left: DMMessage, right: DMMessage) =>
+  left.senderId === right.senderId &&
+  left.recipientId === right.recipientId &&
+  left.message === right.message &&
+  left.messageType === right.messageType &&
+  normalizeQueryType(left.queryType) === normalizeQueryType(right.queryType) &&
+  left.scheduledAt === right.scheduledAt &&
+  left.meetLink === right.meetLink &&
+  left.attachmentUrl === right.attachmentUrl &&
+  left.attachmentType === right.attachmentType &&
+  left.attachmentName === right.attachmentName;
 
 export const useDM = (partnerId?: string) => {
   const queryClient = useQueryClient();
+  const currentUserId = useAuthStore((state) => state.user?._id);
   const [liveMessages, setLiveMessages] = useState<DMMessage[]>([]);
   const [typingFromPartner, setTypingFromPartner] = useState(false);
   const [onlineUsers, setOnlineUsers] = useState<Set<string>>(new Set());
   const typingTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
   const typingDebounce = useRef<ReturnType<typeof setTimeout> | null>(null);
+  
+  // Use ref to always get the current partnerId, preventing stale closures
+  const partnerIdRef = useRef<string | undefined>(partnerId);
+  useEffect(() => {
+    partnerIdRef.current = partnerId;
+  }, [partnerId]);
 
   // Fetch thread history
   const threadQuery = useQuery({
@@ -32,22 +54,33 @@ export const useDM = (partnerId?: string) => {
     if (!socket.connected) socket.connect();
 
     const handleMessage = (msg: DMMessage) => {
-      const isRelevant =
-        partnerId &&
-        ((msg.senderId === partnerId) || (msg.recipientId === partnerId));
+      // Use ref to get current partnerId
+      const currentPartnerId = partnerIdRef.current;
+      
+      // Only process messages for the current conversation
+      const isRelevant = currentPartnerId && (
+        msg.senderId === currentPartnerId || 
+        msg.recipientId === currentPartnerId
+      );
 
       if (isRelevant) {
-        setLiveMessages((cur) =>
-          cur.some((m) => m._id === msg._id) ? cur : [...cur, msg],
-        );
+        setLiveMessages((cur) => {
+          const withoutMatchingOptimistic = cur.filter(
+            (message) => !(message.isOptimistic && isSameOutgoingMessage(message, msg)),
+          );
+          return withoutMatchingOptimistic.some((message) => message._id === msg._id)
+            ? withoutMatchingOptimistic
+            : [...withoutMatchingOptimistic, msg];
+        });
       }
 
-      // Invalidate conversations list so unread counts refresh
+      // Always invalidate conversations list to refresh unread counts
       queryClient.invalidateQueries({ queryKey: ['dm', 'conversations'] });
     };
 
     const handleTyping = ({ senderId, isTyping }: { senderId: string; isTyping: boolean }) => {
-      if (senderId !== partnerId) return;
+      const currentPartnerId = partnerIdRef.current;
+      if (senderId !== currentPartnerId) return;
       setTypingFromPartner(isTyping);
       if (isTyping) {
         if (typingTimer.current) clearTimeout(typingTimer.current);
@@ -63,38 +96,48 @@ export const useDM = (partnerId?: string) => {
         else next.delete(userId);
         return next;
       });
-      // Also refresh partner query and conversations
       queryClient.invalidateQueries({ queryKey: ['dm', 'partner'] });
       queryClient.invalidateQueries({ queryKey: ['dm', 'conversations'] });
     };
 
     // Messages read notification from partner
     const handleMessagesRead = ({ readBy, readAt }: { readBy: string; readAt: string }) => {
-      if (readBy !== partnerId) return;
-      // Update live messages that were sent by current user to mark them as read
+      const currentPartnerId = partnerIdRef.current;
+      if (readBy !== currentPartnerId) return;
+      
       setLiveMessages((cur) =>
         cur.map((m) =>
-          m.recipientId === readBy && !m.readAt
+          m.senderId === readBy && !m.readAt
             ? { ...m, readAt }
             : m,
         ),
       );
-      // Refresh thread to get updated readAt from server
-      queryClient.invalidateQueries({ queryKey: ['dm', 'thread', partnerId] });
+      queryClient.invalidateQueries({ queryKey: ['dm', 'thread', currentPartnerId] });
+    };
+
+    const handleError = (error: { message: string }) => {
+      console.error('[DM Socket Error]', error.message);
     };
 
     socket.on('dm:message', handleMessage);
     socket.on('dm:typing', handleTyping);
     socket.on('dm:presence', handlePresence);
     socket.on('dm:messages-read', handleMessagesRead);
+    socket.on('dm:error', handleError);
 
     return () => {
       socket.off('dm:message', handleMessage);
       socket.off('dm:typing', handleTyping);
       socket.off('dm:presence', handlePresence);
       socket.off('dm:messages-read', handleMessagesRead);
+      socket.off('dm:error', handleError);
     };
-  }, [partnerId, queryClient]);
+  }, [queryClient]);
+
+  // Clear live messages when partner changes
+  useEffect(() => {
+    setLiveMessages([]);
+  }, [partnerId]);
 
   // Auto-mark messages as read when thread is opened
   useEffect(() => {
@@ -103,7 +146,6 @@ export const useDM = (partnerId?: string) => {
     if (socket.connected) {
       socket.emit('dm:read', { partnerId });
     }
-    // Also mark via REST for reliability
     dmApi.markAsRead(partnerId).catch(() => {});
   }, [partnerId, threadQuery.data]);
 
@@ -120,26 +162,58 @@ export const useDM = (partnerId?: string) => {
       .sort((a, b) => new Date(a.sentAt).getTime() - new Date(b.sentAt).getTime());
   })();
 
+  // Secure send - use ref for current partnerId
   const sendMessage = useCallback(
-    (payload: { message?: string; messageType?: 'text' | 'interview_request'; scheduledAt?: string; meetLink?: string }) => {
-      if (!partnerId) return;
+    (payload: { message?: string; messageType?: 'text' | 'interview_request'; scheduledAt?: string; meetLink?: string; queryType?: QueryType; attachmentUrl?: string; attachmentType?: 'image' | 'pdf'; attachmentName?: string }) => {
+      const currentPartnerId = partnerIdRef.current;
+      if (!currentPartnerId) {
+        console.error('[DM] Cannot send: no partnerId');
+        return;
+      }
+
+      if (currentUserId) {
+        const optimisticMessage: DMMessage = {
+          _id: `temp-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`,
+          senderId: currentUserId,
+          recipientId: currentPartnerId,
+          message: payload.message ?? '',
+          messageType: payload.messageType ?? 'text',
+          queryType: normalizeQueryType(payload.queryType),
+          scheduledAt: payload.scheduledAt,
+          meetLink: payload.meetLink,
+          attachmentUrl: payload.attachmentUrl,
+          attachmentType: payload.attachmentType,
+          attachmentName: payload.attachmentName,
+          readAt: null,
+          sentAt: new Date().toISOString(),
+          isOptimistic: true,
+        };
+        setLiveMessages((cur) => [...cur, optimisticMessage]);
+      }
+      
       const socket = getDmSocket();
       if (!socket.connected) socket.connect();
-      socket.emit('dm:send', { recipientId: partnerId, ...payload });
+      
+      // Always use the CURRENT partnerId from ref
+      socket.emit('dm:send', { recipientId: currentPartnerId, ...payload });
+      console.log(`[DM] Sending to ${currentPartnerId}:`, payload.message?.substring(0, 50));
     },
-    [partnerId],
+    [currentUserId],
   );
 
   const sendTyping = useCallback(() => {
-    if (!partnerId) return;
+    const currentPartnerId = partnerIdRef.current;
+    if (!currentPartnerId) return;
+    
     const socket = getDmSocket();
     if (!socket.connected) return;
-    socket.emit('dm:typing', { recipientId: partnerId, isTyping: true });
+    
+    socket.emit('dm:typing', { recipientId: currentPartnerId, isTyping: true });
     if (typingDebounce.current) clearTimeout(typingDebounce.current);
     typingDebounce.current = setTimeout(() => {
-      socket.emit('dm:typing', { recipientId: partnerId, isTyping: false });
+      socket.emit('dm:typing', { recipientId: currentPartnerId, isTyping: false });
     }, 1500);
-  }, [partnerId]);
+  }, []);
 
   const clearLive = useCallback(() => setLiveMessages([]), []);
 

@@ -1,6 +1,7 @@
 import { Request, Response } from 'express';
+import { ApiError } from '../../utils/ApiError';
 import { ApiResponse } from '../../utils/ApiResponse';
-import { getMyPatents, patentSubmissionSchema, submitPatent } from './patent.service';
+import { getMyPatents, getShowcasedPatents, patentSubmissionSchema, submitPatent, togglePatentShowcase } from './patent.service';
 import {
   getMyPatentRequests,
   getPatentRequestById,
@@ -18,6 +19,16 @@ export const createPatent = async (req: Request, res: Response) => {
 export const listMyPatents = async (req: Request, res: Response) => {
   const patents = await getMyPatents(req.user!._id);
   res.json(new ApiResponse(patents));
+};
+
+export const showcasePatent = async (req: Request, res: Response) => {
+  if (!req.user) throw new ApiError(401, 'UNAUTHORIZED', 'Invalid or expired token');
+  const result = await togglePatentShowcase(req.user._id, String(req.params.id));
+  res.json(new ApiResponse(result));
+};
+
+export const listShowcasedPatents = async (_req: Request, res: Response) => {
+  res.json(new ApiResponse(await getShowcasedPatents()));
 };
 
 // ─── Assisted filing ──────────────────────────────────────────────────────────

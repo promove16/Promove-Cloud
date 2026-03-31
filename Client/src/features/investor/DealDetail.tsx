@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
+import { isAxiosError } from 'axios';
 import { Badge } from '../../components/ui/Badge';
 import { Button } from '../../components/ui/Button';
 import { Card } from '../../components/ui/Card';
@@ -16,6 +17,13 @@ type Props = {
 
 const investorRoles = ['shareholder', 'director', 'observer'] as const;
 const formatRoleLabel = (role: (typeof investorRoles)[number]) => role.charAt(0).toUpperCase() + role.slice(1);
+const getDealWorkflowErrorMessage = (error: unknown) => {
+  if (isAxiosError<{ error?: { message?: string } }>(error)) {
+    return error.response?.data?.error?.message ?? 'Unable to update this deal right now.';
+  }
+
+  return error instanceof Error ? error.message : 'Unable to update this deal right now.';
+};
 
 export function DealDetail({ dealId, open, onOpenChange }: Props) {
   const queryClient = useQueryClient();
@@ -36,6 +44,9 @@ export function DealDetail({ dealId, open, onOpenChange }: Props) {
     if (dealQuery.data) {
       setError('');
       setNotice('');
+      setAmountINR(String(dealQuery.data.amountINR || 20000));
+      setEquityPercent(String(dealQuery.data.equityPercent || 10));
+      setInvestorRole(dealQuery.data.investorRole);
       setAwaitingAdminApproval(Boolean(dealQuery.data.adminApprovalRequired && !dealQuery.data.adminApprovedAt));
     }
   }, [dealQuery.data]);
@@ -73,6 +84,9 @@ export function DealDetail({ dealId, open, onOpenChange }: Props) {
       await queryClient.invalidateQueries({ queryKey: ['investor-dashboard'] });
       await queryClient.invalidateQueries({ queryKey: ['investor-portfolio'] });
     },
+    onError: (mutationError) => {
+      setError(getDealWorkflowErrorMessage(mutationError));
+    },
   });
 
   const deal = dealQuery.data as DealDetailView | undefined;
@@ -86,7 +100,7 @@ export function DealDetail({ dealId, open, onOpenChange }: Props) {
     if (deal.currentStage === 1) {
       const parsedAmount = Number(amountINR);
       if (!Number.isFinite(parsedAmount) || parsedAmount < 20000) {
-        setError('Minimum investment is ₹20,000.');
+        setError('Minimum investment is INR 20,000.');
         return;
       }
 
@@ -98,10 +112,26 @@ export function DealDetail({ dealId, open, onOpenChange }: Props) {
     }
 
     if (deal.currentStage === 2) {
+      const parsedEquity = Number(equityPercent);
+      if (!Number.isFinite(parsedEquity) || parsedEquity <= 0 || parsedEquity > 100) {
+        setError('Enter a valid equity percentage between 0.01 and 100.');
+        return;
+      }
+
+      if (deal.investorType === 'penny' && parsedEquity > 5) {
+        setError('A penny investor cannot request more than 5% equity.');
+        return;
+      }
+
+      if (deal.investorType === 'sole' && investorRole === 'director' && parsedEquity < 51) {
+        setError('A sole investor needs at least 51% equity to take the director role.');
+        return;
+      }
+
       advanceMutation.mutate({
         newStage: 3,
         stageData: {
-          equityPercent: Number(equityPercent) || undefined,
+          equityPercent: parsedEquity,
           investorRole,
         },
       });
@@ -172,7 +202,7 @@ export function DealDetail({ dealId, open, onOpenChange }: Props) {
                 <div className="text-sm font-semibold uppercase tracking-[0.2em] text-slate-400">
                   Stage 1 to Stage 2
                 </div>
-                <div className="text-sm text-slate-300">Minimum investment: ₹20,000</div>
+                <div className="text-sm text-slate-300">Minimum investment: INR 20,000</div>
                 <Input
                   type="number"
                   min={20000}
@@ -233,6 +263,7 @@ export function DealDetail({ dealId, open, onOpenChange }: Props) {
                     </div>
                   </div>
                 )}
+                {error ? <div className="text-sm text-red-300">{error}</div> : null}
               </Card>
             ) : null}
 

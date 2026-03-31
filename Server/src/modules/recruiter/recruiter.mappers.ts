@@ -6,6 +6,7 @@ import { Startup } from '../startup/startup.model';
 import { User } from '../user/user.model';
 import { Workspace } from '../workspace/workspace.model';
 import { UserRole } from '../../types/roles.types';
+import { normalizeInnovationScore, normalizeScoreBreakdown } from '../innovationScore/score.utils';
 import {
   RecruiterCollegeCard,
   RecruiterDriveView,
@@ -86,8 +87,8 @@ export const mapTalent = (
   _id: String(student._id),
   displayName: student.displayName,
   ...(student.avatar ? { avatar: student.avatar } : {}),
-  innovationScore: student.innovationScore ?? 0,
-  scoreBreakdown: student.scoreBreakdown,
+  innovationScore: normalizeInnovationScore(student.innovationScore),
+  scoreBreakdown: normalizeScoreBreakdown(student.scoreBreakdown),
   skills: getSkills(student.domain, params.activeProject?.category, params.extraSkills ?? []),
   ...(student.institutionId
     ? {
@@ -124,6 +125,8 @@ export const mapJob = (job: {
   shortlistedIds: Types.ObjectId[];
   createdAt: Date;
   expiresAt?: Date;
+}, options?: {
+  hasApplied?: boolean;
 }): RecruiterJobView => ({
   _id: String(job._id),
   recruiterId: String(job.recruiterId),
@@ -137,6 +140,7 @@ export const mapJob = (job: {
   isActive: job.isActive,
   applicantCount: job.applicantIds.length,
   shortlistedCount: job.shortlistedIds.length,
+  ...(typeof options?.hasApplied === 'boolean' ? { hasApplied: options.hasApplied } : {}),
   createdAt: job.createdAt.toISOString(),
   ...(job.expiresAt ? { expiresAt: job.expiresAt.toISOString() } : {}),
 });
@@ -179,7 +183,7 @@ students: Array<{ _id: Types.ObjectId; displayName: string; avatar?: string; inn
           studentId: String(entry.studentId),
           studentName: student?.displayName ?? 'Student',
           ...(student?.avatar ? { avatar: student.avatar } : {}),
-          innovationScore: student?.innovationScore ?? 0,
+          innovationScore: normalizeInnovationScore(student?.innovationScore ?? 0),
           registeredAt: entry.registeredAt.toISOString(),
           ...(typeof entry.submissionScore === 'number' ? { submissionScore: entry.submissionScore } : {}),
         };
@@ -210,7 +214,7 @@ export const mapPlacement = (
   ...(collegeName ? { collegeName } : {}),
   status: placement.status,
   ...(placement.companyName ? { companyName: placement.companyName } : {}),
-  innovationScore: student?.innovationScore ?? placement.innovationScoreAtTime ?? 0,
+  innovationScore: normalizeInnovationScore(student?.innovationScore ?? placement.innovationScoreAtTime ?? 0),
   updatedAt: placement.updatedAt.toISOString(),
 });
 

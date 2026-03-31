@@ -7,6 +7,8 @@ import { Startup } from './startup.model';
 import { ApiError } from '../../utils/ApiError';
 import { PlacementRecord } from '../college/placementRecord.model';
 import { UserRole } from '../../types/roles.types';
+import { normalizeInnovationScore } from '../innovationScore/score.utils';
+const pdfFileNamePattern = /\.pdf$/i;
 
 export const startupSchema = z.object({
   projectId: z.string().optional(),
@@ -87,7 +89,7 @@ export const launchStartup = async (
   }
 
   const user = await User.findById(userId).select('innovationScore').lean();
-  const score = user?.innovationScore ?? 0;
+  const score = normalizeInnovationScore(user?.innovationScore ?? 0);
 
   startup.launchedToInvestors = payload.launchTo === 'investors' || payload.launchTo === 'both';
   startup.launchedToMentors = payload.launchTo === 'mentors' || payload.launchTo === 'both';
@@ -121,7 +123,7 @@ export const launchStartup = async (
             studentId: userId,
             collegeId: founder.institutionId,
             status: 'Discovered',
-            innovationScoreAtTime: founder.innovationScore ?? 0,
+            innovationScoreAtTime: normalizeInnovationScore(founder.innovationScore ?? 0),
           },
           {
             upsert: true,
@@ -192,12 +194,13 @@ export const launchStartup = async (
 };
 
 export const uploadPitchDeck = async (startupId: string, userId: string, file: Express.Multer.File) => {
-  if (file.mimetype !== 'application/pdf') {
+  if (file.mimetype !== 'application/pdf' && !pdfFileNamePattern.test(file.originalname)) {
     throw new ApiError(400, 'INVALID_FILE_TYPE', 'Only PDF files are allowed');
   }
   const startup = await getStartupForFounder(startupId, userId);
-  const uploaded = await uploadToCloudinary(file.buffer, 'promove/startups', 'raw');
+  const uploaded = await uploadToCloudinary(file.buffer, 'promove/startups', 'raw', { format: 'pdf' });
   startup.pitchDeckUrl = uploaded.secure_url;
+  startup.pitchDeckName = file.originalname;
   await startup.save();
   return startup.toObject();
 };

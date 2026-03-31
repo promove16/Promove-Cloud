@@ -7,6 +7,7 @@ const roles_types_1 = require("../../types/roles.types");
 const asyncHandler_1 = require("../../utils/asyncHandler");
 const user_controller_1 = require("./user.controller");
 const router = (0, express_1.Router)();
+router.get('/search', authenticate_1.authenticate, (0, asyncHandler_1.asyncHandler)(user_controller_1.searchUsers));
 router.get('/me', authenticate_1.authenticate, (0, asyncHandler_1.asyncHandler)(user_controller_1.getMe));
 router.patch('/me', authenticate_1.authenticate, (0, asyncHandler_1.asyncHandler)(user_controller_1.patchMe));
 router.post('/me/social-enrich', authenticate_1.authenticate, (0, asyncHandler_1.asyncHandler)(user_controller_1.enrichMeFromSocialLinks));

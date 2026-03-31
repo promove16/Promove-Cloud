@@ -1,4 +1,5 @@
-import { useMemo, useState } from "react";
+import { ChangeEvent, useMemo, useState } from "react";
+import { isAxiosError } from "axios";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { CheckCircle, Download, Rocket, Target, TrendingUp, Upload, Users, X } from "lucide-react";
 import { DashboardLayout } from "../components/DashboardLayout";
@@ -21,10 +22,13 @@ const emptyPayload: StartupPayload = {
 };
 
 export function StartupLaunch() {
+  const maxPitchDeckSizeBytes = 10 * 1024 * 1024;
+  const pdfFileNamePattern = /\.pdf$/i;
   const queryClient = useQueryClient();
   const [showLaunchModal, setShowLaunchModal] = useState(false);
   const [launchTarget, setLaunchTarget] = useState<"investors" | "mentors" | "both">("both");
   const [toast, setToast] = useState("");
+  const [pendingPitchDeckName, setPendingPitchDeckName] = useState("");
   const [form, setForm] = useState<StartupPayload>(emptyPayload);
 
   const workspaceQuery = useQuery({ queryKey: ["workspaces"], queryFn: () => workspaceApi.list() });
@@ -91,11 +95,45 @@ export function StartupLaunch() {
       const savedStartup = startup?._id ? startup : await persistStartup.mutateAsync();
       return startupApi.uploadPitch(savedStartup._id, file);
     },
-    onSuccess: async () => {
+    onSuccess: async (savedStartup) => {
+      setPendingPitchDeckName("");
+      queryClient.setQueryData(["startup", "mine"], savedStartup);
       setToast("Pitch deck uploaded.");
       await queryClient.invalidateQueries({ queryKey: ["startup", "mine"] });
     },
+    onError: (error) => {
+      setPendingPitchDeckName("");
+      if (isAxiosError<{ error?: { message?: string } }>(error)) {
+        setToast(error.response?.data?.error?.message ?? "Failed to upload pitch deck PDF. Please try again.");
+        return;
+      }
+      setToast("Failed to upload pitch deck PDF. Please try again.");
+    },
   });
+
+  const handlePitchDeckSelect = (event: ChangeEvent<HTMLInputElement>) => {
+    const file = event.target.files?.[0];
+    event.target.value = "";
+
+    if (!file) {
+      return;
+    }
+
+    if (file.type !== "application/pdf" && !pdfFileNamePattern.test(file.name)) {
+      setPendingPitchDeckName("");
+      setToast("Only PDF files are allowed for the pitch deck.");
+      return;
+    }
+
+    if (file.size > maxPitchDeckSizeBytes) {
+      setPendingPitchDeckName("");
+      setToast("Pitch deck PDF must be 10MB or smaller.");
+      return;
+    }
+
+    setPendingPitchDeckName(file.name);
+    uploadPitch.mutate(file);
+  };
 
   const canLaunch = Boolean(hydratedForm.name.trim() && hydratedForm.tagline.trim() && hydratedForm.category.trim() && teamSize > 0);
 
@@ -185,9 +223,16 @@ export function StartupLaunch() {
               </div>
               <label className="flex items-center gap-3 px-4 py-4 bg-slate-950 border border-slate-800 rounded-lg text-white cursor-pointer">
                 <Upload className="w-5 h-5 text-blue-400" />
-                Upload pitch deck PDF
-                <input type="file" accept=".pdf" className="hidden" onChange={(event) => event.target.files?.[0] ? uploadPitch.mutate(event.target.files[0]) : undefined} />
+                {uploadPitch.isPending ? "Uploading pitch deck PDF..." : "Upload pitch deck PDF"}
+                <input type="file" accept="application/pdf,.pdf" className="hidden" onChange={handlePitchDeckSelect} />
               </label>
+              <div className="mt-3 text-sm text-slate-400">
+                {uploadPitch.isPending
+                  ? `Uploading: ${pendingPitchDeckName || "selected PDF"}`
+                  : startup?.pitchDeckName
+                    ? `Uploaded file: ${startup.pitchDeckName}`
+                    : "No PDF uploaded yet."}
+              </div>
             </div>
 
             <div className="bg-slate-900 border border-slate-800 rounded-xl p-6">

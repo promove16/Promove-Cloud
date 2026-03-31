@@ -10,6 +10,7 @@ import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, D
 import { Input } from '../../components/ui/Input';
 import { Spinner } from '../../components/ui/Spinner';
 import { StudentProfileDrawer } from './StudentProfileDrawer';
+import { PatentShowcase } from '../shared/PatentShowcase';
 
 type ModalMode = 'job' | 'search' | 'drive' | null;
 
@@ -201,6 +202,8 @@ export default function RecruiterDashboard() {
           </div>
         )}
       </div>
+
+      <PatentShowcase />
 
       <StudentProfileDrawer
         studentId={selectedStudentId}

@@ -15,6 +15,10 @@ const eventLabel: Record<string, string> = {
   PROGRESS_UPLOADED: "Uploaded workspace progress",
   PATENT_SUBMITTED: "Patent filed",
   STARTUP_LAUNCHED: "Startup launched",
+  GITHUB_CONNECTED: "Connected GitHub profile",
+  LINKEDIN_CONNECTED: "Connected LinkedIn profile",
+  RESUME_UPLOADED: "Uploaded resume",
+  PROFILE_COMPLETE: "Completed profile",
 };
 
 export function LeadershipProfile() {

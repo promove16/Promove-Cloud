@@ -15,8 +15,9 @@ import {
   Users,
   Check,
   CheckCheck,
+  FileText,
 } from 'lucide-react';
-import { dmApi, DMConversation } from '../../api/dm.api';
+import { dmApi, DMConversation, DMMessage } from '../../api/dm.api';
 import { useDM } from '../../hooks/useDM';
 import { useAuthStore } from '../../store/authStore';
 
@@ -61,9 +62,92 @@ function OfflineDot({ className = '' }: { className?: string }) {
 function ReadReceipt({ readAt, isMine }: { readAt?: string | null; isMine: boolean }) {
   if (!isMine) return null;
   return readAt ? (
-    <CheckCheck className="inline h-3.5 w-3.5 text-purple-400" title={`Read ${dt(readAt)}`} />
+    <span title={`Read ${dt(readAt)}`}>
+      <CheckCheck className="inline h-3.5 w-3.5 text-purple-400" />
+    </span>
   ) : (
-    <Check className="inline h-3.5 w-3.5 text-slate-500" title="Sent" />
+    <span title="Sent">
+      <Check className="inline h-3.5 w-3.5 text-slate-500" />
+    </span>
+  );
+}
+
+function MessageBubble({
+  msg,
+  isMine,
+  partnerName,
+  currentUserName,
+}: {
+  msg: DMMessage;
+  isMine: boolean;
+  partnerName: string;
+  currentUserName: string;
+}) {
+  const isImage = msg.attachmentType === 'image';
+  const isPdf = msg.attachmentType === 'pdf';
+
+  return (
+    <div className={`flex gap-2 ${isMine ? 'flex-row-reverse' : ''}`}>
+      <div className="mt-auto flex h-8 w-8 flex-shrink-0 items-center justify-center rounded-full bg-gradient-to-br from-purple-500 to-pink-500 text-xs font-bold text-white">
+        {isMine ? initials(currentUserName) : initials(partnerName)}
+      </div>
+      <div className={`flex max-w-[75%] flex-col ${isMine ? 'items-end' : 'items-start'}`}>
+        {msg.attachmentUrl ? (
+          <div className="mb-1 overflow-hidden rounded-2xl">
+            {isImage ? (
+              <a href={msg.attachmentUrl} target="_blank" rel="noreferrer">
+                <img
+                  src={msg.attachmentUrl}
+                  alt={msg.attachmentName || 'Image'}
+                  className="max-w-[280px] max-h-[300px] object-cover transition-opacity hover:opacity-90"
+                />
+              </a>
+            ) : isPdf ? (
+              <a
+                href={msg.attachmentUrl}
+                target="_blank"
+                rel="noreferrer"
+                className="block rounded-2xl border border-slate-700 bg-slate-800/80 p-3 transition-colors hover:bg-slate-800"
+              >
+                <div className="flex items-center gap-3">
+                  <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-red-500/20 text-red-400">
+                    <FileText className="h-5 w-5" />
+                  </div>
+                  <div className="min-w-0">
+                    <p className="truncate text-sm font-medium text-white">{msg.attachmentName || 'Document.pdf'}</p>
+                    <p className="text-xs text-slate-400">PDF</p>
+                  </div>
+                </div>
+              </a>
+            ) : null}
+            {msg.attachmentName && isImage ? (
+              <p className={`px-2 py-1 text-xs text-slate-400 ${isMine ? 'text-right' : 'text-left'}`}>
+                {msg.attachmentName}
+              </p>
+            ) : null}
+          </div>
+        ) : null}
+
+        {msg.message ? (
+          <div
+            className={`rounded-2xl px-4 py-2.5 ${
+              isMine
+                ? 'rounded-tr-sm bg-purple-600/20 text-white ring-1 ring-purple-500/20'
+                : 'rounded-tl-sm bg-slate-800 text-slate-100'
+            }`}
+          >
+            <p className="text-sm leading-relaxed whitespace-pre-wrap break-words">{msg.message}</p>
+          </div>
+        ) : null}
+
+        <div className={`mt-1 flex items-center gap-1.5 ${isMine ? 'justify-end' : ''}`}>
+          <span className={`text-[11px] ${isMine ? 'text-purple-300/60' : 'text-slate-500'}`}>
+            {dt(msg.sentAt)}
+          </span>
+          <ReadReceipt readAt={msg.readAt} isMine={isMine} />
+        </div>
+      </div>
+    </div>
   );
 }
 
@@ -306,10 +390,18 @@ function ChatPanel({
     useDM(partnerId);
   const [draft, setDraft] = useState('');
   const [showSchedule, setShowSchedule] = useState(false);
-  const bottomRef = useRef<HTMLDivElement>(null);
+  const threadRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
-    bottomRef.current?.scrollIntoView({ behavior: 'smooth' });
+    const thread = threadRef.current;
+    if (!thread) return;
+
+    requestAnimationFrame(() => {
+      thread.scrollTo({
+        top: thread.scrollHeight,
+        behavior: 'smooth',
+      });
+    });
   }, [messages.length]);
 
   const handleSend = () => {
@@ -327,9 +419,9 @@ function ChatPanel({
   };
 
   return (
-    <div className="flex h-full flex-col">
+    <div className="flex h-full min-h-0 flex-col">
       {/* Thread */}
-      <div className="flex-1 overflow-y-auto px-4 py-4">
+      <div ref={threadRef} className="min-h-0 flex-1 overflow-y-auto px-4 py-4">
         {isLoading ? (
           <div className="flex h-full items-center justify-center text-slate-500">
             Loading messages...
@@ -396,31 +488,13 @@ function ChatPanel({
 
               /* ── Regular text message ── */
               return (
-                <div
+                <MessageBubble
                   key={msg._id}
-                  className={`flex gap-2 ${isMine ? 'flex-row-reverse' : ''}`}
-                >
-                  <div className="mt-auto flex h-8 w-8 flex-shrink-0 items-center justify-center rounded-full bg-gradient-to-br from-purple-500 to-pink-500 text-xs font-bold text-white">
-                    {isMine
-                      ? initials(currentUser?.displayName ?? 'Me')
-                      : initials(partnerName)}
-                  </div>
-                  <div
-                    className={`max-w-[75%] rounded-2xl px-4 py-2.5 ${
-                      isMine
-                        ? 'rounded-tr-sm bg-purple-600/20 text-white ring-1 ring-purple-500/20'
-                        : 'rounded-tl-sm bg-slate-800 text-slate-100'
-                    }`}
-                  >
-                    <p className="text-sm leading-relaxed">{msg.message}</p>
-                    <div className={`mt-1 flex items-center gap-1.5 ${isMine ? 'justify-end' : ''}`}>
-                      <span className={`text-[11px] ${isMine ? 'text-purple-300/60' : 'text-slate-500'}`}>
-                        {dt(msg.sentAt)}
-                      </span>
-                      <ReadReceipt readAt={msg.readAt} isMine={isMine} />
-                    </div>
-                  </div>
-                </div>
+                  msg={msg}
+                  isMine={isMine}
+                  partnerName={partnerName}
+                  currentUserName={currentUser?.displayName ?? 'Me'}
+                />
               );
             })}
             {/* Typing indicator */}
@@ -449,7 +523,6 @@ function ChatPanel({
                 {partnerName} is typing...
               </div>
             ) : null}
-            <div ref={bottomRef} />
           </div>
         )}
       </div>
@@ -474,7 +547,7 @@ function ChatPanel({
               sendTyping();
             }}
             onKeyDown={handleKeyDown}
-            placeholder={`Message ${partnerName}…`}
+            placeholder={`Message ${partnerName}...`}
             rows={1}
             className="flex-1 resize-none rounded-2xl border border-slate-700 bg-slate-900 px-4 py-3 text-sm text-white outline-none transition focus:border-purple-500 placeholder:text-slate-500"
             style={{ maxHeight: '120px', overflowY: 'auto' }}
@@ -578,10 +651,10 @@ export function RecruiterMessagesPage() {
   const newUsers = userSearchResults.filter((u) => !existingPartnerIds.has(u._id));
 
   return (
-    <div className="flex h-[calc(100vh-120px)] overflow-hidden rounded-2xl border border-slate-800 bg-slate-950">
+    <div className="flex h-full min-h-0 overflow-hidden rounded-2xl border border-slate-800 bg-slate-950">
       {/* Sidebar — conversation list */}
       <div
-        className={`flex flex-col border-r border-slate-800 bg-slate-900/50 ${
+        className={`flex min-h-0 flex-col border-r border-slate-800 bg-slate-900/50 ${
           partnerId
             ? 'hidden md:flex md:w-72 lg:w-80'
             : 'w-full md:w-72 lg:w-80'
@@ -617,7 +690,7 @@ export function RecruiterMessagesPage() {
           </div>
         </div>
 
-        <div className="flex-1 overflow-y-auto p-2">
+        <div className="min-h-0 flex-1 overflow-y-auto p-2">
           {conversationsQuery.isLoading ? (
             <div className="py-8 text-center text-sm text-slate-500">
               Loading...
@@ -688,7 +761,7 @@ export function RecruiterMessagesPage() {
       </div>
 
       {/* Chat area */}
-      <div className="flex flex-1 flex-col">
+      <div className="flex min-h-0 flex-1 flex-col">
         {partnerId ? (
           <>
             {/* Header */}

@@ -1,4 +1,5 @@
 import { useMemo, useState, type ReactNode } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { DashboardLayout } from '../../app/components/DashboardLayout';
 import { useQuery } from '@tanstack/react-query';
 import {
@@ -15,6 +16,7 @@ import {
   GraduationCap,
   Linkedin,
   MapPin,
+  MessageCircle,
   Search,
   Sparkles,
   Star,
@@ -192,6 +194,7 @@ function MarketplaceProfileDrawer({
   open: boolean;
   onClose: () => void;
 }) {
+  const navigate = useNavigate();
   const profileQuery = useQuery({
     queryKey: ['marketplace', 'profile', profileId],
     queryFn: () => marketplaceApi.getProfile(profileId!),
@@ -199,6 +202,26 @@ function MarketplaceProfileDrawer({
   });
   const profile = profileQuery.data;
   const counts = profile ? getInsightCounts(profile) : null;
+
+  const getQueryType = (role: string) => {
+    switch (role) {
+      case 'mentor': return 'project_mentor';
+      case 'investor': return 'investor';
+      case 'recruiter': return 'recruiter';
+      default: return 'general';
+    }
+  };
+
+  const handleMessage = () => {
+    if (profile) {
+      const storageKey = `dm_first_contact_${profile._id}`;
+      if (!localStorage.getItem(storageKey)) {
+        localStorage.setItem(storageKey, 'true');
+      }
+      navigate(`/dashboard/messages/${profile._id}?queryType=${getQueryType(profile.role)}`);
+      onClose();
+    }
+  };
 
   if (!open) {
     return null;
@@ -239,6 +262,16 @@ function MarketplaceProfileDrawer({
               >
                 <X className="h-5 w-5" />
               </button>
+            </div>
+
+            <div className="flex gap-3">
+              <Button onClick={handleMessage} className="flex-1">
+                <MessageCircle className="mr-2 h-4 w-4" />
+                Message
+              </Button>
+              <Button variant="secondary" onClick={onClose} className="flex-1">
+                Close
+              </Button>
             </div>
 
             <div className="grid gap-4 md:grid-cols-4">
@@ -460,12 +493,6 @@ function MarketplaceProfileDrawer({
                 ) : null}
               </ProfileSection>
             ) : null}
-
-            <div className="flex justify-end">
-              <Button variant="secondary" onClick={onClose}>
-                Close
-              </Button>
-            </div>
           </div>
         )}
       </aside>
@@ -482,6 +509,8 @@ function RecruiterJobCard({
   recruiterName: string;
   onApplyFeedback: (tone: 'success' | 'error', message: string) => void;
 }) {
+  const [appliedJobIds, setAppliedJobIds] = useState<string[]>([]);
+  const [pendingJobIds, setPendingJobIds] = useState<string[]>([]);
   const jobsQuery = useQuery({
     queryKey: ['marketplace', 'recruiter-jobs', recruiterId],
     queryFn: () => recruiterApi.getPublicJobs(recruiterId),
@@ -489,12 +518,21 @@ function RecruiterJobCard({
   });
 
   const applyToJob = async (jobId: string) => {
+    if (appliedJobIds.includes(jobId) || pendingJobIds.includes(jobId)) {
+      return;
+    }
+
+    setPendingJobIds((current) => [...current, jobId]);
+
     try {
       await recruiterApi.applyToJob(jobId);
+      setAppliedJobIds((current) => (current.includes(jobId) ? current : [...current, jobId]));
       await jobsQuery.refetch();
       onApplyFeedback('success', 'Applied! The recruiter can now contact you.');
     } catch {
       onApplyFeedback('error', 'Unable to apply to this job right now.');
+    } finally {
+      setPendingJobIds((current) => current.filter((id) => id !== jobId));
     }
   };
 
@@ -510,24 +548,34 @@ function RecruiterJobCard({
     <div className="mt-4 space-y-3 border-t border-slate-800 pt-4">
       <div className="text-xs uppercase tracking-[0.25em] text-cyan-300">Open Job Posts</div>
       {(jobsQuery.data ?? []).length > 0 ? (
-        (jobsQuery.data ?? []).map((job) => (
-          <Card key={job._id} className="p-4">
-            <div className="flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
-              <div>
-                <div className="font-semibold text-white">{job.title}</div>
-                <div className="mt-1 text-sm text-slate-400">
-                  {job.company} - {job.location} - {job.type}
+        (jobsQuery.data ?? []).map((job) => {
+          const hasApplied = Boolean(job.hasApplied) || appliedJobIds.includes(job._id);
+          const isPending = pendingJobIds.includes(job._id);
+
+          return (
+            <Card key={job._id} className="p-4">
+              <div className="flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
+                <div>
+                  <div className="font-semibold text-white">{job.title}</div>
+                  <div className="mt-1 text-sm text-slate-400">
+                    {job.company} - {job.location} - {job.type}
+                  </div>
+                  <p className="mt-2 text-sm text-slate-300">{job.description}</p>
                 </div>
-                <p className="mt-2 text-sm text-slate-300">{job.description}</p>
+                <div className="flex flex-wrap gap-2">
+                  <Button
+                    variant="secondary"
+                    onClick={() => applyToJob(job._id)}
+                    disabled={hasApplied || isPending}
+                    className={hasApplied ? 'border-emerald-500/40 bg-emerald-500/10 text-emerald-200 hover:border-emerald-500/40 hover:text-emerald-200' : ''}
+                  >
+                    {isPending ? 'Applying...' : hasApplied ? 'Applied' : 'Apply'}
+                  </Button>
+                </div>
               </div>
-              <div className="flex flex-wrap gap-2">
-                <Button variant="secondary" onClick={() => applyToJob(job._id)}>
-                  Apply
-                </Button>
-              </div>
-            </div>
-          </Card>
-        ))
+            </Card>
+          );
+        })
       ) : (
         <div className="text-sm text-slate-400">{recruiterName} has no active openings right now.</div>
       )}
@@ -536,6 +584,7 @@ function RecruiterJobCard({
 }
 
 export function Marketplace() {
+  const navigate = useNavigate();
   const [role, setRole] = useState<MarketplaceRole>('recruiter');
   const [search, setSearch] = useState('');
   const [expandedRecruiterId, setExpandedRecruiterId] = useState<string | null>(null);
@@ -671,7 +720,25 @@ export function Marketplace() {
                           </div>
                         </div>
                       </div>
-                      <div className="flex items-center gap-2">
+                      <div className="flex flex-col items-end gap-2">
+                        <div className="flex items-center gap-2">
+                          <Button
+                            onClick={() => {
+                              const storageKey = `dm_first_contact_${profile._id}`;
+                              if (!localStorage.getItem(storageKey)) {
+                                localStorage.setItem(storageKey, 'true');
+                              }
+                              navigate(`/dashboard/messages/${profile._id}`);
+                            }}
+                          >
+                            <MessageCircle className="mr-2 h-4 w-4" />
+                            Message
+                          </Button>
+                          <Button variant="secondary" onClick={() => setSelectedProfileId(profile._id)}>
+                            <Eye className="mr-2 h-4 w-4" />
+                            View Profile
+                          </Button>
+                        </div>
                         {role === 'recruiter' ? (
                           <Button
                             variant="secondary"
@@ -685,10 +752,6 @@ export function Marketplace() {
                             {expandedRecruiterId === profile._id ? 'Hide Jobs' : 'View Jobs'}
                           </Button>
                         ) : null}
-                        <Button onClick={() => setSelectedProfileId(profile._id)}>
-                          <Eye className="mr-2 h-4 w-4" />
-                          View Profile
-                        </Button>
                       </div>
                     </div>
 

@@ -8,6 +8,8 @@ import { ScoreResponse, ScoreUpdatedEvent } from '../types/score.types';
 export const useInnovationScore = () => {
   const queryClient = useQueryClient();
   const isAuthenticated = useAuthStore((state) => state.isAuthenticated);
+  const authUser = useAuthStore((state) => state.user);
+  const setUser = useAuthStore((state) => state.setUser);
 
   const query = useQuery({
     queryKey: ['score', 'me'],
@@ -27,6 +29,11 @@ export const useInnovationScore = () => {
     }
 
     const handleUpdate = (data: ScoreUpdatedEvent) => {
+      const currentUser = useAuthStore.getState().user;
+      if (currentUser && currentUser.innovationScore !== data.newScore) {
+        setUser({ ...currentUser, innovationScore: data.newScore });
+      }
+
       queryClient.setQueryData<ScoreResponse | undefined>(['score', 'me'], (previous) =>
         previous
           ? {
@@ -43,7 +50,15 @@ export const useInnovationScore = () => {
       socket.off('score:updated', handleUpdate);
       socket.disconnect();
     };
-  }, [isAuthenticated, queryClient]);
+  }, [isAuthenticated, queryClient, setUser]);
+
+  useEffect(() => {
+    if (!authUser || query.data?.score === undefined || authUser.innovationScore === query.data.score) {
+      return;
+    }
+
+    setUser({ ...authUser, innovationScore: query.data.score });
+  }, [authUser, query.data?.score, setUser]);
 
   return query;
 };

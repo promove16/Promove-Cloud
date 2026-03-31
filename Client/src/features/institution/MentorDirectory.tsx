@@ -1,6 +1,7 @@
 import { useMemo, useState } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { useQuery } from '@tanstack/react-query';
-import { Eye, Search } from 'lucide-react';
+import { Eye, MessageCircle, Search } from 'lucide-react';
 import { Card } from '../../components/ui/Card';
 import { Input } from '../../components/ui/Input';
 import { Button } from '../../components/ui/Button';
@@ -15,8 +16,17 @@ export function MentorDirectory({
   title = 'Mentor Directory',
   subtitle = 'Connect with mentors who guide innovation programs',
 }: Props) {
+  const navigate = useNavigate();
   const [search, setSearch] = useState('');
   const [selectedId, setSelectedId] = useState<string | null>(null);
+
+  const handleMessage = (mentorId: string) => {
+    const storageKey = `dm_first_contact_${mentorId}`;
+    if (!localStorage.getItem(storageKey)) {
+      localStorage.setItem(storageKey, 'true');
+    }
+    navigate(`/dashboard/messages/${mentorId}`);
+  };
 
   const mentorsQuery = useQuery({
     queryKey: ['marketplace-mentors'],
@@ -81,10 +91,16 @@ export function MentorDirectory({
                   </p>
                 </div>
               </div>
-              <Button variant="secondary" onClick={() => setSelectedId(mentor._id)}>
-                <Eye className="mr-2 h-4 w-4" />
-                View Profile
-              </Button>
+              <div className="flex gap-2">
+                <Button onClick={() => handleMessage(mentor._id)}>
+                  <MessageCircle className="mr-2 h-4 w-4" />
+                  Message
+                </Button>
+                <Button variant="secondary" onClick={() => setSelectedId(mentor._id)}>
+                  <Eye className="mr-2 h-4 w-4" />
+                  View Profile
+                </Button>
+              </div>
             </div>
           </Card>
         ))}
@@ -107,6 +123,15 @@ export function MentorDirectory({
             <p className="mt-4 leading-7 text-slate-300">
               {profileQuery.data.bio ?? 'This mentor has not added a public bio yet.'}
             </p>
+            <div className="mt-6 flex justify-end gap-3">
+              <Button variant="secondary" onClick={() => setSelectedId(null)}>
+                Close
+              </Button>
+              <Button onClick={() => { handleMessage(selectedId!); setSelectedId(null); }}>
+                <MessageCircle className="mr-2 h-4 w-4" />
+                Message Mentor
+              </Button>
+            </div>
           </Card>
         </div>
       ) : null}

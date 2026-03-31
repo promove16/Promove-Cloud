@@ -6,14 +6,21 @@ import { readRedisJson } from '../../utils/redisJson';
 import { User } from '../user/user.model';
 import { ScoreEvent } from './score.model';
 import { applyScore, SCORE_DELTAS, ScoreTrigger } from '../../services/scoreEngine';
+import {
+  normalizeInnovationScore,
+  normalizeScoreBreakdown,
+} from './score.utils';
 
 const percentileFromRank = (rank: number | null, total: number) => {
-  if (rank === null || total <= 1) {
+  if (rank === null || total <= 0) {
     return 100;
   }
 
-  const fraction = 1 - rank / Math.max(total - 1, 1);
-  return Math.max(1, Math.round(fraction * 100));
+  if (total === 1) {
+    return 1;
+  }
+
+  return Math.min(100, Math.max(1, Math.round(((rank + 1) / total) * 100)));
 };
 
 export const getMyScore = async (req: Request, res: Response) => {
@@ -26,12 +33,22 @@ export const getMyScore = async (req: Request, res: Response) => {
 
   let scorePayload: {
     score: number;
-    breakdown: unknown;
+    breakdown: ReturnType<typeof normalizeScoreBreakdown>;
   };
 
   const cachedPayload = readRedisJson<typeof scorePayload>(cached);
   if (cachedPayload) {
-    scorePayload = cachedPayload;
+    scorePayload = {
+      score: normalizeInnovationScore(cachedPayload.score),
+      breakdown: normalizeScoreBreakdown(cachedPayload.breakdown),
+    };
+
+    if (
+      scorePayload.score !== cachedPayload.score ||
+      JSON.stringify(scorePayload.breakdown) !== JSON.stringify(cachedPayload.breakdown ?? {})
+    ) {
+      await redis.set(cacheKey, JSON.stringify(scorePayload), { ex: 300 });
+    }
   } else {
     const user = await User.findById(req.user._id)
       .select('innovationScore scoreBreakdown')
@@ -41,30 +58,71 @@ export const getMyScore = async (req: Request, res: Response) => {
       throw new ApiError(404, 'USER_NOT_FOUND', 'User not found');
     }
 
+    const normalizedScore = normalizeInnovationScore(user.innovationScore);
+    const normalizedBreakdown = normalizeScoreBreakdown(user.scoreBreakdown);
+
+    if (
+      normalizedScore !== user.innovationScore ||
+      JSON.stringify(normalizedBreakdown) !== JSON.stringify(user.scoreBreakdown ?? {})
+    ) {
+      await User.updateOne(
+        { _id: req.user._id },
+        {
+          innovationScore: normalizedScore,
+          scoreBreakdown: normalizedBreakdown,
+        },
+      );
+    }
+
     scorePayload = {
-      score: user.innovationScore,
-      breakdown: user.scoreBreakdown,
+      score: normalizedScore,
+      breakdown: normalizedBreakdown,
     };
 
     await redis.set(cacheKey, JSON.stringify(scorePayload), { ex: 300 });
   }
 
   const weekAgo = new Date(Date.now() - 7 * 24 * 60 * 60 * 1000);
-  const latest = await ScoreEvent.findOne({ userId: req.user._id }).sort({ createdAt: -1 }).lean();
-  const earlier = await ScoreEvent.findOne({
-    userId: req.user._id,
-    createdAt: { $lte: weekAgo },
-  })
-    .sort({ createdAt: -1 })
-    .lean();
+  const [recentEvents, leaderboardUser] = await Promise.all([
+    ScoreEvent.find({
+      userId: req.user._id,
+      createdAt: { $gte: weekAgo },
+    })
+      .select('delta')
+      .lean(),
+    User.findById(req.user._id).select('institutionId createdAt').lean(),
+  ]);
 
-  const rank = await redis.zrank('lb:global', req.user._id);
-  const total = await redis.zcard('lb:global');
+  if (!leaderboardUser) {
+    throw new ApiError(404, 'USER_NOT_FOUND', 'User not found');
+  }
+
+  let rank = await redis.zrevrank('lb:global', req.user._id);
+  let total = await redis.zcard('lb:global');
+
+  if (rank === null) {
+    await redis.zadd('lb:global', { score: scorePayload.score, member: req.user._id });
+
+    if (leaderboardUser.institutionId) {
+      const institutionTiebreakerScore =
+        scorePayload.score +
+        (9999999999999 - leaderboardUser.createdAt.getTime()) / 1_000_000_000_000_000;
+      await redis.zadd(`lb:${leaderboardUser.institutionId}`, {
+        score: institutionTiebreakerScore,
+        member: req.user._id,
+      });
+    }
+
+    rank = await redis.zrevrank('lb:global', req.user._id);
+    total = await redis.zcard('lb:global');
+  }
+
+  const weeklyDelta = recentEvents.reduce((sum, event) => sum + (event.delta ?? 0), 0);
 
   res.json(
     new ApiResponse({
       ...scorePayload,
-      weeklyDelta: (latest?.scoreAfter ?? scorePayload.score) - (earlier?.scoreAfter ?? 0),
+      weeklyDelta,
       rankPercentile: percentileFromRank(rank, total),
     }),
   );
@@ -83,7 +141,14 @@ export const getScoreHistory = async (req: Request, res: Response) => {
     .limit(100)
     .lean();
 
-  res.json(new ApiResponse(events));
+  res.json(
+    new ApiResponse(
+      events.map((event) => ({
+        ...event,
+        scoreAfter: normalizeInnovationScore(event.scoreAfter),
+      })),
+    ),
+  );
 };
 
 export const getScoreEvents = async (req: Request, res: Response) => {
@@ -106,8 +171,18 @@ export const getScoreEvents = async (req: Request, res: Response) => {
     .lean();
 
   res.json(new ApiResponse({
-    user: user ? { _id: userId, displayName: user.displayName, innovationScore: user.innovationScore, scoreBreakdown: user.scoreBreakdown } : null,
-    events,
+    user: user
+      ? {
+          _id: userId,
+          displayName: user.displayName,
+          innovationScore: normalizeInnovationScore(user.innovationScore),
+          scoreBreakdown: normalizeScoreBreakdown(user.scoreBreakdown),
+        }
+      : null,
+    events: events.map((event) => ({
+      ...event,
+      scoreAfter: normalizeInnovationScore(event.scoreAfter),
+    })),
     total: events.length,
   }));
 };

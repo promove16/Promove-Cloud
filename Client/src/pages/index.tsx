@@ -63,6 +63,7 @@ import { LeadershipProfile } from "../app/pages/LeadershipProfile";
 import { Marketplace } from "../features/student/Marketplace";
 import { MessagesPage } from "../app/pages/Messages";
 import { RecruiterMessagesPage } from "../app/pages/RecruiterMessages";
+import { SettingsPage } from "../features/settings/SettingsPage";
 
 function RootLayout() {
   return <Outlet />;
@@ -166,17 +167,6 @@ function ProtectedAnyRoute({ children }: PropsWithChildren) {
   return children ? <>{children}</> : <Outlet />;
 }
 
-function SettingsPage() {
-  return (
-    <Card className="mx-auto max-w-3xl p-8">
-      <h1 className="text-3xl font-bold text-white">Settings</h1>
-      <p className="mt-3 text-slate-400">
-        Account and institution settings stay role-aware and will expand in
-        later phases.
-      </p>
-    </Card>
-  );
-}
 
 export const router = createBrowserRouter([
   {

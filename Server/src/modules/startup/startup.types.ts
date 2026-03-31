@@ -9,6 +9,7 @@ export interface IStartup {
   category: string;
   stage: 'Pre-Idea' | 'Ideation' | 'MVP' | 'Pre-Launch' | 'Launched';
   pitchDeckUrl?: string;
+  pitchDeckName?: string;
   teamSize: number;
   fundingNeeded?: number;
   activeProducts: number;

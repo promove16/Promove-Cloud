@@ -1,7 +1,18 @@
 import { useEffect, useMemo, useState } from "react";
 import { useInfiniteQuery, useMutation } from "@tanstack/react-query";
 import { useNavigate } from "react-router-dom";
-import { Search, Filter, TrendingUp, Clock, Tag, Plus, CheckCircle, Loader2 } from "lucide-react";
+import {
+  Search,
+  Filter,
+  TrendingUp,
+  Clock,
+  Tag,
+  Plus,
+  CheckCircle,
+  Loader2,
+  ArrowLeft,
+  X,
+} from "lucide-react";
 import { DashboardLayout } from "../components/DashboardLayout";
 import { problemBankApi } from "../../api/problemBank.api";
 import { useAuthStore } from "../../store/authStore";
@@ -45,7 +56,8 @@ export function ProblemBank() {
         page: pageParam,
         limit: 6,
         search: searchQuery || undefined,
-        category: selectedCategory === "All Problems" ? undefined : selectedCategory,
+        category:
+          selectedCategory === "All Problems" ? undefined : selectedCategory,
       }),
     getNextPageParam: (lastPage) => {
       const { meta } = lastPage;
@@ -62,7 +74,8 @@ export function ProblemBank() {
     },
     onError: (error) => {
       const message =
-        (error as { response?: { data?: { error?: { message?: string } } } })?.response?.data?.error?.message ??
+        (error as { response?: { data?: { error?: { message?: string } } } })
+          ?.response?.data?.error?.message ??
         "Unable to claim this problem right now.";
       setFeedback(message);
     },
@@ -73,13 +86,19 @@ export function ProblemBank() {
     [problemsQuery.data],
   );
 
+  const handleCloseProblemDetails = () => {
+    setSelectedProblem(null);
+  };
+
   return (
     <DashboardLayout role="student">
       <div className="space-y-6">
         <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-4">
           <div>
             <h1 className="text-3xl font-bold text-white mb-2">Problem Bank</h1>
-            <p className="text-slate-400">Global repository of real-world problems waiting to be solved</p>
+            <p className="text-slate-400">
+              Global repository of real-world problems waiting to be solved
+            </p>
           </div>
           <button
             type="button"
@@ -127,20 +146,31 @@ export function ProblemBank() {
         </div>
 
         {feedback ? (
-          <div className="p-4 bg-blue-500/10 border border-blue-500/20 rounded-lg text-blue-300 text-sm">{feedback}</div>
+          <div className="p-4 bg-blue-500/10 border border-blue-500/20 rounded-lg text-blue-300 text-sm">
+            {feedback}
+          </div>
         ) : null}
 
         <div className="space-y-4">
           {problems.map((problem) => {
-            const isClaimedByMe = Boolean(problem.claimedBy && problem.claimedBy === currentUser?._id);
-            const isClaimedByOther = Boolean(problem.claimedBy && problem.claimedBy !== currentUser?._id);
+            const isClaimedByMe = Boolean(
+              problem.claimedBy && problem.claimedBy === currentUser?._id,
+            );
+            const isClaimedByOther = Boolean(
+              problem.claimedBy && problem.claimedBy !== currentUser?._id,
+            );
 
             return (
-              <div key={problem._id} className="bg-slate-900 border border-slate-800 rounded-xl p-6 hover:border-slate-700 transition-all">
+              <div
+                key={problem._id}
+                className="bg-slate-900 border border-slate-800 rounded-xl p-6 hover:border-slate-700 transition-all"
+              >
                 <div className="flex items-start justify-between gap-4 mb-4">
                   <div className="flex-1">
                     <div className="flex items-center gap-3 mb-2 flex-wrap">
-                      <h3 className="text-xl font-bold text-white">{problem.title}</h3>
+                      <h3 className="text-xl font-bold text-white">
+                        {problem.title}
+                      </h3>
                       {problem.isVerified ? (
                         <div className="px-2 py-1 bg-green-500/10 rounded text-xs text-green-400 flex items-center gap-1">
                           <CheckCircle className="w-3 h-3" />
@@ -148,10 +178,14 @@ export function ProblemBank() {
                         </div>
                       ) : null}
                       {isClaimedByMe ? (
-                        <div className="px-2 py-1 bg-blue-500/10 rounded text-xs text-blue-400">Already Claimed</div>
+                        <div className="px-2 py-1 bg-blue-500/10 rounded text-xs text-blue-400">
+                          Already Claimed
+                        </div>
                       ) : null}
                       {isClaimedByOther ? (
-                        <div className="px-2 py-1 bg-slate-800 rounded text-xs text-slate-300">Claimed</div>
+                        <div className="px-2 py-1 bg-slate-800 rounded text-xs text-slate-300">
+                          Claimed
+                        </div>
                       ) : null}
                       {problem.sponsorName ? (
                         <div className="px-2 py-1 bg-cyan-500/10 rounded text-xs text-cyan-300">
@@ -160,18 +194,25 @@ export function ProblemBank() {
                       ) : null}
                     </div>
                     <p className="text-slate-400 mb-4">
-                      {problem.description.length > 180 ? `${problem.description.slice(0, 180)}...` : problem.description}
+                      {problem.description.length > 180
+                        ? `${problem.description.slice(0, 180)}...`
+                        : problem.description}
                     </p>
                     <div className="flex flex-wrap gap-2 mb-4">
                       {problem.tags.map((tag) => (
-                        <span key={tag} className="px-3 py-1 bg-slate-800 rounded-full text-xs text-slate-300 flex items-center gap-1">
+                        <span
+                          key={tag}
+                          className="px-3 py-1 bg-slate-800 rounded-full text-xs text-slate-300 flex items-center gap-1"
+                        >
                           <Tag className="w-3 h-3" />
                           {tag}
                         </span>
                       ))}
                     </div>
                     <div className="flex items-center gap-6 text-sm text-slate-400 flex-wrap">
-                      <span className="px-2 py-1 bg-slate-800 rounded text-xs font-semibold">{problem.category}</span>
+                      <span className="px-2 py-1 bg-slate-800 rounded text-xs font-semibold">
+                        {problem.category}
+                      </span>
                       <span
                         className={`px-2 py-1 rounded text-xs font-semibold ${
                           problem.difficulty === "Easy"
@@ -188,10 +229,13 @@ export function ProblemBank() {
                         {timeAgo(problem.createdAt)}
                       </div>
                       <div className="flex items-center gap-1">
-                        <span className="text-slate-500">by</span> {problem.postedBy}
+                        <span className="text-slate-500">by</span>{" "}
+                        {problem.postedBy}
                       </div>
                       <div>{problem.domain}</div>
-                      {problem.geography ? <div>{problem.geography}</div> : null}
+                      {problem.geography ? (
+                        <div>{problem.geography}</div>
+                      ) : null}
                     </div>
                   </div>
                 </div>
@@ -208,7 +252,9 @@ export function ProblemBank() {
                       disabled={claimMutation.isPending}
                       className="flex-1 px-6 py-3 bg-gradient-to-r from-blue-600 to-purple-600 hover:from-blue-700 hover:to-purple-700 text-white rounded-lg font-semibold transition-all disabled:opacity-60"
                     >
-                      {claimMutation.isPending ? "Claiming..." : "Claim & Start Solving"}
+                      {claimMutation.isPending
+                        ? "Claiming..."
+                        : "Claim & Start Solving"}
                     </button>
                   ) : (
                     <button className="flex-1 px-6 py-3 bg-slate-800 text-slate-500 rounded-lg font-semibold cursor-not-allowed">
@@ -228,7 +274,9 @@ export function ProblemBank() {
               disabled={problemsQuery.isFetchingNextPage}
               className="px-6 py-3 bg-slate-800 hover:bg-slate-700 text-white rounded-lg font-semibold transition-colors disabled:opacity-60 flex items-center gap-2"
             >
-              {problemsQuery.isFetchingNextPage ? <Loader2 className="w-4 h-4 animate-spin" /> : null}
+              {problemsQuery.isFetchingNextPage ? (
+                <Loader2 className="w-4 h-4 animate-spin" />
+              ) : null}
               Load More Problems
             </button>
           </div>
@@ -238,120 +286,230 @@ export function ProblemBank() {
           <div className="grid md:grid-cols-3 gap-6 text-center">
             <div>
               <TrendingUp className="w-8 h-8 text-blue-500 mx-auto mb-2" />
-              <div className="text-2xl font-bold text-white mb-1">{problemsQuery.data?.pages[0]?.meta.total ?? 0}</div>
+              <div className="text-2xl font-bold text-white mb-1">
+                {problemsQuery.data?.pages[0]?.meta.total ?? 0}
+              </div>
               <div className="text-sm text-slate-400">Active Problems</div>
             </div>
             <div>
               <CheckCircle className="w-8 h-8 text-green-500 mx-auto mb-2" />
-              <div className="text-2xl font-bold text-white mb-1">{problems.filter((item) => item.isVerified).length}</div>
+              <div className="text-2xl font-bold text-white mb-1">
+                {problems.filter((item) => item.isVerified).length}
+              </div>
               <div className="text-sm text-slate-400">Verified Challenges</div>
             </div>
             <div>
               <Tag className="w-8 h-8 text-purple-500 mx-auto mb-2" />
-              <div className="text-2xl font-bold text-white mb-1">{new Set(problems.map((item) => item.domain)).size}</div>
+              <div className="text-2xl font-bold text-white mb-1">
+                {new Set(problems.map((item) => item.domain)).size}
+              </div>
               <div className="text-sm text-slate-400">Domains</div>
             </div>
           </div>
         </div>
 
         {selectedProblem ? (
-          <div className="fixed inset-0 bg-slate-950/80 backdrop-blur-sm z-50 flex items-center justify-center p-6">
-            <div className="w-full max-w-3xl bg-slate-900 border border-slate-800 rounded-2xl p-8">
-              <div className="flex items-start justify-between gap-4 mb-4">
-                <div>
-                  <h2 className="text-2xl font-bold text-white mb-2">{selectedProblem.title}</h2>
-                  <p className="text-slate-400">{selectedProblem.domain} • {selectedProblem.category}</p>
+          <div
+            className="fixed inset-0 z-50 overflow-y-auto bg-slate-950/80 p-4 backdrop-blur-sm sm:p-6"
+            onClick={handleCloseProblemDetails}
+          >
+            <div
+              className="mx-auto flex max-h-[calc(100vh-2rem)] w-full max-w-3xl flex-col overflow-hidden rounded-2xl border border-slate-800 bg-slate-900 shadow-2xl sm:max-h-[calc(100vh-3rem)]"
+              onClick={(event) => event.stopPropagation()}
+            >
+              <div className="flex items-start justify-between gap-4 border-b border-slate-800 px-5 py-4 sm:px-8">
+                <div className="min-w-0">
+                  <button
+                    type="button"
+                    onClick={handleCloseProblemDetails}
+                    className="mb-3 inline-flex items-center gap-2 text-sm font-medium text-slate-400 transition hover:text-white"
+                  >
+                    <ArrowLeft className="h-4 w-4" />
+                    Back to problems
+                  </button>
+                  <h2 className="text-2xl font-bold text-white">
+                    {selectedProblem.title}
+                  </h2>
+                  <p className="mt-2 text-slate-400">
+                    {selectedProblem.domain} • {selectedProblem.category}
+                  </p>
                 </div>
-                <button onClick={() => setSelectedProblem(null)} className="text-slate-400 hover:text-white">
-                  Close
+                <button
+                  type="button"
+                  onClick={handleCloseProblemDetails}
+                  className="rounded-lg p-2 text-slate-400 transition hover:bg-slate-800 hover:text-white"
+                  aria-label="Close problem details"
+                >
+                  <X className="h-5 w-5" />
                 </button>
               </div>
-              <p className="text-slate-300 leading-7 mb-6">{selectedProblem.description}</p>
-              <div className="grid gap-4 md:grid-cols-2 mb-6">
-                {selectedProblem.expectedOutcome ? (
+              <div className="min-h-0 flex-1 overflow-y-auto px-5 py-5 sm:px-8 sm:py-6">
+                <p className="text-slate-300 leading-7 mb-6">
+                  {selectedProblem.description}
+                </p>
+                <div className="grid gap-4 md:grid-cols-2 mb-6">
+                  {selectedProblem.expectedOutcome ? (
+                    <div className="rounded-xl border border-slate-800 bg-slate-950 p-4">
+                      <div className="text-xs uppercase tracking-[0.25em] text-slate-500 mb-2">
+                        Expected Outcome
+                      </div>
+                      <div className="text-sm text-slate-300">
+                        {selectedProblem.expectedOutcome}
+                      </div>
+                    </div>
+                  ) : null}
+                  {selectedProblem.impactGoal ? (
+                    <div className="rounded-xl border border-slate-800 bg-slate-950 p-4">
+                      <div className="text-xs uppercase tracking-[0.25em] text-slate-500 mb-2">
+                        Impact Goal
+                      </div>
+                      <div className="text-sm text-slate-300">
+                        {selectedProblem.impactGoal}
+                      </div>
+                    </div>
+                  ) : null}
+                </div>
+                <div className="flex flex-wrap gap-2 mb-6">
+                  {selectedProblem.tags.map((tag) => (
+                    <span
+                      key={tag}
+                      className="px-3 py-1 bg-slate-800 rounded-full text-xs text-slate-300"
+                    >
+                      {tag}
+                    </span>
+                  ))}
+                </div>
+                <div className="grid gap-4 md:grid-cols-2 mb-6">
                   <div className="rounded-xl border border-slate-800 bg-slate-950 p-4">
-                    <div className="text-xs uppercase tracking-[0.25em] text-slate-500 mb-2">Expected Outcome</div>
-                    <div className="text-sm text-slate-300">{selectedProblem.expectedOutcome}</div>
+                    <div className="text-xs uppercase tracking-[0.25em] text-slate-500 mb-3">
+                      Problem Details
+                    </div>
+                    <div className="space-y-2 text-sm text-slate-300">
+                      <div>
+                        <span className="text-slate-500">Domain:</span>{" "}
+                        {selectedProblem.domain}
+                      </div>
+                      <div>
+                        <span className="text-slate-500">Category:</span>{" "}
+                        {selectedProblem.category}
+                      </div>
+                      <div>
+                        <span className="text-slate-500">Difficulty:</span>{" "}
+                        {selectedProblem.difficulty}
+                      </div>
+                      {selectedProblem.geography ? (
+                        <div>
+                          <span className="text-slate-500">Geography:</span>{" "}
+                          {selectedProblem.geography}
+                        </div>
+                      ) : null}
+                      {selectedProblem.sponsorName ? (
+                        <div>
+                          <span className="text-slate-500">Sponsor:</span>{" "}
+                          {selectedProblem.sponsorName}
+                        </div>
+                      ) : null}
+                    </div>
+                  </div>
+                  <div className="rounded-xl border border-slate-800 bg-slate-950 p-4">
+                    <div className="text-xs uppercase tracking-[0.25em] text-slate-500 mb-3">
+                      Submission Policy
+                    </div>
+                    <div className="space-y-2 text-sm text-slate-300">
+                      <div>
+                        Documents:{" "}
+                        {selectedProblem.submissionConfig.allowDocuments
+                          ? "Allowed"
+                          : "Not allowed"}
+                      </div>
+                      <div>
+                        Images:{" "}
+                        {selectedProblem.submissionConfig.allowImages
+                          ? "Allowed"
+                          : "Not allowed"}
+                      </div>
+                      <div>
+                        GitHub repos:{" "}
+                        {selectedProblem.submissionConfig.allowGithubRepos
+                          ? `Up to ${selectedProblem.submissionConfig.maxRepoLinks}`
+                          : "Not allowed"}
+                      </div>
+                      <div>
+                        Code snippets:{" "}
+                        {selectedProblem.submissionConfig.allowCodeSnippets
+                          ? `Up to ${selectedProblem.submissionConfig.maxCodeSnippets}`
+                          : "Not allowed"}
+                      </div>
+                      <div>
+                        Max file size:{" "}
+                        {selectedProblem.submissionConfig.maxFileSizeMb} MB
+                      </div>
+                    </div>
+                  </div>
+                </div>
+                {selectedProblem.targetBeneficiaries.length > 0 ? (
+                  <div className="mb-6 rounded-xl border border-slate-800 bg-slate-950 p-4">
+                    <div className="text-xs uppercase tracking-[0.25em] text-slate-500 mb-3">
+                      Target Beneficiaries
+                    </div>
+                    <div className="flex flex-wrap gap-2">
+                      {selectedProblem.targetBeneficiaries.map((item) => (
+                        <span
+                          key={item}
+                          className="px-3 py-1 rounded-full bg-slate-800 text-xs text-slate-300"
+                        >
+                          {item}
+                        </span>
+                      ))}
+                    </div>
                   </div>
                 ) : null}
-                {selectedProblem.impactGoal ? (
-                  <div className="rounded-xl border border-slate-800 bg-slate-950 p-4">
-                    <div className="text-xs uppercase tracking-[0.25em] text-slate-500 mb-2">Impact Goal</div>
-                    <div className="text-sm text-slate-300">{selectedProblem.impactGoal}</div>
+                {selectedProblem.deliverables.length > 0 ? (
+                  <div className="mb-6 rounded-xl border border-slate-800 bg-slate-950 p-4">
+                    <div className="text-xs uppercase tracking-[0.25em] text-slate-500 mb-3">
+                      Expected Deliverables
+                    </div>
+                    <ul className="space-y-2 text-sm text-slate-300">
+                      {selectedProblem.deliverables.map((item) => (
+                        <li key={item}>- {item}</li>
+                      ))}
+                    </ul>
                   </div>
                 ) : null}
-              </div>
-              <div className="flex flex-wrap gap-2 mb-6">
-                {selectedProblem.tags.map((tag) => (
-                  <span key={tag} className="px-3 py-1 bg-slate-800 rounded-full text-xs text-slate-300">
-                    {tag}
-                  </span>
-                ))}
-              </div>
-              <div className="grid gap-4 md:grid-cols-2 mb-6">
-                <div className="rounded-xl border border-slate-800 bg-slate-950 p-4">
-                  <div className="text-xs uppercase tracking-[0.25em] text-slate-500 mb-3">Problem Details</div>
-                  <div className="space-y-2 text-sm text-slate-300">
-                    <div><span className="text-slate-500">Domain:</span> {selectedProblem.domain}</div>
-                    <div><span className="text-slate-500">Category:</span> {selectedProblem.category}</div>
-                    <div><span className="text-slate-500">Difficulty:</span> {selectedProblem.difficulty}</div>
-                    {selectedProblem.geography ? <div><span className="text-slate-500">Geography:</span> {selectedProblem.geography}</div> : null}
-                    {selectedProblem.sponsorName ? <div><span className="text-slate-500">Sponsor:</span> {selectedProblem.sponsorName}</div> : null}
+                {selectedProblem.acceptanceCriteria.length > 0 ? (
+                  <div className="mb-6 rounded-xl border border-slate-800 bg-slate-950 p-4">
+                    <div className="text-xs uppercase tracking-[0.25em] text-slate-500 mb-3">
+                      Acceptance Criteria
+                    </div>
+                    <ul className="space-y-2 text-sm text-slate-300">
+                      {selectedProblem.acceptanceCriteria.map((item) => (
+                        <li key={item}>- {item}</li>
+                      ))}
+                    </ul>
                   </div>
-                </div>
-                <div className="rounded-xl border border-slate-800 bg-slate-950 p-4">
-                  <div className="text-xs uppercase tracking-[0.25em] text-slate-500 mb-3">Submission Policy</div>
-                  <div className="space-y-2 text-sm text-slate-300">
-                    <div>Documents: {selectedProblem.submissionConfig.allowDocuments ? "Allowed" : "Not allowed"}</div>
-                    <div>Images: {selectedProblem.submissionConfig.allowImages ? "Allowed" : "Not allowed"}</div>
-                    <div>GitHub repos: {selectedProblem.submissionConfig.allowGithubRepos ? `Up to ${selectedProblem.submissionConfig.maxRepoLinks}` : "Not allowed"}</div>
-                    <div>Code snippets: {selectedProblem.submissionConfig.allowCodeSnippets ? `Up to ${selectedProblem.submissionConfig.maxCodeSnippets}` : "Not allowed"}</div>
-                    <div>Max file size: {selectedProblem.submissionConfig.maxFileSizeMb} MB</div>
+                ) : null}
+                <div className="mb-6 rounded-xl border border-amber-500/20 bg-amber-500/5 p-4">
+                  <div className="text-xs uppercase tracking-[0.25em] text-amber-300 mb-2">
+                    Security Notice
+                  </div>
+                  <div className="text-sm text-slate-300">
+                    {selectedProblem.securityNotice}
                   </div>
                 </div>
               </div>
-              {selectedProblem.targetBeneficiaries.length > 0 ? (
-                <div className="mb-6 rounded-xl border border-slate-800 bg-slate-950 p-4">
-                  <div className="text-xs uppercase tracking-[0.25em] text-slate-500 mb-3">Target Beneficiaries</div>
-                  <div className="flex flex-wrap gap-2">
-                    {selectedProblem.targetBeneficiaries.map((item) => (
-                      <span key={item} className="px-3 py-1 rounded-full bg-slate-800 text-xs text-slate-300">{item}</span>
-                    ))}
-                  </div>
-                </div>
-              ) : null}
-              {selectedProblem.deliverables.length > 0 ? (
-                <div className="mb-6 rounded-xl border border-slate-800 bg-slate-950 p-4">
-                  <div className="text-xs uppercase tracking-[0.25em] text-slate-500 mb-3">Expected Deliverables</div>
-                  <ul className="space-y-2 text-sm text-slate-300">
-                    {selectedProblem.deliverables.map((item) => (
-                      <li key={item}>- {item}</li>
-                    ))}
-                  </ul>
-                </div>
-              ) : null}
-              {selectedProblem.acceptanceCriteria.length > 0 ? (
-                <div className="mb-6 rounded-xl border border-slate-800 bg-slate-950 p-4">
-                  <div className="text-xs uppercase tracking-[0.25em] text-slate-500 mb-3">Acceptance Criteria</div>
-                  <ul className="space-y-2 text-sm text-slate-300">
-                    {selectedProblem.acceptanceCriteria.map((item) => (
-                      <li key={item}>- {item}</li>
-                    ))}
-                  </ul>
-                </div>
-              ) : null}
-              <div className="mb-6 rounded-xl border border-amber-500/20 bg-amber-500/5 p-4">
-                <div className="text-xs uppercase tracking-[0.25em] text-amber-300 mb-2">Security Notice</div>
-                <div className="text-sm text-slate-300">{selectedProblem.securityNotice}</div>
-              </div>
-              <div className="flex justify-end gap-3">
-                <button onClick={() => setSelectedProblem(null)} className="px-5 py-3 bg-slate-800 hover:bg-slate-700 text-white rounded-lg font-semibold">
+              <div className="flex flex-col-reverse gap-3 border-t border-slate-800 px-5 py-4 sm:flex-row sm:justify-end sm:px-8">
+                <button
+                  type="button"
+                  onClick={handleCloseProblemDetails}
+                  className="rounded-lg bg-slate-800 px-5 py-3 font-semibold text-white transition hover:bg-slate-700"
+                >
                   Close
                 </button>
                 {!selectedProblem.claimedBy ? (
                   <button
+                    type="button"
                     onClick={() => claimMutation.mutate(selectedProblem._id)}
-                    className="px-5 py-3 bg-gradient-to-r from-blue-600 to-purple-600 text-white rounded-lg font-semibold"
+                    className="rounded-lg bg-gradient-to-r from-blue-600 to-purple-600 px-5 py-3 font-semibold text-white"
                   >
                     Claim & Start Solving
                   </button>

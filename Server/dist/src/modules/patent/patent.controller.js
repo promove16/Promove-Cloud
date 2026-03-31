@@ -1,6 +1,7 @@
 "use strict";
 Object.defineProperty(exports, "__esModule", { value: true });
-exports.getPatentRequest = exports.listMyPatentRequests = exports.createPatentRequest = exports.listMyPatents = exports.createPatent = void 0;
+exports.getPatentRequest = exports.listMyPatentRequests = exports.createPatentRequest = exports.listShowcasedPatents = exports.showcasePatent = exports.listMyPatents = exports.createPatent = void 0;
+const ApiError_1 = require("../../utils/ApiError");
 const ApiResponse_1 = require("../../utils/ApiResponse");
 const patent_service_1 = require("./patent.service");
 const patentRequest_service_1 = require("./patentRequest.service");
@@ -15,6 +16,17 @@ const listMyPatents = async (req, res) => {
     res.json(new ApiResponse_1.ApiResponse(patents));
 };
 exports.listMyPatents = listMyPatents;
+const showcasePatent = async (req, res) => {
+    if (!req.user)
+        throw new ApiError_1.ApiError(401, 'UNAUTHORIZED', 'Invalid or expired token');
+    const result = await (0, patent_service_1.togglePatentShowcase)(req.user._id, String(req.params.id));
+    res.json(new ApiResponse_1.ApiResponse(result));
+};
+exports.showcasePatent = showcasePatent;
+const listShowcasedPatents = async (_req, res) => {
+    res.json(new ApiResponse_1.ApiResponse(await (0, patent_service_1.getShowcasedPatents)()));
+};
+exports.listShowcasedPatents = listShowcasedPatents;
 // ─── Assisted filing ──────────────────────────────────────────────────────────
 const createPatentRequest = async (req, res) => {
     const request = await (0, patentRequest_service_1.submitPatentRequest)(req.user._id, patentRequest_service_1.patentRequestSubmissionSchema.parse(req.body));

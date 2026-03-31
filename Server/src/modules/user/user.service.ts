@@ -12,6 +12,7 @@ import { io } from '../../config/socket';
 import { getStudentCollegeId } from '../recruiter/recruiter.mappers';
 import { sanitizePlainText } from '../../utils/sanitizeText';
 import { applyScoreAsync } from '../../services/scoreEngine';
+import { normalizeInnovationScore, normalizeScoreBreakdown } from '../innovationScore/score.utils';
 
 export const updateMeSchema = z
   .object({
@@ -82,8 +83,8 @@ export const toSanitizedUser = (user: UserLike): SanitizedUser => ({
   ...(user.domain ? { domain: user.domain } : {}),
   profileComplete: user.profileComplete,
   registrationStage: user.registrationStage,
-  innovationScore: user.innovationScore,
-  scoreBreakdown: user.scoreBreakdown,
+  innovationScore: normalizeInnovationScore(user.innovationScore),
+  scoreBreakdown: normalizeScoreBreakdown(user.scoreBreakdown),
   accessGrantedBy: user.accessGrantedBy,
   accessExpiresAt: user.accessExpiresAt,
   isActive: user.isActive,

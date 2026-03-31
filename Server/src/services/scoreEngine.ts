@@ -5,6 +5,7 @@ import { scoreQueue } from '../config/bullmq';
 import { io } from '../config/socket';
 import { logError } from '../config/logger';
 import { ScoreEvent } from '../modules/innovationScore/score.model';
+import { normalizeInnovationScore } from '../modules/innovationScore/score.utils';
 
 export const SCORE_DELTAS = {
   PROBLEM_CLAIMED:         5,
@@ -79,8 +80,8 @@ export const applyScore = async ({ userId, trigger, metadata }: ApplyScoreParams
   const user = await User.findById(userId).select('innovationScore institutionId createdAt').lean();
   if (!user) throw new Error(`User ${userId} not found`);
 
-  const currentScore = user.innovationScore || 0;
-  const newScore = Math.min(200, currentScore + delta);
+  const currentScore = normalizeInnovationScore(user.innovationScore);
+  const newScore = normalizeInnovationScore(currentScore + delta);
   const actualDelta = newScore - currentScore;
 
   if (actualDelta <= 0) return currentScore;

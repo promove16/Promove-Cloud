@@ -1,5 +1,5 @@
+import { useEffect, useState } from 'react';
 import { useQuery } from '@tanstack/react-query';
-import { useState } from 'react';
 import { Badge } from '../../components/ui/Badge';
 import { Button } from '../../components/ui/Button';
 import { Card } from '../../components/ui/Card';
@@ -49,6 +49,7 @@ export function StartupDetailDrawer({
   const [proposedAmountINR, setProposedAmountINR] = useState('20000');
   const [proposedEquityPercent, setProposedEquityPercent] = useState('2');
   const [chosenRole, setChosenRole] = useState<'shareholder' | 'director' | 'observer'>('observer');
+  const [submissionError, setSubmissionError] = useState('');
   const startupQuery = useQuery({
     queryKey: ['investor-startup', startupId],
     queryFn: () => investorApi.getStartup(startupId!),
@@ -56,10 +57,90 @@ export function StartupDetailDrawer({
   });
 
   const detail = startupQuery.data as InvestorStartupDetailResponse | undefined;
+  const canChoosePenny = Boolean(detail?.startup.acceptsPennyInvestors);
+  const canChooseSole = Boolean(detail?.startup.acceptsSoleInvestor);
+  const selectedTypeAvailable = investorType === 'penny' ? canChoosePenny : canChooseSole;
+  const canSubmitInterest =
+    canExpressInterest &&
+    Boolean(detail?.canExpressInterest) &&
+    (canChoosePenny || canChooseSole) &&
+    selectedTypeAvailable;
+
+  useEffect(() => {
+    if (!open) {
+      setInvestorType('penny');
+      setProposedAmountINR('20000');
+      setProposedEquityPercent('2');
+      setChosenRole('observer');
+      setSubmissionError('');
+    }
+  }, [open]);
+
+  useEffect(() => {
+    setSubmissionError('');
+  }, [startupId]);
+
+  useEffect(() => {
+    if (!detail) return;
+
+    if (investorType === 'penny' && !canChoosePenny && canChooseSole) {
+      setInvestorType('sole');
+      setChosenRole('shareholder');
+      return;
+    }
+
+    if (investorType === 'sole' && !canChooseSole && canChoosePenny) {
+      setInvestorType('penny');
+      setChosenRole('observer');
+    }
+  }, [detail, investorType, canChoosePenny, canChooseSole]);
 
   if (!open) {
     return null;
   }
+
+  const handleExpressInterest = () => {
+    if (!startupId || !detail) return;
+
+    if (!selectedTypeAvailable) {
+      setSubmissionError(
+        investorType === 'penny'
+          ? 'This startup is not accepting penny investors right now.'
+          : 'This startup already has a sole investor.',
+      );
+      return;
+    }
+
+    const amount = Number(proposedAmountINR);
+    if (!Number.isFinite(amount) || amount < 20000) {
+      setSubmissionError('Minimum investment amount is INR 20,000.');
+      return;
+    }
+
+    const equity = Number(proposedEquityPercent);
+    if (!Number.isFinite(equity) || equity <= 0 || equity > 100) {
+      setSubmissionError('Enter a valid equity percentage between 0.01 and 100.');
+      return;
+    }
+
+    if (investorType === 'penny' && equity > 5) {
+      setSubmissionError('A penny investor cannot request more than 5% equity.');
+      return;
+    }
+
+    if (investorType === 'sole' && chosenRole === 'director' && equity < 51) {
+      setSubmissionError('A sole investor needs at least 51% equity to take the director role.');
+      return;
+    }
+
+    setSubmissionError('');
+    onExpressInterest(startupId, {
+      investorType,
+      proposedAmountINR: amount,
+      proposedEquityPercent: equity,
+      chosenRole,
+    });
+  };
 
   return (
     <div className="fixed inset-0 z-50 flex justify-end bg-slate-950/80 backdrop-blur-sm">
@@ -204,12 +285,16 @@ export function StartupDetailDrawer({
                     setInvestorType('penny');
                     setChosenRole('observer');
                   }}
+                  disabled={!canChoosePenny}
                   className={`rounded-2xl border p-4 text-left ${
                     investorType === 'penny' ? 'border-cyan-400 bg-cyan-500/10' : 'border-slate-800 bg-slate-900/80'
-                  }`}
+                  } ${!canChoosePenny ? 'cursor-not-allowed opacity-50' : ''}`}
                 >
                   <div className="font-semibold text-white">Penny Investor</div>
-                  <div className="mt-2 text-sm text-slate-400">Small stake, shareholder rights, ₹20k-₹5L range</div>
+                  <div className="mt-2 text-sm text-slate-400">Small stake, shareholder rights, INR 20k-INR 5L range</div>
+                  {!canChoosePenny ? (
+                    <div className="mt-2 text-xs text-amber-300">All penny investor slots are filled.</div>
+                  ) : null}
                 </button>
                 <button
                   type="button"
@@ -217,12 +302,16 @@ export function StartupDetailDrawer({
                     setInvestorType('sole');
                     setChosenRole('shareholder');
                   }}
+                  disabled={!canChooseSole}
                   className={`rounded-2xl border p-4 text-left ${
                     investorType === 'sole' ? 'border-amber-400 bg-amber-500/10' : 'border-slate-800 bg-slate-900/80'
-                  }`}
+                  } ${!canChooseSole ? 'cursor-not-allowed opacity-50' : ''}`}
                 >
                   <div className="font-semibold text-white">Sole Investor</div>
                   <div className="mt-2 text-sm text-slate-400">Lead investor, director option, negotiated authority</div>
+                  {!canChooseSole ? (
+                    <div className="mt-2 text-xs text-amber-300">A sole investor is already assigned to this startup.</div>
+                  ) : null}
                 </button>
               </div>
 
@@ -269,21 +358,21 @@ export function StartupDetailDrawer({
                 </div>
               </div>
 
+              {submissionError ? (
+                <div className="rounded-2xl border border-red-500/30 bg-red-500/10 px-4 py-3 text-sm text-red-200">
+                  {submissionError}
+                </div>
+              ) : null}
+
               <div className="flex items-center justify-between gap-3">
                 <div className="text-sm text-slate-400">
-                  Express Interest is only enabled after the full profile is reviewed.
+                  {detail.canExpressInterest
+                    ? 'Express Interest is enabled after the full profile review.'
+                    : 'This startup is not accepting any new investor interest right now.'}
                 </div>
                 <Button
-                  onClick={() =>
-                    startupId &&
-                    onExpressInterest(startupId, {
-                      investorType,
-                      proposedAmountINR: Number(proposedAmountINR),
-                      proposedEquityPercent: Number(proposedEquityPercent),
-                      chosenRole,
-                    })
-                  }
-                  disabled={!canExpressInterest || isExpressingInterest}
+                  onClick={handleExpressInterest}
+                  disabled={!canSubmitInterest || isExpressingInterest}
                 >
                   {isExpressingInterest ? 'Sending...' : 'Express Interest'}
                 </Button>

@@ -1,18 +1,31 @@
 import api from './axiosInstance';
 import { ApiSuccessResponse } from '../types/auth.types';
 
+export type QueryType = 'project_mentor' | 'investor' | 'recruiter' | 'general';
+
 export interface DMMessage {
   _id: string;
   senderId: string;
   recipientId: string;
   message: string;
   messageType: 'text' | 'interview_request';
+  queryType?: QueryType;
   scheduledAt?: string;
   meetLink?: string;
   attachmentUrl?: string;
   attachmentType?: 'image' | 'pdf';
+  attachmentName?: string;
   readAt?: string | null;
   sentAt: string;
+  isOptimistic?: boolean;
+}
+
+export interface AttachmentUpload {
+  url: string;
+  publicId: string;
+  fileType: 'image' | 'pdf';
+  fileName: string;
+  fileSize: number;
 }
 
 export interface DMPartner {
@@ -49,6 +62,10 @@ export const dmApi = {
     messageType?: 'text' | 'interview_request';
     scheduledAt?: string;
     meetLink?: string;
+    queryType?: QueryType;
+    attachmentUrl?: string;
+    attachmentType?: 'image' | 'pdf';
+    attachmentName?: string;
   }) {
     const response = await api.post<ApiSuccessResponse<DMMessage>>(`/api/dm/${userId}`, payload);
     return response.data.data;
@@ -64,6 +81,12 @@ export const dmApi = {
       avatar?: string;
       role: string;
     }>>>(`/api/users/search`, { params: { q: query } });
+    return response.data.data;
+  },
+  async uploadAttachment(file: File) {
+    const formData = new FormData();
+    formData.append('file', file);
+    const response = await api.post<ApiSuccessResponse<AttachmentUpload>>('/api/dm/upload', formData);
     return response.data.data;
   },
 };

@@ -1,10 +1,46 @@
 import { useEffect, useRef, useState, useCallback } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
-import { MessageCircle, Search, Send, ArrowLeft, Calendar, ExternalLink, PenSquare, Users, Check, CheckCheck } from 'lucide-react';
-import { dmApi, DMConversation } from '../../api/dm.api';
+import { isAxiosError } from 'axios';
+import { 
+  MessageCircle, Search, Send, ArrowLeft, Calendar, ExternalLink, PenSquare, Users, 
+  Check, CheckCheck, MoreVertical, AlertTriangle, GraduationCap, TrendingUp, Building2,
+  Image, FileText, X, Paperclip
+} from 'lucide-react';
+import { dmApi, DMConversation, DMMessage, QueryType } from '../../api/dm.api';
 import { useDM } from '../../hooks/useDM';
 import { useAuthStore } from '../../store/authStore';
+import { QueryTypeModal } from '../../components/messaging/QueryTypeModal';
+import { ReportUserModal } from '../../components/messaging/ReportUserModal';
+import { InvestorProposalModal, InvestorProposalReplyActions } from '../../components/messaging/InvestorProposalModal';
+import { getVisibleAssociationQueryTypes, isAssociationQueryType } from '../../components/messaging/queryTypeVisibility';
+
+type PendingAttachmentState = {
+  previewUrl: string;
+  uploadedUrl?: string;
+  localObjectUrl: string;
+  fileType: 'image' | 'pdf';
+  fileName: string;
+  fileSize: number;
+  isUploading: boolean;
+};
+
+const attachmentMaxSizeBytes = 10 * 1024 * 1024;
+const allowedAttachmentMimeTypes = new Set([
+  'image/jpeg',
+  'image/png',
+  'image/gif',
+  'image/webp',
+  'application/pdf',
+]);
+const allowedAttachmentExtensionPattern = /\.(jpe?g|png|gif|webp|pdf)$/i;
+
+const getAttachmentUploadErrorMessage = (error: unknown) => {
+  if (isAxiosError<{ error?: { message?: string } }>(error)) {
+    return error.response?.data?.error?.message ?? 'Attachment upload failed. Please try again.';
+  }
+  return error instanceof Error ? error.message : 'Attachment upload failed. Please try again.';
+};
 
 const dt = (value: string) =>
   new Date(value).toLocaleString('en-IN', {
@@ -13,6 +49,17 @@ const dt = (value: string) =>
     hour: '2-digit',
     minute: '2-digit',
   });
+
+const formatMessageDate = (value: string) => {
+  const date = new Date(value);
+  const today = new Date();
+  const yesterday = new Date(today);
+  yesterday.setDate(yesterday.getDate() - 1);
+
+  if (date.toDateString() === today.toDateString()) return 'Today';
+  if (date.toDateString() === yesterday.toDateString()) return 'Yesterday';
+  return date.toLocaleDateString('en-IN', { day: 'numeric', month: 'long', year: 'numeric' });
+};
 
 const timeAgo = (value: string) => {
   const diff = Date.now() - new Date(value).getTime();
@@ -42,9 +89,249 @@ function OfflineDot({ className = '' }: { className?: string }) {
 function ReadReceipt({ readAt, isMine }: { readAt?: string | null; isMine: boolean }) {
   if (!isMine) return null;
   return readAt ? (
-    <CheckCheck className="inline h-3.5 w-3.5 text-cyan-400" title={`Read ${dt(readAt)}`} />
+    <span title={`Read ${dt(readAt)}`}>
+      <CheckCheck className="inline h-3.5 w-3.5 text-cyan-400" />
+    </span>
   ) : (
-    <Check className="inline h-3.5 w-3.5 text-slate-500" title="Sent" />
+    <span title="Sent">
+      <Check className="inline h-3.5 w-3.5 text-slate-500" />
+    </span>
+  );
+}
+
+type InvestorPitchDetails = {
+  intro: string;
+  startupName?: string;
+  tagline?: string;
+  category?: string;
+  stage?: string;
+  fundingNeeded?: string;
+  teamSize?: string;
+  tractionItems: string[];
+  pitchDeckUrl?: string;
+  closing: string;
+};
+
+const investorPitchFieldLabels = new Set([
+  'Startup',
+  'Category',
+  'Stage',
+  'Funding Needed',
+  'Team Size',
+  'Traction',
+  'Pitch Deck',
+]);
+
+const stripLeadingDecorators = (value: string) =>
+  value.replace(/^[^A-Za-z0-9]+/, '').trim();
+
+const extractFirstEmphasizedText = (value: string) => {
+  const match = value.match(/\*\*([^*]+)\*\*/);
+  return match?.[1]?.trim();
+};
+
+const parseInvestorPitch = (message: string): InvestorPitchDetails | null => {
+  if (!message.trim()) return null;
+
+  const lines = message
+    .split(/\r?\n/)
+    .map((line) => line.trim())
+    .filter(Boolean);
+
+  const hasInvestorFormatting =
+    /\*\*[^*]+\*\*/.test(message) ||
+    lines.some((line) => {
+      const cleaned = stripLeadingDecorators(line);
+      const label = cleaned.split(':')[0]?.trim();
+      return investorPitchFieldLabels.has(label);
+    });
+
+  if (!hasInvestorFormatting) return null;
+
+  const details: InvestorPitchDetails = {
+    intro: '',
+    tractionItems: [],
+    closing: '',
+  };
+
+  const introLines: string[] = [];
+  const closingLines: string[] = [];
+  let hasStructuredFields = false;
+
+  for (const rawLine of lines) {
+    const cleanedLine = stripLeadingDecorators(rawLine);
+    const match = cleanedLine.match(
+      /^(Startup|Category|Stage|Funding Needed|Team Size|Traction|Pitch Deck):\s*(.+)$/i,
+    );
+
+    if (match) {
+      hasStructuredFields = true;
+      const [, rawLabel, rawValue] = match;
+      const label = rawLabel.trim();
+      const value = rawValue.trim();
+
+      if (label === 'Startup') details.startupName = value;
+      if (label === 'Category') details.category = value;
+      if (label === 'Stage') details.stage = value;
+      if (label === 'Funding Needed') details.fundingNeeded = value;
+      if (label === 'Team Size') details.teamSize = value;
+      if (label === 'Traction') {
+        details.tractionItems = value
+          .split(/\s*(?:,|\u00b7|\u2022|\|)\s*/u)
+          .map((item) => item.trim())
+          .filter(Boolean);
+      }
+      if (label === 'Pitch Deck') details.pitchDeckUrl = value;
+      continue;
+    }
+
+    if (hasStructuredFields && details.startupName && !details.tagline) {
+      details.tagline = cleanedLine;
+      continue;
+    }
+
+    if (hasStructuredFields) {
+      closingLines.push(cleanedLine);
+    } else {
+      introLines.push(rawLine);
+    }
+  }
+
+  details.intro = introLines.join(' ').trim();
+  details.closing = closingLines.join(' ').trim();
+
+  if (!details.startupName) {
+    details.startupName = extractFirstEmphasizedText(details.intro);
+  }
+
+  return details;
+};
+
+function EmphasizedMessageText({
+  text,
+  className,
+}: {
+  text: string;
+  className?: string;
+}) {
+  const parts = text.split(/(\*\*[^*]+\*\*)/g).filter(Boolean);
+
+  return (
+    <p className={className}>
+      {parts.map((part, index) => {
+        const match = part.match(/^\*\*([^*]+)\*\*$/);
+        if (!match) return <span key={`${part}-${index}`}>{part}</span>;
+        return (
+          <strong key={`${match[1]}-${index}`} className="font-semibold text-white">
+            {match[1]}
+          </strong>
+        );
+      })}
+    </p>
+  );
+}
+
+function InvestorPitchCard({
+  details,
+  isMine,
+}: {
+  details: InvestorPitchDetails;
+  isMine: boolean;
+}) {
+  const accentBorder = isMine ? 'border-emerald-400/30' : 'border-cyan-400/20';
+  const accentBackground = isMine
+    ? 'bg-gradient-to-br from-emerald-500/12 via-slate-900 to-slate-900'
+    : 'bg-gradient-to-br from-cyan-500/10 via-slate-800 to-slate-900';
+
+  return (
+    <div className={`w-full overflow-hidden rounded-[1.35rem] border ${accentBorder} ${accentBackground}`}>
+      <div className="border-b border-white/10 px-4 py-3">
+        <div className="flex flex-wrap items-start justify-between gap-3">
+          <div className="min-w-0 flex-1">
+            <div className="flex items-center gap-2 text-[11px] font-semibold uppercase tracking-[0.22em] text-emerald-300/80">
+              <TrendingUp className="h-3.5 w-3.5" />
+              Investment Pitch
+            </div>
+            {details.startupName ? (
+              <h4 className="mt-2 text-base font-semibold text-white">{details.startupName}</h4>
+            ) : null}
+            {details.tagline ? (
+              <p className="mt-1 text-sm leading-relaxed text-slate-300">{details.tagline}</p>
+            ) : null}
+          </div>
+          {details.stage ? (
+            <span className="rounded-full border border-emerald-400/20 bg-emerald-500/10 px-3 py-1 text-xs font-semibold text-emerald-300">
+              {details.stage}
+            </span>
+          ) : null}
+        </div>
+
+        {details.intro ? (
+          <div className="mt-3 rounded-2xl border border-white/10 bg-black/10 px-3 py-2.5">
+            <EmphasizedMessageText
+              text={details.intro}
+              className="text-sm leading-relaxed text-slate-100"
+            />
+          </div>
+        ) : null}
+      </div>
+
+      <div className="space-y-3 px-4 py-3">
+        {details.category || details.fundingNeeded || details.teamSize ? (
+          <div className="flex flex-wrap gap-2">
+            {details.category ? (
+              <span className="rounded-full border border-slate-700 bg-slate-900/70 px-3 py-1 text-xs font-medium text-slate-200">
+                {details.category}
+              </span>
+            ) : null}
+            {details.fundingNeeded ? (
+              <span className="rounded-full border border-slate-700 bg-slate-900/70 px-3 py-1 text-xs font-medium text-slate-200">
+                Seeking {details.fundingNeeded}
+              </span>
+            ) : null}
+            {details.teamSize ? (
+              <span className="rounded-full border border-slate-700 bg-slate-900/70 px-3 py-1 text-xs font-medium text-slate-200">
+                Team size {details.teamSize}
+              </span>
+            ) : null}
+          </div>
+        ) : null}
+
+        {details.tractionItems.length > 0 ? (
+          <div>
+            <p className="mb-2 text-xs font-semibold uppercase tracking-[0.2em] text-slate-400">
+              Traction
+            </p>
+            <div className="flex flex-wrap gap-2">
+              {details.tractionItems.map((item) => (
+                <span
+                  key={item}
+                  className="rounded-full border border-emerald-400/20 bg-emerald-500/10 px-3 py-1 text-xs font-medium text-emerald-200"
+                >
+                  {item}
+                </span>
+              ))}
+            </div>
+          </div>
+        ) : null}
+
+        {details.pitchDeckUrl ? (
+          <a
+            href={details.pitchDeckUrl}
+            target="_blank"
+            rel="noreferrer"
+            className="inline-flex items-center gap-2 rounded-xl border border-cyan-400/20 bg-cyan-500/10 px-3 py-2 text-sm font-medium text-cyan-200 transition hover:bg-cyan-500/15"
+          >
+            <ExternalLink className="h-4 w-4" />
+            Open pitch deck
+          </a>
+        ) : null}
+
+        {details.closing ? (
+          <p className="text-sm leading-relaxed text-slate-200">{details.closing}</p>
+        ) : null}
+      </div>
+    </div>
   );
 }
 
@@ -73,16 +360,16 @@ function ConversationItem({
       }`}
     >
       <div className="relative flex-shrink-0">
-        <div className="flex h-11 w-11 items-center justify-center rounded-full bg-gradient-to-br from-cyan-500 to-emerald-500 text-sm font-bold text-white">
+        <div className="flex h-12 w-12 items-center justify-center rounded-full bg-gradient-to-br from-cyan-500 to-emerald-500 text-sm font-bold text-white">
           {partner?.avatar ? (
-            <img src={partner.avatar} alt={name} className="h-11 w-11 rounded-full object-cover" />
+            <img src={partner.avatar} alt={name} className="h-12 w-12 rounded-full object-cover" />
           ) : (
             initials(name)
           )}
         </div>
         {isOnline ? <OnlineDot /> : <OfflineDot />}
         {convo.unreadCount > 0 ? (
-          <span className="absolute -right-0.5 -top-0.5 flex h-4 w-4 items-center justify-center rounded-full bg-cyan-500 text-[10px] font-bold text-white">
+          <span className="absolute -right-0.5 -top-0.5 flex h-5 w-5 items-center justify-center rounded-full bg-cyan-500 text-[10px] font-bold text-white">
             {convo.unreadCount > 9 ? '9+' : convo.unreadCount}
           </span>
         ) : null}
@@ -110,21 +397,370 @@ function ConversationItem({
   );
 }
 
-function ChatPanel({ partnerId, partnerName }: { partnerId: string; partnerName: string }) {
+interface FirstContactPanelProps {
+  partnerName: string;
+  partnerRole?: string;
+  onSend: (message: string, queryType: QueryType) => void;
+}
+
+function FirstContactPanel({ partnerName, partnerRole, onSend }: FirstContactPanelProps) {
+  const [selectedType, setSelectedType] = useState<QueryType | null>(null);
+  const [customMessage, setCustomMessage] = useState('');
+  const visibleAssociationTypes = new Set(getVisibleAssociationQueryTypes(partnerRole));
+
+  const queryTypes: { type: QueryType; label: string; icon: React.ReactNode; color: string; autoMessages: string[] }[] = [
+    {
+      type: 'project_mentor',
+      label: 'Project Mentor',
+      icon: <GraduationCap className="h-5 w-5" />,
+      color: 'from-blue-500 to-cyan-500',
+      autoMessages: [
+        'Hi! I am working on a project and would love to get your guidance and mentorship.',
+        'I am looking for a mentor who can help me with my startup project.',
+      ],
+    },
+    {
+      type: 'investor',
+      label: 'Investor',
+      icon: <TrendingUp className="h-5 w-5" />,
+      color: 'from-emerald-500 to-teal-500',
+      autoMessages: [
+        'Hi! I have an exciting startup that I believe has great potential.',
+        'I am currently raising funds for my startup and would love to discuss.',
+      ],
+    },
+    {
+      type: 'recruiter',
+      label: 'Recruiter',
+      icon: <Building2 className="h-5 w-5" />,
+      color: 'from-purple-500 to-pink-500',
+      autoMessages: [
+        'Hi! I am interested in career opportunities at your organization.',
+        'I would love to discuss potential opportunities with your team.',
+      ],
+    },
+    {
+      type: 'general',
+      label: 'General Query',
+      icon: <MessageCircle className="h-5 w-5" />,
+      color: 'from-slate-500 to-gray-500',
+      autoMessages: [
+        'Hi! I wanted to reach out and connect with you.',
+        'Hello! I hope this message finds you well.',
+      ],
+    },
+  ];
+  const visibleQueryTypes = queryTypes.filter((queryType) => {
+    if (!isAssociationQueryType(queryType.type)) {
+      return true;
+    }
+
+    return visibleAssociationTypes.has(queryType.type);
+  });
+
+  const handleSend = (message: string) => {
+    if (selectedType && message) {
+      onSend(message, selectedType);
+    }
+  };
+
+  useEffect(() => {
+    if (selectedType && !visibleQueryTypes.some((queryType) => queryType.type === selectedType)) {
+      setSelectedType(null);
+    }
+  }, [selectedType, visibleQueryTypes]);
+
+  if (!selectedType) {
+    return (
+      <div className="flex h-full flex-col items-center justify-center gap-6 px-4">
+        <div className="text-center">
+          <h3 className="text-xl font-semibold text-white">Start a conversation with {partnerName}</h3>
+          <p className="mt-2 text-sm text-slate-400">Select what you would like to discuss</p>
+        </div>
+        <div className="grid w-full max-w-md grid-cols-2 gap-3">
+          {visibleQueryTypes.map((qt) => (
+            <button
+              key={qt.type}
+              onClick={() => setSelectedType(qt.type)}
+              className="flex flex-col items-center gap-2 rounded-xl border border-slate-700 bg-slate-800/50 p-4 transition hover:border-slate-600 hover:bg-slate-800"
+            >
+              <div className={`flex h-12 w-12 items-center justify-center rounded-xl bg-gradient-to-br ${qt.color} text-white`}>
+                {qt.icon}
+              </div>
+              <span className="text-sm font-medium text-white">{qt.label}</span>
+            </button>
+          ))}
+        </div>
+      </div>
+    );
+  }
+
+  const currentType = visibleQueryTypes.find((qt) => qt.type === selectedType);
+  if (!currentType) return null;
+
+  return (
+    <div className="flex h-full flex-col items-center justify-center gap-6 px-4">
+      <button
+        onClick={() => setSelectedType(null)}
+        className="self-start text-sm text-slate-400 transition hover:text-white"
+      >
+        ← Back
+      </button>
+      <div className="text-center">
+        <div className={`mx-auto mb-3 flex h-12 w-12 items-center justify-center rounded-xl bg-gradient-to-br ${currentType.color} text-white`}>
+          {currentType.icon}
+        </div>
+        <h3 className="text-lg font-semibold text-white">{currentType.label}</h3>
+      </div>
+      <div className="w-full max-w-md space-y-2">
+        {currentType.autoMessages.map((msg, idx) => (
+          <button
+            key={idx}
+            onClick={() => handleSend(msg)}
+            className="w-full rounded-xl border border-slate-700 bg-slate-800/50 p-3 text-left text-sm text-slate-300 transition hover:border-cyan-500/50 hover:bg-slate-800"
+          >
+            {msg}
+          </button>
+        ))}
+      </div>
+      <div className="w-full max-w-md">
+        <p className="mb-2 text-sm text-slate-400">Or write your own:</p>
+        <div className="flex gap-2">
+          <textarea
+            value={customMessage}
+            onChange={(e) => setCustomMessage(e.target.value)}
+            placeholder="Type your message..."
+            rows={2}
+            className="flex-1 resize-none rounded-xl border border-slate-700 bg-slate-800 p-3 text-sm text-white outline-none transition focus:border-cyan-500 placeholder:text-slate-500"
+          />
+          <button
+            onClick={() => handleSend(customMessage)}
+            disabled={!customMessage.trim()}
+            className="self-end rounded-xl bg-gradient-to-r from-cyan-500 to-emerald-500 px-4 py-2 text-sm font-semibold text-white transition hover:opacity-90 disabled:opacity-40"
+          >
+            Send
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+function MessageBubble({
+  msg,
+  isMine,
+  partnerName,
+  currentUserName,
+  showAvatar,
+  statusText,
+  onRemoveAttachment,
+  disableAttachmentOpen = false,
+  onQuickReply,
+}: {
+  msg: DMMessage;
+  isMine: boolean;
+  partnerName: string;
+  currentUserName: string;
+  showAvatar: boolean;
+  statusText?: string;
+  onRemoveAttachment?: () => void;
+  disableAttachmentOpen?: boolean;
+  onQuickReply?: (message: string) => void;
+}) {
+  const isImage = msg.attachmentType === 'image';
+  const isPdf = msg.attachmentType === 'pdf';
+  const investorPitch = msg.queryType === 'investor' ? parseInvestorPitch(msg.message) : null;
+  const attachmentImage = msg.attachmentUrl ? (
+    <img
+      src={msg.attachmentUrl}
+      alt={msg.attachmentName || 'Image'}
+      className="max-w-[280px] max-h-[300px] object-cover transition-opacity hover:opacity-90"
+    />
+  ) : null;
+  const attachmentDocument = (
+    <div className="flex items-center gap-3 rounded-2xl border border-slate-700 bg-slate-800/80 p-3">
+      <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-red-500/20 text-red-400">
+        <FileText className="h-5 w-5" />
+      </div>
+      <div className="min-w-0">
+        <p className="truncate text-sm font-medium text-white">{msg.attachmentName || 'Document.pdf'}</p>
+        <p className="text-xs text-slate-400">PDF</p>
+      </div>
+    </div>
+  );
+
+  return (
+    <div className={`flex gap-2 ${isMine ? 'flex-row-reverse' : ''} ${showAvatar ? 'mt-3' : 'mt-1'}`}>
+      {/* Avatar */}
+      <div className="flex h-8 w-8 flex-shrink-0 items-center justify-center">
+        {showAvatar && (
+          <div className="flex h-8 w-8 items-center justify-center rounded-full bg-gradient-to-br from-cyan-500 to-emerald-500 text-xs font-bold text-white">
+            {isMine ? initials(currentUserName) : initials(partnerName)}
+          </div>
+        )}
+      </div>
+
+      {/* Message bubble */}
+      <div
+        className={`flex w-full max-w-[42rem] flex-col ${isMine ? 'items-end' : 'items-start'} ${msg.isOptimistic ? 'opacity-85' : ''}`}
+      >
+        {/* Attachment preview */}
+        {msg.attachmentUrl && (
+          <div className={`relative mb-1 overflow-hidden rounded-2xl ${isMine ? 'order-2' : 'order-1'}`}>
+            {isImage ? (
+              disableAttachmentOpen ? (
+                attachmentImage
+              ) : (
+                <a href={msg.attachmentUrl} target="_blank" rel="noreferrer">
+                  {attachmentImage}
+                </a>
+              )
+            ) : isPdf ? (
+              disableAttachmentOpen ? (
+                attachmentDocument
+              ) : (
+                <a 
+                  href={msg.attachmentUrl} 
+                  target="_blank" 
+                  rel="noreferrer"
+                  className="transition-colors hover:bg-slate-800"
+                >
+                  {attachmentDocument}
+                </a>
+              )
+            ) : null}
+            {onRemoveAttachment ? (
+              <button
+                type="button"
+                onClick={onRemoveAttachment}
+                className="absolute right-2 top-2 flex h-7 w-7 items-center justify-center rounded-full bg-slate-950/80 text-white transition hover:bg-slate-900"
+                aria-label="Remove attachment"
+              >
+                <X className="h-4 w-4" />
+              </button>
+            ) : null}
+            {msg.attachmentName && isImage && (
+              <p className={`px-2 py-1 text-xs text-slate-400 ${isMine ? 'text-right' : 'text-left'}`}>
+                {msg.attachmentName}
+              </p>
+            )}
+          </div>
+        )}
+
+        {/* Text message */}
+        {msg.message && (
+          investorPitch ? (
+            <div className="order-1 w-full">
+              <InvestorPitchCard details={investorPitch} isMine={isMine} />
+            </div>
+          ) : (
+            <div
+              className={`max-w-[70%] rounded-2xl px-4 py-2.5 ${
+                isMine
+                  ? 'order-1 rounded-tr-sm bg-gradient-to-br from-cyan-600 to-cyan-700 text-white'
+                  : 'order-1 rounded-tl-sm bg-slate-800 text-slate-100'
+              }`}
+            >
+              <p className="text-sm leading-relaxed whitespace-pre-wrap break-words">{msg.message}</p>
+            </div>
+          )
+        )}
+
+        {/* Timestamp and read receipt */}
+        <div className={`mt-1 flex items-center gap-1.5 ${isMine ? 'order-2 justify-end' : 'order-3 justify-start'}`}>
+          <span className={`text-[11px] ${isMine ? 'text-cyan-300/60' : 'text-slate-500'}`}>
+            {statusText ?? dt(msg.sentAt)}
+          </span>
+          {!statusText ? <ReadReceipt readAt={msg.readAt} isMine={isMine} /> : null}
+        </div>
+
+        {/* Investor proposal quick-reply — shown only to the recipient */}
+        {!isMine && msg.queryType === 'investor' && onQuickReply && (
+          <InvestorProposalReplyActions
+            senderName={partnerName}
+            onAccept={() =>
+              onQuickReply(`Hi! I've reviewed your startup and I'm interested in learning more. Let's schedule a call to discuss the investment opportunity.`)
+            }
+            onDecline={() =>
+              onQuickReply(`Thank you for reaching out. After careful consideration, I'll pass on this opportunity for now. Best of luck with your venture!`)
+            }
+          />
+        )}
+      </div>
+    </div>
+  );
+}
+
+function DateSeparator({ date }: { date: string }) {
+  return (
+    <div className="flex items-center gap-4 py-4">
+      <div className="flex-1 border-t border-slate-800" />
+      <span className="text-xs text-slate-500">{date}</span>
+      <div className="flex-1 border-t border-slate-800" />
+    </div>
+  );
+}
+
+function ChatPanel({ partnerId, partnerName, partnerRole, isFirstContact, onSendWithQuery }: { 
+  partnerId: string; 
+  partnerName: string;
+  partnerRole?: string;
+  isFirstContact?: boolean;
+  onSendWithQuery?: (message: string, queryType: QueryType) => void;
+}) {
   const currentUser = useAuthStore((s) => s.user);
   const { messages, sendMessage, sendTyping, typingFromPartner, isLoading } = useDM(partnerId);
   const [draft, setDraft] = useState('');
-  const bottomRef = useRef<HTMLDivElement>(null);
+  const [showAttachments, setShowAttachments] = useState(false);
+  const [pendingAttachment, setPendingAttachment] = useState<PendingAttachmentState | null>(null);
+  const [isUploading, setIsUploading] = useState(false);
+  const [attachmentError, setAttachmentError] = useState('');
+  const threadRef = useRef<HTMLDivElement>(null);
+  const fileInputRef = useRef<HTMLInputElement>(null);
+  const textareaRef = useRef<HTMLTextAreaElement>(null);
 
   useEffect(() => {
-    bottomRef.current?.scrollIntoView({ behavior: 'smooth' });
-  }, [messages.length]);
+    const thread = threadRef.current;
+    if (!thread) return;
+
+    requestAnimationFrame(() => {
+      thread.scrollTo({
+        top: thread.scrollHeight,
+        behavior: 'smooth',
+      });
+    });
+  }, [messages.length, pendingAttachment?.previewUrl, pendingAttachment?.isUploading]);
+
+  useEffect(() => () => {
+    if (pendingAttachment?.localObjectUrl) {
+      URL.revokeObjectURL(pendingAttachment.localObjectUrl);
+    }
+  }, [pendingAttachment?.localObjectUrl]);
+
+  const removeAttachment = useCallback(() => {
+    setAttachmentError('');
+    setPendingAttachment((current) => {
+      if (current?.localObjectUrl) {
+        URL.revokeObjectURL(current.localObjectUrl);
+      }
+      return null;
+    });
+  }, []);
 
   const handleSend = () => {
     const text = draft.trim();
-    if (!text) return;
-    sendMessage({ message: text, messageType: 'text' });
+    if (!text && !pendingAttachment) return;
+    if (pendingAttachment && !pendingAttachment.uploadedUrl) return;
+    sendMessage({ 
+      message: text, 
+      messageType: 'text',
+      attachmentUrl: pendingAttachment?.uploadedUrl,
+      attachmentType: pendingAttachment?.fileType,
+      attachmentName: pendingAttachment?.fileName,
+    });
     setDraft('');
+    removeAttachment();
+    setShowAttachments(false);
   };
 
   const handleKeyDown = (e: React.KeyboardEvent<HTMLTextAreaElement>) => {
@@ -134,120 +770,250 @@ function ChatPanel({ partnerId, partnerName }: { partnerId: string; partnerName:
     }
   };
 
+  const handleFileSelect = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    setAttachmentError('');
+
+    const hasAllowedMimeType = allowedAttachmentMimeTypes.has(file.type);
+    const hasAllowedExtension = allowedAttachmentExtensionPattern.test(file.name);
+    if (!hasAllowedMimeType && !hasAllowedExtension) {
+      setAttachmentError('Only PDF, JPEG, PNG, GIF, and WebP files are supported.');
+      if (fileInputRef.current) fileInputRef.current.value = '';
+      return;
+    }
+
+    if (file.size > attachmentMaxSizeBytes) {
+      setAttachmentError('File size must be 10MB or smaller.');
+      if (fileInputRef.current) fileInputRef.current.value = '';
+      return;
+    }
+
+    const localObjectUrl = URL.createObjectURL(file);
+    const fileType = file.type === 'application/pdf' || /\.pdf$/i.test(file.name)
+      ? 'pdf'
+      : 'image';
+
+    removeAttachment();
+    setPendingAttachment({
+      previewUrl: localObjectUrl,
+      localObjectUrl,
+      fileType,
+      fileName: file.name,
+      fileSize: file.size,
+      isUploading: true,
+    });
+    setIsUploading(true);
+    try {
+      const upload = await dmApi.uploadAttachment(file);
+      setPendingAttachment((current) => {
+        if (!current || current.localObjectUrl !== localObjectUrl) {
+          URL.revokeObjectURL(localObjectUrl);
+          return current;
+        }
+
+        return {
+          ...current,
+          previewUrl: upload.url,
+          uploadedUrl: upload.url,
+          fileType: upload.fileType,
+          fileName: upload.fileName,
+          fileSize: upload.fileSize,
+          isUploading: false,
+        };
+      });
+      setShowAttachments(false);
+    } catch (err) {
+      console.error('Upload failed:', err);
+      setAttachmentError(getAttachmentUploadErrorMessage(err));
+      setPendingAttachment((current) => {
+        if (current?.localObjectUrl === localObjectUrl) {
+          URL.revokeObjectURL(localObjectUrl);
+          return null;
+        }
+        return current;
+      });
+    } finally {
+      setIsUploading(false);
+      if (fileInputRef.current) fileInputRef.current.value = '';
+    }
+  };
+
+  // Group messages by date
+  const messagesWithDateSeparators: (DMMessage | { type: 'date'; date: string })[] = [];
+  messages.forEach((msg, idx) => {
+    const msgDate = formatMessageDate(msg.sentAt);
+    const prevMsg = idx > 0 ? messages[idx - 1] : null;
+    const prevDate = prevMsg ? formatMessageDate(prevMsg.sentAt) : null;
+
+    if (idx === 0 || msgDate !== prevDate) {
+      messagesWithDateSeparators.push({ type: 'date', date: msgDate });
+    }
+    messagesWithDateSeparators.push(msg);
+  });
+
+  const pendingPreviewMessage: DMMessage | null = pendingAttachment
+    ? {
+        _id: 'pending-attachment-preview',
+        senderId: currentUser?._id ?? '',
+        recipientId: partnerId,
+        message: '',
+        messageType: 'text',
+        attachmentUrl: pendingAttachment.previewUrl,
+        attachmentType: pendingAttachment.fileType,
+        attachmentName: pendingAttachment.fileName,
+        readAt: null,
+        sentAt: new Date().toISOString(),
+        isOptimistic: true,
+      }
+    : null;
+  const pendingAttachmentStatus = pendingAttachment
+    ? pendingAttachment.isUploading
+      ? `Uploading ${pendingAttachment.fileType === 'image' ? 'image' : 'file'}...`
+      : 'Ready to send'
+    : undefined;
+
   return (
-    <div className="flex h-full flex-col">
+    <div className="flex min-h-0 flex-1 flex-col">
       {/* Thread */}
-      <div className="flex-1 overflow-y-auto px-4 py-4">
+      <div ref={threadRef} className="min-h-0 flex-1 overflow-y-auto px-4 py-4">
         {isLoading ? (
           <div className="flex h-full items-center justify-center text-slate-500">Loading messages...</div>
         ) : messages.length === 0 ? (
-          <div className="flex h-full flex-col items-center justify-center gap-3 text-slate-500">
-            <MessageCircle className="h-10 w-10 opacity-30" />
-            <p className="text-sm">Start a conversation with {partnerName}</p>
-          </div>
+          isFirstContact && onSendWithQuery ? (
+            <div className="min-h-0 flex-1 overflow-y-auto">
+              <FirstContactPanel partnerName={partnerName} partnerRole={partnerRole} onSend={onSendWithQuery} />
+            </div>
+          ) : (
+            <div className="flex min-h-0 flex-1 items-center justify-center gap-3 text-slate-500">
+              <MessageCircle className="h-10 w-10 opacity-30" />
+              <p className="text-sm">Start a conversation with {partnerName}</p>
+            </div>
+          )
         ) : (
-          <div className="space-y-2">
-            {messages.map((msg) => {
-              const isMine = msg.senderId === currentUser?._id;
-              if (msg.messageType === 'interview_request') {
-                return (
-                  <div key={msg._id} className={`flex ${isMine ? 'justify-end' : 'justify-start'}`}>
-                    <div className="max-w-[80%] rounded-2xl border border-purple-500/30 bg-purple-900/20 p-4">
-                      <div className="mb-2 flex items-center gap-2 text-sm font-semibold text-purple-300">
-                        <Calendar className="h-4 w-4" />
-                        Interview Request
-                      </div>
-                      {msg.message ? <p className="mb-2 text-sm text-slate-300">{msg.message}</p> : null}
-                      {msg.scheduledAt ? (
-                        <p className="text-sm text-white">
-                          📅 {new Date(msg.scheduledAt).toLocaleString('en-IN', {
-                            weekday: 'short', day: 'numeric', month: 'short',
-                            hour: '2-digit', minute: '2-digit',
-                          })}
-                        </p>
-                      ) : null}
-                      {msg.meetLink ? (
-                        <a
-                          href={msg.meetLink}
-                          target="_blank"
-                          rel="noreferrer"
-                          className="mt-2 inline-flex items-center gap-1 rounded-lg bg-purple-500/20 px-3 py-1.5 text-xs font-semibold text-purple-300 hover:bg-purple-500/30"
-                        >
-                          Join Meeting <ExternalLink className="h-3 w-3" />
-                        </a>
-                      ) : null}
-                      <div className="mt-2 flex items-center gap-1.5">
-                        <span className="text-[11px] text-slate-500">{dt(msg.sentAt)}</span>
-                        <ReadReceipt readAt={msg.readAt} isMine={isMine} />
-                      </div>
-                    </div>
-                  </div>
-                );
+          <div>
+            {messagesWithDateSeparators.map((item: any, idx) => {
+              if (item.type === 'date') {
+                return <DateSeparator key={`date-${idx}`} date={item.date} />;
               }
+              const msg = item;
+              const isMine = msg.senderId === currentUser?._id;
+              const prevMsg = idx > 0 ? messages[messages.indexOf(item) - 1] : null;
+              const showAvatar = !prevMsg || prevMsg.senderId !== msg.senderId;
 
               return (
-                <div key={msg._id} className={`flex gap-2 ${isMine ? 'flex-row-reverse' : ''}`}>
-                  <div className="mt-auto flex h-8 w-8 flex-shrink-0 items-center justify-center rounded-full bg-gradient-to-br from-cyan-500 to-emerald-500 text-xs font-bold text-white">
-                    {isMine
-                      ? initials(currentUser?.displayName ?? 'Me')
-                      : initials(partnerName)}
-                  </div>
-                  <div
-                    className={`max-w-[75%] rounded-2xl px-4 py-2.5 ${
-                      isMine
-                        ? 'rounded-tr-sm bg-cyan-600/20 text-white ring-1 ring-cyan-500/20'
-                        : 'rounded-tl-sm bg-slate-800 text-slate-100'
-                    }`}
-                  >
-                    <p className="text-sm leading-relaxed">{msg.message}</p>
-                    <div className={`mt-1 flex items-center gap-1.5 ${isMine ? 'justify-end' : ''}`}>
-                      <span className={`text-[11px] ${isMine ? 'text-cyan-300/60' : 'text-slate-500'}`}>
-                        {dt(msg.sentAt)}
-                      </span>
-                      <ReadReceipt readAt={msg.readAt} isMine={isMine} />
-                    </div>
-                  </div>
-                </div>
+                <MessageBubble
+                  key={msg._id}
+                  msg={msg}
+                  isMine={isMine}
+                  partnerName={partnerName}
+                  currentUserName={currentUser?.displayName ?? 'Me'}
+                  showAvatar={showAvatar}
+                  onQuickReply={(reply) => sendMessage({ message: reply, messageType: 'text', queryType: 'general' })}
+                />
               );
             })}
             {/* Typing indicator */}
             {typingFromPartner ? (
-              <div className="flex items-center gap-2 text-xs text-slate-400">
-                <div className="flex gap-1">
-                  <span className="animate-bounce" style={{ animationDelay: '0ms' }}>●</span>
-                  <span className="animate-bounce" style={{ animationDelay: '150ms' }}>●</span>
-                  <span className="animate-bounce" style={{ animationDelay: '300ms' }}>●</span>
+              <div className="mt-3 flex items-center gap-2 text-xs text-slate-400">
+                <div className="flex h-6 w-12 items-center rounded-full bg-slate-800 px-3">
+                  <div className="flex gap-0.5">
+                    <span className="h-1.5 w-1.5 animate-bounce rounded-full bg-slate-400" style={{ animationDelay: '0ms' }} />
+                    <span className="h-1.5 w-1.5 animate-bounce rounded-full bg-slate-400" style={{ animationDelay: '150ms' }} />
+                    <span className="h-1.5 w-1.5 animate-bounce rounded-full bg-slate-400" style={{ animationDelay: '300ms' }} />
+                  </div>
                 </div>
-                {partnerName} is typing...
+                <span>{partnerName} is typing...</span>
               </div>
             ) : null}
-            <div ref={bottomRef} />
+            {pendingPreviewMessage ? (
+              <MessageBubble
+                key={pendingPreviewMessage._id}
+                msg={pendingPreviewMessage}
+                isMine={true}
+                partnerName={partnerName}
+                currentUserName={currentUser?.displayName ?? 'Me'}
+                showAvatar={messages.length === 0 || messages[messages.length - 1]?.senderId !== currentUser?._id}
+                statusText={pendingAttachmentStatus}
+                onRemoveAttachment={removeAttachment}
+                disableAttachmentOpen={pendingAttachment?.isUploading}
+              />
+            ) : null}
           </div>
         )}
       </div>
 
       {/* Input bar */}
       <div className="border-t border-slate-800 px-4 py-3">
+        {/* Attachment picker */}
+        {showAttachments && (
+          <div className="mb-3 flex gap-3">
+            <input
+              ref={fileInputRef}
+              type="file"
+              accept=".jpg,.jpeg,.png,.gif,.webp,.pdf,image/jpeg,image/png,image/gif,image/webp,application/pdf"
+              onChange={handleFileSelect}
+              className="hidden"
+            />
+            <button
+              onClick={() => fileInputRef.current?.click()}
+              disabled={isUploading}
+              className="flex flex-col items-center gap-1 rounded-xl bg-slate-800/50 p-3 text-slate-400 hover:bg-slate-800 hover:text-white transition disabled:opacity-50"
+            >
+              <Image className="h-6 w-6" />
+              <span className="text-xs">Photo</span>
+            </button>
+            <button
+              onClick={() => fileInputRef.current?.click()}
+              disabled={isUploading}
+              className="flex flex-col items-center gap-1 rounded-xl bg-slate-800/50 p-3 text-slate-400 hover:bg-slate-800 hover:text-white transition disabled:opacity-50"
+            >
+              <FileText className="h-6 w-6" />
+              <span className="text-xs">Document</span>
+            </button>
+            {isUploading && (
+              <div className="flex items-center gap-2 text-sm text-slate-400">
+                <div className="h-4 w-4 animate-spin rounded-full border-2 border-cyan-500 border-t-transparent" />
+                Uploading...
+              </div>
+            )}
+          </div>
+        )}
+
+        {attachmentError ? (
+          <div className="mb-3 rounded-xl border border-red-500/20 bg-red-500/10 px-3 py-2 text-sm text-red-300">
+            {attachmentError}
+          </div>
+        ) : null}
+
         <div className="flex items-end gap-3">
+          <button
+            type="button"
+            onClick={() => setShowAttachments(!showAttachments)}
+            className="flex h-10 w-10 flex-shrink-0 items-center justify-center rounded-full text-slate-400 transition hover:bg-slate-800 hover:text-white"
+          >
+            <Paperclip className={`h-5 w-5 transition-transform ${showAttachments ? 'rotate-45' : ''}`} />
+          </button>
           <textarea
+            ref={textareaRef}
             value={draft}
             onChange={(e) => { setDraft(e.target.value); sendTyping(); }}
             onKeyDown={handleKeyDown}
-            placeholder={`Message ${partnerName}…`}
+            placeholder={`Message ${partnerName}...`}
             rows={1}
-            className="flex-1 resize-none rounded-2xl border border-slate-700 bg-slate-900 px-4 py-3 text-sm text-white outline-none transition focus:border-cyan-500 placeholder:text-slate-500"
+            className="flex-1 resize-none rounded-2xl border border-slate-700 bg-slate-900 px-4 py-2.5 text-sm text-white outline-none transition focus:border-cyan-500 placeholder:text-slate-500"
             style={{ maxHeight: '120px', overflowY: 'auto' }}
           />
           <button
             type="button"
             onClick={handleSend}
-            disabled={!draft.trim()}
-            className="flex h-11 w-11 flex-shrink-0 items-center justify-center rounded-full bg-cyan-500 text-white transition hover:bg-cyan-400 disabled:opacity-40"
+            disabled={isUploading || (!draft.trim() && !pendingAttachment)}
+            className="flex h-10 w-10 flex-shrink-0 items-center justify-center rounded-full bg-cyan-500 text-white transition hover:bg-cyan-400 disabled:opacity-40"
           >
             <Send className="h-4 w-4" />
           </button>
         </div>
-        <p className="mt-1 text-center text-[11px] text-slate-600">Enter to send · Shift+Enter for new line</p>
       </div>
     </div>
   );
@@ -261,10 +1027,27 @@ export function MessagesPage() {
   const [search, setSearch] = useState('');
   const [userSearchResults, setUserSearchResults] = useState<Array<{ _id: string; displayName: string; avatar?: string; role: string }>>([]);
   const [isSearchingUsers, setIsSearchingUsers] = useState(false);
+  const [showQueryModal, setShowQueryModal] = useState(false);
+  const [pendingPartnerId, setPendingPartnerId] = useState<string | null>(null);
+  const [pendingPartnerName, setPendingPartnerName] = useState<string>('');
+  const [pendingPartnerRole, setPendingPartnerRole] = useState<string>('');
+  const [showReportModal, setShowReportModal] = useState(false);
+  const [showInvestorModal, setShowInvestorModal] = useState(false);
+  const [showMenu, setShowMenu] = useState(false);
   const searchTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const menuRef = useRef<HTMLDivElement>(null);
 
-  // Fetch partner profile for header when navigating to a new user
-  const { partner: partnerProfile, isPartnerOnline } = useDM(partnerId);
+  const { partner: partnerProfile, isPartnerOnline, sendMessage } = useDM(partnerId);
+
+  useEffect(() => {
+    const handleClickOutside = (event: MouseEvent) => {
+      if (menuRef.current && !menuRef.current.contains(event.target as Node)) {
+        setShowMenu(false);
+      }
+    };
+    document.addEventListener('mousedown', handleClickOutside);
+    return () => document.removeEventListener('mousedown', handleClickOutside);
+  }, []);
 
   const conversationsQuery = useQuery({
     queryKey: ['dm', 'conversations'],
@@ -278,19 +1061,66 @@ export function MessagesPage() {
   });
 
   const activeConvo = conversations.find((c) => c.partnerId === partnerId);
-  // Use partner profile from API if not in conversation list (new chat)
   const partnerName = activeConvo?.partner?.displayName
     ?? partnerProfile?.displayName
     ?? (partnerId ? 'Loading...' : 'Unknown');
   const partnerRole = activeConvo?.partner?.role ?? partnerProfile?.role ?? 'user';
   const partnerAvatar = activeConvo?.partner?.avatar ?? partnerProfile?.avatar;
   const partnerOnline = activeConvo?.isOnline || isPartnerOnline;
+  const visibleAssociationTypes = new Set(getVisibleAssociationQueryTypes(partnerRole));
 
-  const handleSelect = (pid: string) => {
-    navigate(`/dashboard/messages/${pid}`);
-    queryClient.invalidateQueries({ queryKey: ['dm', 'thread', pid] });
-    setSearch('');
-    setUserSearchResults([]);
+  const getFirstContactKey = (userId: string) => `dm_first_contact_${userId}_${currentUser?._id}`;
+
+  const isFirstContact = partnerId ? !localStorage.getItem(getFirstContactKey(partnerId)) : false;
+
+  const markAsContacted = (userId: string) => {
+    localStorage.setItem(getFirstContactKey(userId), 'true');
+  };
+
+  const handleSelect = (pid: string, pname: string, prole?: string) => {
+    if (!localStorage.getItem(getFirstContactKey(pid))) {
+      setPendingPartnerId(pid);
+      setPendingPartnerName(pname);
+      setPendingPartnerRole(prole ?? '');
+      setShowQueryModal(true);
+    } else {
+      navigate(`/dashboard/messages/${pid}`);
+      queryClient.invalidateQueries({ queryKey: ['dm', 'thread', pid] });
+      setSearch('');
+      setUserSearchResults([]);
+    }
+  };
+
+  const handleQuerySelect = async (queryType: QueryType, customMessage?: string) => {
+    if (pendingPartnerId) {
+      markAsContacted(pendingPartnerId);
+      if (customMessage) {
+        // Use dmApi directly for the first message before navigation
+        try {
+          await dmApi.send(pendingPartnerId, { 
+            message: customMessage, 
+            messageType: 'text', 
+            queryType 
+          });
+        } catch (err) {
+          console.error('Failed to send initial message:', err);
+        }
+      }
+      navigate(`/dashboard/messages/${pendingPartnerId}`);
+      queryClient.invalidateQueries({ queryKey: ['dm', 'thread', pendingPartnerId] });
+      queryClient.invalidateQueries({ queryKey: ['dm', 'conversations'] });
+      setSearch('');
+      setUserSearchResults([]);
+    }
+    setShowQueryModal(false);
+    setPendingPartnerId(null);
+    setPendingPartnerName('');
+    setPendingPartnerRole('');
+  };
+
+  const handleReportUser = () => {
+    setShowMenu(false);
+    setShowReportModal(true);
   };
 
   // Debounced user search
@@ -322,14 +1152,14 @@ export function MessagesPage() {
   const newUsers = userSearchResults.filter((u) => !existingPartnerIds.has(u._id));
 
   return (
-    <div className="flex h-[calc(100vh-120px)] overflow-hidden rounded-2xl border border-slate-800 bg-slate-950">
+    <div className="flex h-full min-h-0 overflow-hidden rounded-2xl border border-slate-800 bg-slate-950">
       {/* Sidebar — conversation list */}
       <div
-        className={`flex flex-col border-r border-slate-800 bg-slate-900/50 ${
-          partnerId ? 'hidden md:flex md:w-72 lg:w-80' : 'w-full md:w-72 lg:w-80'
+        className={`flex min-h-0 w-80 flex-shrink-0 flex-col border-r border-slate-800 bg-slate-900/50 ${
+          partnerId ? 'hidden lg:flex' : 'flex w-full md:w-80'
         }`}
       >
-        <div className="border-b border-slate-800 p-4">
+        <div className="flex-none border-b border-slate-800 p-4">
           <div className="mb-3 flex items-center justify-between">
             <h2 className="text-lg font-bold text-white">Messages</h2>
             <button
@@ -356,7 +1186,7 @@ export function MessagesPage() {
           </div>
         </div>
 
-        <div className="flex-1 overflow-y-auto p-2">
+        <div className="min-h-0 flex-1 overflow-y-auto">
           {conversationsQuery.isLoading ? (
             <div className="py-8 text-center text-sm text-slate-500">Loading...</div>
           ) : conversations.length === 0 && !search ? (
@@ -375,7 +1205,7 @@ export function MessagesPage() {
                   convo={convo}
                   isActive={convo.partnerId === partnerId}
                   currentUserId={currentUser?._id ?? ''}
-                  onClick={() => handleSelect(convo.partnerId)}
+                  onClick={() => handleSelect(convo.partnerId, convo.partner?.displayName ?? 'Unknown', convo.partner?.role)}
                 />
               ))}
 
@@ -393,7 +1223,7 @@ export function MessagesPage() {
                       <button
                         key={user._id}
                         type="button"
-                        onClick={() => handleSelect(user._id)}
+                        onClick={() => handleSelect(user._id, user.displayName, user.role)}
                         className="flex w-full items-center gap-3 rounded-2xl px-4 py-3 text-left transition-all hover:bg-slate-800/60"
                       >
                         <div className="flex h-11 w-11 items-center justify-center rounded-full bg-gradient-to-br from-cyan-500 to-emerald-500 text-sm font-bold text-white">
@@ -425,59 +1255,179 @@ export function MessagesPage() {
       </div>
 
       {/* Chat area */}
-      <div className="flex flex-1 flex-col">
+      <div className="flex min-h-0 flex-1 flex-col">
         {partnerId ? (
           <>
             {/* Header */}
-            <div className="flex items-center gap-3 border-b border-slate-800 px-4 py-3">
-              <button
-                type="button"
-                onClick={() => navigate('/dashboard/messages')}
-                className="rounded-lg p-1.5 text-slate-400 transition hover:bg-slate-800 hover:text-white md:hidden"
-              >
-                <ArrowLeft className="h-4 w-4" />
-              </button>
-              <div className="relative">
-                <div className="flex h-9 w-9 items-center justify-center rounded-full bg-gradient-to-br from-cyan-500 to-emerald-500 text-xs font-bold text-white">
-                  {partnerAvatar ? (
-                    <img
-                      src={partnerAvatar}
-                      alt={partnerName}
-                      className="h-9 w-9 rounded-full object-cover"
-                    />
+            <div className="flex-none border-b border-slate-800 px-4 py-3">
+              <div className="flex items-center gap-3">
+                <button
+                  type="button"
+                  onClick={() => navigate('/dashboard/messages')}
+                  className="rounded-lg p-1.5 text-slate-400 transition hover:bg-slate-800 hover:text-white lg:hidden"
+                >
+                  <ArrowLeft className="h-4 w-4" />
+                </button>
+                <div className="relative">
+                  <div className="flex h-10 w-10 items-center justify-center rounded-full bg-gradient-to-br from-cyan-500 to-emerald-500 text-sm font-bold text-white">
+                    {partnerAvatar ? (
+                      <img
+                        src={partnerAvatar}
+                        alt={partnerName}
+                        className="h-10 w-10 rounded-full object-cover"
+                      />
+                    ) : (
+                      initials(partnerName)
+                    )}
+                  </div>
+                  {partnerOnline ? (
+                    <span className="absolute -bottom-0.5 -right-0.5 block h-3 w-3 rounded-full border-2 border-slate-950 bg-emerald-400" />
                   ) : (
-                    initials(partnerName)
+                    <span className="absolute -bottom-0.5 -right-0.5 block h-3 w-3 rounded-full border-2 border-slate-950 bg-slate-500" />
                   )}
                 </div>
-                {partnerOnline ? (
-                  <span className="absolute -bottom-0.5 -right-0.5 block h-3 w-3 rounded-full border-2 border-slate-950 bg-emerald-400" />
-                ) : (
-                  <span className="absolute -bottom-0.5 -right-0.5 block h-3 w-3 rounded-full border-2 border-slate-950 bg-slate-500" />
-                )}
-              </div>
-              <div>
-                <div className="text-sm font-semibold text-white">{partnerName}</div>
-                <div className="flex items-center gap-1.5 text-xs">
-                  <span className={partnerOnline ? 'text-emerald-400' : 'text-slate-500'}>
-                    {partnerOnline ? 'Online' : 'Offline'}
-                  </span>
-                  <span className="text-slate-600">·</span>
-                  <span className="capitalize text-slate-500">{partnerRole}</span>
+                <div className="flex-1">
+                  <div className="text-sm font-semibold text-white">{partnerName}</div>
+                  <div className="flex items-center gap-1.5 text-xs">
+                    <span className={partnerOnline ? 'text-emerald-400' : 'text-slate-500'}>
+                      {partnerOnline ? 'Online' : 'Offline'}
+                    </span>
+                    <span className="text-slate-600">·</span>
+                    <span className="capitalize text-slate-500">{partnerRole}</span>
+                  </div>
+                </div>
+                <div className="relative" ref={menuRef}>
+                  <button
+                    type="button"
+                    onClick={() => setShowMenu(!showMenu)}
+                    className="flex h-9 w-9 items-center justify-center rounded-lg text-slate-400 transition hover:bg-slate-800 hover:text-white"
+                    title="More options"
+                  >
+                    <MoreVertical className="h-5 w-5" />
+                  </button>
+                  {showMenu && (
+                    <div className="absolute right-0 top-full z-10 mt-1 w-52 rounded-xl border border-slate-700 bg-slate-900 shadow-xl">
+                      <button
+                        type="button"
+                        onClick={handleReportUser}
+                        className="flex w-full items-center gap-3 px-4 py-2.5 text-left text-sm text-red-400 transition hover:bg-slate-800"
+                      >
+                        <AlertTriangle className="h-4 w-4" />
+                        Report User
+                      </button>
+                      {visibleAssociationTypes.size > 0 ? (
+                        <div className="border-t border-slate-700 px-4 py-2">
+                          <p className="mb-2 text-xs font-medium text-slate-400">Associate as:</p>
+                          <div className="space-y-1">
+                            {visibleAssociationTypes.has('project_mentor') ? (
+                              <button
+                                type="button"
+                                disabled={!partnerId}
+                                onClick={() => {
+                                  if (partnerId) {
+                                    sendMessage({ message: 'Hi! I would like to associate you as a Project Mentor for my project.', messageType: 'text', queryType: 'project_mentor' });
+                                    setShowMenu(false);
+                                  }
+                                }}
+                                className="flex w-full items-center gap-2 rounded-lg px-2 py-1.5 text-left text-sm text-blue-400 transition hover:bg-slate-800 disabled:cursor-not-allowed disabled:opacity-50"
+                              >
+                                <GraduationCap className="h-4 w-4" />
+                                Project Mentor
+                              </button>
+                            ) : null}
+                            {visibleAssociationTypes.has('investor') ? (
+                              <button
+                                type="button"
+                                disabled={!partnerId}
+                                onClick={() => {
+                                  setShowMenu(false);
+                                  setShowInvestorModal(true);
+                                }}
+                                className="flex w-full items-center gap-2 rounded-lg px-2 py-1.5 text-left text-sm text-emerald-400 transition hover:bg-slate-800 disabled:cursor-not-allowed disabled:opacity-50"
+                              >
+                                <TrendingUp className="h-4 w-4" />
+                                Investor
+                              </button>
+                            ) : null}
+                            {visibleAssociationTypes.has('recruiter') ? (
+                              <button
+                                type="button"
+                                disabled={!partnerId}
+                                onClick={() => {
+                                  if (partnerId) {
+                                    sendMessage({ message: 'Hi! I am interested in career opportunities and would like to connect with you as a Recruiter.', messageType: 'text', queryType: 'recruiter' });
+                                    setShowMenu(false);
+                                  }
+                                }}
+                                className="flex w-full items-center gap-2 rounded-lg px-2 py-1.5 text-left text-sm text-purple-400 transition hover:bg-slate-800 disabled:cursor-not-allowed disabled:opacity-50"
+                              >
+                                <Building2 className="h-4 w-4" />
+                                Recruiter
+                              </button>
+                            ) : null}
+                          </div>
+                        </div>
+                      ) : null}
+                    </div>
+                  )}
                 </div>
               </div>
             </div>
-            <ChatPanel partnerId={partnerId} partnerName={partnerName} />
+            <ChatPanel 
+              partnerId={partnerId} 
+              partnerName={partnerName} 
+              partnerRole={partnerRole}
+              isFirstContact={isFirstContact}
+              onSendWithQuery={(message, queryType) => {
+                markAsContacted(partnerId);
+                sendMessage({ message, messageType: 'text', queryType });
+              }}
+            />
           </>
         ) : (
-          <div className="flex flex-1 flex-col items-center justify-center gap-4 text-center">
+          <div className="flex min-h-0 flex-1 items-center justify-center gap-4 text-center">
             <MessageCircle className="h-14 w-14 text-slate-700" />
-            <h3 className="text-xl font-semibold text-white">Your Messages</h3>
-            <p className="max-w-sm text-sm text-slate-400">
-              Select a conversation or search for a user to start messaging.
-            </p>
+            <div>
+              <h3 className="text-xl font-semibold text-white">Your Messages</h3>
+              <p className="max-w-sm text-sm text-slate-400">
+                Select a conversation or search for a user to start messaging.
+              </p>
+            </div>
           </div>
         )}
       </div>
+
+      <QueryTypeModal
+        isOpen={showQueryModal}
+        onClose={() => {
+          setShowQueryModal(false);
+          setPendingPartnerId(null);
+          setPendingPartnerName('');
+          setPendingPartnerRole('');
+        }}
+        onSelect={handleQuerySelect}
+        recipientName={pendingPartnerName}
+        recipientRole={pendingPartnerRole}
+      />
+
+      {partnerId && (
+        <ReportUserModal
+          isOpen={showReportModal}
+          onClose={() => setShowReportModal(false)}
+          reportedUserId={partnerId}
+          reportedUserName={partnerName}
+        />
+      )}
+
+      {partnerId && (
+        <InvestorProposalModal
+          isOpen={showInvestorModal}
+          onClose={() => setShowInvestorModal(false)}
+          onSend={(message) => sendMessage({ message, messageType: 'text', queryType: 'investor' })}
+          recipientName={partnerName}
+          isStudent={currentUser?.role === 'student'}
+        />
+      )}
     </div>
   );
 }

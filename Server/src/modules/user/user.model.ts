@@ -1,5 +1,6 @@
 import { HydratedDocument, Schema, model } from 'mongoose';
 import { USER_ROLES } from '../../types/roles.types';
+import { createDefaultScoreBreakdown } from '../innovationScore/score.utils';
 import { IUser } from './user.types';
 
 const scoreBreakdownSchema = new Schema<IUser['scoreBreakdown']>(
@@ -16,18 +17,6 @@ const scoreBreakdownSchema = new Schema<IUser['scoreBreakdown']>(
   },
   { _id: false },
 );
-
-const defaultScoreBreakdown = () => ({
-  problemsClaimed: 0,
-  skillsCompleted: 0,
-  progressUploads: 0,
-  patentsSubmitted: 0,
-  patentsApproved: 0,
-  mvpsVerified: 0,
-  marketReadyVerified: 0,
-  startupsLaunched: 0,
-  awardsApproved: 0,
-});
 
 const institutionPolicySchema = new Schema<NonNullable<IUser['institutionProfile']>['policies'][number]>(
   {
@@ -557,7 +546,7 @@ const userSchema = new Schema<IUser>(
     },
     scoreBreakdown: {
       type: scoreBreakdownSchema,
-      default: defaultScoreBreakdown,
+      default: createDefaultScoreBreakdown,
     },
     accessGrantedBy: {
       type: String,

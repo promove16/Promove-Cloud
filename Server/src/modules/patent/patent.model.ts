@@ -79,6 +79,7 @@ const patentSchema = new Schema<IPatent>(
     adminReviewedBy: { type: Schema.Types.ObjectId, default: undefined },
     adminNotes: { type: String, default: undefined },
     scoreAwarded: { type: Boolean, default: false },
+    showcasedInMarketplace: { type: Boolean, default: false },
   },
   { timestamps: true },
 );

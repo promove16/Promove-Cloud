@@ -11,11 +11,12 @@ const roles_types_1 = require("../../types/roles.types");
 const asyncHandler_1 = require("../../utils/asyncHandler");
 const ApiError_1 = require("../../utils/ApiError");
 const startup_controller_1 = require("./startup.controller");
+const pdfFileNamePattern = /\.pdf$/i;
 const upload = (0, multer_1.default)({
     storage: multer_1.default.memoryStorage(),
     limits: { fileSize: 10 * 1024 * 1024 },
     fileFilter: (_req, file, cb) => {
-        if (file.mimetype !== 'application/pdf') {
+        if (file.mimetype !== 'application/pdf' && !pdfFileNamePattern.test(file.originalname)) {
             cb(new ApiError_1.ApiError(400, 'INVALID_FILE_TYPE', 'Only PDF files are allowed'));
             return;
         }

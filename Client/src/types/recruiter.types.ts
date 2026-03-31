@@ -105,6 +105,7 @@ export interface RecruiterJobView {
   isActive: boolean;
   applicantCount: number;
   shortlistedCount: number;
+  hasApplied?: boolean;
   createdAt: string;
   expiresAt?: string;
 }

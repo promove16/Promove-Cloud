@@ -77,6 +77,7 @@ export interface IPatent {
   adminReviewedBy?: Types.ObjectId;
   adminNotes?: string;
   scoreAwarded: boolean;
+  showcasedInMarketplace: boolean;
   createdAt: Date;
   updatedAt: Date;
 }

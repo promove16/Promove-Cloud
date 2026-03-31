@@ -3,6 +3,7 @@ Object.defineProperty(exports, "__esModule", { value: true });
 exports.User = void 0;
 const mongoose_1 = require("mongoose");
 const roles_types_1 = require("../../types/roles.types");
+const score_utils_1 = require("../innovationScore/score.utils");
 const scoreBreakdownSchema = new mongoose_1.Schema({
     problemsClaimed: { type: Number, default: 0 },
     skillsCompleted: { type: Number, default: 0 },
@@ -14,17 +15,6 @@ const scoreBreakdownSchema = new mongoose_1.Schema({
     startupsLaunched: { type: Number, default: 0 },
     awardsApproved: { type: Number, default: 0 },
 }, { _id: false });
-const defaultScoreBreakdown = () => ({
-    problemsClaimed: 0,
-    skillsCompleted: 0,
-    progressUploads: 0,
-    patentsSubmitted: 0,
-    patentsApproved: 0,
-    mvpsVerified: 0,
-    marketReadyVerified: 0,
-    startupsLaunched: 0,
-    awardsApproved: 0,
-});
 const institutionPolicySchema = new mongoose_1.Schema({
     name: {
         type: String,
@@ -504,7 +494,7 @@ const userSchema = new mongoose_1.Schema({
     },
     scoreBreakdown: {
         type: scoreBreakdownSchema,
-        default: defaultScoreBreakdown,
+        default: score_utils_1.createDefaultScoreBreakdown,
     },
     accessGrantedBy: {
         type: String,

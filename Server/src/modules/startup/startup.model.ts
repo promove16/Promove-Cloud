@@ -14,6 +14,7 @@ const startupSchema = new Schema<IStartup>(
       default: 'Pre-Idea',
     },
     pitchDeckUrl: { type: String, default: undefined },
+    pitchDeckName: { type: String, default: undefined },
     teamSize: { type: Number, default: 1 },
     fundingNeeded: { type: Number, default: undefined },
     activeProducts: { type: Number, default: 1 },

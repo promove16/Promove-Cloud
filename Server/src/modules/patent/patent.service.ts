@@ -154,3 +154,49 @@ export const submitPatent = async (userId: string, payload: z.infer<typeof paten
 
 export const getMyPatents = async (userId: string) =>
   Patent.find({ studentId: userId }).sort({ createdAt: -1 }).lean();
+
+export const togglePatentShowcase = async (userId: string, patentId: string) => {
+  const patent = await Patent.findOne({ _id: patentId, studentId: userId });
+  if (!patent) throw new ApiError(404, 'PATENT_NOT_FOUND', 'Patent not found');
+  if (patent.status !== 'approved') {
+    throw new ApiError(400, 'NOT_APPROVED', 'Only approved patents can be showcased in the marketplace.');
+  }
+  patent.showcasedInMarketplace = !patent.showcasedInMarketplace;
+  await patent.save();
+  return { showcasedInMarketplace: patent.showcasedInMarketplace };
+};
+
+export const getShowcasedPatents = async () => {
+  const patents = await Patent.find({ status: 'approved', showcasedInMarketplace: true })
+    .sort({ adminReviewedAt: -1 })
+    .lean();
+  const studentIds = patents.map((p) => String(p.studentId));
+  const students = studentIds.length > 0
+    ? await User.find({ _id: { $in: studentIds } })
+        .select('_id displayName avatar domain bio headline')
+        .lean()
+    : [];
+  const studentMap = new Map(students.map((s) => [String(s._id), s]));
+
+  return patents.map((p) => {
+    const student = studentMap.get(String(p.studentId));
+    return {
+      _id: String(p._id),
+      studentId: String(p.studentId),
+      projectTitle: p.projectTitle,
+      inventionCategory: p.filingDocuments?.inventionCategory,
+      specificationType: p.filingDocuments?.specificationType,
+      abstract: p.filingDocuments?.abstractDraft,
+      submittedAt: p.submittedAt,
+      adminReviewedAt: p.adminReviewedAt,
+      student: {
+        _id: String(p.studentId),
+        displayName: student?.displayName ?? 'Student',
+        ...(student?.avatar ? { avatar: student.avatar } : {}),
+        ...(student?.domain ? { domain: student.domain } : {}),
+        ...(student?.bio ? { bio: student.bio } : {}),
+        ...(student?.headline ? { headline: student.headline } : {}),
+      },
+    };
+  });
+};

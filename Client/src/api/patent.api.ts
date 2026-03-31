@@ -5,6 +5,7 @@ import {
   PatentFilingDocuments,
   PatentQuestionnaire,
   PatentSubmission,
+  ShowcasedPatent,
 } from '../types/patent.types';
 
 export const patentApi = {
@@ -20,6 +21,16 @@ export const patentApi = {
   },
   async mine() {
     const response = await api.get<ApiSuccessResponse<PatentSubmission[]>>('/api/patents/mine');
+    return response.data.data;
+  },
+  async toggleShowcase(patentId: string) {
+    const response = await api.patch<ApiSuccessResponse<{ showcasedInMarketplace: boolean }>>(
+      `/api/patents/${patentId}/showcase`,
+    );
+    return response.data.data;
+  },
+  async getShowcased() {
+    const response = await api.get<ApiSuccessResponse<ShowcasedPatent[]>>('/api/patents/showcased');
     return response.data.data;
   },
 };

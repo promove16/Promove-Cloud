@@ -271,7 +271,7 @@ exports.addProgress = addProgress;
 const uploadWorkspaceFile = async (workspaceId, userId, file, note, category) => {
     const workspace = await (0, exports.getWorkspaceForMember)(workspaceId, userId);
     const fileType = file.mimetype === 'application/pdf' ? 'pdf' : 'image';
-    const upload = await (0, cloudinaryService_1.uploadToCloudinary)(file.buffer, 'promove/workspaces', fileType === 'pdf' ? 'raw' : 'image');
+    const upload = await (0, cloudinaryService_1.uploadToCloudinary)(file.buffer, 'promove/workspaces', fileType === 'pdf' ? 'raw' : 'image', fileType === 'pdf' ? { format: 'pdf' } : undefined);
     const allowedCategories = ['bug_report', 'error_log', 'screenshot', 'test_result', 'design_mockup', 'other'];
     const safeCategory = category && allowedCategories.includes(category) ? category : 'other';
     workspace.uploads.push({

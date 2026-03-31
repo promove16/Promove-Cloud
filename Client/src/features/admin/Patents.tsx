@@ -176,13 +176,20 @@ function ReviewModal({
   const queryClient = useQueryClient();
   const [reason, setReason] = useState('');
   const [docsOpen, setDocsOpen] = useState(false);
+  const [actionError, setActionError] = useState('');
 
   const approveMutation = useMutation({
     mutationFn: () => adminApi.approvePatent(patent!._id),
     onSuccess: async () => {
       onClose();
+      setActionError('');
       await queryClient.invalidateQueries({ queryKey: ['admin-patents'] });
       await queryClient.invalidateQueries({ queryKey: ['admin-analytics'] });
+    },
+    onError: (err: unknown) => {
+      type ApiErr = { response?: { data?: { error?: { message?: string } } } };
+      const msg = (err as ApiErr)?.response?.data?.error?.message ?? 'Failed to approve patent. Please try again.';
+      setActionError(msg);
     },
   });
 
@@ -191,8 +198,14 @@ function ReviewModal({
     onSuccess: async () => {
       onClose();
       setReason('');
+      setActionError('');
       await queryClient.invalidateQueries({ queryKey: ['admin-patents'] });
       await queryClient.invalidateQueries({ queryKey: ['admin-analytics'] });
+    },
+    onError: (err: unknown) => {
+      type ApiErr = { response?: { data?: { error?: { message?: string } } } };
+      const msg = (err as ApiErr)?.response?.data?.error?.message ?? 'Failed to reject patent. Please try again.';
+      setActionError(msg);
     },
   });
 
@@ -308,29 +321,49 @@ function ReviewModal({
             </section>
           </div>
 
-          <div className="mt-6 flex shrink-0 flex-col gap-4 border-t border-slate-800 bg-slate-900/95 pt-5 lg:flex-row lg:items-end lg:justify-between">
-            <div className="w-full max-w-xl">
-              <div className="text-sm text-slate-400">Approve will award {PATENT_APPROVAL_SCORE} Innovation Score.</div>
-              <textarea
-                value={reason}
-                onChange={(event) => setReason(event.target.value)}
-                placeholder="Enter a rejection reason (minimum 20 characters)"
-                className="mt-3 min-h-28 w-full rounded-2xl border border-slate-800 bg-slate-950 px-4 py-3 text-white placeholder:text-slate-500"
-              />
+          {actionError && (
+            <div className="mt-4 rounded-2xl border border-red-500/20 bg-red-500/10 px-4 py-3 text-sm text-red-300">
+              {actionError}
             </div>
-            <div className="flex flex-wrap gap-3">
-              <Button variant="secondary" onClick={() => rejectMutation.mutate()} disabled={reason.trim().length < 20 || rejectMutation.isPending}>
-                Reject
-              </Button>
-              <Button onClick={() => {
-                if (window.confirm(`This will award ${PATENT_APPROVAL_SCORE} Innovation Score. Confirm?`)) {
-                  approveMutation.mutate();
-                }
-              }} disabled={approveMutation.isPending}>
-                Approve (+{PATENT_APPROVAL_SCORE} pts)
-              </Button>
+          )}
+
+          {patent && ['submitted', 'under_review'].includes(patent.status) ? (
+            <div className="mt-6 flex shrink-0 flex-col gap-4 border-t border-slate-800 bg-slate-900/95 pt-5 lg:flex-row lg:items-end lg:justify-between">
+              <div className="w-full max-w-xl">
+                <div className="text-sm text-slate-400">Approve will award {PATENT_APPROVAL_SCORE} Innovation Score.</div>
+                <textarea
+                  value={reason}
+                  onChange={(event) => setReason(event.target.value)}
+                  placeholder="Enter a rejection reason (minimum 20 characters)"
+                  className="mt-3 min-h-28 w-full rounded-2xl border border-slate-800 bg-slate-950 px-4 py-3 text-white placeholder:text-slate-500"
+                />
+              </div>
+              <div className="flex flex-wrap gap-3">
+                <Button variant="secondary" onClick={() => rejectMutation.mutate()} disabled={reason.trim().length < 20 || rejectMutation.isPending}>
+                  Reject
+                </Button>
+                <Button onClick={() => {
+                  if (window.confirm(`This will award ${PATENT_APPROVAL_SCORE} Innovation Score. Confirm?`)) {
+                    approveMutation.mutate();
+                  }
+                }} disabled={approveMutation.isPending}>
+                  Approve (+{PATENT_APPROVAL_SCORE} pts)
+                </Button>
+              </div>
             </div>
-          </div>
+          ) : (
+            <div className="mt-6 flex shrink-0 items-center gap-3 border-t border-slate-800 pt-5">
+              <span className={`rounded-full px-3 py-1 text-xs font-semibold ${
+                patent?.status === 'approved' ? 'bg-green-500/20 text-green-300' : 'bg-red-500/20 text-red-300'
+              }`}>
+                {patent?.status === 'approved' ? 'Approved' : 'Rejected'}
+              </span>
+              <span className="text-sm text-slate-400">
+                {patent?.status === 'approved' ? 'This patent has already been approved.' : 'This patent has already been rejected.'}
+                {patent?.adminNotes && ` Reason: ${patent.adminNotes}`}
+              </span>
+            </div>
+          )}
         </Card>
       </div>
       {patent && (

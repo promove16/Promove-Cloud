@@ -8,6 +8,7 @@ import { Spinner } from '../../components/ui/Spinner';
 import { dealApi } from '../../api/deal.api';
 import { investorApi } from '../../api/investor.api';
 import { DealDetail } from './DealDetail';
+import { PatentShowcase } from '../shared/PatentShowcase';
 
 const quickLinks = [
   { label: 'Startups', path: '/dashboard/investor/startups' },
@@ -151,6 +152,8 @@ export default function InvestorDashboard() {
           }
         }}
       />
+
+      <PatentShowcase />
     </div>
   );
 }

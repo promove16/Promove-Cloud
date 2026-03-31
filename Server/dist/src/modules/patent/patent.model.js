@@ -71,6 +71,7 @@ const patentSchema = new mongoose_1.Schema({
     adminReviewedBy: { type: mongoose_1.Schema.Types.ObjectId, default: undefined },
     adminNotes: { type: String, default: undefined },
     scoreAwarded: { type: Boolean, default: false },
+    showcasedInMarketplace: { type: Boolean, default: false },
 }, { timestamps: true });
 patentSchema.index({ studentId: 1, status: 1 });
 exports.Patent = (0, mongoose_1.model)('Patent', patentSchema);

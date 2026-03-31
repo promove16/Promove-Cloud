@@ -7,6 +7,7 @@ const bullmq_1 = require("../config/bullmq");
 const socket_1 = require("../config/socket");
 const logger_1 = require("../config/logger");
 const score_model_1 = require("../modules/innovationScore/score.model");
+const score_utils_1 = require("../modules/innovationScore/score.utils");
 exports.SCORE_DELTAS = {
     PROBLEM_CLAIMED: 5,
     SKILL_COMPLETED: 8,
@@ -65,8 +66,8 @@ const applyScore = async ({ userId, trigger, metadata }) => {
     const user = await user_model_1.User.findById(userId).select('innovationScore institutionId createdAt').lean();
     if (!user)
         throw new Error(`User ${userId} not found`);
-    const currentScore = user.innovationScore || 0;
-    const newScore = Math.min(200, currentScore + delta);
+    const currentScore = (0, score_utils_1.normalizeInnovationScore)(user.innovationScore);
+    const newScore = (0, score_utils_1.normalizeInnovationScore)(currentScore + delta);
     const actualDelta = newScore - currentScore;
     if (actualDelta <= 0)
         return currentScore;

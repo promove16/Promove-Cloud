@@ -1,36 +1,19 @@
-import { useMemo, useState } from 'react';
+import { PropsWithChildren, useMemo, useState } from 'react';
 import { NavLink, Outlet, useLocation, useNavigate } from 'react-router-dom';
 import {
-  BarChart3,
-  ArrowRight,
-  BriefcaseBusiness,
-  Building2,
-  CalendarDays,
-  FileText,
-  Globe,
-  GraduationCap,
-  Home,
   Bell,
-  LogOut,
   Menu,
-  MessageCircle,
   Rocket,
-  Settings,
-  Sparkles,
-  Trophy,
-  Server,
-  User,
-  Users,
   X,
-  type LucideIcon,
 } from 'lucide-react';
 import { Button } from '../ui/Button';
 import { Badge } from '../ui/Badge';
-import { useMutation, useQueryClient } from '@tanstack/react-query';
+import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { useAuthStore } from '../../store/authStore';
 import { UserRole } from '../../types/roles.types';
 import { useLogoutMutation } from '../../features/auth/useAuth';
 import { notificationApi } from '../../api/notification.api';
+import { dmApi } from '../../api/dm.api';
 import { useNotifications } from '../../hooks/useNotifications';
 import { NotificationItem } from '../../types/notification.types';
 import {
@@ -41,20 +24,11 @@ import {
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from '../../app/components/ui/dropdown-menu';
+import { DashboardNavItem, SIDEBAR_CONFIG } from './dashboardNavigation';
 
-type NavItem =
-  | {
-      kind: 'link';
-      label: string;
-      icon: LucideIcon;
-      path: string;
-    }
-  | {
-      kind: 'action';
-      label: string;
-      icon: LucideIcon;
-      action: 'logout';
-    };
+interface DashboardLayoutProps {
+  role?: UserRole;
+}
 
 function NotificationBell() {
   const navigate = useNavigate();
@@ -141,98 +115,30 @@ function NotificationBell() {
   );
 }
 
-export const SIDEBAR_CONFIG: Record<UserRole, NavItem[]> = {
-  [UserRole.STUDENT]: [
-    { kind: 'link', label: 'Dashboard', icon: Home, path: '/dashboard/student' },
-    { kind: 'link', label: 'Problem Bank', icon: Sparkles, path: '/problem-bank' },
-    { kind: 'link', label: 'Product Workspace', icon: Trophy, path: '/product-workspace' },
-    { kind: 'link', label: 'Patent Support', icon: FileText, path: '/patent-support' },
-    { kind: 'link', label: 'Startup Launch', icon: Rocket, path: '/startup-launch' },
-    { kind: 'link', label: 'Cap Table', icon: BarChart3, path: '/startup-launch/cap-table' },
-    { kind: 'link', label: 'Mentor Sessions', icon: CalendarDays, path: '/dashboard/student/mentor-sessions' },
-    { kind: 'link', label: 'Investor Deals', icon: BriefcaseBusiness, path: '/dashboard/student/investor-deals' },
-    { kind: 'link', label: 'Leadership Profile', icon: Trophy, path: '/leadership-profile' },
-    { kind: 'link', label: 'Marketplace', icon: Globe, path: '/marketplace' },
-    { kind: 'link', label: 'Messages', icon: MessageCircle, path: '/dashboard/messages' },
-    { kind: 'link', label: 'My Profile', icon: User, path: '/dashboard/profile' },
-    { kind: 'link', label: 'Settings', icon: Settings, path: '/dashboard/settings' },
-    { kind: 'action', label: 'Logout', icon: LogOut, action: 'logout' },
-  ],
-  [UserRole.SCHOOL]: [
-    { kind: 'link', label: 'Dashboard', icon: Home, path: '/dashboard/school' },
-    { kind: 'link', label: 'Student Innovators', icon: Users, path: '/dashboard/school/students' },
-    { kind: 'link', label: 'Investors', icon: Globe, path: '/dashboard/school/investors' },
-    { kind: 'link', label: 'Mentors', icon: GraduationCap, path: '/dashboard/school/mentors' },
-    { kind: 'link', label: 'Compliance Report', icon: FileText, path: '/dashboard/school/compliance' },
-    { kind: 'link', label: 'Profile', icon: User, path: '/dashboard/profile' },
-    { kind: 'link', label: 'Settings', icon: Settings, path: '/dashboard/settings' },
-    { kind: 'action', label: 'Logout', icon: LogOut, action: 'logout' },
-  ],
-  [UserRole.COLLEGE]: [
-    { kind: 'link', label: 'Dashboard', icon: Home, path: '/dashboard/college' },
-    { kind: 'link', label: 'Student Innovators', icon: Users, path: '/dashboard/college/students' },
-    { kind: 'link', label: 'Recruiters', icon: BriefcaseBusiness, path: '/dashboard/college/recruiters' },
-    { kind: 'link', label: 'Investors', icon: Globe, path: '/dashboard/college/investors' },
-    { kind: 'link', label: 'Mentors', icon: GraduationCap, path: '/dashboard/college/mentors' },
-    { kind: 'link', label: 'Placement Tracker', icon: BarChart3, path: '/dashboard/college/placement' },
-    { kind: 'link', label: 'Events', icon: Sparkles, path: '/dashboard/college/events' },
-    { kind: 'link', label: 'Compliance Report', icon: FileText, path: '/dashboard/college/compliance' },
-    { kind: 'link', label: 'Profile', icon: User, path: '/dashboard/profile' },
-    { kind: 'link', label: 'Settings', icon: Settings, path: '/dashboard/settings' },
-    { kind: 'action', label: 'Logout', icon: LogOut, action: 'logout' },
-  ],
-  [UserRole.MENTOR]: [
-    { kind: 'link', label: 'Dashboard', icon: Home, path: '/dashboard/mentor' },
-    { kind: 'link', label: 'Student Feed', icon: Users, path: '/dashboard/mentor/students' },
-    { kind: 'link', label: 'Sessions', icon: CalendarDays, path: '/dashboard/mentor/sessions' },
-    { kind: 'link', label: 'Messages', icon: MessageCircle, path: '/dashboard/messages' },
-    { kind: 'link', label: 'Profile', icon: User, path: '/dashboard/profile' },
-    { kind: 'link', label: 'Settings', icon: Settings, path: '/dashboard/settings' },
-    { kind: 'action', label: 'Logout', icon: LogOut, action: 'logout' },
-  ],
-  [UserRole.INVESTOR]: [
-    { kind: 'link', label: 'Deal Flow', icon: ArrowRight, path: '/dashboard/investor' },
-    { kind: 'link', label: 'Startups', icon: Rocket, path: '/dashboard/investor/startups' },
-    { kind: 'link', label: 'Institutions', icon: Building2, path: '/dashboard/investor/institutions' },
-    { kind: 'link', label: 'My Portfolio', icon: BriefcaseBusiness, path: '/dashboard/investor/portfolio' },
-    { kind: 'link', label: 'Messages', icon: MessageCircle, path: '/dashboard/messages' },
-    { kind: 'link', label: 'Profile', icon: User, path: '/dashboard/profile' },
-    { kind: 'link', label: 'Settings', icon: Settings, path: '/dashboard/settings' },
-    { kind: 'action', label: 'Logout', icon: LogOut, action: 'logout' },
-  ],
-  [UserRole.RECRUITER]: [
-    { kind: 'link', label: 'Dashboard', icon: BriefcaseBusiness, path: '/dashboard/recruiter' },
-    { kind: 'link', label: 'Talent Search', icon: Users, path: '/dashboard/recruiter/talent' },
-    { kind: 'link', label: 'College Connect', icon: Globe, path: '/dashboard/recruiter/colleges' },
-    { kind: 'link', label: 'Active Drives', icon: BarChart3, path: '/dashboard/recruiter/drives' },
-    { kind: 'link', label: 'Onboarding Tracker', icon: Trophy, path: '/dashboard/recruiter/onboarding' },
-    { kind: 'link', label: 'Messages', icon: MessageCircle, path: '/dashboard/recruiter/messages' },
-    { kind: 'link', label: 'Profile', icon: User, path: '/dashboard/profile' },
-    { kind: 'link', label: 'Settings', icon: Settings, path: '/dashboard/settings' },
-    { kind: 'action', label: 'Logout', icon: LogOut, action: 'logout' },
-  ],
-  [UserRole.ADMIN]: [
-    { kind: 'link', label: 'Dashboard', icon: Home, path: '/dashboard/admin' },
-    { kind: 'link', label: 'Users', icon: Users, path: '/dashboard/admin/users' },
-    { kind: 'link', label: 'Patents', icon: FileText, path: '/dashboard/admin/patents' },
-    { kind: 'link', label: 'Awards', icon: Trophy, path: '/dashboard/admin/awards' },
-    { kind: 'link', label: 'Deals', icon: BriefcaseBusiness, path: '/dashboard/admin/deals' },
-    { kind: 'link', label: 'Analytics', icon: BarChart3, path: '/dashboard/admin/analytics' },
-    { kind: 'link', label: 'Capacity', icon: Server, path: '/dashboard/admin/capacity' },
-    { kind: 'link', label: 'Profile', icon: User, path: '/dashboard/profile' },
-    { kind: 'link', label: 'Settings', icon: Settings, path: '/dashboard/settings' },
-    { kind: 'action', label: 'Logout', icon: LogOut, action: 'logout' },
-  ],
-};
-
-export function DashboardLayout() {
+export function DashboardLayout({ children, role }: PropsWithChildren<DashboardLayoutProps>) {
   const location = useLocation();
   const navigate = useNavigate();
   const logoutMutation = useLogoutMutation();
   const user = useAuthStore((state) => state.user);
   const [sidebarOpen, setSidebarOpen] = useState(false);
 
-  const navItems = user ? SIDEBAR_CONFIG[user.role] : [];
+  const resolvedRole = user?.role ?? role;
+  const navItems = resolvedRole ? SIDEBAR_CONFIG[resolvedRole] : [];
+  const hasMessagesItem = navItems.some(
+    (item) => item.kind === 'link' && item.label === 'Messages',
+  );
+
+  const conversationsQuery = useQuery({
+    queryKey: ['dm', 'conversations'],
+    queryFn: dmApi.listConversations,
+    enabled: Boolean(user) && hasMessagesItem,
+    staleTime: 30_000,
+  });
+
+  const unreadMessagesCount = (conversationsQuery.data ?? []).reduce(
+    (total, conversation) => total + conversation.unreadCount,
+    0,
+  );
 
   const currentLabel = useMemo(() => {
     const activeItem = navItems.find(
@@ -259,7 +165,7 @@ export function DashboardLayout() {
     navigate('/login', { replace: true });
   };
 
-  const renderItem = (item: NavItem) => {
+  const renderItem = (item: DashboardNavItem) => {
     if (item.kind === 'action') {
       return (
         <button
@@ -289,15 +195,21 @@ export function DashboardLayout() {
       >
         <item.icon className="h-5 w-5" />
         <span>{item.label}</span>
+        {item.label === 'Messages' && unreadMessagesCount > 0 ? (
+          <span
+            aria-label={`${unreadMessagesCount} unread messages`}
+            className="ml-auto inline-flex h-2.5 w-2.5 rounded-full bg-cyan-400 shadow-[0_0_10px_rgba(34,211,238,0.7)]"
+          />
+        ) : null}
       </NavLink>
     );
   };
 
   return (
-    <div className="min-h-screen bg-slate-950 text-white">
-      <div className="flex min-h-screen">
+    <div className="h-screen overflow-hidden bg-slate-950 text-white">
+      <div className="flex h-full">
         <aside
-          className={`fixed inset-y-0 left-0 z-40 w-80 transform border-r border-slate-800 bg-slate-950/95 px-6 py-6 backdrop-blur-xl transition lg:static lg:translate-x-0 ${
+          className={`fixed inset-y-0 left-0 z-40 flex w-80 min-h-0 flex-col overflow-hidden transform border-r border-slate-800 bg-slate-950/95 px-6 py-6 backdrop-blur-xl transition lg:static lg:translate-x-0 ${
             sidebarOpen ? 'translate-x-0' : '-translate-x-full'
           }`}
         >
@@ -316,18 +228,20 @@ export function DashboardLayout() {
             </Button>
           </div>
 
-          <div className="space-y-2">{navItems.map(renderItem)}</div>
+          <div className="min-h-0 flex-1 overflow-y-auto pr-1">
+            <div className="space-y-2">{navItems.map(renderItem)}</div>
 
-          <div className="mt-8 rounded-3xl border border-slate-800 bg-slate-900/70 p-5">
-            <div className="text-xs uppercase tracking-[0.3em] text-cyan-300">Active Role</div>
-            <div className="mt-3 text-xl font-semibold text-white capitalize">{user.role}</div>
-            <p className="mt-2 text-sm leading-6 text-slate-400">
-              Role-aware access is controlled from a single sidebar config so navigation stays auditable.
-            </p>
+            <div className="mt-8 rounded-3xl border border-slate-800 bg-slate-900/70 p-5">
+              <div className="text-xs uppercase tracking-[0.3em] text-cyan-300">Active Role</div>
+              <div className="mt-3 text-xl font-semibold text-white capitalize">{user.role}</div>
+              <p className="mt-2 text-sm leading-6 text-slate-400">
+                Role-aware access is controlled from a single sidebar config so navigation stays auditable.
+              </p>
+            </div>
           </div>
         </aside>
 
-        <div className="flex flex-1 flex-col">
+        <div className="flex min-h-0 flex-1 flex-col">
           <header className="sticky top-0 z-30 border-b border-slate-800 bg-slate-950/85 backdrop-blur-xl">
             <div className="flex items-center justify-between px-4 py-4 lg:px-8">
               <div className="flex items-center gap-3">
@@ -358,8 +272,8 @@ export function DashboardLayout() {
             </div>
           </header>
 
-          <main className="flex-1 px-4 py-6 lg:px-8">
-            <Outlet />
+          <main className="flex min-h-0 flex-1 flex-col overflow-y-auto px-4 py-6 lg:px-8">
+            {children ?? <Outlet />}
           </main>
         </div>
       </div>

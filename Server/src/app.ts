@@ -28,6 +28,8 @@ import userRoutes from './modules/user/user.routes';
 import workspaceRoutes from './modules/workspace/workspace.routes';
 import adminRoutes from './modules/admin/admin.routes';
 import dmRoutes from './modules/dm/dm.routes';
+import reportRoutes from './modules/report/report.routes';
+import settingsRoutes from './modules/settings/settings.routes';
 import { ApiError } from './utils/ApiError';
 
 export const createApp = () => {
@@ -72,6 +74,8 @@ export const createApp = () => {
   app.use('/api/events', eventRoutes);
   app.use('/api/admin', adminRoutes);
   app.use('/api/dm', dmRoutes);
+  app.use('/api/report', reportRoutes);
+  app.use('/api/settings', settingsRoutes);
   app.get('/api/health', (_req, res) => {
     res.status(200).json({ success: true, data: { status: 'ok' } });
   });

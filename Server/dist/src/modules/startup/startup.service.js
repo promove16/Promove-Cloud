@@ -10,6 +10,8 @@ const startup_model_1 = require("./startup.model");
 const ApiError_1 = require("../../utils/ApiError");
 const placementRecord_model_1 = require("../college/placementRecord.model");
 const roles_types_1 = require("../../types/roles.types");
+const score_utils_1 = require("../innovationScore/score.utils");
+const pdfFileNamePattern = /\.pdf$/i;
 exports.startupSchema = zod_1.z.object({
     projectId: zod_1.z.string().optional(),
     name: zod_1.z.string().trim().min(0).max(120).default(''),
@@ -74,7 +76,7 @@ const launchStartup = async (startupId, userId, payload) => {
         throw new ApiError_1.ApiError(400, 'STARTUP_INCOMPLETE', 'Startup profile is incomplete for launch.');
     }
     const user = await user_model_1.User.findById(userId).select('innovationScore').lean();
-    const score = user?.innovationScore ?? 0;
+    const score = (0, score_utils_1.normalizeInnovationScore)(user?.innovationScore ?? 0);
     startup.launchedToInvestors = payload.launchTo === 'investors' || payload.launchTo === 'both';
     startup.launchedToMentors = payload.launchTo === 'mentors' || payload.launchTo === 'both';
     startup.launchedToRecruiters = payload.launchTo === 'recruiters';
@@ -99,7 +101,7 @@ const launchStartup = async (startupId, userId, payload) => {
                     studentId: userId,
                     collegeId: founder.institutionId,
                     status: 'Discovered',
-                    innovationScoreAtTime: founder.innovationScore ?? 0,
+                    innovationScoreAtTime: (0, score_utils_1.normalizeInnovationScore)(founder.innovationScore ?? 0),
                 }, {
                     upsert: true,
                     new: true,
@@ -157,12 +159,13 @@ const launchStartup = async (startupId, userId, payload) => {
 };
 exports.launchStartup = launchStartup;
 const uploadPitchDeck = async (startupId, userId, file) => {
-    if (file.mimetype !== 'application/pdf') {
+    if (file.mimetype !== 'application/pdf' && !pdfFileNamePattern.test(file.originalname)) {
         throw new ApiError_1.ApiError(400, 'INVALID_FILE_TYPE', 'Only PDF files are allowed');
     }
     const startup = await (0, exports.getStartupForFounder)(startupId, userId);
-    const uploaded = await (0, cloudinaryService_1.uploadToCloudinary)(file.buffer, 'promove/startups', 'raw');
+    const uploaded = await (0, cloudinaryService_1.uploadToCloudinary)(file.buffer, 'promove/startups', 'raw', { format: 'pdf' });
     startup.pitchDeckUrl = uploaded.secure_url;
+    startup.pitchDeckName = file.originalname;
     await startup.save();
     return startup.toObject();
 };

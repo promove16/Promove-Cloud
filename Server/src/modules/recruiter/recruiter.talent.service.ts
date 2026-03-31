@@ -31,6 +31,7 @@ import {
 } from './recruiter.mappers';
 import { talentQuerySchema } from './recruiter.schemas';
 import { Workspace } from '../workspace/workspace.model';
+import { MAX_INNOVATION_SCORE } from '../innovationScore/score.utils';
 
 type TalentQuery = ReturnType<typeof talentQuerySchema.parse>;
 
@@ -63,9 +64,16 @@ const listTalent = async (
   };
 
   if (typeof query.minScore === 'number' || typeof query.maxScore === 'number') {
+    const normalizedMinScore =
+      typeof query.minScore === 'number' ? Math.min(Math.max(query.minScore, 0), MAX_INNOVATION_SCORE) : undefined;
+    const normalizedMaxScore =
+      typeof query.maxScore === 'number' ? Math.min(Math.max(query.maxScore, 0), MAX_INNOVATION_SCORE) : undefined;
+
     studentFilter.innovationScore = {
-      ...(typeof query.minScore === 'number' ? { $gte: query.minScore } : {}),
-      ...(typeof query.maxScore === 'number' ? { $lte: query.maxScore } : {}),
+      ...(typeof normalizedMinScore === 'number' ? { $gte: normalizedMinScore } : {}),
+      ...(typeof normalizedMaxScore === 'number' && normalizedMaxScore < MAX_INNOVATION_SCORE
+        ? { $lte: normalizedMaxScore }
+        : {}),
     };
   }
 

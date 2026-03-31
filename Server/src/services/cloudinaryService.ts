@@ -12,19 +12,23 @@ export const uploadToCloudinary = async (
   buffer: Buffer,
   folder: string,
   resourceType: 'image' | 'raw',
-) =>
-  new Promise<{ secure_url: string; public_id: string }>((resolve, reject) => {
-    const stream = cloudinary.uploader.upload_stream(
-      { folder, resource_type: resourceType },
-      (
-        error: Error | undefined,
-        result: { secure_url: string; public_id: string } | undefined,
-      ) => {
+  options?: {
+    format?: string;
+  },
+) => {
+  return new Promise<{ secure_url: string; public_id: string }>((resolve, reject) => {
+    const uploadStream = cloudinary.uploader.upload_stream(
+      {
+        folder,
+        resource_type: resourceType,
+        timeout: 60000,
+        ...(options?.format ? { format: options.format } : {}),
+      },
+      (error, result) => {
         if (error || !result) {
           reject(error ?? new Error('Upload failed'));
           return;
         }
-
         resolve({
           secure_url: result.secure_url,
           public_id: result.public_id,
@@ -32,8 +36,12 @@ export const uploadToCloudinary = async (
       },
     );
 
-    Readable.from(buffer).pipe(stream);
+    const readable = new Readable();
+    readable.push(buffer);
+    readable.push(null);
+    readable.pipe(uploadStream);
   });
+};
 
 export const deleteFromCloudinary = async (publicId: string, resourceType: 'image' | 'raw') => {
   await cloudinary.uploader.destroy(publicId, { resource_type: resourceType });

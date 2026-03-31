@@ -1,7 +1,7 @@
 import { useMemo, useState } from "react";
+import { useNavigate, useSearchParams } from "react-router-dom";
 import { useQuery } from "@tanstack/react-query";
-import { Eye, Search, ShoppingCart } from "lucide-react";
-import { useSearchParams } from "react-router-dom";
+import { Eye, MessageCircle, Search, ShoppingCart } from "lucide-react";
 import { DashboardLayout } from "../components/DashboardLayout";
 import { marketplaceApi } from "../../api/marketplace.api";
 
@@ -12,10 +12,19 @@ const tabs = [
 ] as const;
 
 export function Marketplace() {
+  const navigate = useNavigate();
   const [searchParams, setSearchParams] = useSearchParams();
   const [selectedProfile, setSelectedProfile] = useState<string | null>(null);
   const role = (searchParams.get("role") as "mentor" | "investor" | "recruiter" | null) ?? "mentor";
   const domain = searchParams.get("domain") ?? "";
+
+  const handleMessage = (profileId: string) => {
+    const storageKey = `dm_first_contact_${profileId}`;
+    if (!localStorage.getItem(storageKey)) {
+      localStorage.setItem(storageKey, 'true');
+    }
+    navigate(`/dashboard/messages/${profileId}`);
+  };
 
   const listQuery = useQuery({
     queryKey: ["marketplace", role, domain],
@@ -95,12 +104,13 @@ export function Marketplace() {
                     </div>
                   </div>
                   <div className="flex gap-2">
+                    <button onClick={() => handleMessage(profile._id)} className="px-4 py-2 bg-gradient-to-r from-cyan-500 to-emerald-500 text-white rounded-lg text-sm font-semibold flex items-center gap-2">
+                      <MessageCircle className="w-4 h-4" />
+                      Message
+                    </button>
                     <button onClick={() => setSelectedProfile(profile._id)} className="px-4 py-2 bg-slate-800 hover:bg-slate-700 text-white rounded-lg text-sm font-semibold flex items-center gap-2">
                       <Eye className="w-4 h-4" />
                       View Profile
-                    </button>
-                    <button className="px-4 py-2 bg-gradient-to-r from-blue-600 to-purple-600 text-white rounded-lg text-sm font-semibold opacity-80">
-                      Connect
                     </button>
                   </div>
                 </div>
@@ -122,7 +132,10 @@ export function Marketplace() {
               <p className="text-slate-300 leading-7 mb-6">{profileQuery.data.bio ?? "This profile is available in the marketplace and can be used for future connection workflows."}</p>
               <div className="flex justify-end gap-3">
                 <button onClick={() => setSelectedProfile(null)} className="px-5 py-3 bg-slate-800 text-white rounded-lg font-semibold">Close</button>
-                <button className="px-5 py-3 bg-gradient-to-r from-blue-600 to-purple-600 text-white rounded-lg font-semibold opacity-80">Connect Coming Soon</button>
+                <button onClick={() => { handleMessage(selectedProfile); setSelectedProfile(null); }} className="px-5 py-3 bg-gradient-to-r from-cyan-500 to-emerald-500 text-white rounded-lg font-semibold flex items-center gap-2">
+                  <MessageCircle className="w-4 h-4" />
+                  Message
+                </button>
               </div>
             </div>
           </div>

@@ -344,6 +344,7 @@ export const uploadWorkspaceFile = async (
     file.buffer,
     'promove/workspaces',
     fileType === 'pdf' ? 'raw' : 'image',
+    fileType === 'pdf' ? { format: 'pdf' } : undefined,
   );
 
   const allowedCategories = ['bug_report', 'error_log', 'screenshot', 'test_result', 'design_mockup', 'other'];

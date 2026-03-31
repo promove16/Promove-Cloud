@@ -11,6 +11,10 @@ import { Event } from '../event/event.model';
 import { Workspace } from '../workspace/workspace.model';
 import { ComplianceReport } from '../institution/complianceReport.model';
 import {
+  normalizeInnovationScore,
+  normalizeScoreBreakdown,
+} from '../innovationScore/score.utils';
+import {
   bulkCreateManagedStudentCredentials,
   createManagedStudentCredentials,
   createManagedStudentCredentialsSchema,
@@ -111,7 +115,7 @@ export const rebuildInstitutionLeaderboard = async (institutionId: string): Prom
 
   const [firstStudent, ...remainingStudents] = students.map((student) => ({
     member: String(student._id),
-    score: getInstitutionLeaderboardScore(student.innovationScore ?? 0, student.createdAt),
+    score: getInstitutionLeaderboardScore(normalizeInnovationScore(student.innovationScore), student.createdAt),
   }));
 
   await redis.zadd(`lb:${institutionId}`, firstStudent, ...remainingStudents);
@@ -174,8 +178,8 @@ const mapLeaderboardUsers = async (
         _id: memberId,
         displayName: user.displayName,
         ...(user.avatar ? { avatar: user.avatar } : {}),
-        innovationScore: user.innovationScore ?? 0,
-        scoreBreakdown: user.scoreBreakdown,
+        innovationScore: normalizeInnovationScore(user.innovationScore),
+        scoreBreakdown: normalizeScoreBreakdown(user.scoreBreakdown),
         activeSince: user.createdAt.toISOString(),
         ...(activeProject
           ? {
@@ -331,14 +335,14 @@ export const getStudentJourney = async (
       _id: String(student._id),
       displayName: student.displayName,
       ...(student.avatar ? { avatar: student.avatar } : {}),
-      innovationScore: student.innovationScore,
-      scoreBreakdown: student.scoreBreakdown,
+      innovationScore: normalizeInnovationScore(student.innovationScore),
+      scoreBreakdown: normalizeScoreBreakdown(student.scoreBreakdown),
     },
     scoreEvents: scoreEvents.map((event) => ({
       _id: String(event._id),
       trigger: event.trigger,
       delta: event.delta,
-      scoreAfter: event.scoreAfter,
+      scoreAfter: normalizeInnovationScore(event.scoreAfter),
       createdAt: event.createdAt,
     })),
     workspaces: workspaces.map((workspace) => ({

@@ -10,6 +10,7 @@ import { Marketplace } from "./pages/Marketplace";
 import { Login } from "./pages/Login";
 import { Signup } from "./pages/Signup";
 import { ProtectedRoute } from "./components/ProtectedRoute";
+import { SettingsPage } from "../features/settings/SettingsPage";
 
 export const router = createBrowserRouter([
   {
@@ -133,6 +134,14 @@ export const router = createBrowserRouter([
     element: (
       <ProtectedRoute>
         <Marketplace />
+      </ProtectedRoute>
+    ),
+  },
+  {
+    path: "/dashboard/settings",
+    element: (
+      <ProtectedRoute>
+        <SettingsPage />
       </ProtectedRoute>
     ),
   },

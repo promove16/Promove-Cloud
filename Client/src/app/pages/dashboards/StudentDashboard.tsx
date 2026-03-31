@@ -20,6 +20,8 @@ import { useInnovationScore } from "../../../hooks/useInnovationScore";
 import { useAuthStore } from "../../../store/authStore";
 import { Workspace } from "../../../types/workspace.types";
 
+const MAX_INNOVATION_SCORE = 200;
+
 const formatDate = (value?: string) =>
   value
     ? new Date(value).toLocaleDateString("en-IN", {
@@ -66,6 +68,16 @@ export function StudentDashboard() {
   const activeWorkspace = workspaces[0];
   const mentorSessions = mentorSessionsQuery.data ?? [];
   const activeDeals = activeDealsQuery.data?.items ?? [];
+  const innovationScore = Math.min(
+    Math.max(scoreQuery.data?.score ?? authUser?.innovationScore ?? 0, 0),
+    MAX_INNOVATION_SCORE,
+  );
+  const scoreProgress = innovationScore / MAX_INNOVATION_SCORE;
+  const weeklyDelta = scoreQuery.data?.weeklyDelta ?? 0;
+  const weeklyDeltaLabel = `${weeklyDelta > 0 ? "+" : ""}${weeklyDelta} this week`;
+  const weeklyDeltaClass =
+    weeklyDelta > 0 ? "text-green-400" : weeklyDelta < 0 ? "text-amber-300" : "text-blue-200";
+  const rankPercentile = Math.min(Math.max(scoreQuery.data?.rankPercentile ?? 100, 1), 100);
 
   const stages = [
     { id: "Ideation", name: "Idea", icon: Lightbulb },
@@ -79,8 +91,8 @@ export function StudentDashboard() {
     () => [
       {
         label: "Innovation Score",
-        value: String(scoreQuery.data?.score ?? authUser?.innovationScore ?? 0),
-        helper: `Top ${scoreQuery.data?.rankPercentile ?? 100}%`,
+        value: String(innovationScore),
+        helper: `Top ${rankPercentile}%`,
       },
       {
         label: "Problems Claimed",
@@ -90,7 +102,7 @@ export function StudentDashboard() {
       {
         label: "Progress Uploads",
         value: String(scoreQuery.data?.breakdown.progressUploads ?? 0),
-        helper: `${scoreQuery.data?.weeklyDelta ?? 0} points this week`,
+        helper: weeklyDeltaLabel,
       },
       {
         label: "Startups Launched",
@@ -98,7 +110,7 @@ export function StudentDashboard() {
         helper: "Launch engine connected",
       },
     ],
-    [authUser?.innovationScore, scoreQuery.data],
+    [innovationScore, rankPercentile, scoreQuery.data, weeklyDeltaLabel],
   );
 
   return (
@@ -183,11 +195,11 @@ export function StudentDashboard() {
                 strokeWidth="12"
                 fill="transparent"
                 strokeDasharray={`${2 * Math.PI * 70}`}
-                strokeDashoffset={`${2 * Math.PI * 70 * (1 - (scoreQuery.data?.score ?? 0) / 200)}`}
+                strokeDashoffset={`${2 * Math.PI * 70 * (1 - scoreProgress)}`}
                 className={`${
-                  (scoreQuery.data?.score ?? 0) > 150
+                  innovationScore > 150
                     ? "text-green-400"
-                    : (scoreQuery.data?.score ?? 0) >= 80
+                    : innovationScore >= 80
                       ? "text-blue-300"
                       : "text-amber-400"
                 }`}
@@ -196,16 +208,16 @@ export function StudentDashboard() {
             </svg>
             <div className="absolute inset-0 flex items-center justify-center">
               <div>
-                <div className="text-5xl font-bold text-white">{scoreQuery.data?.score ?? 0}</div>
-                <div className="text-sm text-blue-200">of 200</div>
+                <div className="text-5xl font-bold text-white">{innovationScore}</div>
+                <div className="text-sm text-blue-200">of {MAX_INNOVATION_SCORE}</div>
               </div>
             </div>
           </div>
-          <div className="flex items-center justify-center gap-2 text-green-400">
+          <div className={`flex items-center justify-center gap-2 ${weeklyDeltaClass}`}>
             <TrendingUp className="h-4 w-4" />
-            <span className="text-sm font-semibold">+{scoreQuery.data?.weeklyDelta ?? 0} this week</span>
+            <span className="text-sm font-semibold">{weeklyDeltaLabel}</span>
           </div>
-          <p className="mt-3 text-xs text-blue-200">Top {scoreQuery.data?.rankPercentile ?? 100}% of innovators</p>
+          <p className="mt-3 text-xs text-blue-200">Top {rankPercentile}% of innovators</p>
         </div>
 
         <div className="lg:col-span-2 rounded-2xl border border-slate-800 bg-slate-900 p-6">

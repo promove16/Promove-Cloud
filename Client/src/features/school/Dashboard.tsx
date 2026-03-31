@@ -7,6 +7,7 @@ import { Card } from '../../components/ui/Card';
 import { Button } from '../../components/ui/Button';
 import { schoolApi } from '../../api/school.api';
 import { StudentIntakePanel } from '../institution/StudentIntakePanel';
+import { PatentShowcase } from '../shared/PatentShowcase';
 import { ApiErrorResponse } from '../../types/auth.types';
 import { BulkCredentialImportResult, TemporaryStudentCredentials } from '../../types/school.types';
 import { useAuthStore } from '../../store/authStore';
@@ -433,6 +434,8 @@ export default function Dashboard() {
             ) : null}
           </div>
         </Card>
+
+        <PatentShowcase />
       </div>
     </div>
   );

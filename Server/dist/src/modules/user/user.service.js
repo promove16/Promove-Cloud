@@ -14,6 +14,7 @@ const socket_1 = require("../../config/socket");
 const recruiter_mappers_1 = require("../recruiter/recruiter.mappers");
 const sanitizeText_1 = require("../../utils/sanitizeText");
 const scoreEngine_1 = require("../../services/scoreEngine");
+const score_utils_1 = require("../innovationScore/score.utils");
 exports.updateMeSchema = zod_1.z
     .object({
     displayName: zod_1.z.string().trim().min(2).max(100).optional(),
@@ -75,8 +76,8 @@ const toSanitizedUser = (user) => ({
     ...(user.domain ? { domain: user.domain } : {}),
     profileComplete: user.profileComplete,
     registrationStage: user.registrationStage,
-    innovationScore: user.innovationScore,
-    scoreBreakdown: user.scoreBreakdown,
+    innovationScore: (0, score_utils_1.normalizeInnovationScore)(user.innovationScore),
+    scoreBreakdown: (0, score_utils_1.normalizeScoreBreakdown)(user.scoreBreakdown),
     accessGrantedBy: user.accessGrantedBy,
     accessExpiresAt: user.accessExpiresAt,
     isActive: user.isActive,

@@ -67,6 +67,8 @@ const user_routes_1 = __importDefault(require("./modules/user/user.routes"));
 const workspace_routes_1 = __importDefault(require("./modules/workspace/workspace.routes"));
 const admin_routes_1 = __importDefault(require("./modules/admin/admin.routes"));
 const dm_routes_1 = __importDefault(require("./modules/dm/dm.routes"));
+const report_routes_1 = __importDefault(require("./modules/report/report.routes"));
+const settings_routes_1 = __importDefault(require("./modules/settings/settings.routes"));
 const ApiError_1 = require("./utils/ApiError");
 const createApp = () => {
     const app = (0, express_1.default)();
@@ -105,6 +107,8 @@ const createApp = () => {
     app.use('/api/events', event_routes_1.default);
     app.use('/api/admin', admin_routes_1.default);
     app.use('/api/dm', dm_routes_1.default);
+    app.use('/api/report', report_routes_1.default);
+    app.use('/api/settings', settings_routes_1.default);
     app.get('/api/health', (_req, res) => {
         res.status(200).json({ success: true, data: { status: 'ok' } });
     });

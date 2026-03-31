@@ -8,6 +8,7 @@ import { Badge } from '../../components/ui/Badge';
 import { Button } from '../../components/ui/Button';
 import { Card } from '../../components/ui/Card';
 import { Spinner } from '../../components/ui/Spinner';
+import { PatentShowcase } from '../shared/PatentShowcase';
 
 export default function MentorDashboard() {
   const navigate = useNavigate();
@@ -165,6 +166,8 @@ export default function MentorDashboard() {
           );
         })()}
       </Card>
+
+      <PatentShowcase />
     </div>
   );
 }

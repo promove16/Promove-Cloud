@@ -1,5 +1,6 @@
 import { useMemo, useState } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
+import { isAxiosError } from 'axios';
 import { Badge } from '../../components/ui/Badge';
 import { Button } from '../../components/ui/Button';
 import { Card } from '../../components/ui/Card';
@@ -10,6 +11,14 @@ import { StartupDetailDrawer } from './StartupDetailDrawer';
 
 const categories = ['Agriculture', 'Health', 'Education', 'Energy', 'Software', 'Other'];
 const stages = ['Pre-Idea', 'Ideation', 'MVP', 'Pre-Launch', 'Launched'];
+
+const getInvestorWorkflowErrorMessage = (error: unknown) => {
+  if (isAxiosError<{ error?: { message?: string } }>(error)) {
+    return error.response?.data?.error?.message ?? 'Unable to complete the investor action right now.';
+  }
+
+  return error instanceof Error ? error.message : 'Unable to complete the investor action right now.';
+};
 
 export default function StartupMarketplace() {
   const queryClient = useQueryClient();
@@ -22,7 +31,7 @@ export default function StartupMarketplace() {
   const [acceptingSole, setAcceptingSole] = useState(true);
   const [selectedStartupId, setSelectedStartupId] = useState<string | null>(null);
   const [viewedStartupIds, setViewedStartupIds] = useState<Set<string>>(new Set());
-  const [toast, setToast] = useState('');
+  const [feedback, setFeedback] = useState<{ type: 'success' | 'error'; message: string } | null>(null);
 
   const startupsQuery = useQuery({
     queryKey: ['investor-startups', { category, stage, minScore, maxScore, acceptingPenny, acceptingSole }],
@@ -49,13 +58,20 @@ export default function StartupMarketplace() {
         proposedEquityPercent: number;
         chosenRole?: 'shareholder' | 'director' | 'observer';
       };
-    }) => investorApi.expressInterest(params.startupId, params.payload),
+    }) =>
+      params.payload.investorType === 'sole'
+        ? investorApi.expressSoleInterest(params.startupId, params.payload)
+        : investorApi.expressInterest(params.startupId, params.payload),
     onSuccess: async () => {
-      setToast('Interest sent. The student has been notified.');
+      setFeedback({ type: 'success', message: 'Interest sent. The student has been notified.' });
+      setSelectedStartupId(null);
       await queryClient.invalidateQueries({ queryKey: ['investor-startups'] });
       await queryClient.invalidateQueries({ queryKey: ['investor-deals'] });
       await queryClient.invalidateQueries({ queryKey: ['investor-dashboard'] });
       await queryClient.invalidateQueries({ queryKey: ['investor-portfolio'] });
+    },
+    onError: (error) => {
+      setFeedback({ type: 'error', message: getInvestorWorkflowErrorMessage(error) });
     },
   });
 
@@ -70,6 +86,7 @@ export default function StartupMarketplace() {
   );
 
   const openStartup = (startupId: string) => {
+    setFeedback(null);
     setViewedStartupIds((current) => new Set(current).add(startupId));
     setSelectedStartupId(startupId);
   };
@@ -90,7 +107,17 @@ export default function StartupMarketplace() {
         </div>
       </div>
 
-      {toast ? <div className="rounded-2xl border border-cyan-500/30 bg-cyan-500/10 px-4 py-3 text-sm text-cyan-200">{toast}</div> : null}
+      {feedback ? (
+        <div
+          className={`rounded-2xl px-4 py-3 text-sm ${
+            feedback.type === 'success'
+              ? 'border border-cyan-500/30 bg-cyan-500/10 text-cyan-200'
+              : 'border border-red-500/30 bg-red-500/10 text-red-200'
+          }`}
+        >
+          {feedback.message}
+        </div>
+      ) : null}
 
       <Card className="grid gap-4 p-5 lg:grid-cols-4">
         <div>
@@ -178,6 +205,14 @@ export default function StartupMarketplace() {
         <div className="flex justify-center py-12">
           <Spinner />
         </div>
+      ) : startupsQuery.isError ? (
+        <Card className="p-6 text-sm text-red-200">
+          {getInvestorWorkflowErrorMessage(startupsQuery.error)}
+        </Card>
+      ) : startups.length === 0 ? (
+        <Card className="p-6 text-sm text-slate-400">
+          No startups match the current investor filters.
+        </Card>
       ) : (
         <div className="grid gap-4 xl:grid-cols-2">
           {startups.map((startup) => {
@@ -249,6 +284,7 @@ export default function StartupMarketplace() {
         }}
         onExpressInterest={(startupId, payload) => {
           setViewedStartupIds((current) => new Set(current).add(startupId));
+          setFeedback(null);
           expressInterestMutation.mutate({ startupId, payload });
         }}
       />

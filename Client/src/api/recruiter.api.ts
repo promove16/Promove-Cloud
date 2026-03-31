@@ -111,7 +111,7 @@ export const recruiterApi = {
     return response.data.data;
   },
   async applyToJob(jobId: string) {
-    const response = await api.post<ApiSuccessResponse<{ applied: boolean }>>(
+    const response = await api.post<ApiSuccessResponse<{ applied: boolean; alreadyApplied: boolean }>>(
       `/api/recruiter/jobs/${jobId}/apply`,
     );
     return response.data.data;

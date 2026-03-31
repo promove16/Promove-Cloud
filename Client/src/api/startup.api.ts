@@ -35,9 +35,7 @@ export const startupApi = {
   async uploadPitch(startupId: string, file: File) {
     const body = new FormData();
     body.append('file', file);
-    const response = await api.post<ApiSuccessResponse<Startup>>(`/api/startup/${startupId}/upload-pitch`, body, {
-      headers: { 'Content-Type': 'multipart/form-data' },
-    });
+    const response = await api.post<ApiSuccessResponse<Startup>>(`/api/startup/${startupId}/upload-pitch`, body);
     return response.data.data;
   },
   async getCapTable(startupId: string) {

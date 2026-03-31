@@ -1,9 +1,14 @@
-import { Server } from 'socket.io';
+import { Server, Socket } from 'socket.io';
 import jwt from 'jsonwebtoken';
 import { Types } from 'mongoose';
 import { env } from '../config/env';
 import { DirectMessage } from '../modules/dm/dm.model';
 import { onlineUsers } from '../modules/dm/dm.controller';
+import { User } from '../modules/user/user.model';
+
+// Map to store userId -> socket mapping for secure message routing
+const userSockets = new Map<string, Set<Socket>>();
+const allowedQueryTypes = new Set<string>(['project_mentor', 'investor', 'recruiter', 'general']);
 
 export const initDmSocket = (io: Server) => {
   const dm = io.of('/dm');
@@ -23,6 +28,11 @@ export const initDmSocket = (io: Server) => {
   dm.on('connection', (socket) => {
     const userId: string = socket.data.userId;
 
+    // Track socket for this user
+    const userSocketSet = userSockets.get(userId) ?? new Set();
+    userSocketSet.add(socket);
+    userSockets.set(userId, userSocketSet);
+
     // Each user joins their own room named by their userId
     socket.join(`user:${userId}`);
 
@@ -30,18 +40,39 @@ export const initDmSocket = (io: Server) => {
     onlineUsers.add(userId);
     dm.emit('dm:presence', { userId, isOnline: true });
 
-    // Send a DM
-    socket.on('dm:send', async ({ recipientId, message, messageType, scheduledAt, meetLink }) => {
+    // Send a DM - SECURE VERSION
+    socket.on('dm:send', async (data: { 
+      recipientId?: string; 
+      message?: string; 
+      messageType?: string; 
+      scheduledAt?: string; 
+      meetLink?: string; 
+      attachmentUrl?: string; 
+      attachmentType?: string; 
+      attachmentName?: string;
+      queryType?: string;
+    }) => {
       try {
+        // CRITICAL: Use the socket's authenticated userId as sender, NOT from payload
+        const senderId = userId;
+        
+        const { recipientId, message, messageType, scheduledAt, meetLink, attachmentUrl, attachmentType, attachmentName, queryType } = data;
+
         if (!recipientId || !Types.ObjectId.isValid(recipientId)) {
           socket.emit('dm:error', { message: 'Invalid recipient' });
+          return;
+        }
+
+        // Prevent sending to self
+        if (recipientId === senderId) {
+          socket.emit('dm:error', { message: 'Cannot send message to yourself' });
           return;
         }
 
         const normalizedMessage = typeof message === 'string' ? message.trim() : '';
         const type = messageType === 'interview_request' ? 'interview_request' : 'text';
 
-        if (!normalizedMessage && type !== 'interview_request') {
+        if (!normalizedMessage && type !== 'interview_request' && !attachmentUrl) {
           socket.emit('dm:error', { message: 'Message cannot be empty' });
           return;
         }
@@ -51,27 +82,52 @@ export const initDmSocket = (io: Server) => {
           return;
         }
 
+        if (queryType && !allowedQueryTypes.has(queryType)) {
+          socket.emit('dm:error', { message: 'Invalid message query type' });
+          return;
+        }
+
+        const recipientExists = await User.exists({ _id: recipientId });
+        if (!recipientExists) {
+          socket.emit('dm:error', { message: 'Recipient not found' });
+          return;
+        }
+
+        // Create message with verified senderId from socket auth
         const msg = await DirectMessage.create({
-          senderId: new Types.ObjectId(userId),
+          senderId: new Types.ObjectId(senderId),
           recipientId: new Types.ObjectId(recipientId),
           message: normalizedMessage,
           messageType: type,
+          queryType: queryType || 'general',
           ...(scheduledAt ? { scheduledAt: new Date(scheduledAt) } : {}),
           ...(meetLink ? { meetLink } : {}),
+          ...(attachmentUrl ? { attachmentUrl } : {}),
+          ...(attachmentType ? { attachmentType } : {}),
+          ...(attachmentName ? { attachmentName } : {}),
         });
 
-        // Send to recipient's room
+        // Send ONLY to the intended recipient
         dm.to(`user:${recipientId}`).emit('dm:message', msg);
-        // Echo back to sender (in case multiple tabs)
+        
+        // Echo back to sender only (to their own sockets)
         socket.emit('dm:message', msg);
+        
+        console.log(`[DM] Message sent from ${senderId} to ${recipientId}`);
       } catch (_err) {
+        console.error('[DM] Send error:', _err);
         socket.emit('dm:error', { message: 'Failed to send message' });
       }
     });
 
-    // Mark messages as read & notify sender
-    socket.on('dm:read', async ({ partnerId }: { partnerId: string }) => {
+    // Mark messages as read & notify sender - SECURE VERSION
+    socket.on('dm:read', async (data: { partnerId?: string }) => {
+      const { partnerId } = data;
+      
       if (!partnerId || !Types.ObjectId.isValid(partnerId)) return;
+      
+      // Use socket's authenticated userId
+      const userId = socket.data.userId;
 
       const now = new Date();
       await DirectMessage.updateMany(
@@ -90,19 +146,27 @@ export const initDmSocket = (io: Server) => {
       });
     });
 
-    // Typing indicator
-    socket.on('dm:typing', ({ recipientId, isTyping }: { recipientId: string; isTyping: boolean }) => {
+    // Typing indicator - SECURE VERSION
+    socket.on('dm:typing', (data: { recipientId?: string; isTyping?: boolean }) => {
+      const { recipientId, isTyping } = data;
       if (!recipientId) return;
-      dm.to(`user:${recipientId}`).emit('dm:typing', { senderId: userId, isTyping });
+      
+      // Use socket's authenticated userId
+      const senderId = socket.data.userId;
+      dm.to(`user:${recipientId}`).emit('dm:typing', { senderId, isTyping });
     });
 
     // Handle disconnect — remove from online set
     socket.on('disconnect', () => {
-      // Only mark offline if no other sockets for this user
-      const rooms = dm.adapter.rooms.get(`user:${userId}`);
-      if (!rooms || rooms.size === 0) {
-        onlineUsers.delete(userId);
-        dm.emit('dm:presence', { userId, isOnline: false });
+      // Remove socket from user's socket set
+      const userSocketSet = userSockets.get(userId);
+      if (userSocketSet) {
+        userSocketSet.delete(socket);
+        if (userSocketSet.size === 0) {
+          userSockets.delete(userId);
+          onlineUsers.delete(userId);
+          dm.emit('dm:presence', { userId, isOnline: false });
+        }
       }
     });
   });

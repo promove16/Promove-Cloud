@@ -16,9 +16,18 @@ export const getRecruiterJobs = async (recruiterId: string): Promise<RecruiterJo
   }));
 };
 
-export const getPublicRecruiterJobs = async (recruiterId: string): Promise<RecruiterJobView[]> => {
+export const getPublicRecruiterJobs = async (
+  recruiterId: string,
+  studentId?: string,
+): Promise<RecruiterJobView[]> => {
   const jobs = await JobPost.find({ recruiterId, isActive: true }).sort({ createdAt: -1 }).lean();
-  return jobs.map(mapJob);
+  return jobs.map((job) =>
+    mapJob(job, {
+      hasApplied: studentId
+        ? job.applicantIds.some((applicantId) => String(applicantId) === studentId)
+        : undefined,
+    }),
+  );
 };
 
 export const createRecruiterJob = async (recruiterId: string, payload: z.infer<typeof jobCreateSchema>) => {
@@ -86,6 +95,10 @@ export const applyToRecruiterJob = async (studentId: string, jobId: string) => {
     throw new ApiError(404, 'JOB_NOT_FOUND', 'Job post not found');
   }
 
+  if (job.applicantIds.some((applicantId) => String(applicantId) === studentId)) {
+    return { applied: true, alreadyApplied: true };
+  }
+
   await createBridge(String(job.recruiterId), studentId, 'ACTIVE_APPLICATION');
   await JobPost.updateOne({ _id: jobId }, { $addToSet: { applicantIds: studentId } });
 
@@ -96,5 +109,5 @@ export const applyToRecruiterJob = async (studentId: string, jobId: string) => {
     '/dashboard/recruiter/talent',
   );
 
-  return { applied: true };
+  return { applied: true, alreadyApplied: false };
 };

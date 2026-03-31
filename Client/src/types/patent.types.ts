@@ -78,6 +78,26 @@ export interface PatentSubmission {
   adminReviewedBy?: string;
   adminNotes?: string;
   scoreAwarded: boolean;
+  showcasedInMarketplace: boolean;
   createdAt: string;
   updatedAt: string;
+}
+
+export interface ShowcasedPatent {
+  _id: string;
+  studentId: string;
+  projectTitle: string;
+  inventionCategory?: string;
+  specificationType?: string;
+  abstract?: string;
+  submittedAt: string;
+  adminReviewedAt?: string;
+  student: {
+    _id: string;
+    displayName: string;
+    avatar?: string;
+    domain?: string;
+    bio?: string;
+    headline?: string;
+  };
 }
