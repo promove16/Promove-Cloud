@@ -122,31 +122,36 @@ Two account sources exist in the repo.
 
 - [ ] Run `cd Server && npm run seed:users`
 - [ ] Seeded emails:
-  `student@test.com`, `school@test.com`, `college@test.com`, `mentor@test.com`, `investor@test.com`, `recruiter@test.com`, `admin@test.com`
-- [ ] Seeded password for all above users:
-  `Password123!`
+  `admin@promove.dev`, `school@promove.dev`, `college@promove.dev`, `mentor@promove.dev`, `investor@promove.dev`, `recruiter@promove.dev`, `arjun.sharma@student.promove.dev`, `priya.nair@student.promove.dev`, `rohit.patel@student.promove.dev`, `neha.verma@student.promove.dev`
+- [ ] Seeded shared password for school, college, mentor, investor, recruiter, and student users:
+  `Password@123`
+- [ ] Seeded admin password:
+  `Admin@ProMove1`
 
-### Source B: Postman local environment placeholders
+### Source B: Postman local environment
 
-The Postman environment includes example role accounts such as:
+The generated Postman environment is aligned with the seed script and includes these defaults:
 
-- `pm.school@pic.test`
-- `pm.college@pic.test`
-- `pm.student@pic.test`
-- `pm.college.student@pic.test`
-- `pm.investor@pic.test`
-- `pm.recruiter@pic.test`
-- `pm.mentor@pic.test`
-- `pm.admin@pic.test`
+- `studentEmail` -> `arjun.sharma@student.promove.dev`
+- `collegeStudentEmail` -> `priya.nair@student.promove.dev`
+- `schoolStudentEmail` -> `rohit.patel@student.promove.dev`
+- `pendingStudentEmail` -> `neha.verma@student.promove.dev`
+- `schoolEmail` -> `school@promove.dev`
+- `collegeEmail` -> `college@promove.dev`
+- `mentorEmail` -> `mentor@promove.dev`
+- `investorEmail` -> `investor@promove.dev`
+- `recruiterEmail` -> `recruiter@promove.dev`
+- `adminEmail` -> `admin@promove.dev`
 
-Password placeholder in the environment:
+Password defaults in the Postman environment:
 
-- `Worker1234!`
+- `defaultPassword` -> `Password@123`
+- `adminPassword` -> `Admin@ProMove1`
 
 Important note:
 
-- [ ] The Postman environment variables are placeholders and not guaranteed to exist in MongoDB.
-- [ ] Use the server seed script, direct registration, or admin/institution onboarding flows to create real data before testing.
+- [ ] Run the seed script before testing if the database does not already contain the demo users.
+- [ ] Registration requests and ad hoc signup requests in the collection still create timestamped test accounts; only the login defaults are tied to the seeded demo users.
 
 ## 8. Reusable Test Assets
 

@@ -15,11 +15,16 @@ export interface MentorDashboardData {
   sessionsToday: number;
   pendingReviews: number;
   activeStudentCount: number;
+  assignedProjectsCount: number;
+  assignedProgramsCount: number;
   recentActivities: MentorDashboardActivity[];
+  projectAssignments: MentorAssignedProject[];
+  institutionPrograms: MentorAssignedInstitutionProgram[];
 }
 
 export interface MentorFeedStudent {
   _id: string;
+  workspaceId: string;
   studentId: string;
   displayName: string;
   avatar?: string;
@@ -166,3 +171,186 @@ export interface MentorWorkspaceDetail {
     submittedAt: Date;
   }>;
 }
+
+export interface MentorAssignmentStudent {
+  _id: string;
+  displayName: string;
+  avatar?: string;
+  institutionName?: string;
+}
+
+export interface MentorAssignedProject {
+  workspaceId: string;
+  title: string;
+  category: string;
+  stage: string;
+  progressPercent: number;
+  updatedAt: string;
+  startupName?: string;
+  students: MentorAssignmentStudent[];
+}
+
+export interface MentorAssignedInstitutionProgram {
+  _id: string;
+  institution: InstitutionMentorshipProgramInstitution;
+  title: string;
+  objective: string;
+  preferredDate: string;
+  scheduledAt?: string;
+  durationMinutes: number;
+  expectedParticipants: number;
+  deliveryMode: 'Online' | 'Offline';
+  platform: 'Google Meet' | 'Microsoft Teams' | 'Zoom' | 'Offline';
+  meetingLink?: string;
+  venue?: string;
+  adminNotes?: string;
+  preferredExpertise?: string;
+  status: 'Assigned';
+}
+
+export interface InstitutionMentorshipProgramInstitution {
+  _id: string;
+  displayName: string;
+  type: 'school' | 'college';
+}
+
+export interface InstitutionMentorshipProgramRequester {
+  _id: string;
+  displayName: string;
+  email: string;
+}
+
+export interface InstitutionMentorshipProgramMentor {
+  _id: string;
+  displayName: string;
+  email: string;
+  avatar?: string;
+  domain?: string;
+  bio?: string;
+}
+
+export interface InstitutionMentorshipProgramItem {
+  _id: string;
+  institution: InstitutionMentorshipProgramInstitution;
+  requestedBy: InstitutionMentorshipProgramRequester;
+  mentor?: InstitutionMentorshipProgramMentor;
+  title: string;
+  objective: string;
+  preferredDate: string;
+  scheduledAt?: string;
+  durationMinutes: number;
+  expectedParticipants: number;
+  deliveryMode: 'Online' | 'Offline';
+  platform: 'Google Meet' | 'Microsoft Teams' | 'Zoom' | 'Offline';
+  meetingLink?: string;
+  venue?: string;
+  preferredExpertise?: string;
+  adminNotes?: string;
+  rejectionReason?: string;
+  status: 'Pending' | 'Assigned' | 'Rejected';
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface InstitutionMentorshipProgramStats {
+  total: number;
+  pending: number;
+  assigned: number;
+  rejected: number;
+}
+
+export interface InstitutionMentorshipProgramView {
+  items: InstitutionMentorshipProgramItem[];
+  stats: InstitutionMentorshipProgramStats;
+}
+
+export type InstitutionMentorshipProgramListResponse = InstitutionMentorshipProgramView;
+
+export interface CreateInstitutionMentorshipProgramInput {
+  title: string;
+  objective: string;
+  preferredDate: string;
+  durationMinutes: number;
+  expectedParticipants: number;
+  deliveryMode: 'Online' | 'Offline';
+  platform: 'Google Meet' | 'Microsoft Teams' | 'Zoom' | 'Offline';
+  meetingLink?: string;
+  venue?: string;
+  preferredExpertise?: string;
+}
+
+export type InstitutionMentorshipProgramReviewInput =
+  | {
+      decision: 'assigned';
+      mentorId: string;
+      scheduledAt: string;
+      deliveryMode: 'Online' | 'Offline';
+      platform: 'Google Meet' | 'Microsoft Teams' | 'Zoom' | 'Offline';
+      meetingLink?: string;
+      venue?: string;
+      adminNotes?: string;
+    }
+  | {
+      decision: 'rejected';
+      rejectionReason: string;
+      adminNotes?: string;
+    };
+
+export interface MentorshipAdminMentorItem {
+  _id: string;
+  displayName: string;
+  email: string;
+  avatar?: string;
+  domain?: string;
+  bio?: string;
+  headline?: string;
+  assignedProjects: number;
+  assignedPrograms: number;
+  createdAt: string;
+}
+
+export interface CreateMentorProfileInput {
+  displayName: string;
+  email: string;
+  domain?: string;
+  bio?: string;
+  headline?: string;
+}
+
+export interface CreatedMentorProfileResult {
+  mentor: MentorshipAdminMentorItem;
+  temporaryPassword: string;
+}
+
+export interface AdminProjectMentorshipItem {
+  workspaceId: string;
+  title: string;
+  category: string;
+  stage: string;
+  progressPercent: number;
+  updatedAt: string;
+  startupName?: string;
+  preferredExpertise?: string;
+  students: MentorAssignmentStudent[];
+  mentor?: InstitutionMentorshipProgramMentor;
+}
+
+export interface AdminProjectMentorshipStats {
+  total: number;
+  assigned: number;
+  unassigned: number;
+}
+
+export interface AdminProjectMentorshipView {
+  items: AdminProjectMentorshipItem[];
+  stats: AdminProjectMentorshipStats;
+}
+
+export type ProjectMentorAssignmentInput =
+  | {
+      decision: 'assigned';
+      mentorId: string;
+    }
+  | {
+      decision: 'unassigned';
+    };

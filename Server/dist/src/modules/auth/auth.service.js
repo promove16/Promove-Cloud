@@ -12,8 +12,10 @@ const redis_1 = require("../../config/redis");
 const user_model_1 = require("../user/user.model");
 const roles_types_1 = require("../../types/roles.types");
 const ApiError_1 = require("../../utils/ApiError");
+const logger_1 = require("../../config/logger");
 const user_service_1 = require("../user/user.service");
 const sanitizeText_1 = require("../../utils/sanitizeText");
+const activity_service_1 = require("../analytics/activity.service");
 const institutionAccess_service_1 = require("../institution/institutionAccess.service");
 const studentRoster_service_1 = require("../institution/studentRoster.service");
 const REFRESH_TTL_SECONDS = 30 * 24 * 60 * 60;
@@ -122,6 +124,12 @@ const assertUserCanAuthenticate = (user) => {
 const issueAuthResultForUser = async (user) => {
     user.lastLogin = new Date();
     await user.save();
+    try {
+        await (0, activity_service_1.recordLoginActivity)(String(user._id));
+    }
+    catch (error) {
+        (0, logger_1.logError)('Failed to record login activity', error);
+    }
     const sanitizedUser = (0, user_service_1.toSanitizedUser)(user.toObject());
     const tokens = await createTokenPair(sanitizedUser);
     return {

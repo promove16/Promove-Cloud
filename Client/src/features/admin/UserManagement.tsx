@@ -1,6 +1,7 @@
 import { useMemo, useState, type ReactNode } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { Eye, MoreHorizontal, Search, ShieldCheck, ShieldOff, UserCog } from 'lucide-react';
+import { useSearchParams } from 'react-router-dom';
 import { adminApi, AdminUserListItem } from '../../api/admin.api';
 import { scoreApi } from '../../api/score.api';
 import { UserRole } from '../../types/roles.types';
@@ -156,10 +157,19 @@ function UserActionMenu({
 }
 
 export default function UserManagement() {
+  const [searchParams, setSearchParams] = useSearchParams();
   const queryClient = useQueryClient();
+  const initialRoleFilter = searchParams.get('role');
+  const initialStatusFilter = searchParams.get('status');
   const [search, setSearch] = useState('');
-  const [roleFilter, setRoleFilter] = useState<UserRole | 'all'>('all');
-  const [statusFilter, setStatusFilter] = useState<'all' | 'active' | 'inactive'>('all');
+  const [roleFilter, setRoleFilter] = useState<UserRole | 'all'>(
+    initialRoleFilter && Object.values(UserRole).includes(initialRoleFilter as UserRole)
+      ? (initialRoleFilter as UserRole)
+      : 'all',
+  );
+  const [statusFilter, setStatusFilter] = useState<'all' | 'active' | 'inactive'>(
+    initialStatusFilter === 'active' || initialStatusFilter === 'inactive' ? initialStatusFilter : 'all',
+  );
   const [selectedUser, setSelectedUser] = useState<AdminUserListItem | null>(null);
   const [modalMode, setModalMode] = useState<ModalMode>(null);
   const [roleDraft, setRoleDraft] = useState<UserRole>(UserRole.STUDENT);
@@ -229,6 +239,24 @@ export default function UserManagement() {
       ),
     [users],
   );
+
+  const updateFiltersInUrl = (nextRole: UserRole | 'all', nextStatus: 'all' | 'active' | 'inactive') => {
+    const nextParams = new URLSearchParams(searchParams);
+
+    if (nextRole === 'all') {
+      nextParams.delete('role');
+    } else {
+      nextParams.set('role', nextRole);
+    }
+
+    if (nextStatus === 'all') {
+      nextParams.delete('status');
+    } else {
+      nextParams.set('status', nextStatus);
+    }
+
+    setSearchParams(nextParams, { replace: true });
+  };
 
   return (
     <div className="space-y-6">
@@ -327,7 +355,11 @@ export default function UserManagement() {
         <select
           className="rounded-lg border border-slate-800 bg-slate-950 px-4 py-3 text-white"
           value={roleFilter}
-          onChange={(event) => setRoleFilter(event.target.value as UserRole | 'all')}
+          onChange={(event) => {
+            const nextRole = event.target.value as UserRole | 'all';
+            setRoleFilter(nextRole);
+            updateFiltersInUrl(nextRole, statusFilter);
+          }}
         >
           <option value="all">All Roles</option>
           {Object.values(UserRole).map((role) => (
@@ -339,7 +371,11 @@ export default function UserManagement() {
         <select
           className="rounded-lg border border-slate-800 bg-slate-950 px-4 py-3 text-white"
           value={statusFilter}
-          onChange={(event) => setStatusFilter(event.target.value as 'all' | 'active' | 'inactive')}
+          onChange={(event) => {
+            const nextStatus = event.target.value as 'all' | 'active' | 'inactive';
+            setStatusFilter(nextStatus);
+            updateFiltersInUrl(roleFilter, nextStatus);
+          }}
         >
           <option value="all">All Statuses</option>
           <option value="active">Active</option>

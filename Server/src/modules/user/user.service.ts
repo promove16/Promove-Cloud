@@ -3,6 +3,7 @@ import { z } from 'zod';
 import { User } from './user.model';
 import { IUser, LaunchToRecruitersResult, SanitizedUser, StudentMentorSessionView } from './user.types';
 import { ApiError } from '../../utils/ApiError';
+import { recordClientActivity, recordClientActivitySchema } from '../analytics/activity.service';
 import { MentorSession } from '../mentor/mentorSession.model';
 import { UserRole } from '../../types/roles.types';
 import { RelevanceBridge } from '../recruiter/relevanceBridge.model';
@@ -13,6 +14,7 @@ import { getStudentCollegeId } from '../recruiter/recruiter.mappers';
 import { sanitizePlainText } from '../../utils/sanitizeText';
 import { applyScoreAsync } from '../../services/scoreEngine';
 import { normalizeInnovationScore, normalizeScoreBreakdown } from '../innovationScore/score.utils';
+import { fetchLinkedInPublicProfile } from './linkedinPublicProfile';
 
 export const updateMeSchema = z
   .object({
@@ -32,12 +34,26 @@ export const updateMeSchema = z
 export const socialEnrichSchema = z.object({
   githubUrl: z.string().trim().url().optional(),
   linkedinUrl: z.string().trim().url().optional(),
+  confirmLinkedinFetch: z.boolean().optional(),
 });
 
 type UserLike = Omit<IUser, '_id' | 'institutionId'> & {
   _id: { toString(): string };
   institutionId?: { toString(): string } | null;
 };
+
+const GITHUB_PROFILE_ROLES = new Set<UserRole>([UserRole.STUDENT, UserRole.MENTOR]);
+
+const supportsGithubProfile = (role: UserRole) => GITHUB_PROFILE_ROLES.has(role);
+
+const computeProfileComplete = (user: Pick<IUser, 'role' | 'displayName' | 'bio' | 'domain' | 'githubUrl' | 'linkedinUrl'>) =>
+  Boolean(
+    user.displayName?.trim() &&
+      ((user.bio && user.bio.trim()) ||
+        (user.domain && user.domain.trim()) ||
+        (user.linkedinUrl && user.linkedinUrl.trim()) ||
+        (supportsGithubProfile(user.role) && user.githubUrl && user.githubUrl.trim())),
+  );
 
 const toSanitizedConnectedAccounts = (connectedAccounts: IUser['connectedAccounts']): SanitizedUser['connectedAccounts'] => ({
   github: {
@@ -151,6 +167,12 @@ export const getCurrentUser = async (userId: string) => {
   return toSanitizedUser(user as UserLike);
 };
 
+export const recordCurrentUserActivity = async (userId: string, payload: unknown) => {
+  const parsed = recordClientActivitySchema.parse(payload);
+  await recordClientActivity(userId, parsed);
+  return { tracked: true };
+};
+
 const extractGithubUsername = (githubUrl: string) => {
   try {
     const url = new URL(githubUrl);
@@ -248,6 +270,60 @@ const normalizeOptionalUrl = (value?: string | null) => {
   return `https://${trimmed}`;
 };
 
+const applyLinkedInProfileFields = (
+  user: IUser,
+  profile: Awaited<ReturnType<typeof fetchLinkedInPublicProfile>>,
+) => {
+  let importedProfileFields = 0;
+
+  if ((!user.displayName || user.displayName.trim().length === 0) && profile.displayName) {
+    user.displayName = sanitizePlainText(profile.displayName);
+    importedProfileFields += 1;
+  }
+
+  if ((!user.headline || user.headline.trim().length === 0) && profile.headline) {
+    user.headline = sanitizePlainText(profile.headline);
+    importedProfileFields += 1;
+  }
+
+  if ((!user.location || user.location.trim().length === 0) && profile.location) {
+    user.location = sanitizePlainText(profile.location);
+    importedProfileFields += 1;
+  }
+
+  if ((!user.bio || user.bio.trim().length === 0) && profile.bio) {
+    user.bio = sanitizePlainText(profile.bio);
+    importedProfileFields += 1;
+  }
+
+  if ((!user.avatar || user.avatar.trim().length === 0) && profile.avatar) {
+    user.avatar = profile.avatar;
+    importedProfileFields += 1;
+  }
+
+  user.skills = [...(user.skills ?? []).filter((skill) => skill.source !== 'linkedin'), ...profile.skills];
+  user.experience = [
+    ...(user.experience ?? []).filter((experience) => experience.source !== 'linkedin'),
+    ...profile.experience,
+  ];
+  user.education = [
+    ...(user.education ?? []).filter((education) => education.source !== 'linkedin'),
+    ...profile.education,
+  ];
+  user.certifications = [
+    ...(user.certifications ?? []).filter((certification) => certification.source !== 'linkedin'),
+    ...profile.certifications,
+  ];
+
+  return {
+    importedProfileFields,
+    importedSkills: profile.skills.length,
+    importedExperience: profile.experience.length,
+    importedEducation: profile.education.length,
+    importedCertifications: profile.certifications.length,
+  };
+};
+
 export const enrichCurrentUserFromSocialLinks = async (
   userId: string,
   payload: z.infer<typeof socialEnrichSchema>,
@@ -271,6 +347,13 @@ export const enrichCurrentUserFromSocialLinks = async (
 
   const warnings: string[] = [];
   let githubImported = false;
+  let linkedinImported = false;
+  let importedSkills = 0;
+  let importedProjects = 0;
+  let importedProfileFields = 0;
+  let importedExperience = 0;
+  let importedEducation = 0;
+  let importedCertifications = 0;
 
   if (githubUrl) {
     const username = extractGithubUsername(githubUrl);
@@ -378,6 +461,8 @@ export const enrichCurrentUserFromSocialLinks = async (
 
     user.githubUrl = githubUser.html_url;
     githubImported = true;
+    importedSkills += githubSkills.length;
+    importedProjects += githubProjects.length;
 
     await applyScoreAsync({
       userId,
@@ -387,19 +472,100 @@ export const enrichCurrentUserFromSocialLinks = async (
   }
 
   if (linkedinUrl) {
-    extractLinkedInHandle(linkedinUrl);
-    warnings.push(
-      'LinkedIn profile import is not enabled yet. Your LinkedIn URL was saved successfully.',
-    );
+    const handle = extractLinkedInHandle(linkedinUrl);
+    const shouldFetchLinkedIn = payload.confirmLinkedinFetch === true;
+    const shouldWarnSkippedLinkedIn =
+      payload.linkedinUrl !== undefined && payload.confirmLinkedinFetch !== true;
+
+    if (shouldFetchLinkedIn) {
+      try {
+        const linkedInProfile = await fetchLinkedInPublicProfile(linkedinUrl, handle);
+        const summary = applyLinkedInProfileFields(user, linkedInProfile);
+        const hasLinkedInPublicData = Boolean(
+          linkedInProfile.displayName ||
+            linkedInProfile.headline ||
+            linkedInProfile.location ||
+            linkedInProfile.bio ||
+            linkedInProfile.avatar ||
+            linkedInProfile.skills.length > 0 ||
+            linkedInProfile.experience.length > 0 ||
+            linkedInProfile.education.length > 0 ||
+            linkedInProfile.certifications.length > 0,
+        );
+
+        importedProfileFields += summary.importedProfileFields;
+        importedSkills += summary.importedSkills;
+        importedExperience += summary.importedExperience;
+        importedEducation += summary.importedEducation;
+        importedCertifications += summary.importedCertifications;
+
+        user.connectedAccounts.linkedin = {
+          ...user.connectedAccounts.linkedin,
+          userId: handle,
+          username: handle.split('/').filter(Boolean).pop() ?? handle,
+          connectedAt: user.connectedAccounts.linkedin.connectedAt ?? new Date(),
+          lastSyncedAt: new Date(),
+        };
+        user.linkedinUrl = linkedInProfile.canonicalUrl;
+
+        if (hasLinkedInPublicData) {
+          linkedinImported = true;
+
+          if (
+            summary.importedProfileFields +
+              summary.importedSkills +
+              summary.importedExperience +
+              summary.importedEducation +
+              summary.importedCertifications ===
+            0
+          ) {
+            warnings.push(
+              'LinkedIn data was fetched successfully, but your existing profile fields were already populated so nothing new was applied.',
+            );
+          }
+
+          await applyScoreAsync({
+            userId,
+            trigger: 'LINKEDIN_CONNECTED',
+            metadata: {
+              handle,
+              importedProfileFields: summary.importedProfileFields,
+              importedSkills: summary.importedSkills,
+              importedExperience: summary.importedExperience,
+              importedEducation: summary.importedEducation,
+              importedCertifications: summary.importedCertifications,
+            },
+          });
+        } else {
+          warnings.push(
+            'LinkedIn profile was reachable, but no public data could be imported. The URL was still saved.',
+          );
+        }
+      } catch (error) {
+        const code = error instanceof Error ? error.message : 'LINKEDIN_FETCH_FAILED';
+
+        if (code === 'LINKEDIN_PROFILE_NOT_FOUND') {
+          throw new ApiError(404, code, 'LinkedIn profile not found');
+        }
+
+        if (code === 'LINKEDIN_FETCH_BLOCKED') {
+          warnings.push(
+            'LinkedIn blocked automatic profile extraction for this URL. The link was saved, but no LinkedIn data was imported.',
+          );
+        } else {
+          warnings.push(
+            'Unable to fetch LinkedIn data right now. The link was saved, but LinkedIn details were not imported.',
+          );
+        }
+      }
+    } else if (shouldWarnSkippedLinkedIn) {
+      warnings.push(
+        'LinkedIn URL was saved, but profile data was not fetched because you did not confirm the LinkedIn import.',
+      );
+    }
   }
 
-  user.profileComplete = Boolean(
-    user.displayName?.trim() &&
-      ((user.bio && user.bio.trim()) ||
-        (user.domain && user.domain.trim()) ||
-        (user.githubUrl && user.githubUrl.trim()) ||
-        (user.linkedinUrl && user.linkedinUrl.trim())),
-  );
+  user.profileComplete = computeProfileComplete(user);
 
   await user.save();
 
@@ -407,10 +573,14 @@ export const enrichCurrentUserFromSocialLinks = async (
     user: toSanitizedUser(user.toObject() as UserLike),
     summary: {
       githubImported,
-      linkedinImported: false,
+      linkedinImported,
       warnings,
-      importedSkills: user.skills.filter((skill) => skill.source === 'github').length,
-      importedProjects: user.portfolioProjects.filter((project) => project.source === 'github').length,
+      importedSkills,
+      importedProjects,
+      importedProfileFields,
+      importedExperience,
+      importedEducation,
+      importedCertifications,
     },
   };
 };
@@ -563,13 +733,11 @@ export const updateCurrentUser = async (
     user.linkedinUrl = payload.linkedinUrl || null;
   }
 
-  if (payload.profileComplete !== undefined) {
-    user.profileComplete = payload.profileComplete;
-  }
-
   if (payload.discoverableToRecruiters !== undefined) {
     user.discoverableToRecruiters = payload.discoverableToRecruiters;
   }
+
+  user.profileComplete = computeProfileComplete(user);
 
   await user.save();
 

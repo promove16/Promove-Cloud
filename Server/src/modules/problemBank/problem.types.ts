@@ -12,6 +12,10 @@ export type ProblemCategory =
 export type ProblemDifficulty = 'Easy' | 'Medium' | 'Hard';
 export type ProblemPublicationStatus = 'draft' | 'published' | 'archived';
 export type ProblemClaimStatus = 'open' | 'claimed' | 'completed';
+export type ProblemSubmissionStatus =
+  | 'review_requested'
+  | 'changes_requested'
+  | 'approved';
 
 export interface ProblemSubmissionConfig {
   allowDocuments: boolean;
@@ -51,6 +55,24 @@ export interface IProblem {
   createdByAdminId?: Types.ObjectId;
   claimedBy?: Types.ObjectId;
   claimedAt?: Date;
+  createdAt: Date;
+  updatedAt: Date;
+}
+
+export interface IProblemSubmission {
+  _id: Types.ObjectId;
+  problemId: Types.ObjectId;
+  workspaceId: Types.ObjectId;
+  ownerId: Types.ObjectId;
+  teamMemberIds: Types.ObjectId[];
+  submittedBy: Types.ObjectId;
+  requestNote: string;
+  reviewStatus: ProblemSubmissionStatus;
+  requestedAt: Date;
+  adminReviewedAt?: Date;
+  adminReviewedBy?: Types.ObjectId;
+  adminNotes?: string;
+  pointsAwarded: number;
   createdAt: Date;
   updatedAt: Date;
 }

@@ -1,6 +1,10 @@
 import api from './axiosInstance';
 import { ApiSuccessResponse } from '../types/auth.types';
-import { Problem, ProblemListMeta } from '../types/problem.types';
+import {
+  Problem,
+  ProblemLeaderboardResponse,
+  ProblemListMeta,
+} from '../types/problem.types';
 import { Workspace } from '../types/workspace.types';
 
 interface ProblemListResponse extends ApiSuccessResponse<Problem[]> {
@@ -14,6 +18,11 @@ export interface ProblemQuery {
   domain?: string;
   page?: number;
   limit?: number;
+}
+
+export interface ProblemReviewRequestPayload {
+  workspaceId: string;
+  requestNote: string;
 }
 
 export const problemBankApi = {
@@ -30,6 +39,20 @@ export const problemBankApi = {
   },
   async claim(problemId: string) {
     const response = await api.post<ApiSuccessResponse<Workspace>>(`/api/problems/${problemId}/claim`);
+    return response.data.data;
+  },
+  async requestReview(problemId: string, payload: ProblemReviewRequestPayload) {
+    const response = await api.post<ApiSuccessResponse<{
+      _id: string;
+      reviewStatus: 'review_requested';
+      requestedAt: string;
+    }>>(`/api/problems/${problemId}/review-request`, payload);
+    return response.data.data;
+  },
+  async getLeaderboard(problemId: string) {
+    const response = await api.get<ApiSuccessResponse<ProblemLeaderboardResponse>>(
+      `/api/problems/${problemId}/leaderboard`,
+    );
     return response.data.data;
   },
 };

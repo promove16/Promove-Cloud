@@ -1,144 +1,120 @@
-import { useMemo } from 'react';
+import { useCallback } from 'react';
 import { useQuery } from '@tanstack/react-query';
-import { adminApi } from '../../api/admin.api';
-import { Badge } from '../../components/ui/Badge';
-import { Card } from '../../components/ui/Card';
+import { NavLink, Outlet, useLocation, useNavigate, useOutletContext } from 'react-router-dom';
+import { adminApi, type AdminAnalyticsData } from '../../api/admin.api';
 import { Spinner } from '../../components/ui/Spinner';
+import { ADMIN_ANALYTICS_SECTION_LINKS } from './analyticsNavigation';
 
-const scoreBuckets = ['0-50', '51-100', '101-150', '151-200'] as const;
+export interface AdminAnalyticsOutletContext {
+  analytics: AdminAnalyticsData;
+  onRoleSelect: (role: string) => void;
+}
+
+export function useAdminAnalyticsContext() {
+  return useOutletContext<AdminAnalyticsOutletContext>();
+}
 
 export default function Analytics() {
+  const location = useLocation();
+  const navigate = useNavigate();
   const analyticsQuery = useQuery({
     queryKey: ['admin-analytics'],
     queryFn: adminApi.getAnalytics,
     refetchInterval: 60_000,
+    staleTime: 60_000,
   });
 
-  const bucketData = useMemo(
-    () =>
-      scoreBuckets.map((bucket) => ({
-        bucket,
-        value: analyticsQuery.data?.scoreDistribution[bucket] ?? 0,
-      })),
-    [analyticsQuery.data],
-  );
+  const activeSection =
+    ADMIN_ANALYTICS_SECTION_LINKS.find(
+      (section) => location.pathname === section.path || location.pathname.startsWith(`${section.path}/`),
+    ) ?? ADMIN_ANALYTICS_SECTION_LINKS[0];
 
-  const roleData = useMemo(
-    () => Object.entries(analyticsQuery.data?.usersByRole ?? {}).map(([role, value]) => ({ role, value })),
-    [analyticsQuery.data],
+  const handleRoleSelect = useCallback(
+    (role: string) => {
+      navigate(`/dashboard/admin/users?role=${encodeURIComponent(role)}`);
+    },
+    [navigate],
   );
 
   return (
     <div className="space-y-6">
-      <div>
-        <div className="text-xs uppercase tracking-[0.3em] text-cyan-300">Analytics</div>
-        <h1 className="mt-2 text-3xl font-bold text-white">Platform analytics</h1>
-        <p className="mt-2 text-slate-400">Score, deal, patent, and role distribution snapshots.</p>
-      </div>
+      <section className="overflow-hidden border border-slate-800 bg-slate-950">
+        <div className="border-b border-slate-800 px-6 py-6 lg:px-8">
+          <div className="flex flex-col gap-6 xl:flex-row xl:items-end xl:justify-between">
+            <div className="max-w-3xl">
+              <div className="text-[11px] uppercase tracking-[0.35em] text-cyan-300">Admin Analytics</div>
+              <h1 className="mt-3 text-3xl font-semibold tracking-tight text-white">{activeSection.label}</h1>
+              <p className="mt-3 max-w-2xl text-sm leading-6 text-slate-400">{activeSection.description}</p>
+            </div>
+
+            {analyticsQuery.data ? (
+              <div className="grid gap-3 sm:grid-cols-3 xl:min-w-[30rem]">
+                <div className="border border-slate-800/80 bg-slate-950/80 px-4 py-3">
+                  <div className="text-[11px] uppercase tracking-[0.25em] text-slate-500">Platform users</div>
+                  <div className="mt-2 text-sm font-medium text-white">{analyticsQuery.data.totalUsers}</div>
+                </div>
+                <div className="border border-slate-800/80 bg-slate-950/80 px-4 py-3">
+                  <div className="text-[11px] uppercase tracking-[0.25em] text-slate-500">Active this week</div>
+                  <div className="mt-2 text-sm font-medium text-white">{analyticsQuery.data.activeThisWeek}</div>
+                </div>
+                <div className="border border-slate-800/80 bg-slate-950/80 px-4 py-3">
+                  <div className="text-[11px] uppercase tracking-[0.25em] text-slate-500">Deal completion</div>
+                  <div className="mt-2 text-sm font-medium text-white">{analyticsQuery.data.dealConversionRate}%</div>
+                </div>
+              </div>
+            ) : null}
+          </div>
+        </div>
+
+        <div className="overflow-x-auto px-6 py-3 lg:px-8">
+          <div className="flex min-w-max items-stretch gap-6 border-b border-slate-800/80 pb-1">
+            {ADMIN_ANALYTICS_SECTION_LINKS.map((section) => {
+              const isActive = location.pathname === section.path || location.pathname.startsWith(`${section.path}/`);
+              const Icon = section.icon;
+
+              return (
+                <NavLink
+                  key={section.path}
+                  to={section.path}
+                  className={`group relative flex min-w-[9rem] flex-col gap-2 pb-4 pr-2 text-sm transition ${
+                    isActive ? 'text-white' : 'text-slate-500 hover:text-slate-200'
+                  }`}
+                >
+                  <div className="flex items-center gap-2.5">
+                    <span
+                      className={`flex h-8 w-8 items-center justify-center rounded-full transition ${
+                        isActive
+                          ? 'bg-cyan-400/12 text-cyan-200 shadow-[0_0_24px_rgba(34,211,238,0.15)]'
+                          : 'bg-transparent text-slate-600 group-hover:text-slate-300'
+                      }`}
+                    >
+                      <Icon className="h-4 w-4" />
+                    </span>
+                    <span className="font-semibold">{section.shortLabel}</span>
+                  </div>
+                  <span
+                    className={`absolute bottom-0 left-0 h-[2px] rounded-full transition-all duration-300 ${
+                      isActive
+                        ? 'w-full bg-gradient-to-r from-cyan-300 via-sky-400 to-indigo-400'
+                        : 'w-0 bg-slate-500/70 group-hover:w-full'
+                    }`}
+                  />
+                </NavLink>
+              );
+            })}
+          </div>
+        </div>
+      </section>
 
       {analyticsQuery.isLoading ? (
-        <div className="flex items-center justify-center py-16">
+        <div className="flex items-center justify-center py-20">
           <Spinner />
         </div>
+      ) : analyticsQuery.data ? (
+        <Outlet context={{ analytics: analyticsQuery.data, onRoleSelect: handleRoleSelect }} />
       ) : (
-        <div className="grid gap-6 xl:grid-cols-2">
-          <Card className="p-6 xl:col-span-2">
-            <div className="mb-4 text-xs uppercase tracking-[0.3em] text-cyan-300">Investment Type Breakdown</div>
-            <div className="grid gap-4 md:grid-cols-2">
-              <div className="rounded-2xl border border-slate-800 bg-slate-900/70 p-4">
-                <div className="text-sm text-slate-400">Penny Investments</div>
-                <div className="mt-2 text-3xl font-bold text-white">
-                  {analyticsQuery.data?.investmentTypeBreakdown.pennyCount ?? 0}
-                </div>
-                <div className="mt-1 text-sm text-slate-500">
-                  ₹{analyticsQuery.data?.investmentTypeBreakdown.pennyCapitalDeployed ?? 0} deployed
-                </div>
-              </div>
-              <div className="rounded-2xl border border-slate-800 bg-slate-900/70 p-4">
-                <div className="text-sm text-slate-400">Sole Investments</div>
-                <div className="mt-2 text-3xl font-bold text-white">
-                  {analyticsQuery.data?.investmentTypeBreakdown.soleCount ?? 0}
-                </div>
-                <div className="mt-1 text-sm text-slate-500">
-                  ₹{analyticsQuery.data?.investmentTypeBreakdown.soleCapitalDeployed ?? 0} deployed
-                </div>
-              </div>
-            </div>
-          </Card>
-
-          <Card className="p-6">
-            <div className="mb-4 text-xs uppercase tracking-[0.3em] text-cyan-300">Score Distribution</div>
-            <div className="space-y-4">
-              {bucketData.map((bucket) => {
-                const max = Math.max(...bucketData.map((item) => item.value), 1);
-                return (
-                  <div key={bucket.bucket} className="space-y-2">
-                    <div className="flex items-center justify-between text-sm text-slate-300">
-                      <span>{bucket.bucket}</span>
-                      <span>{bucket.value}</span>
-                    </div>
-                    <div className="h-3 rounded-full bg-slate-800">
-                      <div
-                        className="h-3 rounded-full bg-gradient-to-r from-cyan-400 to-emerald-400"
-                        style={{ width: `${(bucket.value / max) * 100}%` }}
-                      />
-                    </div>
-                  </div>
-                );
-              })}
-            </div>
-          </Card>
-
-          <Card className="p-6">
-            <div className="mb-4 text-xs uppercase tracking-[0.3em] text-cyan-300">Role Breakdown</div>
-            <div className="flex flex-wrap gap-3">
-              {roleData.map((entry) => (
-                <Badge key={entry.role}>
-                  {entry.role}: {entry.value}
-                </Badge>
-              ))}
-            </div>
-            <div className="mt-6 flex items-center justify-center">
-              <svg viewBox="0 0 120 120" className="h-56 w-56">
-                <circle cx="60" cy="60" r="42" className="fill-none stroke-slate-800" strokeWidth="16" />
-                {bucketData.map((bucket, index) => {
-                  const total = bucketData.reduce((sum, item) => sum + item.value, 0) || 1;
-                  const circumference = 2 * Math.PI * 42;
-                  const offset = bucketData.slice(0, index).reduce((sum, item) => sum + item.value, 0);
-                  return (
-                    <circle
-                      key={bucket.bucket}
-                      cx="60"
-                      cy="60"
-                      r="42"
-                      className="fill-none"
-                      stroke={['#22d3ee', '#34d399', '#fbbf24', '#fb7185'][index]}
-                      strokeWidth="16"
-                      strokeLinecap="round"
-                      strokeDasharray={circumference}
-                      strokeDashoffset={circumference - (bucket.value / total) * circumference}
-                      transform="rotate(-90 60 60)"
-                    />
-                  );
-                })}
-              </svg>
-            </div>
-          </Card>
-
-          <Card className="p-6 xl:col-span-2">
-            <div className="mb-4 text-xs uppercase tracking-[0.3em] text-cyan-300">Recent Admin Actions</div>
-            <div className="space-y-3">
-              {(analyticsQuery.data?.recentAdminActions ?? []).map((action) => (
-                <div key={action._id} className="flex flex-col gap-2 rounded-2xl border border-slate-800 bg-slate-900/70 p-4 lg:flex-row lg:items-center lg:justify-between">
-                  <div>
-                    <div className="font-semibold text-white">{action.action.replace(/_/g, ' ')}</div>
-                    <div className="text-sm text-slate-400">{action.targetModel}</div>
-                  </div>
-                  <div className="text-sm text-slate-500">{new Date(action.createdAt).toLocaleString('en-IN')}</div>
-                </div>
-              ))}
-            </div>
-          </Card>
+        <div className="border border-dashed border-slate-800 bg-slate-950 px-6 py-10 text-sm text-slate-400">
+          Analytics data is unavailable right now.
         </div>
       )}
     </div>

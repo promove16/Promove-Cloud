@@ -32,6 +32,7 @@ export interface AuthUser {
   displayName: string;
   avatar?: string;
   bio?: string;
+  isProfilePublic?: boolean;
   domain?: string;
   githubUrl?: string | null;
   linkedinUrl?: string | null;

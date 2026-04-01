@@ -1,5 +1,7 @@
 import { Types } from 'mongoose';
 
+export type StartupReviewStatus = 'draft' | 'review_requested' | 'changes_requested' | 'approved';
+
 export interface IStartup {
   _id: Types.ObjectId;
   founderIds: Types.ObjectId[];
@@ -31,6 +33,11 @@ export interface IStartup {
     revenueGenerating: boolean;
     usersCount?: number;
   };
+  reviewStatus: StartupReviewStatus;
+  reviewRequestedAt?: Date;
+  adminReviewedAt?: Date;
+  adminReviewedBy?: Types.ObjectId | null;
+  adminNotes?: string;
   isActive: boolean;
   createdAt: Date;
   updatedAt: Date;

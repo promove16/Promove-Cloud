@@ -28,6 +28,10 @@ export const startupApi = {
     const response = await api.patch<ApiSuccessResponse<Startup>>(`/api/startup/${startupId}`, payload);
     return response.data.data;
   },
+  async requestReview(startupId: string) {
+    const response = await api.post<ApiSuccessResponse<Startup>>(`/api/startup/${startupId}/request-review`);
+    return response.data.data;
+  },
   async launch(startupId: string, launchTo: 'investors' | 'mentors' | 'both' | 'recruiters') {
     const response = await api.post<ApiSuccessResponse<Startup>>(`/api/startup/${startupId}/launch`, { launchTo });
     return response.data.data;

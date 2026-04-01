@@ -2,6 +2,7 @@ import { Request, Response } from 'express';
 import { ApiResponse } from '../../utils/ApiResponse';
 import {
   cancelCollegeStudentRosterInvite,
+  createCollegeMentorshipProgramRequest,
   createCollegeManagedStudentCredentials,
   createManagedStudentCredentialsSchema,
   createCollegeStudentAccessToken,
@@ -14,6 +15,7 @@ import {
   getCollegeDashboard,
   getCollegeEventRankings,
   getCollegeInvestors,
+  getCollegeMentorshipPrograms,
   getCollegePlacementTracker,
   getCollegeStudentJourney,
   getCollegeStudentLeaderboard,
@@ -32,6 +34,7 @@ import {
 import { createEventSchema } from '../event/event.service';
 import { generateCollegeReport } from '../../services/complianceReport';
 import { ApiError } from '../../utils/ApiError';
+import { createInstitutionMentorshipProgramSchema } from '../mentor/mentor.validation';
 
 export const getCollegeDashboardController = async (req: Request, res: Response) => {
   const data = await getCollegeDashboard(req.user!._id);
@@ -188,4 +191,15 @@ export const importCollegeStudentCredentialsController = async (req: Request, re
     buffer: req.file.buffer,
   });
   res.status(200).json(new ApiResponse(data));
+};
+
+export const listCollegeMentorshipProgramsController = async (req: Request, res: Response) => {
+  const data = await getCollegeMentorshipPrograms(req.user!._id);
+  res.status(200).json(new ApiResponse(data));
+};
+
+export const createCollegeMentorshipProgramController = async (req: Request, res: Response) => {
+  const payload = createInstitutionMentorshipProgramSchema.parse(req.body);
+  const data = await createCollegeMentorshipProgramRequest(req.user!._id, req.user!._id, payload);
+  res.status(201).json(new ApiResponse(data));
 };

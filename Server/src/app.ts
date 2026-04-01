@@ -9,6 +9,7 @@ import { env } from './config/env';
 import { httpLogStream } from './config/logger';
 import { apiLimiter, withRateLimit } from './middleware/rateLimiter';
 import { errorHandler } from './middleware/errorHandler';
+import { userActivityMiddleware } from './middleware/userActivity';
 import authRoutes from './modules/auth/auth.routes';
 import chatRoutes from './modules/chat/chat.routes';
 import collegeRoutes from './modules/college/college.routes';
@@ -53,6 +54,7 @@ export const createApp = () => {
       stream: httpLogStream,
     }),
   );
+  app.use(userActivityMiddleware);
   app.use('/api', withRateLimit(apiLimiter));
   app.use('/api/auth', authRoutes);
   app.use('/api/users', userRoutes);

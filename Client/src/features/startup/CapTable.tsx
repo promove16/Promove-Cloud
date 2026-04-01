@@ -3,7 +3,6 @@ import { Badge } from '../../components/ui/Badge';
 import { Card } from '../../components/ui/Card';
 import { Spinner } from '../../components/ui/Spinner';
 import { startupApi } from '../../api/startup.api';
-import { DashboardLayout } from '../../app/components/DashboardLayout';
 
 const formatRoleLabel = (value: string) => value.charAt(0).toUpperCase() + value.slice(1);
 
@@ -21,22 +20,18 @@ export default function StartupCapTable() {
 
   if (startupQuery.isLoading || capTableQuery.isLoading) {
     return (
-      <DashboardLayout role="student">
-        <div className="flex min-h-[40vh] items-center justify-center">
-          <Spinner />
-        </div>
-      </DashboardLayout>
+      <div className="flex min-h-[40vh] items-center justify-center">
+        <Spinner />
+      </div>
     );
   }
 
   if (!startupQuery.data) {
     return (
-      <DashboardLayout role="student">
-        <Card className="max-w-3xl p-8">
-          <h1 className="text-3xl font-bold text-white">Cap Table</h1>
-          <p className="mt-3 text-slate-400">Create your startup first to begin tracking investors and shares.</p>
-        </Card>
-      </DashboardLayout>
+      <Card className="max-w-3xl p-8">
+        <h1 className="text-3xl font-bold text-white">Cap Table</h1>
+        <p className="mt-3 text-slate-400">Create your startup first to begin tracking investors and shares.</p>
+      </Card>
     );
   }
 
@@ -44,7 +39,6 @@ export default function StartupCapTable() {
   const pennyRows = capTable?.pennyInvestors ?? [];
 
   return (
-    <DashboardLayout role="student">
     <div className="space-y-6">
       <div>
         <h1 className="text-3xl font-bold text-white">Cap Table</h1>
@@ -146,6 +140,5 @@ export default function StartupCapTable() {
         </>
       ) : null}
     </div>
-    </DashboardLayout>
   );
 }

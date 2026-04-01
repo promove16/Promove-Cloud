@@ -7,6 +7,10 @@ import { User } from '../user/user.model';
 import { UserRole } from '../../types/roles.types';
 import { Event } from '../event/event.model';
 import {
+  createInstitutionMentorshipProgram,
+  listInstitutionMentorshipPrograms,
+} from '../mentor/mentorshipProgram.service';
+import {
   bulkCreateManagedStudentCredentials,
   createManagedStudentCredentials,
   createManagedStudentCredentialsSchema,
@@ -422,6 +426,25 @@ export const getCollegeStudentRoster = (
   collegeId: string,
   search?: string,
 ) => listStudentRosterEntries(collegeId, UserRole.COLLEGE, search);
+
+export const createCollegeMentorshipProgramRequest = (
+  collegeId: string,
+  requestedBy: string,
+  payload: {
+    title: string;
+    objective: string;
+    preferredDate: string;
+    durationMinutes: number;
+    expectedParticipants: number;
+    deliveryMode: 'Online' | 'Offline';
+    platform: 'Google Meet' | 'Microsoft Teams' | 'Zoom' | 'Offline';
+    meetingLink?: string;
+    venue?: string;
+  },
+) => createInstitutionMentorshipProgram(collegeId, 'college', requestedBy, payload);
+
+export const getCollegeMentorshipPrograms = (collegeId: string) =>
+  listInstitutionMentorshipPrograms(collegeId, 'college');
 
 export {
   createManagedStudentCredentialsSchema,

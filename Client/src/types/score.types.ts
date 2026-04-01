@@ -22,6 +22,7 @@ export interface ScoreEvent {
   userId: string;
   trigger:
     | 'PROBLEM_CLAIMED'
+    | 'PROBLEM_COMPLETED'
     | 'SKILL_COMPLETED'
     | 'PROGRESS_UPLOADED'
     | 'PATENT_SUBMITTED'

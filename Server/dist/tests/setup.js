@@ -36,6 +36,7 @@ process.env.FROM_EMAIL = 'noreply@promovecyc.com';
 const redisStore = new Map();
 const redisLists = new Map();
 const redisSortedSets = new Map();
+const redisSets = new Map();
 const rateState = new Map();
 const getSortedSet = (key) => {
     const existing = redisSortedSets.get(key);
@@ -88,6 +89,7 @@ jest.mock('@upstash/redis', () => ({
                 const existed = redisStore.delete(key);
                 redisLists.delete(key);
                 redisSortedSets.delete(key);
+                redisSets.delete(key);
                 return existed ? 1 : 0;
             },
             async zadd(key, ...members) {
@@ -124,11 +126,31 @@ jest.mock('@upstash/redis', () => ({
                 redisLists.set(key, existing.slice(start, normalizedStop + 1));
                 return 'OK';
             },
+            async lrange(key, start, stop) {
+                const existing = redisLists.get(key) ?? [];
+                const normalizedStop = stop < 0 ? existing.length + stop : stop;
+                return existing.slice(start, normalizedStop + 1);
+            },
             async expire() {
                 return 1;
             },
-            async smembers() {
-                return [];
+            async sadd(key, ...members) {
+                const current = redisSets.get(key) ?? new Set();
+                members.forEach((member) => current.add(member));
+                redisSets.set(key, current);
+                return current.size;
+            },
+            async srem(key, ...members) {
+                const current = redisSets.get(key) ?? new Set();
+                members.forEach((member) => current.delete(member));
+                redisSets.set(key, current);
+                return current.size;
+            },
+            async smembers(key) {
+                return Array.from(redisSets.get(key) ?? new Set());
+            },
+            async scard(key) {
+                return redisSets.get(key)?.size ?? 0;
             },
         }),
     },
@@ -200,6 +222,7 @@ beforeEach(async () => {
     redisStore.clear();
     redisLists.clear();
     redisSortedSets.clear();
+    redisSets.clear();
     rateState.clear();
     await dropDatabaseWithRetry();
 });

@@ -7,8 +7,10 @@ import { User, UserDocument } from '../user/user.model';
 import { AccessGrantedBy, SanitizedUser } from '../user/user.types';
 import { UserRole } from '../../types/roles.types';
 import { ApiError } from '../../utils/ApiError';
+import { logError } from '../../config/logger';
 import { toSanitizedUser } from '../user/user.service';
 import { sanitizePlainText } from '../../utils/sanitizeText';
+import { recordLoginActivity } from '../analytics/activity.service';
 import {
   registerTokenUsage,
   resolveInstitutionToken,
@@ -214,6 +216,12 @@ const assertUserCanAuthenticate = (user: UserDocument) => {
 const issueAuthResultForUser = async (user: UserDocument): Promise<AuthResult> => {
   user.lastLogin = new Date();
   await user.save();
+
+  try {
+    await recordLoginActivity(String(user._id));
+  } catch (error) {
+    logError('Failed to record login activity', error);
+  }
 
   const sanitizedUser = toSanitizedUser(user.toObject());
   const tokens = await createTokenPair(sanitizedUser);

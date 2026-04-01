@@ -10,7 +10,7 @@ export function Homepage() {
         <div className="max-w-7xl mx-auto px-6 py-4 flex items-center justify-between">
           <BusinessLogo
             to="/"
-            imageWrapperClassName="h-10 w-10 rounded-lg"
+            imageWrapperClassName="h-10 w-10"
             titleClassName="text-xl text-white"
             subtitle="Craft Your Career"
             subtitleClassName="text-slate-400"
@@ -177,7 +177,7 @@ export function Homepage() {
               <BusinessLogo
                 to="/"
                 className="mb-4"
-                imageWrapperClassName="h-8 w-8 rounded-lg"
+                imageWrapperClassName="h-8 w-8"
                 titleClassName="text-lg text-white"
                 subtitle="Craft Your Career"
                 subtitleClassName="text-slate-400"

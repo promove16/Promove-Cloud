@@ -18,21 +18,32 @@ import {
   Users,
   type LucideIcon,
 } from 'lucide-react';
+import { STARTUP_LAUNCH_BASE_PATH, STARTUP_LAUNCH_SECTION_LINKS } from '../../features/startup/navigation';
 import { UserRole } from '../../types/roles.types';
 
-export type DashboardNavItem =
-  | {
-      kind: 'link';
-      label: string;
-      icon: LucideIcon;
-      path: string;
-    }
-  | {
-      kind: 'action';
-      label: string;
-      icon: LucideIcon;
-      action: 'logout';
-    };
+export interface DashboardNavLinkItem {
+  kind: 'link';
+  label: string;
+  icon: LucideIcon;
+  path: string;
+}
+
+export interface DashboardNavGroupItem {
+  kind: 'group';
+  label: string;
+  icon: LucideIcon;
+  path: string;
+  children: Array<Pick<DashboardNavLinkItem, 'label' | 'path'>>;
+}
+
+export interface DashboardNavActionItem {
+  kind: 'action';
+  label: string;
+  icon: LucideIcon;
+  action: 'logout';
+}
+
+export type DashboardNavItem = DashboardNavLinkItem | DashboardNavGroupItem | DashboardNavActionItem;
 
 export const SIDEBAR_CONFIG: Record<UserRole, DashboardNavItem[]> = {
   [UserRole.STUDENT]: [
@@ -40,10 +51,17 @@ export const SIDEBAR_CONFIG: Record<UserRole, DashboardNavItem[]> = {
     { kind: 'link', label: 'Problem Bank', icon: Sparkles, path: '/problem-bank' },
     { kind: 'link', label: 'Product Workspace', icon: Trophy, path: '/product-workspace' },
     { kind: 'link', label: 'Patent Support', icon: FileText, path: '/patent-support' },
-    { kind: 'link', label: 'Startup Launch', icon: Rocket, path: '/startup-launch' },
-    { kind: 'link', label: 'Cap Table', icon: BarChart3, path: '/startup-launch/cap-table' },
+    {
+      kind: 'group',
+      label: 'Startup',
+      icon: Rocket,
+      path: STARTUP_LAUNCH_BASE_PATH,
+      children: STARTUP_LAUNCH_SECTION_LINKS.map(({ shortLabel, path }) => ({
+        label: shortLabel,
+        path,
+      })),
+    },
     { kind: 'link', label: 'Mentor Sessions', icon: CalendarDays, path: '/dashboard/student/mentor-sessions' },
-    { kind: 'link', label: 'Investor Deals', icon: BriefcaseBusiness, path: '/dashboard/student/investor-deals' },
     { kind: 'link', label: 'Leadership Profile', icon: Trophy, path: '/leadership-profile' },
     { kind: 'link', label: 'Marketplace', icon: Globe, path: '/marketplace' },
     { kind: 'link', label: 'Messages', icon: MessageCircle, path: '/dashboard/messages' },
@@ -106,10 +124,12 @@ export const SIDEBAR_CONFIG: Record<UserRole, DashboardNavItem[]> = {
   ],
   [UserRole.ADMIN]: [
     { kind: 'link', label: 'Dashboard', icon: Home, path: '/dashboard/admin' },
+    { kind: 'link', label: 'Problems', icon: Sparkles, path: '/dashboard/admin/problems' },
     { kind: 'link', label: 'Users', icon: Users, path: '/dashboard/admin/users' },
     { kind: 'link', label: 'Patents', icon: FileText, path: '/dashboard/admin/patents' },
-    { kind: 'link', label: 'Awards', icon: Trophy, path: '/dashboard/admin/awards' },
+    { kind: 'link', label: 'Startups', icon: Rocket, path: '/dashboard/admin/startups' },
     { kind: 'link', label: 'Deals', icon: BriefcaseBusiness, path: '/dashboard/admin/deals' },
+    { kind: 'link', label: 'Mentorship', icon: GraduationCap, path: '/dashboard/admin/mentorship' },
     { kind: 'link', label: 'Analytics', icon: BarChart3, path: '/dashboard/admin/analytics' },
     { kind: 'link', label: 'Profile', icon: User, path: '/dashboard/profile' },
     { kind: 'link', label: 'Settings', icon: Settings, path: '/dashboard/settings' },

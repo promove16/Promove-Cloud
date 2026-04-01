@@ -7,6 +7,7 @@ import { ProductWorkspace } from "./pages/ProductWorkspace";
 import { PatentSupport } from "./pages/PatentSupport";
 import { StartupLaunch } from "./pages/StartupLaunch";
 import { Marketplace } from "./pages/Marketplace";
+import { MarketplaceDetail } from "./pages/MarketplaceDetail";
 import { Login } from "./pages/Login";
 import { Signup } from "./pages/Signup";
 import { ProtectedRoute } from "./components/ProtectedRoute";
@@ -134,6 +135,14 @@ export const router = createBrowserRouter([
     element: (
       <ProtectedRoute>
         <Marketplace />
+      </ProtectedRoute>
+    ),
+  },
+  {
+    path: "/marketplace/view/:entityType/:entityId",
+    element: (
+      <ProtectedRoute>
+        <MarketplaceDetail />
       </ProtectedRoute>
     ),
   },

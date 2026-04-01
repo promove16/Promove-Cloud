@@ -14,6 +14,7 @@ import {
 import { Card } from '../../components/ui/Card';
 import { Button } from '../../components/ui/Button';
 import { collegeApi } from '../../api/college.api';
+import { MentorshipProgramPanel } from '../institution/MentorshipProgramPanel';
 import { StudentIntakePanel } from '../institution/StudentIntakePanel';
 import { PatentShowcase } from '../shared/PatentShowcase';
 import { ApiErrorResponse } from '../../types/auth.types';
@@ -249,6 +250,14 @@ export default function Dashboard() {
           </Card>
         </Link>
       </div>
+
+      <MentorshipProgramPanel
+        queryKey="college-mentorship-programs"
+        heading="Request a college mentorship program"
+        description="Send a mentorship request to admin, specify Google Meet, Teams, Zoom, or offline delivery, and track assigned mentors."
+        fetchPrograms={collegeApi.getMentorshipPrograms}
+        createProgram={collegeApi.createMentorshipProgram}
+      />
 
       <StudentIntakePanel
         heading="Feed student intake data for your college"

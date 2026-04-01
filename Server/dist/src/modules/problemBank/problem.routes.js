@@ -10,5 +10,7 @@ const router = (0, express_1.Router)();
 router.use(authenticate_1.authenticate, (0, authorize_1.authorize)(roles_types_1.UserRole.STUDENT));
 router.get('/', (0, asyncHandler_1.asyncHandler)(problem_controller_1.getProblems));
 router.get('/:id', (0, asyncHandler_1.asyncHandler)(problem_controller_1.getProblem));
+router.get('/:id/leaderboard', (0, asyncHandler_1.asyncHandler)(problem_controller_1.getProblemLeaderboardController));
 router.post('/:id/claim', (0, asyncHandler_1.asyncHandler)(problem_controller_1.claimProblemController));
+router.post('/:id/review-request', (0, asyncHandler_1.asyncHandler)(problem_controller_1.requestProblemReviewController));
 exports.default = router;

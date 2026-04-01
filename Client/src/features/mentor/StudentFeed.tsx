@@ -64,7 +64,14 @@ function ScheduleModal({
           <select
             className="rounded-lg border border-slate-800 bg-slate-950 px-4 py-3 text-white"
             value={value.studentId}
-            onChange={(event) => onChange({ ...value, studentId: event.target.value })}
+            onChange={(event) => {
+              const selectedStudent = students.find((student) => student.studentId === event.target.value);
+              onChange({
+                ...value,
+                studentId: event.target.value,
+                workspaceId: selectedStudent?.workspaceId ?? '',
+              });
+            }}
           >
             <option value="">Select student</option>
             {students.map((student) => (
@@ -177,8 +184,13 @@ export default function StudentFeed() {
   );
 
   const openSchedule = (studentId: string) => {
+    const selectedStudent = studentsQuery.data?.find((student) => student.studentId === studentId);
     setScheduleStudentId(studentId);
-    setSessionForm((current) => ({ ...current, studentId }));
+    setSessionForm((current) => ({
+      ...current,
+      studentId,
+      workspaceId: selectedStudent?.workspaceId ?? '',
+    }));
   };
 
   return (
@@ -186,8 +198,8 @@ export default function StudentFeed() {
       <div className="flex flex-col gap-4 lg:flex-row lg:items-end lg:justify-between">
         <div>
           <div className="text-xs uppercase tracking-[0.3em] text-cyan-300">Student Feed</div>
-          <h1 className="mt-2 text-3xl font-bold text-white">Students in your watch list</h1>
-          <p className="mt-2 text-slate-400">Launch-aware students and their startups are shown in real time.</p>
+          <h1 className="mt-2 text-3xl font-bold text-white">Students routed to you</h1>
+          <p className="mt-2 text-slate-400">This feed is limited to students attached to your admin-assigned project workspaces. Watching a student keeps their live score activity flowing into your dashboard.</p>
         </div>
         <div className="relative w-full max-w-md">
           <Search className="pointer-events-none absolute left-4 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-500" />
@@ -224,7 +236,7 @@ export default function StudentFeed() {
                   <div className="mt-3 flex flex-wrap gap-2">
                     <Badge>{student.category}</Badge>
                     <Badge>{student.innovationScore}/200</Badge>
-                    <Badge>{student.isWatched ? 'Watching' : 'Discovering'}</Badge>
+                    <Badge>{student.isWatched ? 'Watching' : 'Assigned'}</Badge>
                   </div>
                   <p className="mt-3 text-sm leading-6 text-slate-400">{student.recentActivitySummary}</p>
                 </div>

@@ -6,6 +6,7 @@ import {
   getCurrentUser,
   getCurrentUserMentorSessions,
   launchCurrentUserToRecruiters,
+  recordCurrentUserActivity,
   socialEnrichSchema,
   updateCurrentUser,
   updateMeSchema,
@@ -39,6 +40,15 @@ export const enrichMeFromSocialLinks = async (req: Request, res: Response) => {
   const payload = socialEnrichSchema.parse(req.body);
   const result = await enrichCurrentUserFromSocialLinks(req.user._id, payload);
   res.status(200).json(new ApiResponse(result));
+};
+
+export const trackMeActivity = async (req: Request, res: Response) => {
+  if (!req.user) {
+    throw new ApiError(401, 'UNAUTHORIZED', 'Invalid or expired token');
+  }
+
+  const result = await recordCurrentUserActivity(req.user._id, req.body);
+  res.status(201).json(new ApiResponse(result));
 };
 
 export const getMySessions = async (req: Request, res: Response) => {

@@ -20,6 +20,7 @@ type Props = {
 
 const triggerLabel: Record<string, string> = {
   PROBLEM_CLAIMED: 'Claimed a new problem',
+  PROBLEM_COMPLETED: 'Completed a problem',
   PROGRESS_UPLOADED: 'Uploaded workspace progress',
   PATENT_SUBMITTED: 'Patent submitted',
   PATENT_APPROVED: 'Patent approved',

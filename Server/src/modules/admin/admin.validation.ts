@@ -41,3 +41,31 @@ export const listRegistrationRequestsQuerySchema = z.object({
     ])
     .optional(),
 });
+
+export const createMentorProfileSchema = z.object({
+  displayName: z.string().trim().min(2).max(100),
+  email: z.string().trim().email(),
+  domain: z.string().trim().max(120).optional(),
+  bio: z.string().trim().max(500).optional(),
+  headline: z.string().trim().max(120).optional(),
+});
+
+export const listMentorshipProgramsQuerySchema = z.object({
+  status: z.enum(['Pending', 'Assigned', 'Rejected']).optional(),
+});
+
+export const analyticsLogsQuerySchema = z.object({
+  limit: z.coerce.number().int().positive().max(50).default(20),
+});
+
+export const analyticsUsersQuerySchema = z.object({
+  q: z.string().trim().max(120).optional(),
+  limit: z.coerce.number().int().positive().max(10).default(8),
+});
+
+export const dealReviewSchema = z.object({
+  stockTransferStatus: z.enum(['pending_review', 'under_review']).optional(),
+  reviewNotes: z.string().trim().max(1500).optional(),
+  royaltyPercentage: z.number().min(0).max(100).optional(),
+  royaltyStatus: z.enum(['pending', 'invoiced', 'received']).optional(),
+});

@@ -1,6 +1,6 @@
 "use strict";
 Object.defineProperty(exports, "__esModule", { value: true });
-exports.uploadPitchController = exports.launchStartupController = exports.patchStartup = exports.getMyStartupController = exports.createStartup = void 0;
+exports.uploadPitchController = exports.requestStartupReviewController = exports.launchStartupController = exports.patchStartup = exports.getMyStartupController = exports.createStartup = void 0;
 const ApiResponse_1 = require("../../utils/ApiResponse");
 const startup_service_1 = require("./startup.service");
 const ApiError_1 = require("../../utils/ApiError");
@@ -33,6 +33,15 @@ const launchStartupController = async (req, res) => {
     res.json(new ApiResponse_1.ApiResponse(startup));
 };
 exports.launchStartupController = launchStartupController;
+const requestStartupReviewController = async (req, res) => {
+    const startupId = getParam(req.params.id);
+    if (!startupId) {
+        throw new ApiError_1.ApiError(400, 'STARTUP_REQUIRED', 'Startup id is required');
+    }
+    const startup = await (0, startup_service_1.requestStartupReview)(startupId, req.user._id);
+    res.json(new ApiResponse_1.ApiResponse(startup));
+};
+exports.requestStartupReviewController = requestStartupReviewController;
 const uploadPitchController = async (req, res) => {
     if (!req.file) {
         throw new ApiError_1.ApiError(400, 'FILE_REQUIRED', 'A pitch deck PDF is required');

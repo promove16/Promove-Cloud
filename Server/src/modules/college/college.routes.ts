@@ -7,6 +7,7 @@ import { UserRole } from '../../types/roles.types';
 import { asyncHandler } from '../../utils/asyncHandler';
 import {
   cancelCollegeStudentRosterInviteController,
+  createCollegeMentorshipProgramController,
   createCollegeManagedStudentCredentialsController,
   createCollegeStudentAccessTokenController,
   createCollegeStudentRosterEntryController,
@@ -19,6 +20,7 @@ import {
   getLatestCollegeComplianceReportController,
   importCollegeStudentCredentialsController,
   importCollegeStudentRosterController,
+  listCollegeMentorshipProgramsController,
   listCollegePendingStudentVerificationsController,
   listCollegeStudentRosterController,
   listCollegeStudentAccessTokensController,
@@ -110,6 +112,16 @@ router.post(
   '/student-temp-credentials',
   authorize(UserRole.COLLEGE),
   asyncHandler(createCollegeManagedStudentCredentialsController),
+);
+router.get(
+  '/mentorship-programs',
+  authorize(UserRole.COLLEGE),
+  asyncHandler(listCollegeMentorshipProgramsController),
+);
+router.post(
+  '/mentorship-programs',
+  authorize(UserRole.COLLEGE),
+  asyncHandler(createCollegeMentorshipProgramController),
 );
 router.post(
   '/student-roster/import',

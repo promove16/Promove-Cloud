@@ -1,8 +1,8 @@
 import { ChangeEvent, useMemo, useState } from "react";
+import { useNavigate } from "react-router-dom";
 import { isAxiosError } from "axios";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { CheckCircle, Download, Rocket, Target, TrendingUp, Upload, Users, X } from "lucide-react";
-import { DashboardLayout } from "../components/DashboardLayout";
+import { CheckCircle, Download, Rocket, Send, Target, TrendingUp, Upload, Users, X } from "lucide-react";
 import { dealApi } from "../../api/deal.api";
 import { startupApi, StartupPayload } from "../../api/startup.api";
 import { workspaceApi } from "../../api/workspace.api";
@@ -21,9 +21,18 @@ const emptyPayload: StartupPayload = {
   },
 };
 
+const getStartupActionErrorMessage = (error: unknown, fallback: string) => {
+  if (isAxiosError<{ error?: { message?: string } }>(error)) {
+    return error.response?.data?.error?.message ?? fallback;
+  }
+
+  return error instanceof Error ? error.message : fallback;
+};
+
 export function StartupLaunch() {
   const maxPitchDeckSizeBytes = 10 * 1024 * 1024;
   const pdfFileNamePattern = /\.pdf$/i;
+  const navigate = useNavigate();
   const queryClient = useQueryClient();
   const [showLaunchModal, setShowLaunchModal] = useState(false);
   const [launchTarget, setLaunchTarget] = useState<"investors" | "mentors" | "both">("both");
@@ -42,7 +51,7 @@ export function StartupLaunch() {
   const startup = startupQuery.data;
   const activeWorkspace = workspaceQuery.data?.[0];
   const activeDeals = dealsQuery.data?.items ?? [];
-  const teamSize = activeWorkspace?.teamMembers?.length ?? activeWorkspace?.teamMemberIds.length ?? 1;
+  const teamSize = activeWorkspace?.teamMembers?.length ?? activeWorkspace?.teamMemberIds?.length ?? 1;
 
   const hydratedForm = useMemo(
     () =>
@@ -73,6 +82,23 @@ export function StartupLaunch() {
       setToast("Startup profile saved.");
       await queryClient.invalidateQueries({ queryKey: ["startup", "mine"] });
     },
+    onError: (error) => {
+      setToast(getStartupActionErrorMessage(error, "Unable to save startup profile right now."));
+    },
+  });
+
+  const requestReview = useMutation({
+    mutationFn: async () => {
+      const savedStartup = startup?._id ? startup : await persistStartup.mutateAsync();
+      return startupApi.requestReview(savedStartup._id);
+    },
+    onSuccess: async () => {
+      setToast("Startup submitted for admin review.");
+      await queryClient.invalidateQueries({ queryKey: ["startup", "mine"] });
+    },
+    onError: (error) => {
+      setToast(getStartupActionErrorMessage(error, "Unable to submit startup for admin review."));
+    },
   });
 
   const launchStartup = useMutation({
@@ -87,6 +113,9 @@ export function StartupLaunch() {
         queryClient.invalidateQueries({ queryKey: ["startup", "mine"] }),
         queryClient.invalidateQueries({ queryKey: ["score", "me"] }),
       ]);
+    },
+    onError: (error) => {
+      setToast(getStartupActionErrorMessage(error, "Unable to launch startup right now."));
     },
   });
 
@@ -136,20 +165,61 @@ export function StartupLaunch() {
   };
 
   const canLaunch = Boolean(hydratedForm.name.trim() && hydratedForm.tagline.trim() && hydratedForm.category.trim() && teamSize > 0);
+  const reviewStatus = startup?.reviewStatus ?? "draft";
+  const isApproved = reviewStatus === "approved";
+  const isUnderReview = reviewStatus === "review_requested";
+  const hasChangesRequested = reviewStatus === "changes_requested";
+  const reviewTone =
+    reviewStatus === "approved"
+      ? "bg-emerald-500/10 border-emerald-500/20 text-emerald-200"
+      : reviewStatus === "review_requested"
+        ? "bg-amber-500/10 border-amber-500/20 text-amber-200"
+        : reviewStatus === "changes_requested"
+          ? "bg-rose-500/10 border-rose-500/20 text-rose-200"
+          : "bg-slate-900 border-slate-800 text-slate-300";
+  const reviewTitle =
+    reviewStatus === "approved"
+      ? "Admin review approved"
+      : reviewStatus === "review_requested"
+        ? "Awaiting admin review"
+        : reviewStatus === "changes_requested"
+          ? "Changes requested by admin"
+          : "Draft startup profile";
+  const reviewDescription =
+    reviewStatus === "approved"
+      ? "This startup is cleared for marketplace launch. Investors can discover it after you launch to investors."
+      : reviewStatus === "review_requested"
+        ? "The admin team is reviewing this startup profile before it goes live in the marketplace."
+        : reviewStatus === "changes_requested"
+          ? "Update the startup profile based on admin notes and submit it again for review."
+          : "Complete the launch form and submit it for admin review before publishing it to investors or mentors.";
 
   return (
-    <DashboardLayout role="student">
-      <div className="space-y-6">
+    <div className="space-y-6">
         <div className="flex flex-col md:flex-row md:items-start md:justify-between gap-4">
           <div>
             <h1 className="text-3xl font-bold text-white mb-2">Startup Launch Engine</h1>
             <p className="text-slate-400">Transform your innovation into a startup</p>
           </div>
           <div className="flex gap-3">
+            <button
+              onClick={() => navigate("/startup-launch/investor-outreach")}
+              className="px-5 py-3 bg-slate-800 hover:bg-slate-700 text-white rounded-lg font-semibold flex items-center gap-2"
+            >
+              <Send className="w-4 h-4" />
+              Investor Outreach
+            </button>
             <button onClick={() => persistStartup.mutate()} className="px-5 py-3 bg-slate-800 hover:bg-slate-700 text-white rounded-lg font-semibold">
               Save Profile
             </button>
-            <button onClick={() => setShowLaunchModal(true)} disabled={!canLaunch} className="px-6 py-3 bg-gradient-to-r from-blue-600 to-purple-600 text-white rounded-lg font-semibold flex items-center gap-2 disabled:opacity-50">
+            <button
+              onClick={() => requestReview.mutate()}
+              disabled={!canLaunch || isUnderReview || requestReview.isPending || launchStartup.isPending}
+              className="px-5 py-3 bg-slate-800 hover:bg-slate-700 text-white rounded-lg font-semibold disabled:opacity-50"
+            >
+              {requestReview.isPending ? "Submitting..." : isApproved ? "Approved" : isUnderReview ? "Under Review" : "Submit for Review"}
+            </button>
+            <button onClick={() => setShowLaunchModal(true)} disabled={!canLaunch || !isApproved} className="px-6 py-3 bg-gradient-to-r from-blue-600 to-purple-600 text-white rounded-lg font-semibold flex items-center gap-2 disabled:opacity-50">
               <Rocket className="w-5 h-5" />
               Launch
             </button>
@@ -178,6 +248,25 @@ export function StartupLaunch() {
             <div className="text-center"><TrendingUp className="w-8 h-8 text-green-400 mx-auto mb-2" /><div className="text-2xl font-bold text-white mb-1">{startup?.innovationScoreAtLaunch ?? 0}</div><div className="text-sm text-slate-400">Launch Score Snapshot</div></div>
             <div className="text-center"><Target className="w-8 h-8 text-purple-400 mx-auto mb-2" /><div className="text-2xl font-bold text-white mb-1">{startup?.activeProducts ?? hydratedForm.activeProducts}</div><div className="text-sm text-slate-400">Active Products</div></div>
             <div className="text-center"><CheckCircle className="w-8 h-8 text-yellow-400 mx-auto mb-2" /><div className="text-2xl font-bold text-white mb-1">{startup?.launchedAt ? "Live" : "Draft"}</div><div className="text-sm text-slate-400">Status</div></div>
+          </div>
+        </div>
+
+        <div className={`border rounded-xl p-5 ${reviewTone}`}>
+          <div className="flex flex-col gap-3 lg:flex-row lg:items-start lg:justify-between">
+            <div>
+              <div className="text-xs uppercase tracking-[0.25em] mb-2">Marketplace Review</div>
+              <h2 className="text-xl font-bold text-white">{reviewTitle}</h2>
+              <p className="mt-2 text-sm leading-6">{reviewDescription}</p>
+              {startup?.adminNotes ? (
+                <div className="mt-4 rounded-lg border border-white/10 bg-slate-950/40 px-4 py-3 text-sm text-slate-200">
+                  Admin notes: {startup.adminNotes}
+                </div>
+              ) : null}
+            </div>
+            <div className="text-sm text-slate-300 lg:text-right">
+              <div>Submitted: {startup?.reviewRequestedAt ? new Date(startup.reviewRequestedAt).toLocaleString("en-IN") : "Not submitted"}</div>
+              <div className="mt-1">Reviewed: {startup?.adminReviewedAt ? new Date(startup.adminReviewedAt).toLocaleString("en-IN") : "Pending"}</div>
+            </div>
           </div>
         </div>
 
@@ -283,7 +372,9 @@ export function StartupLaunch() {
               <h3 className="font-bold text-white mb-2">Launch checklist</h3>
               <ul className="space-y-2 text-sm text-slate-300">
                 <li>{canLaunch ? "Ready to launch" : "Name, tagline, category, and at least one founder are required"}</li>
+                <li>{isApproved ? "Admin review approved for marketplace launch" : isUnderReview ? "Admin review is in progress" : hasChangesRequested ? "Admin requested changes before launch" : "Submit the startup to admin review before marketplace launch"}</li>
                 <li>Pitch deck upload is optional but recommended</li>
+                <li>Investor Outreach lets you shortlist investors and send pitch requests for this startup directly</li>
                 <li>Launch to recruiters is available from Leadership Profile too</li>
               </ul>
             </div>
@@ -341,6 +432,9 @@ export function StartupLaunch() {
                 <h2 className="text-2xl font-bold text-white">Launch Your Startup To:</h2>
                 <button onClick={() => setShowLaunchModal(false)} className="text-slate-400 hover:text-white"><X className="w-5 h-5" /></button>
               </div>
+              <div className="mb-5 rounded-lg border border-cyan-500/20 bg-cyan-500/10 px-4 py-3 text-sm text-cyan-100">
+                Approved startups launched to investors will appear in the investor marketplace. You can then continue outreach for this startup from Investor Outreach.
+              </div>
               <div className="space-y-3 mb-6">
                 {[
                   ["investors", "Launch to Investors"],
@@ -374,7 +468,6 @@ export function StartupLaunch() {
             </div>
           </div>
         ) : null}
-      </div>
-    </DashboardLayout>
+    </div>
   );
 }

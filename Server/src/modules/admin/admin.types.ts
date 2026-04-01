@@ -1,4 +1,28 @@
 import { UserRole } from '../../types/roles.types';
+import {
+  DealMediationStatus,
+  DealRequestOrigin,
+  DealRoyalty,
+  DealStockDetails,
+  DealStockTransfer,
+} from '../deal/deal.types';
+import {
+  ActivityRouteMetric,
+  DailyUsagePoint,
+  UsageInsight,
+  UserActivityDetail,
+  UserActivityFeedItem,
+  UserActivitySummary,
+  PlatformUsageSummary,
+} from '../analytics/activity.types';
+import {
+  AdminProjectMentorshipView,
+  CreatedMentorProfileResult,
+  InstitutionMentorshipProgramListResponse,
+  InstitutionMentorshipProgramReviewInput,
+  MentorshipAdminMentorItem,
+  ProjectMentorAssignmentInput,
+} from '../mentor/mentor.types';
 
 export interface AdminUserListItem {
   _id: string;
@@ -141,6 +165,9 @@ export interface AdminDealItem {
   investorId: string;
   startupId: string;
   studentId: string;
+  mediatorLabel: string;
+  requestOrigin: DealRequestOrigin;
+  mediationStatus: DealMediationStatus;
   stage: 1 | 2 | 3 | 4;
   amountINR?: number;
   equityPercent?: number;
@@ -152,6 +179,21 @@ export interface AdminDealItem {
   adminApprovalRequired: boolean;
   adminApprovedAt?: string;
   adminApprovedBy?: string;
+  stockDetails: DealStockDetails & {
+    sharePriceInr: number;
+    transferValueInr: number;
+    totalSharesConsidered: number;
+  };
+  stockTransfer: Omit<DealStockTransfer, 'requestedAt' | 'reviewedAt' | 'reviewedBy'> & {
+    status: 'not_started' | 'pending_review' | 'under_review' | 'approved';
+    requestedAt?: string;
+    reviewedAt?: string;
+    reviewedBy?: string;
+  };
+  royalty: Omit<DealRoyalty, 'settledAt'> & {
+    status: 'pending' | 'invoiced' | 'received';
+    settledAt?: string;
+  };
   innovationScoreSnapshot: number;
   status: 'active' | 'closed' | 'cancelled';
   nextActionLabel: string;
@@ -172,6 +214,35 @@ export interface AdminDealReviewItem extends AdminDealItem {
     category: string;
     stage: string;
     pitchDeckUrl?: string;
+    pitchDeckName?: string;
+    projectId?: string;
+    teamSize: number;
+    fundingNeeded?: number;
+    activeProducts: number;
+    launchedAt?: string;
+    innovationScoreAtLaunch: number;
+    traction: {
+      patentFiled: boolean;
+      mvpBuilt: boolean;
+      revenueGenerating: boolean;
+      usersCount?: number;
+    };
+    sharePool: {
+      totalShares: number;
+      availableShares: number;
+      reservedForSole: number;
+      maxPennyInvestors: number;
+      currentPennyCount: number;
+      hasSoleInvestor: boolean;
+    };
+    founders: Array<{
+      _id: string;
+      displayName: string;
+      avatar?: string;
+      innovationScore: number;
+      scoreBreakdown: Record<string, number>;
+      domain?: string;
+    }>;
   };
   student: {
     _id: string;
@@ -186,6 +257,60 @@ export interface AdminDealReviewItem extends AdminDealItem {
     avatar?: string;
     role: UserRole;
     innovationScore: number;
+  };
+  scoreEvents: Array<{
+    _id: string;
+    trigger: string;
+    delta: number;
+    scoreAfter: number;
+    createdAt: string;
+  }>;
+  workspace?: {
+    _id: string;
+    title: string;
+    category: string;
+    stage: string;
+    progressPercent: number;
+    milestones: Array<{
+      _id: string;
+      name: string;
+      isCompleted: boolean;
+      completionPercent: number;
+      completedAt?: string;
+    }>;
+    evidenceSummary: {
+      uploadsCount: number;
+      repoCount: number;
+      codeCount: number;
+      progressUpdatesCount: number;
+    };
+    uploads: Array<{
+      _id: string;
+      fileUrl: string;
+      fileType: 'pdf' | 'image';
+      fileName: string;
+      fileSizeBytes: number;
+      uploadedAt: string;
+      note?: string;
+      category?: string;
+    }>;
+    repoSubmissions: Array<{
+      _id: string;
+      provider: 'github';
+      repoUrl: string;
+      displayName: string;
+      branch?: string;
+      commitHash?: string;
+      note?: string;
+      uploadedAt: string;
+    }>;
+    progressUpdates: Array<{
+      _id: string;
+      note: string;
+      milestoneRef?: string;
+      submittedAt: string;
+    }>;
+    updatedAt: string;
   };
 }
 
@@ -217,4 +342,38 @@ export interface AdminAnalyticsData {
     pennyCapitalDeployed: number;
     soleCapitalDeployed: number;
   };
+  usageSummary: PlatformUsageSummary;
+  dailyUsage: DailyUsagePoint[];
+  topRoutes: ActivityRouteMetric[];
+  mostActiveUsers: UserActivitySummary[];
+  recentUserActivity: UserActivityFeedItem[];
+  insights: UsageInsight[];
 }
+
+export interface AdminAnalyticsLogEntry {
+  _id: string;
+  level: string;
+  message: string;
+  source: 'http' | 'application';
+  timestamp?: string;
+}
+
+export interface AdminUserActivitySearchResponse {
+  items: UserActivitySummary[];
+}
+
+export type AdminUserActivityDetail = UserActivityDetail;
+
+export interface AdminDealReviewPayload {
+  stockTransferStatus?: 'pending_review' | 'under_review';
+  reviewNotes?: string;
+  royaltyPercentage?: number;
+  royaltyStatus?: 'pending' | 'invoiced' | 'received';
+}
+
+export type AdminMentorshipProgramsResponse = InstitutionMentorshipProgramListResponse;
+export type AdminMentorshipProgramReviewPayload = InstitutionMentorshipProgramReviewInput;
+export type AdminMentorListItem = MentorshipAdminMentorItem;
+export type AdminCreatedMentorProfile = CreatedMentorProfileResult;
+export type AdminProjectMentorshipsResponse = AdminProjectMentorshipView;
+export type AdminProjectMentorAssignmentPayload = ProjectMentorAssignmentInput;

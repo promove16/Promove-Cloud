@@ -5,6 +5,34 @@ export type DealStage = 1 | 2 | 3 | 4;
 export type DealStatus = 'active' | 'closed' | 'cancelled';
 export type InvestorType = 'penny' | 'sole';
 export type InvestorRole = 'shareholder' | 'director' | 'observer';
+export type DealRequestOrigin = 'investor' | 'student';
+export type DealMediationStatus = 'intake' | 'under_review' | 'approved';
+export type StockTransferStatus = 'not_started' | 'pending_review' | 'under_review' | 'approved';
+export type RoyaltyStatus = 'pending' | 'invoiced' | 'received';
+
+export interface DealStockDetails {
+  shareClassLabel: string;
+  sharePriceInr: number;
+  transferValueInr: number;
+  totalSharesConsidered: number;
+}
+
+export interface DealStockTransfer {
+  status: StockTransferStatus;
+  requestedAt?: Date;
+  requestedByRole?: DealRequestOrigin | 'admin';
+  requestSummary?: string;
+  reviewNotes?: string;
+  reviewedAt?: Date;
+  reviewedBy?: Types.ObjectId;
+}
+
+export interface DealRoyalty {
+  promovePercentage: number;
+  promoveAmountINR: number;
+  status: RoyaltyStatus;
+  settledAt?: Date;
+}
 
 export interface InvestmentAuthority {
   investorRole: InvestorRole;
@@ -19,6 +47,9 @@ export interface IInvestment extends InvestmentAuthority {
   startupId: Types.ObjectId;
   investorId: Types.ObjectId;
   studentId: Types.ObjectId;
+  mediatorLabel: string;
+  requestOrigin: DealRequestOrigin;
+  mediationStatus: DealMediationStatus;
   investorType: InvestorType;
   stage: DealStage;
   amountINR: number;
@@ -26,6 +57,9 @@ export interface IInvestment extends InvestmentAuthority {
   equityPercent: number;
   proposedEquityPercent?: number;
   sharesAllocated: number;
+  stockDetails: DealStockDetails;
+  stockTransfer: DealStockTransfer;
+  royalty: DealRoyalty;
   fundTransferInitiatedAt?: Date;
   adminApprovalRequired: boolean;
   adminApprovedAt?: Date;
@@ -59,6 +93,9 @@ export interface DealSummaryView extends InvestmentAuthority {
   startupId: string;
   studentId: string;
   investorId: string;
+  mediatorLabel: string;
+  requestOrigin: DealRequestOrigin;
+  mediationStatus: DealMediationStatus;
   startupName: string;
   startupCategory: string;
   studentDisplayName: string;
@@ -71,6 +108,27 @@ export interface DealSummaryView extends InvestmentAuthority {
   sharesAllocated: number;
   adminApprovalRequired: boolean;
   adminApprovedAt?: string;
+  stockDetails: {
+    shareClassLabel: string;
+    sharePriceInr: number;
+    transferValueInr: number;
+    totalSharesConsidered: number;
+  };
+  stockTransfer: {
+    status: StockTransferStatus;
+    requestedAt?: string;
+    requestedByRole?: DealRequestOrigin | 'admin';
+    requestSummary?: string;
+    reviewNotes?: string;
+    reviewedAt?: string;
+    reviewedBy?: string;
+  };
+  royalty: {
+    promovePercentage: number;
+    promoveAmountINR: number;
+    status: RoyaltyStatus;
+    settledAt?: string;
+  };
   innovationScoreSnapshot: number;
   nextActionLabel: string;
   createdAt: string;

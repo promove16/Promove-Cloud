@@ -12,6 +12,7 @@ import { useInnovationScore } from "../../hooks/useInnovationScore";
 
 const eventLabel: Record<string, string> = {
   PROBLEM_CLAIMED: "Claimed a new problem",
+  PROBLEM_COMPLETED: "Completed a problem",
   PROGRESS_UPLOADED: "Uploaded workspace progress",
   PATENT_SUBMITTED: "Patent filed",
   STARTUP_LAUNCHED: "Startup launched",

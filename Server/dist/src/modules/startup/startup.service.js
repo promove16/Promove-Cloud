@@ -1,6 +1,7 @@
 "use strict";
 Object.defineProperty(exports, "__esModule", { value: true });
-exports.uploadPitchDeck = exports.launchStartup = exports.updateStartupProfile = exports.getStartupForFounder = exports.getMyStartup = exports.createStartupProfile = exports.launchSchema = exports.startupSchema = void 0;
+exports.reviewStartupSubmission = exports.listStartupsForAdmin = exports.uploadPitchDeck = exports.launchStartup = exports.requestStartupReview = exports.updateStartupProfile = exports.getStartupForFounder = exports.getMyStartup = exports.createStartupProfile = exports.reviewStartupSubmissionSchema = exports.launchSchema = exports.startupSchema = void 0;
+const mongoose_1 = require("mongoose");
 const zod_1 = require("zod");
 const bullmq_1 = require("../../config/bullmq");
 const cloudinaryService_1 = require("../../services/cloudinaryService");
@@ -37,6 +38,27 @@ exports.startupSchema = zod_1.z.object({
 exports.launchSchema = zod_1.z.object({
     launchTo: zod_1.z.enum(['investors', 'mentors', 'both', 'recruiters']),
 });
+exports.reviewStartupSubmissionSchema = zod_1.z
+    .object({
+    decision: zod_1.z.enum(['approved', 'changes_requested']),
+    adminNotes: zod_1.z.string().trim().max(1500).optional(),
+})
+    .superRefine((value, ctx) => {
+    if (value.decision === 'changes_requested' && (!value.adminNotes || value.adminNotes.length < 10)) {
+        ctx.addIssue({
+            code: zod_1.z.ZodIssueCode.custom,
+            path: ['adminNotes'],
+            message: 'Admin notes are required when requesting changes.',
+        });
+    }
+});
+const clearReviewMetadata = (startup) => {
+    startup.reviewRequestedAt = undefined;
+    startup.adminReviewedAt = undefined;
+    startup.adminReviewedBy = null;
+    startup.adminNotes = undefined;
+};
+const isStartupProfileReady = (startup) => Boolean(startup.name && startup.tagline && startup.category && startup.founderIds.length > 0);
 const createStartupProfile = async (userId, payload) => {
     const existing = await startup_model_1.Startup.findOne({ founderIds: userId, isActive: true });
     if (existing) {
@@ -66,14 +88,41 @@ exports.getStartupForFounder = getStartupForFounder;
 const updateStartupProfile = async (startupId, userId, payload) => {
     const startup = await (0, exports.getStartupForFounder)(startupId, userId);
     Object.assign(startup, payload);
+    if (startup.reviewStatus === 'review_requested') {
+        startup.reviewStatus = 'draft';
+        clearReviewMetadata(startup);
+    }
     await startup.save();
     return startup.toObject();
 };
 exports.updateStartupProfile = updateStartupProfile;
+const requestStartupReview = async (startupId, userId) => {
+    const startup = await (0, exports.getStartupForFounder)(startupId, userId);
+    if (!isStartupProfileReady(startup)) {
+        throw new ApiError_1.ApiError(400, 'STARTUP_INCOMPLETE', 'Startup profile is incomplete for review.');
+    }
+    if (startup.reviewStatus === 'approved') {
+        throw new ApiError_1.ApiError(409, 'STARTUP_ALREADY_APPROVED', 'Startup has already been approved.');
+    }
+    if (startup.reviewStatus === 'review_requested') {
+        throw new ApiError_1.ApiError(409, 'STARTUP_ALREADY_UNDER_REVIEW', 'Startup review is already pending.');
+    }
+    startup.reviewStatus = 'review_requested';
+    startup.reviewRequestedAt = new Date();
+    startup.adminReviewedAt = undefined;
+    startup.adminReviewedBy = null;
+    startup.adminNotes = undefined;
+    await startup.save();
+    return startup.toObject();
+};
+exports.requestStartupReview = requestStartupReview;
 const launchStartup = async (startupId, userId, payload) => {
     const startup = await (0, exports.getStartupForFounder)(startupId, userId);
-    if (!startup.name || !startup.tagline || !startup.category || startup.founderIds.length === 0) {
+    if (!isStartupProfileReady(startup)) {
         throw new ApiError_1.ApiError(400, 'STARTUP_INCOMPLETE', 'Startup profile is incomplete for launch.');
+    }
+    if (payload.launchTo !== 'recruiters' && startup.reviewStatus !== 'approved') {
+        throw new ApiError_1.ApiError(403, 'STARTUP_REVIEW_REQUIRED', 'Startup must be approved by admin before it can be launched to the marketplace.');
     }
     const user = await user_model_1.User.findById(userId).select('innovationScore').lean();
     const score = (0, score_utils_1.normalizeInnovationScore)(user?.innovationScore ?? 0);
@@ -166,7 +215,78 @@ const uploadPitchDeck = async (startupId, userId, file) => {
     const uploaded = await (0, cloudinaryService_1.uploadToCloudinary)(file.buffer, 'promove/startups', 'raw', { format: 'pdf' });
     startup.pitchDeckUrl = uploaded.secure_url;
     startup.pitchDeckName = file.originalname;
+    if (startup.reviewStatus === 'review_requested') {
+        startup.reviewStatus = 'draft';
+        clearReviewMetadata(startup);
+    }
     await startup.save();
     return startup.toObject();
 };
 exports.uploadPitchDeck = uploadPitchDeck;
+const listStartupsForAdmin = async (status) => {
+    const query = status && status !== 'draft'
+        ? { isActive: true, reviewStatus: status }
+        : status
+            ? { isActive: true, reviewStatus: status }
+            : { isActive: true };
+    const startups = await startup_model_1.Startup.find(query)
+        .sort({ reviewRequestedAt: -1, updatedAt: -1, createdAt: -1 })
+        .lean();
+    const founderIds = [...new Set(startups.flatMap((startup) => startup.founderIds.map(String)))];
+    const founders = founderIds.length > 0
+        ? await user_model_1.User.find({ _id: { $in: founderIds } })
+            .select('_id displayName avatar innovationScore domain')
+            .lean()
+        : [];
+    const founderMap = new Map(founders.map((founder) => [String(founder._id), founder]));
+    return startups.map((startup) => ({
+        _id: String(startup._id),
+        name: startup.name,
+        tagline: startup.tagline,
+        category: startup.category,
+        stage: startup.stage,
+        fundingNeeded: startup.fundingNeeded,
+        activeProducts: startup.activeProducts,
+        teamSize: startup.teamSize,
+        launchedToInvestors: startup.launchedToInvestors,
+        launchedToMentors: startup.launchedToMentors,
+        ...(startup.launchedAt ? { launchedAt: startup.launchedAt.toISOString() } : {}),
+        reviewStatus: startup.reviewStatus,
+        ...(startup.reviewRequestedAt ? { reviewRequestedAt: startup.reviewRequestedAt.toISOString() } : {}),
+        ...(startup.adminReviewedAt ? { adminReviewedAt: startup.adminReviewedAt.toISOString() } : {}),
+        ...(startup.adminReviewedBy ? { adminReviewedBy: String(startup.adminReviewedBy) } : {}),
+        ...(startup.adminNotes ? { adminNotes: startup.adminNotes } : {}),
+        ...(startup.pitchDeckUrl ? { pitchDeckUrl: startup.pitchDeckUrl } : {}),
+        ...(startup.pitchDeckName ? { pitchDeckName: startup.pitchDeckName } : {}),
+        traction: startup.traction,
+        founders: startup.founderIds
+            .map((founderId) => founderMap.get(String(founderId)))
+            .filter((founder) => Boolean(founder))
+            .map((founder) => ({
+            _id: String(founder._id),
+            displayName: founder.displayName,
+            ...(founder.avatar ? { avatar: founder.avatar } : {}),
+            innovationScore: founder.innovationScore ?? 0,
+            ...(founder.domain ? { domain: founder.domain } : {}),
+        })),
+        createdAt: startup.createdAt.toISOString(),
+        updatedAt: startup.updatedAt.toISOString(),
+    }));
+};
+exports.listStartupsForAdmin = listStartupsForAdmin;
+const reviewStartupSubmission = async (adminId, startupId, payload) => {
+    const startup = await startup_model_1.Startup.findById(startupId);
+    if (!startup || !startup.isActive) {
+        throw new ApiError_1.ApiError(404, 'STARTUP_NOT_FOUND', 'Startup not found');
+    }
+    startup.reviewStatus = payload.decision;
+    startup.adminReviewedAt = new Date();
+    startup.adminReviewedBy = new mongoose_1.Types.ObjectId(adminId);
+    startup.adminNotes = payload.adminNotes?.trim() || undefined;
+    if (payload.decision === 'approved') {
+        startup.reviewRequestedAt = startup.reviewRequestedAt ?? new Date();
+    }
+    await startup.save();
+    return startup.toObject();
+};
+exports.reviewStartupSubmission = reviewStartupSubmission;

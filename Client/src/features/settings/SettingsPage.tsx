@@ -1,11 +1,12 @@
 import { useEffect, useState } from 'react';
 import { useForm } from 'react-hook-form';
 import { User, Bell, Shield, Palette, Settings2, Save, Loader2, Check, Lock, Globe, Monitor, Moon, Sun } from 'lucide-react';
-import { useAuth } from '../../app/context/AuthContext';
-import type { UserSettings, SettingsUpdate } from '../../types/settings.types';
+import { userApi } from '../../api/user.api';
+import type { UserSettings } from '../../types/settings.types';
 import { useSettings } from '../../hooks/useSettings';
 import { useAuthStore } from '../../store/authStore';
 import { applyTheme } from '../../hooks/useTheme';
+import { UserRole } from '../../types/roles.types';
 
 // ─── Layout helper ────────────────────────────────────────────────────────────
 
@@ -103,6 +104,48 @@ const defaultRole: RoleState = {
   publicProfile: true, allowStudentApplications: true,
 };
 
+const buildRoleSettingsPayload = (role: UserRole, roleState: RoleState): UserSettings['roleSettings'] => {
+  switch (role) {
+    case UserRole.STUDENT:
+      return {
+        jobSeeking: roleState.jobSeeking,
+        openToMentorship: roleState.openToMentorship,
+        innovationVisibility: roleState.innovationVisibility,
+      };
+    case UserRole.INVESTOR:
+      return {
+        dealFlowNotifications: roleState.dealFlowNotifications,
+        minInvestmentSize: roleState.minInvestment,
+        maxInvestmentSize: roleState.maxInvestment,
+        preferredSectors: splitCsv(roleState.preferredSectors),
+      };
+    case UserRole.MENTOR:
+      return {
+        availableForSessions: roleState.availableForSessions,
+        sessionTypes: [
+          ...(roleState.sessionTypes.video ? ['video' as const] : []),
+          ...(roleState.sessionTypes.text ? ['text' as const] : []),
+          ...(roleState.sessionTypes.inPerson ? ['in-person' as const] : []),
+        ],
+        maxStudents: roleState.maxConcurrentStudents,
+      };
+    case UserRole.RECRUITER:
+      return {
+        activelyHiring: roleState.activelyHiring,
+        preferredRoles: splitCsv(roleState.preferredRoles),
+      };
+    case UserRole.SCHOOL:
+    case UserRole.COLLEGE:
+      return {
+        publicProfile: roleState.publicProfile,
+        allowStudentApplications: roleState.allowStudentApplications,
+      };
+    case UserRole.ADMIN:
+    default:
+      return {};
+  }
+};
+
 // ─── Skeleton ─────────────────────────────────────────────────────────────────
 
 function SettingsSkeleton() {
@@ -120,16 +163,17 @@ function SettingsSkeleton() {
 // ─── Main component ───────────────────────────────────────────────────────────
 
 export function SettingsPage() {
-  const { user } = useAuth();
   const { settings, isLoading, updateSettingsAsync, isSaving } = useSettings();
   const authUser = useAuthStore((s) => s.user);
   const setAuthUser = useAuthStore((s) => s.setUser);
   const [activeTab, setActiveTab] = useState<TabId>('account');
   const [savedTab, setSavedTab] = useState<TabId | null>(null);
+  const [savingTab, setSavingTab] = useState<TabId | null>(null);
   const [notif, setNotif] = useState<NotifMatrix>(defaultNotif);
   const [privacy, setPrivacy] = useState<PrivacyState>(defaultPrivacy);
   const [appearance, setAppearance] = useState<AppearanceState>(defaultAppearance);
   const [roleState, setRoleState] = useState<RoleState>(defaultRole);
+  const role = authUser?.role ?? UserRole.STUDENT;
 
   const { register, handleSubmit, watch, reset, formState: { errors } } = useForm<AccountValues>({
     defaultValues: { displayName: '', bio: '', timezone: 'UTC', language: 'en' },
@@ -138,12 +182,11 @@ export function SettingsPage() {
 
   useEffect(() => {
     if (!settings) return;
-    const s = settings as UserSettings & Record<string, unknown>;
     reset({
-      displayName: (s.displayName as string) ?? user?.name ?? '',
-      bio: (s.bio as string) ?? '',
-      timezone: (s.timezone as string) ?? 'UTC',
-      language: (s.language as string) ?? 'en',
+      displayName: authUser?.displayName ?? settings.displayName ?? '',
+      bio: authUser?.bio ?? settings.bio ?? '',
+      timezone: settings.timezone ?? 'UTC',
+      language: settings.language ?? 'en',
     });
     if (settings.notifications) {
       setNotif({
@@ -186,110 +229,143 @@ export function SettingsPage() {
     if (settings.appearance) {
       setAppearance(settings.appearance);
     }
-    if (settings.roleSettings) {
-      setRoleState((prev) => ({
-        ...prev,
-        ...settings.roleSettings,
-        minInvestment: settings.roleSettings.minInvestmentSize ?? prev.minInvestment,
-        maxInvestment: settings.roleSettings.maxInvestmentSize ?? prev.maxInvestment,
-        preferredSectors: settings.roleSettings.preferredSectors?.join(', ') ?? prev.preferredSectors,
-        sessionTypes: {
-          video: settings.roleSettings.sessionTypes?.includes('video') ?? prev.sessionTypes.video,
-          text: settings.roleSettings.sessionTypes?.includes('text') ?? prev.sessionTypes.text,
-          inPerson: settings.roleSettings.sessionTypes?.includes('in-person') ?? prev.sessionTypes.inPerson,
-        },
-        maxConcurrentStudents: settings.roleSettings.maxStudents ?? prev.maxConcurrentStudents,
-        preferredRoles: settings.roleSettings.preferredRoles?.join(', ') ?? prev.preferredRoles,
-      }));
+    const persistedRoleSettings = settings.roleSettings ?? {};
+    const nextRoleState: RoleState = {
+      ...defaultRole,
+      ...persistedRoleSettings,
+      minInvestment: persistedRoleSettings.minInvestmentSize ?? defaultRole.minInvestment,
+      maxInvestment: persistedRoleSettings.maxInvestmentSize ?? defaultRole.maxInvestment,
+      preferredSectors: persistedRoleSettings.preferredSectors?.join(', ') ?? defaultRole.preferredSectors,
+      sessionTypes: {
+        video: persistedRoleSettings.sessionTypes?.includes('video') ?? defaultRole.sessionTypes.video,
+        text: persistedRoleSettings.sessionTypes?.includes('text') ?? defaultRole.sessionTypes.text,
+        inPerson: persistedRoleSettings.sessionTypes?.includes('in-person') ?? defaultRole.sessionTypes.inPerson,
+      },
+      maxConcurrentStudents: persistedRoleSettings.maxStudents ?? defaultRole.maxConcurrentStudents,
+      preferredRoles: persistedRoleSettings.preferredRoles?.join(', ') ?? defaultRole.preferredRoles,
+    };
+
+    if (role === UserRole.STUDENT && authUser?.discoverableToRecruiters !== undefined) {
+      nextRoleState.jobSeeking = authUser.discoverableToRecruiters;
     }
-  }, [settings]); // eslint-disable-line react-hooks/exhaustive-deps
+
+    if ((role === UserRole.SCHOOL || role === UserRole.COLLEGE) && authUser?.isProfilePublic !== undefined) {
+      nextRoleState.publicProfile = authUser.isProfilePublic;
+    }
+
+    setRoleState(nextRoleState);
+  }, [
+    authUser?.bio,
+    authUser?.displayName,
+    authUser?.discoverableToRecruiters,
+    authUser?.isProfilePublic,
+    reset,
+    role,
+    settings,
+  ]);
 
   const markSaved = (tab: TabId) => { setSavedTab(tab); setTimeout(() => setSavedTab(null), 2000); };
+  const withSaveState = async (tab: TabId, action: () => Promise<void>) => {
+    setSavingTab(tab);
+    try {
+      await action();
+      markSaved(tab);
+    } finally {
+      setSavingTab((current) => (current === tab ? null : current));
+    }
+  };
 
   const onSaveAccount = handleSubmit(async (values) => {
-    await updateSettingsAsync(values);
-    // Sync displayName + bio into the auth store so the header updates immediately
-    if (authUser) {
-      setAuthUser({ ...authUser, displayName: values.displayName });
-    }
-    markSaved('account');
+    await withSaveState('account', async () => {
+      const [updatedUser] = await Promise.all([
+        userApi.updateMe({
+          displayName: values.displayName.trim(),
+          bio: values.bio.trim() || '',
+        }),
+        updateSettingsAsync({
+          timezone: values.timezone,
+          language: values.language,
+        }),
+      ]);
+
+      setAuthUser(updatedUser);
+    });
   });
   const onSaveNotif = async () => {
-    await updateSettingsAsync({
-      notifications: {
-        email: {
-          messages: notif.messages.email,
-          deals: notif.deals.email,
-          sessions: notif.sessions.email,
-          patents: notif.patents.email,
-          platform: notif.platform.email,
+    await withSaveState('notifications', async () => {
+      await updateSettingsAsync({
+        notifications: {
+          email: {
+            messages: notif.messages.email,
+            deals: notif.deals.email,
+            sessions: notif.sessions.email,
+            patents: notif.patents.email,
+            platform: notif.platform.email,
+          },
+          inApp: {
+            messages: notif.messages.inApp,
+            deals: notif.deals.inApp,
+            sessions: notif.sessions.inApp,
+            patents: notif.patents.inApp,
+            platform: notif.platform.inApp,
+          },
         },
-        inApp: {
-          messages: notif.messages.inApp,
-          deals: notif.deals.inApp,
-          sessions: notif.sessions.inApp,
-          patents: notif.patents.inApp,
-          platform: notif.platform.inApp,
-        },
-      },
+      });
     });
-    markSaved('notifications');
   };
   const onSavePrivacy = async () => {
-    await updateSettingsAsync({
-      privacy: {
-        profileVisibility: privacy.profileVisibility,
-        showEmail: privacy.showEmail,
-        showPhone: privacy.showPhone,
-        allowDMs:
-          privacy.dmPermissions === 'everyone'
-            ? 'all'
-            : privacy.dmPermissions === 'nobody'
-              ? 'none'
-              : 'connections',
-        showOnlineStatus: privacy.showOnlineStatus,
-      },
+    await withSaveState('privacy', async () => {
+      await updateSettingsAsync({
+        privacy: {
+          profileVisibility: privacy.profileVisibility,
+          showEmail: privacy.showEmail,
+          showPhone: privacy.showPhone,
+          allowDMs:
+            privacy.dmPermissions === 'everyone'
+              ? 'all'
+              : privacy.dmPermissions === 'nobody'
+                ? 'none'
+                : 'connections',
+          showOnlineStatus: privacy.showOnlineStatus,
+        },
+      });
     });
-    markSaved('privacy');
   };
-  const onSaveAppearance = async () => { await updateSettingsAsync({ appearance }); markSaved('appearance'); };
-  const onSaveRole = async () => {
-    await updateSettingsAsync({
-      roleSettings: {
-        jobSeeking: roleState.jobSeeking,
-        openToMentorship: roleState.openToMentorship,
-        innovationVisibility: roleState.innovationVisibility,
-        dealFlowNotifications: roleState.dealFlowNotifications,
-        minInvestmentSize: roleState.minInvestment,
-        maxInvestmentSize: roleState.maxInvestment,
-        preferredSectors: splitCsv(roleState.preferredSectors),
-        availableForSessions: roleState.availableForSessions,
-        sessionTypes: [
-          ...(roleState.sessionTypes.video ? ['video' as const] : []),
-          ...(roleState.sessionTypes.text ? ['text' as const] : []),
-          ...(roleState.sessionTypes.inPerson ? ['in-person' as const] : []),
-        ],
-        maxStudents: roleState.maxConcurrentStudents,
-        activelyHiring: roleState.activelyHiring,
-        preferredRoles: splitCsv(roleState.preferredRoles),
-        publicProfile: roleState.publicProfile,
-        allowStudentApplications: roleState.allowStudentApplications,
-      },
+  const onSaveAppearance = async () => {
+    await withSaveState('appearance', async () => {
+      await updateSettingsAsync({ appearance });
     });
-    markSaved('role');
+  };
+  const onSaveRole = async () => {
+    await withSaveState('role', async () => {
+      await updateSettingsAsync({
+        roleSettings: buildRoleSettingsPayload(role, roleState),
+      });
+
+      if (!authUser) {
+        return;
+      }
+
+      if (role === UserRole.STUDENT) {
+        setAuthUser({ ...authUser, discoverableToRecruiters: roleState.jobSeeking });
+      }
+
+      if (role === UserRole.SCHOOL || role === UserRole.COLLEGE) {
+        setAuthUser({ ...authUser, isProfilePublic: roleState.publicProfile });
+      }
+    });
   };
 
   function SaveBtn({ tab, onSave }: { tab: TabId; onSave: () => void }) {
     const saved = savedTab === tab;
+    const isTabSaving = savingTab === tab || isSaving;
     return (
-      <button type="button" onClick={onSave} disabled={isSaving} className={saveBtnCls}>
-        {isSaving ? <Loader2 className="w-4 h-4 animate-spin" /> : saved ? <Check className="w-4 h-4" /> : <Save className="w-4 h-4" />}
-        {isSaving ? 'Saving...' : saved ? 'Saved!' : 'Save Changes'}
+      <button type="button" onClick={onSave} disabled={isTabSaving} className={saveBtnCls}>
+        {isTabSaving ? <Loader2 className="w-4 h-4 animate-spin" /> : saved ? <Check className="w-4 h-4" /> : <Save className="w-4 h-4" />}
+        {isTabSaving ? 'Saving...' : saved ? 'Saved!' : 'Save Changes'}
       </button>
     );
   }
-
-  const role = user?.role ?? 'student';
 
   if (isLoading) {
     return (
@@ -491,7 +567,7 @@ export function SettingsPage() {
         {/* ── Role Settings ────────────────────────────────────────────────── */}
         {activeTab === 'role' && (
           <div className="space-y-6">
-            {role === 'student' && (
+            {role === UserRole.STUDENT && (
               <>
                 <div className={card}>
                   <p className={sectionHdr}>Career &amp; Discovery</p>
@@ -512,7 +588,7 @@ export function SettingsPage() {
               </>
             )}
 
-            {role === 'investor' && (
+            {role === UserRole.INVESTOR && (
               <>
                 <div className={card}>
                   <p className={sectionHdr}>Deal Flow</p>
@@ -544,7 +620,7 @@ export function SettingsPage() {
               </>
             )}
 
-            {role === 'mentor' && (
+            {role === UserRole.MENTOR && (
               <>
                 <div className={card}>
                   <p className={sectionHdr}>Availability</p>
@@ -576,7 +652,7 @@ export function SettingsPage() {
               </>
             )}
 
-            {(role === 'recruiter' || role === 'company') && (
+            {role === UserRole.RECRUITER && (
               <div className={card}>
                 <p className={sectionHdr}>Hiring Preferences</p>
                 <div className="space-y-5">
@@ -591,7 +667,7 @@ export function SettingsPage() {
               </div>
             )}
 
-            {(role === 'school' || role === 'college') && (
+            {(role === UserRole.SCHOOL || role === UserRole.COLLEGE) && (
               <div className={card}>
                 <p className={sectionHdr}>Institution Settings</p>
                 <div className="space-y-5">
@@ -601,14 +677,14 @@ export function SettingsPage() {
               </div>
             )}
 
-            {role === 'admin' && (
+            {role === UserRole.ADMIN && (
               <div className={card}>
                 <div className="flex items-center gap-3 mb-3"><Settings2 className="w-5 h-5 text-cyan-400" /><p className="text-base font-semibold text-white">Admin Settings</p></div>
                 <p className="text-sm text-slate-400">Admin settings are managed system-wide. Use the Admin panel to configure platform-level settings, permissions, and system parameters.</p>
               </div>
             )}
 
-            {role !== 'admin' && <div className="flex justify-end"><SaveBtn tab="role" onSave={onSaveRole} /></div>}
+            {role !== UserRole.ADMIN && <div className="flex justify-end"><SaveBtn tab="role" onSave={onSaveRole} /></div>}
           </div>
         )}
       </div>

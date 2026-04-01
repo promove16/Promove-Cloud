@@ -1,14 +1,140 @@
 import { IUserSettings, ISettingsDocument } from './settings.types';
 import { Settings } from './settings.model';
+import { UserRole } from '../../types/roles.types';
+import { User } from '../user/user.model';
+import { ApiError } from '../../utils/ApiError';
+import { sanitizePlainText } from '../../utils/sanitizeText';
+import { SettingsUpdateInput, settingsUpdateSchema } from './settings.validation';
 
 type NestedObject = Record<string, unknown>;
+type RoleSettings = IUserSettings['roleSettings'];
+type NotificationPreferencesUpdate = Partial<IUserSettings['notifications']['email']>;
+type SettingsUpdatePayload = Partial<
+  Omit<IUserSettings, 'notifications' | 'privacy' | 'appearance' | 'roleSettings'>
+> & {
+  notifications?: {
+    email?: NotificationPreferencesUpdate;
+    inApp?: NotificationPreferencesUpdate;
+  };
+  privacy?: Partial<IUserSettings['privacy']>;
+  appearance?: Partial<IUserSettings['appearance']>;
+  roleSettings?: Partial<RoleSettings>;
+};
+
+const ROLE_SETTING_KEYS: Record<UserRole, Array<keyof RoleSettings>> = {
+  [UserRole.STUDENT]: ['jobSeeking', 'openToMentorship', 'innovationVisibility'],
+  [UserRole.SCHOOL]: ['publicProfile', 'allowStudentApplications'],
+  [UserRole.COLLEGE]: ['publicProfile', 'allowStudentApplications'],
+  [UserRole.MENTOR]: ['availableForSessions', 'sessionTypes', 'maxStudents'],
+  [UserRole.INVESTOR]: [
+    'dealFlowNotifications',
+    'minInvestmentSize',
+    'maxInvestmentSize',
+    'preferredSectors',
+  ],
+  [UserRole.RECRUITER]: ['activelyHiring', 'preferredRoles'],
+  [UserRole.ADMIN]: [],
+};
+
+const sanitizeStringList = (values: string[] | undefined) =>
+  values
+    ? Array.from(
+        new Set(
+          values
+            .map((value) => sanitizePlainText(value))
+            .filter(Boolean),
+        ),
+      )
+    : undefined;
+
+const sanitizeRoleSettings = (
+  role: UserRole,
+  roleSettings?: SettingsUpdateInput['roleSettings'],
+): Partial<RoleSettings> | undefined => {
+  if (!roleSettings) {
+    return undefined;
+  }
+
+  const allowedKeys = ROLE_SETTING_KEYS[role];
+  const next: Partial<RoleSettings> = {};
+
+  for (const key of allowedKeys) {
+    const value = roleSettings[key];
+    if (value !== undefined) {
+      (next as Record<string, unknown>)[key] = value;
+    }
+  }
+
+  if (next.preferredSectors) {
+    next.preferredSectors = sanitizeStringList(next.preferredSectors);
+  }
+
+  if (next.preferredRoles) {
+    next.preferredRoles = sanitizeStringList(next.preferredRoles);
+  }
+
+  if (
+    next.minInvestmentSize !== undefined &&
+    next.maxInvestmentSize !== undefined &&
+    next.minInvestmentSize > next.maxInvestmentSize
+  ) {
+    throw new ApiError(400, 'VALIDATION_ERROR', 'Minimum investment size cannot exceed maximum');
+  }
+
+  return Object.keys(next).length > 0 ? next : undefined;
+};
+
+const sanitizeSettingsUpdate = (role: UserRole, payload: unknown): SettingsUpdatePayload => {
+  const parsed = settingsUpdateSchema.parse(payload);
+  const roleSettings = sanitizeRoleSettings(role, parsed.roleSettings);
+
+  return {
+    ...(parsed.displayName !== undefined ? { displayName: sanitizePlainText(parsed.displayName) } : {}),
+    ...(parsed.bio !== undefined ? { bio: parsed.bio ? sanitizePlainText(parsed.bio) : undefined } : {}),
+    ...(parsed.timezone !== undefined ? { timezone: parsed.timezone } : {}),
+    ...(parsed.language !== undefined ? { language: parsed.language } : {}),
+    ...(parsed.notifications !== undefined ? { notifications: parsed.notifications } : {}),
+    ...(parsed.privacy !== undefined ? { privacy: parsed.privacy } : {}),
+    ...(parsed.appearance !== undefined ? { appearance: parsed.appearance } : {}),
+    ...(roleSettings ? { roleSettings } : {}),
+  };
+};
+
+const syncUserSettingsSideEffects = async (
+  userId: string,
+  role: UserRole,
+  roleSettings?: Partial<RoleSettings>,
+) => {
+  if (!roleSettings) {
+    return;
+  }
+
+  const userUpdate: Record<string, unknown> = {};
+
+  if (role === UserRole.STUDENT && roleSettings.jobSeeking !== undefined) {
+    userUpdate.discoverableToRecruiters = roleSettings.jobSeeking;
+  }
+
+  if (
+    (role === UserRole.SCHOOL || role === UserRole.COLLEGE) &&
+    roleSettings.publicProfile !== undefined
+  ) {
+    userUpdate.isProfilePublic = roleSettings.publicProfile;
+  }
+
+  if (Object.keys(userUpdate).length === 0) {
+    return;
+  }
+
+  await User.findByIdAndUpdate(userId, { $set: userUpdate });
+};
 
 /**
  * Flattens nested objects to dot-notation keys for MongoDB $set operations.
  * Only descends one level for known nested keys so that partial updates to
  * e.g. notifications.email don't wipe sibling fields.
  */
-function buildDotNotationUpdate(updates: Partial<IUserSettings>): Record<string, unknown> {
+function buildDotNotationUpdate(updates: SettingsUpdatePayload): Record<string, unknown> {
   const flat: Record<string, unknown> = {};
 
   const nestedKeys: (keyof IUserSettings)[] = ['notifications', 'privacy', 'appearance', 'roleSettings'];
@@ -48,9 +174,16 @@ export async function getSettings(userId: string): Promise<ISettingsDocument> {
 
 export async function updateSettings(
   userId: string,
-  updates: Partial<IUserSettings>,
+  role: UserRole,
+  payload: unknown,
 ): Promise<ISettingsDocument> {
+  const updates = sanitizeSettingsUpdate(role, payload);
+  await syncUserSettingsSideEffects(userId, role, updates.roleSettings);
   const dotUpdate = buildDotNotationUpdate(updates);
+
+  if (Object.keys(dotUpdate).length === 0) {
+    return getSettings(userId);
+  }
 
   const settings = await Settings.findOneAndUpdate(
     { userId },

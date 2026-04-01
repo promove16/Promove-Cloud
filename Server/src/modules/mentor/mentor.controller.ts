@@ -32,18 +32,20 @@ export const listMentorStudentsController = async (req: Request, res: Response) 
 };
 
 export const getMentorStudentProfileController = async (req: Request, res: Response) => {
+  if (!req.user) throw new ApiError(401, 'UNAUTHORIZED', 'Invalid or expired token');
   const studentId = getParam(req.params.id);
   if (!studentId || !isObjectId(studentId)) throw new ApiError(400, 'INVALID_ID', 'Invalid ID format');
-  res.status(200).json(new ApiResponse(await getMentorStudentProfile(studentId)));
+  res.status(200).json(new ApiResponse(await getMentorStudentProfile(req.user._id, studentId)));
 };
 
 export const getMentorWorkspaceController = async (req: Request, res: Response) => {
+  if (!req.user) throw new ApiError(401, 'UNAUTHORIZED', 'Invalid or expired token');
   const studentId = getParam(req.params.id);
   const workspaceId = getParam(req.params.workspaceId);
   if (!studentId || !workspaceId || !isObjectId(studentId) || !isObjectId(workspaceId)) {
     throw new ApiError(400, 'INVALID_ID', 'Invalid ID format');
   }
-  res.status(200).json(new ApiResponse(await getMentorWorkspace(studentId, workspaceId)));
+  res.status(200).json(new ApiResponse(await getMentorWorkspace(req.user._id, studentId, workspaceId)));
 };
 
 export const createMentorSessionController = async (req: Request, res: Response) => {

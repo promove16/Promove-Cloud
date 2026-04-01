@@ -8,6 +8,11 @@ import { ScoreEvent } from '../innovationScore/score.model';
 import { Startup } from '../startup/startup.model';
 import { User } from '../user/user.model';
 import { Event } from '../event/event.model';
+import { InstitutionMentorshipProgram } from '../mentor/mentorshipProgram.model';
+import {
+  createInstitutionMentorshipProgram,
+  listInstitutionMentorshipPrograms,
+} from '../mentor/mentorshipProgram.service';
 import { Workspace } from '../workspace/workspace.model';
 import { ComplianceReport } from '../institution/complianceReport.model';
 import {
@@ -223,20 +228,38 @@ export const getDashboardStats = async (institutionId: string): Promise<SchoolDa
 
   const studentIds = await getStudentIdsForInstitution(institutionId);
 
-  const [totalStudents, totalInnovationActivities, patentsFiled, startupsLaunched, institution] =
+  const [totalStudents, totalInnovationActivities, patentsFiled, startupsLaunched, institution, completedMentoringMinutes] =
     await Promise.all([
       User.countDocuments({ institutionId, role: UserRole.STUDENT, isActive: true }),
       studentIds.length > 0 ? ScoreEvent.countDocuments({ userId: { $in: studentIds } }) : 0,
       studentIds.length > 0 ? Patent.countDocuments({ studentId: { $in: studentIds } }) : 0,
       studentIds.length > 0 ? Startup.countDocuments({ founderIds: { $in: studentIds } }) : 0,
       User.findById(institutionId).select('institutionProfile').lean(),
+      InstitutionMentorshipProgram.aggregate<{ totalMinutes: number }>([
+        {
+          $match: {
+            institutionId: new Types.ObjectId(institutionId),
+            status: 'Assigned',
+            scheduledAt: { $lte: new Date() },
+          },
+        },
+        {
+          $group: {
+            _id: null,
+            totalMinutes: { $sum: '$durationMinutes' },
+          },
+        },
+      ]).then((rows) => rows[0]?.totalMinutes ?? 0),
     ]);
 
   const stats: SchoolDashboardStats = {
     totalStudents,
     totalInnovationActivities,
     patentsFiled,
-    totalMentoringHours: institution?.institutionProfile?.stats.totalMentoringHours ?? 0,
+    totalMentoringHours:
+      Number((completedMentoringMinutes / 60).toFixed(1)) ||
+      institution?.institutionProfile?.stats.totalMentoringHours ||
+      0,
     startupsLaunched,
     industryCollaborations:
       institution?.institutionProfile?.stats.industryCollaborations ??
@@ -493,6 +516,25 @@ export const getSchoolStudentRoster = (
   schoolId: string,
   search?: string,
 ) => listStudentRosterEntries(schoolId, UserRole.SCHOOL, search);
+
+export const createSchoolMentorshipProgramRequest = (
+  schoolId: string,
+  requestedBy: string,
+  payload: {
+    title: string;
+    objective: string;
+    preferredDate: string;
+    durationMinutes: number;
+    expectedParticipants: number;
+    deliveryMode: 'Online' | 'Offline';
+    platform: 'Google Meet' | 'Microsoft Teams' | 'Zoom' | 'Offline';
+    meetingLink?: string;
+    venue?: string;
+  },
+) => createInstitutionMentorshipProgram(schoolId, 'school', requestedBy, payload);
+
+export const getSchoolMentorshipPrograms = (schoolId: string) =>
+  listInstitutionMentorshipPrograms(schoolId, 'school');
 
 export {
   createManagedStudentCredentialsSchema,

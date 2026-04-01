@@ -1,3 +1,41 @@
+export type ProblemViewerStatus =
+  | 'in_progress'
+  | 'review_requested'
+  | 'changes_requested'
+  | 'approved';
+
+export interface ProblemViewerState {
+  workspaceId: string;
+  submissionId?: string;
+  status: ProblemViewerStatus;
+  progressPercent: number;
+  teamSize: number;
+  requestedAt?: string;
+  reviewedAt?: string;
+  pointsAwarded?: number;
+  adminNotes?: string;
+}
+
+export interface ProblemStats {
+  activeTeamsCount: number;
+  approvedTeamsCount: number;
+  topPointsAwarded: number;
+}
+
+export interface ProblemLeaderboardEntry {
+  rank: number;
+  submissionId: string;
+  workspaceId: string;
+  teamName: string;
+  pointsAwarded: number;
+  reviewedAt: string;
+  teamMembers: Array<{
+    _id: string;
+    displayName: string;
+    avatar?: string;
+  }>;
+}
+
 export interface Problem {
   _id: string;
   title: string;
@@ -40,6 +78,8 @@ export interface Problem {
   };
   claimedBy?: string;
   claimedAt?: string;
+  stats: ProblemStats;
+  viewerState: ProblemViewerState | null;
   createdAt: string;
   updatedAt: string;
 }
@@ -47,5 +87,10 @@ export interface Problem {
 export interface ProblemListMeta {
   page: number;
   limit: number;
+  total: number;
+}
+
+export interface ProblemLeaderboardResponse {
+  items: ProblemLeaderboardEntry[];
   total: number;
 }

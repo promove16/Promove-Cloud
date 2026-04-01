@@ -28,6 +28,7 @@ router.use(authenticate_1.authenticate, (0, authorize_1.authorize)(roles_types_1
 router.post('/', (0, asyncHandler_1.asyncHandler)(startup_controller_1.createStartup));
 router.get('/mine', (0, asyncHandler_1.asyncHandler)(startup_controller_1.getMyStartupController));
 router.patch('/:id', (0, asyncHandler_1.asyncHandler)(startup_controller_1.patchStartup));
+router.post('/:id/request-review', (0, asyncHandler_1.asyncHandler)(startup_controller_1.requestStartupReviewController));
 router.post('/:id/launch', (0, asyncHandler_1.asyncHandler)(startup_controller_1.launchStartupController));
 router.post('/:id/upload-pitch', upload.single('file'), (0, asyncHandler_1.asyncHandler)(startup_controller_1.uploadPitchController));
 exports.default = router;

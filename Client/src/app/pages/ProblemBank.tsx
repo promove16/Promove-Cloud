@@ -1,22 +1,27 @@
-import { useEffect, useMemo, useState } from "react";
-import { useInfiniteQuery, useMutation } from "@tanstack/react-query";
+import { useDeferredValue, useEffect, useMemo, useState } from "react";
+import {
+  useInfiniteQuery,
+  useMutation,
+  useQuery,
+  useQueryClient,
+} from "@tanstack/react-query";
 import { useNavigate } from "react-router-dom";
 import {
-  Search,
-  Filter,
-  TrendingUp,
-  Clock,
-  Tag,
-  Plus,
-  CheckCircle,
-  Loader2,
   ArrowLeft,
+  CheckCircle,
+  Clock,
+  Filter,
+  Loader2,
+  Search,
+  Tag,
+  Target,
+  Trophy,
+  Users,
   X,
 } from "lucide-react";
 import { DashboardLayout } from "../components/DashboardLayout";
 import { problemBankApi } from "../../api/problemBank.api";
-import { useAuthStore } from "../../store/authStore";
-import { Problem } from "../../types/problem.types";
+import { Problem, ProblemLeaderboardEntry } from "../../types/problem.types";
 
 const categoryOptions = [
   "All Problems",
@@ -35,27 +40,77 @@ const timeAgo = (value: string) => {
   return days === 1 ? "1 day ago" : `${days} days ago`;
 };
 
+const getViewerStatusStyles = (status?: Problem["viewerState"] | null) => {
+  switch (status?.status) {
+    case "approved":
+      return {
+        label: "Approved",
+        className: "bg-emerald-500/10 text-emerald-300",
+      };
+    case "review_requested":
+      return {
+        label: "Review Pending",
+        className: "bg-amber-500/10 text-amber-300",
+      };
+    case "changes_requested":
+      return {
+        label: "Changes Requested",
+        className: "bg-rose-500/10 text-rose-300",
+      };
+    case "in_progress":
+      return {
+        label: "In Progress",
+        className: "bg-cyan-500/10 text-cyan-300",
+      };
+    default:
+      return null;
+  }
+};
+
+const leaderboardRow = (entry: ProblemLeaderboardEntry) => (
+  <div
+    key={entry.submissionId}
+    className="flex items-center justify-between gap-4 rounded-xl border border-slate-800 bg-slate-950 px-4 py-3"
+  >
+    <div className="min-w-0">
+      <div className="flex items-center gap-3">
+        <div className="flex h-8 w-8 items-center justify-center rounded-full bg-slate-800 text-sm font-bold text-white">
+          {entry.rank}
+        </div>
+        <div className="min-w-0">
+          <div className="truncate font-semibold text-white">{entry.teamName}</div>
+          <div className="truncate text-xs text-slate-400">
+            {entry.teamMembers.map((member) => member.displayName).join(", ")}
+          </div>
+        </div>
+      </div>
+    </div>
+    <div className="text-right">
+      <div className="font-semibold text-cyan-300">{entry.pointsAwarded} pts</div>
+      <div className="text-xs text-slate-500">
+        {new Date(entry.reviewedAt).toLocaleDateString("en-IN")}
+      </div>
+    </div>
+  </div>
+);
+
 export function ProblemBank() {
   const navigate = useNavigate();
-  const currentUser = useAuthStore((state) => state.user);
+  const queryClient = useQueryClient();
   const [selectedCategory, setSelectedCategory] = useState("All Problems");
   const [searchValue, setSearchValue] = useState("");
-  const [searchQuery, setSearchQuery] = useState("");
-  const [selectedProblem, setSelectedProblem] = useState<Problem | null>(null);
+  const [selectedProblemId, setSelectedProblemId] = useState<string | null>(null);
   const [feedback, setFeedback] = useState("");
-
-  useEffect(() => {
-    const timeout = window.setTimeout(() => setSearchQuery(searchValue), 300);
-    return () => window.clearTimeout(timeout);
-  }, [searchValue]);
+  const [reviewNote, setReviewNote] = useState("");
+  const deferredSearchQuery = useDeferredValue(searchValue.trim());
 
   const problemsQuery = useInfiniteQuery({
-    queryKey: ["problems", selectedCategory, searchQuery],
+    queryKey: ["problems", selectedCategory, deferredSearchQuery],
     queryFn: ({ pageParam = 1 }) =>
       problemBankApi.list({
         page: pageParam,
         limit: 6,
-        search: searchQuery || undefined,
+        search: deferredSearchQuery || undefined,
         category:
           selectedCategory === "All Problems" ? undefined : selectedCategory,
       }),
@@ -66,65 +121,129 @@ export function ProblemBank() {
     initialPageParam: 1,
   });
 
+  const problems = useMemo(
+    () => problemsQuery.data?.pages.flatMap((page) => page.items) ?? [],
+    [problemsQuery.data],
+  );
+
+  const selectedProblem =
+    problems.find((problem) => problem._id === selectedProblemId) ?? null;
+
+  useEffect(() => {
+    setReviewNote("");
+  }, [selectedProblemId]);
+
+  const leaderboardQuery = useQuery({
+    queryKey: ["problem-leaderboard", selectedProblemId],
+    queryFn: () => problemBankApi.getLeaderboard(selectedProblemId!),
+    enabled: Boolean(selectedProblemId),
+  });
+
   const claimMutation = useMutation({
     mutationFn: (problemId: string) => problemBankApi.claim(problemId),
     onSuccess: (workspace) => {
-      setFeedback("Problem claimed successfully. Your workspace is ready.");
+      void queryClient.invalidateQueries({ queryKey: ["problems"] });
+      setFeedback("Problem started. Your team workspace is ready.");
       navigate(`/product-workspace/${workspace._id}`);
     },
     onError: (error) => {
       const message =
         (error as { response?: { data?: { error?: { message?: string } } } })
           ?.response?.data?.error?.message ??
-        "Unable to claim this problem right now.";
+        "Unable to start this problem right now.";
       setFeedback(message);
     },
   });
 
-  const problems = useMemo(
-    () => problemsQuery.data?.pages.flatMap((page) => page.items) ?? [],
-    [problemsQuery.data],
+  const reviewMutation = useMutation({
+    mutationFn: (payload: { problemId: string; workspaceId: string; requestNote: string }) =>
+      problemBankApi.requestReview(payload.problemId, {
+        workspaceId: payload.workspaceId,
+        requestNote: payload.requestNote,
+      }),
+    onSuccess: () => {
+      setFeedback("Review request sent to admin.");
+      setReviewNote("");
+      void queryClient.invalidateQueries({ queryKey: ["problems"] });
+      if (selectedProblemId) {
+        void queryClient.invalidateQueries({
+          queryKey: ["problem-leaderboard", selectedProblemId],
+        });
+      }
+    },
+    onError: (error) => {
+      const message =
+        (error as { response?: { data?: { error?: { message?: string } } } })
+          ?.response?.data?.error?.message ??
+        "Unable to send the review request right now.";
+      setFeedback(message);
+    },
+  });
+
+  const approvedTeams = useMemo(
+    () =>
+      problems.reduce(
+        (sum, problem) => sum + (problem.stats?.approvedTeamsCount ?? 0),
+        0,
+      ),
+    [problems],
   );
 
-  const handleCloseProblemDetails = () => {
-    setSelectedProblem(null);
+  const activeTeams = useMemo(
+    () =>
+      problems.reduce(
+        (sum, problem) => sum + (problem.stats?.activeTeamsCount ?? 0),
+        0,
+      ),
+    [problems],
+  );
+
+  const requestReview = () => {
+    if (!selectedProblem?.viewerState?.workspaceId) {
+      return;
+    }
+
+    reviewMutation.mutate({
+      problemId: selectedProblem._id,
+      workspaceId: selectedProblem.viewerState.workspaceId,
+      requestNote: reviewNote.trim(),
+    });
+  };
+
+  const closeDetails = () => {
+    setSelectedProblemId(null);
   };
 
   return (
     <DashboardLayout role="student">
       <div className="space-y-6">
-        <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-4">
+        <div className="flex flex-col gap-4 md:flex-row md:items-center md:justify-between">
           <div>
-            <h1 className="text-3xl font-bold text-white mb-2">Problem Bank</h1>
+            <h1 className="mb-2 text-3xl font-bold text-white">Problem Bank</h1>
             <p className="text-slate-400">
-              Global repository of real-world problems waiting to be solved
+              Admin-curated assignments with team review and per-problem ranking.
             </p>
           </div>
-          <button
-            type="button"
-            disabled
-            className="px-6 py-3 bg-slate-800 text-slate-400 rounded-xl font-semibold transition-all flex items-center gap-2 cursor-not-allowed border border-slate-700"
-          >
-            <Plus className="w-5 h-5" />
-            Admin-curated only
-          </button>
+          <div className="rounded-xl border border-slate-800 bg-slate-900 px-5 py-3 text-sm text-slate-300">
+            Complete the problem, request admin review, and earn leaderboard points.
+          </div>
         </div>
 
-        <div className="bg-slate-900 border border-slate-800 rounded-xl p-6">
-          <div className="flex flex-col md:flex-row gap-4">
-            <div className="flex-1 relative">
-              <Search className="absolute left-4 top-1/2 -translate-y-1/2 w-5 h-5 text-slate-400" />
+        <div className="rounded-xl border border-slate-800 bg-slate-900 p-6">
+          <div className="flex flex-col gap-4 md:flex-row">
+            <div className="relative flex-1">
+              <Search className="absolute left-4 top-1/2 h-5 w-5 -translate-y-1/2 text-slate-400" />
               <input
                 type="text"
                 placeholder="Search problems..."
                 value={searchValue}
                 onChange={(event) => setSearchValue(event.target.value)}
-                className="w-full pl-12 pr-4 py-3 bg-slate-950 border border-slate-800 rounded-lg text-white placeholder-slate-500 focus:outline-none focus:border-blue-500"
+                className="w-full rounded-lg border border-slate-800 bg-slate-950 py-3 pl-12 pr-4 text-white placeholder-slate-500 focus:border-blue-500 focus:outline-none"
               />
             </div>
-            <button className="px-6 py-3 bg-slate-800 hover:bg-slate-700 text-white rounded-lg font-semibold transition-colors flex items-center gap-2">
-              <Filter className="w-5 h-5" />
-              Student Search
+            <button className="flex items-center gap-2 rounded-lg bg-slate-800 px-6 py-3 font-semibold text-white transition-colors hover:bg-slate-700">
+              <Filter className="h-5 w-5" />
+              Filter
             </button>
           </div>
         </div>
@@ -134,10 +253,10 @@ export function ProblemBank() {
             <button
               key={category}
               onClick={() => setSelectedCategory(category)}
-              className={`px-4 py-2 rounded-lg font-medium transition-all ${
+              className={`rounded-lg px-4 py-2 font-medium transition-all ${
                 selectedCategory === category
                   ? "bg-blue-600 text-white"
-                  : "bg-slate-900 text-slate-400 hover:bg-slate-800 border border-slate-800"
+                  : "border border-slate-800 bg-slate-900 text-slate-400 hover:bg-slate-800"
               }`}
             >
               {category}
@@ -146,182 +265,188 @@ export function ProblemBank() {
         </div>
 
         {feedback ? (
-          <div className="p-4 bg-blue-500/10 border border-blue-500/20 rounded-lg text-blue-300 text-sm">
+          <div className="rounded-lg border border-blue-500/20 bg-blue-500/10 p-4 text-sm text-blue-300">
             {feedback}
           </div>
         ) : null}
 
-        <div className="space-y-4">
-          {problems.map((problem) => {
-            const isClaimedByMe = Boolean(
-              problem.claimedBy && problem.claimedBy === currentUser?._id,
-            );
-            const isClaimedByOther = Boolean(
-              problem.claimedBy && problem.claimedBy !== currentUser?._id,
-            );
+        {problemsQuery.isLoading ? (
+          <div className="flex items-center justify-center py-16">
+            <Loader2 className="h-6 w-6 animate-spin text-cyan-300" />
+          </div>
+        ) : (
+          <div className="space-y-4">
+            {problems.map((problem) => {
+              const viewerStatus = getViewerStatusStyles(problem.viewerState);
+              const isStarted = Boolean(problem.viewerState?.workspaceId);
 
-            return (
-              <div
-                key={problem._id}
-                className="bg-slate-900 border border-slate-800 rounded-xl p-6 hover:border-slate-700 transition-all"
-              >
-                <div className="flex items-start justify-between gap-4 mb-4">
-                  <div className="flex-1">
-                    <div className="flex items-center gap-3 mb-2 flex-wrap">
-                      <h3 className="text-xl font-bold text-white">
-                        {problem.title}
-                      </h3>
-                      {problem.isVerified ? (
-                        <div className="px-2 py-1 bg-green-500/10 rounded text-xs text-green-400 flex items-center gap-1">
-                          <CheckCircle className="w-3 h-3" />
-                          Verified
-                        </div>
-                      ) : null}
-                      {isClaimedByMe ? (
-                        <div className="px-2 py-1 bg-blue-500/10 rounded text-xs text-blue-400">
-                          Already Claimed
-                        </div>
-                      ) : null}
-                      {isClaimedByOther ? (
-                        <div className="px-2 py-1 bg-slate-800 rounded text-xs text-slate-300">
-                          Claimed
-                        </div>
-                      ) : null}
-                      {problem.sponsorName ? (
-                        <div className="px-2 py-1 bg-cyan-500/10 rounded text-xs text-cyan-300">
-                          {problem.sponsorName}
-                        </div>
-                      ) : null}
-                    </div>
-                    <p className="text-slate-400 mb-4">
-                      {problem.description.length > 180
-                        ? `${problem.description.slice(0, 180)}...`
-                        : problem.description}
-                    </p>
-                    <div className="flex flex-wrap gap-2 mb-4">
-                      {problem.tags.map((tag) => (
-                        <span
-                          key={tag}
-                          className="px-3 py-1 bg-slate-800 rounded-full text-xs text-slate-300 flex items-center gap-1"
-                        >
-                          <Tag className="w-3 h-3" />
-                          {tag}
+              return (
+                <div
+                  key={problem._id}
+                  className="rounded-xl border border-slate-800 bg-slate-900 p-6 transition-all hover:border-slate-700"
+                >
+                  <div className="mb-4 flex items-start justify-between gap-4">
+                    <div className="flex-1">
+                      <div className="mb-2 flex flex-wrap items-center gap-3">
+                        <h3 className="text-xl font-bold text-white">
+                          {problem.title}
+                        </h3>
+                        {problem.isVerified ? (
+                          <div className="flex items-center gap-1 rounded px-2 py-1 text-xs text-green-400">
+                            <CheckCircle className="h-3 w-3" />
+                            Verified
+                          </div>
+                        ) : null}
+                        {viewerStatus ? (
+                          <div
+                            className={`rounded px-2 py-1 text-xs ${viewerStatus.className}`}
+                          >
+                            {viewerStatus.label}
+                          </div>
+                        ) : null}
+                        {problem.sponsorName ? (
+                          <div className="rounded bg-cyan-500/10 px-2 py-1 text-xs text-cyan-300">
+                            {problem.sponsorName}
+                          </div>
+                        ) : null}
+                      </div>
+
+                      <p className="mb-4 text-slate-400">
+                        {problem.description.length > 180
+                          ? `${problem.description.slice(0, 180)}...`
+                          : problem.description}
+                      </p>
+
+                      <div className="mb-4 flex flex-wrap gap-2">
+                        {problem.tags.map((tag) => (
+                          <span
+                            key={tag}
+                            className="flex items-center gap-1 rounded-full bg-slate-800 px-3 py-1 text-xs text-slate-300"
+                          >
+                            <Tag className="h-3 w-3" />
+                            {tag}
+                          </span>
+                        ))}
+                      </div>
+
+                      <div className="flex flex-wrap items-center gap-6 text-sm text-slate-400">
+                        <span className="rounded bg-slate-800 px-2 py-1 text-xs font-semibold">
+                          {problem.category}
                         </span>
-                      ))}
-                    </div>
-                    <div className="flex items-center gap-6 text-sm text-slate-400 flex-wrap">
-                      <span className="px-2 py-1 bg-slate-800 rounded text-xs font-semibold">
-                        {problem.category}
-                      </span>
-                      <span
-                        className={`px-2 py-1 rounded text-xs font-semibold ${
-                          problem.difficulty === "Easy"
-                            ? "bg-green-500/10 text-green-400"
-                            : problem.difficulty === "Medium"
-                              ? "bg-yellow-500/10 text-yellow-400"
-                              : "bg-red-500/10 text-red-400"
-                        }`}
-                      >
-                        {problem.difficulty}
-                      </span>
-                      <div className="flex items-center gap-1">
-                        <Clock className="w-4 h-4" />
-                        {timeAgo(problem.createdAt)}
+                        <span
+                          className={`rounded px-2 py-1 text-xs font-semibold ${
+                            problem.difficulty === "Easy"
+                              ? "bg-green-500/10 text-green-400"
+                              : problem.difficulty === "Medium"
+                                ? "bg-yellow-500/10 text-yellow-400"
+                                : "bg-red-500/10 text-red-400"
+                          }`}
+                        >
+                          {problem.difficulty}
+                        </span>
+                        <div className="flex items-center gap-1">
+                          <Clock className="h-4 w-4" />
+                          {timeAgo(problem.createdAt)}
+                        </div>
+                        <div>{problem.domain}</div>
+                        <div className="flex items-center gap-1">
+                          <Users className="h-4 w-4" />
+                          {problem.stats.activeTeamsCount} teams
+                        </div>
+                        <div className="flex items-center gap-1">
+                          <Trophy className="h-4 w-4" />
+                          {problem.stats.approvedTeamsCount} approved
+                        </div>
+                        {problem.stats.topPointsAwarded > 0 ? (
+                          <div className="text-cyan-300">
+                            Top score: {problem.stats.topPointsAwarded} pts
+                          </div>
+                        ) : null}
                       </div>
-                      <div className="flex items-center gap-1">
-                        <span className="text-slate-500">by</span>{" "}
-                        {problem.postedBy}
-                      </div>
-                      <div>{problem.domain}</div>
-                      {problem.geography ? (
-                        <div>{problem.geography}</div>
-                      ) : null}
                     </div>
                   </div>
-                </div>
-                <div className="flex gap-3 pt-4 border-t border-slate-800">
-                  <button
-                    onClick={() => setSelectedProblem(problem)}
-                    className="flex-1 px-6 py-3 bg-slate-800 hover:bg-slate-700 text-white rounded-lg font-semibold transition-colors"
-                  >
-                    View Details
-                  </button>
-                  {!problem.claimedBy ? (
+
+                  <div className="flex gap-3 border-t border-slate-800 pt-4">
                     <button
-                      onClick={() => claimMutation.mutate(problem._id)}
-                      disabled={claimMutation.isPending}
-                      className="flex-1 px-6 py-3 bg-gradient-to-r from-blue-600 to-purple-600 hover:from-blue-700 hover:to-purple-700 text-white rounded-lg font-semibold transition-all disabled:opacity-60"
+                      onClick={() => setSelectedProblemId(problem._id)}
+                      className="flex-1 rounded-lg bg-slate-800 px-6 py-3 font-semibold text-white transition-colors hover:bg-slate-700"
                     >
-                      {claimMutation.isPending
-                        ? "Claiming..."
-                        : "Claim & Start Solving"}
+                      View Details
                     </button>
-                  ) : (
-                    <button className="flex-1 px-6 py-3 bg-slate-800 text-slate-500 rounded-lg font-semibold cursor-not-allowed">
-                      {isClaimedByMe ? "Already Claimed" : "Claimed"}
-                    </button>
-                  )}
+
+                    {isStarted ? (
+                      <button
+                        onClick={() =>
+                          navigate(
+                            `/product-workspace/${problem.viewerState?.workspaceId}`,
+                          )
+                        }
+                        className="flex-1 rounded-lg bg-gradient-to-r from-cyan-600 to-blue-600 px-6 py-3 font-semibold text-white"
+                      >
+                        Open Workspace
+                      </button>
+                    ) : (
+                      <button
+                        onClick={() => claimMutation.mutate(problem._id)}
+                        disabled={claimMutation.isPending}
+                        className="flex-1 rounded-lg bg-gradient-to-r from-blue-600 to-purple-600 px-6 py-3 font-semibold text-white transition-all disabled:opacity-60"
+                      >
+                        {claimMutation.isPending ? "Starting..." : "Start Problem"}
+                      </button>
+                    )}
+                  </div>
                 </div>
-              </div>
-            );
-          })}
-        </div>
+              );
+            })}
+          </div>
+        )}
 
         {problemsQuery.hasNextPage ? (
           <div className="flex justify-center">
             <button
               onClick={() => problemsQuery.fetchNextPage()}
               disabled={problemsQuery.isFetchingNextPage}
-              className="px-6 py-3 bg-slate-800 hover:bg-slate-700 text-white rounded-lg font-semibold transition-colors disabled:opacity-60 flex items-center gap-2"
+              className="flex items-center gap-2 rounded-lg bg-slate-800 px-6 py-3 font-semibold text-white transition-colors hover:bg-slate-700 disabled:opacity-60"
             >
               {problemsQuery.isFetchingNextPage ? (
-                <Loader2 className="w-4 h-4 animate-spin" />
+                <Loader2 className="h-4 w-4 animate-spin" />
               ) : null}
               Load More Problems
             </button>
           </div>
         ) : null}
 
-        <div className="bg-gradient-to-r from-blue-900/20 to-purple-900/20 border border-blue-800/30 rounded-xl p-6">
-          <div className="grid md:grid-cols-3 gap-6 text-center">
-            <div>
-              <TrendingUp className="w-8 h-8 text-blue-500 mx-auto mb-2" />
-              <div className="text-2xl font-bold text-white mb-1">
-                {problemsQuery.data?.pages[0]?.meta.total ?? 0}
-              </div>
-              <div className="text-sm text-slate-400">Active Problems</div>
+        <div className="grid gap-4 md:grid-cols-3">
+          <div className="rounded-xl border border-slate-800 bg-slate-900 p-6 text-center">
+            <div className="text-2xl font-bold text-white">
+              {problemsQuery.data?.pages[0]?.meta.total ?? 0}
             </div>
-            <div>
-              <CheckCircle className="w-8 h-8 text-green-500 mx-auto mb-2" />
-              <div className="text-2xl font-bold text-white mb-1">
-                {problems.filter((item) => item.isVerified).length}
-              </div>
-              <div className="text-sm text-slate-400">Verified Challenges</div>
-            </div>
-            <div>
-              <Tag className="w-8 h-8 text-purple-500 mx-auto mb-2" />
-              <div className="text-2xl font-bold text-white mb-1">
-                {new Set(problems.map((item) => item.domain)).size}
-              </div>
-              <div className="text-sm text-slate-400">Domains</div>
-            </div>
+            <div className="mt-2 text-sm text-slate-400">Published Problems</div>
+          </div>
+          <div className="rounded-xl border border-slate-800 bg-slate-900 p-6 text-center">
+            <div className="text-2xl font-bold text-white">{activeTeams}</div>
+            <div className="mt-2 text-sm text-slate-400">Active Team Attempts</div>
+          </div>
+          <div className="rounded-xl border border-slate-800 bg-slate-900 p-6 text-center">
+            <div className="text-2xl font-bold text-white">{approvedTeams}</div>
+            <div className="mt-2 text-sm text-slate-400">Approved Team Solutions</div>
           </div>
         </div>
 
         {selectedProblem ? (
           <div
             className="fixed inset-0 z-50 overflow-y-auto bg-slate-950/80 p-4 backdrop-blur-sm sm:p-6"
-            onClick={handleCloseProblemDetails}
+            onClick={closeDetails}
           >
             <div
-              className="mx-auto flex max-h-[calc(100vh-2rem)] w-full max-w-3xl flex-col overflow-hidden rounded-2xl border border-slate-800 bg-slate-900 shadow-2xl sm:max-h-[calc(100vh-3rem)]"
+              className="mx-auto flex max-h-[calc(100vh-2rem)] w-full max-w-4xl flex-col overflow-hidden rounded-2xl border border-slate-800 bg-slate-900 shadow-2xl sm:max-h-[calc(100vh-3rem)]"
               onClick={(event) => event.stopPropagation()}
             >
               <div className="flex items-start justify-between gap-4 border-b border-slate-800 px-5 py-4 sm:px-8">
                 <div className="min-w-0">
                   <button
                     type="button"
-                    onClick={handleCloseProblemDetails}
+                    onClick={closeDetails}
                     className="mb-3 inline-flex items-center gap-2 text-sm font-medium text-slate-400 transition hover:text-white"
                   >
                     <ArrowLeft className="h-4 w-4" />
@@ -331,57 +456,152 @@ export function ProblemBank() {
                     {selectedProblem.title}
                   </h2>
                   <p className="mt-2 text-slate-400">
-                    {selectedProblem.domain} • {selectedProblem.category}
+                    {selectedProblem.domain} / {selectedProblem.category}
                   </p>
                 </div>
                 <button
                   type="button"
-                  onClick={handleCloseProblemDetails}
+                  onClick={closeDetails}
                   className="rounded-lg p-2 text-slate-400 transition hover:bg-slate-800 hover:text-white"
                   aria-label="Close problem details"
                 >
                   <X className="h-5 w-5" />
                 </button>
               </div>
+
               <div className="min-h-0 flex-1 overflow-y-auto px-5 py-5 sm:px-8 sm:py-6">
-                <p className="text-slate-300 leading-7 mb-6">
+                <p className="mb-6 leading-7 text-slate-300">
                   {selectedProblem.description}
                 </p>
-                <div className="grid gap-4 md:grid-cols-2 mb-6">
-                  {selectedProblem.expectedOutcome ? (
-                    <div className="rounded-xl border border-slate-800 bg-slate-950 p-4">
-                      <div className="text-xs uppercase tracking-[0.25em] text-slate-500 mb-2">
-                        Expected Outcome
-                      </div>
-                      <div className="text-sm text-slate-300">
-                        {selectedProblem.expectedOutcome}
-                      </div>
-                    </div>
-                  ) : null}
-                  {selectedProblem.impactGoal ? (
-                    <div className="rounded-xl border border-slate-800 bg-slate-950 p-4">
-                      <div className="text-xs uppercase tracking-[0.25em] text-slate-500 mb-2">
-                        Impact Goal
-                      </div>
-                      <div className="text-sm text-slate-300">
-                        {selectedProblem.impactGoal}
-                      </div>
-                    </div>
-                  ) : null}
-                </div>
-                <div className="flex flex-wrap gap-2 mb-6">
-                  {selectedProblem.tags.map((tag) => (
-                    <span
-                      key={tag}
-                      className="px-3 py-1 bg-slate-800 rounded-full text-xs text-slate-300"
-                    >
-                      {tag}
-                    </span>
-                  ))}
-                </div>
-                <div className="grid gap-4 md:grid-cols-2 mb-6">
+
+                <div className="mb-6 grid gap-4 md:grid-cols-3">
                   <div className="rounded-xl border border-slate-800 bg-slate-950 p-4">
-                    <div className="text-xs uppercase tracking-[0.25em] text-slate-500 mb-3">
+                    <div className="mb-2 text-xs uppercase tracking-[0.25em] text-slate-500">
+                      Teams Attempting
+                    </div>
+                    <div className="text-2xl font-bold text-white">
+                      {selectedProblem.stats.activeTeamsCount}
+                    </div>
+                  </div>
+                  <div className="rounded-xl border border-slate-800 bg-slate-950 p-4">
+                    <div className="mb-2 text-xs uppercase tracking-[0.25em] text-slate-500">
+                      Approved Teams
+                    </div>
+                    <div className="text-2xl font-bold text-white">
+                      {selectedProblem.stats.approvedTeamsCount}
+                    </div>
+                  </div>
+                  <div className="rounded-xl border border-slate-800 bg-slate-950 p-4">
+                    <div className="mb-2 text-xs uppercase tracking-[0.25em] text-slate-500">
+                      Best Score
+                    </div>
+                    <div className="text-2xl font-bold text-cyan-300">
+                      {selectedProblem.stats.topPointsAwarded} pts
+                    </div>
+                  </div>
+                </div>
+
+                {selectedProblem.viewerState ? (
+                  <div className="mb-6 rounded-xl border border-cyan-500/20 bg-cyan-500/5 p-4">
+                    <div className="mb-3 flex items-center justify-between gap-4">
+                      <div>
+                        <div className="text-xs uppercase tracking-[0.25em] text-cyan-300">
+                          Your Team
+                        </div>
+                        <div className="mt-2 text-lg font-semibold text-white">
+                          Workspace linked to this problem
+                        </div>
+                      </div>
+                      <button
+                        type="button"
+                        onClick={() =>
+                          navigate(
+                            `/product-workspace/${selectedProblem.viewerState?.workspaceId}`,
+                          )
+                        }
+                        className="rounded-lg bg-slate-800 px-4 py-2 text-sm font-semibold text-white"
+                      >
+                        Open Workspace
+                      </button>
+                    </div>
+
+                    <div className="grid gap-3 text-sm text-slate-300 md:grid-cols-3">
+                      <div>
+                        <span className="text-slate-500">Status:</span>{" "}
+                        {getViewerStatusStyles(selectedProblem.viewerState)?.label}
+                      </div>
+                      <div>
+                        <span className="text-slate-500">Progress:</span>{" "}
+                        {selectedProblem.viewerState.progressPercent}%
+                      </div>
+                      <div>
+                        <span className="text-slate-500">Team size:</span>{" "}
+                        {selectedProblem.viewerState.teamSize}
+                      </div>
+                    </div>
+
+                    {selectedProblem.viewerState.reviewedAt ? (
+                      <div className="mt-3 text-sm text-slate-400">
+                        Reviewed on{" "}
+                        {new Date(
+                          selectedProblem.viewerState.reviewedAt,
+                        ).toLocaleDateString("en-IN")}
+                      </div>
+                    ) : null}
+
+                    {selectedProblem.viewerState.adminNotes ? (
+                      <div className="mt-4 rounded-lg border border-slate-800 bg-slate-950 p-3 text-sm text-slate-300">
+                        <div className="mb-1 text-xs uppercase tracking-[0.2em] text-slate-500">
+                          Admin Notes
+                        </div>
+                        {selectedProblem.viewerState.adminNotes}
+                      </div>
+                    ) : null}
+
+                    {selectedProblem.viewerState.status === "approved" ? (
+                      <div className="mt-4 rounded-lg border border-emerald-500/20 bg-emerald-500/10 p-3 text-sm text-emerald-200">
+                        Approved. Your team earned{" "}
+                        {selectedProblem.viewerState.pointsAwarded ?? 0} leaderboard
+                        points for this problem.
+                      </div>
+                    ) : selectedProblem.viewerState.status === "review_requested" ? (
+                      <div className="mt-4 rounded-lg border border-amber-500/20 bg-amber-500/10 p-3 text-sm text-amber-200">
+                        Review request sent. The admin team will verify your
+                        completion and award points.
+                      </div>
+                    ) : (
+                      <div className="mt-4 space-y-3">
+                        <div className="text-sm text-slate-400">
+                          {selectedProblem.viewerState.status === "changes_requested"
+                            ? "Update the workspace evidence if needed, then request another review."
+                            : "When your team is done, send a review request to the admin team."}
+                        </div>
+                        <textarea
+                          value={reviewNote}
+                          onChange={(event) => setReviewNote(event.target.value)}
+                          placeholder="Summarize what your team completed, what evidence is available in the workspace, and what the admin should review."
+                          className="min-h-[120px] w-full rounded-xl border border-slate-800 bg-slate-950 px-4 py-3 text-sm text-white placeholder-slate-500 focus:border-cyan-500 focus:outline-none"
+                        />
+                        <button
+                          type="button"
+                          onClick={requestReview}
+                          disabled={
+                            reviewMutation.isPending || reviewNote.trim().length < 20
+                          }
+                          className="rounded-lg bg-gradient-to-r from-cyan-600 to-blue-600 px-5 py-3 font-semibold text-white disabled:opacity-60"
+                        >
+                          {reviewMutation.isPending
+                            ? "Sending Review..."
+                            : "Send Review Request"}
+                        </button>
+                      </div>
+                    )}
+                  </div>
+                ) : null}
+
+                <div className="mb-6 grid gap-4 md:grid-cols-2">
+                  <div className="rounded-xl border border-slate-800 bg-slate-950 p-4">
+                    <div className="mb-3 text-xs uppercase tracking-[0.25em] text-slate-500">
                       Problem Details
                     </div>
                     <div className="space-y-2 text-sm text-slate-300">
@@ -411,8 +631,9 @@ export function ProblemBank() {
                       ) : null}
                     </div>
                   </div>
+
                   <div className="rounded-xl border border-slate-800 bg-slate-950 p-4">
-                    <div className="text-xs uppercase tracking-[0.25em] text-slate-500 mb-3">
+                    <div className="mb-3 text-xs uppercase tracking-[0.25em] text-slate-500">
                       Submission Policy
                     </div>
                     <div className="space-y-2 text-sm text-slate-300">
@@ -447,27 +668,11 @@ export function ProblemBank() {
                     </div>
                   </div>
                 </div>
-                {selectedProblem.targetBeneficiaries.length > 0 ? (
-                  <div className="mb-6 rounded-xl border border-slate-800 bg-slate-950 p-4">
-                    <div className="text-xs uppercase tracking-[0.25em] text-slate-500 mb-3">
-                      Target Beneficiaries
-                    </div>
-                    <div className="flex flex-wrap gap-2">
-                      {selectedProblem.targetBeneficiaries.map((item) => (
-                        <span
-                          key={item}
-                          className="px-3 py-1 rounded-full bg-slate-800 text-xs text-slate-300"
-                        >
-                          {item}
-                        </span>
-                      ))}
-                    </div>
-                  </div>
-                ) : null}
+
                 {selectedProblem.deliverables.length > 0 ? (
                   <div className="mb-6 rounded-xl border border-slate-800 bg-slate-950 p-4">
-                    <div className="text-xs uppercase tracking-[0.25em] text-slate-500 mb-3">
-                      Expected Deliverables
+                    <div className="mb-3 text-xs uppercase tracking-[0.25em] text-slate-500">
+                      Deliverables
                     </div>
                     <ul className="space-y-2 text-sm text-slate-300">
                       {selectedProblem.deliverables.map((item) => (
@@ -476,9 +681,10 @@ export function ProblemBank() {
                     </ul>
                   </div>
                 ) : null}
+
                 {selectedProblem.acceptanceCriteria.length > 0 ? (
                   <div className="mb-6 rounded-xl border border-slate-800 bg-slate-950 p-4">
-                    <div className="text-xs uppercase tracking-[0.25em] text-slate-500 mb-3">
+                    <div className="mb-3 text-xs uppercase tracking-[0.25em] text-slate-500">
                       Acceptance Criteria
                     </div>
                     <ul className="space-y-2 text-sm text-slate-300">
@@ -488,8 +694,33 @@ export function ProblemBank() {
                     </ul>
                   </div>
                 ) : null}
-                <div className="mb-6 rounded-xl border border-amber-500/20 bg-amber-500/5 p-4">
-                  <div className="text-xs uppercase tracking-[0.25em] text-amber-300 mb-2">
+
+                <div className="mb-6 rounded-xl border border-slate-800 bg-slate-950 p-4">
+                  <div className="mb-3 flex items-center gap-2 text-xs uppercase tracking-[0.25em] text-slate-500">
+                    <Target className="h-4 w-4" />
+                    Problem Leaderboard
+                  </div>
+                  {leaderboardQuery.isLoading ? (
+                    <div className="flex items-center gap-2 text-sm text-slate-400">
+                      <Loader2 className="h-4 w-4 animate-spin" />
+                      Loading leaderboard...
+                    </div>
+                  ) : leaderboardQuery.data?.items.length ? (
+                    <div className="space-y-3">
+                      {leaderboardQuery.data.items
+                        .slice(0, 5)
+                        .map((entry) => leaderboardRow(entry))}
+                    </div>
+                  ) : (
+                    <div className="text-sm text-slate-400">
+                      No approved team submissions yet. Be the first team on this
+                      leaderboard.
+                    </div>
+                  )}
+                </div>
+
+                <div className="rounded-xl border border-amber-500/20 bg-amber-500/5 p-4">
+                  <div className="mb-2 text-xs uppercase tracking-[0.25em] text-amber-300">
                     Security Notice
                   </div>
                   <div className="text-sm text-slate-300">
@@ -497,23 +728,37 @@ export function ProblemBank() {
                   </div>
                 </div>
               </div>
+
               <div className="flex flex-col-reverse gap-3 border-t border-slate-800 px-5 py-4 sm:flex-row sm:justify-end sm:px-8">
                 <button
                   type="button"
-                  onClick={handleCloseProblemDetails}
+                  onClick={closeDetails}
                   className="rounded-lg bg-slate-800 px-5 py-3 font-semibold text-white transition hover:bg-slate-700"
                 >
                   Close
                 </button>
-                {!selectedProblem.claimedBy ? (
+                {selectedProblem.viewerState?.workspaceId ? (
+                  <button
+                    type="button"
+                    onClick={() =>
+                      navigate(
+                        `/product-workspace/${selectedProblem.viewerState?.workspaceId}`,
+                      )
+                    }
+                    className="rounded-lg bg-gradient-to-r from-cyan-600 to-blue-600 px-5 py-3 font-semibold text-white"
+                  >
+                    Open Workspace
+                  </button>
+                ) : (
                   <button
                     type="button"
                     onClick={() => claimMutation.mutate(selectedProblem._id)}
+                    disabled={claimMutation.isPending}
                     className="rounded-lg bg-gradient-to-r from-blue-600 to-purple-600 px-5 py-3 font-semibold text-white"
                   >
-                    Claim & Start Solving
+                    Start Problem
                   </button>
-                ) : null}
+                )}
               </div>
             </div>
           </div>

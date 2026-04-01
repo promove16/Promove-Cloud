@@ -48,6 +48,7 @@ const env_1 = require("./config/env");
 const logger_1 = require("./config/logger");
 const rateLimiter_1 = require("./middleware/rateLimiter");
 const errorHandler_1 = require("./middleware/errorHandler");
+const userActivity_1 = require("./middleware/userActivity");
 const auth_routes_1 = __importDefault(require("./modules/auth/auth.routes"));
 const chat_routes_1 = __importDefault(require("./modules/chat/chat.routes"));
 const college_routes_1 = __importDefault(require("./modules/college/college.routes"));
@@ -86,6 +87,7 @@ const createApp = () => {
     app.use((0, morgan_1.default)(env_1.env.NODE_ENV === 'production' ? 'combined' : 'dev', {
         stream: logger_1.httpLogStream,
     }));
+    app.use(userActivity_1.userActivityMiddleware);
     app.use('/api', (0, rateLimiter_1.withRateLimit)(rateLimiter_1.apiLimiter));
     app.use('/api/auth', auth_routes_1.default);
     app.use('/api/users', user_routes_1.default);

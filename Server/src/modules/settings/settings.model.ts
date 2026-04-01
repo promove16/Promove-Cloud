@@ -102,16 +102,25 @@ const settingsSchema = new Schema<ISettingsDocument>(
           dealFlowNotifications: { type: Boolean },
           minInvestmentSize: { type: Number },
           maxInvestmentSize: { type: Number },
-          preferredSectors: [{ type: String }],
+          preferredSectors: {
+            type: [{ type: String }],
+            default: undefined,
+          },
 
           // Mentor
           availableForSessions: { type: Boolean },
-          sessionTypes: [{ type: String, enum: ['video', 'text', 'in-person'] }],
+          sessionTypes: {
+            type: [{ type: String, enum: ['video', 'text', 'in-person'] }],
+            default: undefined,
+          },
           maxStudents: { type: Number },
 
           // Recruiter
           activelyHiring: { type: Boolean },
-          preferredRoles: [{ type: String }],
+          preferredRoles: {
+            type: [{ type: String }],
+            default: undefined,
+          },
 
           // School/College
           publicProfile: { type: Boolean },

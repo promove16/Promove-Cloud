@@ -37,6 +37,7 @@ type SetOptions = { ex?: number };
 const redisStore = new Map<string, { value: string; expiresAt?: number }>();
 const redisLists = new Map<string, string[]>();
 const redisSortedSets = new Map<string, Map<string, number>>();
+const redisSets = new Map<string, Set<string>>();
 const rateState = new Map<string, { count: number; reset: number }>();
 
 const getSortedSet = (key: string) => {
@@ -103,6 +104,7 @@ jest.mock('@upstash/redis', () => ({
         const existed = redisStore.delete(key);
         redisLists.delete(key);
         redisSortedSets.delete(key);
+        redisSets.delete(key);
         return existed ? 1 : 0;
       },
       async zadd(key: string, ...members: Array<{ score: number; member: string }>) {
@@ -144,11 +146,31 @@ jest.mock('@upstash/redis', () => ({
         redisLists.set(key, existing.slice(start, normalizedStop + 1));
         return 'OK';
       },
+      async lrange(key: string, start: number, stop: number) {
+        const existing = redisLists.get(key) ?? [];
+        const normalizedStop = stop < 0 ? existing.length + stop : stop;
+        return existing.slice(start, normalizedStop + 1);
+      },
       async expire() {
         return 1;
       },
-      async smembers() {
-        return [];
+      async sadd(key: string, ...members: string[]) {
+        const current = redisSets.get(key) ?? new Set<string>();
+        members.forEach((member) => current.add(member));
+        redisSets.set(key, current);
+        return current.size;
+      },
+      async srem(key: string, ...members: string[]) {
+        const current = redisSets.get(key) ?? new Set<string>();
+        members.forEach((member) => current.delete(member));
+        redisSets.set(key, current);
+        return current.size;
+      },
+      async smembers(key: string) {
+        return Array.from(redisSets.get(key) ?? new Set<string>());
+      },
+      async scard(key: string) {
+        return redisSets.get(key)?.size ?? 0;
       },
     }),
   },
@@ -235,6 +257,7 @@ beforeEach(async () => {
   redisStore.clear();
   redisLists.clear();
   redisSortedSets.clear();
+  redisSets.clear();
   rateState.clear();
   await dropDatabaseWithRetry();
 });

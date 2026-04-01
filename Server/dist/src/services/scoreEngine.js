@@ -10,6 +10,7 @@ const score_model_1 = require("../modules/innovationScore/score.model");
 const score_utils_1 = require("../modules/innovationScore/score.utils");
 exports.SCORE_DELTAS = {
     PROBLEM_CLAIMED: 5,
+    PROBLEM_COMPLETED: 20,
     SKILL_COMPLETED: 8,
     PROGRESS_UPLOADED: 3,
     PATENT_SUBMITTED: 15,
@@ -26,6 +27,7 @@ exports.SCORE_DELTAS = {
 };
 const BREAKDOWN_FIELD_MAP = {
     PROBLEM_CLAIMED: 'problemsClaimed',
+    PROBLEM_COMPLETED: null,
     SKILL_COMPLETED: 'skillsCompleted',
     PROGRESS_UPLOADED: 'progressUploads',
     PATENT_SUBMITTED: 'patentsSubmitted',

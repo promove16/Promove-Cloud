@@ -587,6 +587,14 @@ export const addChatParticipant = async (
   ownerId: string,
   payload: z.infer<typeof addChatParticipantSchema>,
 ) => {
+  if (payload.role === 'mentor') {
+    throw new ApiError(
+      403,
+      'MENTOR_ASSIGNMENT_ADMIN_ONLY',
+      'Mentor assignments are managed by admin. Students can only add investor participants.',
+    );
+  }
+
   const workspace = await getWorkspaceForOwner(workspaceId, ownerId);
 
   let user = payload.userId ? await User.findById(payload.userId) : null;
@@ -596,10 +604,6 @@ export const addChatParticipant = async (
 
   if (!user) {
     throw new ApiError(404, 'USER_NOT_FOUND', 'User not found');
-  }
-
-  if (user.role !== payload.role && user.role !== 'mentor' && user.role !== 'investor') {
-    throw new ApiError(400, 'INVALID_ROLE', `Only users with role mentor or investor can be added as chat participants.`);
   }
 
   if (user.role !== payload.role) {
@@ -646,11 +650,17 @@ export const removeChatParticipant = async (
   participantUserId: string,
 ) => {
   const workspace = await getWorkspaceForOwner(workspaceId, ownerId);
-  const exists = workspace.chatParticipants.some(
-    (p) => String(p.userId) === participantUserId,
-  );
-  if (!exists) {
+  const participant = workspace.chatParticipants.find((p) => String(p.userId) === participantUserId);
+  if (!participant) {
     throw new ApiError(404, 'PARTICIPANT_NOT_FOUND', 'Chat participant not found');
+  }
+
+  if (participant.role === 'mentor') {
+    throw new ApiError(
+      403,
+      'MENTOR_ASSIGNMENT_ADMIN_ONLY',
+      'Mentor assignments are managed by admin and cannot be removed from the student workspace.',
+    );
   }
 
   workspace.chatParticipants = workspace.chatParticipants.filter(

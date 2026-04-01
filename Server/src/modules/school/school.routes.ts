@@ -8,6 +8,7 @@ import { ApiError } from '../../utils/ApiError';
 import { asyncHandler } from '../../utils/asyncHandler';
 import {
   cancelSchoolStudentRosterInviteController,
+  createSchoolMentorshipProgramController,
   createSchoolManagedStudentCredentialsController,
   createSchoolStudentAccessTokenController,
   createSchoolStudentRosterEntryController,
@@ -17,6 +18,7 @@ import {
   getSchoolStudentJourneyController,
   importSchoolStudentCredentialsController,
   importSchoolStudentRosterController,
+  listSchoolMentorshipProgramsController,
   listSchoolStudentRosterController,
   listSchoolPendingStudentVerificationsController,
   listSchoolStudentAccessTokensController,
@@ -68,6 +70,8 @@ router.post('/student-access-tokens', asyncHandler(createSchoolStudentAccessToke
 router.get('/student-roster', asyncHandler(listSchoolStudentRosterController));
 router.post('/student-roster/manual', asyncHandler(createSchoolStudentRosterEntryController));
 router.delete('/student-roster/:rosterEntryId', asyncHandler(cancelSchoolStudentRosterInviteController));
+router.get('/mentorship-programs', asyncHandler(listSchoolMentorshipProgramsController));
+router.post('/mentorship-programs', asyncHandler(createSchoolMentorshipProgramController));
 router.post(
   '/student-temp-credentials',
   asyncHandler(createSchoolManagedStudentCredentialsController),

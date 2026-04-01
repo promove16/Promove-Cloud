@@ -2,8 +2,10 @@ import { PropsWithChildren, useMemo, useState } from 'react';
 import { NavLink, Outlet, useLocation, useNavigate } from 'react-router-dom';
 import {
   Bell,
+  ChevronRight,
   Menu,
   X,
+  type LucideIcon,
 } from 'lucide-react';
 import { Button } from '../ui/Button';
 import { Badge } from '../ui/Badge';
@@ -14,7 +16,9 @@ import { useLogoutMutation } from '../../features/auth/useAuth';
 import { notificationApi } from '../../api/notification.api';
 import { dmApi } from '../../api/dm.api';
 import { useNotifications } from '../../hooks/useNotifications';
+import { trackNavigationClick } from '../../lib/activityTracker';
 import { NotificationItem } from '../../types/notification.types';
+import { roleRedirect } from '../../utils/roleRedirect';
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -29,6 +33,9 @@ import { BusinessLogo } from '../branding/BusinessLogo';
 interface DashboardLayoutProps {
   role?: UserRole;
 }
+
+const ACTIVE_NAV_ITEM_CLASS =
+  'bg-cyan-500/10 text-cyan-200 shadow-[inset_0_0_0_1px_rgba(34,211,238,0.3)]';
 
 function NotificationBell() {
   const navigate = useNavigate();
@@ -124,6 +131,7 @@ export function DashboardLayout({ children, role }: PropsWithChildren<DashboardL
 
   const resolvedRole = user?.role ?? role;
   const navItems = resolvedRole ? SIDEBAR_CONFIG[resolvedRole] : [];
+  const dashboardHomePath = resolvedRole ? roleRedirect(resolvedRole) : '/dashboard';
   const hasMessagesItem = navItems.some(
     (item) => item.kind === 'link' && item.label === 'Messages',
   );
@@ -140,13 +148,30 @@ export function DashboardLayout({ children, role }: PropsWithChildren<DashboardL
     0,
   );
 
+  const isPathActive = (path: string, exact = false) =>
+    location.pathname === path || (!exact && location.pathname.startsWith(`${path}/`));
+
+  const isHomePath = (path: string) => path === dashboardHomePath;
+
   const currentLabel = useMemo(() => {
-    const activeItem = navItems.find(
-      (item) =>
-        item.kind === 'link' &&
-        (location.pathname === item.path || location.pathname.startsWith(`${item.path}/`)),
-    );
-    return activeItem?.label ?? 'Dashboard';
+    for (const item of navItems) {
+      if (item.kind === 'link' && isPathActive(item.path, isHomePath(item.path))) {
+        return item.label;
+      }
+
+      if (item.kind === 'group') {
+        const activeChild = item.children.find((child) => isPathActive(child.path));
+        if (activeChild) {
+          return activeChild.label;
+        }
+
+        if (isPathActive(item.path)) {
+          return item.label;
+        }
+      }
+    }
+
+    return 'Dashboard';
   }, [location.pathname, navItems]);
 
   if (!user) {
@@ -165,6 +190,34 @@ export function DashboardLayout({ children, role }: PropsWithChildren<DashboardL
     navigate('/login', { replace: true });
   };
 
+  const renderLink = (label: string, path: string, Icon: LucideIcon) => (
+    <NavLink
+      key={label}
+      to={path}
+      end={isHomePath(path)}
+      onClick={() => {
+        trackNavigationClick(path, label);
+        setSidebarOpen(false);
+      }}
+      className={({ isActive }) =>
+        `flex items-center gap-3 rounded-2xl px-4 py-3 transition ${
+          isActive || isPathActive(path, isHomePath(path))
+            ? ACTIVE_NAV_ITEM_CLASS
+            : 'text-slate-300 hover:bg-slate-900 hover:text-white'
+        }`
+      }
+    >
+      <Icon className="h-5 w-5" />
+      <span>{label}</span>
+      {label === 'Messages' && unreadMessagesCount > 0 ? (
+        <span
+          aria-label={`${unreadMessagesCount} unread messages`}
+          className="ml-auto inline-flex h-2.5 w-2.5 rounded-full bg-cyan-400 shadow-[0_0_10px_rgba(34,211,238,0.7)]"
+        />
+      ) : null}
+    </NavLink>
+  );
+
   const renderItem = (item: DashboardNavItem) => {
     if (item.kind === 'action') {
       return (
@@ -180,28 +233,57 @@ export function DashboardLayout({ children, role }: PropsWithChildren<DashboardL
       );
     }
 
+    if (item.kind === 'link') {
+      return renderLink(item.label, item.path, item.icon);
+    }
+
+    const groupExpanded = isPathActive(item.path) || item.children.some((child) => isPathActive(child.path));
+
     return (
-      <NavLink
-        key={item.label}
-        to={item.path}
-        onClick={() => setSidebarOpen(false)}
-        className={({ isActive }) =>
-          `flex items-center gap-3 rounded-2xl px-4 py-3 transition ${
-            isActive || location.pathname.startsWith(`${item.path}/`)
-              ? 'bg-cyan-500/10 text-cyan-200 ring-1 ring-cyan-500/30'
-              : 'text-slate-300 hover:bg-slate-900 hover:text-white'
-          }`
-        }
-      >
-        <item.icon className="h-5 w-5" />
-        <span>{item.label}</span>
-        {item.label === 'Messages' && unreadMessagesCount > 0 ? (
-          <span
-            aria-label={`${unreadMessagesCount} unread messages`}
-            className="ml-auto inline-flex h-2.5 w-2.5 rounded-full bg-cyan-400 shadow-[0_0_10px_rgba(34,211,238,0.7)]"
-          />
+      <div key={item.label}>
+        <NavLink
+          to={item.path}
+          onClick={() => {
+            trackNavigationClick(item.path, item.label);
+            setSidebarOpen(false);
+          }}
+          className={() =>
+            `flex items-center gap-3 rounded-2xl px-4 py-3 transition ${
+              groupExpanded
+                ? ACTIVE_NAV_ITEM_CLASS
+                : 'text-slate-300 hover:bg-slate-900 hover:text-white'
+            }`
+          }
+        >
+          <item.icon className="h-5 w-5" />
+          <span>{item.label}</span>
+          <ChevronRight className={`ml-auto h-4 w-4 transition-transform ${groupExpanded ? 'rotate-90' : ''}`} />
+        </NavLink>
+
+        {groupExpanded ? (
+          <div className="ml-6 mt-2 space-y-1 border-l border-slate-800 pl-4">
+            {item.children.map((child) => (
+              <NavLink
+                key={child.path}
+                to={child.path}
+                onClick={() => {
+                  trackNavigationClick(child.path, `${item.label}: ${child.label}`);
+                  setSidebarOpen(false);
+                }}
+                className={({ isActive }) =>
+                  `flex rounded-xl px-3 py-2 text-sm transition ${
+                    isActive || isPathActive(child.path)
+                      ? 'bg-slate-900 text-cyan-200'
+                      : 'text-slate-400 hover:bg-slate-900 hover:text-white'
+                  }`
+                }
+              >
+                {child.label}
+              </NavLink>
+            ))}
+          </div>
         ) : null}
-      </NavLink>
+      </div>
     );
   };
 
@@ -215,8 +297,8 @@ export function DashboardLayout({ children, role }: PropsWithChildren<DashboardL
         >
           <div className="mb-8 flex items-center justify-between">
             <BusinessLogo
-              to="/dashboard"
-              imageWrapperClassName="h-12 w-12 rounded-2xl"
+              to={dashboardHomePath}
+              imageWrapperClassName="h-12 w-12"
               titleClassName="text-lg text-white"
               subtitleClassName="text-slate-500"
             />

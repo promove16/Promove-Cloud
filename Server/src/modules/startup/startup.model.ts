@@ -36,6 +36,15 @@ const startupSchema = new Schema<IStartup>(
       revenueGenerating: { type: Boolean, default: false },
       usersCount: { type: Number, default: undefined },
     },
+    reviewStatus: {
+      type: String,
+      enum: ['draft', 'review_requested', 'changes_requested', 'approved'],
+      default: 'draft',
+    },
+    reviewRequestedAt: { type: Date, default: undefined },
+    adminReviewedAt: { type: Date, default: undefined },
+    adminReviewedBy: { type: Schema.Types.ObjectId, ref: 'User', default: null },
+    adminNotes: { type: String, default: undefined },
     isActive: { type: Boolean, default: true },
   },
   { timestamps: true },
@@ -44,5 +53,6 @@ const startupSchema = new Schema<IStartup>(
 startupSchema.index({ launchedToInvestors: 1, innovationScoreAtLaunch: -1 });
 startupSchema.index({ launchedToMentors: 1 });
 startupSchema.index({ launchedToRecruiters: 1 });
+startupSchema.index({ reviewStatus: 1, updatedAt: -1 });
 
 export const Startup = model<IStartup>('Startup', startupSchema);

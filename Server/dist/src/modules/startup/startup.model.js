@@ -36,9 +36,19 @@ const startupSchema = new mongoose_1.Schema({
         revenueGenerating: { type: Boolean, default: false },
         usersCount: { type: Number, default: undefined },
     },
+    reviewStatus: {
+        type: String,
+        enum: ['draft', 'review_requested', 'changes_requested', 'approved'],
+        default: 'draft',
+    },
+    reviewRequestedAt: { type: Date, default: undefined },
+    adminReviewedAt: { type: Date, default: undefined },
+    adminReviewedBy: { type: mongoose_1.Schema.Types.ObjectId, ref: 'User', default: null },
+    adminNotes: { type: String, default: undefined },
     isActive: { type: Boolean, default: true },
 }, { timestamps: true });
 startupSchema.index({ launchedToInvestors: 1, innovationScoreAtLaunch: -1 });
 startupSchema.index({ launchedToMentors: 1 });
 startupSchema.index({ launchedToRecruiters: 1 });
+startupSchema.index({ reviewStatus: 1, updatedAt: -1 });
 exports.Startup = (0, mongoose_1.model)('Startup', startupSchema);

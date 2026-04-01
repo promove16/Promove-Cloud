@@ -18,6 +18,23 @@ const investmentSchema = new Schema<IInvestment>(
       ref: 'User',
       required: true,
     },
+    mediatorLabel: {
+      type: String,
+      default: 'ProMove',
+      trim: true,
+    },
+    requestOrigin: {
+      type: String,
+      enum: ['investor', 'student'],
+      default: 'investor',
+      required: true,
+    },
+    mediationStatus: {
+      type: String,
+      enum: ['intake', 'under_review', 'approved'],
+      default: 'intake',
+      required: true,
+    },
     investorType: {
       type: String,
       enum: ['penny', 'sole'],
@@ -49,6 +66,87 @@ const investmentSchema = new Schema<IInvestment>(
       type: Number,
       default: 0,
       min: 0,
+    },
+    stockDetails: {
+      shareClassLabel: {
+        type: String,
+        default: 'Common Equity',
+        trim: true,
+      },
+      sharePriceInr: {
+        type: Number,
+        default: 0,
+        min: 0,
+      },
+      transferValueInr: {
+        type: Number,
+        default: 0,
+        min: 0,
+      },
+      totalSharesConsidered: {
+        type: Number,
+        default: 0,
+        min: 0,
+      },
+    },
+    stockTransfer: {
+      status: {
+        type: String,
+        enum: ['not_started', 'pending_review', 'under_review', 'approved'],
+        default: 'not_started',
+        required: true,
+      },
+      requestedAt: {
+        type: Date,
+        default: undefined,
+      },
+      requestedByRole: {
+        type: String,
+        enum: ['investor', 'student', 'admin'],
+        default: undefined,
+      },
+      requestSummary: {
+        type: String,
+        default: undefined,
+        trim: true,
+      },
+      reviewNotes: {
+        type: String,
+        default: undefined,
+        trim: true,
+      },
+      reviewedAt: {
+        type: Date,
+        default: undefined,
+      },
+      reviewedBy: {
+        type: Schema.Types.ObjectId,
+        ref: 'User',
+        default: undefined,
+      },
+    },
+    royalty: {
+      promovePercentage: {
+        type: Number,
+        default: 2.5,
+        min: 0,
+        max: 100,
+      },
+      promoveAmountINR: {
+        type: Number,
+        default: 0,
+        min: 0,
+      },
+      status: {
+        type: String,
+        enum: ['pending', 'invoiced', 'received'],
+        default: 'pending',
+        required: true,
+      },
+      settledAt: {
+        type: Date,
+        default: undefined,
+      },
     },
     investorRole: {
       type: String,

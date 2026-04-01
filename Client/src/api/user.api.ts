@@ -92,6 +92,7 @@ export interface UpdateUserProfilePayload {
 export interface SocialEnrichPayload {
   githubUrl?: string;
   linkedinUrl?: string;
+  confirmLinkedinFetch?: boolean;
 }
 
 export interface SocialEnrichSummary {
@@ -100,11 +101,22 @@ export interface SocialEnrichSummary {
   warnings: string[];
   importedSkills: number;
   importedProjects: number;
+  importedProfileFields: number;
+  importedExperience: number;
+  importedEducation: number;
+  importedCertifications: number;
 }
 
 export interface SocialEnrichResponse {
   user: UserProfile;
   summary: SocialEnrichSummary;
+}
+
+export interface RecordUserActivityPayload {
+  eventType: 'page_view' | 'navigation_click';
+  path: string;
+  label?: string;
+  referrerPath?: string;
 }
 
 export const userApi = {
@@ -118,6 +130,10 @@ export const userApi = {
   },
   async enrichFromSocialLinks(payload: SocialEnrichPayload) {
     const response = await api.post<ApiSuccessResponse<SocialEnrichResponse>>('/api/users/me/social-enrich', payload);
+    return response.data.data;
+  },
+  async trackActivity(payload: RecordUserActivityPayload) {
+    const response = await api.post<ApiSuccessResponse<{ tracked: true }>>('/api/users/me/activity', payload);
     return response.data.data;
   },
 };

@@ -12,6 +12,10 @@ import { Workspace } from '../workspace/workspace.model';
 import { MentorSession } from './mentorSession.model';
 import { MentorFeedback } from './mentorFeedback.model';
 import {
+  listMentorAssignedInstitutionPrograms,
+  listMentorAssignedProjects,
+} from './mentorshipProgram.service';
+import {
   CreateMentorFeedbackInput,
   CreateMentorSessionInput,
   MentorDashboardData,
@@ -117,20 +121,100 @@ const getStudentSummary = async (studentId: string) => {
   };
 };
 
+type MentorWorkspaceAccess = {
+  _id: Types.ObjectId;
+  ownerId: Types.ObjectId;
+  teamMemberIds: Types.ObjectId[];
+  title: string;
+  category: string;
+  stage: string;
+  progressPercent: number;
+  updatedAt: Date;
+};
+
+const getMentorAssignedWorkspaces = async (mentorId: string): Promise<MentorWorkspaceAccess[]> =>
+  Workspace.find({
+    isActive: true,
+    chatParticipants: {
+      $elemMatch: {
+        userId: new Types.ObjectId(mentorId),
+        role: 'mentor',
+      },
+    },
+  })
+    .select('_id ownerId teamMemberIds title category stage progressPercent updatedAt')
+    .sort({ updatedAt: -1 })
+    .lean();
+
+const getMentorAssignedStudentIds = (workspaces: MentorWorkspaceAccess[]) =>
+  Array.from(
+    new Set(
+      workspaces.flatMap((workspace) => [
+        String(workspace.ownerId),
+        ...workspace.teamMemberIds.map((memberId) => String(memberId)),
+      ]),
+    ),
+  );
+
+const assertMentorStudentAccess = async (mentorId: string, studentId: string) => {
+  const hasAssignment = await Workspace.exists({
+    isActive: true,
+    chatParticipants: {
+      $elemMatch: {
+        userId: new Types.ObjectId(mentorId),
+        role: 'mentor',
+      },
+    },
+    $or: [{ ownerId: new Types.ObjectId(studentId) }, { teamMemberIds: new Types.ObjectId(studentId) }],
+  });
+
+  if (!hasAssignment) {
+    throw new ApiError(403, 'MENTOR_ASSIGNMENT_REQUIRED', 'This student is not assigned to you');
+  }
+};
+
+const assertMentorWorkspaceAccess = async (mentorId: string, studentId: string, workspaceId: string) => {
+  const workspace = await Workspace.findOne({
+    _id: workspaceId,
+    isActive: true,
+    chatParticipants: {
+      $elemMatch: {
+        userId: new Types.ObjectId(mentorId),
+        role: 'mentor',
+      },
+    },
+  }).lean();
+
+  if (!workspace) {
+    throw new ApiError(403, 'MENTOR_ASSIGNMENT_REQUIRED', 'This workspace is not assigned to you');
+  }
+
+  const isOwner = String(workspace.ownerId) === studentId;
+  const isMember = workspace.teamMemberIds.some((memberId) => String(memberId) === studentId);
+  if (!isOwner && !isMember) {
+    throw new ApiError(403, 'FORBIDDEN', 'Workspace is not available to this student');
+  }
+
+  return workspace;
+};
+
 export const getMentorDashboard = async (mentorId: string): Promise<MentorDashboardData> => {
   const now = new Date();
   const startOfDay = new Date(now);
   startOfDay.setHours(0, 0, 0, 0);
 
-  const [sessionsToday, pendingReviews, activeStudentCount, activities, watchedStudents] = await Promise.all([
+  const [sessionsToday, pendingReviews, assignedProjects, institutionPrograms, activities] = await Promise.all([
     MentorSession.countDocuments({ mentorId, scheduledAt: { $gte: startOfDay, $lte: now } }),
     MentorSession.countDocuments({ mentorId, status: 'Completed', mentorNotes: { $in: [null, ''] } }),
-    redis.scard(`mentor:watch:${mentorId}`),
+    listMentorAssignedProjects(mentorId),
+    listMentorAssignedInstitutionPrograms(mentorId),
     readMentorFeed(mentorId),
-    redis.smembers(`mentor:watch:${mentorId}`) as Promise<string[]>,
   ]);
 
-  const studentIds = watchedStudents.length > 0 ? watchedStudents : activities.map((item) => item.studentId);
+  const assignedStudentIds = Array.from(
+    new Set(assignedProjects.flatMap((project) => project.students.map((student) => student._id))),
+  );
+  const studentIds = assignedStudentIds.length > 0 ? assignedStudentIds : activities.map((item) => item.studentId);
   const students =
     studentIds.length > 0
       ? await User.find({ _id: { $in: studentIds } }).select('_id displayName avatar').lean()
@@ -140,8 +224,12 @@ export const getMentorDashboard = async (mentorId: string): Promise<MentorDashbo
   return {
     sessionsToday,
     pendingReviews,
-    activeStudentCount,
-    recentActivities: activities.map((activity) => {
+    activeStudentCount: assignedStudentIds.length,
+    assignedProjectsCount: assignedProjects.length,
+    assignedProgramsCount: institutionPrograms.length,
+    recentActivities: activities
+      .filter((activity) => assignedStudentIds.includes(activity.studentId))
+      .map((activity) => {
       const student = studentMap.get(activity.studentId);
       return {
         studentId: activity.studentId,
@@ -153,34 +241,51 @@ export const getMentorDashboard = async (mentorId: string): Promise<MentorDashbo
         timestamp: activity.timestamp,
       };
     }),
+    projectAssignments: assignedProjects,
+    institutionPrograms,
   };
 };
 
 export const getMentorStudents = async (mentorId: string): Promise<MentorFeedStudent[]> => {
   const watched = new Set((await redis.smembers(`mentor:watch:${mentorId}`)) as string[]);
-  const startups = await Startup.find({ launchedToMentors: true, isActive: true })
-    .sort({ innovationScoreAtLaunch: -1, createdAt: -1 })
-    .lean();
+  const workspaces = await getMentorAssignedWorkspaces(mentorId);
+  const workspaceIds = workspaces.map((workspace) => String(workspace._id));
+  const startups =
+    workspaceIds.length > 0
+      ? await Startup.find({ projectId: { $in: workspaceIds }, isActive: true })
+          .sort({ innovationScoreAtLaunch: -1, createdAt: -1 })
+          .lean()
+      : [];
+  const startupMap = new Map(
+    startups
+      .filter((startup) => startup.projectId)
+      .map((startup) => [String(startup.projectId), startup]),
+  );
 
-  return Promise.all(startups.map(async (startup) => {
-    const founderId = String(startup.founderIds[0] ?? '');
-    const { student: founder, summary } = founderId ? await getStudentSummary(founderId) : { student: null, summary: 'Recent activity available' };
+  return Promise.all(workspaces.map(async (workspace) => {
+    const leadStudentId = String(workspace.ownerId);
+    const { student: leadStudent, summary } = await getStudentSummary(leadStudentId);
+    const startup = startupMap.get(String(workspace._id));
+
     return {
-      _id: String(startup._id),
-      studentId: founderId,
-      displayName: founder?.displayName ?? 'Student',
-      ...(founder?.avatar ? { avatar: founder.avatar } : {}),
-      startupName: startup.name,
-      category: startup.category,
-      innovationScore: startup.innovationScoreAtLaunch ?? founder?.innovationScore ?? 0,
+      _id: String(workspace._id),
+      workspaceId: String(workspace._id),
+      studentId: leadStudentId,
+      displayName: leadStudent?.displayName ?? 'Student',
+      ...(leadStudent?.avatar ? { avatar: leadStudent.avatar } : {}),
+      startupName: startup?.name ?? workspace.title,
+      category: startup?.category ?? workspace.category,
+      innovationScore: startup?.innovationScoreAtLaunch ?? leadStudent?.innovationScore ?? 0,
       recentActivitySummary: summary,
-      isWatched: founderId ? watched.has(founderId) : false,
-      activeSince: founder?.createdAt ? toIso(founder.createdAt) : toIso(startup.createdAt),
+      isWatched: watched.has(leadStudentId),
+      activeSince: leadStudent?.createdAt ? toIso(leadStudent.createdAt) : toIso(workspace.updatedAt),
     };
   }));
 };
 
-export const getMentorStudentProfile = async (studentId: string): Promise<MentorStudentProfile> => {
+export const getMentorStudentProfile = async (mentorId: string, studentId: string): Promise<MentorStudentProfile> => {
+  await assertMentorStudentAccess(mentorId, studentId);
+
   const student = await User.findById(studentId).lean();
   if (!student || student.role !== UserRole.STUDENT) {
     throw new ApiError(404, 'STUDENT_NOT_FOUND', 'Student not found');
@@ -240,17 +345,12 @@ export const getMentorStudentProfile = async (studentId: string): Promise<Mentor
   };
 };
 
-export const getMentorWorkspace = async (studentId: string, workspaceId: string): Promise<MentorWorkspaceDetail> => {
-  const workspace = await Workspace.findById(workspaceId).lean();
-  if (!workspace) {
-    throw new ApiError(404, 'WORKSPACE_NOT_FOUND', 'Workspace not found');
-  }
-
-  const isOwner = String(workspace.ownerId) === studentId;
-  const isMember = workspace.teamMemberIds.some((memberId) => String(memberId) === studentId);
-  if (!isOwner && !isMember) {
-    throw new ApiError(403, 'FORBIDDEN', 'Workspace is not available to this student');
-  }
+export const getMentorWorkspace = async (
+  mentorId: string,
+  studentId: string,
+  workspaceId: string,
+): Promise<MentorWorkspaceDetail> => {
+  const workspace = await assertMentorWorkspaceAccess(mentorId, studentId, workspaceId);
 
   return {
     _id: String(workspace._id),
@@ -289,12 +389,12 @@ export const getMentorWorkspace = async (studentId: string, workspaceId: string)
 };
 
 export const createMentorSession = async (mentorId: string, payload: CreateMentorSessionInput) => {
+  await assertMentorStudentAccess(mentorId, payload.studentId);
+
   const [student, mentor, workspace] = await Promise.all([
     User.findById(payload.studentId).select('_id displayName avatar role').lean(),
     User.findById(mentorId).select('_id displayName role').lean(),
-    payload.workspaceId
-      ? Workspace.findById(payload.workspaceId).select('_id ownerId teamMemberIds').lean()
-      : Promise.resolve(null),
+    payload.workspaceId ? assertMentorWorkspaceAccess(mentorId, payload.studentId, payload.workspaceId) : Promise.resolve(null),
   ]);
 
   if (!student || student.role !== UserRole.STUDENT) {
@@ -304,15 +404,6 @@ export const createMentorSession = async (mentorId: string, payload: CreateMento
   if (!mentor || mentor.role !== UserRole.MENTOR) {
     throw new ApiError(404, 'MENTOR_NOT_FOUND', 'Mentor not found');
   }
-
-  if (workspace) {
-    const isOwner = String(workspace.ownerId) === payload.studentId;
-    const isMember = workspace.teamMemberIds.some((memberId) => String(memberId) === payload.studentId);
-    if (!isOwner && !isMember) {
-      throw new ApiError(403, 'FORBIDDEN', 'Workspace is not available to this student');
-    }
-  }
-
   const session = await MentorSession.create({
     mentorId,
     studentId: payload.studentId,
@@ -495,25 +586,16 @@ export const createMentorFeedback = async (
   mentorId: string,
   payload: CreateMentorFeedbackInput,
 ): Promise<MentorFeedbackItem> => {
+  await assertMentorStudentAccess(mentorId, payload.studentId);
+
   const [student, workspace] = await Promise.all([
     User.findOne({ _id: payload.studentId, role: UserRole.STUDENT }).select('_id displayName').lean(),
-    payload.workspaceId
-      ? Workspace.findById(payload.workspaceId).select('_id ownerId teamMemberIds').lean()
-      : Promise.resolve(null),
+    payload.workspaceId ? assertMentorWorkspaceAccess(mentorId, payload.studentId, payload.workspaceId) : Promise.resolve(null),
   ]);
 
   if (!student) {
     throw new ApiError(404, 'STUDENT_NOT_FOUND', 'Student not found');
   }
-
-  if (workspace) {
-    const isOwner = String(workspace.ownerId) === payload.studentId;
-    const isMember = workspace.teamMemberIds.some((memberId) => String(memberId) === payload.studentId);
-    if (!isOwner && !isMember) {
-      throw new ApiError(403, 'FORBIDDEN', 'Workspace is not available to this student');
-    }
-  }
-
   const feedback = await MentorFeedback.create({
     mentorId,
     studentId: payload.studentId,

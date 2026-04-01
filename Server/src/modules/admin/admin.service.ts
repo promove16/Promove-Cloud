@@ -1,8 +1,14 @@
+import bcrypt from 'bcrypt';
+import { randomBytes } from 'crypto';
+import { open } from 'fs/promises';
+import path from 'path';
 import { Types } from 'mongoose';
+import { logError } from '../../config/logger';
 import { redis } from '../../config/redis';
 import { io } from '../../config/socket';
 import { ApiError } from '../../utils/ApiError';
 import { readRedisJson } from '../../utils/redisJson';
+import { sanitizePlainText } from '../../utils/sanitizeText';
 import { applyScore, type ScoreTrigger } from '../../services/scoreEngine';
 import { NotificationService } from '../notification/notification.service';
 import { Patent } from '../patent/patent.model';
@@ -11,6 +17,7 @@ import { User } from '../user/user.model';
 import { RegistrationStage } from '../user/user.types';
 import { UserRole } from '../../types/roles.types';
 import { Workspace } from '../workspace/workspace.model';
+import { ScoreEvent } from '../innovationScore/score.model';
 import { Deal } from '../deal/deal.model';
 import {
   getInvestmentTypeAnalytics as getDealInvestmentTypeAnalytics,
@@ -21,15 +28,37 @@ import {
 import { AdminAuditLog } from './adminAuditLog.model';
 import { AdminAward } from './award.model';
 import {
+  getPlatformUsageAnalytics,
+  getUserActivityDetail,
+  searchUserActivitySummaries,
+} from '../analytics/activity.service';
+import {
   AdminAnalyticsData,
+  AdminAnalyticsLogEntry,
   AdminAwardItem,
   AdminDealItem,
+  AdminDealReviewPayload,
   AdminDealReviewItem,
+  AdminCreatedMentorProfile,
+  AdminMentorListItem,
+  AdminProjectMentorAssignmentPayload,
+  AdminProjectMentorshipsResponse,
+  AdminMentorshipProgramReviewPayload,
+  AdminMentorshipProgramsResponse,
   AdminPatentItem,
   AdminRegistrationRequestItem,
+  AdminUserActivityDetail,
   AdminUserListItem,
+  AdminUserActivitySearchResponse,
   AdminUsersResponse,
 } from './admin.types';
+import {
+  assignProjectMentor,
+  listAdminProjectMentorships,
+  listAdminMentorshipPrograms,
+  listAdminMentors,
+  reviewInstitutionMentorshipProgram,
+} from '../mentor/mentorshipProgram.service';
 
 type AuditAction =
   | 'PATENT_APPROVED'
@@ -43,7 +72,13 @@ type AuditAction =
   | 'SOLE_INVESTOR_RESET'
   | 'USER_ROLE_CHANGED'
   | 'USER_DEACTIVATED'
-  | 'USER_ACTIVATED';
+  | 'USER_ACTIVATED'
+  | 'DEAL_REVIEW_UPDATED'
+  | 'MENTOR_PROFILE_CREATED'
+  | 'PROJECT_MENTOR_ASSIGNED'
+  | 'PROJECT_MENTOR_UNASSIGNED'
+  | 'MENTORSHIP_REQUEST_ASSIGNED'
+  | 'MENTORSHIP_REQUEST_REJECTED';
 
 const NON_STUDENT_REGISTRATION_ROLES = new Set<UserRole>([
   UserRole.SCHOOL,
@@ -53,6 +88,15 @@ const NON_STUDENT_REGISTRATION_ROLES = new Set<UserRole>([
   UserRole.RECRUITER,
 ]);
 const MAX_ADMIN_CREDENTIALS = 3;
+const MS_IN_YEAR = 365 * 24 * 60 * 60 * 1000;
+const ANALYTICS_CACHE_TTL_SECONDS = 60;
+const ANALYTICS_LOG_CACHE_TTL_SECONDS = 15;
+const APP_LOG_TAIL_LINE_LIMIT = 20;
+const APP_LOG_READ_CHUNK_BYTES = 64 * 1024;
+const appLogPath = path.resolve(__dirname, '../../../../logs/app.log');
+const ansiEscapeSequence = /\u001b\[[0-9;]*m/g;
+const DEFAULT_PROMOVE_ROYALTY_PERCENTAGE = 2.5;
+const DEFAULT_SHARE_CLASS_LABEL = 'Common Equity';
 
 const assertAdminCapacityAvailable = async () => {
   const adminCount = await User.countDocuments({ role: UserRole.ADMIN });
@@ -85,6 +129,108 @@ const deriveApprovedRegistrationStage = (user: {
 };
 
 const toIso = (value: Date | string) => new Date(value).toISOString();
+const round = (value: number) => Number(value.toFixed(2));
+const calculateRoyaltyAmount = (amountINR: number, royaltyPercentage: number) =>
+  round((amountINR * royaltyPercentage) / 100);
+
+const slugifyDisplayName = (displayName: string) => {
+  const normalized = displayName
+    .normalize('NFKD')
+    .replace(/[^\w\s-]/g, '')
+    .trim()
+    .toLowerCase()
+    .replace(/[\s_-]+/g, '-')
+    .replace(/^-+|-+$/g, '');
+
+  return normalized || 'mentor';
+};
+
+const generateProfileSlug = async (displayName: string) => {
+  const baseSlug = slugifyDisplayName(displayName);
+
+  for (let attempt = 0; attempt < 10; attempt += 1) {
+    const suffix = randomBytes(2).toString('hex');
+    const candidate = `${baseSlug}-${suffix}`;
+    const existing = await User.exists({ profileSlug: candidate });
+
+    if (!existing) {
+      return candidate;
+    }
+  }
+
+  throw new ApiError(500, 'PROFILE_SLUG_GENERATION_FAILED', 'Unable to generate a unique profile URL');
+};
+
+const generateTemporaryPassword = () => randomBytes(6).toString('base64url');
+
+const stripAnsi = (value: string) => value.replace(ansiEscapeSequence, '');
+
+const countLines = (value: string) => value.split(/\r?\n/).filter((line) => line.trim().length > 0).length;
+
+const readRecentLogLines = async (limit: number): Promise<string[]> => {
+  let fileHandle: Awaited<ReturnType<typeof open>> | null = null;
+
+  try {
+    fileHandle = await open(appLogPath, 'r');
+    const stat = await fileHandle.stat();
+
+    if (stat.size === 0) {
+      return [];
+    }
+
+    let offset = stat.size;
+    let content = '';
+
+    while (offset > 0 && countLines(content) <= limit) {
+      const chunkSize = Math.min(APP_LOG_READ_CHUNK_BYTES, offset);
+      offset -= chunkSize;
+
+      const buffer = Buffer.alloc(chunkSize);
+      const { bytesRead } = await fileHandle.read(buffer, 0, chunkSize, offset);
+      content = buffer.toString('utf8', 0, bytesRead) + content;
+    }
+
+    return content
+      .split(/\r?\n/)
+      .map((line) => line.trim())
+      .filter((line) => line.length > 0)
+      .slice(-limit);
+  } catch (error) {
+    const code = (error as NodeJS.ErrnoException).code;
+    if (code === 'ENOENT') {
+      return [];
+    }
+    throw error;
+  } finally {
+    await fileHandle?.close();
+  }
+};
+
+const parseApplicationLogLine = (
+  line: string,
+  index: number,
+): AdminAnalyticsLogEntry => {
+  const sanitizedLine = stripAnsi(line).trim();
+  const matched = sanitizedLine.match(/^(?<timestamp>\S+)\s+\[(?<level>[^\]]+)\]\s*(?<message>.*)$/);
+  const timestamp = matched?.groups?.timestamp;
+  const level = matched?.groups?.level?.toLowerCase() ?? 'info';
+  const message = matched?.groups?.message?.trim() || sanitizedLine;
+
+  return {
+    _id: `${timestamp ?? 'app-log'}-${index}`,
+    level,
+    message,
+    source: /^(GET|POST|PUT|PATCH|DELETE|OPTIONS|HEAD)\s/i.test(message) ? 'http' : 'application',
+    ...(timestamp ? { timestamp } : {}),
+  };
+};
+
+const listRecentApplicationLogs = async (limit = APP_LOG_TAIL_LINE_LIMIT): Promise<AdminAnalyticsLogEntry[]> => {
+  const recentLines = await readRecentLogLines(limit);
+  return recentLines
+    .map((line, index) => parseApplicationLogLine(line, index))
+    .reverse();
+};
 
 const userListItem = (user: {
   _id: { toString(): string };
@@ -197,12 +343,76 @@ const createAudit = (adminId: string, action: AuditAction, targetId: string, tar
     ...(metadata ? { metadata } : {}),
   });
 
+const getAdminStockDetails = (deal: {
+  amountINR?: number;
+  sharesAllocated?: number;
+  stockDetails?: {
+    shareClassLabel?: string;
+    sharePriceInr?: number;
+    transferValueInr?: number;
+    totalSharesConsidered?: number;
+  };
+}) => ({
+  shareClassLabel: deal.stockDetails?.shareClassLabel ?? DEFAULT_SHARE_CLASS_LABEL,
+  sharePriceInr:
+    deal.stockDetails?.sharePriceInr ??
+    ((deal.sharesAllocated ?? 0) > 0 && typeof deal.amountINR === 'number'
+      ? round(deal.amountINR / (deal.sharesAllocated ?? 1))
+      : 0),
+  transferValueInr: deal.stockDetails?.transferValueInr ?? deal.amountINR ?? 0,
+  totalSharesConsidered: deal.stockDetails?.totalSharesConsidered ?? deal.sharesAllocated ?? 0,
+});
+
+const getAdminStockTransfer = (deal: {
+  stage: number;
+  stockTransfer?: {
+    status?: 'not_started' | 'pending_review' | 'under_review' | 'approved';
+    requestedAt?: Date | null;
+    requestedByRole?: 'investor' | 'student' | 'admin';
+    requestSummary?: string;
+    reviewNotes?: string;
+    reviewedAt?: Date | null;
+    reviewedBy?: Types.ObjectId;
+  };
+}) => ({
+  status: deal.stockTransfer?.status ?? (deal.stage >= 3 ? 'pending_review' : 'not_started'),
+  ...(deal.stockTransfer?.requestedAt ? { requestedAt: toIso(deal.stockTransfer.requestedAt) } : {}),
+  ...(deal.stockTransfer?.requestedByRole ? { requestedByRole: deal.stockTransfer.requestedByRole } : {}),
+  ...(deal.stockTransfer?.requestSummary ? { requestSummary: deal.stockTransfer.requestSummary } : {}),
+  ...(deal.stockTransfer?.reviewNotes ? { reviewNotes: deal.stockTransfer.reviewNotes } : {}),
+  ...(deal.stockTransfer?.reviewedAt ? { reviewedAt: toIso(deal.stockTransfer.reviewedAt) } : {}),
+  ...(deal.stockTransfer?.reviewedBy ? { reviewedBy: String(deal.stockTransfer.reviewedBy) } : {}),
+});
+
+const getAdminRoyalty = (deal: {
+  amountINR?: number;
+  royalty?: {
+    promovePercentage?: number;
+    promoveAmountINR?: number;
+    status?: 'pending' | 'invoiced' | 'received';
+    settledAt?: Date | null;
+  };
+}) => {
+  const promovePercentage = deal.royalty?.promovePercentage ?? DEFAULT_PROMOVE_ROYALTY_PERCENTAGE;
+
+  return {
+    promovePercentage,
+    promoveAmountINR:
+      deal.royalty?.promoveAmountINR ?? calculateRoyaltyAmount(deal.amountINR ?? 0, promovePercentage),
+    status: deal.royalty?.status ?? 'pending',
+    ...(deal.royalty?.settledAt ? { settledAt: toIso(deal.royalty.settledAt) } : {}),
+  };
+};
+
 const buildAdminDealItem = (
   deal: {
     _id: Types.ObjectId;
     investorId: Types.ObjectId;
     startupId: Types.ObjectId;
     studentId: Types.ObjectId;
+    mediatorLabel?: string;
+    requestOrigin?: 'investor' | 'student';
+    mediationStatus?: 'intake' | 'under_review' | 'approved';
     investorType: 'penny' | 'sole';
     stage: number;
     amountINR?: number;
@@ -214,6 +424,27 @@ const buildAdminDealItem = (
     adminApprovalRequired: boolean;
     adminApprovedAt?: Date | null;
     adminApprovedBy?: Types.ObjectId;
+    stockDetails?: {
+      shareClassLabel?: string;
+      sharePriceInr?: number;
+      transferValueInr?: number;
+      totalSharesConsidered?: number;
+    };
+    stockTransfer?: {
+      status?: 'not_started' | 'pending_review' | 'under_review' | 'approved';
+      requestedAt?: Date | null;
+      requestedByRole?: 'investor' | 'student' | 'admin';
+      requestSummary?: string;
+      reviewNotes?: string;
+      reviewedAt?: Date | null;
+      reviewedBy?: Types.ObjectId;
+    };
+    royalty?: {
+      promovePercentage?: number;
+      promoveAmountINR?: number;
+      status?: 'pending' | 'invoiced' | 'received';
+      settledAt?: Date | null;
+    };
     innovationScoreSnapshot: number;
     status: 'active' | 'closed' | 'cancelled';
   },
@@ -225,6 +456,9 @@ const buildAdminDealItem = (
   investorId: String(deal.investorId),
   startupId: String(deal.startupId),
   studentId: String(deal.studentId),
+  mediatorLabel: deal.mediatorLabel ?? 'ProMove',
+  requestOrigin: deal.requestOrigin ?? 'investor',
+  mediationStatus: deal.mediationStatus ?? (deal.stage >= 3 ? 'under_review' : 'intake'),
   investorType: deal.investorType,
   stage: deal.stage as 1 | 2 | 3 | 4,
   ...(deal.amountINR ? { amountINR: deal.amountINR } : {}),
@@ -236,9 +470,17 @@ const buildAdminDealItem = (
   adminApprovalRequired: deal.adminApprovalRequired,
   ...(deal.adminApprovedAt ? { adminApprovedAt: toIso(deal.adminApprovedAt) } : {}),
   ...(deal.adminApprovedBy ? { adminApprovedBy: String(deal.adminApprovedBy) } : {}),
+  stockDetails: getAdminStockDetails(deal),
+  stockTransfer: getAdminStockTransfer(deal),
+  royalty: getAdminRoyalty(deal),
   innovationScoreSnapshot: deal.innovationScoreSnapshot,
   status: deal.status,
-  nextActionLabel: deal.adminApprovedAt ? 'Verified by admin' : 'Approve equity transfer',
+  nextActionLabel:
+    deal.stage < 3
+      ? 'Waiting for stock transfer request'
+      : deal.adminApprovedAt
+        ? 'Transfer verified by ProMove'
+        : 'Review stock transfer',
   investorName,
   startupName,
   studentName,
@@ -250,6 +492,9 @@ const buildAdminDealReviewItem = (
     investorId: Types.ObjectId;
     startupId: Types.ObjectId;
     studentId: Types.ObjectId;
+    mediatorLabel?: string;
+    requestOrigin?: 'investor' | 'student';
+    mediationStatus?: 'intake' | 'under_review' | 'approved';
     investorType: 'penny' | 'sole';
     stage: number;
     amountINR?: number;
@@ -261,6 +506,27 @@ const buildAdminDealReviewItem = (
     adminApprovalRequired: boolean;
     adminApprovedAt?: Date | null;
     adminApprovedBy?: Types.ObjectId;
+    stockDetails?: {
+      shareClassLabel?: string;
+      sharePriceInr?: number;
+      transferValueInr?: number;
+      totalSharesConsidered?: number;
+    };
+    stockTransfer?: {
+      status?: 'not_started' | 'pending_review' | 'under_review' | 'approved';
+      requestedAt?: Date | null;
+      requestedByRole?: 'investor' | 'student' | 'admin';
+      requestSummary?: string;
+      reviewNotes?: string;
+      reviewedAt?: Date | null;
+      reviewedBy?: Types.ObjectId;
+    };
+    royalty?: {
+      promovePercentage?: number;
+      promoveAmountINR?: number;
+      status?: 'pending' | 'invoiced' | 'received';
+      settledAt?: Date | null;
+    };
     innovationScoreSnapshot: number;
     status: 'active' | 'closed' | 'cancelled';
     createdAt: Date;
@@ -275,6 +541,26 @@ const buildAdminDealReviewItem = (
     category: string;
     stage: string;
     pitchDeckUrl?: string;
+    pitchDeckName?: string;
+    projectId?: Types.ObjectId;
+    founderIds: Types.ObjectId[];
+    teamSize?: number;
+    fundingNeeded?: number;
+    activeProducts?: number;
+    launchedAt?: Date;
+    innovationScoreAtLaunch?: number;
+    totalShares?: number;
+    availableShares?: number;
+    reservedForSole?: number;
+    maxPennyInvestors?: number;
+    currentPennyCount?: number;
+    hasSoleInvestor?: boolean;
+    traction?: {
+      patentFiled?: boolean;
+      mvpBuilt?: boolean;
+      revenueGenerating?: boolean;
+      usersCount?: number;
+    };
   } | null,
   student: {
     _id: Types.ObjectId;
@@ -289,6 +575,65 @@ const buildAdminDealReviewItem = (
     avatar?: string;
     role: UserRole;
     innovationScore: number;
+  } | null,
+  founders: Array<{
+    _id: Types.ObjectId;
+    displayName: string;
+    avatar?: string;
+    innovationScore?: number;
+    scoreBreakdown?: Record<string, number>;
+    domain?: string;
+  }>,
+  scoreEvents: Array<{
+    _id: Types.ObjectId;
+    trigger: string;
+    delta: number;
+    scoreAfter: number;
+    createdAt: Date;
+  }>,
+  workspace: {
+    _id: Types.ObjectId;
+    title: string;
+    category: string;
+    stage: string;
+    progressPercent: number;
+    milestones: Array<{
+      _id: Types.ObjectId;
+      name: string;
+      isCompleted: boolean;
+      completionPercent: number;
+      completedAt?: Date;
+    }>;
+    uploads: Array<{
+      _id: Types.ObjectId;
+      fileUrl: string;
+      fileType: 'pdf' | 'image';
+      fileName: string;
+      fileSizeBytes: number;
+      uploadedAt: Date;
+      note?: string;
+      category?: string;
+    }>;
+    repoSubmissions: Array<{
+      _id: Types.ObjectId;
+      provider: 'github';
+      repoUrl: string;
+      displayName: string;
+      branch?: string;
+      commitHash?: string;
+      note?: string;
+      uploadedAt: Date;
+    }>;
+    codeSubmissions: Array<{
+      _id: Types.ObjectId;
+    }>;
+    progressUpdates: Array<{
+      _id: Types.ObjectId;
+      note: string;
+      milestoneRef?: string;
+      submittedAt: Date;
+    }>;
+    updatedAt: Date;
   } | null,
 ): AdminDealReviewItem => ({
   ...buildAdminDealItem(
@@ -307,6 +652,35 @@ const buildAdminDealReviewItem = (
     tagline: startup?.tagline ?? 'No startup summary available.',
     category: startup?.category ?? 'Category pending',
     stage: startup?.stage ?? 'Stage pending',
+    ...(startup?.pitchDeckName ? { pitchDeckName: startup.pitchDeckName } : {}),
+    ...(startup?.projectId ? { projectId: String(startup.projectId) } : {}),
+    teamSize: startup?.teamSize ?? startup?.founderIds.length ?? 0,
+    ...(typeof startup?.fundingNeeded === 'number' ? { fundingNeeded: startup.fundingNeeded } : {}),
+    activeProducts: startup?.activeProducts ?? 0,
+    ...(startup?.launchedAt ? { launchedAt: toIso(startup.launchedAt) } : {}),
+    innovationScoreAtLaunch: startup?.innovationScoreAtLaunch ?? 0,
+    traction: {
+      patentFiled: startup?.traction?.patentFiled ?? false,
+      mvpBuilt: startup?.traction?.mvpBuilt ?? false,
+      revenueGenerating: startup?.traction?.revenueGenerating ?? false,
+      ...(typeof startup?.traction?.usersCount === 'number' ? { usersCount: startup.traction.usersCount } : {}),
+    },
+    sharePool: {
+      totalShares: startup?.totalShares ?? 0,
+      availableShares: startup?.availableShares ?? 0,
+      reservedForSole: startup?.reservedForSole ?? 0,
+      maxPennyInvestors: startup?.maxPennyInvestors ?? 0,
+      currentPennyCount: startup?.currentPennyCount ?? 0,
+      hasSoleInvestor: startup?.hasSoleInvestor ?? false,
+    },
+    founders: founders.map((founder) => ({
+      _id: String(founder._id),
+      displayName: founder.displayName,
+      ...(founder.avatar ? { avatar: founder.avatar } : {}),
+      innovationScore: founder.innovationScore ?? 0,
+      scoreBreakdown: founder.scoreBreakdown ?? {},
+      ...(founder.domain ? { domain: founder.domain } : {}),
+    })),
     ...(startup?.pitchDeckUrl ? { pitchDeckUrl: startup.pitchDeckUrl } : {}),
   },
   student: {
@@ -323,34 +697,109 @@ const buildAdminDealReviewItem = (
     role: investor?.role ?? UserRole.INVESTOR,
     innovationScore: investor?.innovationScore ?? 0,
   },
+  scoreEvents: scoreEvents.map((event) => ({
+    _id: String(event._id),
+    trigger: event.trigger,
+    delta: event.delta,
+    scoreAfter: event.scoreAfter,
+    createdAt: toIso(event.createdAt),
+  })),
+  ...(workspace
+    ? {
+        workspace: {
+          _id: String(workspace._id),
+          title: workspace.title,
+          category: workspace.category,
+          stage: workspace.stage,
+          progressPercent: workspace.progressPercent,
+          milestones: workspace.milestones.map((milestone) => ({
+            _id: String(milestone._id),
+            name: milestone.name,
+            isCompleted: milestone.isCompleted,
+            completionPercent: milestone.completionPercent,
+            ...(milestone.completedAt ? { completedAt: toIso(milestone.completedAt) } : {}),
+          })),
+          evidenceSummary: {
+            uploadsCount: workspace.uploads.length,
+            repoCount: workspace.repoSubmissions.length,
+            codeCount: workspace.codeSubmissions.length,
+            progressUpdatesCount: workspace.progressUpdates.length,
+          },
+          uploads: workspace.uploads
+            .slice()
+            .sort((left, right) => right.uploadedAt.getTime() - left.uploadedAt.getTime())
+            .slice(0, 6)
+            .map((upload) => ({
+              _id: String(upload._id),
+              fileUrl: upload.fileUrl,
+              fileType: upload.fileType,
+              fileName: upload.fileName,
+              fileSizeBytes: upload.fileSizeBytes,
+              uploadedAt: toIso(upload.uploadedAt),
+              ...(upload.note ? { note: upload.note } : {}),
+              ...(upload.category ? { category: upload.category } : {}),
+            })),
+          repoSubmissions: workspace.repoSubmissions
+            .slice()
+            .sort((left, right) => right.uploadedAt.getTime() - left.uploadedAt.getTime())
+            .slice(0, 4)
+            .map((repo) => ({
+              _id: String(repo._id),
+              provider: repo.provider,
+              repoUrl: repo.repoUrl,
+              displayName: repo.displayName,
+              ...(repo.branch ? { branch: repo.branch } : {}),
+              ...(repo.commitHash ? { commitHash: repo.commitHash } : {}),
+              ...(repo.note ? { note: repo.note } : {}),
+              uploadedAt: toIso(repo.uploadedAt),
+            })),
+          progressUpdates: workspace.progressUpdates
+            .slice()
+            .sort((left, right) => right.submittedAt.getTime() - left.submittedAt.getTime())
+            .slice(0, 6)
+            .map((update) => ({
+              _id: String(update._id),
+              note: update.note,
+              ...(update.milestoneRef ? { milestoneRef: update.milestoneRef } : {}),
+              submittedAt: toIso(update.submittedAt),
+            })),
+          updatedAt: toIso(workspace.updatedAt),
+        },
+      }
+    : {}),
 });
 
 const deleteRefreshTokensForUser = async (userId: string) => {
-  const scan = (redis as unknown as {
+  const redisClient = redis as unknown as {
     scan?: (cursor: string) => Promise<[string, string[]]>;
-  }).scan;
+  };
+  const scan = typeof redisClient.scan === 'function' ? redisClient.scan.bind(redisClient) : null;
 
-  if (typeof scan !== 'function') {
+  if (!scan) {
     return;
   }
 
-  let cursor = '0';
-  const keysToDelete: string[] = [];
+  try {
+    let cursor = '0';
+    const keysToDelete: string[] = [];
 
-  do {
-    const [nextCursor, keys] = await scan(cursor);
-    cursor = nextCursor;
-    for (const key of keys) {
-      if (!key.startsWith('refresh:')) continue;
-      const value = await redis.get<string>(key);
-      if (value === userId) {
-        keysToDelete.push(key);
+    do {
+      const [nextCursor, keys] = await scan(cursor);
+      cursor = nextCursor;
+      for (const key of keys) {
+        if (!key.startsWith('refresh:')) continue;
+        const value = await redis.get<string>(key);
+        if (value === userId) {
+          keysToDelete.push(key);
+        }
       }
-    }
-  } while (cursor !== '0');
+    } while (cursor !== '0');
 
-  if (keysToDelete.length > 0) {
-    await Promise.all(keysToDelete.map((key) => redis.del(key)));
+    if (keysToDelete.length > 0) {
+      await Promise.all(keysToDelete.map((key) => redis.del(key)));
+    }
+  } catch (error) {
+    logError(`Failed to delete refresh tokens for user ${userId}`, error);
   }
 };
 
@@ -740,10 +1189,8 @@ export const verifyMilestone = async (adminId: string, milestoneId: string, mile
 
 export const listDealsAwaitingApproval = async (): Promise<AdminDealItem[]> => {
   const deals = await Deal.find({
-    adminApprovalRequired: true,
-    stage: 3,
     status: { $ne: 'cancelled' },
-  }).sort({ createdAt: -1 }).lean();
+  }).sort({ adminApprovalRequired: -1, stage: -1, updatedAt: -1, createdAt: -1 }).lean();
 
   const investorIds = [...new Set(deals.map((deal) => String(deal.investorId)))];
   const startupIds = [...new Set(deals.map((deal) => String(deal.startupId)))];
@@ -777,8 +1224,32 @@ export const getDealAwaitingApproval = async (dealId: string): Promise<AdminDeal
 
   const [investor, startup, student] = await Promise.all([
     User.findById(deal.investorId).select('_id displayName avatar role innovationScore').lean(),
-    Startup.findById(deal.startupId).select('_id name tagline category stage pitchDeckUrl').lean(),
+    Startup.findById(deal.startupId)
+      .select(
+        '_id name tagline category stage pitchDeckUrl pitchDeckName projectId founderIds teamSize fundingNeeded activeProducts launchedAt innovationScoreAtLaunch totalShares availableShares reservedForSole maxPennyInvestors currentPennyCount hasSoleInvestor traction',
+      )
+      .lean(),
     User.findById(deal.studentId).select('_id displayName avatar role innovationScore').lean(),
+  ]);
+
+  const founderIds = startup?.founderIds?.map((founderId) => String(founderId)) ?? [];
+
+  const [founders, scoreEvents, workspace] = await Promise.all([
+    founderIds.length > 0
+      ? User.find({ _id: { $in: founderIds } })
+          .select('_id displayName avatar innovationScore scoreBreakdown domain')
+          .lean()
+      : Promise.resolve([]),
+    founderIds.length > 0
+      ? ScoreEvent.find({ userId: startup!.founderIds[0] }).sort({ createdAt: -1 }).limit(12).lean()
+      : Promise.resolve([]),
+    startup?.projectId
+      ? Workspace.findById(startup.projectId)
+          .select(
+            '_id title category stage progressPercent milestones uploads repoSubmissions codeSubmissions progressUpdates updatedAt',
+          )
+          .lean()
+      : Promise.resolve(null),
   ]);
 
   return buildAdminDealReviewItem(
@@ -786,7 +1257,82 @@ export const getDealAwaitingApproval = async (dealId: string): Promise<AdminDeal
     startup,
     student,
     investor,
+    founders,
+    scoreEvents,
+    workspace,
   );
+};
+
+export const reviewDeal = async (
+  adminId: string,
+  dealId: string,
+  payload: AdminDealReviewPayload,
+): Promise<AdminDealReviewItem> => {
+  const deal = await Deal.findById(dealId);
+  if (!deal || deal.status === 'cancelled') {
+    throw new ApiError(404, 'DEAL_NOT_FOUND', 'Deal not found');
+  }
+
+  if (deal.stage < 2) {
+    throw new ApiError(400, 'DEAL_NOT_READY_FOR_REVIEW', 'This deal has not reached the mediation workflow yet');
+  }
+
+  const reviewTouched =
+    payload.stockTransferStatus !== undefined ||
+    payload.reviewNotes !== undefined;
+  const royaltyPercentage = payload.royaltyPercentage ?? deal.royalty?.promovePercentage ?? DEFAULT_PROMOVE_ROYALTY_PERCENTAGE;
+
+  deal.mediatorLabel = deal.mediatorLabel || 'ProMove';
+  deal.royalty = {
+    promovePercentage: royaltyPercentage,
+    promoveAmountINR: calculateRoyaltyAmount(deal.amountINR ?? 0, royaltyPercentage),
+    status: payload.royaltyStatus ?? deal.royalty?.status ?? 'pending',
+    ...(payload.royaltyStatus === 'received'
+      ? { settledAt: new Date() }
+      : deal.royalty?.settledAt
+        ? { settledAt: deal.royalty.settledAt }
+        : {}),
+  };
+
+  if (deal.stage >= 3) {
+    deal.stockTransfer = {
+      status: payload.stockTransferStatus ?? deal.stockTransfer?.status ?? 'pending_review',
+      requestedAt: deal.stockTransfer?.requestedAt ?? new Date(),
+      requestedByRole: deal.stockTransfer?.requestedByRole ?? deal.requestOrigin ?? 'investor',
+      requestSummary:
+        deal.stockTransfer?.requestSummary ??
+        `${deal.mediatorLabel || 'ProMove'} mediation review opened for the stock transfer.`,
+      reviewNotes:
+        payload.reviewNotes !== undefined
+          ? payload.reviewNotes
+          : deal.stockTransfer?.reviewNotes,
+      ...(reviewTouched ? { reviewedAt: new Date(), reviewedBy: new Types.ObjectId(adminId) } : {}),
+      ...(deal.stockTransfer?.reviewedAt && !reviewTouched ? { reviewedAt: deal.stockTransfer.reviewedAt } : {}),
+      ...(deal.stockTransfer?.reviewedBy && !reviewTouched ? { reviewedBy: deal.stockTransfer.reviewedBy } : {}),
+    };
+    deal.mediationStatus = deal.adminApprovedAt ? 'approved' : 'under_review';
+  }
+
+  deal.stockDetails = {
+    shareClassLabel: deal.stockDetails?.shareClassLabel ?? DEFAULT_SHARE_CLASS_LABEL,
+    sharePriceInr:
+      deal.sharesAllocated > 0 && typeof deal.amountINR === 'number'
+        ? round(deal.amountINR / deal.sharesAllocated)
+        : deal.stockDetails?.sharePriceInr ?? 0,
+    transferValueInr: deal.amountINR ?? deal.stockDetails?.transferValueInr ?? 0,
+    totalSharesConsidered: deal.sharesAllocated ?? deal.stockDetails?.totalSharesConsidered ?? 0,
+  };
+
+  await deal.save();
+
+  await createAudit(adminId, 'DEAL_REVIEW_UPDATED', String(deal._id), 'Deal', {
+    stage: deal.stage,
+    ...(payload.stockTransferStatus ? { stockTransferStatus: payload.stockTransferStatus } : {}),
+    ...(payload.royaltyStatus ? { royaltyStatus: payload.royaltyStatus } : {}),
+    ...(payload.royaltyPercentage !== undefined ? { royaltyPercentage: payload.royaltyPercentage } : {}),
+  });
+
+  return getDealAwaitingApproval(String(deal._id));
 };
 
 export const approveDealStage = async (adminId: string, dealId: string) => {
@@ -795,9 +1341,40 @@ export const approveDealStage = async (adminId: string, dealId: string) => {
   if (!deal.adminApprovalRequired || deal.stage !== 3) {
     throw new ApiError(400, 'DEAL_NOT_PENDING_APPROVAL', 'Deal is not awaiting admin approval');
   }
-  deal.adminApprovedAt = new Date();
+  const approvedAt = new Date();
+  const reviewedBy = new Types.ObjectId(adminId);
+  const royaltyPercentage = deal.royalty?.promovePercentage ?? DEFAULT_PROMOVE_ROYALTY_PERCENTAGE;
+  deal.adminApprovedAt = approvedAt;
   deal.adminApprovedBy = new Types.ObjectId(adminId);
   deal.adminApprovalRequired = false;
+  deal.mediatorLabel = deal.mediatorLabel || 'ProMove';
+  deal.mediationStatus = 'approved';
+  deal.stockDetails = {
+    shareClassLabel: deal.stockDetails?.shareClassLabel ?? DEFAULT_SHARE_CLASS_LABEL,
+    sharePriceInr:
+      deal.sharesAllocated > 0 && typeof deal.amountINR === 'number'
+        ? round(deal.amountINR / deal.sharesAllocated)
+        : deal.stockDetails?.sharePriceInr ?? 0,
+    transferValueInr: deal.amountINR ?? deal.stockDetails?.transferValueInr ?? 0,
+    totalSharesConsidered: deal.sharesAllocated ?? deal.stockDetails?.totalSharesConsidered ?? 0,
+  };
+  deal.stockTransfer = {
+    status: 'approved',
+    requestedAt: deal.stockTransfer?.requestedAt ?? approvedAt,
+    requestedByRole: deal.stockTransfer?.requestedByRole ?? deal.requestOrigin ?? 'investor',
+    requestSummary:
+      deal.stockTransfer?.requestSummary ??
+      `${deal.mediatorLabel || 'ProMove'} mediation approved the stock transfer.`,
+    reviewNotes: deal.stockTransfer?.reviewNotes,
+    reviewedAt: approvedAt,
+    reviewedBy,
+  };
+  deal.royalty = {
+    promovePercentage: royaltyPercentage,
+    promoveAmountINR: calculateRoyaltyAmount(deal.amountINR ?? 0, royaltyPercentage),
+    status: deal.royalty?.status ?? 'pending',
+    ...(deal.royalty?.settledAt ? { settledAt: deal.royalty.settledAt } : {}),
+  };
   await deal.save();
 
   const [student, investor] = await Promise.all([
@@ -850,13 +1427,14 @@ export const getAnalytics = async (): Promise<AdminAnalyticsData> => {
   const cachedData = readRedisJson<AdminAnalyticsData>(cached);
   if (cachedData) return cachedData;
 
-  const [users, deals, patents, auditLogs, topInnovators, investmentTypeBreakdown] = await Promise.all([
+  const [users, deals, patents, auditLogs, topInnovators, investmentTypeBreakdown, awardsPending] = await Promise.all([
     User.find({}).select('_id displayName email role innovationScore isActive accessGrantedBy accessExpiresAt createdAt lastLogin').lean(),
     Deal.find({}).select('stage status').lean(),
     Patent.find({}).select('status').lean(),
     AdminAuditLog.find().sort({ createdAt: -1 }).limit(10).lean(),
     User.find({}).sort({ innovationScore: -1 }).limit(5).select('_id displayName email role innovationScore isActive accessGrantedBy accessExpiresAt createdAt').lean(),
     getDealInvestmentTypeAnalytics(),
+    AdminAward.countDocuments({ status: { $in: ['submitted', 'under_review'] } }),
   ]);
 
   const totalUsers = users.length;
@@ -884,6 +1462,7 @@ export const getAnalytics = async (): Promise<AdminAnalyticsData> => {
     approved: patents.filter((patent) => patent.status === 'approved').length,
     rejected: patents.filter((patent) => patent.status === 'rejected').length,
   } as const;
+  const platformUsage = await getPlatformUsageAnalytics(totalUsers);
 
   const result: AdminAnalyticsData = {
     totalUsers,
@@ -911,12 +1490,156 @@ export const getAnalytics = async (): Promise<AdminAnalyticsData> => {
       createdAt: toIso(entry.createdAt),
     })),
     patentsPending: patents.filter((patent) => patent.status === 'submitted' || patent.status === 'under_review').length,
-    awardsPending: await AdminAward.countDocuments({ status: { $in: ['submitted', 'under_review'] } }),
+    awardsPending,
     investmentTypeBreakdown,
+    usageSummary: platformUsage.usageSummary,
+    dailyUsage: platformUsage.dailyUsage,
+    topRoutes: platformUsage.topRoutes,
+    mostActiveUsers: platformUsage.mostActiveUsers,
+    recentUserActivity: platformUsage.recentUserActivity,
+    insights: platformUsage.insights,
   };
 
-  await redis.set(cacheKey, JSON.stringify(result), { ex: 60 * 30 });
+  await redis.set(cacheKey, JSON.stringify(result), { ex: ANALYTICS_CACHE_TTL_SECONDS });
   return result;
 };
 
+export const getAnalyticsLogs = async (limit = APP_LOG_TAIL_LINE_LIMIT): Promise<AdminAnalyticsLogEntry[]> => {
+  const normalizedLimit = Math.min(Math.max(limit, 1), 50);
+  const cacheKey = `admin:analytics:logs:${normalizedLimit}`;
+  const cached = await redis.get<string>(cacheKey);
+  const cachedData = readRedisJson<AdminAnalyticsLogEntry[]>(cached);
+  if (cachedData) {
+    return cachedData;
+  }
+
+  const logs = await listRecentApplicationLogs(normalizedLimit);
+  await redis.set(cacheKey, JSON.stringify(logs), { ex: ANALYTICS_LOG_CACHE_TTL_SECONDS });
+  return logs;
+};
+
+export const getAnalyticsUsers = async (
+  query?: string,
+  limit = 8,
+): Promise<AdminUserActivitySearchResponse> => ({
+  items: await searchUserActivitySummaries(query, limit),
+});
+
+export const getAnalyticsUserDetail = async (userId: string): Promise<AdminUserActivityDetail> =>
+  getUserActivityDetail(userId);
+
 export const validateUserAccessQuery = () => undefined;
+
+export const getMentorshipPrograms = async (
+  status?: 'Pending' | 'Assigned' | 'Rejected',
+): Promise<AdminMentorshipProgramsResponse> => listAdminMentorshipPrograms(status);
+
+export const getProjectMentorships = async (): Promise<AdminProjectMentorshipsResponse> =>
+  listAdminProjectMentorships();
+
+export const getMentorDirectory = async (): Promise<AdminMentorListItem[]> => listAdminMentors();
+
+export const createMentorProfile = async (
+  adminId: string,
+  payload: { displayName: string; email: string; domain?: string; bio?: string; headline?: string },
+): Promise<AdminCreatedMentorProfile> => {
+  const admin = await findUser(adminId);
+  if (admin.role !== UserRole.ADMIN) {
+    throw new ApiError(403, 'FORBIDDEN', 'Only admins can create mentor profiles');
+  }
+
+  const normalizedEmail = payload.email.toLowerCase();
+  const existing = await User.findOne({ email: normalizedEmail }).lean();
+  if (existing) {
+    throw new ApiError(409, 'DUPLICATE_KEY', 'Email already registered');
+  }
+
+  const displayName = sanitizePlainText(payload.displayName);
+  const profileSlug = await generateProfileSlug(displayName);
+  const temporaryPassword = generateTemporaryPassword();
+  const passwordHash = await bcrypt.hash(temporaryPassword, 12);
+
+  const mentor = await User.create({
+    email: normalizedEmail,
+    passwordHash,
+    role: UserRole.MENTOR,
+    displayName,
+    profileSlug,
+    ...(payload.domain ? { domain: sanitizePlainText(payload.domain) } : {}),
+    ...(payload.bio ? { bio: sanitizePlainText(payload.bio) } : {}),
+    ...(payload.headline ? { headline: sanitizePlainText(payload.headline) } : {}),
+    accessGrantedBy: 'admin',
+    accessExpiresAt: new Date(Date.now() + MS_IN_YEAR),
+    isActive: true,
+    profileComplete: Boolean(payload.domain || payload.bio),
+    registrationStage: 'basic',
+    institutionToken: null,
+    institutionId: null,
+    institutionVerificationStatus: 'none',
+    verificationStatus: 'not_required',
+    adminApprovalStatus: 'approved',
+    adminApprovedAt: new Date(),
+    adminApprovedBy: new Types.ObjectId(adminId),
+    mustChangePasswordOnNextLogin: true,
+  });
+
+  await createAudit(adminId, 'MENTOR_PROFILE_CREATED', String(mentor._id), 'User', {
+    role: UserRole.MENTOR,
+  });
+
+  return {
+    mentor: {
+      _id: String(mentor._id),
+      displayName: mentor.displayName,
+      email: mentor.email,
+      ...(mentor.avatar ? { avatar: mentor.avatar } : {}),
+      ...(mentor.domain ? { domain: mentor.domain } : {}),
+      ...(mentor.bio ? { bio: mentor.bio } : {}),
+      ...(mentor.headline ? { headline: mentor.headline } : {}),
+      assignedProjects: 0,
+      assignedPrograms: 0,
+      createdAt: toIso(mentor.createdAt),
+    },
+    temporaryPassword,
+  };
+};
+
+export const reviewMentorshipProgram = async (
+  adminId: string,
+  programId: string,
+  payload: AdminMentorshipProgramReviewPayload,
+) => {
+  const updated = await reviewInstitutionMentorshipProgram(adminId, programId, payload);
+  await createAudit(
+    adminId,
+    payload.decision === 'assigned' ? 'MENTORSHIP_REQUEST_ASSIGNED' : 'MENTORSHIP_REQUEST_REJECTED',
+    programId,
+    'InstitutionMentorshipProgram',
+    {
+      status: updated.status,
+      institutionId: updated.institution._id,
+      ...(updated.mentor ? { mentorId: updated.mentor._id } : {}),
+    },
+  );
+  return updated;
+};
+
+export const reviewProjectMentorAssignment = async (
+  adminId: string,
+  workspaceId: string,
+  payload: AdminProjectMentorAssignmentPayload,
+) => {
+  const updated = await assignProjectMentor(adminId, workspaceId, payload);
+  await createAudit(
+    adminId,
+    payload.decision === 'assigned' ? 'PROJECT_MENTOR_ASSIGNED' : 'PROJECT_MENTOR_UNASSIGNED',
+    workspaceId,
+    'Workspace',
+    {
+      title: updated.title,
+      category: updated.category,
+      ...(updated.mentor ? { mentorId: updated.mentor._id } : {}),
+    },
+  );
+  return updated;
+};

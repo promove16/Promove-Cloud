@@ -5,6 +5,8 @@ export interface StartupTraction {
   usersCount?: number;
 }
 
+export type StartupReviewStatus = 'draft' | 'review_requested' | 'changes_requested' | 'approved';
+
 export interface Startup {
   _id: string;
   founderIds: string[];
@@ -31,6 +33,11 @@ export interface Startup {
   hasSoleInvestor: boolean;
   soleInvestorId?: string | null;
   traction: StartupTraction;
+  reviewStatus: StartupReviewStatus;
+  reviewRequestedAt?: string;
+  adminReviewedAt?: string;
+  adminReviewedBy?: string | null;
+  adminNotes?: string;
   isActive: boolean;
   createdAt: string;
   updatedAt: string;

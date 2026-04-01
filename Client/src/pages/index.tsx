@@ -32,10 +32,17 @@ import MentorSessions from "../features/mentor/Sessions";
 import AdminDashboard from "../features/admin/Dashboard";
 import AdminUserManagement from "../features/admin/UserManagement";
 import AdminPatents from "../features/admin/Patents";
-import AdminAwards from "../features/admin/Awards";
+import AdminStartups from "../features/admin/Startups";
 import AdminDeals from "../features/admin/Deals";
 import AdminDealReview from "../features/admin/DealReview";
-import AdminAnalytics from "../features/admin/Analytics";
+// import AdminAnalytics from "../features/admin/Analytics";
+// import AdminAnalyticsLogs from "../features/admin/AnalyticsLogs";
+// import AdminAnalyticsOverview from "../features/admin/AnalyticsOverview";
+import AdminAnalyticsTemporary from "../features/admin/AnalyticsTemporary";
+// import AdminAnalyticsUsage from "../features/admin/AnalyticsUsage";
+// import AdminAnalyticsUsers from "../features/admin/AnalyticsUsers";
+import AdminMentorshipPrograms from "../features/admin/MentorshipPrograms";
+import AdminProblemBank from "../features/admin/ProblemBank";
 import RecruiterDashboard from "../features/recruiter/Dashboard";
 import RecruiterTalentSearch from "../features/recruiter/TalentSearch";
 import RecruiterCollegeConnect from "../features/recruiter/CollegeConnect";
@@ -46,9 +53,12 @@ import InvestorStartupMarketplace from "../features/investor/StartupMarketplace"
 import InvestorInstitutions from "../features/investor/Institutions";
 import InvestorPortfolio from "../features/investor/Portfolio";
 import StartupCapTable from "../features/startup/CapTable";
+import { StartupLaunchShell } from "../features/startup/StartupLaunchShell";
+import { InvestorOutreach } from "../features/startup/InvestorOutreach";
 import { UserProfilePage } from "../features/profile/UserProfilePage";
 import { MentorDirectory } from "../features/institution/MentorDirectory";
 import { useProtectedRoute } from "../hooks/useProtectedRoute";
+import { useRouteActivityTracking } from "../hooks/useRouteActivityTracking";
 import { useAuthStore } from "../store/authStore";
 import { UserRole } from "../types/roles.types";
 import { roleRedirect } from "../utils/roleRedirect";
@@ -66,6 +76,7 @@ import { RecruiterMessagesPage } from "../app/pages/RecruiterMessages";
 import { SettingsPage } from "../features/settings/SettingsPage";
 
 function RootLayout() {
+  useRouteActivityTracking();
   return <Outlet />;
 }
 
@@ -167,6 +178,15 @@ function ProtectedAnyRoute({ children }: PropsWithChildren) {
   return children ? <>{children}</> : <Outlet />;
 }
 
+function DashboardIndexRedirect() {
+  const user = useAuthStore((state) => state.user);
+
+  if (!user) {
+    return <Navigate to="/login" replace />;
+  }
+
+  return <Navigate to={roleRedirect(user.role)} replace />;
+}
 
 export const router = createBrowserRouter([
   {
@@ -259,18 +279,25 @@ export const router = createBrowserRouter([
         ),
       },
       {
-        path: "/startup-launch/:startupId?",
+        path: "/startup-launch",
         element: (
           <ProtectedRoleRoute role={UserRole.STUDENT}>
-            <StartupLaunch />
+            <StartupLaunchShell />
           </ProtectedRoleRoute>
         ),
+        children: [
+          { index: true, element: <Navigate to="/startup-launch/overview" replace /> },
+          { path: "overview", element: <StartupLaunch /> },
+          { path: "investor-outreach", element: <InvestorOutreach /> },
+          { path: "cap-table", element: <StartupCapTable /> },
+          { path: "investor-deals", element: <StudentInvestorDeals /> },
+        ],
       },
       {
-        path: "/startup-launch/cap-table",
+        path: "/startup-launch/:startupId",
         element: (
           <ProtectedRoleRoute role={UserRole.STUDENT}>
-            <StartupCapTable />
+            <Navigate to="/startup-launch/overview" replace />
           </ProtectedRoleRoute>
         ),
       },
@@ -307,12 +334,16 @@ export const router = createBrowserRouter([
         ),
         children: [
           {
+            index: true,
+            element: <DashboardIndexRedirect />,
+          },
+          {
             path: "student",
             element: <ProtectedRoleRoute role={UserRole.STUDENT} />,
             children: [
               { index: true, element: <LegacyStudentDashboard /> },
               { path: "mentor-sessions", element: <StudentMentorSessions /> },
-              { path: "investor-deals", element: <StudentInvestorDeals /> },
+              { path: "investor-deals", element: <Navigate to="/startup-launch/investor-deals" replace /> },
             ],
           },
           {
@@ -363,12 +394,27 @@ export const router = createBrowserRouter([
             element: <ProtectedRoleRoute role={UserRole.ADMIN} />,
             children: [
               { index: true, element: <AdminDashboard /> },
+              { path: "problems", element: <AdminProblemBank /> },
               { path: "users", element: <AdminUserManagement /> },
               { path: "patents", element: <AdminPatents /> },
-              { path: "awards", element: <AdminAwards /> },
+              { path: "startups", element: <AdminStartups /> },
               { path: "deals", element: <AdminDeals /> },
               { path: "deals/:dealId", element: <AdminDealReview /> },
-              { path: "analytics", element: <AdminAnalytics /> },
+              { path: "mentorship", element: <AdminMentorshipPrograms /> },
+              // Previous analytics workspace kept here for future restore.
+              // {
+              //   path: "analytics",
+              //   element: <AdminAnalytics />,
+              //   children: [
+              //     { index: true, element: <Navigate to="overview" replace /> },
+              //     { path: "overview", element: <AdminAnalyticsOverview /> },
+              //     { path: "usage", element: <AdminAnalyticsUsage /> },
+              //     { path: "users", element: <AdminAnalyticsUsers /> },
+              //     { path: "logs", element: <AdminAnalyticsLogs /> },
+              //   ],
+              // },
+              { path: "analytics", element: <AdminAnalyticsTemporary /> },
+              { path: "analytics/*", element: <AdminAnalyticsTemporary /> },
             ],
           },
           {

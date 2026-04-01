@@ -21,6 +21,11 @@ import {
   StudentJourney,
   TemporaryStudentCredentials,
 } from '../types/school.types';
+import {
+  CreateInstitutionMentorshipProgramInput,
+  InstitutionMentorshipProgram,
+  InstitutionMentorshipProgramView,
+} from '../types/mentorship.types';
 import { PlacementTrackerData, PlacementStatus } from '../types/placement.types';
 
 export const collegeApi = {
@@ -179,6 +184,19 @@ export const collegeApi = {
       '/api/college/student-roster/import-credentials',
       formData,
       { headers: { 'Content-Type': 'multipart/form-data' } },
+    );
+    return response.data.data;
+  },
+  async getMentorshipPrograms() {
+    const response = await api.get<ApiSuccessResponse<InstitutionMentorshipProgramView>>(
+      '/api/college/mentorship-programs',
+    );
+    return response.data.data;
+  },
+  async createMentorshipProgram(payload: CreateInstitutionMentorshipProgramInput) {
+    const response = await api.post<ApiSuccessResponse<InstitutionMentorshipProgram>>(
+      '/api/college/mentorship-programs',
+      payload,
     );
     return response.data.data;
   },

@@ -10,6 +10,7 @@ import {
   getMyStartupController,
   launchStartupController,
   patchStartup,
+  requestStartupReviewController,
   uploadPitchController,
 } from './startup.controller';
 
@@ -33,6 +34,7 @@ router.use(authenticate, authorize(UserRole.STUDENT));
 router.post('/', asyncHandler(createStartup));
 router.get('/mine', asyncHandler(getMyStartupController));
 router.patch('/:id', asyncHandler(patchStartup));
+router.post('/:id/request-review', asyncHandler(requestStartupReviewController));
 router.post('/:id/launch', asyncHandler(launchStartupController));
 router.post('/:id/upload-pitch', upload.single('file'), asyncHandler(uploadPitchController));
 

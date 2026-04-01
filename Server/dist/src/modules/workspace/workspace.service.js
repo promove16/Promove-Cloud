@@ -468,6 +468,9 @@ const getWorkspaceChatHistory = async (workspaceId, userId, before, limit = 50) 
 };
 exports.getWorkspaceChatHistory = getWorkspaceChatHistory;
 const addChatParticipant = async (workspaceId, ownerId, payload) => {
+    if (payload.role === 'mentor') {
+        throw new ApiError_1.ApiError(403, 'MENTOR_ASSIGNMENT_ADMIN_ONLY', 'Mentor assignments are managed by admin. Students can only add investor participants.');
+    }
     const workspace = await (0, exports.getWorkspaceForOwner)(workspaceId, ownerId);
     let user = payload.userId ? await user_model_1.User.findById(payload.userId) : null;
     if (!user && payload.email) {
@@ -475,9 +478,6 @@ const addChatParticipant = async (workspaceId, ownerId, payload) => {
     }
     if (!user) {
         throw new ApiError_1.ApiError(404, 'USER_NOT_FOUND', 'User not found');
-    }
-    if (user.role !== payload.role && user.role !== 'mentor' && user.role !== 'investor') {
-        throw new ApiError_1.ApiError(400, 'INVALID_ROLE', `Only users with role mentor or investor can be added as chat participants.`);
     }
     if (user.role !== payload.role) {
         throw new ApiError_1.ApiError(400, 'ROLE_MISMATCH', `User's role is '${user.role}', but '${payload.role}' was specified.`);
@@ -510,9 +510,12 @@ const addChatParticipant = async (workspaceId, ownerId, payload) => {
 exports.addChatParticipant = addChatParticipant;
 const removeChatParticipant = async (workspaceId, ownerId, participantUserId) => {
     const workspace = await (0, exports.getWorkspaceForOwner)(workspaceId, ownerId);
-    const exists = workspace.chatParticipants.some((p) => String(p.userId) === participantUserId);
-    if (!exists) {
+    const participant = workspace.chatParticipants.find((p) => String(p.userId) === participantUserId);
+    if (!participant) {
         throw new ApiError_1.ApiError(404, 'PARTICIPANT_NOT_FOUND', 'Chat participant not found');
+    }
+    if (participant.role === 'mentor') {
+        throw new ApiError_1.ApiError(403, 'MENTOR_ASSIGNMENT_ADMIN_ONLY', 'Mentor assignments are managed by admin and cannot be removed from the student workspace.');
     }
     workspace.chatParticipants = workspace.chatParticipants.filter((p) => String(p.userId) !== participantUserId);
     await workspace.save();

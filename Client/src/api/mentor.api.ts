@@ -15,11 +15,16 @@ export interface MentorDashboardData {
   sessionsToday: number;
   pendingReviews: number;
   activeStudentCount: number;
+  assignedProjectsCount: number;
+  assignedProgramsCount: number;
   recentActivities: MentorDashboardActivity[];
+  projectAssignments: MentorProjectAssignment[];
+  institutionPrograms: MentorInstitutionProgram[];
 }
 
 export interface MentorFeedStudent {
   _id: string;
+  workspaceId: string;
   studentId: string;
   displayName: string;
   avatar?: string;
@@ -29,6 +34,44 @@ export interface MentorFeedStudent {
   recentActivitySummary: string;
   isWatched: boolean;
   activeSince: string;
+}
+
+export interface MentorProjectAssignment {
+  workspaceId: string;
+  title: string;
+  category: string;
+  stage: string;
+  progressPercent: number;
+  updatedAt: string;
+  startupName?: string;
+  students: Array<{
+    _id: string;
+    displayName: string;
+    avatar?: string;
+    institutionName?: string;
+  }>;
+}
+
+export interface MentorInstitutionProgram {
+  _id: string;
+  institution: {
+    _id: string;
+    displayName: string;
+    type: 'school' | 'college';
+  };
+  title: string;
+  objective: string;
+  preferredDate: string;
+  scheduledAt?: string;
+  durationMinutes: number;
+  expectedParticipants: number;
+  deliveryMode: 'Online' | 'Offline';
+  platform: 'Google Meet' | 'Microsoft Teams' | 'Zoom' | 'Offline';
+  meetingLink?: string;
+  venue?: string;
+  adminNotes?: string;
+  preferredExpertise?: string;
+  status: 'Assigned';
 }
 
 export interface MentorStudentProfile {

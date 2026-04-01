@@ -6,6 +6,7 @@ import { Award, ClipboardCheck, KeyRound, Sparkles, UserCheck, Users } from 'luc
 import { Card } from '../../components/ui/Card';
 import { Button } from '../../components/ui/Button';
 import { schoolApi } from '../../api/school.api';
+import { MentorshipProgramPanel } from '../institution/MentorshipProgramPanel';
 import { StudentIntakePanel } from '../institution/StudentIntakePanel';
 import { PatentShowcase } from '../shared/PatentShowcase';
 import { ApiErrorResponse } from '../../types/auth.types';
@@ -291,6 +292,14 @@ export default function Dashboard() {
           </div>
         </Card>
       </div>
+
+      <MentorshipProgramPanel
+        queryKey="school-mentorship-programs"
+        heading="Request admin-led mentor allocation"
+        description="Ask admin to assign a mentor to your school session, confirm online or offline mode, and track approval."
+        fetchPrograms={schoolApi.getMentorshipPrograms}
+        createProgram={schoolApi.createMentorshipProgram}
+      />
 
       <StudentIntakePanel
         heading="Feed student data manually or from Excel"

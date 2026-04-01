@@ -3,7 +3,16 @@ import { ApiError } from '../../utils/ApiError';
 import { ApiResponse } from '../../utils/ApiResponse';
 import { UserRole } from '../../types/roles.types';
 import {
+  projectMentorAssignmentSchema,
+  reviewInstitutionMentorshipProgramSchema,
+} from '../mentor/mentor.validation';
+import {
+  createMentorProfileSchema,
+  analyticsLogsQuerySchema,
+  analyticsUsersQuerySchema,
   awardRejectSchema,
+  dealReviewSchema,
+  listMentorshipProgramsQuerySchema,
   listRegistrationRequestsQuerySchema,
   listUsersQuerySchema,
   milestoneVerifySchema,
@@ -14,24 +23,39 @@ import {
   approveAward,
   getAdminCapTable,
   getDealAwaitingApproval,
+  createMentorProfile,
+  getMentorDirectory,
+  getMentorshipPrograms,
+  getProjectMentorships,
   approveDealStage,
   approvePatent,
   getAnalytics,
+  getAnalyticsLogs,
+  getAnalyticsUserDetail,
+  getAnalyticsUsers,
   getInvestmentTypeBreakdown,
   listAwards,
   listDealsAwaitingApproval,
   listPatents,
   listRegistrationRequests,
   listUsers,
+  reviewDeal,
   reviewRegistrationRequest,
   rejectAward,
   rejectPatent,
   resetStartupSoleInvestor,
+  reviewMentorshipProgram,
+  reviewProjectMentorAssignment,
   updateDealInvestorRole,
   updateUserAccess,
   updateUserRole,
   verifyMilestone,
 } from './admin.service';
+import {
+  listStartupsForAdmin,
+  reviewStartupSubmission,
+  reviewStartupSubmissionSchema,
+} from '../startup/startup.service';
 
 const getParam = (value: string | string[] | undefined) =>
   Array.isArray(value) ? value[0] : value;
@@ -165,6 +189,29 @@ export const getDealsController = async (_req: Request, res: Response) => {
   res.status(200).json(new ApiResponse(await listDealsAwaitingApproval()));
 };
 
+export const getStartupReviewsController = async (req: Request, res: Response) => {
+  const rawStatus = typeof req.query.status === 'string' ? req.query.status : undefined;
+  const allowedStatuses = new Set(['draft', 'review_requested', 'changes_requested', 'approved']);
+
+  if (rawStatus && !allowedStatuses.has(rawStatus)) {
+    throw new ApiError(400, 'INVALID_STATUS', 'Invalid startup review status');
+  }
+
+  const startups = await listStartupsForAdmin(
+    rawStatus as 'draft' | 'review_requested' | 'changes_requested' | 'approved' | undefined,
+  );
+  res.status(200).json(new ApiResponse(startups));
+};
+
+export const reviewStartupController = async (req: Request, res: Response) => {
+  if (!req.user) throw new ApiError(401, 'UNAUTHORIZED', 'Invalid or expired token');
+  const startupId = getParam(req.params.id);
+  if (!startupId || !isObjectId(startupId)) throw new ApiError(400, 'INVALID_ID', 'Invalid ID format');
+  const payload = reviewStartupSubmissionSchema.parse(req.body);
+  const startup = await reviewStartupSubmission(req.user._id, startupId, payload);
+  res.status(200).json(new ApiResponse(startup));
+};
+
 export const getDealController = async (req: Request, res: Response) => {
   const dealId = getParam(req.params.id);
   if (!dealId || !isObjectId(dealId)) throw new ApiError(400, 'INVALID_ID', 'Invalid ID format');
@@ -177,6 +224,14 @@ export const approveDealStageController = async (req: Request, res: Response) =>
   if (!dealId || !isObjectId(dealId)) throw new ApiError(400, 'INVALID_ID', 'Invalid ID format');
   await approveDealStage(req.user._id, dealId);
   res.status(200).json(new ApiResponse({ approved: true }));
+};
+
+export const reviewDealController = async (req: Request, res: Response) => {
+  if (!req.user) throw new ApiError(401, 'UNAUTHORIZED', 'Invalid or expired token');
+  const dealId = getParam(req.params.id);
+  if (!dealId || !isObjectId(dealId)) throw new ApiError(400, 'INVALID_ID', 'Invalid ID format');
+  const payload = dealReviewSchema.parse(req.body);
+  res.status(200).json(new ApiResponse(await reviewDeal(req.user._id, dealId, payload)));
 };
 
 export const updateDealInvestorRoleController = async (req: Request, res: Response) => {
@@ -212,6 +267,22 @@ export const getAnalyticsController = async (_req: Request, res: Response) => {
   res.status(200).json(new ApiResponse(await getAnalytics()));
 };
 
+export const getAnalyticsLogsController = async (req: Request, res: Response) => {
+  const query = analyticsLogsQuerySchema.parse(req.query);
+  res.status(200).json(new ApiResponse(await getAnalyticsLogs(query.limit)));
+};
+
+export const getAnalyticsUsersController = async (req: Request, res: Response) => {
+  const query = analyticsUsersQuerySchema.parse(req.query);
+  res.status(200).json(new ApiResponse(await getAnalyticsUsers(query.q, query.limit)));
+};
+
+export const getAnalyticsUserDetailController = async (req: Request, res: Response) => {
+  const userId = getParam(req.params.userId);
+  if (!userId || !isObjectId(userId)) throw new ApiError(400, 'INVALID_ID', 'Invalid ID format');
+  res.status(200).json(new ApiResponse(await getAnalyticsUserDetail(userId)));
+};
+
 export const verifyMilestoneController = async (req: Request, res: Response) => {
   if (!req.user) throw new ApiError(401, 'UNAUTHORIZED', 'Invalid or expired token');
   const milestoneId = getParam(req.params.id);
@@ -219,4 +290,39 @@ export const verifyMilestoneController = async (req: Request, res: Response) => 
   const { milestoneType } = milestoneVerifySchema.parse(req.body);
   const newScore = await verifyMilestone(req.user._id, milestoneId, milestoneType);
   res.status(200).json(new ApiResponse({ verified: true, newScore }));
+};
+
+export const getMentorshipProgramsController = async (req: Request, res: Response) => {
+  const query = listMentorshipProgramsQuerySchema.parse(req.query);
+  res.status(200).json(new ApiResponse(await getMentorshipPrograms(query.status)));
+};
+
+export const getProjectMentorshipsController = async (_req: Request, res: Response) => {
+  res.status(200).json(new ApiResponse(await getProjectMentorships()));
+};
+
+export const getMentorsController = async (_req: Request, res: Response) => {
+  res.status(200).json(new ApiResponse(await getMentorDirectory()));
+};
+
+export const createMentorProfileController = async (req: Request, res: Response) => {
+  if (!req.user) throw new ApiError(401, 'UNAUTHORIZED', 'Invalid or expired token');
+  const payload = createMentorProfileSchema.parse(req.body);
+  res.status(201).json(new ApiResponse(await createMentorProfile(req.user._id, payload)));
+};
+
+export const reviewMentorshipProgramController = async (req: Request, res: Response) => {
+  if (!req.user) throw new ApiError(401, 'UNAUTHORIZED', 'Invalid or expired token');
+  const programId = getParam(req.params.id);
+  if (!programId || !isObjectId(programId)) throw new ApiError(400, 'INVALID_ID', 'Invalid ID format');
+  const payload = reviewInstitutionMentorshipProgramSchema.parse(req.body);
+  res.status(200).json(new ApiResponse(await reviewMentorshipProgram(req.user._id, programId, payload)));
+};
+
+export const reviewProjectMentorAssignmentController = async (req: Request, res: Response) => {
+  if (!req.user) throw new ApiError(401, 'UNAUTHORIZED', 'Invalid or expired token');
+  const workspaceId = getParam(req.params.workspaceId);
+  if (!workspaceId || !isObjectId(workspaceId)) throw new ApiError(400, 'INVALID_ID', 'Invalid ID format');
+  const payload = projectMentorAssignmentSchema.parse(req.body);
+  res.status(200).json(new ApiResponse(await reviewProjectMentorAssignment(req.user._id, workspaceId, payload)));
 };

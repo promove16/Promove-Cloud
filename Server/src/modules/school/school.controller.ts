@@ -3,12 +3,14 @@ import { ApiResponse } from '../../utils/ApiResponse';
 import {
   cancelSchoolStudentRosterInvite,
   createManagedStudentCredentialsSchema,
+  createSchoolMentorshipProgramRequest,
   createSchoolManagedStudentCredentials,
   createSchoolStudentAccessToken,
   createSchoolStudentRosterEntry,
   createStudentAccessTokenSchema,
   getInvestorDirectory,
   getLatestComplianceReport,
+  getSchoolMentorshipPrograms,
   getSchoolPendingStudentVerifications,
   getSchoolStudentRoster,
   getSchoolStudentAccessTokens,
@@ -24,6 +26,7 @@ import {
 } from './school.service';
 import { generateSchoolReport } from '../../services/complianceReport';
 import { ApiError } from '../../utils/ApiError';
+import { createInstitutionMentorshipProgramSchema } from '../mentor/mentor.validation';
 
 export const getSchoolDashboardController = async (req: Request, res: Response) => {
   const data = await getSchoolDashboard(req.user!._id);
@@ -135,4 +138,15 @@ export const importSchoolStudentCredentialsController = async (req: Request, res
     buffer: req.file.buffer,
   });
   res.status(200).json(new ApiResponse(data));
+};
+
+export const listSchoolMentorshipProgramsController = async (req: Request, res: Response) => {
+  const data = await getSchoolMentorshipPrograms(req.user!._id);
+  res.status(200).json(new ApiResponse(data));
+};
+
+export const createSchoolMentorshipProgramController = async (req: Request, res: Response) => {
+  const payload = createInstitutionMentorshipProgramSchema.parse(req.body);
+  const data = await createSchoolMentorshipProgramRequest(req.user!._id, req.user!._id, payload);
+  res.status(201).json(new ApiResponse(data));
 };

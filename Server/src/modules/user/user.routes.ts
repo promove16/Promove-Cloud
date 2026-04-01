@@ -9,6 +9,7 @@ import {
   getMySessions,
   launchToRecruiters,
   patchMe,
+  trackMeActivity,
   searchUsers,
 } from './user.controller';
 
@@ -17,6 +18,7 @@ const router = Router();
 router.get('/search', authenticate, asyncHandler(searchUsers));
 router.get('/me', authenticate, asyncHandler(getMe));
 router.patch('/me', authenticate, asyncHandler(patchMe));
+router.post('/me/activity', authenticate, asyncHandler(trackMeActivity));
 router.post('/me/social-enrich', authenticate, asyncHandler(enrichMeFromSocialLinks));
 router.get('/me/sessions', authenticate, authorize(UserRole.STUDENT), asyncHandler(getMySessions));
 router.post(

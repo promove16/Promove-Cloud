@@ -5,6 +5,7 @@ import {
   getMyStartup,
   launchSchema,
   launchStartup,
+  requestStartupReview,
   startupSchema,
   updateStartupProfile,
   uploadPitchDeck,
@@ -39,6 +40,15 @@ export const launchStartupController = async (req: Request, res: Response) => {
     throw new ApiError(400, 'STARTUP_REQUIRED', 'Startup id is required');
   }
   const startup = await launchStartup(startupId, req.user!._id, launchSchema.parse(req.body));
+  res.json(new ApiResponse(startup));
+};
+
+export const requestStartupReviewController = async (req: Request, res: Response) => {
+  const startupId = getParam(req.params.id);
+  if (!startupId) {
+    throw new ApiError(400, 'STARTUP_REQUIRED', 'Startup id is required');
+  }
+  const startup = await requestStartupReview(startupId, req.user!._id);
   res.json(new ApiResponse(startup));
 };
 

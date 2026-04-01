@@ -36,6 +36,8 @@ const STAGE_LABELS: Record<DealStage, string> = {
 const STAGE_ORDER: DealStage[] = [1, 2, 3, 4];
 const MAX_PENNY_EQUITY = 49;
 const MAX_PENNY_EQUITY_PER_INVESTOR = 5;
+const DEFAULT_PROMOVE_ROYALTY_PERCENTAGE = 2.5;
+const DEFAULT_SHARE_CLASS_LABEL = 'Common Equity';
 
 export const ExpressInterestSchema = z.object({
   investorType: z.enum(['penny', 'sole']),
@@ -114,8 +116,98 @@ const currentStage = (deal: DealDocumentLike): DealStage => deal.stage;
 const nextActionLabel = (deal: DealDocumentLike): string => {
   if (deal.stage === 1) return 'Advance to Fund Transfer';
   if (deal.stage === 2) return 'Advance to Equity Transfer';
-  if (deal.stage === 3) return deal.adminApprovedAt ? 'Advance to Portfolio' : 'Awaiting Admin Verification';
+  if (deal.stage === 3) return deal.adminApprovedAt ? 'Advance to Portfolio' : 'Awaiting ProMove Mediation Review';
   return 'View in Portfolio';
+};
+
+const calculateRoyaltyAmount = (amountINR: number, royaltyPercentage: number) =>
+  round((amountINR * royaltyPercentage) / 100);
+
+const getRoyaltyPercentage = (deal: DealDocumentLike) =>
+  deal.royalty?.promovePercentage ?? DEFAULT_PROMOVE_ROYALTY_PERCENTAGE;
+
+const getStockDetailsView = (deal: DealDocumentLike) => ({
+  shareClassLabel: deal.stockDetails?.shareClassLabel ?? DEFAULT_SHARE_CLASS_LABEL,
+  sharePriceInr:
+    deal.stockDetails?.sharePriceInr ??
+    (deal.sharesAllocated > 0 ? round(deal.amountINR / deal.sharesAllocated) : 0),
+  transferValueInr: deal.stockDetails?.transferValueInr ?? deal.amountINR,
+  totalSharesConsidered: deal.stockDetails?.totalSharesConsidered ?? deal.sharesAllocated,
+});
+
+const getStockTransferView = (deal: DealDocumentLike) => ({
+  status: deal.stockTransfer?.status ?? (deal.stage >= 3 ? 'pending_review' : 'not_started'),
+  ...(deal.stockTransfer?.requestedAt ? { requestedAt: deal.stockTransfer.requestedAt.toISOString() } : {}),
+  ...(deal.stockTransfer?.requestedByRole ? { requestedByRole: deal.stockTransfer.requestedByRole } : {}),
+  ...(deal.stockTransfer?.requestSummary ? { requestSummary: deal.stockTransfer.requestSummary } : {}),
+  ...(deal.stockTransfer?.reviewNotes ? { reviewNotes: deal.stockTransfer.reviewNotes } : {}),
+  ...(deal.stockTransfer?.reviewedAt ? { reviewedAt: deal.stockTransfer.reviewedAt.toISOString() } : {}),
+  ...(deal.stockTransfer?.reviewedBy ? { reviewedBy: String(deal.stockTransfer.reviewedBy) } : {}),
+});
+
+const getRoyaltyView = (deal: DealDocumentLike) => {
+  const promovePercentage = getRoyaltyPercentage(deal);
+
+  return {
+    promovePercentage,
+    promoveAmountINR:
+      deal.royalty?.promoveAmountINR ?? calculateRoyaltyAmount(deal.amountINR, promovePercentage),
+    status: deal.royalty?.status ?? 'pending',
+    ...(deal.royalty?.settledAt ? { settledAt: deal.royalty.settledAt.toISOString() } : {}),
+  };
+};
+
+const buildDealFinancialMetadata = (
+  deal: DealDocumentLike,
+  requestSummary?: string,
+) => {
+  const royaltyPercentage = getRoyaltyPercentage(deal);
+  const sharePriceInr = deal.sharesAllocated > 0 ? round(deal.amountINR / deal.sharesAllocated) : 0;
+  const mediatorLabel = deal.mediatorLabel || 'ProMove';
+  const stockDetails = {
+    shareClassLabel: deal.stockDetails?.shareClassLabel ?? DEFAULT_SHARE_CLASS_LABEL,
+    sharePriceInr,
+    transferValueInr: deal.amountINR,
+    totalSharesConsidered: deal.sharesAllocated,
+  };
+  const royalty = {
+    promovePercentage: royaltyPercentage,
+    promoveAmountINR: calculateRoyaltyAmount(deal.amountINR, royaltyPercentage),
+    status: deal.royalty?.status ?? 'pending',
+    ...(deal.royalty?.settledAt ? { settledAt: deal.royalty.settledAt } : {}),
+  };
+
+  if (requestSummary) {
+    return {
+      mediatorLabel,
+      stockDetails,
+      royalty,
+      stockTransfer: {
+        status: 'pending_review' as const,
+        requestedAt: new Date(),
+        requestedByRole: 'investor' as const,
+        requestSummary,
+        ...(deal.stockTransfer?.reviewNotes ? { reviewNotes: deal.stockTransfer.reviewNotes } : {}),
+      },
+      mediationStatus: 'under_review' as const,
+    };
+  }
+
+  return {
+    mediatorLabel,
+    stockDetails,
+    royalty,
+    stockTransfer: {
+      status: deal.stockTransfer?.status ?? 'not_started',
+      ...(deal.stockTransfer?.requestedAt ? { requestedAt: deal.stockTransfer.requestedAt } : {}),
+      ...(deal.stockTransfer?.requestedByRole ? { requestedByRole: deal.stockTransfer.requestedByRole } : {}),
+      ...(deal.stockTransfer?.requestSummary ? { requestSummary: deal.stockTransfer.requestSummary } : {}),
+      ...(deal.stockTransfer?.reviewNotes ? { reviewNotes: deal.stockTransfer.reviewNotes } : {}),
+      ...(deal.stockTransfer?.reviewedAt ? { reviewedAt: deal.stockTransfer.reviewedAt } : {}),
+      ...(deal.stockTransfer?.reviewedBy ? { reviewedBy: deal.stockTransfer.reviewedBy } : {}),
+    },
+    mediationStatus: deal.stage >= 3 ? ('under_review' as const) : deal.mediationStatus ?? 'intake',
+  };
 };
 
 const getParticipantSummary = (user: LeanUser | undefined) => {
@@ -143,6 +235,9 @@ const buildSummary = (
   startupId: String(deal.startupId),
   studentId: String(deal.studentId),
   investorId: String(deal.investorId),
+  mediatorLabel: deal.mediatorLabel ?? 'ProMove',
+  requestOrigin: deal.requestOrigin ?? 'investor',
+  mediationStatus: deal.mediationStatus ?? (deal.stage >= 3 ? 'under_review' : 'intake'),
   startupName: startup.name,
   startupCategory: startup.category,
   studentDisplayName: student.displayName,
@@ -160,6 +255,9 @@ const buildSummary = (
   canRequestUpdates: deal.canRequestUpdates,
   adminApprovalRequired: deal.adminApprovalRequired,
   ...(deal.adminApprovedAt ? { adminApprovedAt: deal.adminApprovedAt.toISOString() } : {}),
+  stockDetails: getStockDetailsView(deal),
+  stockTransfer: getStockTransferView(deal),
+  royalty: getRoyaltyView(deal),
   innovationScoreSnapshot: deal.innovationScoreSnapshot,
   nextActionLabel: nextActionLabel(deal),
   createdAt: deal.createdAt.toISOString(),
@@ -474,6 +572,9 @@ export const createInvestorDealFromInterest = async (
     investorId,
     startupId,
     studentId,
+    mediatorLabel: 'ProMove',
+    requestOrigin: 'investor',
+    mediationStatus: 'intake',
     investorType: parsed.investorType,
     stage: 1,
     amountINR: parsed.proposedAmountINR,
@@ -481,6 +582,20 @@ export const createInvestorDealFromInterest = async (
     equityPercent: parsed.proposedEquityPercent,
     proposedEquityPercent: parsed.proposedEquityPercent,
     sharesAllocated: sharesToAllocate,
+    stockDetails: {
+      shareClassLabel: DEFAULT_SHARE_CLASS_LABEL,
+      sharePriceInr: sharesToAllocate > 0 ? round(parsed.proposedAmountINR / sharesToAllocate) : 0,
+      transferValueInr: parsed.proposedAmountINR,
+      totalSharesConsidered: sharesToAllocate,
+    },
+    stockTransfer: {
+      status: 'not_started',
+    },
+    royalty: {
+      promovePercentage: DEFAULT_PROMOVE_ROYALTY_PERCENTAGE,
+      promoveAmountINR: calculateRoyaltyAmount(parsed.proposedAmountINR, DEFAULT_PROMOVE_ROYALTY_PERCENTAGE),
+      status: 'pending',
+    },
     ...authority,
     innovationScoreSnapshot: founder.innovationScore ?? 0,
     status: 'active',
@@ -642,6 +757,7 @@ export const advanceDealStage = async (
 ): Promise<DealTransitionResponse> => {
   await ensureInvestor(investorId);
   const parsed = transitionSchema.parse(payload);
+  const isStageThreeTransition = parsed.newStage === 3;
 
   const deal = await Deal.findOne({
     _id: dealId,
@@ -684,6 +800,12 @@ export const advanceDealStage = async (
     deal.adminApprovalRequired = false;
     deal.adminApprovedAt = undefined;
     deal.adminApprovedBy = undefined;
+    deal.mediationStatus = 'intake';
+    const metadata = buildDealFinancialMetadata(deal.toObject() as DealDocumentLike);
+    deal.mediatorLabel = metadata.mediatorLabel;
+    deal.stockDetails = metadata.stockDetails;
+    deal.stockTransfer = metadata.stockTransfer;
+    deal.royalty = metadata.royalty;
   }
 
   if (parsed.newStage === 3) {
@@ -723,11 +845,21 @@ export const advanceDealStage = async (
     deal.canRequestUpdates = authority.canRequestUpdates;
     deal.adminApprovedAt = undefined;
     deal.adminApprovedBy = undefined;
+    const metadata = buildDealFinancialMetadata(
+      deal.toObject() as DealDocumentLike,
+      `${startup.name} stock transfer request submitted to ProMove for ${nextEquityPercent}% equity (${sharesToAllocate} shares).`,
+    );
+    deal.mediatorLabel = metadata.mediatorLabel;
+    deal.requestOrigin = deal.requestOrigin ?? 'investor';
+    deal.mediationStatus = metadata.mediationStatus;
+    deal.stockDetails = metadata.stockDetails;
+    deal.stockTransfer = metadata.stockTransfer;
+    deal.royalty = metadata.royalty;
     await deal.save();
     await invalidateInvestmentCaches(String(deal.startupId), investorId);
     return {
       requiresAdminApproval: true,
-      message: 'Stage 3 requires admin verification.',
+      message: 'Stage 3 submitted to ProMove for mediation and stock transfer review.',
     };
   }
 
@@ -736,6 +868,7 @@ export const advanceDealStage = async (
     deal.status = 'closed';
     deal.closedAt = new Date();
     deal.adminApprovalRequired = false;
+    deal.mediationStatus = deal.mediationStatus ?? 'approved';
   }
 
   await deal.save();
@@ -747,7 +880,10 @@ export const advanceDealStage = async (
     userId: String(deal.studentId),
     type: 'deal_interest',
     title: `Your deal has moved to Stage ${parsed.newStage}`,
-    body: `${context.investor.displayName} advanced the deal for ${context.startup.name}.`,
+    body:
+      isStageThreeTransition
+        ? `${context.investor.displayName} submitted ${context.startup.name} to ProMove for stock transfer review.`
+        : `${context.investor.displayName} advanced the deal for ${context.startup.name}.`,
     link: '/startup-launch',
   });
 

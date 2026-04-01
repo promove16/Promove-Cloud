@@ -1,6 +1,6 @@
 "use strict";
 Object.defineProperty(exports, "__esModule", { value: true });
-exports.getMarketplaceProfile = exports.getMarketplace = void 0;
+exports.getMarketplaceProfile = exports.getMarketplaceEntityDetail = exports.getMarketplace = void 0;
 const ApiResponse_1 = require("../../utils/ApiResponse");
 const marketplace_service_1 = require("./marketplace.service");
 const roles_types_1 = require("../../types/roles.types");
@@ -11,6 +11,16 @@ const getMarketplace = async (req, res) => {
     res.json(new ApiResponse_1.ApiResponse(users));
 };
 exports.getMarketplace = getMarketplace;
+const getMarketplaceEntityDetail = async (req, res) => {
+    const entityType = getParam(req.params.entityType);
+    const entityId = getParam(req.params.entityId);
+    if (!entityType || !entityId) {
+        throw new Error('Marketplace entity type and id are required');
+    }
+    const entity = await (0, marketplace_service_1.getMarketplaceEntity)(req.user.role, entityType, entityId);
+    res.json(new ApiResponse_1.ApiResponse(entity));
+};
+exports.getMarketplaceEntityDetail = getMarketplaceEntityDetail;
 const getMarketplaceProfile = async (req, res) => {
     const userId = getParam(req.params.userId);
     if (!userId) {

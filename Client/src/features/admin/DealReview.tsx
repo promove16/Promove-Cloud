@@ -1,504 +1,449 @@
+import { useMemo, type ReactNode } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
-import { isAxiosError } from 'axios';
-import {
-  ArrowLeft,
-  ArrowRight,
-  CheckCircle2,
-  ExternalLink,
-  FileCheck,
-  Landmark,
-  type LucideIcon,
-  PieChart,
-  ShieldCheck,
-  Wallet,
-} from 'lucide-react';
-import { Navigate, useNavigate, useParams } from 'react-router-dom';
+import { ArrowRight, ExternalLink, FileText, GitBranch, TrendingUp } from 'lucide-react';
+import { useParams } from 'react-router-dom';
 import { adminApi, type AdminDealReviewItem } from '../../api/admin.api';
 import { Badge } from '../../components/ui/Badge';
 import { Button } from '../../components/ui/Button';
 import { Card } from '../../components/ui/Card';
 import { Spinner } from '../../components/ui/Spinner';
-import { CapTableInvestorRow } from '../../types/deal.types';
 
-const formatCurrency = new Intl.NumberFormat('en-IN', {
+const currency = new Intl.NumberFormat('en-IN', {
   style: 'currency',
   currency: 'INR',
   maximumFractionDigits: 0,
 });
 
-const formatNumber = new Intl.NumberFormat('en-IN');
+const number = new Intl.NumberFormat('en-IN');
 
-const stageLabels: Record<1 | 2 | 3 | 4, string> = {
-  1: 'Due Diligence',
-  2: 'Fund Transfer',
-  3: 'Equity Transfer',
-  4: 'Portfolio',
+const transferTone: Record<string, string> = {
+  not_started: 'border-slate-700 bg-slate-900 text-slate-300',
+  pending_review: 'border-amber-500/30 bg-amber-500/10 text-amber-300',
+  under_review: 'border-cyan-500/30 bg-cyan-500/10 text-cyan-300',
+  approved: 'border-emerald-500/30 bg-emerald-500/10 text-emerald-300',
 };
 
-const roleLabel = (value?: string) => (value ? value.charAt(0).toUpperCase() + value.slice(1) : 'Pending');
-
-const formatDateTime = (value?: string) =>
-  value ? new Date(value).toLocaleString('en-IN', { dateStyle: 'medium', timeStyle: 'short' }) : 'Not recorded';
-
-const getErrorMessage = (error: unknown) => {
-  if (isAxiosError<{ error?: { message?: string } }>(error)) {
-    return error.response?.data?.error?.message ?? 'Unable to load this transaction.';
-  }
-
-  return error instanceof Error ? error.message : 'Unable to load this transaction.';
+const breakdownLabels: Record<string, string> = {
+  problemsClaimed: 'Problems Claimed',
+  skillsCompleted: 'Skills Completed',
+  progressUploads: 'Progress Uploads',
+  patentsSubmitted: 'Patents Submitted',
+  patentsApproved: 'Patents Approved',
+  mvpsVerified: 'MVPs Verified',
+  marketReadyVerified: 'Market Ready',
+  startupsLaunched: 'Startups Launched',
+  awardsApproved: 'Awards Approved',
 };
 
-function MetricTile({
-  icon: Icon,
-  label,
-  value,
-  tone = 'default',
-}: {
-  icon: LucideIcon;
-  label: string;
-  value: string;
-  tone?: 'default' | 'success';
-}) {
+const money = (value?: number | null) => currency.format(value ?? 0);
+const pct = (value?: number | null) => `${(value ?? 0).toFixed(value && value % 1 !== 0 ? 2 : 0)}%`;
+const dt = (value?: string) =>
+  value
+    ? new Date(value).toLocaleString('en-IN', { dateStyle: 'medium', timeStyle: 'short' })
+    : 'Pending';
+const d = (value?: string) =>
+  value ? new Date(value).toLocaleDateString('en-IN', { dateStyle: 'medium' }) : 'Pending';
+const role = (value?: string) => (value ? `${value.charAt(0).toUpperCase()}${value.slice(1)}` : 'Pending');
+const trigger = (value: string) =>
+  value
+    .split('_')
+    .map((part) => `${part.charAt(0).toUpperCase()}${part.slice(1).toLowerCase()}`)
+    .join(' ');
+
+function Stat({ label, value, detail }: { label: string; value: string; detail?: string }) {
   return (
-    <div className="rounded-3xl border border-slate-800 bg-slate-900/70 p-5">
-      <div
-        className={`flex h-11 w-11 items-center justify-center rounded-2xl ${
-          tone === 'success' ? 'bg-emerald-500/15 text-emerald-300' : 'bg-cyan-500/10 text-cyan-300'
-        }`}
-      >
-        <Icon className="h-5 w-5" />
-      </div>
-      <div className="mt-4 text-xs uppercase tracking-[0.24em] text-slate-500">{label}</div>
-      <div className="mt-2 text-2xl font-semibold text-white">{value}</div>
+    <div className="border border-slate-800 bg-slate-950/80 px-4 py-4">
+      <div className="text-[11px] uppercase tracking-[0.26em] text-slate-500">{label}</div>
+      <div className="mt-3 text-2xl font-semibold text-white">{value}</div>
+      {detail ? <div className="mt-2 text-sm text-slate-400">{detail}</div> : null}
     </div>
   );
 }
 
-function PartyPanel({
+function Section({
+  eyebrow,
   title,
-  subtitle,
-  name,
-  score,
-  role,
+  description,
+  children,
 }: {
+  eyebrow: string;
   title: string;
-  subtitle: string;
-  name: string;
-  score: number;
-  role: string;
+  description: string;
+  children: ReactNode;
 }) {
   return (
-    <div className="rounded-3xl border border-slate-800 bg-slate-900/70 p-5">
-      <div className="text-xs uppercase tracking-[0.24em] text-slate-500">{title}</div>
-      <div className="mt-3 text-xl font-semibold text-white">{name}</div>
-      <div className="mt-2 text-sm text-slate-400">{subtitle}</div>
-      <div className="mt-5 flex flex-wrap gap-2">
-        <Badge>{roleLabel(role)}</Badge>
-        <Badge className="border-cyan-500/30 bg-cyan-500/10 text-cyan-300">{score}/200 score</Badge>
+    <Card className="overflow-hidden rounded-none border border-slate-800 bg-slate-950">
+      <div className="border-b border-slate-800 px-6 py-5 lg:px-8">
+        <div className="text-[11px] uppercase tracking-[0.3em] text-cyan-300">{eyebrow}</div>
+        <h2 className="mt-2 text-2xl font-semibold text-white">{title}</h2>
+        <p className="mt-2 text-sm leading-6 text-slate-400">{description}</p>
       </div>
-    </div>
-  );
-}
-
-function CapTableRow({
-  row,
-  isActive,
-}: {
-  row: CapTableInvestorRow;
-  isActive: boolean;
-}) {
-  return (
-    <div
-      className={`grid gap-3 rounded-3xl border p-4 md:grid-cols-[1.5fr,0.8fr,0.8fr,0.9fr] ${
-        isActive
-          ? 'border-cyan-500/40 bg-cyan-500/10 shadow-[0_0_0_1px_rgba(34,211,238,0.12)]'
-          : 'border-slate-800 bg-slate-900/60'
-      }`}
-    >
-      <div>
-        <div className="text-xs uppercase tracking-[0.2em] text-slate-500">Investor</div>
-        <div className="mt-2 font-semibold text-white">{row.name ?? 'Restricted'}</div>
-        <div className="mt-1 text-sm text-slate-400">{roleLabel(row.investorRole)}</div>
-      </div>
-      <div>
-        <div className="text-xs uppercase tracking-[0.2em] text-slate-500">Equity</div>
-        <div className="mt-2 font-semibold text-white">{row.equityPercent}%</div>
-      </div>
-      <div>
-        <div className="text-xs uppercase tracking-[0.2em] text-slate-500">Shares</div>
-        <div className="mt-2 font-semibold text-white">{formatNumber.format(row.sharesAllocated)}</div>
-      </div>
-      <div>
-        <div className="text-xs uppercase tracking-[0.2em] text-slate-500">Voting</div>
-        <div className="mt-2 font-semibold text-white">{row.votingWeight}%</div>
-      </div>
-    </div>
-  );
-}
-
-function ReviewChecklist({ deal }: { deal: AdminDealReviewItem }) {
-  const checks = [
-    {
-      label: 'Fund transfer initiated',
-      value: deal.fundTransferInitiatedAt ? formatDateTime(deal.fundTransferInitiatedAt) : 'Waiting for stage 2 transfer log',
-      complete: Boolean(deal.fundTransferInitiatedAt),
-    },
-    {
-      label: 'Equity transfer staged',
-      value: deal.stage >= 3 ? `Stage ${deal.stage} - ${stageLabels[deal.stage]}` : 'Transaction has not reached review stage',
-      complete: deal.stage >= 3,
-    },
-    {
-      label: 'Authority terms resolved',
-      value: `${roleLabel(deal.investorRole)} with ${deal.votingWeight ?? 0}% voting weight`,
-      complete: typeof deal.votingWeight === 'number' && typeof deal.investorRole === 'string',
-    },
-    {
-      label: 'Admin verification',
-      value: deal.adminApprovedAt ? formatDateTime(deal.adminApprovedAt) : 'Pending admin approval',
-      complete: Boolean(deal.adminApprovedAt),
-    },
-  ];
-
-  return (
-    <div className="space-y-3">
-      {checks.map((item) => (
-        <div
-          key={item.label}
-          className={`rounded-3xl border px-4 py-4 ${
-            item.complete ? 'border-emerald-500/20 bg-emerald-500/10' : 'border-slate-800 bg-slate-900/70'
-          }`}
-        >
-          <div className="flex items-start gap-3">
-            <div
-              className={`mt-0.5 flex h-8 w-8 items-center justify-center rounded-full ${
-                item.complete ? 'bg-emerald-500/20 text-emerald-300' : 'bg-slate-800 text-slate-400'
-              }`}
-            >
-              <CheckCircle2 className="h-4 w-4" />
-            </div>
-            <div>
-              <div className="text-sm font-semibold text-white">{item.label}</div>
-              <div className="mt-1 text-sm text-slate-400">{item.value}</div>
-            </div>
-          </div>
-        </div>
-      ))}
-    </div>
+      <div className="px-6 py-6 lg:px-8">{children}</div>
+    </Card>
   );
 }
 
 export default function DealReview() {
-  const { dealId } = useParams();
-  const navigate = useNavigate();
+  const { dealId } = useParams<{ dealId: string }>();
   const queryClient = useQueryClient();
 
   const dealQuery = useQuery({
-    queryKey: ['admin-deal', dealId],
+    queryKey: ['admin-deal-review', dealId],
     queryFn: () => adminApi.getDeal(dealId!),
     enabled: Boolean(dealId),
   });
 
+  const deal = dealQuery.data as AdminDealReviewItem | undefined;
+
   const capTableQuery = useQuery({
-    queryKey: ['admin-cap-table', dealQuery.data?.startupId],
-    queryFn: () => adminApi.getStartupCapTable(dealQuery.data!.startupId),
-    enabled: Boolean(dealQuery.data?.startupId),
+    queryKey: ['admin-startup-cap-table', deal?.startup._id],
+    queryFn: () => adminApi.getStartupCapTable(deal!.startup._id),
+    enabled: Boolean(deal?.startup._id),
   });
 
   const approveMutation = useMutation({
     mutationFn: adminApi.approveDealStage,
     onSuccess: async () => {
-      await Promise.all([
-        queryClient.invalidateQueries({ queryKey: ['admin-deals'] }),
-        queryClient.invalidateQueries({ queryKey: ['admin-deal', dealId] }),
-        queryClient.invalidateQueries({ queryKey: ['admin-analytics'] }),
-        queryClient.invalidateQueries({ queryKey: ['admin-cap-table', dealQuery.data?.startupId] }),
-      ]);
+      await queryClient.invalidateQueries({ queryKey: ['admin-deal-review', dealId] });
+      await queryClient.invalidateQueries({ queryKey: ['admin-deals'] });
+      await queryClient.invalidateQueries({ queryKey: ['admin-startup-cap-table', deal?.startup._id] });
+      await queryClient.invalidateQueries({ queryKey: ['admin-analytics'] });
     },
   });
 
-  if (!dealId) {
-    return <Navigate to="/dashboard/admin/deals" replace />;
-  }
+  const metrics = useMemo(() => {
+    if (!deal) return null;
+    const amount = deal.amountINR ?? deal.stockDetails.transferValueInr ?? 0;
+    const fundingNeeded = deal.startup.fundingNeeded ?? 0;
+    const equity = deal.equityPercent ?? 0;
+    const postMoney = equity > 0 ? amount / (equity / 100) : null;
+    return {
+      amount,
+      coverage: fundingNeeded > 0 ? (amount / fundingNeeded) * 100 : null,
+      gap: fundingNeeded > 0 ? Math.max(fundingNeeded - amount, 0) : null,
+      postMoney,
+      preMoney: postMoney !== null ? Math.max(postMoney - amount, 0) : null,
+    };
+  }, [deal]);
+
+  const canApprove = deal
+    ? deal.stage === 3 && deal.stockTransfer.status !== 'approved' && !deal.adminApprovedAt
+    : false;
 
   if (dealQuery.isLoading) {
     return (
-      <div className="flex min-h-[45vh] items-center justify-center">
+      <div className="flex items-center justify-center py-16">
         <Spinner />
       </div>
     );
   }
 
-  if (dealQuery.isError || !dealQuery.data) {
+  if (!deal) {
     return (
-      <Card className="max-w-3xl space-y-4 p-8">
-        <div className="text-xs uppercase tracking-[0.3em] text-cyan-300">Deals</div>
-        <h1 className="text-3xl font-bold text-white">Transaction review unavailable</h1>
-        <p className="text-slate-400">{getErrorMessage(dealQuery.error)}</p>
-        <div>
-          <Button variant="secondary" onClick={() => navigate('/dashboard/admin/deals')}>
-            Back to approvals
-          </Button>
-        </div>
+      <Card className="p-6">
+        <div className="text-sm text-slate-400">Deal not found.</div>
       </Card>
     );
   }
 
-  const deal = dealQuery.data;
-  const capTable = capTableQuery.data;
-  const capTableRows = [
-    ...(capTable?.soleInvestor ? [capTable.soleInvestor] : []),
-    ...(capTable?.pennyInvestors ?? []),
-  ];
-  const activeDealRow = capTableRows.find((row) => row.dealId === deal._id);
-  const canApprove = deal.adminApprovalRequired && deal.stage === 3 && !deal.adminApprovedAt;
-
   return (
     <div className="space-y-6">
-      <div className="flex flex-col gap-4 xl:flex-row xl:items-start xl:justify-between">
-        <div className="space-y-4">
-          <button
-            type="button"
-            onClick={() => navigate('/dashboard/admin/deals')}
-            className="inline-flex items-center gap-2 text-sm font-semibold text-slate-400 transition hover:text-white"
-          >
-            <ArrowLeft className="h-4 w-4" />
-            Back to approvals
-          </button>
-          <div>
-            <div className="text-xs uppercase tracking-[0.3em] text-cyan-300">Transaction Review</div>
-            <h1 className="mt-2 text-3xl font-bold text-white">{deal.startup.name}</h1>
-            <p className="mt-2 max-w-3xl text-slate-400">
-              Review the staged equity transfer, confirm authority terms, and approve the transaction once the
-              funding and cap-table context look correct.
-            </p>
-          </div>
-          <div className="flex flex-wrap gap-2">
-            <Badge>Stage {deal.stage}</Badge>
-            <Badge className="border-cyan-500/30 bg-cyan-500/10 text-cyan-300">{stageLabels[deal.stage]}</Badge>
-            {deal.investorType ? (
-              <Badge className="border-amber-500/30 bg-amber-500/10 text-amber-300">{deal.investorType.toUpperCase()}</Badge>
-            ) : null}
-            <Badge>{roleLabel(deal.investorRole)}</Badge>
-            {deal.canVeto ? <Badge className="border-red-500/30 bg-red-500/10 text-red-300">Veto Enabled</Badge> : null}
-            {deal.adminApprovedAt ? (
-              <Badge className="border-emerald-500/30 bg-emerald-500/10 text-emerald-300">Approved</Badge>
-            ) : (
-              <Badge className="border-amber-500/30 bg-amber-500/10 text-amber-300">Pending Admin Review</Badge>
-            )}
-          </div>
-        </div>
-
-        <div className="flex w-full max-w-xl flex-col gap-3 rounded-[2rem] border border-slate-800 bg-slate-900/70 p-5 xl:items-end">
-          <div className="text-right">
-            <div className="text-xs uppercase tracking-[0.24em] text-slate-500">Transaction ID</div>
-            <div className="mt-2 font-mono text-sm text-slate-300">{deal._id}</div>
-          </div>
-          {approveMutation.isError ? (
-            <div className="w-full rounded-2xl border border-red-500/30 bg-red-500/10 px-4 py-3 text-sm text-red-200">
-              {getErrorMessage(approveMutation.error)}
-            </div>
-          ) : null}
-          {approveMutation.isSuccess ? (
-            <div className="w-full rounded-2xl border border-emerald-500/30 bg-emerald-500/10 px-4 py-3 text-sm text-emerald-200">
-              Equity transfer approved. The investor can now move the deal forward.
-            </div>
-          ) : null}
-          <div className="flex w-full flex-col gap-3 sm:flex-row sm:justify-end">
-            <Button variant="secondary" onClick={() => navigate('/dashboard/admin/deals')}>
-              Return to queue
-            </Button>
-            <Button onClick={() => approveMutation.mutate(deal._id)} disabled={!canApprove || approveMutation.isPending}>
-              {approveMutation.isPending ? 'Approving...' : canApprove ? 'Approve Equity Transfer' : 'Approval Complete'}
-              <ArrowRight className="ml-2 h-4 w-4" />
-            </Button>
-          </div>
-        </div>
-      </div>
-
-      <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
-        <MetricTile
-          icon={Wallet}
-          label="Investment Amount"
-          value={formatCurrency.format(deal.amountINR ?? 0)}
-        />
-        <MetricTile
-          icon={PieChart}
-          label="Equity Requested"
-          value={`${deal.equityPercent ?? 0}%`}
-        />
-        <MetricTile
-          icon={Landmark}
-          label="Allocated Shares"
-          value={formatNumber.format(deal.sharesAllocated ?? 0)}
-        />
-        <MetricTile
-          icon={deal.adminApprovedAt ? CheckCircle2 : ShieldCheck}
-          label="Admin Status"
-          value={deal.adminApprovedAt ? 'Verified' : 'Pending'}
-          tone={deal.adminApprovedAt ? 'success' : 'default'}
-        />
-      </div>
-
-      <div className="grid gap-6 xl:grid-cols-[1.1fr,0.9fr]">
-        <Card className="space-y-5 p-6">
-          <div className="flex items-start justify-between gap-4">
-            <div>
-              <div className="text-xs uppercase tracking-[0.3em] text-cyan-300">Terms Snapshot</div>
-              <h2 className="mt-2 text-2xl font-semibold text-white">Commercial and authority terms</h2>
-            </div>
-            <Badge className="border-slate-700 bg-slate-900 text-slate-300">{deal.status}</Badge>
-          </div>
-
-          <div className="grid gap-4 md:grid-cols-2">
-            <div className="rounded-3xl border border-slate-800 bg-slate-900/60 p-5">
-              <div className="text-xs uppercase tracking-[0.2em] text-slate-500">Next action</div>
-              <div className="mt-2 text-lg font-semibold text-white">{deal.nextActionLabel}</div>
-              <div className="mt-2 text-sm text-slate-400">
-                {deal.adminApprovalRequired
-                  ? 'The transaction is blocked until admin review is completed.'
-                  : 'This transaction has cleared the admin gate for the current stage.'}
+      <Card className="overflow-hidden rounded-none border border-slate-800 bg-slate-950">
+        <div className="border-b border-slate-800 px-6 py-6 lg:px-8">
+          <div className="flex flex-col gap-6 xl:flex-row xl:items-start xl:justify-between">
+            <div className="max-w-4xl">
+              <div className="text-[11px] uppercase tracking-[0.35em] text-cyan-300">Deal Review</div>
+              <h1 className="mt-3 text-4xl font-semibold text-white">{deal.startup.name}</h1>
+              <p className="mt-3 text-base leading-7 text-slate-300">{deal.startup.tagline}</p>
+              <div className="mt-4 flex flex-wrap gap-2">
+                <Badge>Stage {deal.stage}</Badge>
+                <Badge className={transferTone[deal.stockTransfer.status] ?? transferTone.not_started}>
+                  {deal.stockTransfer.status.replace(/_/g, ' ')}
+                </Badge>
+                <Badge className="border-slate-700 bg-slate-900 text-slate-300">{deal.startup.stage}</Badge>
+                <Badge className="border-slate-700 bg-slate-900 text-slate-300">{deal.startup.category}</Badge>
               </div>
             </div>
-            <div className="rounded-3xl border border-slate-800 bg-slate-900/60 p-5">
-              <div className="text-xs uppercase tracking-[0.2em] text-slate-500">Authority profile</div>
-              <div className="mt-2 text-lg font-semibold text-white">{roleLabel(deal.investorRole)}</div>
-              <div className="mt-2 text-sm text-slate-400">
-                Voting weight {deal.votingWeight ?? 0}%{deal.canVeto ? ' with veto rights.' : '.'}
-              </div>
-            </div>
-          </div>
-
-          <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-3">
-            <PartyPanel
-              title="Startup"
-              subtitle={`${deal.startup.category} - ${deal.startup.stage}`}
-              name={deal.startup.name}
-              score={deal.innovationScoreSnapshot}
-              role="startup snapshot"
-            />
-            <PartyPanel
-              title="Founder"
-              subtitle="Student account attached to the transaction"
-              name={deal.student.displayName}
-              score={deal.student.innovationScore}
-              role={deal.student.role}
-            />
-            <PartyPanel
-              title="Investor"
-              subtitle="Investor account requesting the transfer"
-              name={deal.investor.displayName}
-              score={deal.investor.innovationScore}
-              role={deal.investor.role}
-            />
-          </div>
-
-          <div className="rounded-3xl border border-slate-800 bg-slate-900/60 p-5">
-            <div className="flex flex-col gap-3 md:flex-row md:items-start md:justify-between">
-              <div>
-                <div className="text-xs uppercase tracking-[0.2em] text-slate-500">Startup context</div>
-                <div className="mt-2 text-lg font-semibold text-white">{deal.startup.tagline}</div>
-                <div className="mt-3 text-sm leading-6 text-slate-400">
-                  This approval should be reviewed against the startup's current stage, requested authority, and cap-table
-                  availability before releasing the transaction.
-                </div>
-              </div>
+            <div className="flex w-full flex-col gap-3 xl:max-w-sm">
               {deal.startup.pitchDeckUrl ? (
-                <a
-                  href={deal.startup.pitchDeckUrl}
-                  target="_blank"
-                  rel="noreferrer"
-                  className="inline-flex items-center gap-2 rounded-2xl border border-slate-700 px-4 py-3 text-sm font-semibold text-white transition hover:border-cyan-500/40"
-                >
-                  Open Pitch Deck
-                  <ExternalLink className="h-4 w-4" />
+                <a href={deal.startup.pitchDeckUrl} target="_blank" rel="noreferrer">
+                  <Button variant="secondary" className="w-full justify-center">
+                    Open Pitch Deck
+                    <ExternalLink className="ml-2 h-4 w-4" />
+                  </Button>
                 </a>
               ) : null}
+              <Button
+                onClick={() => approveMutation.mutate(deal._id)}
+                disabled={!canApprove || approveMutation.isPending}
+                className="w-full justify-center"
+              >
+                {canApprove ? 'Approve Transfer' : 'Transfer Already Reviewed'}
+                <ArrowRight className="ml-2 h-4 w-4" />
+              </Button>
             </div>
           </div>
-        </Card>
-
-        <Card className="space-y-5 p-6">
-          <div>
-            <div className="text-xs uppercase tracking-[0.3em] text-cyan-300">Review Checklist</div>
-            <h2 className="mt-2 text-2xl font-semibold text-white">Approval readiness</h2>
-            <p className="mt-2 text-sm text-slate-400">
-              Verify the stage progression and authority terms before releasing the transaction.
-            </p>
-          </div>
-          <ReviewChecklist deal={deal} />
-        </Card>
-      </div>
-
-      <Card className="space-y-5 p-6">
-        <div className="flex flex-col gap-3 md:flex-row md:items-start md:justify-between">
-          <div>
-            <div className="text-xs uppercase tracking-[0.3em] text-cyan-300">Cap Table</div>
-            <h2 className="mt-2 text-2xl font-semibold text-white">Current ownership impact</h2>
-            <p className="mt-2 text-sm text-slate-400">
-              The highlighted row shows where this transaction sits in the startup's current ownership structure.
-            </p>
-          </div>
-          {activeDealRow ? (
-            <Badge className="border-cyan-500/30 bg-cyan-500/10 text-cyan-300">Transaction located in cap table</Badge>
-          ) : (
-            <Badge className="border-slate-700 bg-slate-900 text-slate-300">Row not available yet</Badge>
-          )}
         </div>
 
-        {capTableQuery.isLoading ? (
-          <div className="flex justify-center py-8">
-            <Spinner />
+        <div className="grid gap-px bg-slate-800 md:grid-cols-2 xl:grid-cols-4">
+          <Stat label="Investor ticket" value={money(deal.amountINR)} detail={`${pct(deal.equityPercent)} equity`} />
+          <Stat label="Funding target" value={deal.startup.fundingNeeded ? money(deal.startup.fundingNeeded) : 'Not provided'} detail={`${deal.startup.activeProducts} active products`} />
+          <Stat label="Founder score" value={number.format(deal.student.innovationScore)} detail={deal.student.displayName} />
+          <Stat label="ProMove royalty" value={money(deal.royalty.promoveAmountINR)} detail={`${deal.royalty.promovePercentage}% mediation fee`} />
+        </div>
+      </Card>
+
+      <div className="grid gap-6 xl:grid-cols-[1.15fr_0.85fr]">
+        <Section
+          eyebrow="Commercial Analytics"
+          title="Revenue expectation and financial signals"
+          description="Derived from the launch profile and the current deal terms."
+        >
+          <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-3">
+            <Stat label="Coverage of target" value={metrics?.coverage !== null && metrics?.coverage !== undefined ? `${metrics.coverage.toFixed(1)}%` : 'Not enough data'} detail={metrics?.gap ? `${money(metrics.gap)} still open` : 'Raise target covered or not disclosed'} />
+            <Stat label="Implied post-money" value={metrics?.postMoney !== null && metrics?.postMoney !== undefined ? money(metrics.postMoney) : 'Pending terms'} detail={metrics?.preMoney !== null && metrics?.preMoney !== undefined ? `Pre-money ${money(metrics.preMoney)}` : 'Requires amount and equity'} />
+            <Stat label="Commercial state" value={deal.startup.traction.revenueGenerating ? 'Revenue active' : 'Pre-revenue'} detail={typeof deal.startup.traction.usersCount === 'number' ? `${number.format(deal.startup.traction.usersCount)} users reported` : 'No user count shared'} />
+            <Stat label="Launch score" value={number.format(deal.startup.innovationScoreAtLaunch)} detail={`Current snapshot ${number.format(deal.innovationScoreSnapshot)}`} />
+            <Stat label="Per-share price" value={money(deal.stockDetails.sharePriceInr)} detail={`${number.format(deal.sharesAllocated ?? 0)} shares allocated`} />
+            <Stat label="Transfer value" value={money(deal.stockDetails.transferValueInr)} detail={`${number.format(deal.stockDetails.totalSharesConsidered)} shares considered`} />
           </div>
-        ) : capTable ? (
-          <>
-            <div className="grid gap-4 md:grid-cols-4">
-              <MetricTile icon={Landmark} label="Total Shares" value={formatNumber.format(capTable.totalShares)} />
-              <MetricTile icon={Landmark} label="Available Shares" value={formatNumber.format(capTable.availableShares)} />
-              <MetricTile icon={PieChart} label="Investor Equity" value={`${capTable.totalInvestorEquity}%`} />
-              <MetricTile icon={FileCheck} label="Founder Retained" value={`${capTable.founderRetained.equityPercent}%`} />
+        </Section>
+
+        <Section
+          eyebrow="Workflow"
+          title="Review and ownership status"
+          description="Admin approval state, transfer metadata, and current cap-table position."
+        >
+          <div className="space-y-4">
+            <div className="border border-slate-800 bg-slate-950/80 px-4 py-4">
+              <div className="text-[11px] uppercase tracking-[0.25em] text-slate-500">Next action</div>
+              <div className="mt-2 text-lg font-semibold text-white">{deal.nextActionLabel}</div>
+              <div className="mt-2 text-sm text-slate-400">Requested {dt(deal.stockTransfer.requestedAt ?? deal.createdAt)}</div>
+              <div className="mt-2 text-sm text-slate-400">Admin approval {dt(deal.adminApprovedAt)}</div>
+            </div>
+            <div className="grid gap-4 md:grid-cols-2">
+              <Stat label="Founder retained" value={pct(capTableQuery.data?.founderRetained.equityPercent ?? 0)} detail={`${number.format(capTableQuery.data?.founderRetained.sharesAllocated ?? 0)} shares`} />
+              <Stat label="Investor equity" value={pct(capTableQuery.data?.totalInvestorEquity ?? 0)} detail={`${number.format(capTableQuery.data?.availableShares ?? deal.startup.sharePool.availableShares)} shares left`} />
+            </div>
+            <div className="border border-slate-800 bg-slate-950/80 px-4 py-4 text-sm text-slate-300">
+              Review notes: {deal.stockTransfer.reviewNotes?.trim() || 'No admin notes added yet.'}
+            </div>
+          </div>
+        </Section>
+      </div>
+
+      <div className="grid gap-6 xl:grid-cols-[1fr_1fr]">
+        <Section
+          eyebrow="Project Workspace"
+          title="Execution progress and evidence"
+          description="Milestones, recent updates, repositories, and uploaded diligence material linked to this startup."
+        >
+          {deal.workspace ? (
+            <div className="space-y-5">
+              <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
+                <Stat label="Workspace" value={deal.workspace.title} detail={`${deal.workspace.category} | ${deal.workspace.stage}`} />
+                <Stat label="Progress" value={`${deal.workspace.progressPercent}%`} detail={`${deal.workspace.milestones.filter((item) => item.isCompleted).length}/${deal.workspace.milestones.length} milestones complete`} />
+                <Stat label="Evidence items" value={number.format(deal.workspace.evidenceSummary.uploadsCount + deal.workspace.evidenceSummary.repoCount + deal.workspace.evidenceSummary.codeCount)} detail={`${deal.workspace.evidenceSummary.progressUpdatesCount} progress updates`} />
+                <Stat label="Updated" value={d(deal.workspace.updatedAt)} detail={`Project id ${deal.startup.projectId ?? 'Not linked'}`} />
+              </div>
+
+              <div className="space-y-3">
+                {deal.workspace.milestones.map((milestone) => (
+                  <div key={milestone._id} className="border border-slate-800 bg-slate-950/80 px-4 py-4">
+                    <div className="mb-2 flex items-center justify-between gap-4">
+                      <div className="font-medium text-white">{milestone.name}</div>
+                      <div className="text-sm text-slate-400">{milestone.completionPercent}%</div>
+                    </div>
+                    <div className="h-2 overflow-hidden bg-slate-900">
+                      <div className={`h-full ${milestone.isCompleted ? 'bg-emerald-400' : 'bg-cyan-400'}`} style={{ width: `${milestone.completionPercent}%` }} />
+                    </div>
+                  </div>
+                ))}
+              </div>
+
+              <div className="grid gap-5 xl:grid-cols-2">
+                <div className="space-y-3">
+                  <div className="text-sm font-semibold uppercase tracking-[0.22em] text-slate-500">Recent updates</div>
+                  {deal.workspace.progressUpdates.length === 0 ? (
+                    <div className="border border-dashed border-slate-800 px-4 py-8 text-sm text-slate-400">No progress updates logged yet.</div>
+                  ) : (
+                    deal.workspace.progressUpdates.map((update) => (
+                      <div key={update._id} className="border border-slate-800 bg-slate-950/80 px-4 py-4">
+                        <div className="text-sm leading-6 text-slate-200">{update.note}</div>
+                        <div className="mt-3 text-xs uppercase tracking-[0.2em] text-slate-500">
+                          {update.milestoneRef ?? 'General update'} | {dt(update.submittedAt)}
+                        </div>
+                      </div>
+                    ))
+                  )}
+                </div>
+
+                <div className="space-y-3">
+                  <div className="text-sm font-semibold uppercase tracking-[0.22em] text-slate-500">Repositories</div>
+                  {deal.workspace.repoSubmissions.length === 0 ? (
+                    <div className="border border-dashed border-slate-800 px-4 py-8 text-sm text-slate-400">No repository links attached.</div>
+                  ) : (
+                    deal.workspace.repoSubmissions.map((repo) => (
+                      <a key={repo._id} href={repo.repoUrl} target="_blank" rel="noreferrer" className="block border border-slate-800 bg-slate-950/80 px-4 py-4 transition-colors hover:border-slate-700">
+                        <div className="flex items-start justify-between gap-4">
+                          <div>
+                            <div className="flex items-center gap-2 font-semibold text-white">
+                              <GitBranch className="h-4 w-4 text-cyan-300" />
+                              {repo.displayName}
+                            </div>
+                            <div className="mt-2 text-sm text-slate-400">
+                              {repo.branch ? `Branch ${repo.branch}` : 'Branch not provided'}
+                              {repo.commitHash ? ` | Commit ${repo.commitHash}` : ''}
+                            </div>
+                            {repo.note ? <div className="mt-2 text-sm text-slate-300">{repo.note}</div> : null}
+                          </div>
+                          <ExternalLink className="mt-1 h-4 w-4 text-slate-500" />
+                        </div>
+                      </a>
+                    ))
+                  )}
+                </div>
+              </div>
+            </div>
+          ) : (
+            <div className="border border-dashed border-slate-800 px-4 py-8 text-sm text-slate-400">
+              This startup is not linked to a workspace record yet.
+            </div>
+          )}
+        </Section>
+
+        <Section
+          eyebrow="Documents"
+          title="Pitch deck and uploaded artifacts"
+          description="Primary launch document plus recent files available for diligence."
+        >
+          <div className="space-y-5">
+            <div className="grid gap-4 md:grid-cols-2">
+              <div className="border border-slate-800 bg-slate-950/80 px-4 py-4">
+                <div className="flex items-start justify-between gap-4">
+                  <div>
+                    <div className="text-[11px] uppercase tracking-[0.25em] text-slate-500">Pitch deck</div>
+                    <div className="mt-2 text-lg font-semibold text-white">{deal.startup.pitchDeckName ?? 'Startup pitch deck'}</div>
+                    <div className="mt-2 text-sm text-slate-400">{deal.startup.pitchDeckUrl ? 'Deck uploaded and available.' : 'No pitch deck uploaded.'}</div>
+                  </div>
+                  <FileText className="h-5 w-5 text-cyan-300" />
+                </div>
+                {deal.startup.pitchDeckUrl ? (
+                  <a href={deal.startup.pitchDeckUrl} target="_blank" rel="noreferrer" className="mt-4 inline-flex">
+                    <Button variant="secondary">
+                      Open deck
+                      <ExternalLink className="ml-2 h-4 w-4" />
+                    </Button>
+                  </a>
+                ) : null}
+              </div>
+
+              <div className="border border-slate-800 bg-slate-950/80 px-4 py-4">
+                <div className="text-[11px] uppercase tracking-[0.25em] text-slate-500">Evidence snapshot</div>
+                <div className="mt-4 space-y-3 text-sm">
+                  <div className="flex items-center justify-between text-slate-400"><span>Uploads</span><span className="font-semibold text-white">{number.format(deal.workspace?.evidenceSummary.uploadsCount ?? 0)}</span></div>
+                  <div className="flex items-center justify-between text-slate-400"><span>Repositories</span><span className="font-semibold text-white">{number.format(deal.workspace?.evidenceSummary.repoCount ?? 0)}</span></div>
+                  <div className="flex items-center justify-between text-slate-400"><span>Code snippets</span><span className="font-semibold text-white">{number.format(deal.workspace?.evidenceSummary.codeCount ?? 0)}</span></div>
+                  <div className="flex items-center justify-between text-slate-400"><span>Progress updates</span><span className="font-semibold text-white">{number.format(deal.workspace?.evidenceSummary.progressUpdatesCount ?? 0)}</span></div>
+                </div>
+              </div>
             </div>
 
             <div className="space-y-3">
-              {capTableRows.length === 0 ? (
-                <div className="rounded-3xl border border-dashed border-slate-800 px-5 py-8 text-sm text-slate-400">
-                  No investor rows exist for this startup yet.
-                </div>
-              ) : (
-                capTableRows.map((row) => (
-                  <CapTableRow key={row.dealId} row={row} isActive={row.dealId === deal._id} />
+              <div className="text-sm font-semibold uppercase tracking-[0.22em] text-slate-500">Recent uploaded files</div>
+              {deal.workspace?.uploads.length ? (
+                deal.workspace.uploads.map((upload) => (
+                  <a key={upload._id} href={upload.fileUrl} target="_blank" rel="noreferrer" className="block border border-slate-800 bg-slate-950/80 px-4 py-4 transition-colors hover:border-slate-700">
+                    <div className="flex items-start justify-between gap-4">
+                      <div>
+                        <div className="font-semibold text-white">{upload.fileName}</div>
+                        <div className="mt-2 text-sm text-slate-400">
+                          {(upload.category ?? 'other').replace(/_/g, ' ')} | {upload.fileType.toUpperCase()} | {number.format(upload.fileSizeBytes)} bytes
+                        </div>
+                        {upload.note ? <div className="mt-2 text-sm text-slate-300">{upload.note}</div> : null}
+                        <div className="mt-2 text-xs uppercase tracking-[0.2em] text-slate-500">Uploaded {dt(upload.uploadedAt)}</div>
+                      </div>
+                      <ExternalLink className="mt-1 h-4 w-4 text-slate-500" />
+                    </div>
+                  </a>
                 ))
+              ) : (
+                <div className="border border-dashed border-slate-800 px-4 py-8 text-sm text-slate-400">No uploaded files linked yet.</div>
               )}
             </div>
-          </>
-        ) : (
-          <div className="rounded-3xl border border-dashed border-slate-800 px-5 py-8 text-sm text-slate-400">
-            Cap table data could not be loaded for this startup.
           </div>
-        )}
-      </Card>
+        </Section>
+      </div>
 
-      <Card className="space-y-4 p-6">
-        <div>
-          <div className="text-xs uppercase tracking-[0.3em] text-cyan-300">Timeline</div>
-          <h2 className="mt-2 text-2xl font-semibold text-white">Transaction history</h2>
-        </div>
-        {[
-          ['Created', formatDateTime(deal.createdAt)],
-          ['Fund transfer initiated', formatDateTime(deal.fundTransferInitiatedAt)],
-          ['Last updated', formatDateTime(deal.updatedAt)],
-          ['Admin approved', formatDateTime(deal.adminApprovedAt)],
-          ['Closed', formatDateTime(deal.closedAt)],
-        ].map(([label, value]) => (
-          <div
-            key={label}
-            className="flex flex-col gap-1 rounded-3xl border border-slate-800 bg-slate-900/60 px-5 py-4 md:flex-row md:items-center md:justify-between"
-          >
-            <div className="text-sm font-semibold text-white">{label}</div>
-            <div className="text-sm text-slate-400">{value}</div>
+      <div className="grid gap-6 xl:grid-cols-[1fr_1fr]">
+        <Section
+          eyebrow="Founder Detail"
+          title="Profiles and execution signals"
+          description="Founders, score breakdowns, and traction indicators tied to the launch profile."
+        >
+          <div className="space-y-4">
+            <div className="flex flex-wrap gap-2">
+              <Badge className={deal.startup.traction.mvpBuilt ? 'border-emerald-500/30 bg-emerald-500/10 text-emerald-300' : 'border-slate-700 bg-slate-900 text-slate-300'}>MVP {deal.startup.traction.mvpBuilt ? 'built' : 'pending'}</Badge>
+              <Badge className={deal.startup.traction.patentFiled ? 'border-emerald-500/30 bg-emerald-500/10 text-emerald-300' : 'border-slate-700 bg-slate-900 text-slate-300'}>Patent {deal.startup.traction.patentFiled ? 'filed' : 'not filed'}</Badge>
+              <Badge className={deal.startup.traction.revenueGenerating ? 'border-emerald-500/30 bg-emerald-500/10 text-emerald-300' : 'border-slate-700 bg-slate-900 text-slate-300'}>{deal.startup.traction.revenueGenerating ? 'Revenue generating' : 'Pre-revenue'}</Badge>
+            </div>
+            {deal.startup.founders.length === 0 ? (
+              <div className="border border-dashed border-slate-800 px-4 py-8 text-sm text-slate-400">No founder profiles attached yet.</div>
+            ) : (
+              deal.startup.founders.map((founder) => (
+                <div key={founder._id} className="border border-slate-800 bg-slate-950/80 px-4 py-4">
+                  <div className="flex items-center justify-between gap-4">
+                    <div>
+                      <div className="text-lg font-semibold text-white">{founder.displayName}</div>
+                      <div className="mt-1 text-sm text-slate-400">{founder.domain ?? 'Founder'} | Score {number.format(founder.innovationScore)}</div>
+                    </div>
+                    <Badge className="border-slate-700 bg-slate-900 text-slate-300">Founder</Badge>
+                  </div>
+                  <div className="mt-4 grid gap-3 md:grid-cols-2">
+                    {Object.entries(founder.scoreBreakdown).length === 0 ? (
+                      <div className="text-sm text-slate-500">No score breakdown submitted.</div>
+                    ) : (
+                      Object.entries(founder.scoreBreakdown).map(([key, value]) => (
+                        <div key={key} className="flex items-center justify-between border border-slate-800 bg-slate-900/70 px-3 py-3 text-sm">
+                          <span className="text-slate-400">{breakdownLabels[key] ?? key}</span>
+                          <span className="font-semibold text-white">{number.format(value)}</span>
+                        </div>
+                      ))
+                    )}
+                  </div>
+                </div>
+              ))
+            )}
           </div>
-        ))}
-      </Card>
+        </Section>
+
+        <Section
+          eyebrow="Score Timeline"
+          title="Recent founder momentum"
+          description="Latest score events from the lead founder profile."
+        >
+          {deal.scoreEvents.length === 0 ? (
+            <div className="border border-dashed border-slate-800 px-4 py-8 text-sm text-slate-400">No score events available yet.</div>
+          ) : (
+            <div className="grid gap-4 md:grid-cols-2">
+              {deal.scoreEvents.map((event) => (
+                <div key={event._id} className="border border-slate-800 bg-slate-950/80 px-4 py-4">
+                  <div className="flex items-start justify-between gap-4">
+                    <div>
+                      <div className="font-semibold text-white">{trigger(event.trigger)}</div>
+                      <div className="mt-2 text-sm text-slate-400">{dt(event.createdAt)}</div>
+                    </div>
+                    <div className="inline-flex items-center gap-1 border border-cyan-500/30 bg-cyan-500/10 px-3 py-1 text-sm font-semibold text-cyan-300">
+                      <TrendingUp className="h-4 w-4" />+{number.format(event.delta)}
+                    </div>
+                  </div>
+                  <div className="mt-4 text-sm text-slate-300">Score after event: {number.format(event.scoreAfter)}</div>
+                </div>
+              ))}
+            </div>
+          )}
+        </Section>
+      </div>
     </div>
   );
 }

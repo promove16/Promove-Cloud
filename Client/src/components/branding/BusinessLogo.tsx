@@ -26,14 +26,14 @@ export function BusinessLogo({
     <>
       <span
         className={clsx(
-          'flex h-12 w-12 items-center justify-center overflow-hidden rounded-2xl bg-white shadow-[0_12px_32px_rgba(37,99,235,0.22)] ring-1 ring-white/20',
+          'flex h-12 w-12 items-center justify-center rounded-none bg-transparent',
           imageWrapperClassName,
         )}
       >
         <img
           src="/image/promoveLogo.png"
           alt="ProMove business logo"
-          className={clsx('h-full w-full object-contain', imageClassName)}
+          className={clsx('h-full w-full rounded-none object-contain', imageClassName)}
         />
       </span>
       <span>

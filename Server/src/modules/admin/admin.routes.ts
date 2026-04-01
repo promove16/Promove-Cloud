@@ -4,14 +4,22 @@ import { authorize } from '../../middleware/authorize';
 import { UserRole } from '../../types/roles.types';
 import { asyncHandler } from '../../utils/asyncHandler';
 import {
+  createMentorProfileController,
   approveRegistrationRequestController,
   approveAwardController,
   approveDealStageController,
   approvePatentController,
   getAnalyticsController,
+  getAnalyticsLogsController,
+  getAnalyticsUserDetailController,
+  getAnalyticsUsersController,
   getInvestmentTypeAnalyticsController,
+  getMentorsController,
+  getMentorshipProgramsController,
+  getProjectMentorshipsController,
   getRegistrationRequestsController,
   getStartupCapTableController,
+  getStartupReviewsController,
   getAwardsController,
   getDealController,
   getDealsController,
@@ -20,7 +28,11 @@ import {
   rejectRegistrationRequestController,
   rejectAwardController,
   rejectPatentController,
+  reviewDealController,
   reviewRegistrationRequestController,
+  reviewStartupController,
+  reviewMentorshipProgramController,
+  reviewProjectMentorAssignmentController,
   resetSoleInvestorController,
   updateDealInvestorRoleController,
   updateUserAccessController,
@@ -29,7 +41,10 @@ import {
 } from './admin.controller';
 import {
   createAdminProblemController,
+  deleteAdminProblemController,
   listAdminProblemsController,
+  listProblemReviewRequestsController,
+  reviewProblemSubmissionController,
   updateAdminProblemController,
 } from '../problemBank/problem.controller';
 
@@ -41,20 +56,32 @@ router.get('/users', asyncHandler(getUsersController));
 router.get('/problems', asyncHandler(listAdminProblemsController));
 router.post('/problems', asyncHandler(createAdminProblemController));
 router.patch('/problems/:id', asyncHandler(updateAdminProblemController));
+router.delete('/problems/:id', asyncHandler(deleteAdminProblemController));
+router.get('/problems/review-requests', asyncHandler(listProblemReviewRequestsController));
+router.patch('/problems/review-requests/:submissionId', asyncHandler(reviewProblemSubmissionController));
 router.get('/registration-requests', asyncHandler(getRegistrationRequestsController));
 router.patch('/registration-requests/:id/approve', asyncHandler(approveRegistrationRequestController));
 router.patch('/registration-requests/:id/reject', asyncHandler(rejectRegistrationRequestController));
 router.patch('/users/:id/role', asyncHandler(updateUserRoleController));
 router.patch('/users/:id/access', asyncHandler(updateUserAccessController));
 router.patch('/users/:id/registration-request', asyncHandler(reviewRegistrationRequestController));
+router.get('/mentors', asyncHandler(getMentorsController));
+router.post('/mentors', asyncHandler(createMentorProfileController));
+router.get('/mentorship-programs', asyncHandler(getMentorshipProgramsController));
+router.patch('/mentorship-programs/:id', asyncHandler(reviewMentorshipProgramController));
+router.get('/project-mentorships', asyncHandler(getProjectMentorshipsController));
+router.patch('/project-mentorships/:workspaceId', asyncHandler(reviewProjectMentorAssignmentController));
 router.get('/patents', asyncHandler(getPatentsController));
 router.patch('/patents/:id/approve', asyncHandler(approvePatentController));
 router.patch('/patents/:id/reject', asyncHandler(rejectPatentController));
 router.get('/awards', asyncHandler(getAwardsController));
 router.patch('/awards/:id/approve', asyncHandler(approveAwardController));
 router.patch('/awards/:id/reject', asyncHandler(rejectAwardController));
+router.get('/startups', asyncHandler(getStartupReviewsController));
+router.patch('/startups/:id/review', asyncHandler(reviewStartupController));
 router.get('/deals', asyncHandler(getDealsController));
 router.get('/deals/:id', asyncHandler(getDealController));
+router.patch('/deals/:id/review', asyncHandler(reviewDealController));
 router.patch('/deals/:id/approve-stage', asyncHandler(approveDealStageController));
 router.patch('/deals/:id/investor-role', asyncHandler(updateDealInvestorRoleController));
 router.get('/startups/:id/cap-table', asyncHandler(getStartupCapTableController));
@@ -62,5 +89,8 @@ router.post('/startups/:id/reset-sole-investor', asyncHandler(resetSoleInvestorC
 router.get('/investments/by-type', asyncHandler(getInvestmentTypeAnalyticsController));
 router.patch('/milestones/:id/verify', asyncHandler(verifyMilestoneController));
 router.get('/analytics', asyncHandler(getAnalyticsController));
+router.get('/analytics/logs', asyncHandler(getAnalyticsLogsController));
+router.get('/analytics/users', asyncHandler(getAnalyticsUsersController));
+router.get('/analytics/users/:userId', asyncHandler(getAnalyticsUserDetailController));
 
 export default router;
