@@ -1,5 +1,6 @@
 import http from 'http';
 import app from './app';
+import { startActivityWorker } from './jobs/activityWorker';
 import { startNotificationWorker } from './jobs/notificationWorker';
 import { startScoreWorker } from './jobs/scoreRecalcWorker';
 import { startInstitutionVerifyWorker } from './workers/institutionVerifyWorker';
@@ -17,6 +18,7 @@ const startServer = async () => {
   initSocket(httpServer);
 
   if (env.NODE_ENV !== 'test') {
+    startActivityWorker();
     startScoreWorker();
     startNotificationWorker();
     startInstitutionVerifyWorker();

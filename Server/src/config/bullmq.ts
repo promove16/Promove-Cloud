@@ -1,6 +1,7 @@
 import { Job, JobsOptions, Queue, Worker, WorkerOptions } from 'bullmq';
 import { env } from './env';
 import { logError, logger } from './logger';
+import { ApiRequestActivityPayload } from '../modules/analytics/activity.types';
 
 export const hasBullMqRedisConnection = Boolean(env.UPSTASH_REDIS_PASSWORD);
 
@@ -193,6 +194,7 @@ export const createQueueWorker = <T>(
 
 export const scoreQueue = createSafeQueue('score-recalc');
 export const notificationQueue = createSafeQueue('notifications');
+export const activityQueue = createSafeQueue<ApiRequestActivityPayload>('activity');
 export const institutionVerifyQueue = createSafeQueue<{ userId: string; token: string }>(
   'institution-verify',
 );

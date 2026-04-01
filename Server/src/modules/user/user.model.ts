@@ -778,6 +778,8 @@ const userSchema = new Schema<IUser>(
 userSchema.index({ role: 1, innovationScore: -1 });
 userSchema.index({ institutionId: 1 });
 userSchema.index({ role: 1, isActive: 1 });
+userSchema.index({ role: 1, institutionId: 1 });
+userSchema.index({ isActive: 1, role: 1 });
 userSchema.index({ profileSlug: 1 }, { unique: true, sparse: true });
 userSchema.index({ 'connectedAccounts.github.username': 1 }, { sparse: true });
 userSchema.index({ 'connectedAccounts.google.userId': 1 }, { sparse: true });

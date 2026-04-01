@@ -1,6 +1,10 @@
-import { PropsWithChildren } from "react";
-import { RequestAccessPage } from "../features/auth/RequestAccessPage";
-import { ChangePasswordPage } from "../features/auth/ChangePasswordPage";
+import {
+  type ComponentType,
+  type LazyExoticComponent,
+  type PropsWithChildren,
+  Suspense,
+  lazy,
+} from "react";
 import {
   Link,
   Navigate,
@@ -13,67 +17,151 @@ import { AuthLayout } from "../components/layouts/AuthLayout";
 import { DashboardLayout } from "../components/layouts/DashboardLayout";
 import { Card } from "../components/ui/Card";
 import { Spinner } from "../components/ui/Spinner";
+import { ChangePasswordPage } from "../features/auth/ChangePasswordPage";
 import { LoginPage } from "../features/auth/LoginPage";
+import { RequestAccessPage } from "../features/auth/RequestAccessPage";
 import { SignupPage } from "../features/auth/SignupPage";
-import SchoolDashboard from "../features/school/Dashboard";
-import SchoolStudentLeaderboard from "../features/school/StudentLeaderboard";
-import SchoolInvestorDirectory from "../features/school/InvestorDirectory";
-import SchoolComplianceReport from "../features/school/ComplianceReport";
-import CollegeDashboard from "../features/college/Dashboard";
-import CollegeStudentLeaderboard from "../features/college/StudentLeaderboard";
-import CollegeInvestorDirectory from "../features/college/InvestorDirectory";
-import RecruiterDirectory from "../features/college/RecruiterDirectory";
-import PlacementTracker from "../features/college/PlacementTracker";
-import EventManager from "../features/college/EventManager";
-import CollegeComplianceReport from "../features/college/ComplianceReport";
-import MentorDashboard from "../features/mentor/Dashboard";
-import MentorStudentFeed from "../features/mentor/StudentFeed";
-import MentorSessions from "../features/mentor/Sessions";
-import AdminDashboard from "../features/admin/Dashboard";
-import AdminUserManagement from "../features/admin/UserManagement";
-import AdminPatents from "../features/admin/Patents";
-import AdminStartups from "../features/admin/Startups";
-import AdminDeals from "../features/admin/Deals";
-import AdminDealReview from "../features/admin/DealReview";
-// import AdminAnalytics from "../features/admin/Analytics";
-// import AdminAnalyticsLogs from "../features/admin/AnalyticsLogs";
-// import AdminAnalyticsOverview from "../features/admin/AnalyticsOverview";
-import AdminAnalyticsTemporary from "../features/admin/AnalyticsTemporary";
-// import AdminAnalyticsUsage from "../features/admin/AnalyticsUsage";
-// import AdminAnalyticsUsers from "../features/admin/AnalyticsUsers";
-import AdminMentorshipPrograms from "../features/admin/MentorshipPrograms";
-import AdminProblemBank from "../features/admin/ProblemBank";
-import RecruiterDashboard from "../features/recruiter/Dashboard";
-import RecruiterTalentSearch from "../features/recruiter/TalentSearch";
-import RecruiterCollegeConnect from "../features/recruiter/CollegeConnect";
-import RecruiterActiveDrives from "../features/recruiter/ActiveDrives";
-import RecruiterOnboardingTracker from "../features/recruiter/OnboardingTracker";
-import InvestorDashboard from "../features/investor/Dashboard";
-import InvestorStartupMarketplace from "../features/investor/StartupMarketplace";
-import InvestorInstitutions from "../features/investor/Institutions";
-import InvestorPortfolio from "../features/investor/Portfolio";
-import StartupCapTable from "../features/startup/CapTable";
-import { StartupLaunchShell } from "../features/startup/StartupLaunchShell";
-import { InvestorOutreach } from "../features/startup/InvestorOutreach";
-import { UserProfilePage } from "../features/profile/UserProfilePage";
-import { MentorDirectory } from "../features/institution/MentorDirectory";
 import { useProtectedRoute } from "../hooks/useProtectedRoute";
 import { useRouteActivityTracking } from "../hooks/useRouteActivityTracking";
 import { useAuthStore } from "../store/authStore";
 import { UserRole } from "../types/roles.types";
 import { roleRedirect } from "../utils/roleRedirect";
-import { StudentDashboard as LegacyStudentDashboard } from "../app/pages/dashboards/StudentDashboard";
-import { StudentMentorSessions } from "../app/pages/dashboards/StudentMentorSessions";
-import { StudentInvestorDeals } from "../app/pages/dashboards/StudentInvestorDeals";
-import { ProblemBank } from "../app/pages/ProblemBank";
-import { ProductWorkspace } from "../app/pages/ProductWorkspace";
-import { PatentSupport } from "../app/pages/PatentSupport";
-import { StartupLaunch } from "../app/pages/StartupLaunch";
-import { LeadershipProfile } from "../app/pages/LeadershipProfile";
-import { Marketplace } from "../features/student/Marketplace";
-import { MessagesPage } from "../app/pages/Messages";
-import { RecruiterMessagesPage } from "../app/pages/RecruiterMessages";
-import { SettingsPage } from "../features/settings/SettingsPage";
+
+function LazyPage({ component: Component }: { component: LazyExoticComponent<ComponentType> }) {
+  return (
+    <Suspense
+      fallback={
+        <div className="flex min-h-[40vh] items-center justify-center">
+          <Spinner />
+        </div>
+      }
+    >
+      <Component />
+    </Suspense>
+  );
+}
+
+const SchoolDashboard = lazy(() => import("../features/school/Dashboard"));
+const SchoolStudentLeaderboard = lazy(() => import("../features/school/StudentLeaderboard"));
+const SchoolInvestorDirectory = lazy(() => import("../features/school/InvestorDirectory"));
+const SchoolComplianceReport = lazy(() => import("../features/school/ComplianceReport"));
+
+const CollegeDashboard = lazy(() => import("../features/college/Dashboard"));
+const CollegeStudentLeaderboard = lazy(() => import("../features/college/StudentLeaderboard"));
+const CollegeInvestorDirectory = lazy(() => import("../features/college/InvestorDirectory"));
+const RecruiterDirectory = lazy(() => import("../features/college/RecruiterDirectory"));
+const PlacementTracker = lazy(() => import("../features/college/PlacementTracker"));
+const EventManager = lazy(() => import("../features/college/EventManager"));
+const CollegeComplianceReport = lazy(() => import("../features/college/ComplianceReport"));
+
+const MentorDashboard = lazy(() => import("../features/mentor/Dashboard"));
+const MentorStudentFeed = lazy(() => import("../features/mentor/StudentFeed"));
+const MentorSessions = lazy(() => import("../features/mentor/Sessions"));
+
+const AdminDashboard = lazy(() => import("../features/admin/Dashboard"));
+const AdminUserManagement = lazy(() => import("../features/admin/UserManagement"));
+const AdminPatents = lazy(() => import("../features/admin/Patents"));
+const AdminStartups = lazy(() => import("../features/admin/Startups"));
+const AdminDeals = lazy(() => import("../features/admin/Deals"));
+const AdminDealReview = lazy(() => import("../features/admin/DealReview"));
+const AdminAnalyticsTemporary = lazy(() => import("../features/admin/AnalyticsTemporary"));
+const AdminMentorshipPrograms = lazy(() => import("../features/admin/MentorshipPrograms"));
+const AdminProblemBank = lazy(() => import("../features/admin/ProblemBank"));
+
+const RecruiterDashboard = lazy(() => import("../features/recruiter/Dashboard"));
+const RecruiterTalentSearch = lazy(() => import("../features/recruiter/TalentSearch"));
+const RecruiterCollegeConnect = lazy(() => import("../features/recruiter/CollegeConnect"));
+const RecruiterActiveDrives = lazy(() => import("../features/recruiter/ActiveDrives"));
+const RecruiterOnboardingTracker = lazy(() => import("../features/recruiter/OnboardingTracker"));
+
+const InvestorDashboard = lazy(() => import("../features/investor/Dashboard"));
+const InvestorStartupMarketplace = lazy(() => import("../features/investor/StartupMarketplace"));
+const InvestorInstitutions = lazy(() => import("../features/investor/Institutions"));
+const InvestorPortfolio = lazy(() => import("../features/investor/Portfolio"));
+
+const StartupCapTable = lazy(() => import("../features/startup/CapTable"));
+const StartupLaunchShell = lazy(() =>
+  import("../features/startup/StartupLaunchShell").then((module) => ({
+    default: module.StartupLaunchShell,
+  })),
+);
+const InvestorOutreach = lazy(() =>
+  import("../features/startup/InvestorOutreach").then((module) => ({
+    default: module.InvestorOutreach,
+  })),
+);
+
+const UserProfilePage = lazy(() =>
+  import("../features/profile/UserProfilePage").then((module) => ({
+    default: module.UserProfilePage,
+  })),
+);
+const MentorDirectory = lazy(() =>
+  import("../features/institution/MentorDirectory").then((module) => ({
+    default: module.MentorDirectory,
+  })),
+);
+const SettingsPage = lazy(() =>
+  import("../features/settings/SettingsPage").then((module) => ({
+    default: module.SettingsPage,
+  })),
+);
+
+const LegacyStudentDashboard = lazy(() =>
+  import("../app/pages/dashboards/StudentDashboard").then((module) => ({
+    default: module.StudentDashboard,
+  })),
+);
+const StudentMentorSessions = lazy(() =>
+  import("../app/pages/dashboards/StudentMentorSessions").then((module) => ({
+    default: module.StudentMentorSessions,
+  })),
+);
+const StudentInvestorDeals = lazy(() =>
+  import("../app/pages/dashboards/StudentInvestorDeals").then((module) => ({
+    default: module.StudentInvestorDeals,
+  })),
+);
+const ProblemBank = lazy(() =>
+  import("../app/pages/ProblemBank").then((module) => ({
+    default: module.ProblemBank,
+  })),
+);
+const ProductWorkspace = lazy(() =>
+  import("../app/pages/ProductWorkspace").then((module) => ({
+    default: module.ProductWorkspace,
+  })),
+);
+const PatentSupport = lazy(() =>
+  import("../app/pages/PatentSupport").then((module) => ({
+    default: module.PatentSupport,
+  })),
+);
+const StartupLaunch = lazy(() =>
+  import("../app/pages/StartupLaunch").then((module) => ({
+    default: module.StartupLaunch,
+  })),
+);
+const LeadershipProfile = lazy(() =>
+  import("../app/pages/LeadershipProfile").then((module) => ({
+    default: module.LeadershipProfile,
+  })),
+);
+const Marketplace = lazy(() =>
+  import("../features/student/Marketplace").then((module) => ({
+    default: module.Marketplace,
+  })),
+);
+const MessagesPage = lazy(() =>
+  import("../app/pages/Messages").then((module) => ({
+    default: module.MessagesPage,
+  })),
+);
+const RecruiterMessagesPage = lazy(() =>
+  import("../app/pages/RecruiterMessages").then((module) => ({
+    default: module.RecruiterMessagesPage,
+  })),
+);
 
 function RootLayout() {
   useRouteActivityTracking();
@@ -258,7 +346,7 @@ export const router = createBrowserRouter([
         path: "/problem-bank",
         element: (
           <ProtectedRoleRoute role={UserRole.STUDENT}>
-            <ProblemBank />
+            <LazyPage component={ProblemBank} />
           </ProtectedRoleRoute>
         ),
       },
@@ -266,7 +354,7 @@ export const router = createBrowserRouter([
         path: "/product-workspace/:projectId?",
         element: (
           <ProtectedRoleRoute role={UserRole.STUDENT}>
-            <ProductWorkspace />
+            <LazyPage component={ProductWorkspace} />
           </ProtectedRoleRoute>
         ),
       },
@@ -274,7 +362,7 @@ export const router = createBrowserRouter([
         path: "/patent-support/:innovationId?",
         element: (
           <ProtectedRoleRoute role={UserRole.STUDENT}>
-            <PatentSupport />
+            <LazyPage component={PatentSupport} />
           </ProtectedRoleRoute>
         ),
       },
@@ -282,15 +370,15 @@ export const router = createBrowserRouter([
         path: "/startup-launch",
         element: (
           <ProtectedRoleRoute role={UserRole.STUDENT}>
-            <StartupLaunchShell />
+            <LazyPage component={StartupLaunchShell} />
           </ProtectedRoleRoute>
         ),
         children: [
           { index: true, element: <Navigate to="/startup-launch/overview" replace /> },
-          { path: "overview", element: <StartupLaunch /> },
-          { path: "investor-outreach", element: <InvestorOutreach /> },
-          { path: "cap-table", element: <StartupCapTable /> },
-          { path: "investor-deals", element: <StudentInvestorDeals /> },
+          { path: "overview", element: <LazyPage component={StartupLaunch} /> },
+          { path: "investor-outreach", element: <LazyPage component={InvestorOutreach} /> },
+          { path: "cap-table", element: <LazyPage component={StartupCapTable} /> },
+          { path: "investor-deals", element: <LazyPage component={StudentInvestorDeals} /> },
         ],
       },
       {
@@ -305,7 +393,7 @@ export const router = createBrowserRouter([
         path: "/leadership-profile",
         element: (
           <ProtectedRoleRoute role={UserRole.STUDENT}>
-            <LeadershipProfile />
+            <LazyPage component={LeadershipProfile} />
           </ProtectedRoleRoute>
         ),
       },
@@ -313,7 +401,7 @@ export const router = createBrowserRouter([
         path: "/marketplace",
         element: (
           <ProtectedRoleRoute role={UserRole.STUDENT}>
-            <Marketplace />
+            <LazyPage component={Marketplace} />
           </ProtectedRoleRoute>
         ),
       },
@@ -341,8 +429,8 @@ export const router = createBrowserRouter([
             path: "student",
             element: <ProtectedRoleRoute role={UserRole.STUDENT} />,
             children: [
-              { index: true, element: <LegacyStudentDashboard /> },
-              { path: "mentor-sessions", element: <StudentMentorSessions /> },
+              { index: true, element: <LazyPage component={LegacyStudentDashboard} /> },
+              { path: "mentor-sessions", element: <LazyPage component={StudentMentorSessions} /> },
               { path: "investor-deals", element: <Navigate to="/startup-launch/investor-deals" replace /> },
             ],
           },
@@ -350,24 +438,24 @@ export const router = createBrowserRouter([
             path: "mentor",
             element: <ProtectedRoleRoute role={UserRole.MENTOR} />,
             children: [
-              { index: true, element: <MentorDashboard /> },
-              { path: "students", element: <MentorStudentFeed /> },
-              { path: "students/:id", element: <MentorStudentFeed /> },
-              { path: "sessions", element: <MentorSessions /> },
+              { index: true, element: <LazyPage component={MentorDashboard} /> },
+              { path: "students", element: <LazyPage component={MentorStudentFeed} /> },
+              { path: "students/:id", element: <LazyPage component={MentorStudentFeed} /> },
+              { path: "sessions", element: <LazyPage component={MentorSessions} /> },
             ],
           },
           {
             path: "investor",
             element: <ProtectedRoleRoute role={UserRole.INVESTOR} />,
             children: [
-              { index: true, element: <InvestorDashboard /> },
-              { path: "startups", element: <InvestorStartupMarketplace /> },
-              { path: "institutions", element: <InvestorInstitutions /> },
-              { path: "portfolio", element: <InvestorPortfolio /> },
+              { index: true, element: <LazyPage component={InvestorDashboard} /> },
+              { path: "startups", element: <LazyPage component={InvestorStartupMarketplace} /> },
+              { path: "institutions", element: <LazyPage component={InvestorInstitutions} /> },
+              { path: "portfolio", element: <LazyPage component={InvestorPortfolio} /> },
               {
                 path: "settings",
                 element: <ProtectedAnyRoute />,
-                children: [{ index: true, element: <SettingsPage /> }],
+                children: [{ index: true, element: <LazyPage component={SettingsPage} /> }],
               },
             ],
           },
@@ -375,16 +463,16 @@ export const router = createBrowserRouter([
             path: "recruiter",
             element: <ProtectedRoleRoute role={UserRole.RECRUITER} />,
             children: [
-              { index: true, element: <RecruiterDashboard /> },
-              { path: "talent", element: <RecruiterTalentSearch /> },
-              { path: "colleges", element: <RecruiterCollegeConnect /> },
-              { path: "drives", element: <RecruiterActiveDrives /> },
-              { path: "onboarding", element: <RecruiterOnboardingTracker /> },
+              { index: true, element: <LazyPage component={RecruiterDashboard} /> },
+              { path: "talent", element: <LazyPage component={RecruiterTalentSearch} /> },
+              { path: "colleges", element: <LazyPage component={RecruiterCollegeConnect} /> },
+              { path: "drives", element: <LazyPage component={RecruiterActiveDrives} /> },
+              { path: "onboarding", element: <LazyPage component={RecruiterOnboardingTracker} /> },
               {
                 path: "messages",
                 children: [
-                  { index: true, element: <RecruiterMessagesPage /> },
-                  { path: ":partnerId", element: <RecruiterMessagesPage /> },
+                  { index: true, element: <LazyPage component={RecruiterMessagesPage} /> },
+                  { path: ":partnerId", element: <LazyPage component={RecruiterMessagesPage} /> },
                 ],
               },
             ],
@@ -393,73 +481,61 @@ export const router = createBrowserRouter([
             path: "admin",
             element: <ProtectedRoleRoute role={UserRole.ADMIN} />,
             children: [
-              { index: true, element: <AdminDashboard /> },
-              { path: "problems", element: <AdminProblemBank /> },
-              { path: "users", element: <AdminUserManagement /> },
-              { path: "patents", element: <AdminPatents /> },
-              { path: "startups", element: <AdminStartups /> },
-              { path: "deals", element: <AdminDeals /> },
-              { path: "deals/:dealId", element: <AdminDealReview /> },
-              { path: "mentorship", element: <AdminMentorshipPrograms /> },
-              // Previous analytics workspace kept here for future restore.
-              // {
-              //   path: "analytics",
-              //   element: <AdminAnalytics />,
-              //   children: [
-              //     { index: true, element: <Navigate to="overview" replace /> },
-              //     { path: "overview", element: <AdminAnalyticsOverview /> },
-              //     { path: "usage", element: <AdminAnalyticsUsage /> },
-              //     { path: "users", element: <AdminAnalyticsUsers /> },
-              //     { path: "logs", element: <AdminAnalyticsLogs /> },
-              //   ],
-              // },
-              { path: "analytics", element: <AdminAnalyticsTemporary /> },
-              { path: "analytics/*", element: <AdminAnalyticsTemporary /> },
+              { index: true, element: <LazyPage component={AdminDashboard} /> },
+              { path: "problems", element: <LazyPage component={AdminProblemBank} /> },
+              { path: "users", element: <LazyPage component={AdminUserManagement} /> },
+              { path: "patents", element: <LazyPage component={AdminPatents} /> },
+              { path: "startups", element: <LazyPage component={AdminStartups} /> },
+              { path: "deals", element: <LazyPage component={AdminDeals} /> },
+              { path: "deals/:dealId", element: <LazyPage component={AdminDealReview} /> },
+              { path: "mentorship", element: <LazyPage component={AdminMentorshipPrograms} /> },
+              { path: "analytics", element: <LazyPage component={AdminAnalyticsTemporary} /> },
+              { path: "analytics/*", element: <LazyPage component={AdminAnalyticsTemporary} /> },
             ],
           },
           {
             path: "profile",
             element: <ProtectedAnyRoute />,
-            children: [{ index: true, element: <UserProfilePage /> }],
+            children: [{ index: true, element: <LazyPage component={UserProfilePage} /> }],
           },
           {
             path: "settings",
             element: <ProtectedAnyRoute />,
-            children: [{ index: true, element: <SettingsPage /> }],
+            children: [{ index: true, element: <LazyPage component={SettingsPage} /> }],
           },
           {
             path: "messages",
             element: <ProtectedAnyRoute />,
             children: [
-              { index: true, element: <MessagesPage /> },
-              { path: ":partnerId", element: <MessagesPage /> },
+              { index: true, element: <LazyPage component={MessagesPage} /> },
+              { path: ":partnerId", element: <LazyPage component={MessagesPage} /> },
             ],
           },
           {
             path: "school",
             element: <ProtectedRoleRoute role={UserRole.SCHOOL} />,
             children: [
-              { index: true, element: <SchoolDashboard /> },
-              { path: "students", element: <SchoolStudentLeaderboard /> },
-              { path: "students/:id", element: <SchoolStudentLeaderboard /> },
-              { path: "investors", element: <SchoolInvestorDirectory /> },
-              { path: "mentors", element: <MentorDirectory /> },
-              { path: "compliance", element: <SchoolComplianceReport /> },
+              { index: true, element: <LazyPage component={SchoolDashboard} /> },
+              { path: "students", element: <LazyPage component={SchoolStudentLeaderboard} /> },
+              { path: "students/:id", element: <LazyPage component={SchoolStudentLeaderboard} /> },
+              { path: "investors", element: <LazyPage component={SchoolInvestorDirectory} /> },
+              { path: "mentors", element: <LazyPage component={MentorDirectory} /> },
+              { path: "compliance", element: <LazyPage component={SchoolComplianceReport} /> },
             ],
           },
           {
             path: "college",
             element: <ProtectedRoleRoute role={UserRole.COLLEGE} />,
             children: [
-              { index: true, element: <CollegeDashboard /> },
-              { path: "students", element: <CollegeStudentLeaderboard /> },
-              { path: "students/:id", element: <CollegeStudentLeaderboard /> },
-              { path: "recruiters", element: <RecruiterDirectory /> },
-              { path: "investors", element: <CollegeInvestorDirectory /> },
-              { path: "mentors", element: <MentorDirectory /> },
-              { path: "placement", element: <PlacementTracker /> },
-              { path: "events", element: <EventManager /> },
-              { path: "compliance", element: <CollegeComplianceReport /> },
+              { index: true, element: <LazyPage component={CollegeDashboard} /> },
+              { path: "students", element: <LazyPage component={CollegeStudentLeaderboard} /> },
+              { path: "students/:id", element: <LazyPage component={CollegeStudentLeaderboard} /> },
+              { path: "recruiters", element: <LazyPage component={RecruiterDirectory} /> },
+              { path: "investors", element: <LazyPage component={CollegeInvestorDirectory} /> },
+              { path: "mentors", element: <LazyPage component={MentorDirectory} /> },
+              { path: "placement", element: <LazyPage component={PlacementTracker} /> },
+              { path: "events", element: <LazyPage component={EventManager} /> },
+              { path: "compliance", element: <LazyPage component={CollegeComplianceReport} /> },
             ],
           },
         ],

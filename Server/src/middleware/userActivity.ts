@@ -1,3 +1,5 @@
+import { activityQueue } from '../config/bullmq';
+import { env } from '../config/env';
 import { NextFunction, Request, Response } from 'express';
 import { logError } from '../config/logger';
 import { recordApiRequestActivity } from '../modules/analytics/activity.service';
@@ -26,13 +28,22 @@ export const userActivityMiddleware = (req: Request, res: Response, next: NextFu
       return;
     }
 
-    void recordApiRequestActivity({
+    const activityPayload = {
       userId,
       method: req.method,
       path,
       statusCode: res.statusCode,
       durationMs: Date.now() - startedAt,
-    }).catch((error) => {
+    };
+
+    if (activityQueue && env.NODE_ENV !== 'test') {
+      void activityQueue.add('record', activityPayload).catch((error) => {
+        logError('Failed to enqueue activity', error);
+      });
+      return;
+    }
+
+    void recordApiRequestActivity(activityPayload).catch((error) => {
       logError('Failed to record API activity', error);
     });
   });

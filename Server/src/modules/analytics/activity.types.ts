@@ -4,6 +4,14 @@ import { UserRole } from '../../types/roles.types';
 export type UserActivityEventType = 'login' | 'api_request' | 'page_view' | 'navigation_click';
 export type UserActivitySource = 'server' | 'client';
 
+export interface ApiRequestActivityPayload {
+  userId: string;
+  method: string;
+  path: string;
+  statusCode: number;
+  durationMs: number;
+}
+
 export interface IUserActivity {
   _id: Types.ObjectId;
   userId: Types.ObjectId;

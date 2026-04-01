@@ -1,4 +1,5 @@
 import cookieParser from 'cookie-parser';
+import compression from 'compression';
 import cors from 'cors';
 import express from 'express';
 import helmet from 'helmet';
@@ -39,6 +40,7 @@ export const createApp = () => {
   const hasClientBuild = existsSync(clientBuildPath);
 
   app.set('trust proxy', 1);
+  app.use(compression());
   app.use(helmet());
   app.use(
     cors({

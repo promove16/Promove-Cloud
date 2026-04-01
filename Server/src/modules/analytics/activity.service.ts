@@ -3,6 +3,7 @@ import { z } from 'zod';
 import { UserActivity } from './userActivity.model';
 import {
   ActivityRouteMetric,
+  ApiRequestActivityPayload,
   DailyUsagePoint,
   PlatformUsageAnalytics,
   UsageInsight,
@@ -357,13 +358,7 @@ export const recordLoginActivity = async (userId: string) =>
     statusCode: 200,
   });
 
-export const recordApiRequestActivity = async (payload: {
-  userId: string;
-  method: string;
-  path: string;
-  statusCode: number;
-  durationMs: number;
-}) =>
+export const recordApiRequestActivity = async (payload: ApiRequestActivityPayload) =>
   createActivity({
     userId: payload.userId,
     eventType: 'api_request',
