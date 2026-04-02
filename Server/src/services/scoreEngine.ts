@@ -23,6 +23,10 @@ export const SCORE_DELTAS = {
   LINKEDIN_CONNECTED:      5,
   RESUME_UPLOADED:         3,
   PROFILE_COMPLETE:        10,
+  ONBOARDING_PROFILE:      10,
+  ONBOARDING_PROJECT:      20,
+  ONBOARDING_GITHUB:       30,
+  ONBOARDING_SHARE:        10,
 } as const;
 
 export type ScoreTrigger = keyof typeof SCORE_DELTAS;
@@ -43,6 +47,10 @@ const BREAKDOWN_FIELD_MAP: Record<ScoreTrigger, keyof IUser['scoreBreakdown'] | 
   LINKEDIN_CONNECTED:     null,
   RESUME_UPLOADED:        null,
   PROFILE_COMPLETE:       null,
+  ONBOARDING_PROFILE:     null,
+  ONBOARDING_PROJECT:     null,
+  ONBOARDING_GITHUB:      null,
+  ONBOARDING_SHARE:       null,
 };
 
 const ONE_TIME_SCORE_TRIGGERS: ScoreTrigger[] = [
@@ -50,6 +58,10 @@ const ONE_TIME_SCORE_TRIGGERS: ScoreTrigger[] = [
   'LINKEDIN_CONNECTED',
   'RESUME_UPLOADED',
   'PROFILE_COMPLETE',
+  'ONBOARDING_PROFILE',
+  'ONBOARDING_PROJECT',
+  'ONBOARDING_GITHUB',
+  'ONBOARDING_SHARE',
 ];
 
 export interface ApplyScoreParams {

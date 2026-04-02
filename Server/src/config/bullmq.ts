@@ -194,6 +194,7 @@ export const createQueueWorker = <T>(
 
 export const scoreQueue = createSafeQueue('score-recalc');
 export const notificationQueue = createSafeQueue('notifications');
+export const emailQueue = createSafeQueue('emails');
 export const activityQueue = createSafeQueue<ApiRequestActivityPayload>('activity');
 export const institutionVerifyQueue = createSafeQueue<{ userId: string; token: string }>(
   'institution-verify',

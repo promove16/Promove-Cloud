@@ -1,498 +1,87 @@
-import { useMemo, useState, type ReactNode } from 'react';
-import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
-import { Eye, MoreHorizontal, Search, ShieldCheck, ShieldOff, UserCog } from 'lucide-react';
-import { useSearchParams } from 'react-router-dom';
-import { adminApi, AdminUserListItem } from '../../api/admin.api';
-import { scoreApi } from '../../api/score.api';
-import { UserRole } from '../../types/roles.types';
-import { Badge } from '../../components/ui/Badge';
-import { Button } from '../../components/ui/Button';
+import { useMemo } from 'react';
+import { useQuery } from '@tanstack/react-query';
+import { Outlet, useLocation, useOutletContext } from 'react-router-dom';
+import { adminApi, type AdminUserListItem } from '../../api/admin.api';
 import { Card } from '../../components/ui/Card';
-import { Input } from '../../components/ui/Input';
 import { Spinner } from '../../components/ui/Spinner';
-import {
-  DropdownMenu,
-  DropdownMenuContent,
-  DropdownMenuItem,
-  DropdownMenuLabel,
-  DropdownMenuSeparator,
-  DropdownMenuTrigger,
-} from '../../app/components/ui/dropdown-menu';
+import { AdminSectionTabs, getActiveAdminSection } from './AdminSectionTabs';
+import { ADMIN_USERS_SECTION_LINKS } from './usersNavigation';
 
-type ModalMode = 'role' | 'access' | null;
-
-function ConfirmModal({
-  open,
-  title,
-  description,
-  children,
-  confirmLabel,
-  busy,
-  onConfirm,
-  onClose,
-}: {
-  open: boolean;
-  title: string;
-  description: string;
-  children?: ReactNode;
-  confirmLabel: string;
-  busy: boolean;
-  onConfirm: () => void;
-  onClose: () => void;
-}) {
-  if (!open) return null;
-
-  return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-950/70 p-4 backdrop-blur-sm">
-      <Card className="w-full max-w-lg p-6">
-        <h3 className="text-2xl font-bold text-white">{title}</h3>
-        <p className="mt-3 text-sm leading-6 text-slate-400">{description}</p>
-        {children ? <div className="mt-4">{children}</div> : null}
-        <div className="mt-6 flex justify-end gap-3">
-          <Button variant="secondary" onClick={onClose}>Cancel</Button>
-          <Button onClick={onConfirm} disabled={busy}>{busy ? 'Working...' : confirmLabel}</Button>
-        </div>
-      </Card>
-    </div>
-  );
+export interface AdminUsersOutletContext {
+  users: AdminUserListItem[];
+  isLoading: boolean;
 }
 
-function ActivityDrawer({
-  user,
-  open,
-  onClose,
-}: {
-  user: AdminUserListItem | null;
-  open: boolean;
-  onClose: () => void;
-}) {
-  const activityQuery = useQuery({
-    queryKey: ['admin-user-activity', user?._id],
-    queryFn: () => scoreApi.getScoreHistory(user!._id),
-    enabled: open && Boolean(user),
-  });
-
-  if (!open || !user) return null;
-
-  return (
-    <div className="fixed inset-0 z-50 flex justify-end bg-slate-950/70 backdrop-blur-sm">
-      <div className="h-full w-full max-w-2xl overflow-y-auto border-l border-slate-800 bg-slate-950 px-6 py-6">
-        <div className="flex items-start justify-between gap-4">
-          <div>
-            <div className="text-xs uppercase tracking-[0.3em] text-cyan-300">User Activity</div>
-            <h3 className="mt-2 text-2xl font-bold text-white">{user.displayName}</h3>
-          </div>
-          <Button variant="ghost" onClick={onClose}>Close</Button>
-        </div>
-        <div className="mt-6 space-y-3">
-          {activityQuery.isLoading ? (
-            <div className="flex items-center justify-center py-16"><Spinner /></div>
-          ) : (activityQuery.data ?? []).length === 0 ? (
-            <div className="rounded-2xl border border-dashed border-slate-800 px-4 py-6 text-sm text-slate-400">
-              No score events available.
-            </div>
-          ) : (
-            (activityQuery.data ?? []).map((event) => (
-              <div key={event._id} className="rounded-2xl border border-slate-800 bg-slate-900/70 p-4">
-                <div className="flex items-center justify-between gap-3">
-                  <div className="font-semibold text-white">{event.trigger.replace(/_/g, ' ')}</div>
-                  <Badge>+{event.delta}</Badge>
-                </div>
-                <div className="mt-2 text-sm text-slate-400">{new Date(event.createdAt).toLocaleString('en-IN')}</div>
-              </div>
-            ))
-          )}
-        </div>
-      </div>
-    </div>
-  );
-}
-
-function UserActionMenu({
-  user,
-  onViewActivity,
-  onChangeRole,
-  onToggleAccess,
-}: {
-  user: AdminUserListItem;
-  onViewActivity: () => void;
-  onChangeRole: () => void;
-  onToggleAccess: () => void;
-}) {
-  return (
-    <DropdownMenu>
-      <DropdownMenuTrigger asChild>
-        <Button
-          variant="secondary"
-          className="h-10 w-10 rounded-full border-slate-700 p-0"
-          aria-label={`Open actions for ${user.displayName}`}
-        >
-          <MoreHorizontal className="h-4 w-4" />
-        </Button>
-      </DropdownMenuTrigger>
-      <DropdownMenuContent align="end" className="w-52 border-slate-800 bg-slate-950 text-white">
-        <DropdownMenuLabel className="text-xs uppercase tracking-[0.2em] text-slate-400">
-          Actions
-        </DropdownMenuLabel>
-        <DropdownMenuSeparator className="bg-slate-800" />
-        <DropdownMenuItem className="cursor-pointer rounded-lg px-3 py-2 focus:bg-slate-900" onSelect={onViewActivity}>
-          <Eye className="h-4 w-4 text-slate-400" />
-          View Activity
-        </DropdownMenuItem>
-        <DropdownMenuItem className="cursor-pointer rounded-lg px-3 py-2 focus:bg-slate-900" onSelect={onChangeRole}>
-          <UserCog className="h-4 w-4 text-slate-400" />
-          Change Role
-        </DropdownMenuItem>
-        <DropdownMenuItem className="cursor-pointer rounded-lg px-3 py-2 focus:bg-slate-900" onSelect={onToggleAccess}>
-          {user.isActive ? (
-            <ShieldOff className="h-4 w-4 text-rose-300" />
-          ) : (
-            <ShieldCheck className="h-4 w-4 text-emerald-300" />
-          )}
-          {user.isActive ? 'Deactivate User' : 'Activate User'}
-        </DropdownMenuItem>
-      </DropdownMenuContent>
-    </DropdownMenu>
-  );
+export function useAdminUsersContext() {
+  return useOutletContext<AdminUsersOutletContext>();
 }
 
 export default function UserManagement() {
-  const [searchParams, setSearchParams] = useSearchParams();
-  const queryClient = useQueryClient();
-  const initialRoleFilter = searchParams.get('role');
-  const initialStatusFilter = searchParams.get('status');
-  const [search, setSearch] = useState('');
-  const [roleFilter, setRoleFilter] = useState<UserRole | 'all'>(
-    initialRoleFilter && Object.values(UserRole).includes(initialRoleFilter as UserRole)
-      ? (initialRoleFilter as UserRole)
-      : 'all',
-  );
-  const [statusFilter, setStatusFilter] = useState<'all' | 'active' | 'inactive'>(
-    initialStatusFilter === 'active' || initialStatusFilter === 'inactive' ? initialStatusFilter : 'all',
-  );
-  const [selectedUser, setSelectedUser] = useState<AdminUserListItem | null>(null);
-  const [modalMode, setModalMode] = useState<ModalMode>(null);
-  const [roleDraft, setRoleDraft] = useState<UserRole>(UserRole.STUDENT);
+  const location = useLocation();
+  const activeSection = getActiveAdminSection(location.pathname, ADMIN_USERS_SECTION_LINKS);
 
   const usersQuery = useQuery({
-    queryKey: ['admin-users', roleFilter, statusFilter],
-    queryFn: () =>
-      adminApi.getUsers({
-        role: roleFilter === 'all' ? undefined : roleFilter,
-        isActive: statusFilter === 'all' ? undefined : statusFilter === 'active',
-        page: 1,
-        limit: 100,
-      }),
+    queryKey: ['admin-users', 'workspace'],
+    queryFn: () => adminApi.getUsers({ page: 1, limit: 100 }),
     refetchInterval: 60_000,
   });
 
-  const updateRoleMutation = useMutation({
-    mutationFn: ({ userId, role }: { userId: string; role: UserRole }) => adminApi.updateUserRole(userId, role),
-    onSuccess: async () => {
-      setModalMode(null);
-      setSelectedUser(null);
-      await queryClient.invalidateQueries({ queryKey: ['admin-users'] });
-    },
-  });
-
-  const updateAccessMutation = useMutation({
-    mutationFn: ({ userId, isActive }: { userId: string; isActive: boolean }) =>
-      adminApi.updateUserAccess(userId, isActive),
-    onSuccess: async () => {
-      setModalMode(null);
-      setSelectedUser(null);
-      await queryClient.invalidateQueries({ queryKey: ['admin-users'] });
-    },
-  });
-
-  const reviewRequestMutation = useMutation({
-    mutationFn: ({
-      userId,
-      decision,
-      reason,
-    }: {
-      userId: string;
-      decision: 'approved' | 'rejected';
-      reason?: string;
-    }) => adminApi.reviewRegistrationRequest(userId, { decision, reason }),
-    onSuccess: async () => {
-      await Promise.all([
-        queryClient.invalidateQueries({ queryKey: ['admin-users'] }),
-        queryClient.invalidateQueries({ queryKey: ['admin-analytics'] }),
-      ]);
-    },
-  });
-
-  const users = useMemo(
-    () =>
-      (usersQuery.data?.items ?? []).filter((user) =>
-        `${user.displayName} ${user.email} ${user.role}`.toLowerCase().includes(search.toLowerCase()),
-      ),
-    [search, usersQuery.data?.items],
-  );
+  const users = usersQuery.data?.items ?? [];
   const pendingRequests = useMemo(
-    () =>
-      users.filter(
-        (user) =>
-          user.adminApprovalStatus === 'pending' &&
-          ![UserRole.STUDENT].includes(user.role),
-      ),
+    () => users.filter((user) => user.adminApprovalStatus === 'pending' && user.role !== 'student').length,
     [users],
   );
-
-  const updateFiltersInUrl = (nextRole: UserRole | 'all', nextStatus: 'all' | 'active' | 'inactive') => {
-    const nextParams = new URLSearchParams(searchParams);
-
-    if (nextRole === 'all') {
-      nextParams.delete('role');
-    } else {
-      nextParams.set('role', nextRole);
-    }
-
-    if (nextStatus === 'all') {
-      nextParams.delete('status');
-    } else {
-      nextParams.set('status', nextStatus);
-    }
-
-    setSearchParams(nextParams, { replace: true });
-  };
+  const activeUsers = useMemo(() => users.filter((user) => user.isActive).length, [users]);
+  const inactiveUsers = users.length - activeUsers;
 
   return (
     <div className="space-y-6">
-      <div className="flex flex-col gap-4 lg:flex-row lg:items-end lg:justify-between">
-        <div>
-          <div className="text-xs uppercase tracking-[0.3em] text-cyan-300">Users</div>
-          <h1 className="mt-2 text-3xl font-bold text-white">User Management</h1>
-          <p className="mt-2 text-slate-400">Search, review, and control access across every role.</p>
-        </div>
-        <div className="relative w-full max-w-md">
-          <Search className="pointer-events-none absolute left-4 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-500" />
-          <Input className="pl-11" value={search} onChange={(event) => setSearch(event.target.value)} placeholder="Search name or email" />
-        </div>
-      </div>
+      <section className="overflow-hidden border border-slate-800 bg-slate-950">
+        <div className="border-b border-slate-800 px-6 py-6 lg:px-8">
+          <div className="flex flex-col gap-6 xl:flex-row xl:items-end xl:justify-between">
+            <div className="max-w-4xl">
+              <div className="text-[11px] uppercase tracking-[0.35em] text-cyan-300">Admin Users</div>
+              <h1 className="mt-3 text-3xl font-semibold tracking-tight text-white">{activeSection.label}</h1>
+              <p className="mt-3 max-w-3xl text-sm leading-6 text-slate-400">{activeSection.description}</p>
+            </div>
 
-      <Card className="p-6">
-        <div className="flex items-start justify-between gap-4">
-          <div>
-            <div className="text-xs uppercase tracking-[0.3em] text-cyan-300">Registration Requests</div>
-            <h2 className="mt-2 text-2xl font-bold text-white">Approve public sign-up requests</h2>
-            <p className="mt-2 text-slate-400">
-              Students complete public signup with an institution token. All other roles wait here for admin approval.
-            </p>
+            <div className="grid gap-3 sm:grid-cols-3 xl:min-w-[32rem]">
+              <div className="border border-slate-800/80 bg-slate-950/80 px-4 py-3">
+                <div className="text-[11px] uppercase tracking-[0.25em] text-slate-500">Tracked accounts</div>
+                <div className="mt-2 text-sm font-medium text-white">{users.length}</div>
+              </div>
+              <div className="border border-slate-800/80 bg-slate-950/80 px-4 py-3">
+                <div className="text-[11px] uppercase tracking-[0.25em] text-slate-500">Pending requests</div>
+                <div className="mt-2 text-sm font-medium text-white">{pendingRequests}</div>
+              </div>
+              <div className="grid gap-3 sm:grid-cols-2">
+                <div className="border border-slate-800/80 bg-slate-950/80 px-4 py-3">
+                  <div className="text-[11px] uppercase tracking-[0.25em] text-slate-500">Active</div>
+                  <div className="mt-2 text-sm font-medium text-white">{activeUsers}</div>
+                </div>
+                <div className="border border-slate-800/80 bg-slate-950/80 px-4 py-3">
+                  <div className="text-[11px] uppercase tracking-[0.25em] text-slate-500">Inactive</div>
+                  <div className="mt-2 text-sm font-medium text-white">{inactiveUsers}</div>
+                </div>
+              </div>
+            </div>
           </div>
-          <Badge>{pendingRequests.length} pending</Badge>
         </div>
 
-        <div className="mt-6 space-y-3">
-          {usersQuery.isLoading ? (
-            <div className="flex items-center justify-center py-12">
-              <Spinner />
-            </div>
-          ) : pendingRequests.length === 0 ? (
-            <div className="rounded-2xl border border-dashed border-slate-800 px-5 py-10 text-sm text-slate-400">
-              No registration requests are waiting right now.
-            </div>
-          ) : (
-            pendingRequests.map((request) => (
-              <div key={request._id} className="rounded-2xl border border-slate-800 bg-slate-900/70 px-5 py-5">
-                <div className="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
-                  <div className="space-y-3">
-                    <div className="flex flex-wrap items-center gap-3">
-                      <div className="text-lg font-semibold text-white">{request.displayName}</div>
-                      <Badge className="border-amber-500/30 bg-amber-500/10 text-amber-300">
-                        pending
-                      </Badge>
-                      <Badge className="border-slate-700 bg-slate-800 text-slate-200 capitalize">
-                        {request.role}
-                      </Badge>
-                    </div>
-                    <div className="text-sm text-slate-300">{request.email}</div>
-                    {request.adminApprovalRequestedAt ? (
-                      <div className="text-xs uppercase tracking-[0.25em] text-slate-500">
-                        Requested {new Date(request.adminApprovalRequestedAt).toLocaleString('en-IN')}
-                      </div>
-                    ) : null}
-                    <div className="text-sm text-slate-400">
-                      Access will stay disabled until this request is approved.
-                    </div>
-                  </div>
-                  <div className="flex flex-wrap gap-2">
-                    <Button
-                      onClick={() =>
-                        reviewRequestMutation.mutate({
-                          userId: request._id,
-                          decision: 'approved',
-                        })
-                      }
-                      disabled={reviewRequestMutation.isPending}
-                    >
-                      Approve
-                    </Button>
-                    <Button
-                      variant="secondary"
-                      onClick={() => {
-                        const reason = window.prompt('Add a short rejection reason (optional):')?.trim();
-                        reviewRequestMutation.mutate({
-                          userId: request._id,
-                          decision: 'rejected',
-                          ...(reason ? { reason } : {}),
-                        });
-                      }}
-                      disabled={reviewRequestMutation.isPending}
-                    >
-                      Reject
-                    </Button>
-                  </div>
-                </div>
-              </div>
-            ))
-          )}
+        <AdminSectionTabs links={ADMIN_USERS_SECTION_LINKS} />
+      </section>
+
+      {usersQuery.isLoading ? (
+        <div className="flex items-center justify-center py-20">
+          <Spinner />
         </div>
-      </Card>
-
-      <div className="flex flex-wrap gap-3">
-        <select
-          className="rounded-lg border border-slate-800 bg-slate-950 px-4 py-3 text-white"
-          value={roleFilter}
-          onChange={(event) => {
-            const nextRole = event.target.value as UserRole | 'all';
-            setRoleFilter(nextRole);
-            updateFiltersInUrl(nextRole, statusFilter);
-          }}
-        >
-          <option value="all">All Roles</option>
-          {Object.values(UserRole).map((role) => (
-            <option key={role} value={role}>
-              {role}
-            </option>
-          ))}
-        </select>
-        <select
-          className="rounded-lg border border-slate-800 bg-slate-950 px-4 py-3 text-white"
-          value={statusFilter}
-          onChange={(event) => {
-            const nextStatus = event.target.value as 'all' | 'active' | 'inactive';
-            setStatusFilter(nextStatus);
-            updateFiltersInUrl(roleFilter, nextStatus);
-          }}
-        >
-          <option value="all">All Statuses</option>
-          <option value="active">Active</option>
-          <option value="inactive">Inactive</option>
-        </select>
-      </div>
-
-      <Card className="overflow-hidden">
-        <div className="grid grid-cols-[minmax(180px,1.1fr)_minmax(240px,1.5fr)_88px_72px_132px_108px_96px_72px] gap-4 border-b border-slate-800 bg-slate-900/70 px-5 py-4 text-xs uppercase tracking-[0.3em] text-slate-400">
-          <div>Name</div>
-          <div>Email</div>
-          <div>Role</div>
-          <div>Score</div>
-          <div>Access</div>
-          <div>Expires</div>
-          <div>Status</div>
-          <div>Actions</div>
-        </div>
-        <div className="divide-y divide-slate-800">
-          {usersQuery.isLoading ? (
-            <div className="flex items-center justify-center py-12">
-              <Spinner />
-            </div>
-          ) : users.length === 0 ? (
-            <div className="px-5 py-12 text-sm text-slate-400">No users found.</div>
-          ) : (
-            users.map((user) => (
-              <div key={user._id} className="grid grid-cols-[minmax(180px,1.1fr)_minmax(240px,1.5fr)_88px_72px_132px_108px_96px_72px] items-center gap-4 px-5 py-4">
-                <div className="min-w-0">
-                  <div className="truncate font-semibold text-white">{user.displayName}</div>
-                </div>
-                <div className="min-w-0 text-sm text-slate-300">
-                  <div className="truncate">{user.email}</div>
-                </div>
-                <div className="text-sm text-slate-300 capitalize">{user.role}</div>
-                <div className="text-sm text-slate-300">{user.innovationScore}</div>
-                <div className="min-w-0 text-sm text-slate-300">
-                  <div className="truncate">{user.accessGrantedBy}</div>
-                </div>
-                <div className="text-sm text-slate-400">{new Date(user.accessExpiresAt).toLocaleDateString('en-IN')}</div>
-                <div>
-                  <Badge className={user.isActive ? 'border-emerald-500/30 bg-emerald-500/10 text-emerald-300' : 'border-rose-500/30 bg-rose-500/10 text-rose-300'}>
-                    {user.isActive ? 'Active' : 'Inactive'}
-                  </Badge>
-                </div>
-                <div className="flex justify-end">
-                  <UserActionMenu
-                    user={user}
-                    onViewActivity={() => setSelectedUser(user)}
-                    onChangeRole={() => {
-                      setSelectedUser(user);
-                      setRoleDraft(user.role);
-                      setModalMode('role');
-                    }}
-                    onToggleAccess={() => {
-                      setSelectedUser(user);
-                      setModalMode('access');
-                    }}
-                  />
-                </div>
-              </div>
-            ))
-          )}
-        </div>
-      </Card>
-
-      <ConfirmModal
-        open={modalMode === 'role' && Boolean(selectedUser)}
-        title="Change user role"
-        description={`Update ${selectedUser?.displayName ?? 'this user'} to a new role.`}
-        confirmLabel="Update Role"
-        busy={updateRoleMutation.isPending}
-        onClose={() => {
-          setModalMode(null);
-          setSelectedUser(null);
-        }}
-        onConfirm={() => {
-          if (selectedUser) {
-            updateRoleMutation.mutate({ userId: selectedUser._id, role: roleDraft });
-          }
-        }}
-      >
-        <select
-          className="w-full rounded-lg border border-slate-800 bg-slate-950 px-4 py-3 text-white"
-          value={roleDraft}
-          onChange={(event) => setRoleDraft(event.target.value as UserRole)}
-        >
-          {Object.values(UserRole).map((role) => (
-            <option key={role} value={role}>
-              {role}
-            </option>
-          ))}
-        </select>
-      </ConfirmModal>
-
-      <ConfirmModal
-        open={modalMode === 'access' && Boolean(selectedUser)}
-        title={selectedUser?.isActive ? 'Deactivate user access' : 'Activate user access'}
-        description={`This will update access for ${selectedUser?.displayName ?? 'the selected user'} and clear their session tokens.`}
-        confirmLabel={selectedUser?.isActive ? 'Deactivate' : 'Activate'}
-        busy={updateAccessMutation.isPending}
-        onClose={() => {
-          setModalMode(null);
-          setSelectedUser(null);
-        }}
-        onConfirm={() => {
-          if (selectedUser) {
-            updateAccessMutation.mutate({ userId: selectedUser._id, isActive: !selectedUser.isActive });
-          }
-        }}
-      />
-
-      <ActivityDrawer
-        user={selectedUser}
-        open={Boolean(selectedUser) && modalMode === null}
-        onClose={() => setSelectedUser(null)}
-      />
+      ) : usersQuery.isError ? (
+        <Card className="border-dashed p-6 text-sm text-slate-400">
+          User data is unavailable right now.
+        </Card>
+      ) : (
+        <Outlet context={{ users, isLoading: usersQuery.isLoading }} />
+      )}
     </div>
   );
 }

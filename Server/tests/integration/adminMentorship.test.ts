@@ -289,4 +289,89 @@ describe('admin mentorship integration', () => {
       ]),
     );
   });
+
+  it('allows admins to create a mentorship program for a college and assign an available mentor immediately', async () => {
+    const { email: adminEmail } = await createApprovedUser({
+      role: UserRole.ADMIN,
+      displayName: 'Programme Admin',
+    });
+    const { user: collegeUser } = await createApprovedUser({
+      role: UserRole.COLLEGE,
+      displayName: 'Promove College',
+    });
+    const { user: mentorUser, email: mentorEmail } = await createApprovedUser({
+      role: UserRole.MENTOR,
+      displayName: 'Operations Mentor',
+    });
+
+    const adminAccessToken = await loginAs(adminEmail);
+    const mentorAccessToken = await loginAs(mentorEmail);
+
+    const preferredDate = new Date(Date.now() + 7 * 24 * 60 * 60 * 1000).toISOString();
+    const scheduledAt = new Date(Date.now() + 8 * 24 * 60 * 60 * 1000).toISOString();
+
+    const createProgramResponse = await request(app)
+      .post('/api/admin/mentorship-programs')
+      .set('Authorization', `Bearer ${adminAccessToken}`)
+      .send({
+        institutionId: collegeUser._id.toString(),
+        mentorId: mentorUser._id.toString(),
+        title: 'Campus Startup Sprint',
+        objective: 'Guide college teams through problem validation, mentor feedback, and investor readiness.',
+        preferredDate,
+        scheduledAt,
+        durationMinutes: 120,
+        expectedParticipants: 80,
+        deliveryMode: 'Online',
+        platform: 'Google Meet',
+        meetingLink: 'https://meet.google.com/campus-startup-sprint',
+        preferredExpertise: 'Startup validation',
+        adminNotes: 'Created directly by admin for campus innovation week.',
+      });
+
+    expect(createProgramResponse.status).toBe(201);
+    expect(createProgramResponse.body.data).toEqual(
+      expect.objectContaining({
+        status: 'Assigned',
+        title: 'Campus Startup Sprint',
+        institution: expect.objectContaining({
+          _id: collegeUser._id.toString(),
+          type: 'college',
+        }),
+        mentor: expect.objectContaining({
+          _id: mentorUser._id.toString(),
+          displayName: 'Operations Mentor',
+        }),
+      }),
+    );
+
+    const programId = createProgramResponse.body.data._id as string;
+    const storedProgram = await InstitutionMentorshipProgram.findById(programId).lean();
+    expect(storedProgram).toEqual(
+      expect.objectContaining({
+        institutionId: collegeUser._id,
+        mentorId: mentorUser._id,
+        status: 'Assigned',
+      }),
+    );
+
+    const mentorDashboardResponse = await request(app)
+      .get('/api/mentor/dashboard')
+      .set('Authorization', `Bearer ${mentorAccessToken}`);
+
+    expect(mentorDashboardResponse.status).toBe(200);
+    expect(mentorDashboardResponse.body.data.assignedProgramsCount).toBe(1);
+    expect(mentorDashboardResponse.body.data.institutionPrograms).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({
+          _id: programId,
+          title: 'Campus Startup Sprint',
+          institution: expect.objectContaining({
+            _id: collegeUser._id.toString(),
+            type: 'college',
+          }),
+        }),
+      ]),
+    );
+  });
 });

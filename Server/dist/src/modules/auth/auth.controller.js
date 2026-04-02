@@ -84,8 +84,6 @@ const submitInstitutionTokenAfterRegister = async (req, res) => {
     }
     const { institutionToken } = auth_schema_1.submitInstitutionTokenSchema.parse(req.body);
     const result = await (0, auth_service_1.submitInstitutionToken)(req.user._id, institutionToken);
-    res.status(200).json(new ApiResponse_1.ApiResponse({
-        message: result.message,
-    }));
+    res.status(200).json(new ApiResponse_1.ApiResponse(result));
 };
 exports.submitInstitutionTokenAfterRegister = submitInstitutionTokenAfterRegister;

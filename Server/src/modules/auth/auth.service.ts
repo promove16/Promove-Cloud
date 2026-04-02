@@ -9,8 +9,14 @@ import { UserRole } from '../../types/roles.types';
 import { ApiError } from '../../utils/ApiError';
 import { logError } from '../../config/logger';
 import { toSanitizedUser } from '../user/user.service';
+import { getProfileCompletionProgress } from '../user/profileCompletion';
 import { sanitizePlainText } from '../../utils/sanitizeText';
 import { recordLoginActivity } from '../analytics/activity.service';
+import {
+  queueProfileCompletionMilestoneEmail,
+  queueWelcomeEmail,
+} from '../../services/retentionEmailService';
+import { applyScore } from '../../services/scoreEngine';
 import {
   registerTokenUsage,
   resolveInstitutionToken,
@@ -275,8 +281,23 @@ export const registerUser = async (payload: {
       adminApprovalStatus: 'not_required',
     });
 
+    if (profileComplete) {
+      const newScore = await applyScore({
+        userId: String(createdUser._id),
+        trigger: 'PROFILE_COMPLETE',
+        metadata: { source: 'register' },
+      });
+      createdUser.innovationScore = newScore;
+    }
+
     const user = toSanitizedUser(createdUser.toObject());
     const tokens = await createTokenPair(user);
+    await queueWelcomeEmail(String(createdUser._id));
+    await queueProfileCompletionMilestoneEmail(
+      String(createdUser._id),
+      0,
+      getProfileCompletionProgress(createdUser.toObject()).percent,
+    );
 
     return {
       ...tokens,
@@ -327,6 +348,15 @@ export const registerUser = async (payload: {
     institutionVerifiedAt: verificationTimestamp,
   });
 
+  if (profileComplete) {
+    const newScore = await applyScore({
+      userId: String(createdUser._id),
+      trigger: 'PROFILE_COMPLETE',
+      metadata: { source: 'register' },
+    });
+    createdUser.innovationScore = newScore;
+  }
+
   const user = toSanitizedUser(createdUser.toObject());
 
   if (studentInstitutionContext) {
@@ -336,6 +366,13 @@ export const registerUser = async (payload: {
   if (matchedRoster) {
     await markStudentRosterEntryRegistered(String(matchedRoster.institutionId), payload.email, user._id);
   }
+
+  await queueWelcomeEmail(String(createdUser._id));
+  await queueProfileCompletionMilestoneEmail(
+    String(createdUser._id),
+    0,
+    getProfileCompletionProgress(createdUser.toObject()).percent,
+  );
 
   return {
     pendingApproval: true,
@@ -461,6 +498,13 @@ export const submitRegistrationRequest = async (payload: {
 
   await user.save();
 
+  await queueWelcomeEmail(String(user._id));
+  await queueProfileCompletionMilestoneEmail(
+    String(user._id),
+    0,
+    getProfileCompletionProgress(user.toObject()).percent,
+  );
+
   return {
     pendingApproval: true,
     approvalType: 'admin',
@@ -483,6 +527,15 @@ export const submitInstitutionToken = async (userId: string, institutionToken: s
 
   const normalizedToken = institutionToken.trim().toUpperCase();
   const { tokenRecord, institution } = await resolveStudentInstitutionContext(normalizedToken);
+  const matchedRoster = await findInstitutionRosterMatchByEmail(user.email);
+
+  if (matchedRoster && String(matchedRoster.institutionId) !== String(institution._id)) {
+    throw new ApiError(
+      409,
+      'INSTITUTION_TOKEN_MISMATCH',
+      'This email belongs to a different institution roster. Please use the correct institution token.',
+    );
+  }
 
   user.institutionToken = normalizedToken;
   user.institutionId = institution._id;
@@ -493,13 +546,21 @@ export const submitInstitutionToken = async (userId: string, institutionToken: s
   user.verificationRequestedAt = new Date();
   user.verificationRejectedAt = undefined;
   user.verificationRejectedReason = undefined;
-  user.accessGrantedBy = 'institution_token';
+  user.accessGrantedBy = matchedRoster ? 'institution_roster' : 'institution_token';
   await user.save();
 
   await registerTokenUsage(String(tokenRecord._id));
+  if (matchedRoster) {
+    await markStudentRosterEntryRegistered(
+      String(matchedRoster.institutionId),
+      user.email,
+      String(user._id),
+    );
+  }
 
   return {
     message: 'Token submitted successfully. Your institution can now review your account.',
+    user: toSanitizedUser(user.toObject()),
   };
 };
 

@@ -35,7 +35,16 @@ export function LeadershipProfile() {
     queryFn: () => scoreApi.getScoreHistory(authUser!._id),
     enabled: Boolean(authUser?._id),
   });
-  const startup = useQuery({ queryKey: ["startup", "mine"], queryFn: () => startupApi.mine() });
+  const startups = useQuery({ queryKey: ["startup", "mine"], queryFn: () => startupApi.mine() });
+  const publicProfileUrl =
+    authUser?.profileSlug && typeof window !== "undefined"
+      ? `${window.location.origin}/students/${authUser.profileSlug}`
+      : "";
+  const canShareProfile = Boolean(
+    authUser?.verificationStatus === "verified" &&
+      authUser?.profileComplete &&
+      authUser?.profileSlug,
+  );
 
   const stats = useMemo(
     () => [
@@ -50,7 +59,7 @@ export function LeadershipProfile() {
 
   const launchToRecruiters = async () => {
     try {
-      if (!startup.data) {
+      if ((startups.data?.length ?? 0) === 0) {
         await startupApi.create({
           projectId: workspaces.data?.[0]?._id,
           name: workspaces.data?.[0]?.title ?? "Student Innovation Profile",
@@ -73,6 +82,20 @@ export function LeadershipProfile() {
       }
     } catch (error) {
       setToast((error as { response?: { data?: { error?: { message?: string } } } })?.response?.data?.error?.message ?? "Unable to launch your profile to recruiters.");
+    }
+  };
+
+  const copyShareLink = async () => {
+    if (!publicProfileUrl) {
+      setToast("Public profile link is not available yet.");
+      return;
+    }
+
+    try {
+      await navigator.clipboard.writeText(publicProfileUrl);
+      setToast("Public profile link copied.");
+    } catch (_error) {
+      setToast("Unable to copy the public profile link.");
     }
   };
 
@@ -122,6 +145,14 @@ export function LeadershipProfile() {
             </div>
           </div>
           <div className="flex gap-3 flex-wrap">
+            <button
+              onClick={copyShareLink}
+              disabled={!canShareProfile}
+              className="px-6 py-3 bg-slate-800 hover:bg-slate-700 text-white rounded-lg font-semibold transition-colors flex items-center gap-2 disabled:cursor-not-allowed disabled:opacity-60"
+            >
+              <Share2 className="w-5 h-5" />
+              Copy Public Link
+            </button>
             <button onClick={() => setShowLaunchModal(true)} className="px-6 py-3 bg-slate-800 hover:bg-slate-700 text-white rounded-lg font-semibold transition-colors flex items-center gap-2">
               <Share2 className="w-5 h-5" />
               Launch to Recruiters
@@ -132,6 +163,11 @@ export function LeadershipProfile() {
             </button>
           </div>
         </div>
+        {!canShareProfile ? (
+          <div className="rounded-xl border border-amber-500/20 bg-amber-500/10 p-4 text-sm text-amber-200">
+            Public sharing unlocks only after your profile is complete and your institution has verified your account.
+          </div>
+        ) : null}
 
         <div className="grid md:grid-cols-5 gap-6">
           {stats.map((stat) => (

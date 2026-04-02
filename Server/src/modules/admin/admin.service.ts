@@ -33,6 +33,7 @@ import {
   searchUserActivitySummaries,
 } from '../analytics/activity.service';
 import {
+  AdminCreateMentorshipProgramPayload,
   AdminAnalyticsData,
   AdminAnalyticsLogEntry,
   AdminAwardItem,
@@ -53,6 +54,7 @@ import {
   AdminUsersResponse,
 } from './admin.types';
 import {
+  createAdminInstitutionMentorshipProgram,
   assignProjectMentor,
   listAdminProjectMentorships,
   listAdminMentorshipPrograms,
@@ -77,6 +79,7 @@ type AuditAction =
   | 'MENTOR_PROFILE_CREATED'
   | 'PROJECT_MENTOR_ASSIGNED'
   | 'PROJECT_MENTOR_UNASSIGNED'
+  | 'MENTORSHIP_PROGRAM_CREATED'
   | 'MENTORSHIP_REQUEST_ASSIGNED'
   | 'MENTORSHIP_REQUEST_REJECTED';
 
@@ -1538,6 +1541,19 @@ export const getProjectMentorships = async (): Promise<AdminProjectMentorshipsRe
   listAdminProjectMentorships();
 
 export const getMentorDirectory = async (): Promise<AdminMentorListItem[]> => listAdminMentors();
+
+export const createAdminMentorshipProgram = async (
+  adminId: string,
+  payload: AdminCreateMentorshipProgramPayload,
+) => {
+  const created = await createAdminInstitutionMentorshipProgram(adminId, payload);
+  await createAudit(adminId, 'MENTORSHIP_PROGRAM_CREATED', created._id, 'InstitutionMentorshipProgram', {
+    institutionId: created.institution._id,
+    mentorId: created.mentor?._id,
+    status: created.status,
+  });
+  return created;
+};
 
 export const createMentorProfile = async (
   adminId: string,

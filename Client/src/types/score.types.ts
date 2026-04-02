@@ -35,7 +35,11 @@ export interface ScoreEvent {
     | 'GITHUB_CONNECTED'
     | 'LINKEDIN_CONNECTED'
     | 'RESUME_UPLOADED'
-    | 'PROFILE_COMPLETE';
+    | 'PROFILE_COMPLETE'
+    | 'ONBOARDING_PROFILE'
+    | 'ONBOARDING_PROJECT'
+    | 'ONBOARDING_GITHUB'
+    | 'ONBOARDING_SHARE';
   delta: number;
   scoreAfter: number;
   metadata?: Record<string, unknown>;

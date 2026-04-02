@@ -6,7 +6,7 @@ import { BusinessLogo } from '../../components/branding/BusinessLogo';
 import { RoleSelector } from './RoleSelector';
 import { useLoginMutation } from './useAuth';
 import { UserRole } from '../../types/roles.types';
-import { roleRedirect } from '../../utils/roleRedirect';
+import { getPostLoginRedirect } from '../../utils/postLoginRedirect';
 
 export function LoginPage() {
   const navigate = useNavigate();
@@ -34,7 +34,7 @@ export function LoginPage() {
         role: selectedRole,
       });
 
-      navigate(roleRedirect(payload.user.role), { replace: true });
+      navigate(getPostLoginRedirect(payload.user), { replace: true });
     } catch (submissionError) {
       if (isAxiosError(submissionError)) {
         const apiError = submissionError.response?.data?.error;

@@ -2,6 +2,7 @@ import http from 'http';
 import app from './app';
 import { startActivityWorker } from './jobs/activityWorker';
 import { startNotificationWorker } from './jobs/notificationWorker';
+import { scheduleWeeklyProgressSummaryJob, startRetentionEmailWorker } from './jobs/retentionEmailWorker';
 import { startScoreWorker } from './jobs/scoreRecalcWorker';
 import { startInstitutionVerifyWorker } from './workers/institutionVerifyWorker';
 import { seedProblemsIfEmpty } from './modules/problemBank/problem.service';
@@ -21,7 +22,9 @@ const startServer = async () => {
     startActivityWorker();
     startScoreWorker();
     startNotificationWorker();
+    startRetentionEmailWorker();
     startInstitutionVerifyWorker();
+    await scheduleWeeklyProgressSummaryJob();
   }
 
   httpServer.listen(env.PORT, () => {

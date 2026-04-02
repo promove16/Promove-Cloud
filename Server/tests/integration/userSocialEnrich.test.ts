@@ -30,6 +30,8 @@ describe('user social enrichment', () => {
     expect(fetchSpy).not.toHaveBeenCalled();
     expect(scoreAddSpy).not.toHaveBeenCalled();
     expect(result.user.linkedinUrl).toBe('https://www.linkedin.com/in/jane-doe/');
+    expect(result.user.profileComplete).toBe(true);
+    expect(result.user.innovationScore).toBe(10);
     expect(result.summary.linkedinImported).toBe(false);
     expect(result.summary.warnings).toContain(
       'LinkedIn URL was saved, but profile data was not fetched because you did not confirm the LinkedIn import.',

@@ -7,7 +7,8 @@ import { asyncHandler } from '../../utils/asyncHandler';
 import { ApiError } from '../../utils/ApiError';
 import {
   createStartup,
-  getMyStartupController,
+  getMyStartupsController,
+  getStartupByIdController,
   launchStartupController,
   patchStartup,
   requestStartupReviewController,
@@ -32,7 +33,8 @@ const router = Router();
 
 router.use(authenticate, authorize(UserRole.STUDENT));
 router.post('/', asyncHandler(createStartup));
-router.get('/mine', asyncHandler(getMyStartupController));
+router.get('/mine', asyncHandler(getMyStartupsController));
+router.get('/:id', asyncHandler(getStartupByIdController));
 router.patch('/:id', asyncHandler(patchStartup));
 router.post('/:id/request-review', asyncHandler(requestStartupReviewController));
 router.post('/:id/launch', asyncHandler(launchStartupController));

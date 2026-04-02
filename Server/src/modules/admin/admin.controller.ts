@@ -3,14 +3,15 @@ import { ApiError } from '../../utils/ApiError';
 import { ApiResponse } from '../../utils/ApiResponse';
 import { UserRole } from '../../types/roles.types';
 import {
+  createAdminInstitutionMentorshipProgramSchema,
   projectMentorAssignmentSchema,
   reviewInstitutionMentorshipProgramSchema,
 } from '../mentor/mentor.validation';
 import {
-  createMentorProfileSchema,
   analyticsLogsQuerySchema,
   analyticsUsersQuerySchema,
   awardRejectSchema,
+  createMentorProfileSchema,
   dealReviewSchema,
   listMentorshipProgramsQuerySchema,
   listRegistrationRequestsQuerySchema,
@@ -23,6 +24,7 @@ import {
   approveAward,
   getAdminCapTable,
   getDealAwaitingApproval,
+  createAdminMentorshipProgram,
   createMentorProfile,
   getMentorDirectory,
   getMentorshipPrograms,
@@ -309,6 +311,12 @@ export const createMentorProfileController = async (req: Request, res: Response)
   if (!req.user) throw new ApiError(401, 'UNAUTHORIZED', 'Invalid or expired token');
   const payload = createMentorProfileSchema.parse(req.body);
   res.status(201).json(new ApiResponse(await createMentorProfile(req.user._id, payload)));
+};
+
+export const createAdminMentorshipProgramController = async (req: Request, res: Response) => {
+  if (!req.user) throw new ApiError(401, 'UNAUTHORIZED', 'Invalid or expired token');
+  const payload = createAdminInstitutionMentorshipProgramSchema.parse(req.body);
+  res.status(201).json(new ApiResponse(await createAdminMentorshipProgram(req.user._id, payload)));
 };
 
 export const reviewMentorshipProgramController = async (req: Request, res: Response) => {

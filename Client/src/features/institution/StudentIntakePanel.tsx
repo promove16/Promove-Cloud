@@ -1,6 +1,7 @@
-import { ChangeEvent, ElementType, FormEvent, useMemo, useState } from 'react';
-import { AlertCircle, ChevronDown, Copy, Download, FileSpreadsheet, Info, ShieldCheck, Upload, UserPlus, X, Users } from 'lucide-react';
+import { ChangeEvent, FormEvent, useMemo, useState } from 'react';
+import { AlertCircle, ChevronDown, Copy, Download, FileSpreadsheet, Info, ShieldCheck, Upload, UserPlus, X, Users, type LucideIcon } from 'lucide-react';
 import { Button } from '../../components/ui/Button';
+import { OptionTabs } from '../../components/ui/OptionTabs';
 import { BulkCredentialImportResult, TemporaryStudentCredentials, StudentRosterEntry } from '../../types/school.types';
 
 const rosterTone: Record<StudentRosterEntry['status'], string> = {
@@ -201,7 +202,7 @@ export function StudentIntakePanel({
     URL.revokeObjectURL(url);
   };
 
-  const tabs: { id: Tab; label: string; icon: ElementType }[] = [
+  const tabs: { id: Tab; label: string; icon: LucideIcon }[] = [
     { id: 'add', label: 'Add Student', icon: UserPlus },
     { id: 'import', label: 'Import Roster', icon: FileSpreadsheet },
     { id: 'credentials', label: 'Temp Login', icon: ShieldCheck },
@@ -261,22 +262,13 @@ export function StudentIntakePanel({
             </div>
 
             {/* Tabs */}
-            <div className="flex border-b border-slate-800">
-              {tabs.map((tab) => (
-                <button
-                  key={tab.id}
-                  onClick={() => setActiveTab(tab.id)}
-                  className={`flex flex-1 flex-col items-center gap-1 px-2 py-3 text-xs transition ${
-                    activeTab === tab.id
-                      ? 'border-b-2 border-cyan-400 text-cyan-300'
-                      : 'text-slate-500 hover:text-slate-300'
-                  }`}
-                >
-                  <tab.icon className="h-4 w-4" />
-                  {tab.label}
-                </button>
-              ))}
-            </div>
+            <OptionTabs
+              items={tabs}
+              activeId={activeTab}
+              onChange={setActiveTab}
+              stretch
+              aria-label="Student onboarding sections"
+            />
 
             {/* Tab content */}
             <div className="flex-1 overflow-y-auto p-6">

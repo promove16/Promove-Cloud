@@ -1,7 +1,14 @@
 import { Types } from 'mongoose';
 import { z } from 'zod';
-import { User } from './user.model';
-import { IUser, LaunchToRecruitersResult, SanitizedUser, StudentMentorSessionView } from './user.types';
+import { randomBytes } from 'crypto';
+import { User, UserDocument } from './user.model';
+import {
+  IUser,
+  LaunchToRecruitersResult,
+  PublicStudentProfile,
+  SanitizedUser,
+  StudentMentorSessionView,
+} from './user.types';
 import { ApiError } from '../../utils/ApiError';
 import { recordClientActivity, recordClientActivitySchema } from '../analytics/activity.service';
 import { MentorSession } from '../mentor/mentorSession.model';
@@ -12,9 +19,21 @@ import { NotificationService } from '../notification/notification.service';
 import { io } from '../../config/socket';
 import { getStudentCollegeId } from '../recruiter/recruiter.mappers';
 import { sanitizePlainText } from '../../utils/sanitizeText';
-import { applyScoreAsync } from '../../services/scoreEngine';
+import { applyScore, applyScoreAsync } from '../../services/scoreEngine';
+import { getProfileCompletionProgress } from './profileCompletion';
+import { queueProfileCompletionMilestoneEmail } from '../../services/retentionEmailService';
 import { normalizeInnovationScore, normalizeScoreBreakdown } from '../innovationScore/score.utils';
 import { fetchLinkedInPublicProfile } from './linkedinPublicProfile';
+import {
+  consumeGithubOauthState,
+  createGithubOauthStart,
+  GithubRepositoryChoice,
+  isGithubOauthAvailable,
+  listGithubRepositoryChoices,
+  replaceImportedGithubRepositories,
+  resolveGithubOauthCallback,
+  syncGithubProofForUser,
+} from './githubProof';
 
 export const updateMeSchema = z
   .object({
@@ -37,6 +56,10 @@ export const socialEnrichSchema = z.object({
   confirmLinkedinFetch: z.boolean().optional(),
 });
 
+export const importGithubRepositoriesSchema = z.object({
+  repoIds: z.array(z.string().trim().min(1)).min(1).max(8),
+});
+
 type UserLike = Omit<IUser, '_id' | 'institutionId'> & {
   _id: { toString(): string };
   institutionId?: { toString(): string } | null;
@@ -45,6 +68,61 @@ type UserLike = Omit<IUser, '_id' | 'institutionId'> & {
 const GITHUB_PROFILE_ROLES = new Set<UserRole>([UserRole.STUDENT, UserRole.MENTOR]);
 
 const supportsGithubProfile = (role: UserRole) => GITHUB_PROFILE_ROLES.has(role);
+
+const slugifyDisplayName = (displayName: string) => {
+  const normalized = displayName
+    .normalize('NFKD')
+    .replace(/[^\w\s-]/g, '')
+    .trim()
+    .toLowerCase()
+    .replace(/[\s_-]+/g, '-')
+    .replace(/^-+|-+$/g, '');
+
+  return normalized || 'user';
+};
+
+const generateProfileSlug = async (displayName: string) => {
+  const baseSlug = slugifyDisplayName(displayName);
+
+  for (let attempt = 0; attempt < 10; attempt += 1) {
+    const suffix = randomBytes(2).toString('hex');
+    const candidate = `${baseSlug}-${suffix}`;
+    const existing = await User.exists({ profileSlug: candidate });
+
+    if (!existing) {
+      return candidate;
+    }
+  }
+
+  throw new ApiError(500, 'PROFILE_SLUG_GENERATION_FAILED', 'Unable to generate a unique profile URL');
+};
+
+const ensureProfileSlug = async (user: UserDocument) => {
+  if (user.profileSlug) {
+    return false;
+  }
+
+  user.profileSlug = await generateProfileSlug(user.displayName);
+  return true;
+};
+
+const applyProfileCompleteScoreIfNeeded = async (
+  user: UserDocument,
+  userId: string,
+  wasProfileComplete: boolean,
+  source: string,
+) => {
+  if (wasProfileComplete || !user.profileComplete) {
+    return;
+  }
+
+  const newScore = await applyScore({
+    userId,
+    trigger: 'PROFILE_COMPLETE',
+    metadata: { source },
+  });
+  user.innovationScore = newScore;
+};
 
 const computeProfileComplete = (user: Pick<IUser, 'role' | 'displayName' | 'bio' | 'domain' | 'githubUrl' | 'linkedinUrl'>) =>
   Boolean(
@@ -87,6 +165,7 @@ export const toSanitizedUser = (user: UserLike): SanitizedUser => ({
   email: user.email,
   role: user.role,
   displayName: user.displayName,
+  githubOAuthAvailable: isGithubOauthAvailable(),
   ...(user.avatar ? { avatar: user.avatar } : {}),
   ...(user.bio ? { bio: user.bio } : {}),
   headline: user.headline ?? '',
@@ -151,6 +230,17 @@ export const toSanitizedUser = (user: UserLike): SanitizedUser => ({
     contributionsLastYear: 0,
     lastSyncedAt: null,
   },
+  githubProof: user.githubProof ?? {
+    importedRepoIds: [],
+    importedRepos: [],
+    recentActivity: [],
+    commitCount30Days: 0,
+    activeDays30Days: 0,
+    pushEvents30Days: 0,
+    pullRequests30Days: 0,
+    issues30Days: 0,
+    lastSyncedAt: null,
+  },
   teamRequestsSent: (user.teamRequestsSent ?? []).map((requestId) => requestId.toString()),
   teamRequestsReceived: (user.teamRequestsReceived ?? []).map((requestId) => requestId.toString()),
   createdAt: user.createdAt,
@@ -158,13 +248,18 @@ export const toSanitizedUser = (user: UserLike): SanitizedUser => ({
 });
 
 export const getCurrentUser = async (userId: string) => {
-  const user = await User.findById(userId).lean();
+  const user = await User.findById(userId);
 
   if (!user) {
     throw new ApiError(404, 'USER_NOT_FOUND', 'User not found');
   }
 
-  return toSanitizedUser(user as UserLike);
+  const profileSlugCreated = await ensureProfileSlug(user);
+  if (profileSlugCreated) {
+    await user.save();
+  }
+
+  return toSanitizedUser(user.toObject() as UserLike);
 };
 
 export const recordCurrentUserActivity = async (userId: string, payload: unknown) => {
@@ -333,6 +428,9 @@ export const enrichCurrentUserFromSocialLinks = async (
   if (!user) {
     throw new ApiError(404, 'USER_NOT_FOUND', 'User not found');
   }
+
+  const wasProfileComplete = user.profileComplete;
+  const previousProfilePercent = getProfileCompletionProgress(user).percent;
 
   if (payload.githubUrl !== undefined) {
     user.githubUrl = payload.githubUrl;
@@ -565,9 +663,16 @@ export const enrichCurrentUserFromSocialLinks = async (
     }
   }
 
+  await ensureProfileSlug(user);
   user.profileComplete = computeProfileComplete(user);
 
   await user.save();
+  await applyProfileCompleteScoreIfNeeded(user, userId, wasProfileComplete, 'social_enrich');
+  await queueProfileCompletionMilestoneEmail(
+    userId,
+    previousProfilePercent,
+    getProfileCompletionProgress(user).percent,
+  );
 
   return {
     user: toSanitizedUser(user.toObject() as UserLike),
@@ -582,6 +687,112 @@ export const enrichCurrentUserFromSocialLinks = async (
       importedEducation,
       importedCertifications,
     },
+  };
+};
+
+export const beginGithubOauthForCurrentUser = async (userId: string, returnTo?: string) =>
+  createGithubOauthStart(userId, returnTo);
+
+export const connectGithubForCurrentUserFromCallback = async (state: string, code: string) => {
+  const { userId, returnTo } = await consumeGithubOauthState(state);
+  const accessToken = await resolveGithubOauthCallback(code);
+  const user = await User.findById(userId).select('+connectedAccounts.github.accessToken');
+
+  if (!user) {
+    throw new ApiError(404, 'USER_NOT_FOUND', 'User not found');
+  }
+
+  const wasConnected = Boolean(user.connectedAccounts.github.userId);
+  const wasProfileComplete = user.profileComplete;
+  user.connectedAccounts.github = {
+    ...user.connectedAccounts.github,
+    accessToken,
+    connectedAt: user.connectedAccounts.github.connectedAt ?? new Date(),
+  };
+
+  const previousProfilePercent = getProfileCompletionProgress(user).percent;
+  await syncGithubProofForUser(user);
+  await ensureProfileSlug(user);
+  user.profileComplete = computeProfileComplete(user);
+  await user.save();
+  await applyProfileCompleteScoreIfNeeded(user, userId, wasProfileComplete, 'github_oauth');
+  await queueProfileCompletionMilestoneEmail(
+    userId,
+    previousProfilePercent,
+    getProfileCompletionProgress(user).percent,
+  );
+
+  if (!wasConnected) {
+    await applyScoreAsync({
+      userId,
+      trigger: 'GITHUB_CONNECTED',
+      metadata: { username: user.connectedAccounts.github.username ?? null },
+    });
+  }
+
+  return {
+    user,
+    returnTo,
+  };
+};
+
+const getCurrentUserWithGithubAccess = async (userId: string) => {
+  const user = await User.findById(userId).select('+connectedAccounts.github.accessToken');
+
+  if (!user) {
+    throw new ApiError(404, 'USER_NOT_FOUND', 'User not found');
+  }
+
+  return user;
+};
+
+export const syncCurrentUserGithubProof = async (userId: string) => {
+  const user = await getCurrentUserWithGithubAccess(userId);
+  const wasProfileComplete = user.profileComplete;
+  const previousProfilePercent = getProfileCompletionProgress(user).percent;
+  const result = await syncGithubProofForUser(user);
+  await ensureProfileSlug(user);
+  user.profileComplete = computeProfileComplete(user);
+  await user.save();
+  await applyProfileCompleteScoreIfNeeded(user, userId, wasProfileComplete, 'github_sync');
+  await queueProfileCompletionMilestoneEmail(
+    userId,
+    previousProfilePercent,
+    getProfileCompletionProgress(user).percent,
+  );
+
+  return {
+    user: toSanitizedUser(user.toObject() as UserLike),
+    repositoryCount: result.repositoryCount,
+  };
+};
+
+export const listCurrentUserGithubRepositories = async (userId: string): Promise<GithubRepositoryChoice[]> => {
+  const user = await getCurrentUserWithGithubAccess(userId);
+  return listGithubRepositoryChoices(user);
+};
+
+export const importCurrentUserGithubRepositories = async (
+  userId: string,
+  payload: z.infer<typeof importGithubRepositoriesSchema>,
+) => {
+  const user = await getCurrentUserWithGithubAccess(userId);
+  const wasProfileComplete = user.profileComplete;
+  const previousProfilePercent = getProfileCompletionProgress(user).percent;
+  const result = await replaceImportedGithubRepositories(user, payload.repoIds);
+  await ensureProfileSlug(user);
+  user.profileComplete = computeProfileComplete(user);
+  await user.save();
+  await applyProfileCompleteScoreIfNeeded(user, userId, wasProfileComplete, 'github_import');
+  await queueProfileCompletionMilestoneEmail(
+    userId,
+    previousProfilePercent,
+    getProfileCompletionProgress(user).percent,
+  );
+
+  return {
+    user: toSanitizedUser(user.toObject() as UserLike),
+    importedCount: result.importedCount,
   };
 };
 
@@ -627,7 +838,25 @@ export const launchCurrentUserToRecruiters = async (studentId: string): Promise<
     throw new ApiError(404, 'STUDENT_NOT_FOUND', 'Student not found');
   }
 
+  if (!student.profileComplete) {
+    throw new ApiError(
+      409,
+      'PROFILE_INCOMPLETE',
+      'Complete your profile before launching it to recruiters or sharing it publicly.',
+    );
+  }
+
+  if (student.verificationStatus !== 'verified') {
+    throw new ApiError(
+      409,
+      'PROFILE_NOT_VERIFIED',
+      'Your school or college must verify your account before this profile can be shared.',
+    );
+  }
+
+  await ensureProfileSlug(student);
   student.discoverableToRecruiters = true;
+  student.isProfilePublic = true;
   await student.save();
 
   const recruiters = await User.find({ role: UserRole.RECRUITER, isActive: true })
@@ -709,6 +938,9 @@ export const updateCurrentUser = async (
     throw new ApiError(404, 'USER_NOT_FOUND', 'User not found');
   }
 
+  const wasProfileComplete = user.profileComplete;
+  const previousProfilePercent = getProfileCompletionProgress(user).percent;
+
   if (payload.displayName !== undefined) {
     user.displayName = sanitizePlainText(payload.displayName);
   }
@@ -737,9 +969,83 @@ export const updateCurrentUser = async (
     user.discoverableToRecruiters = payload.discoverableToRecruiters;
   }
 
+  await ensureProfileSlug(user);
   user.profileComplete = computeProfileComplete(user);
 
   await user.save();
+  await applyProfileCompleteScoreIfNeeded(user, userId, wasProfileComplete, 'profile_update');
+  await queueProfileCompletionMilestoneEmail(
+    userId,
+    previousProfilePercent,
+    getProfileCompletionProgress(user).percent,
+  );
 
   return toSanitizedUser(user.toObject() as UserLike);
+};
+
+export const getPublicStudentProfileBySlug = async (profileSlug: string): Promise<PublicStudentProfile> => {
+  const student = await User.findOne({
+    profileSlug,
+    role: UserRole.STUDENT,
+    isActive: true,
+    isProfilePublic: true,
+    profileComplete: true,
+    verificationStatus: 'verified',
+  }).lean();
+
+  if (!student) {
+    throw new ApiError(404, 'PUBLIC_PROFILE_NOT_FOUND', 'Public student profile not found');
+  }
+
+  const institution = student.institutionId
+    ? await User.findById(student.institutionId).select('_id displayName').lean()
+    : null;
+
+  return {
+    _id: String(student._id),
+    displayName: student.displayName,
+    ...(student.avatar ? { avatar: student.avatar } : {}),
+    ...(student.bio ? { bio: student.bio } : {}),
+    headline: student.headline ?? '',
+    location: student.location ?? '',
+    websiteUrl: student.websiteUrl ?? null,
+    githubUrl: student.githubUrl ?? null,
+    linkedinUrl: student.linkedinUrl ?? null,
+    profileSlug: student.profileSlug ?? '',
+    ...(student.domain ? { domain: student.domain } : {}),
+    innovationScore: normalizeInnovationScore(student.innovationScore),
+    institutionVerifiedAt: student.institutionVerifiedAt ?? null,
+    ...(student.verifiedAt ? { verifiedAt: student.verifiedAt } : {}),
+    createdAt: student.createdAt,
+    updatedAt: student.updatedAt,
+    skills: student.skills ?? [],
+    experience: student.experience ?? [],
+    education: student.education ?? [],
+    certifications: student.certifications ?? [],
+    portfolioProjects: student.portfolioProjects ?? [],
+    githubStats: student.githubStats ?? {
+      totalRepos: 0,
+      totalStars: 0,
+      totalForks: 0,
+      topLanguages: [],
+      contributionsLastYear: 0,
+      lastSyncedAt: null,
+    },
+    githubProof: {
+      importedRepos: (student.githubProof?.importedRepos ?? []).filter((repo) => !repo.isPrivate),
+      recentActivity: (student.githubProof?.recentActivity ?? []).filter((activity) => !activity.isPrivate),
+      commitCount30Days: student.githubProof?.commitCount30Days ?? 0,
+      activeDays30Days: student.githubProof?.activeDays30Days ?? 0,
+      pushEvents30Days: student.githubProof?.pushEvents30Days ?? 0,
+      pullRequests30Days: student.githubProof?.pullRequests30Days ?? 0,
+      issues30Days: student.githubProof?.issues30Days ?? 0,
+      lastSyncedAt: student.githubProof?.lastSyncedAt ?? null,
+    },
+    institution: institution
+      ? {
+          _id: String(institution._id),
+          displayName: institution.displayName,
+        }
+      : null,
+  };
 };

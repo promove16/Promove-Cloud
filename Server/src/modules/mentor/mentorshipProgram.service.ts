@@ -11,6 +11,7 @@ import { Startup } from '../startup/startup.model';
 import { User } from '../user/user.model';
 import { Workspace } from '../workspace/workspace.model';
 import {
+  AdminCreateInstitutionMentorshipProgramInput,
   AdminProjectMentorshipItem,
   AdminProjectMentorshipView,
   CreateInstitutionMentorshipProgramInput,
@@ -458,6 +459,42 @@ const assertInstitutionRequester = async (
   return { institution, requester };
 };
 
+const assertInstitutionAccount = async (institutionId: string) => {
+  const institution = await User.findById(institutionId)
+    .select('_id displayName email role institutionProfile')
+    .lean();
+
+  if (!institution) {
+    throw new ApiError(404, 'INSTITUTION_NOT_FOUND', 'Institution account not found');
+  }
+
+  if (institution.role !== UserRole.SCHOOL && institution.role !== UserRole.COLLEGE) {
+    throw new ApiError(403, 'FORBIDDEN', 'Only school or college accounts can host mentorship programs');
+  }
+
+  return {
+    institution,
+    institutionType: institution.role === UserRole.SCHOOL ? ('school' as const) : ('college' as const),
+  };
+};
+
+const assertAssignableMentor = async (mentorId: string) => {
+  const mentor = await User.findOne({
+    _id: mentorId,
+    role: UserRole.MENTOR,
+    isActive: true,
+    adminApprovalStatus: { $in: ['approved', 'not_required'] },
+  })
+    .select('_id displayName email avatar domain bio')
+    .lean();
+
+  if (!mentor) {
+    throw new ApiError(404, 'MENTOR_NOT_FOUND', 'Assigned mentor not found');
+  }
+
+  return mentor;
+};
+
 export const createInstitutionMentorshipProgram = async (
   institutionId: string,
   institutionType: 'school' | 'college',
@@ -516,6 +553,75 @@ export const listInstitutionMentorshipPrograms = async (
     items,
     stats: buildStats(items),
   };
+};
+
+export const createAdminInstitutionMentorshipProgram = async (
+  adminId: string,
+  payload: AdminCreateInstitutionMentorshipProgramInput,
+): Promise<InstitutionMentorshipProgramItem> => {
+  const admin = await User.findById(adminId).select('_id role displayName email').lean();
+  if (!admin || admin.role !== UserRole.ADMIN) {
+    throw new ApiError(403, 'FORBIDDEN', 'Only admins can create institution mentorship programs');
+  }
+
+  const [{ institution, institutionType }, mentor] = await Promise.all([
+    assertInstitutionAccount(payload.institutionId),
+    assertAssignableMentor(payload.mentorId),
+  ]);
+
+  const created = await InstitutionMentorshipProgram.create({
+    institutionId: institution._id,
+    institutionType,
+    requestedBy: institution._id,
+    mentorId: mentor._id,
+    title: sanitizePlainText(payload.title),
+    objective: sanitizePlainText(payload.objective),
+    preferredDate: new Date(payload.preferredDate),
+    scheduledAt: new Date(payload.scheduledAt),
+    durationMinutes: payload.durationMinutes,
+    expectedParticipants: payload.expectedParticipants,
+    deliveryMode: payload.deliveryMode,
+    platform: payload.platform,
+    ...(payload.meetingLink ? { meetingLink: payload.meetingLink } : {}),
+    ...(payload.venue ? { venue: sanitizePlainText(payload.venue) } : {}),
+    ...(payload.preferredExpertise ? { preferredExpertise: sanitizePlainText(payload.preferredExpertise) } : {}),
+    ...(payload.adminNotes ? { adminNotes: sanitizePlainText(payload.adminNotes) } : {}),
+    status: 'Assigned',
+  });
+
+  await invalidateInstitutionMentorshipCaches(String(institution._id));
+
+  await Promise.all([
+    NotificationService.create({
+      userId: String(mentor._id),
+      type: 'system',
+      title: 'New institution mentorship assignment',
+      body: `You were assigned to "${created.title}" for an institution mentorship session.`,
+      link: '/dashboard/mentor',
+    }),
+    NotificationService.create({
+      userId: String(institution._id),
+      type: 'system',
+      title: 'Mentorship program scheduled',
+      body: `Admin scheduled "${created.title}" with ${mentor.displayName}.`,
+      link: institution.role === UserRole.COLLEGE ? '/dashboard/college' : '/dashboard/school',
+    }),
+  ]);
+
+  if (io) {
+    io.of('/notifications').to(`user:${String(mentor._id)}`).emit('notification:new');
+  }
+
+  return mapProgram(
+    created.toObject(),
+    institution,
+    {
+      _id: institution._id,
+      displayName: institution.displayName,
+      email: institution.email,
+    },
+    mentor,
+  );
 };
 
 export const listAdminMentorshipPrograms = async (status?: 'Pending' | 'Assigned' | 'Rejected'): Promise<InstitutionMentorshipProgramListResponse> => {
@@ -671,18 +777,7 @@ export const reviewInstitutionMentorshipProgram = async (
     program.adminNotes = payload.adminNotes ? sanitizePlainText(payload.adminNotes) : undefined;
     program.rejectionReason = sanitizePlainText(payload.rejectionReason);
   } else {
-    const mentor = await User.findOne({
-      _id: payload.mentorId,
-      role: UserRole.MENTOR,
-      isActive: true,
-      adminApprovalStatus: { $in: ['approved', 'not_required'] },
-    })
-      .select('_id displayName email avatar domain bio')
-      .lean();
-
-    if (!mentor) {
-      throw new ApiError(404, 'MENTOR_NOT_FOUND', 'Assigned mentor not found');
-    }
+    const mentor = await assertAssignableMentor(payload.mentorId);
 
     program.status = 'Assigned';
     program.mentorId = new Types.ObjectId(payload.mentorId);

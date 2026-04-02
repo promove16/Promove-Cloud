@@ -10,8 +10,10 @@ import {
 } from '../types/deal.types';
 import {
   AdminMentorListItem,
+  AdminCreateMentorshipProgramInput,
   CreateMentorProfileInput,
   CreatedMentorProfileResult,
+  InstitutionMentorshipProgram,
   InstitutionMentorshipProgramView,
   ProjectMentorshipAssignment,
   ProjectMentorshipView,
@@ -40,6 +42,12 @@ export interface AdminUserListItem {
   adminApprovalRejectedReason?: string;
   accessGrantedBy: string;
   accessExpiresAt: string;
+  institutionProfile?: {
+    institutionName?: string;
+    location?: string;
+    academicYear?: string;
+    iicStarRating?: number;
+  };
   createdAt: string;
 }
 
@@ -674,6 +682,13 @@ export const adminApi = {
     const response = await api.get<ApiSuccessResponse<InstitutionMentorshipProgramView>>(
       '/api/admin/mentorship-programs',
       { params },
+    );
+    return response.data.data;
+  },
+  async createMentorshipProgram(payload: AdminCreateMentorshipProgramInput) {
+    const response = await api.post<ApiSuccessResponse<InstitutionMentorshipProgram>>(
+      '/api/admin/mentorship-programs',
+      payload,
     );
     return response.data.data;
   },

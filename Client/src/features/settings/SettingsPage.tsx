@@ -7,6 +7,7 @@ import { useSettings } from '../../hooks/useSettings';
 import { useAuthStore } from '../../store/authStore';
 import { applyTheme } from '../../hooks/useTheme';
 import { UserRole } from '../../types/roles.types';
+import { OptionTabs } from '../../components/ui/OptionTabs';
 
 // ─── Layout helper ────────────────────────────────────────────────────────────
 
@@ -152,7 +153,7 @@ function SettingsSkeleton() {
   return (
     <div className="animate-pulse space-y-6">
       <div className="h-8 w-48 bg-slate-800 rounded-lg" /><div className="h-4 w-72 bg-slate-800 rounded" />
-      <div className="flex gap-2">{[...Array(5)].map((_, i) => <div key={i} className="h-10 w-28 bg-slate-800 rounded-xl" />)}</div>
+      <div className="flex gap-2">{[...Array(5)].map((_, i) => <div key={i} className="h-12 w-28 bg-slate-800 rounded-xl" />)}</div>
       <div className="bg-slate-900 rounded-2xl border border-slate-800 p-6 space-y-4">
         {[...Array(4)].map((_, i) => <div key={i} className="space-y-1.5"><div className="h-4 w-24 bg-slate-800 rounded" /><div className="h-10 bg-slate-800 rounded-xl" /></div>)}
       </div>
@@ -385,15 +386,7 @@ export function SettingsPage() {
         </div>
 
         {/* Tab bar */}
-        <div className="flex gap-1 overflow-x-auto pb-px mb-8 border-b border-slate-800">
-          {TABS.map(({ id, label, icon: Icon }) => (
-            <button key={id} type="button" onClick={() => setActiveTab(id)}
-              className={`flex items-center gap-2 px-4 py-2.5 text-sm font-medium whitespace-nowrap transition-colors relative ${activeTab === id ? 'text-cyan-400' : 'text-slate-400 hover:text-slate-200'}`}>
-              <Icon className="w-4 h-4" />{label}
-              {activeTab === id && <span className="absolute bottom-0 left-0 right-0 h-0.5 bg-cyan-500 rounded-full" />}
-            </button>
-          ))}
-        </div>
+        <OptionTabs items={TABS} activeId={activeTab} onChange={setActiveTab} className="mb-8" aria-label="Settings sections" />
 
         {/* ── Account ─────────────────────────────────────────────────────── */}
         {activeTab === 'account' && (

@@ -183,12 +183,64 @@ export interface GithubLanguageStat {
   percentage: number;
 }
 
+export type GithubActivityType = 'push' | 'pull_request' | 'issue' | 'release' | 'fork' | 'watch' | 'other';
+
+export interface GithubRecentCommit {
+  sha: string;
+  message: string;
+  committedAt: Date;
+  url: string | null;
+}
+
+export interface GithubImportedRepo {
+  repoId: string;
+  name: string;
+  fullName: string;
+  description: string;
+  url: string;
+  owner: string;
+  isPrivate: boolean;
+  defaultBranch: string;
+  primaryLanguage: string | null;
+  languages: string[];
+  stars: number;
+  forks: number;
+  openIssues: number;
+  pushedAt: Date | null;
+  importedAt: Date;
+  recentCommits: GithubRecentCommit[];
+}
+
+export interface GithubActivityEvent {
+  id: string;
+  type: GithubActivityType;
+  repoFullName: string;
+  title: string;
+  summary: string;
+  url: string | null;
+  occurredAt: Date;
+  commitCount: number;
+  isPrivate: boolean;
+}
+
 export interface GithubStats {
   totalRepos: number;
   totalStars: number;
   totalForks: number;
   topLanguages: GithubLanguageStat[];
   contributionsLastYear: number;
+  lastSyncedAt: Date | null;
+}
+
+export interface GithubProof {
+  importedRepoIds: string[];
+  importedRepos: GithubImportedRepo[];
+  recentActivity: GithubActivityEvent[];
+  commitCount30Days: number;
+  activeDays30Days: number;
+  pushEvents30Days: number;
+  pullRequests30Days: number;
+  issues30Days: number;
   lastSyncedAt: Date | null;
 }
 
@@ -242,6 +294,7 @@ export interface IUser {
   portfolioProjects: PortfolioProjectEntry[];
   resume: ResumeInfo;
   githubStats: GithubStats;
+  githubProof: GithubProof;
   teamRequestsSent: Types.ObjectId[];
   teamRequestsReceived: Types.ObjectId[];
   createdAt: Date;
@@ -253,6 +306,7 @@ export interface SanitizedUser {
   email: string;
   role: UserRole;
   displayName: string;
+  githubOAuthAvailable: boolean;
   avatar?: string;
   bio?: string;
   headline: string;
@@ -297,6 +351,7 @@ export interface SanitizedUser {
   portfolioProjects: PortfolioProjectEntry[];
   resume: ResumeInfo;
   githubStats: GithubStats;
+  githubProof: GithubProof;
   teamRequestsSent: string[];
   teamRequestsReceived: string[];
   createdAt: Date;
@@ -326,4 +381,43 @@ export interface StudentMentorSessionView {
 export interface LaunchToRecruitersResult {
   bridgesCreated: number;
   user: SanitizedUser;
+}
+
+export interface PublicStudentProfile {
+  _id: string;
+  displayName: string;
+  avatar?: string;
+  bio?: string;
+  headline: string;
+  location: string;
+  websiteUrl: string | null;
+  githubUrl: string | null;
+  linkedinUrl: string | null;
+  profileSlug: string;
+  domain?: string;
+  innovationScore: number;
+  institutionVerifiedAt: Date | null;
+  verifiedAt?: Date;
+  createdAt: Date;
+  updatedAt: Date;
+  skills: SkillEntry[];
+  experience: ExperienceEntry[];
+  education: EducationEntry[];
+  certifications: CertificationEntry[];
+  portfolioProjects: PortfolioProjectEntry[];
+  githubStats: GithubStats;
+  githubProof: {
+    importedRepos: GithubImportedRepo[];
+    recentActivity: GithubActivityEvent[];
+    commitCount30Days: number;
+    activeDays30Days: number;
+    pushEvents30Days: number;
+    pullRequests30Days: number;
+    issues30Days: number;
+    lastSyncedAt: Date | null;
+  };
+  institution: {
+    _id: string;
+    displayName: string;
+  } | null;
 }

@@ -26,7 +26,8 @@ const upload = (0, multer_1.default)({
 const router = (0, express_1.Router)();
 router.use(authenticate_1.authenticate, (0, authorize_1.authorize)(roles_types_1.UserRole.STUDENT));
 router.post('/', (0, asyncHandler_1.asyncHandler)(startup_controller_1.createStartup));
-router.get('/mine', (0, asyncHandler_1.asyncHandler)(startup_controller_1.getMyStartupController));
+router.get('/mine', (0, asyncHandler_1.asyncHandler)(startup_controller_1.getMyStartupsController));
+router.get('/:id', (0, asyncHandler_1.asyncHandler)(startup_controller_1.getStartupByIdController));
 router.patch('/:id', (0, asyncHandler_1.asyncHandler)(startup_controller_1.patchStartup));
 router.post('/:id/request-review', (0, asyncHandler_1.asyncHandler)(startup_controller_1.requestStartupReviewController));
 router.post('/:id/launch', (0, asyncHandler_1.asyncHandler)(startup_controller_1.launchStartupController));

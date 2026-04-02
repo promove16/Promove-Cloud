@@ -26,7 +26,16 @@ exports.registerSchema = zod_1.z
     password: zod_1.z.string().min(8).max(72),
     displayName: zod_1.z.string().trim().min(2).max(60),
     role: zod_1.z.literal(roles_types_1.UserRole.STUDENT),
-    institutionToken: zod_1.z.string().trim().min(6).max(64),
+    institutionToken: zod_1.z
+        .union([zod_1.z.string().trim().min(6).max(64), zod_1.z.literal('')])
+        .optional()
+        .transform((value) => {
+        if (!value) {
+            return undefined;
+        }
+        const trimmed = value.trim();
+        return trimmed.length > 0 ? trimmed : undefined;
+    }),
     domain: optionalProfileString(120),
     bio: optionalProfileString(500),
 });

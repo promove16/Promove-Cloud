@@ -279,6 +279,13 @@ export interface CreateInstitutionMentorshipProgramInput {
   preferredExpertise?: string;
 }
 
+export interface AdminCreateInstitutionMentorshipProgramInput extends CreateInstitutionMentorshipProgramInput {
+  institutionId: string;
+  mentorId: string;
+  scheduledAt: string;
+  adminNotes?: string;
+}
+
 export type InstitutionMentorshipProgramReviewInput =
   | {
       decision: 'assigned';

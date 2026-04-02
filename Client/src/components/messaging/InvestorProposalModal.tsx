@@ -23,6 +23,7 @@ interface InvestorProposalModalProps {
   onSend: (message: string) => void;
   recipientName: string;
   isStudent: boolean;
+  preferredStartupId?: string;
 }
 
 type ProposalSource = {
@@ -70,43 +71,48 @@ const getProjectTeamSize = (project: Workspace) =>
   project.teamMembers?.length ?? project.teamMemberIds.length ?? 1;
 
 const buildProposalSource = (
-  startup: Startup | null | undefined,
+  startups: Startup[] | undefined,
   selectedProject: Workspace | null,
+  selectedStartupId: string | null,
 ): ProposalSource | null => {
-  if (selectedProject) {
-    const linkedStartup =
-      startup && (!startup.projectId || startup.projectId === selectedProject._id)
-        ? startup
-        : null;
+  const startupList = startups ?? [];
+  const linkedStartupFromProject = selectedProject
+    ? startupList.find((startup) => startup.projectId === selectedProject._id) ?? null
+    : null;
+  const selectedStartup = !selectedProject
+    ? startupList.find((startup) => startup._id === selectedStartupId) ??
+      (startupList.length === 1 ? startupList[0] : null)
+    : null;
 
+  if (selectedProject) {
     return {
-      name: linkedStartup?.name || selectedProject.title,
+      name: linkedStartupFromProject?.name || selectedProject.title,
       tagline:
-        linkedStartup?.tagline ||
+        linkedStartupFromProject?.tagline ||
         `${selectedProject.title} is a ${selectedProject.category} project currently in the ${selectedProject.stage} stage.`,
-      category: linkedStartup?.category || selectedProject.category,
-      stage: linkedStartup?.stage || workspaceStageToPitchStage[selectedProject.stage],
-      fundingNeeded: linkedStartup?.fundingNeeded,
-      teamSize: linkedStartup?.teamSize || getProjectTeamSize(selectedProject),
-      pitchDeckUrl: linkedStartup?.pitchDeckUrl,
-      traction: linkedStartup?.traction || defaultTraction,
-      kindLabel: linkedStartup ? 'startup' : 'project',
+      category: linkedStartupFromProject?.category || selectedProject.category,
+      stage: linkedStartupFromProject?.stage || workspaceStageToPitchStage[selectedProject.stage],
+      fundingNeeded: linkedStartupFromProject?.fundingNeeded,
+      teamSize: linkedStartupFromProject?.teamSize || getProjectTeamSize(selectedProject),
+      pitchDeckUrl: linkedStartupFromProject?.pitchDeckUrl,
+      traction: linkedStartupFromProject?.traction || defaultTraction,
+      kindLabel: linkedStartupFromProject ? 'startup' : 'project',
     };
   }
 
-  if (!startup) {
+  if (!selectedStartup) {
     return null;
   }
 
   return {
-    name: startup.name,
-    tagline: startup.tagline,
-    category: startup.category,
-    stage: startup.stage,
-    fundingNeeded: startup.fundingNeeded,
-    teamSize: startup.teamSize,
-    pitchDeckUrl: startup.pitchDeckUrl,
-    traction: startup.traction,
+    name: selectedStartup.name,
+    tagline: selectedStartup.tagline,
+    category: selectedStartup.category,
+    stage: selectedStartup.stage,
+    fundingNeeded: selectedStartup.fundingNeeded,
+    teamSize: selectedStartup.teamSize,
+    pitchDeckUrl: selectedStartup.pitchDeckUrl,
+    traction: selectedStartup.traction,
     kindLabel: 'startup',
   };
 };
@@ -146,9 +152,11 @@ export function InvestorProposalModal({
   onSend,
   recipientName,
   isStudent,
+  preferredStartupId,
 }: InvestorProposalModalProps) {
   const [customNote, setCustomNote] = useState('');
   const [selectedProjectId, setSelectedProjectId] = useState<string | null>(null);
+  const [selectedStartupId, setSelectedStartupId] = useState<string | null>(preferredStartupId ?? null);
 
   const startupQuery = useQuery({
     queryKey: ['startup', 'mine'],
@@ -168,18 +176,56 @@ export function InvestorProposalModal({
     if (!isOpen) {
       setCustomNote('');
       setSelectedProjectId(null);
+      setSelectedStartupId(preferredStartupId ?? null);
     }
-  }, [isOpen]);
+  }, [isOpen, preferredStartupId]);
 
-  const startup = startupQuery.data;
+  const startups = startupQuery.data;
   const projects = workspaceQuery.data ?? [];
-  const selectedProject =
-    projects.find((project) => project._id === selectedProjectId) ?? null;
-  const proposalSource = buildProposalSource(startup, selectedProject);
+  const startupOptions = startups ?? [];
+  const isSourceLocked = Boolean(preferredStartupId);
+
+  useEffect(() => {
+    if (!isOpen || isSourceLocked || startupQuery.isLoading || workspaceQuery.isLoading) {
+      return;
+    }
+
+    if (selectedStartupId || selectedProjectId) {
+      return;
+    }
+
+    if (startupOptions.length === 1 && projects.length === 0) {
+      setSelectedStartupId(startupOptions[0]._id);
+      return;
+    }
+
+    if (startupOptions.length === 0 && projects.length === 1) {
+      setSelectedProjectId(projects[0]._id);
+    }
+  }, [
+    isOpen,
+    isSourceLocked,
+    projects,
+    selectedProjectId,
+    selectedStartupId,
+    startupOptions,
+    startupQuery.isLoading,
+    workspaceQuery.isLoading,
+  ]);
+
+  const selectedProject = projects.find((project) => project._id === selectedProjectId) ?? null;
+  const proposalSource = buildProposalSource(
+    startups,
+    selectedProject,
+    preferredStartupId ?? selectedStartupId,
+  );
 
   const isLoading = isStudent && (startupQuery.isLoading || workspaceQuery.isLoading);
   const hasProjects = projects.length > 0;
-  const showProjectPicker = isStudent && hasProjects && !selectedProject;
+  const hasStartups = startupOptions.length > 0;
+  const hasSelectableSources = hasStartups || hasProjects;
+  const canChooseSource = !isSourceLocked && startupOptions.length + projects.length > 1;
+  const showSourcePicker = isStudent && !proposalSource && !isSourceLocked && hasSelectableSources;
 
   if (!isOpen) return null;
 
@@ -197,12 +243,14 @@ export function InvestorProposalModal({
     onClose();
     setCustomNote('');
     setSelectedProjectId(null);
+    setSelectedStartupId(preferredStartupId ?? null);
   };
 
   const handleClose = () => {
     onClose();
     setCustomNote('');
     setSelectedProjectId(null);
+    setSelectedStartupId(preferredStartupId ?? null);
   };
 
   return (
@@ -216,8 +264,8 @@ export function InvestorProposalModal({
             <div>
               <h2 className="text-lg font-bold text-white">Investment Proposal</h2>
               <p className="text-sm text-slate-400">
-                {showProjectPicker
-                  ? `Choose a project to pitch to ${recipientName}`
+                {showSourcePicker
+                  ? `Choose a startup or project to pitch to ${recipientName}`
                   : `Pitch your ${proposalSource?.kindLabel ?? 'startup'} to ${recipientName}`}
               </p>
             </div>
@@ -271,7 +319,7 @@ export function InvestorProposalModal({
                 </button>
               </div>
             </div>
-          ) : showProjectPicker ? (
+          ) : showSourcePicker ? (
             <div className="space-y-3">
               <div className="rounded-xl border border-emerald-500/20 bg-emerald-500/5 p-4">
                 <div className="flex items-center gap-3">
@@ -279,18 +327,53 @@ export function InvestorProposalModal({
                     <FolderKanban className="h-5 w-5" />
                   </div>
                   <div>
-                    <h3 className="text-base font-semibold text-white">Select a project</h3>
+                    <h3 className="text-base font-semibold text-white">Select a pitch source</h3>
                     <p className="text-sm text-slate-400">
-                      Choose the project you want to pitch to {recipientName}.
+                      Choose the startup or project you want to pitch to {recipientName}.
                     </p>
                   </div>
                 </div>
               </div>
 
+              {startupOptions.map((startup) => (
+                <button
+                  key={startup._id}
+                  onClick={() => {
+                    setSelectedStartupId(startup._id);
+                    setSelectedProjectId(null);
+                  }}
+                  className="w-full rounded-xl border border-slate-700 bg-slate-800/50 p-4 text-left transition hover:border-emerald-500/40 hover:bg-slate-800"
+                >
+                  <div className="flex items-start justify-between gap-3">
+                    <div className="min-w-0 flex-1">
+                      <div className="flex items-center gap-2">
+                        <Rocket className="h-4 w-4 text-emerald-300" />
+                        <div className="text-base font-semibold text-white">{startup.name}</div>
+                      </div>
+                      <div className="mt-1 text-sm text-slate-400">{startup.tagline}</div>
+                    </div>
+                    <span className="rounded-full bg-slate-700 px-2.5 py-1 text-xs font-medium text-slate-200">
+                      {startup.stage}
+                    </span>
+                  </div>
+                  <div className="mt-3 flex flex-wrap gap-2 text-xs">
+                    <span className="rounded-lg bg-slate-900 px-2.5 py-1 text-slate-300">
+                      {startup.category || 'Innovation'}
+                    </span>
+                    <span className="rounded-lg bg-slate-900 px-2.5 py-1 text-slate-300">
+                      Team {startup.teamSize}
+                    </span>
+                  </div>
+                </button>
+              ))}
+
               {projects.map((project) => (
                 <button
                   key={project._id}
-                  onClick={() => setSelectedProjectId(project._id)}
+                  onClick={() => {
+                    setSelectedProjectId(project._id);
+                    setSelectedStartupId(null);
+                  }}
                   className="w-full rounded-xl border border-slate-700 bg-slate-800/50 p-4 text-left transition hover:border-emerald-500/40 hover:bg-slate-800"
                 >
                   <div className="flex items-start justify-between gap-3">
@@ -322,9 +405,9 @@ export function InvestorProposalModal({
                 <Rocket className="h-8 w-8" />
               </div>
               <div>
-                <h3 className="text-base font-semibold text-white">No project found</h3>
+                <h3 className="text-base font-semibold text-white">No pitch source found</h3>
                 <p className="mt-1 text-sm text-slate-400">
-                  Create a project in Product Workspace before pitching to investors.
+                  Create a startup or project before pitching to investors.
                 </p>
               </div>
               <div className="flex items-start gap-2 rounded-xl border border-amber-500/30 bg-amber-500/10 p-3 text-sm text-amber-400">
@@ -337,13 +420,16 @@ export function InvestorProposalModal({
             </div>
           ) : (
             <>
-              {hasProjects ? (
+              {canChooseSource ? (
                 <button
-                  onClick={() => setSelectedProjectId(null)}
+                  onClick={() => {
+                    setSelectedProjectId(null);
+                    setSelectedStartupId(null);
+                  }}
                   className="flex items-center gap-2 text-sm text-slate-400 transition hover:text-white"
                 >
                   <ArrowLeft className="h-4 w-4" />
-                  Back to project list
+                  Back to source list
                 </button>
               ) : null}
 

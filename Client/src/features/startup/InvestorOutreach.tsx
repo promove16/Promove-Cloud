@@ -1,5 +1,5 @@
 import { useDeferredValue, useMemo, useState } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, useParams } from 'react-router-dom';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import {
   BriefcaseBusiness,
@@ -24,6 +24,7 @@ import { Input } from '../../components/ui/Input';
 import { Spinner } from '../../components/ui/Spinner';
 import { useAuthStore } from '../../store/authStore';
 import { getApiErrorMessage } from '../../utils/apiError';
+import { getStartupSectionPath } from './navigation';
 
 const getInvestorSearchText = (profile: MarketplaceProfile) =>
   [profile.displayName, profile.domain, profile.headline, profile.location, profile.bio]
@@ -47,6 +48,7 @@ const countsLabel = (profile: MarketplaceProfile) => [
 
 export function InvestorOutreach() {
   const navigate = useNavigate();
+  const { startupId } = useParams<{ startupId: string }>();
   const queryClient = useQueryClient();
   const currentUserId = useAuthStore((state) => state.user?._id);
   const [search, setSearch] = useState('');
@@ -55,8 +57,9 @@ export function InvestorOutreach() {
   const deferredSearch = useDeferredValue(search.trim().toLowerCase());
 
   const startupQuery = useQuery({
-    queryKey: ['startup', 'mine'],
-    queryFn: startupApi.mine,
+    queryKey: ['startup', startupId],
+    queryFn: () => startupApi.getById(startupId!),
+    enabled: Boolean(startupId),
   });
 
   const dealsQuery = useQuery({
@@ -126,11 +129,18 @@ export function InvestorOutreach() {
           </p>
         </div>
         <div className="flex flex-wrap gap-3">
-          <Button variant="secondary" onClick={() => navigate('/startup-launch/overview')}>
+          <Button
+            variant="secondary"
+            onClick={() => navigate(getStartupSectionPath(startupId!, 'overview'))}
+            disabled={!startupId}
+          >
             <Rocket className="mr-2 h-4 w-4" />
             Launch Overview
           </Button>
-          <Button onClick={() => navigate('/startup-launch/investor-deals')}>
+          <Button
+            onClick={() => navigate(getStartupSectionPath(startupId!, 'investor-deals'))}
+            disabled={!startupId}
+          >
             <BriefcaseBusiness className="mr-2 h-4 w-4" />
             Investor Deals
           </Button>
@@ -247,10 +257,14 @@ export function InvestorOutreach() {
         </div>
       </Card>
 
-      {investorsQuery.isLoading ? (
+      {startupQuery.isLoading || investorsQuery.isLoading ? (
         <div className="flex justify-center py-12">
           <Spinner />
         </div>
+      ) : startupQuery.isError ? (
+        <Card className="p-6 text-sm text-red-200">
+          {getApiErrorMessage(startupQuery.error, 'Unable to load this startup right now.')}
+        </Card>
       ) : investorsQuery.isError ? (
         <Card className="p-6 text-sm text-red-200">
           {getApiErrorMessage(investorsQuery.error, 'Unable to load investors right now.')}
@@ -376,6 +390,7 @@ export function InvestorOutreach() {
         }}
         recipientName={selectedInvestor?.displayName ?? 'Investor'}
         isStudent={true}
+        preferredStartupId={startupId}
       />
 
       {!canPitchFromStartup ? (

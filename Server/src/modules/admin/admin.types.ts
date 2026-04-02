@@ -16,6 +16,7 @@ import {
   PlatformUsageSummary,
 } from '../analytics/activity.types';
 import {
+  AdminCreateInstitutionMentorshipProgramInput,
   AdminProjectMentorshipView,
   CreatedMentorProfileResult,
   InstitutionMentorshipProgramListResponse,
@@ -372,6 +373,7 @@ export interface AdminDealReviewPayload {
 }
 
 export type AdminMentorshipProgramsResponse = InstitutionMentorshipProgramListResponse;
+export type AdminCreateMentorshipProgramPayload = AdminCreateInstitutionMentorshipProgramInput;
 export type AdminMentorshipProgramReviewPayload = InstitutionMentorshipProgramReviewInput;
 export type AdminMentorListItem = MentorshipAdminMentorItem;
 export type AdminCreatedMentorProfile = CreatedMentorProfileResult;

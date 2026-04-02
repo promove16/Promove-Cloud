@@ -5,8 +5,10 @@ import { ApiError } from '../../utils/ApiError';
 import { NotificationService } from '../notification/notification.service';
 import { Patent } from '../patent/patent.model';
 import { ScoreEvent } from '../innovationScore/score.model';
+import { ProfileView } from '../social/profileView.model';
 import { Startup } from '../startup/startup.model';
 import { User } from '../user/user.model';
+import { queueMentorViewedProfileEmail } from '../../services/retentionEmailService';
 import { UserRole } from '../../types/roles.types';
 import { Workspace } from '../workspace/workspace.model';
 import { MentorSession } from './mentorSession.model';
@@ -290,6 +292,14 @@ export const getMentorStudentProfile = async (mentorId: string, studentId: strin
   if (!student || student.role !== UserRole.STUDENT) {
     throw new ApiError(404, 'STUDENT_NOT_FOUND', 'Student not found');
   }
+
+  await ProfileView.create({
+    viewerId: mentorId,
+    viewedId: studentId,
+    viewerRole: UserRole.MENTOR,
+    viewedAt: new Date(),
+  });
+  await queueMentorViewedProfileEmail(studentId, mentorId);
 
   const [workspaces, scoreEvents, patents, startups] = await Promise.all([
     Workspace.find({ $or: [{ ownerId: studentId }, { teamMemberIds: studentId }] })

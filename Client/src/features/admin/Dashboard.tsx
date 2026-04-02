@@ -94,7 +94,7 @@ export default function Dashboard() {
     () => [
       {
         label: 'Problems',
-        path: '/dashboard/admin/problems',
+        path: '/dashboard/admin/problems/reviews',
         eyebrow: 'Challenge operations',
         description: 'Manage problem statements and review solution submissions from the admin queue.',
         meta: 'Catalog and review workflow',
@@ -102,7 +102,7 @@ export default function Dashboard() {
       },
       {
         label: 'Users',
-        path: '/dashboard/admin/users',
+        path: '/dashboard/admin/users/requests',
         eyebrow: 'Access control',
         description: 'Approve registrations, manage roles, and inspect operator activity in one place.',
         meta: `${analytics?.totalUsers ?? 0} tracked accounts`,
@@ -118,7 +118,7 @@ export default function Dashboard() {
       },
       {
         label: 'Deals',
-        path: '/dashboard/admin/deals',
+        path: '/dashboard/admin/deals/overview',
         eyebrow: 'Mediation desk',
         description: 'Track stock-transfer reviews, investor approvals, and ProMove royalty flow.',
         meta: `${analytics?.totalDeals ?? 0} active deal records`,
@@ -126,7 +126,7 @@ export default function Dashboard() {
       },
       {
         label: 'Mentorship',
-        path: '/dashboard/admin/mentorship',
+        path: '/dashboard/admin/mentorship/requests',
         eyebrow: 'Program operations',
         description: 'Create mentor accounts and assign pending institution mentorship requests.',
         meta: `${mentorshipStats?.pending ?? 0} pending requests`,
@@ -162,7 +162,7 @@ export default function Dashboard() {
               <Button variant="secondary" onClick={() => navigate('/dashboard/admin/patents')}>
                 Review Patents
               </Button>
-              <Button variant="secondary" onClick={() => navigate('/dashboard/admin/mentorship')}>
+              <Button variant="secondary" onClick={() => navigate('/dashboard/admin/mentorship/requests')}>
                 Open Mentorship
               </Button>
               <Button onClick={() => navigate('/dashboard/admin/analytics')}>

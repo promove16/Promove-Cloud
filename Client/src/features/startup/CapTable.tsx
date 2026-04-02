@@ -1,21 +1,26 @@
 import { useQuery } from '@tanstack/react-query';
+import { useParams } from 'react-router-dom';
 import { Badge } from '../../components/ui/Badge';
 import { Card } from '../../components/ui/Card';
 import { Spinner } from '../../components/ui/Spinner';
 import { startupApi } from '../../api/startup.api';
+import { getApiErrorMessage } from '../../utils/apiError';
 
 const formatRoleLabel = (value: string) => value.charAt(0).toUpperCase() + value.slice(1);
 
 export default function StartupCapTable() {
+  const { startupId } = useParams<{ startupId: string }>();
+
   const startupQuery = useQuery({
-    queryKey: ['startup', 'mine'],
-    queryFn: startupApi.mine,
+    queryKey: ['startup', startupId],
+    queryFn: () => startupApi.getById(startupId!),
+    enabled: Boolean(startupId),
   });
 
   const capTableQuery = useQuery({
-    queryKey: ['startup', 'cap-table', startupQuery.data?._id],
-    queryFn: () => startupApi.getCapTable(startupQuery.data!._id),
-    enabled: Boolean(startupQuery.data?._id),
+    queryKey: ['startup', 'cap-table', startupId],
+    queryFn: () => startupApi.getCapTable(startupId!),
+    enabled: Boolean(startupId),
   });
 
   if (startupQuery.isLoading || capTableQuery.isLoading) {
@@ -23,6 +28,14 @@ export default function StartupCapTable() {
       <div className="flex min-h-[40vh] items-center justify-center">
         <Spinner />
       </div>
+    );
+  }
+
+  if (startupQuery.isError || capTableQuery.isError) {
+    return (
+      <Card className="max-w-3xl p-8 text-sm text-red-200">
+        {getApiErrorMessage(startupQuery.error ?? capTableQuery.error, 'Unable to load the cap table right now.')}
+      </Card>
     );
   }
 

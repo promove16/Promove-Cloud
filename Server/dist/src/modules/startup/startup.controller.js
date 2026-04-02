@@ -1,6 +1,6 @@
 "use strict";
 Object.defineProperty(exports, "__esModule", { value: true });
-exports.uploadPitchController = exports.requestStartupReviewController = exports.launchStartupController = exports.patchStartup = exports.getMyStartupController = exports.createStartup = void 0;
+exports.uploadPitchController = exports.requestStartupReviewController = exports.launchStartupController = exports.patchStartup = exports.getStartupByIdController = exports.getMyStartupsController = exports.createStartup = void 0;
 const ApiResponse_1 = require("../../utils/ApiResponse");
 const startup_service_1 = require("./startup.service");
 const ApiError_1 = require("../../utils/ApiError");
@@ -10,11 +10,20 @@ const createStartup = async (req, res) => {
     res.status(201).json(new ApiResponse_1.ApiResponse(startup));
 };
 exports.createStartup = createStartup;
-const getMyStartupController = async (req, res) => {
-    const startup = await (0, startup_service_1.getMyStartup)(req.user._id);
+const getMyStartupsController = async (req, res) => {
+    const startups = await (0, startup_service_1.getMyStartups)(req.user._id);
+    res.json(new ApiResponse_1.ApiResponse(startups));
+};
+exports.getMyStartupsController = getMyStartupsController;
+const getStartupByIdController = async (req, res) => {
+    const startupId = getParam(req.params.id);
+    if (!startupId) {
+        throw new ApiError_1.ApiError(400, 'STARTUP_REQUIRED', 'Startup id is required');
+    }
+    const startup = await (0, startup_service_1.getStartupForFounder)(startupId, req.user._id);
     res.json(new ApiResponse_1.ApiResponse(startup));
 };
-exports.getMyStartupController = getMyStartupController;
+exports.getStartupByIdController = getStartupByIdController;
 const patchStartup = async (req, res) => {
     const startupId = getParam(req.params.id);
     if (!startupId) {

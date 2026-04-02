@@ -61,6 +61,13 @@ export interface CreateInstitutionMentorshipProgramInput {
   preferredExpertise?: string;
 }
 
+export interface AdminCreateMentorshipProgramInput extends CreateInstitutionMentorshipProgramInput {
+  institutionId: string;
+  mentorId: string;
+  scheduledAt: string;
+  adminNotes?: string;
+}
+
 export interface AdminMentorListItem {
   _id: string;
   displayName: string;

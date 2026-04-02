@@ -4,6 +4,7 @@ import { authorize } from '../../middleware/authorize';
 import { UserRole } from '../../types/roles.types';
 import { asyncHandler } from '../../utils/asyncHandler';
 import {
+  createAdminMentorshipProgramController,
   createMentorProfileController,
   approveRegistrationRequestController,
   approveAwardController,
@@ -68,6 +69,7 @@ router.patch('/users/:id/registration-request', asyncHandler(reviewRegistrationR
 router.get('/mentors', asyncHandler(getMentorsController));
 router.post('/mentors', asyncHandler(createMentorProfileController));
 router.get('/mentorship-programs', asyncHandler(getMentorshipProgramsController));
+router.post('/mentorship-programs', asyncHandler(createAdminMentorshipProgramController));
 router.patch('/mentorship-programs/:id', asyncHandler(reviewMentorshipProgramController));
 router.get('/project-mentorships', asyncHandler(getProjectMentorshipsController));
 router.patch('/project-mentorships/:workspaceId', asyncHandler(reviewProjectMentorAssignmentController));

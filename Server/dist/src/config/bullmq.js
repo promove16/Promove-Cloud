@@ -1,6 +1,6 @@
 "use strict";
 Object.defineProperty(exports, "__esModule", { value: true });
-exports.institutionVerifyQueue = exports.notificationQueue = exports.scoreQueue = exports.createQueueWorker = exports.bullmqConnection = exports.hasBullMqRedisConnection = void 0;
+exports.institutionVerifyQueue = exports.activityQueue = exports.emailQueue = exports.notificationQueue = exports.scoreQueue = exports.createQueueWorker = exports.bullmqConnection = exports.hasBullMqRedisConnection = void 0;
 const bullmq_1 = require("bullmq");
 const env_1 = require("./env");
 const logger_1 = require("./logger");
@@ -136,4 +136,6 @@ const createQueueWorker = (queueName, processor, options) => {
 exports.createQueueWorker = createQueueWorker;
 exports.scoreQueue = createSafeQueue('score-recalc');
 exports.notificationQueue = createSafeQueue('notifications');
+exports.emailQueue = createSafeQueue('emails');
+exports.activityQueue = createSafeQueue('activity');
 exports.institutionVerifyQueue = createSafeQueue('institution-verify');

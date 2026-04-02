@@ -60,13 +60,23 @@ const MentorSessions = lazy(() => import("../features/mentor/Sessions"));
 
 const AdminDashboard = lazy(() => import("../features/admin/Dashboard"));
 const AdminUserManagement = lazy(() => import("../features/admin/UserManagement"));
+const AdminUserRequests = lazy(() => import("../features/admin/UserRequests"));
+const AdminUserDirectory = lazy(() => import("../features/admin/UserDirectory"));
 const AdminPatents = lazy(() => import("../features/admin/Patents"));
 const AdminStartups = lazy(() => import("../features/admin/Startups"));
 const AdminDeals = lazy(() => import("../features/admin/Deals"));
+const AdminDealsOverview = lazy(() => import("../features/admin/DealsOverview"));
+const AdminDealsRegister = lazy(() => import("../features/admin/DealsRegister"));
 const AdminDealReview = lazy(() => import("../features/admin/DealReview"));
 const AdminAnalyticsTemporary = lazy(() => import("../features/admin/AnalyticsTemporary"));
 const AdminMentorshipPrograms = lazy(() => import("../features/admin/MentorshipPrograms"));
+const AdminMentorshipMentors = lazy(() => import("../features/admin/MentorshipMentors"));
+const AdminMentorshipProgramCreation = lazy(() => import("../features/admin/MentorshipProgramCreation"));
+const AdminMentorshipRequests = lazy(() => import("../features/admin/MentorshipRequests"));
+const AdminMentorshipProjects = lazy(() => import("../features/admin/MentorshipProjects"));
 const AdminProblemBank = lazy(() => import("../features/admin/ProblemBank"));
+const AdminProblemLibrary = lazy(() => import("../features/admin/ProblemLibrary"));
+const AdminProblemReviewQueue = lazy(() => import("../features/admin/ProblemReviewQueue"));
 
 const RecruiterDashboard = lazy(() => import("../features/recruiter/Dashboard"));
 const RecruiterTalentSearch = lazy(() => import("../features/recruiter/TalentSearch"));
@@ -80,6 +90,11 @@ const InvestorInstitutions = lazy(() => import("../features/investor/Institution
 const InvestorPortfolio = lazy(() => import("../features/investor/Portfolio"));
 
 const StartupCapTable = lazy(() => import("../features/startup/CapTable"));
+const MyStartups = lazy(() =>
+  import("../features/startup/MyStartups").then((module) => ({
+    default: module.MyStartups,
+  })),
+);
 const StartupLaunchShell = lazy(() =>
   import("../features/startup/StartupLaunchShell").then((module) => ({
     default: module.StartupLaunchShell,
@@ -150,6 +165,11 @@ const LeadershipProfile = lazy(() =>
 const Marketplace = lazy(() =>
   import("../features/student/Marketplace").then((module) => ({
     default: module.Marketplace,
+  })),
+);
+const PublicStudentProfilePage = lazy(() =>
+  import("../features/student/PublicStudentProfilePage").then((module) => ({
+    default: module.PublicStudentProfilePage,
   })),
 );
 const MessagesPage = lazy(() =>
@@ -287,6 +307,10 @@ export const router = createBrowserRouter([
         element: <Navigate to="/login" replace />,
       },
       {
+        path: "/students/:profileSlug",
+        element: <LazyPage component={PublicStudentProfilePage} />,
+      },
+      {
         element: <PublicOnlyRoute />,
         children: [
           {
@@ -370,24 +394,24 @@ export const router = createBrowserRouter([
         path: "/startup-launch",
         element: (
           <ProtectedRoleRoute role={UserRole.STUDENT}>
-            <LazyPage component={StartupLaunchShell} />
+            <LazyPage component={MyStartups} />
           </ProtectedRoleRoute>
         ),
-        children: [
-          { index: true, element: <Navigate to="/startup-launch/overview" replace /> },
-          { path: "overview", element: <LazyPage component={StartupLaunch} /> },
-          { path: "investor-outreach", element: <LazyPage component={InvestorOutreach} /> },
-          { path: "cap-table", element: <LazyPage component={StartupCapTable} /> },
-          { path: "investor-deals", element: <LazyPage component={StudentInvestorDeals} /> },
-        ],
       },
       {
         path: "/startup-launch/:startupId",
         element: (
           <ProtectedRoleRoute role={UserRole.STUDENT}>
-            <Navigate to="/startup-launch/overview" replace />
+            <LazyPage component={StartupLaunchShell} />
           </ProtectedRoleRoute>
         ),
+        children: [
+          { index: true, element: <Navigate to="overview" replace /> },
+          { path: "overview", element: <LazyPage component={StartupLaunch} /> },
+          { path: "investor-outreach", element: <LazyPage component={InvestorOutreach} /> },
+          { path: "cap-table", element: <LazyPage component={StartupCapTable} /> },
+          { path: "investor-deals", element: <LazyPage component={StudentInvestorDeals} /> },
+        ],
       },
       {
         path: "/leadership-profile",
@@ -431,7 +455,7 @@ export const router = createBrowserRouter([
             children: [
               { index: true, element: <LazyPage component={LegacyStudentDashboard} /> },
               { path: "mentor-sessions", element: <LazyPage component={StudentMentorSessions} /> },
-              { path: "investor-deals", element: <Navigate to="/startup-launch/investor-deals" replace /> },
+              { path: "investor-deals", element: <Navigate to="/startup-launch" replace /> },
             ],
           },
           {
@@ -482,13 +506,47 @@ export const router = createBrowserRouter([
             element: <ProtectedRoleRoute role={UserRole.ADMIN} />,
             children: [
               { index: true, element: <LazyPage component={AdminDashboard} /> },
-              { path: "problems", element: <LazyPage component={AdminProblemBank} /> },
-              { path: "users", element: <LazyPage component={AdminUserManagement} /> },
+              {
+                path: "problems",
+                element: <LazyPage component={AdminProblemBank} />,
+                children: [
+                  { index: true, element: <Navigate to="reviews" replace /> },
+                  { path: "library", element: <LazyPage component={AdminProblemLibrary} /> },
+                  { path: "reviews", element: <LazyPage component={AdminProblemReviewQueue} /> },
+                ],
+              },
+              {
+                path: "users",
+                element: <LazyPage component={AdminUserManagement} />,
+                children: [
+                  { index: true, element: <Navigate to="requests" replace /> },
+                  { path: "requests", element: <LazyPage component={AdminUserRequests} /> },
+                  { path: "directory", element: <LazyPage component={AdminUserDirectory} /> },
+                ],
+              },
               { path: "patents", element: <LazyPage component={AdminPatents} /> },
               { path: "startups", element: <LazyPage component={AdminStartups} /> },
-              { path: "deals", element: <LazyPage component={AdminDeals} /> },
+              {
+                path: "deals",
+                element: <LazyPage component={AdminDeals} />,
+                children: [
+                  { index: true, element: <Navigate to="overview" replace /> },
+                  { path: "overview", element: <LazyPage component={AdminDealsOverview} /> },
+                  { path: "register", element: <LazyPage component={AdminDealsRegister} /> },
+                ],
+              },
               { path: "deals/:dealId", element: <LazyPage component={AdminDealReview} /> },
-              { path: "mentorship", element: <LazyPage component={AdminMentorshipPrograms} /> },
+              {
+                path: "mentorship",
+                element: <LazyPage component={AdminMentorshipPrograms} />,
+                children: [
+                  { index: true, element: <Navigate to="requests" replace /> },
+                  { path: "requests", element: <LazyPage component={AdminMentorshipRequests} /> },
+                  { path: "mentors", element: <LazyPage component={AdminMentorshipMentors} /> },
+                  { path: "programs", element: <LazyPage component={AdminMentorshipProgramCreation} /> },
+                  { path: "projects", element: <LazyPage component={AdminMentorshipProjects} /> },
+                ],
+              },
               { path: "analytics", element: <LazyPage component={AdminAnalyticsTemporary} /> },
               { path: "analytics/*", element: <LazyPage component={AdminAnalyticsTemporary} /> },
             ],

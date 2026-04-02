@@ -6,6 +6,7 @@ import { PatentSupportingDocument } from '../../types/patent.types';
 import { Badge } from '../../components/ui/Badge';
 import { Button } from '../../components/ui/Button';
 import { Card } from '../../components/ui/Card';
+import { OptionTabs } from '../../components/ui/OptionTabs';
 import { Spinner } from '../../components/ui/Spinner';
 import { getApiErrorMessage } from '../../utils/apiError';
 
@@ -398,13 +399,12 @@ export default function Patents() {
         </div>
       </div>
 
-      <div className="flex flex-wrap gap-3">
-        {tabs.map((tab) => (
-          <Button key={tab.key} variant={activeTab === tab.key ? 'primary' : 'secondary'} onClick={() => setActiveTab(tab.key)}>
-            {tab.label}
-          </Button>
-        ))}
-      </div>
+      <OptionTabs
+        items={tabs.map((tab) => ({ id: tab.key, label: tab.label }))}
+        activeId={activeTab}
+        onChange={setActiveTab}
+        aria-label="Patent status filters"
+      />
 
       <Card className="overflow-hidden">
         <div className="grid grid-cols-[1.4fr,1fr,160px,120px,100px,140px] border-b border-slate-800 bg-slate-900/70 px-5 py-4 text-xs uppercase tracking-[0.3em] text-slate-400">

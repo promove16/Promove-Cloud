@@ -13,6 +13,8 @@ import {
   TrendingUp,
 } from "lucide-react";
 import { useAuth } from "../../context/AuthContext";
+import { OnboardingChecklist } from "../../../components/onboarding/OnboardingChecklist";
+import { StudentGithubProofPrompt } from "../../../components/onboarding/StudentGithubProofPrompt";
 import { dealApi } from "../../../api/deal.api";
 import { studentApi } from "../../../api/student.api";
 import { workspaceApi } from "../../../api/workspace.api";
@@ -121,6 +123,9 @@ export function StudentDashboard() {
         </h1>
         <p className="text-lg text-slate-400">Keep building amazing things</p>
       </div>
+
+      <StudentGithubProofPrompt />
+      <OnboardingChecklist />
 
       <div className="rounded-2xl border border-blue-800/30 bg-gradient-to-r from-blue-900/20 to-purple-900/20 p-8">
         <h2 className="mb-6 text-center text-xl font-bold text-white">Your Innovation Journey</h2>

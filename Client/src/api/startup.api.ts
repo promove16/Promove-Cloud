@@ -21,7 +21,11 @@ export const startupApi = {
     return response.data.data;
   },
   async mine() {
-    const response = await api.get<ApiSuccessResponse<Startup | null>>('/api/startup/mine');
+    const response = await api.get<ApiSuccessResponse<Startup[]>>('/api/startup/mine');
+    return response.data.data;
+  },
+  async getById(startupId: string) {
+    const response = await api.get<ApiSuccessResponse<Startup>>(`/api/startup/${startupId}`);
     return response.data.data;
   },
   async update(startupId: string, payload: Partial<StartupPayload>) {

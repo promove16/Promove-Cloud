@@ -18,7 +18,10 @@ import {
   Users,
   type LucideIcon,
 } from 'lucide-react';
-import { STARTUP_LAUNCH_BASE_PATH, STARTUP_LAUNCH_SECTION_LINKS } from '../../features/startup/navigation';
+import {
+  STARTUP_LAUNCH_BASE_PATH,
+  STARTUP_LAUNCH_NEW_PATH,
+} from '../../features/startup/navigation';
 import { UserRole } from '../../types/roles.types';
 
 export interface DashboardNavLinkItem {
@@ -56,10 +59,10 @@ export const SIDEBAR_CONFIG: Record<UserRole, DashboardNavItem[]> = {
       label: 'Startup',
       icon: Rocket,
       path: STARTUP_LAUNCH_BASE_PATH,
-      children: STARTUP_LAUNCH_SECTION_LINKS.map(({ shortLabel, path }) => ({
-        label: shortLabel,
-        path,
-      })),
+      children: [
+        { label: 'My Startups', path: STARTUP_LAUNCH_BASE_PATH },
+        { label: 'New Startup', path: STARTUP_LAUNCH_NEW_PATH },
+      ],
     },
     { kind: 'link', label: 'Mentor Sessions', icon: CalendarDays, path: '/dashboard/student/mentor-sessions' },
     { kind: 'link', label: 'Leadership Profile', icon: Trophy, path: '/leadership-profile' },

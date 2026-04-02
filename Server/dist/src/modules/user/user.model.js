@@ -418,6 +418,198 @@ const githubStatsSchema = new mongoose_1.Schema({
         default: null,
     },
 }, { _id: false });
+const githubRecentCommitSchema = new mongoose_1.Schema({
+    sha: {
+        type: String,
+        required: true,
+        trim: true,
+        maxlength: 64,
+    },
+    message: {
+        type: String,
+        required: true,
+        trim: true,
+        maxlength: 300,
+    },
+    committedAt: {
+        type: Date,
+        required: true,
+    },
+    url: {
+        type: String,
+        default: null,
+    },
+}, { _id: false });
+const githubImportedRepoSchema = new mongoose_1.Schema({
+    repoId: {
+        type: String,
+        required: true,
+        trim: true,
+    },
+    name: {
+        type: String,
+        required: true,
+        trim: true,
+        maxlength: 120,
+    },
+    fullName: {
+        type: String,
+        required: true,
+        trim: true,
+        maxlength: 160,
+    },
+    description: {
+        type: String,
+        default: '',
+        maxlength: 1000,
+    },
+    url: {
+        type: String,
+        required: true,
+    },
+    owner: {
+        type: String,
+        required: true,
+        trim: true,
+        maxlength: 80,
+    },
+    isPrivate: {
+        type: Boolean,
+        default: false,
+    },
+    defaultBranch: {
+        type: String,
+        required: true,
+        trim: true,
+        maxlength: 120,
+    },
+    primaryLanguage: {
+        type: String,
+        default: null,
+        maxlength: 80,
+    },
+    languages: {
+        type: [String],
+        default: [],
+    },
+    stars: {
+        type: Number,
+        default: 0,
+        min: 0,
+    },
+    forks: {
+        type: Number,
+        default: 0,
+        min: 0,
+    },
+    openIssues: {
+        type: Number,
+        default: 0,
+        min: 0,
+    },
+    pushedAt: {
+        type: Date,
+        default: null,
+    },
+    importedAt: {
+        type: Date,
+        required: true,
+    },
+    recentCommits: {
+        type: [githubRecentCommitSchema],
+        default: [],
+    },
+}, { _id: false });
+const githubActivityEventSchema = new mongoose_1.Schema({
+    id: {
+        type: String,
+        required: true,
+        trim: true,
+    },
+    type: {
+        type: String,
+        enum: ['push', 'pull_request', 'issue', 'release', 'fork', 'watch', 'other'],
+        required: true,
+    },
+    repoFullName: {
+        type: String,
+        required: true,
+        trim: true,
+        maxlength: 160,
+    },
+    title: {
+        type: String,
+        required: true,
+        trim: true,
+        maxlength: 160,
+    },
+    summary: {
+        type: String,
+        required: true,
+        trim: true,
+        maxlength: 300,
+    },
+    url: {
+        type: String,
+        default: null,
+    },
+    occurredAt: {
+        type: Date,
+        required: true,
+    },
+    commitCount: {
+        type: Number,
+        default: 0,
+        min: 0,
+    },
+    isPrivate: {
+        type: Boolean,
+        default: false,
+    },
+}, { _id: false });
+const githubProofSchema = new mongoose_1.Schema({
+    importedRepoIds: {
+        type: [String],
+        default: [],
+    },
+    importedRepos: {
+        type: [githubImportedRepoSchema],
+        default: [],
+    },
+    recentActivity: {
+        type: [githubActivityEventSchema],
+        default: [],
+    },
+    commitCount30Days: {
+        type: Number,
+        default: 0,
+        min: 0,
+    },
+    activeDays30Days: {
+        type: Number,
+        default: 0,
+        min: 0,
+    },
+    pushEvents30Days: {
+        type: Number,
+        default: 0,
+        min: 0,
+    },
+    pullRequests30Days: {
+        type: Number,
+        default: 0,
+        min: 0,
+    },
+    issues30Days: {
+        type: Number,
+        default: 0,
+        min: 0,
+    },
+    lastSyncedAt: {
+        type: Date,
+        default: null,
+    },
+}, { _id: false });
 const userSchema = new mongoose_1.Schema({
     email: {
         type: String,
@@ -706,6 +898,20 @@ const userSchema = new mongoose_1.Schema({
             lastSyncedAt: null,
         }),
     },
+    githubProof: {
+        type: githubProofSchema,
+        default: () => ({
+            importedRepoIds: [],
+            importedRepos: [],
+            recentActivity: [],
+            commitCount30Days: 0,
+            activeDays30Days: 0,
+            pushEvents30Days: 0,
+            pullRequests30Days: 0,
+            issues30Days: 0,
+            lastSyncedAt: null,
+        }),
+    },
     teamRequestsSent: {
         type: [{ type: mongoose_1.Schema.Types.ObjectId, ref: 'TeamRequest' }],
         default: [],
@@ -720,6 +926,8 @@ const userSchema = new mongoose_1.Schema({
 userSchema.index({ role: 1, innovationScore: -1 });
 userSchema.index({ institutionId: 1 });
 userSchema.index({ role: 1, isActive: 1 });
+userSchema.index({ role: 1, institutionId: 1 });
+userSchema.index({ isActive: 1, role: 1 });
 userSchema.index({ profileSlug: 1 }, { unique: true, sparse: true });
 userSchema.index({ 'connectedAccounts.github.username': 1 }, { sparse: true });
 userSchema.index({ 'connectedAccounts.google.userId': 1 }, { sparse: true });

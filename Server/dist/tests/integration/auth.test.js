@@ -97,15 +97,57 @@ const createInstitutionToken = async (role, email) => {
 };
 describe('auth integration', () => {
     describe('POST /api/auth/register', () => {
-        it('requires an institution token for student signup', async () => {
+        it('allows direct student signup without an institution token', async () => {
             const response = await (0, supertest_1.default)(app_1.default).post('/api/auth/register').send({
                 email: `student-${(0, crypto_1.randomUUID)()}@example.com`,
                 password: PASSWORD,
                 displayName: 'Student User',
                 role: 'student',
             });
-            expect(response.status).toBe(400);
-            expect(response.body.error.code).toBe('VALIDATION_ERROR');
+            expect(response.status).toBe(201);
+            expect(response.body.data.accessToken).toEqual(expect.any(String));
+            expect(response.body.data.user.accessGrantedBy).toBe('self_registered');
+            expect(response.body.data.user.verificationStatus).toBe('not_required');
+            expect(response.body.data.user.isActive).toBe(true);
+            expect(response.headers['set-cookie']?.[0]).toContain('refreshToken=');
+            const created = await user_model_1.User.findOne({ email: response.body.data.user.email }).lean();
+            expect(created?.institutionId).toBeNull();
+            expect(created?.verificationStatus).toBe('not_required');
+            expect(created?.isActive).toBe(true);
+        });
+        it('lets a self-registered student submit an institution token later', async () => {
+            const schoolEmail = `late-token-${(0, crypto_1.randomUUID)()}@school.test`;
+            await createApprovedUser({
+                role: roles_types_1.UserRole.SCHOOL,
+                email: schoolEmail,
+                displayName: 'Late Token School',
+                institutionProfile: {
+                    institutionName: 'Late Token School',
+                    location: 'Hyderabad',
+                    totalStudentsEnrolled: 1100,
+                    academicYear: '2025-26',
+                },
+            });
+            const { token } = await createInstitutionToken(roles_types_1.UserRole.SCHOOL, schoolEmail);
+            const registerResponse = await (0, supertest_1.default)(app_1.default).post('/api/auth/register').send({
+                email: `student-${(0, crypto_1.randomUUID)()}@school.test`,
+                password: PASSWORD,
+                displayName: 'Late Token Student',
+                role: 'student',
+            });
+            expect(registerResponse.status).toBe(201);
+            const submitResponse = await (0, supertest_1.default)(app_1.default)
+                .post('/api/auth/submit-institution-token')
+                .set('Authorization', `Bearer ${registerResponse.body.data.accessToken}`)
+                .send({ institutionToken: token });
+            expect(submitResponse.status).toBe(200);
+            expect(submitResponse.body.data.message).toBe('Token submitted successfully. Your institution can now review your account.');
+            expect(submitResponse.body.data.user.verificationStatus).toBe('pending');
+            expect(submitResponse.body.data.user.institutionVerificationStatus).toBe('verified');
+            expect(submitResponse.body.data.user.accessGrantedBy).toBe('institution_token');
+            const updated = await user_model_1.User.findOne({ email: registerResponse.body.data.user.email }).lean();
+            expect(updated?.verificationStatus).toBe('pending');
+            expect(updated?.institutionVerificationStatus).toBe('verified');
         });
         it('creates a pending student account when the institution token is valid', async () => {
             const schoolEmail = `coordinator-${(0, crypto_1.randomUUID)()}@school.test`;

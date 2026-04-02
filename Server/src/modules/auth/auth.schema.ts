@@ -28,7 +28,17 @@ export const registerSchema = z
     password: z.string().min(8).max(72),
     displayName: z.string().trim().min(2).max(60),
     role: z.literal(UserRole.STUDENT),
-    institutionToken: z.string().trim().min(6).max(64),
+    institutionToken: z
+      .union([z.string().trim().min(6).max(64), z.literal('')])
+      .optional()
+      .transform((value) => {
+        if (!value) {
+          return undefined;
+        }
+
+        const trimmed = value.trim();
+        return trimmed.length > 0 ? trimmed : undefined;
+      }),
     domain: optionalProfileString(120),
     bio: optionalProfileString(500),
   });

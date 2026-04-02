@@ -14,8 +14,11 @@ const roles_types_1 = require("../../types/roles.types");
 const ApiError_1 = require("../../utils/ApiError");
 const logger_1 = require("../../config/logger");
 const user_service_1 = require("../user/user.service");
+const profileCompletion_1 = require("../user/profileCompletion");
 const sanitizeText_1 = require("../../utils/sanitizeText");
 const activity_service_1 = require("../analytics/activity.service");
+const retentionEmailService_1 = require("../../services/retentionEmailService");
+const scoreEngine_1 = require("../../services/scoreEngine");
 const institutionAccess_service_1 = require("../institution/institutionAccess.service");
 const studentRoster_service_1 = require("../institution/studentRoster.service");
 const REFRESH_TTL_SECONDS = 30 * 24 * 60 * 60;
@@ -168,8 +171,18 @@ const registerUser = async (payload) => {
             verificationStatus: 'not_required',
             adminApprovalStatus: 'not_required',
         });
+        if (profileComplete) {
+            const newScore = await (0, scoreEngine_1.applyScore)({
+                userId: String(createdUser._id),
+                trigger: 'PROFILE_COMPLETE',
+                metadata: { source: 'register' },
+            });
+            createdUser.innovationScore = newScore;
+        }
         const user = (0, user_service_1.toSanitizedUser)(createdUser.toObject());
         const tokens = await createTokenPair(user);
+        await (0, retentionEmailService_1.queueWelcomeEmail)(String(createdUser._id));
+        await (0, retentionEmailService_1.queueProfileCompletionMilestoneEmail)(String(createdUser._id), 0, (0, profileCompletion_1.getProfileCompletionProgress)(createdUser.toObject()).percent);
         return {
             ...tokens,
             user,
@@ -208,6 +221,14 @@ const registerUser = async (payload) => {
         verificationRequestedAt: verificationTimestamp,
         institutionVerifiedAt: verificationTimestamp,
     });
+    if (profileComplete) {
+        const newScore = await (0, scoreEngine_1.applyScore)({
+            userId: String(createdUser._id),
+            trigger: 'PROFILE_COMPLETE',
+            metadata: { source: 'register' },
+        });
+        createdUser.innovationScore = newScore;
+    }
     const user = (0, user_service_1.toSanitizedUser)(createdUser.toObject());
     if (studentInstitutionContext) {
         await (0, institutionAccess_service_1.registerTokenUsage)(String(studentInstitutionContext.tokenRecord._id));
@@ -215,6 +236,8 @@ const registerUser = async (payload) => {
     if (matchedRoster) {
         await (0, studentRoster_service_1.markStudentRosterEntryRegistered)(String(matchedRoster.institutionId), payload.email, user._id);
     }
+    await (0, retentionEmailService_1.queueWelcomeEmail)(String(createdUser._id));
+    await (0, retentionEmailService_1.queueProfileCompletionMilestoneEmail)(String(createdUser._id), 0, (0, profileCompletion_1.getProfileCompletionProgress)(createdUser.toObject()).percent);
     return {
         pendingApproval: true,
         approvalType: 'institution',
@@ -306,6 +329,8 @@ const submitRegistrationRequest = async (payload) => {
         user.institutionProfile = undefined;
     }
     await user.save();
+    await (0, retentionEmailService_1.queueWelcomeEmail)(String(user._id));
+    await (0, retentionEmailService_1.queueProfileCompletionMilestoneEmail)(String(user._id), 0, (0, profileCompletion_1.getProfileCompletionProgress)(user.toObject()).percent);
     return {
         pendingApproval: true,
         approvalType: 'admin',
@@ -324,6 +349,10 @@ const submitInstitutionToken = async (userId, institutionToken) => {
     }
     const normalizedToken = institutionToken.trim().toUpperCase();
     const { tokenRecord, institution } = await resolveStudentInstitutionContext(normalizedToken);
+    const matchedRoster = await (0, studentRoster_service_1.findInstitutionRosterMatchByEmail)(user.email);
+    if (matchedRoster && String(matchedRoster.institutionId) !== String(institution._id)) {
+        throw new ApiError_1.ApiError(409, 'INSTITUTION_TOKEN_MISMATCH', 'This email belongs to a different institution roster. Please use the correct institution token.');
+    }
     user.institutionToken = normalizedToken;
     user.institutionId = institution._id;
     user.institutionVerificationStatus = 'verified';
@@ -333,11 +362,15 @@ const submitInstitutionToken = async (userId, institutionToken) => {
     user.verificationRequestedAt = new Date();
     user.verificationRejectedAt = undefined;
     user.verificationRejectedReason = undefined;
-    user.accessGrantedBy = 'institution_token';
+    user.accessGrantedBy = matchedRoster ? 'institution_roster' : 'institution_token';
     await user.save();
     await (0, institutionAccess_service_1.registerTokenUsage)(String(tokenRecord._id));
+    if (matchedRoster) {
+        await (0, studentRoster_service_1.markStudentRosterEntryRegistered)(String(matchedRoster.institutionId), user.email, String(user._id));
+    }
     return {
         message: 'Token submitted successfully. Your institution can now review your account.',
+        user: (0, user_service_1.toSanitizedUser)(user.toObject()),
     };
 };
 exports.submitInstitutionToken = submitInstitutionToken;

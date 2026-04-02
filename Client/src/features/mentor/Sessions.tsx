@@ -6,6 +6,7 @@ import { Badge } from '../../components/ui/Badge';
 import { Button } from '../../components/ui/Button';
 import { Card } from '../../components/ui/Card';
 import { Input } from '../../components/ui/Input';
+import { OptionTabs } from '../../components/ui/OptionTabs';
 
 type TabKey = 'upcoming' | 'completed' | 'cancelled';
 
@@ -221,13 +222,12 @@ export default function Sessions() {
         ))}
       </div>
 
-      <div className="flex flex-wrap gap-3">
-        {(Object.keys(tabLabels) as TabKey[]).map((tab) => (
-          <Button key={tab} variant={activeTab === tab ? 'primary' : 'secondary'} onClick={() => setActiveTab(tab)}>
-            {tabLabels[tab]}
-          </Button>
-        ))}
-      </div>
+      <OptionTabs
+        items={(Object.keys(tabLabels) as TabKey[]).map((tab) => ({ id: tab, label: tabLabels[tab] }))}
+        activeId={activeTab}
+        onChange={setActiveTab}
+        aria-label="Mentor session filters"
+      />
 
       <div className="space-y-4">
         {currentSessions.map((session) => (

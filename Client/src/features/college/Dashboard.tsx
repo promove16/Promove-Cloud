@@ -297,7 +297,7 @@ export default function Dashboard() {
               <div className="text-xs uppercase tracking-[0.3em] text-cyan-300">Student Token Desk</div>
               <h2 className="mt-2 text-xl font-semibold text-white">Issue college verification tokens</h2>
               <p className="mt-2 text-sm text-slate-400">
-                Students must use one of these shared tokens during public signup. Institution-created temporary credentials are managed from the intake panel.
+                Students can use these tokens during signup or submit them later from their profile when they are ready for college verification.
               </p>
             </div>
             <div className="flex h-12 w-12 items-center justify-center rounded-2xl bg-slate-900">
@@ -353,7 +353,7 @@ export default function Dashboard() {
               <div className="text-xs uppercase tracking-[0.3em] text-cyan-300">Pending Approval</div>
               <h2 className="mt-2 text-xl font-semibold text-white">Review student registrations</h2>
               <p className="mt-2 text-sm text-slate-400">
-                Only approved token-based student signups get access to the platform. Institution-created temporary accounts are already active.
+                Review students who have submitted a valid institution token. Institution-created temporary accounts are already active.
               </p>
             </div>
             <div className="flex h-12 w-12 items-center justify-center rounded-2xl bg-slate-900">

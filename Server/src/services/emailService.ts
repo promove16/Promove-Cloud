@@ -1,5 +1,4 @@
 import nodemailer from 'nodemailer';
-import { SESClient, SendRawEmailCommand } from '@aws-sdk/client-ses';
 import { env } from '../config/env';
 
 export interface TeamInviteEmailParams {
@@ -9,25 +8,42 @@ export interface TeamInviteEmailParams {
   inviteLink: string;
 }
 
-const sesClient =
-  env.NODE_ENV === 'production' && env.AWS_ACCESS_KEY_ID && env.AWS_SECRET_ACCESS_KEY
-    ? new SESClient({
-        region: env.AWS_REGION,
-        credentials: {
-          accessKeyId: env.AWS_ACCESS_KEY_ID,
-          secretAccessKey: env.AWS_SECRET_ACCESS_KEY,
-        },
-      })
-    : null;
+export interface SendEmailParams {
+  toEmail: string;
+  subject: string;
+  html: string;
+}
 
-const transporter = sesClient
+const smtpUser = env.EMAIL_USER ?? env.SMTP_USER;
+const smtpPass = env.EMAIL_PASS ?? env.SMTP_PASS;
+const smtpHost = env.SMTP_HOST ?? (smtpUser ? 'smtp.gmail.com' : undefined);
+const smtpPort = env.SMTP_HOST ? env.SMTP_PORT : smtpUser ? 587 : env.SMTP_PORT;
+const smtpSecure = env.SMTP_HOST ? env.SMTP_SECURE : false;
+
+const transporter = smtpHost
   ? nodemailer.createTransport({
-      SES: {
-        ses: sesClient,
-        aws: { SendRawEmailCommand },
-      },
+      host: smtpHost,
+      port: smtpPort,
+      secure: smtpSecure,
+      ...(smtpUser && smtpPass
+        ? {
+            auth: {
+              user: smtpUser,
+              pass: smtpPass,
+            },
+          }
+        : {}),
     })
   : nodemailer.createTransport({ jsonTransport: true });
+
+export const sendEmail = async ({ toEmail, subject, html }: SendEmailParams): Promise<void> => {
+  await transporter.sendMail({
+    from: env.FROM_EMAIL || smtpUser,
+    to: toEmail,
+    subject,
+    html,
+  });
+};
 
 export const sendTeamInviteEmail = async ({
   toEmail,
@@ -35,9 +51,8 @@ export const sendTeamInviteEmail = async ({
   workspaceTitle,
   inviteLink,
 }: TeamInviteEmailParams): Promise<void> => {
-  await transporter.sendMail({
-    from: env.FROM_EMAIL,
-    to: toEmail,
+  await sendEmail({
+    toEmail,
     subject: `${inviterName} invited you to collaborate on ProMove`,
     html: `
       <div style="font-family: Arial, sans-serif; line-height: 1.6;">

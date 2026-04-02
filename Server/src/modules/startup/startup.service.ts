@@ -68,11 +68,6 @@ const isStartupProfileReady = (startup: {
 }) => Boolean(startup.name && startup.tagline && startup.category && startup.founderIds.length > 0);
 
 export const createStartupProfile = async (userId: string, payload: z.infer<typeof startupSchema>) => {
-  const existing = await Startup.findOne({ founderIds: userId, isActive: true });
-  if (existing) {
-    throw new ApiError(400, 'STARTUP_EXISTS', 'You already have an active startup.');
-  }
-
   const startup = await Startup.create({
     founderIds: [userId],
     ...payload,
@@ -81,7 +76,16 @@ export const createStartupProfile = async (userId: string, payload: z.infer<type
   return startup.toObject();
 };
 
-export const getMyStartup = async (userId: string) => Startup.findOne({ founderIds: userId, isActive: true }).lean();
+export const getMyStartups = async (userId: string) =>
+  Startup.find({ founderIds: userId, isActive: true }).sort({ updatedAt: -1 }).lean();
+
+export const getStartupById = async (startupId: string) => {
+  const startup = await Startup.findById(startupId).lean();
+  if (!startup || !startup.isActive) {
+    throw new ApiError(404, 'STARTUP_NOT_FOUND', 'Startup not found.');
+  }
+  return startup;
+};
 
 export const getStartupForFounder = async (startupId: string, userId: string) => {
   const startup = await Startup.findById(startupId);

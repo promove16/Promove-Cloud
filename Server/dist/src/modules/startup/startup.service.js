@@ -1,6 +1,6 @@
 "use strict";
 Object.defineProperty(exports, "__esModule", { value: true });
-exports.reviewStartupSubmission = exports.listStartupsForAdmin = exports.uploadPitchDeck = exports.launchStartup = exports.requestStartupReview = exports.updateStartupProfile = exports.getStartupForFounder = exports.getMyStartup = exports.createStartupProfile = exports.reviewStartupSubmissionSchema = exports.launchSchema = exports.startupSchema = void 0;
+exports.reviewStartupSubmission = exports.listStartupsForAdmin = exports.uploadPitchDeck = exports.launchStartup = exports.requestStartupReview = exports.updateStartupProfile = exports.getStartupForFounder = exports.getStartupById = exports.getMyStartups = exports.createStartupProfile = exports.reviewStartupSubmissionSchema = exports.launchSchema = exports.startupSchema = void 0;
 const mongoose_1 = require("mongoose");
 const zod_1 = require("zod");
 const bullmq_1 = require("../../config/bullmq");
@@ -60,10 +60,6 @@ const clearReviewMetadata = (startup) => {
 };
 const isStartupProfileReady = (startup) => Boolean(startup.name && startup.tagline && startup.category && startup.founderIds.length > 0);
 const createStartupProfile = async (userId, payload) => {
-    const existing = await startup_model_1.Startup.findOne({ founderIds: userId, isActive: true });
-    if (existing) {
-        throw new ApiError_1.ApiError(400, 'STARTUP_EXISTS', 'You already have an active startup.');
-    }
     const startup = await startup_model_1.Startup.create({
         founderIds: [userId],
         ...payload,
@@ -71,8 +67,16 @@ const createStartupProfile = async (userId, payload) => {
     return startup.toObject();
 };
 exports.createStartupProfile = createStartupProfile;
-const getMyStartup = async (userId) => startup_model_1.Startup.findOne({ founderIds: userId, isActive: true }).lean();
-exports.getMyStartup = getMyStartup;
+const getMyStartups = async (userId) => startup_model_1.Startup.find({ founderIds: userId, isActive: true }).sort({ updatedAt: -1 }).lean();
+exports.getMyStartups = getMyStartups;
+const getStartupById = async (startupId) => {
+    const startup = await startup_model_1.Startup.findById(startupId).lean();
+    if (!startup || !startup.isActive) {
+        throw new ApiError_1.ApiError(404, 'STARTUP_NOT_FOUND', 'Startup not found.');
+    }
+    return startup;
+};
+exports.getStartupById = getStartupById;
 const getStartupForFounder = async (startupId, userId) => {
     const startup = await startup_model_1.Startup.findById(startupId);
     if (!startup) {

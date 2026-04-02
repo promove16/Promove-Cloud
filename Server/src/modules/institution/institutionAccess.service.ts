@@ -14,7 +14,12 @@ import {
 } from './studentRoster.service';
 import { StudentVerificationReviewResult } from '../school/school.types';
 import { User } from '../user/user.model';
+import { getProfileCompletionProgress } from '../user/profileCompletion';
 import { StudentAccessToken } from './studentAccessToken.model';
+import {
+  queueInstitutionVerifiedEmail,
+  queueProfileCompletionMilestoneEmail,
+} from '../../services/retentionEmailService';
 
 const TOKEN_TTL_DAYS = 90;
 const MS_IN_YEAR = 365 * 24 * 60 * 60 * 1000;
@@ -292,6 +297,10 @@ export const reviewStudentVerification = async (
     link: '/login',
   });
 
+  if (payload.decision === 'approved') {
+    await queueInstitutionVerifiedEmail(studentId, institutionId);
+  }
+
   return {
     _id: String(student._id),
     status: payload.decision === 'approved' ? 'verified' : 'rejected',
@@ -368,6 +377,12 @@ export const createManagedStudentCredentials = async (
   });
 
   await invalidateInstitutionCaches(institutionId);
+
+  await queueProfileCompletionMilestoneEmail(
+    String(createdStudent._id),
+    0,
+    getProfileCompletionProgress(createdStudent.toObject()).percent,
+  );
 
   await NotificationService.create({
     userId: String(createdStudent._id),

@@ -2,7 +2,8 @@ import { Request, Response } from 'express';
 import { ApiResponse } from '../../utils/ApiResponse';
 import {
   createStartupProfile,
-  getMyStartup,
+  getMyStartups,
+  getStartupForFounder,
   launchSchema,
   launchStartup,
   requestStartupReview,
@@ -20,8 +21,17 @@ export const createStartup = async (req: Request, res: Response) => {
   res.status(201).json(new ApiResponse(startup));
 };
 
-export const getMyStartupController = async (req: Request, res: Response) => {
-  const startup = await getMyStartup(req.user!._id);
+export const getMyStartupsController = async (req: Request, res: Response) => {
+  const startups = await getMyStartups(req.user!._id);
+  res.json(new ApiResponse(startups));
+};
+
+export const getStartupByIdController = async (req: Request, res: Response) => {
+  const startupId = getParam(req.params.id);
+  if (!startupId) {
+    throw new ApiError(400, 'STARTUP_REQUIRED', 'Startup id is required');
+  }
+  const startup = await getStartupForFounder(startupId, req.user!._id);
   res.json(new ApiResponse(startup));
 };
 

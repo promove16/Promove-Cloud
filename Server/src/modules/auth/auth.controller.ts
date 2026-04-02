@@ -114,9 +114,5 @@ export const submitInstitutionTokenAfterRegister = async (req: Request, res: Res
   const { institutionToken } = submitInstitutionTokenSchema.parse(req.body);
   const result = await submitInstitutionToken(req.user._id, institutionToken);
 
-  res.status(200).json(
-    new ApiResponse({
-      message: result.message,
-    }),
-  );
+  res.status(200).json(new ApiResponse(result));
 };

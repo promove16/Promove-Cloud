@@ -12,6 +12,7 @@ import {
   SignupResponse,
 } from '../../types/auth.types';
 import { UserRole } from '../../types/roles.types';
+import { getPostLoginRedirect } from '../../utils/postLoginRedirect';
 
 interface User {
   email: string;
@@ -80,7 +81,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         success: true,
         redirectTo: payload.user.mustChangePasswordOnNextLogin
           ? '/change-password'
-          : (roleHome[payload.user.role] ?? '/dashboard'),
+          : getPostLoginRedirect(payload.user),
       };
     } catch (error) {
       const apiError = (error as { response?: { data?: ApiErrorResponse } })?.response?.data?.error;
@@ -131,7 +132,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
           return {
             success: true,
-            redirectTo: roleHome[payload.user.role] ?? '/dashboard',
+            redirectTo: getPostLoginRedirect(payload.user),
           };
         }
 

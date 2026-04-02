@@ -58,18 +58,15 @@ export function SignupPage() {
       return;
     }
 
-    if (!formData.institutionToken.trim()) {
-      setError("Student signup requires an institution token.");
-      return;
-    }
-
     try {
       const payload = await signupMutation.mutateAsync({
         displayName: formData.displayName.trim(),
         email: formData.email.trim(),
         password: formData.password,
         role: UserRole.STUDENT,
-        institutionToken: formData.institutionToken.trim(),
+        ...(formData.institutionToken.trim()
+          ? { institutionToken: formData.institutionToken.trim() }
+          : {}),
         ...(formData.domain.trim() ? { domain: formData.domain.trim() } : {}),
         ...(formData.bio.trim() ? { bio: formData.bio.trim() } : {}),
       });
@@ -94,9 +91,7 @@ export function SignupPage() {
         setError(
           apiError?.code === "INSTITUTION_TOKEN_EXPIRED"
               ? "That institution token has expired. Please ask your school or college for a fresh one."
-              : apiError?.code === "INSTITUTION_TOKEN_REQUIRED"
-                ? "Student signup requires an institution token."
-                : apiError?.code === "INSTITUTION_APPROVAL_PENDING"
+              : apiError?.code === "INSTITUTION_APPROVAL_PENDING"
                   ? "Your institution has not approved your account yet. Please contact your school or college."
                   : apiError?.code === "INSTITUTION_TOKEN_MISMATCH"
                     ? "This email is already linked to a different institution. Use the correct token or contact your institution."
@@ -138,8 +133,8 @@ export function SignupPage() {
               Student Registration
             </div>
             <p className="mt-3 text-sm text-slate-400">
-              Public registration is available only for students with a valid
-              institution token.
+              Students can start with direct signup, then submit an institution
+              token later for school or college verification.
             </p>
           </div>
 
@@ -273,7 +268,7 @@ export function SignupPage() {
 
           <div className="mb-6">
             <label className="mb-2 block text-sm font-semibold text-white">
-              Institution Token <span className="text-red-400">*</span>
+              Institution Token
             </label>
             <div className="relative">
               <Ticket className="absolute left-4 top-1/2 h-5 w-5 -translate-y-1/2 text-slate-400" />
@@ -285,16 +280,16 @@ export function SignupPage() {
                 }
                 placeholder="SCH-AB12CD34"
                 className="w-full rounded-lg border border-slate-800 bg-slate-950 py-3 pl-12 pr-4 text-white placeholder-slate-500 focus:border-blue-500 focus:outline-none"
-                required
               />
             </div>
             <p className="mt-2 text-xs text-slate-500">
-              Use the institution token shared by your school or college. It is
-              required for student signup.
+              Add the token now to go straight into institution review, or leave
+              it blank and submit it from your profile later.
             </p>
             <div className="mt-3 rounded-2xl border border-slate-800 bg-slate-950/70 p-4 text-sm text-slate-400">
-              Your student account will stay pending until your institution
-              approves it.
+              Token-based signups stay pending until the institution approves
+              them. Direct signups can finish profile setup first, then request
+              verification when ready.
             </div>
           </div>
 
