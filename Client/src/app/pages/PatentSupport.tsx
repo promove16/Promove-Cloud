@@ -1,5 +1,6 @@
 import { useRef, useState, useMemo, useEffect } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
+import { useNavigate, useParams } from 'react-router-dom';
 import {
   AlertCircle,
   Award,
@@ -352,6 +353,8 @@ function PatentDetailModal({
 // ─── Main page ────────────────────────────────────────────────────────────────
 
 export function PatentSupport() {
+  const { innovationId } = useParams();
+  const navigate = useNavigate();
   const queryClient = useQueryClient();
   const [workspaceId, setWorkspaceId] = useState('');
   const [projectTitle, setProjectTitle] = useState('');
@@ -368,6 +371,11 @@ export function PatentSupport() {
 
   const workspacesQuery = useQuery({ queryKey: ['workspaces'], queryFn: () => workspaceApi.list() });
   const patentsQuery = useQuery({ queryKey: ['patents', 'mine'], queryFn: () => patentApi.mine() });
+  const patentEligibleWorkspaces = useMemo(
+    () => (workspacesQuery.data ?? []).filter((workspace) => !workspace.claimedProblemId),
+    [workspacesQuery.data],
+  );
+  const hasPatentEligibleWorkspaces = patentEligibleWorkspaces.length > 0;
 
   const showcaseMutation = useMutation({
     mutationFn: (patentId: string) => patentApi.toggleShowcase(patentId),
@@ -382,11 +390,34 @@ export function PatentSupport() {
     },
   });
 
-  const selectedWorkspaceId = workspaceId || workspacesQuery.data?.[0]?._id || '';
+  const preferredWorkspaceId = workspaceId || innovationId || '';
+  const selectedWorkspaceId =
+    patentEligibleWorkspaces.find((workspace) => workspace._id === preferredWorkspaceId)?._id ??
+    patentEligibleWorkspaces[0]?._id ??
+    '';
   const activeWorkspace = useMemo(
-    () => workspacesQuery.data?.find((w) => w._id === selectedWorkspaceId),
-    [selectedWorkspaceId, workspacesQuery.data],
+    () => patentEligibleWorkspaces.find((workspace) => workspace._id === selectedWorkspaceId),
+    [patentEligibleWorkspaces, selectedWorkspaceId],
   );
+
+  useEffect(() => {
+    if (!patentEligibleWorkspaces.length) {
+      if (workspaceId) {
+        setWorkspaceId('');
+      }
+      return;
+    }
+
+    if (!preferredWorkspaceId) {
+      setWorkspaceId(patentEligibleWorkspaces[0]._id);
+      return;
+    }
+
+    const match = patentEligibleWorkspaces.find((item) => item._id === preferredWorkspaceId);
+    if (!match) {
+      setWorkspaceId(patentEligibleWorkspaces[0]._id);
+    }
+  }, [patentEligibleWorkspaces, preferredWorkspaceId, workspaceId]);
 
   // Clear slots that were uploaded to a workspace that changed
   useEffect(() => {
@@ -519,15 +550,33 @@ export function PatentSupport() {
           <div>
             <h1 className="mb-2 text-3xl font-bold text-white">Patent Support System</h1>
             <p className="text-slate-400">
-              Upload your government filing documents, answer the questionnaire, and complete the checklist for admin review in one pass.
+              Choose your own product workspace, upload the filing documents, and submit your invention for patent review. ProMove problem-bank workspaces are for leaderboard points and are not eligible for patent filing.
             </p>
           </div>
           <div className="rounded-2xl border border-cyan-500/20 bg-cyan-500/10 px-4 py-3 text-sm text-cyan-200">
-            Upload the 4 required government documents and answer all 5 questionnaire fields to unlock submission.
+            Patent support is only for self-created student products, brands, and startup workspaces. Upload the 4 required filing documents and answer all 5 questionnaire fields to unlock submission.
           </div>
         </div>
 
-        {submitted ? (
+        {!hasPatentEligibleWorkspaces && !workspacesQuery.isLoading ? (
+          <div className="rounded-3xl border border-dashed border-slate-800 bg-slate-900/90 p-10 text-center">
+            <FileText className="mx-auto mb-4 h-10 w-10 text-slate-500" />
+            <h2 className="mb-3 text-2xl font-bold text-white">Create your own product workspace first</h2>
+            <p className="mx-auto mb-5 max-w-2xl text-slate-400">
+              Patent support is tied to your own product workspace so your filing documents, evidence, and review history stay attached to one innovation. Problem-bank workspaces remain available for leaderboard points only.
+            </p>
+            <div className="flex flex-wrap justify-center gap-3">
+              <button
+                onClick={() => navigate('/product-workspace')}
+                className="rounded-2xl bg-slate-800 px-5 py-3 font-semibold text-white"
+              >
+                Open Product Workspace
+              </button>
+            </div>
+          </div>
+        ) : null}
+
+        {hasPatentEligibleWorkspaces ? submitted ? (
           <div className="rounded-3xl border border-slate-800 bg-slate-900 p-10 text-center">
             <div className="mx-auto mb-4 flex h-16 w-16 items-center justify-center rounded-full bg-green-500/10">
               <CheckCircle className="h-8 w-8 text-green-500" />
@@ -550,17 +599,20 @@ export function PatentSupport() {
                     onChange={(e) => {
                       setWorkspaceId(e.target.value);
                       setProjectTitle(
-                        workspacesQuery.data?.find((w) => w._id === e.target.value)?.title ?? '',
+                        patentEligibleWorkspaces.find((w) => w._id === e.target.value)?.title ?? '',
                       );
                     }}
                     className={fieldCls}
                   >
-                    {(workspacesQuery.data ?? []).map((w) => (
+                    {patentEligibleWorkspaces.map((w) => (
                       <option key={w._id} value={w._id}>
-                        {w.title}
+                        {w.title} · {w.claimedProblemId ? 'Problem Bank' : 'Own Product'}
                       </option>
                     ))}
                   </select>
+                  <p className="mt-2 text-xs text-slate-500">
+                    Pick the self-created workspace that represents the invention you want to file. Problem-bank workspaces are excluded from patent support.
+                  </p>
                 </div>
                 <div>
                   <label className="mb-2 block text-sm font-semibold text-white">Project title for filing</label>
@@ -903,7 +955,7 @@ export function PatentSupport() {
               <div className="flex items-start gap-3 text-sm text-slate-400">
                 <AlertCircle className="mt-0.5 h-4 w-4 shrink-0 text-cyan-300" />
                 <div>
-                  Patent support packages are reviewed only after the questionnaire, filing checklist, and government documents are all present.
+                  Patent support packages are reviewed after the questionnaire, filing checklist, and government documents are complete for the selected workspace.
                 </div>
               </div>
               <button
@@ -920,7 +972,7 @@ export function PatentSupport() {
               </button>
             </div>
           </div>
-        )}
+        ) : null}
 
         {/* ── Existing submissions ───────────────────────────────────── */}
         <div className="grid gap-6 lg:grid-cols-3">

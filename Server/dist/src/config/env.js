@@ -4,9 +4,16 @@ var __importDefault = (this && this.__importDefault) || function (mod) {
 };
 Object.defineProperty(exports, "__esModule", { value: true });
 exports.env = void 0;
+const fs_1 = require("fs");
+const path_1 = __importDefault(require("path"));
 const dotenv_1 = __importDefault(require("dotenv"));
 const zod_1 = require("zod");
-dotenv_1.default.config();
+const envPathCandidates = [
+    path_1.default.resolve(__dirname, "../../.env"),
+    path_1.default.resolve(__dirname, "../../../.env"),
+];
+const envPath = envPathCandidates.find((candidate) => (0, fs_1.existsSync)(candidate));
+dotenv_1.default.config(envPath ? { path: envPath } : undefined);
 const booleanFromEnv = zod_1.z.preprocess((value) => {
     if (typeof value === "boolean")
         return value;

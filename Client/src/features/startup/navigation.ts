@@ -10,7 +10,9 @@ export interface StartupLaunchSectionLink {
 
 export const STARTUP_LAUNCH_BASE_PATH = '/startup-launch';
 export const STARTUP_LAUNCH_LIST_PATH = STARTUP_LAUNCH_BASE_PATH;
-export const STARTUP_LAUNCH_NEW_PATH = `${STARTUP_LAUNCH_BASE_PATH}/new/overview`;
+export const STARTUP_LAUNCH_DRAFT_ID = 'new';
+export const STARTUP_LAUNCH_NEW_PATH = `${STARTUP_LAUNCH_BASE_PATH}/new`;
+export const STARTUP_LAUNCH_LEGACY_NEW_OVERVIEW_PATH = `${STARTUP_LAUNCH_BASE_PATH}/new/overview`;
 
 export const STARTUP_LAUNCH_SECTION_LINKS: StartupLaunchSectionLink[] = [
   {
@@ -48,3 +50,6 @@ export const getStartupSectionPath = (startupId: string, segment: string) =>
 
 export const getStartupOverviewPath = (startupId: string) =>
   getStartupSectionPath(startupId, 'overview');
+
+export const normalizeStartupRouteId = (startupId?: string) =>
+  startupId && startupId !== STARTUP_LAUNCH_DRAFT_ID ? startupId : undefined;

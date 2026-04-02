@@ -1,6 +1,7 @@
 import { useQuery } from "@tanstack/react-query";
 import { Calendar, Clock, CheckCircle2, XCircle, CalendarClock } from "lucide-react";
 import { studentApi, StudentMentorSessionItem } from "../../../api/student.api";
+import { StudentWorkspaceTabs } from "../../../features/student/StudentWorkspaceTabs";
 
 const formatDate = (value?: string) =>
   value
@@ -136,6 +137,8 @@ export function StudentMentorSessions() {
           Track all your scheduled, completed, and cancelled sessions with mentors.
         </p>
       </div>
+
+      <StudentWorkspaceTabs />
 
       <div className="grid gap-4 sm:grid-cols-3">
         {[

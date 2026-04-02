@@ -11,7 +11,9 @@ import {
   getStartupByIdController,
   launchStartupController,
   patchStartup,
+  removeStartupDocumentController,
   requestStartupReviewController,
+  uploadStartupDocumentController,
   uploadPitchController,
 } from './startup.controller';
 
@@ -29,6 +31,20 @@ const upload = multer({
   },
 });
 
+const documentUpload = multer({
+  storage: multer.memoryStorage(),
+  limits: { fileSize: 10 * 1024 * 1024 },
+  fileFilter: (_req, file, cb) => {
+    const isPdf = file.mimetype === 'application/pdf' || pdfFileNamePattern.test(file.originalname);
+    const isImage = file.mimetype.startsWith('image/');
+    if (!isPdf && !isImage) {
+      cb(new ApiError(400, 'INVALID_FILE_TYPE', 'Only PDF or image files are allowed'));
+      return;
+    }
+    cb(null, true);
+  },
+});
+
 const router = Router();
 
 router.use(authenticate, authorize(UserRole.STUDENT));
@@ -39,5 +55,7 @@ router.patch('/:id', asyncHandler(patchStartup));
 router.post('/:id/request-review', asyncHandler(requestStartupReviewController));
 router.post('/:id/launch', asyncHandler(launchStartupController));
 router.post('/:id/upload-pitch', upload.single('file'), asyncHandler(uploadPitchController));
+router.post('/:id/documents', documentUpload.single('file'), asyncHandler(uploadStartupDocumentController));
+router.delete('/:id/documents/:documentId', asyncHandler(removeStartupDocumentController));
 
 export default router;

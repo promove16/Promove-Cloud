@@ -154,6 +154,7 @@ export function ProblemBank() {
       setFeedback(message);
     },
   });
+  const startingProblemId = claimMutation.isPending ? claimMutation.variables : null;
 
   const reviewMutation = useMutation({
     mutationFn: (payload: { problemId: string; workspaceId: string; requestNote: string }) =>
@@ -391,7 +392,7 @@ export function ProblemBank() {
                         disabled={claimMutation.isPending}
                         className="flex-1 rounded-lg bg-gradient-to-r from-blue-600 to-purple-600 px-6 py-3 font-semibold text-white transition-all disabled:opacity-60"
                       >
-                        {claimMutation.isPending ? "Starting..." : "Start Problem"}
+                        {startingProblemId === problem._id ? "Starting..." : "Start Problem"}
                       </button>
                     )}
                   </div>
@@ -756,7 +757,7 @@ export function ProblemBank() {
                     disabled={claimMutation.isPending}
                     className="rounded-lg bg-gradient-to-r from-blue-600 to-purple-600 px-5 py-3 font-semibold text-white"
                   >
-                    Start Problem
+                    {startingProblemId === selectedProblem._id ? "Starting..." : "Start Problem"}
                   </button>
                 )}
               </div>

@@ -5,22 +5,24 @@ import { Card } from '../../components/ui/Card';
 import { Spinner } from '../../components/ui/Spinner';
 import { startupApi } from '../../api/startup.api';
 import { getApiErrorMessage } from '../../utils/apiError';
+import { normalizeStartupRouteId } from './navigation';
 
 const formatRoleLabel = (value: string) => value.charAt(0).toUpperCase() + value.slice(1);
 
 export default function StartupCapTable() {
   const { startupId } = useParams<{ startupId: string }>();
+  const normalizedStartupId = normalizeStartupRouteId(startupId);
 
   const startupQuery = useQuery({
-    queryKey: ['startup', startupId],
-    queryFn: () => startupApi.getById(startupId!),
-    enabled: Boolean(startupId),
+    queryKey: ['startup', normalizedStartupId],
+    queryFn: () => startupApi.getById(normalizedStartupId!),
+    enabled: Boolean(normalizedStartupId),
   });
 
   const capTableQuery = useQuery({
-    queryKey: ['startup', 'cap-table', startupId],
-    queryFn: () => startupApi.getCapTable(startupId!),
-    enabled: Boolean(startupId),
+    queryKey: ['startup', 'cap-table', normalizedStartupId],
+    queryFn: () => startupApi.getCapTable(normalizedStartupId!),
+    enabled: Boolean(normalizedStartupId),
   });
 
   if (startupQuery.isLoading || capTableQuery.isLoading) {

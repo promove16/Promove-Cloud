@@ -1,7 +1,7 @@
 import { useMemo, useState } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { isAxiosError } from 'axios';
-import { CheckCircle2, Clock3, Rocket, RotateCcw } from 'lucide-react';
+import { CheckCircle2, Clock3, FileText, Rocket, RotateCcw, ShieldCheck } from 'lucide-react';
 import { adminApi, AdminStartupReviewItem } from '../../api/admin.api';
 import { Badge } from '../../components/ui/Badge';
 import { Button } from '../../components/ui/Button';
@@ -16,14 +16,6 @@ const reviewTone: Record<StartupReviewStatus, string> = {
   approved: 'border-emerald-500/30 bg-emerald-500/10 text-emerald-300',
 };
 
-const getErrorMessage = (error: unknown) => {
-  if (isAxiosError<{ error?: { message?: string } }>(error)) {
-    return error.response?.data?.error?.message ?? 'Unable to update startup review right now.';
-  }
-
-  return error instanceof Error ? error.message : 'Unable to update startup review right now.';
-};
-
 const statusOptions: Array<{ value: StartupReviewStatus | 'all'; label: string }> = [
   { value: 'review_requested', label: 'Pending Review' },
   { value: 'changes_requested', label: 'Changes Requested' },
@@ -31,6 +23,35 @@ const statusOptions: Array<{ value: StartupReviewStatus | 'all'; label: string }
   { value: 'draft', label: 'Drafts' },
   { value: 'all', label: 'All Startups' },
 ];
+
+const legalStructureLabel: Record<AdminStartupReviewItem['registrationProfile']['legalStructure'], string> = {
+  private_limited: 'Private Limited',
+  llp: 'LLP',
+  partnership: 'Partnership',
+  opc: 'OPC',
+};
+
+const registrationStageLabel: Record<AdminStartupReviewItem['registrationProfile']['registrationStage'], string> = {
+  idea: 'Idea',
+  name_reserved: 'Name Reserved',
+  incorporation_in_progress: 'Incorporation In Progress',
+  incorporated: 'Incorporated',
+  startup_india_recognized: 'Startup India Recognized',
+};
+
+const startupIndiaStatusLabel: Record<AdminStartupReviewItem['registrationProfile']['startupIndiaStatus'], string> = {
+  not_started: 'Not started',
+  applied: 'Applied',
+  recognized: 'Recognized',
+};
+
+const getErrorMessage = (error: unknown) => {
+  if (isAxiosError<{ error?: { message?: string } }>(error)) {
+    return error.response?.data?.error?.message ?? 'Unable to update startup review right now.';
+  }
+
+  return error instanceof Error ? error.message : 'Unable to update startup review right now.';
+};
 
 export default function Startups() {
   const queryClient = useQueryClient();
@@ -89,8 +110,7 @@ export default function Startups() {
           <div className="text-xs uppercase tracking-[0.3em] text-cyan-300">Admin Startups</div>
           <h1 className="mt-2 text-3xl font-bold text-white">Startup review queue</h1>
           <p className="mt-2 max-w-4xl text-slate-400">
-            Review startup launch submissions before they go live in investor discovery. Deal mediation starts only after
-            investors express interest.
+            Review startup launch submissions before they go live in investor discovery. This queue now shows entity setup readiness, required documents, and launch compliance in one place.
           </p>
         </div>
         <div className="flex flex-wrap gap-3">
@@ -135,6 +155,9 @@ export default function Startups() {
                     </Badge>
                     <Badge>{startup.stage}</Badge>
                     <Badge className="border-slate-700 bg-slate-900 text-slate-300">{startup.category}</Badge>
+                    <Badge className="border-slate-700 bg-slate-900 text-slate-300">
+                      {legalStructureLabel[startup.registrationProfile.legalStructure]}
+                    </Badge>
                     {startup.launchedToInvestors ? (
                       <Badge className="border-cyan-500/30 bg-cyan-500/10 text-cyan-300">Investor marketplace live</Badge>
                     ) : null}
@@ -155,7 +178,7 @@ export default function Startups() {
                     <div className="rounded-2xl border border-slate-800 bg-slate-950/70 px-4 py-3">
                       <div className="text-xs uppercase tracking-[0.22em] text-slate-500">Products / Team</div>
                       <div className="mt-2 text-sm text-white">
-                        {startup.activeProducts} active products · {startup.teamSize} team members
+                        {startup.activeProducts} active products / {startup.teamSize} team members
                       </div>
                     </div>
                     <div className="rounded-2xl border border-slate-800 bg-slate-950/70 px-4 py-3">
@@ -165,6 +188,51 @@ export default function Startups() {
                       </div>
                       <div className="mt-1 text-xs text-slate-400">
                         Reviewed {startup.adminReviewedAt ? new Date(startup.adminReviewedAt).toLocaleString('en-IN') : 'Pending'}
+                      </div>
+                    </div>
+                  </div>
+
+                  <div className="grid gap-3 md:grid-cols-2">
+                    <div className="rounded-2xl border border-slate-800 bg-slate-950/70 px-4 py-4">
+                      <div className="text-xs uppercase tracking-[0.22em] text-slate-500">Registration Profile</div>
+                      <div className="mt-3 space-y-2 text-sm text-slate-300">
+                        <div>
+                          <span className="text-slate-500">Stage:</span> {registrationStageLabel[startup.registrationProfile.registrationStage]}
+                        </div>
+                        <div>
+                          <span className="text-slate-500">Entity:</span>{' '}
+                          {startup.registrationProfile.registeredEntityName || startup.registrationProfile.proposedEntityName || 'Not provided'}
+                        </div>
+                        <div>
+                          <span className="text-slate-500">Startup India:</span>{' '}
+                          {startupIndiaStatusLabel[startup.registrationProfile.startupIndiaStatus]}
+                        </div>
+                        {startup.registrationProfile.startupIndiaRecognitionNumber ? (
+                          <div>
+                            <span className="text-slate-500">Recognition No:</span>{' '}
+                            {startup.registrationProfile.startupIndiaRecognitionNumber}
+                          </div>
+                        ) : null}
+                      </div>
+                    </div>
+
+                    <div className="rounded-2xl border border-slate-800 bg-slate-950/70 px-4 py-4">
+                      <div className="flex items-center gap-2 text-xs uppercase tracking-[0.22em] text-slate-500">
+                        <ShieldCheck className="h-4 w-4" />
+                        Review Readiness
+                      </div>
+                      <div className="mt-3">
+                        <Badge className={startup.readiness.isReviewReady ? 'border-emerald-500/30 bg-emerald-500/10 text-emerald-300' : 'border-amber-500/30 bg-amber-500/10 text-amber-300'}>
+                          {startup.readiness.isReviewReady ? 'Ready for approval' : 'Readiness incomplete'}
+                        </Badge>
+                      </div>
+                      <div className="mt-3 text-sm text-slate-300">
+                        {startup.readiness.isReviewReady
+                          ? 'All required fields and document categories are satisfied.'
+                          : startup.readiness.missingItems.slice(0, 5).join(', ')}
+                        {!startup.readiness.isReviewReady && startup.readiness.missingItems.length > 5
+                          ? `, and ${startup.readiness.missingItems.length - 5} more`
+                          : ''}
                       </div>
                     </div>
                   </div>
@@ -180,6 +248,33 @@ export default function Startups() {
                       <Button variant="secondary">Open Pitch Deck</Button>
                     </a>
                   ) : null}
+
+                  <div className="rounded-2xl border border-slate-800 bg-slate-950/70 px-4 py-4">
+                    <div className="mb-3 flex items-center gap-2 text-xs uppercase tracking-[0.22em] text-slate-500">
+                      <FileText className="h-4 w-4" />
+                      Uploaded Documents
+                    </div>
+                    {startup.documents.length > 0 ? (
+                      <div className="grid gap-2 md:grid-cols-2">
+                        {startup.documents.map((document) => (
+                          <a
+                            key={document._id}
+                            href={document.fileUrl}
+                            target="_blank"
+                            rel="noreferrer"
+                            className="rounded-xl border border-slate-800 bg-slate-900 px-3 py-3 text-sm text-slate-200 transition hover:border-cyan-500/40"
+                          >
+                            <div className="font-medium text-white">{document.fileName}</div>
+                            <div className="mt-1 text-xs text-slate-500">
+                              {document.category.replace(/_/g, ' ')} / {new Date(document.uploadedAt).toLocaleDateString('en-IN')}
+                            </div>
+                          </a>
+                        ))}
+                      </div>
+                    ) : (
+                      <div className="text-sm text-slate-500">No legal or compliance documents uploaded yet.</div>
+                    )}
+                  </div>
 
                   {startup.adminNotes ? (
                     <div className="rounded-2xl border border-slate-800 bg-slate-950/70 px-4 py-4 text-sm text-slate-300">
@@ -206,10 +301,7 @@ export default function Startups() {
                   </div>
 
                   <div className="flex flex-wrap gap-3">
-                    <Button
-                      onClick={() => handleReview(startup, 'approved')}
-                      disabled={reviewMutation.isPending}
-                    >
+                    <Button onClick={() => handleReview(startup, 'approved')} disabled={reviewMutation.isPending}>
                       <CheckCircle2 className="mr-2 h-4 w-4" />
                       Approve Startup
                     </Button>
@@ -242,7 +334,7 @@ export default function Startups() {
                       <CheckCircle2 className="h-4 w-4 text-cyan-300" />
                       <div className="mt-3 text-sm font-semibold text-white">Deal flow</div>
                       <div className="mt-2 text-xs leading-5 text-slate-400">
-                        Investor “Express Interest” continues to act as the bidding and negotiation entry point.
+                        Investor "Express Interest" remains the entry point for negotiation and bidding.
                       </div>
                     </div>
                   </div>

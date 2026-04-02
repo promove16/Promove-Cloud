@@ -23,7 +23,7 @@ import {
 import { PatentFilingDocuments, PatentSupportingDocument } from '../types/patent.types';
 import { Problem } from '../types/problem.types';
 import { UserRole } from '../types/roles.types';
-import { StartupReviewStatus } from '../types/startup.types';
+import { StartupDocument, StartupReadiness, StartupRegistrationProfile, StartupReviewStatus } from '../types/startup.types';
 import { MentorStudentProfile } from './mentor.api';
 
 export interface AdminUserListItem {
@@ -267,6 +267,12 @@ export interface AdminStartupReviewItem {
   adminNotes?: string;
   pitchDeckUrl?: string;
   pitchDeckName?: string;
+  registrationProfile: Pick<
+    StartupRegistrationProfile,
+    'legalStructure' | 'registrationStage' | 'proposedEntityName' | 'registeredEntityName' | 'startupIndiaStatus' | 'startupIndiaRecognitionNumber'
+  >;
+  readiness: StartupReadiness;
+  documents: StartupDocument[];
   traction: {
     patentFiled: boolean;
     mvpBuilt: boolean;

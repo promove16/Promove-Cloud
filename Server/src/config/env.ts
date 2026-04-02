@@ -1,7 +1,16 @@
+import { existsSync } from "fs";
+import path from "path";
 import dotenv from "dotenv";
 import { z } from "zod";
 
-dotenv.config();
+const envPathCandidates = [
+  path.resolve(__dirname, "../../.env"),
+  path.resolve(__dirname, "../../../.env"),
+];
+
+const envPath = envPathCandidates.find((candidate) => existsSync(candidate));
+
+dotenv.config(envPath ? { path: envPath } : undefined);
 
 const booleanFromEnv = z.preprocess((value) => {
   if (typeof value === "boolean") return value;

@@ -11,7 +11,7 @@ interface StartupSectionTabsProps {
 export function StartupSectionTabs({ className }: StartupSectionTabsProps) {
   const location = useLocation();
   const { startupId } = useParams<{ startupId: string }>();
-  const id = startupId ?? 'new';
+  const id = startupId ?? '';
 
   return (
     <div className={twMerge(clsx('overflow-x-auto', className))}>

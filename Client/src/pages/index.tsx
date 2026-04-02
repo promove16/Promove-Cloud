@@ -95,6 +95,11 @@ const MyStartups = lazy(() =>
     default: module.MyStartups,
   })),
 );
+const NewStartupPage = lazy(() =>
+  import("../features/startup/NewStartupPage").then((module) => ({
+    default: module.NewStartupPage,
+  })),
+);
 const StartupLaunchShell = lazy(() =>
   import("../features/startup/StartupLaunchShell").then((module) => ({
     default: module.StartupLaunchShell,
@@ -397,6 +402,18 @@ export const router = createBrowserRouter([
             <LazyPage component={MyStartups} />
           </ProtectedRoleRoute>
         ),
+      },
+      {
+        path: "/startup-launch/new",
+        element: (
+          <ProtectedRoleRoute role={UserRole.STUDENT}>
+            <LazyPage component={NewStartupPage} />
+          </ProtectedRoleRoute>
+        ),
+      },
+      {
+        path: "/startup-launch/new/overview",
+        element: <Navigate to="/startup-launch/new" replace />,
       },
       {
         path: "/startup-launch/:startupId",

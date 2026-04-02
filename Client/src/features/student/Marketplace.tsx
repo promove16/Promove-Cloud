@@ -31,6 +31,7 @@ import { Card } from '../../components/ui/Card';
 import { Input } from '../../components/ui/Input';
 import { Spinner } from '../../components/ui/Spinner';
 import { StartupSectionTabs } from '../startup/StartupSectionTabs';
+import { StudentWorkspaceTabs } from './StudentWorkspaceTabs';
 
 const tabs: Array<{
   id: MarketplaceRole;
@@ -680,6 +681,11 @@ export function Marketplace() {
   return (
     <DashboardLayout role="student">
       <div className="mx-auto max-w-7xl space-y-8 text-white">
+        <section className="space-y-3">
+          <div className="text-[11px] uppercase tracking-[0.34em] text-slate-500">Student Workspace</div>
+          <StudentWorkspaceTabs />
+        </section>
+
         <section className="space-y-3">
           <div className="text-[11px] uppercase tracking-[0.34em] text-slate-500">Startup Workspace</div>
           <StartupSectionTabs />

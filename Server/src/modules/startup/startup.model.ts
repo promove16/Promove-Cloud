@@ -1,6 +1,26 @@
 import { Schema, model } from 'mongoose';
 import { IStartup } from './startup.types';
 
+const startupDocumentCategoryEnum = [
+  'business_plan',
+  'incorporation_certificate',
+  'moa',
+  'aoa',
+  'llp_agreement',
+  'partnership_deed',
+  'founder_agreement',
+  'company_pan',
+  'tan_allotment',
+  'gst_registration',
+  'registered_office_proof',
+  'office_noc_or_utility_bill',
+  'startup_india_certificate',
+  'trademark_certificate',
+  'patent_proof',
+  'bank_account_proof',
+  'regulatory_license',
+] as const;
+
 const startupSchema = new Schema<IStartup>(
   {
     founderIds: { type: [Schema.Types.ObjectId], required: true, default: [], index: true },
@@ -18,6 +38,81 @@ const startupSchema = new Schema<IStartup>(
     teamSize: { type: Number, default: 1 },
     fundingNeeded: { type: Number, default: undefined },
     activeProducts: { type: Number, default: 1 },
+    businessProfile: {
+      problemStatement: { type: String, trim: true, default: '' },
+      solutionSummary: { type: String, trim: true, default: '' },
+      targetCustomers: { type: String, trim: true, default: '' },
+      marketAnalysis: { type: String, trim: true, default: '' },
+      revenueModel: { type: String, trim: true, default: '' },
+      goToMarketPlan: { type: String, trim: true, default: '' },
+    },
+    registrationProfile: {
+      legalStructure: {
+        type: String,
+        enum: ['private_limited', 'llp', 'partnership', 'opc'],
+        default: 'private_limited',
+      },
+      registrationStage: {
+        type: String,
+        enum: ['idea', 'name_reserved', 'incorporation_in_progress', 'incorporated', 'startup_india_recognized'],
+        default: 'idea',
+      },
+      proposedEntityName: { type: String, trim: true, default: '' },
+      registeredEntityName: { type: String, trim: true, default: undefined },
+      businessObjective: { type: String, trim: true, default: '' },
+      incorporationDate: { type: Date, default: undefined },
+      incorporationState: { type: String, trim: true, default: '' },
+      registeredOfficeAddress: { type: String, trim: true, default: '' },
+      registeredOfficeCity: { type: String, trim: true, default: '' },
+      registeredOfficeState: { type: String, trim: true, default: '' },
+      registeredOfficePincode: { type: String, trim: true, default: '' },
+      cinOrLlpin: { type: String, trim: true, default: undefined },
+      companyPan: { type: String, trim: true, default: undefined },
+      tanNumber: { type: String, trim: true, default: undefined },
+      gstin: { type: String, trim: true, default: undefined },
+      startupIndiaStatus: {
+        type: String,
+        enum: ['not_started', 'applied', 'recognized'],
+        default: 'not_started',
+      },
+      startupIndiaRecognitionNumber: { type: String, trim: true, default: undefined },
+      bankAccountOpened: { type: Boolean, default: false },
+      bankName: { type: String, trim: true, default: undefined },
+      dscReady: { type: Boolean, default: false },
+      founderAgreementSigned: { type: Boolean, default: false },
+      ndaReady: { type: Boolean, default: false },
+      employmentContractsReady: { type: Boolean, default: false },
+      operationalLicenses: { type: String, trim: true, default: '' },
+      trademarkStatus: {
+        type: String,
+        enum: ['not_started', 'applied', 'registered'],
+        default: 'not_started',
+      },
+      patentStatus: {
+        type: String,
+        enum: ['not_started', 'drafting', 'filed', 'granted'],
+        default: 'not_started',
+      },
+    },
+    documents: {
+      type: [
+        new Schema(
+          {
+            category: { type: String, enum: startupDocumentCategoryEnum, required: true },
+            fileUrl: { type: String, required: true },
+            fileType: { type: String, enum: ['pdf', 'image'], required: true },
+            fileName: { type: String, required: true },
+            fileSizeBytes: { type: Number, required: true },
+            uploadedAt: { type: Date, default: () => new Date() },
+            uploadedBy: { type: Schema.Types.ObjectId, required: true },
+            note: { type: String, trim: true, default: undefined },
+            cloudinaryPublicId: { type: String, default: undefined },
+          },
+          { _id: true },
+        ),
+      ],
+      default: [],
+    },
     launchedToInvestors: { type: Boolean, default: false },
     launchedToMentors: { type: Boolean, default: false },
     launchedToRecruiters: { type: Boolean, default: false },

@@ -3,15 +3,12 @@ import { isAxiosError } from 'axios';
 import { Lock, Mail } from 'lucide-react';
 import { Link, useNavigate } from 'react-router-dom';
 import { BusinessLogo } from '../../components/branding/BusinessLogo';
-import { RoleSelector } from './RoleSelector';
 import { useLoginMutation } from './useAuth';
-import { UserRole } from '../../types/roles.types';
 import { getPostLoginRedirect } from '../../utils/postLoginRedirect';
 
 export function LoginPage() {
   const navigate = useNavigate();
   const loginMutation = useLoginMutation();
-  const [selectedRole, setSelectedRole] = useState<UserRole | null>(null);
   const [formData, setFormData] = useState({
     email: '',
     password: '',
@@ -22,16 +19,10 @@ export function LoginPage() {
     event.preventDefault();
     setError('');
 
-    if (!selectedRole) {
-      setError('Please select a role before signing in.');
-      return;
-    }
-
     try {
       const payload = await loginMutation.mutateAsync({
         email: formData.email,
         password: formData.password,
-        role: selectedRole,
       });
 
       navigate(getPostLoginRedirect(payload.user), { replace: true });
@@ -115,11 +106,6 @@ export function LoginPage() {
                 required
               />
             </div>
-          </div>
-
-          <div className="mb-8">
-            <label className="mb-4 block text-lg font-semibold text-white">Select Your Role</label>
-            <RoleSelector value={selectedRole} onChange={setSelectedRole} />
           </div>
 
           {error ? (

@@ -1,12 +1,11 @@
-import { Outlet, useNavigate, useParams } from 'react-router-dom';
+import { useNavigate } from 'react-router-dom';
 import { ArrowLeft } from 'lucide-react';
 import { DashboardLayout } from '../../app/components/DashboardLayout';
-import { StartupSectionTabs } from './StartupSectionTabs';
+import { StartupLaunch } from '../../app/pages/StartupLaunch';
 import { STARTUP_LAUNCH_LIST_PATH } from './navigation';
 
-export function StartupLaunchShell() {
+export function NewStartupPage() {
   const navigate = useNavigate();
-  const { startupId } = useParams<{ startupId: string }>();
 
   return (
     <DashboardLayout role="student">
@@ -22,15 +21,15 @@ export function StartupLaunchShell() {
 
           <div className="flex items-center gap-2 text-[11px] font-semibold uppercase tracking-[0.24em] text-slate-500">
             <span className="rounded-full border border-slate-800 bg-slate-900/80 px-2.5 py-1 text-slate-300">
-              Saved Startup
+              Draft Startup
             </span>
-            <span className="hidden sm:inline">Profile sections unlocked</span>
+            <span className="hidden sm:inline">
+              Save once to unlock outreach, cap table, and investor deal sections
+            </span>
           </div>
         </div>
 
-        <StartupSectionTabs />
-
-        <Outlet context={{ startupId }} />
+        <StartupLaunch />
       </div>
     </DashboardLayout>
   );

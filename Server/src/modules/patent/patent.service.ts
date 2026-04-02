@@ -94,6 +94,14 @@ export const submitPatent = async (userId: string, payload: z.infer<typeof paten
     throw new ApiError(404, 'WORKSPACE_NOT_FOUND', 'Select a valid workspace before submitting for patent review.');
   }
 
+  if (workspace.claimedProblemId) {
+    throw new ApiError(
+      400,
+      'PATENT_WORKSPACE_NOT_ELIGIBLE',
+      'Patent support is only available for your own product workspace. ProMove problem-bank workspaces are leaderboard-only.',
+    );
+  }
+
   const supportingDocuments = payload.documentUploads.map((item) => {
     const upload = workspace.uploads.find((u) => String(u._id) === item.uploadId);
     if (!upload) {

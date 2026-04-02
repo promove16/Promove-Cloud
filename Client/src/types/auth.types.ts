@@ -156,7 +156,6 @@ export interface PendingSignupPayload {
 export interface LoginInput {
   email: string;
   password: string;
-  role: UserRole;
 }
 
 export interface SignupInput {
