@@ -7,6 +7,7 @@ export type PatentDocumentCategory =
   | 'abstract_draft'
   | 'claims_draft'
   | 'drawings_diagrams'
+  | 'design_plan_sketch'
   | 'examination_request'
   | 'form3_foreign_filing'
   | 'cost_management';
@@ -60,16 +61,27 @@ export interface PatentSupportingDocument {
 export interface IPatent {
   _id: Types.ObjectId;
   studentId: Types.ObjectId;
+  coInventorIds: Types.ObjectId[];
   workspaceId?: Types.ObjectId;
   projectTitle: string;
   questionnaire: {
-    whatIsYourInnovation: string;
-    noveltyExplanation: string;
-    technicalDetails: string;
-    marketUseCase: string;
-    priorArtAwareness: string;
+    problemStatement: string;
+    solutionDifferentiation: string;
+    coreInnovation: string;
+    priorArtStatus: string;
+    workingMechanism: string;
+    keyComponents: string;
+    developmentStage: string;
+    documentationReadiness: string;
+    inventorOwnership: string;
+    developmentContext: string;
+    targetMarkets: string;
+    commercializationStrategy: string;
+    publicDisclosureStatus: string;
+    legalAgreements: string;
+    ipProtectionType: string;
   };
-  filingDocuments: PatentFilingDocuments;
+  filingDocuments?: PatentFilingDocuments;
   supportingDocuments: PatentSupportingDocument[];
   status: 'submitted' | 'under_review' | 'approved' | 'rejected';
   submittedAt: Date;

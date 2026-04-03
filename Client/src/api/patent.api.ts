@@ -14,7 +14,7 @@ export const patentApi = {
     workspaceId: string;
     documentUploads: { uploadId: string; category: PatentDocumentCategory }[];
     questionnaire: PatentQuestionnaire;
-    filingDocuments: PatentFilingDocuments;
+    filingDocuments?: PatentFilingDocuments;
   }) {
     const response = await api.post<ApiSuccessResponse<PatentSubmission>>('/api/patents/submit', payload);
     return response.data.data;

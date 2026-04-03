@@ -104,6 +104,16 @@ export interface RecruiterJobView {
   minimumInnovationScore: number;
   type: 'Full-time' | 'Internship' | 'Contract' | 'Part-time';
   location: string;
+  workMode?: 'On-site' | 'Hybrid' | 'Remote';
+  salaryExpectation?: string;
+  experienceLevel?: string;
+  openings?: number;
+  companyOverview?: string;
+  roleSummary?: string;
+  keyResponsibilities: string[];
+  requirements: string[];
+  benefits: string[];
+  applicationSteps: string[];
   isActive: boolean;
   applicantCount: number;
   shortlistedCount: number;

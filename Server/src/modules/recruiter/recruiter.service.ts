@@ -11,6 +11,7 @@ export {
 export {
   applyToRecruiterJob,
   createRecruiterJob,
+  getPublicRecruiterJob,
   deleteRecruiterJob,
   getPublicRecruiterJobs,
   getRecruiterJobs,

@@ -301,13 +301,35 @@ export const getMentorStudentProfile = async (mentorId: string, studentId: strin
   });
   await queueMentorViewedProfileEmail(studentId, mentorId);
 
-  const [workspaces, scoreEvents, patents, startups] = await Promise.all([
-    Workspace.find({ $or: [{ ownerId: studentId }, { teamMemberIds: studentId }] })
-      .sort({ updatedAt: -1 })
-      .lean(),
+  // Scope to workspaces where this mentor is assigned as a chat participant
+  const assignedWorkspaces = await Workspace.find({
+    isActive: true,
+    chatParticipants: { $elemMatch: { userId: new Types.ObjectId(mentorId), role: 'mentor' } },
+    $or: [{ ownerId: new Types.ObjectId(studentId) }, { teamMemberIds: new Types.ObjectId(studentId) }],
+  })
+    .sort({ updatedAt: -1 })
+    .lean();
+
+  const assignedWorkspaceIds = assignedWorkspaces.map((w) => w._id);
+
+  const [scoreEvents, patents, startups] = await Promise.all([
     ScoreEvent.find({ userId: studentId }).sort({ createdAt: -1 }).limit(20).lean(),
-    Patent.find({ studentId }).sort({ createdAt: -1 }).lean(),
-    Startup.find({ founderIds: studentId }).sort({ createdAt: -1 }).lean(),
+    // Only patents linked to assigned workspaces, or where student is inventor
+    assignedWorkspaceIds.length > 0
+      ? Patent.find({
+          $or: [
+            { studentId, workspaceId: { $in: assignedWorkspaceIds } },
+            { coInventorIds: studentId, workspaceId: { $in: assignedWorkspaceIds } },
+          ],
+        }).sort({ createdAt: -1 }).lean()
+      : Promise.resolve([]),
+    // Only startups linked to assigned workspaces
+    assignedWorkspaceIds.length > 0
+      ? Startup.find({
+          isActive: true,
+          projectId: { $in: assignedWorkspaceIds },
+        }).sort({ createdAt: -1 }).lean()
+      : Promise.resolve([]),
   ]);
 
   return {
@@ -323,7 +345,7 @@ export const getMentorStudentProfile = async (mentorId: string, studentId: strin
         ? { institutionName: student.institutionProfile.institutionName }
         : {}),
     },
-    workspaces: workspaces.map((workspace) => ({
+    workspaces: assignedWorkspaces.map((workspace) => ({
       _id: String(workspace._id),
       title: workspace.title,
       category: workspace.category,

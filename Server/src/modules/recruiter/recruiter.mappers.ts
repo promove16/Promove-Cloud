@@ -120,6 +120,16 @@ export const mapJob = (job: {
   minimumInnovationScore: number;
   type: RecruiterJobView['type'];
   location: string;
+  workMode?: RecruiterJobView['workMode'];
+  salaryExpectation?: string;
+  experienceLevel?: string;
+  openings?: number;
+  companyOverview?: string;
+  roleSummary?: string;
+  keyResponsibilities?: string[];
+  requirements?: string[];
+  benefits?: string[];
+  applicationSteps?: string[];
   isActive: boolean;
   applicantIds: Types.ObjectId[];
   shortlistedIds: Types.ObjectId[];
@@ -137,6 +147,16 @@ export const mapJob = (job: {
   minimumInnovationScore: job.minimumInnovationScore ?? 0,
   type: job.type,
   location: job.location,
+  ...(job.workMode ? { workMode: job.workMode } : {}),
+  ...(job.salaryExpectation ? { salaryExpectation: job.salaryExpectation } : {}),
+  ...(job.experienceLevel ? { experienceLevel: job.experienceLevel } : {}),
+  ...(typeof job.openings === 'number' ? { openings: job.openings } : {}),
+  ...(job.companyOverview ? { companyOverview: job.companyOverview } : {}),
+  ...(job.roleSummary ? { roleSummary: job.roleSummary } : {}),
+  keyResponsibilities: job.keyResponsibilities ?? [],
+  requirements: job.requirements ?? [],
+  benefits: job.benefits ?? [],
+  applicationSteps: job.applicationSteps ?? [],
   isActive: job.isActive,
   applicantCount: job.applicantIds.length,
   shortlistedCount: job.shortlistedIds.length,

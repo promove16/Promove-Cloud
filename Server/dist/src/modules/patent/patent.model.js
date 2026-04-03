@@ -44,22 +44,33 @@ const supportingDocumentSchema = new mongoose_1.Schema({
     note: { type: String, default: undefined },
     documentCategory: {
         type: String,
-        enum: ['inventor_journal', 'prior_art_search', 'specification_draft', 'abstract_draft', 'claims_draft', 'drawings_diagrams', 'examination_request', 'form3_foreign_filing', 'cost_management'],
+        enum: ['inventor_journal', 'prior_art_search', 'specification_draft', 'abstract_draft', 'claims_draft', 'drawings_diagrams', 'design_plan_sketch', 'examination_request', 'form3_foreign_filing', 'cost_management'],
         default: undefined,
     },
 }, { _id: false });
 const patentSchema = new mongoose_1.Schema({
     studentId: { type: mongoose_1.Schema.Types.ObjectId, required: true, index: true },
+    coInventorIds: { type: [mongoose_1.Schema.Types.ObjectId], default: [] },
     workspaceId: { type: mongoose_1.Schema.Types.ObjectId, default: undefined },
     projectTitle: { type: String, required: true, trim: true },
     questionnaire: {
-        whatIsYourInnovation: { type: String, required: true },
-        noveltyExplanation: { type: String, required: true },
-        technicalDetails: { type: String, required: true },
-        marketUseCase: { type: String, required: true },
-        priorArtAwareness: { type: String, required: true },
+        problemStatement: { type: String, required: true },
+        solutionDifferentiation: { type: String, required: true },
+        coreInnovation: { type: String, required: true },
+        priorArtStatus: { type: String, required: true },
+        workingMechanism: { type: String, required: true },
+        keyComponents: { type: String, required: true },
+        developmentStage: { type: String, required: true },
+        documentationReadiness: { type: String, required: true },
+        inventorOwnership: { type: String, required: true },
+        developmentContext: { type: String, required: true },
+        targetMarkets: { type: String, required: true },
+        commercializationStrategy: { type: String, required: true },
+        publicDisclosureStatus: { type: String, required: true },
+        legalAgreements: { type: String, required: true },
+        ipProtectionType: { type: String, required: true },
     },
-    filingDocuments: { type: filingDocumentsSchema, required: true },
+    filingDocuments: { type: filingDocumentsSchema, default: undefined },
     supportingDocuments: { type: [supportingDocumentSchema], default: [] },
     status: {
         type: String,
@@ -74,4 +85,5 @@ const patentSchema = new mongoose_1.Schema({
     showcasedInMarketplace: { type: Boolean, default: false },
 }, { timestamps: true });
 patentSchema.index({ studentId: 1, status: 1 });
+patentSchema.index({ coInventorIds: 1 });
 exports.Patent = (0, mongoose_1.model)('Patent', patentSchema);

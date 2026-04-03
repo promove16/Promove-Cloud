@@ -7,6 +7,7 @@ import {
   BriefcaseBusiness,
   ChevronDown,
   ChevronUp,
+  Clock3,
   Code2,
   Compass,
   ExternalLink,
@@ -22,16 +23,17 @@ import {
   Search,
   Sparkles,
   Star,
+  Users,
   X,
 } from 'lucide-react';
 import { marketplaceApi, MarketplaceProfile, MarketplaceRole } from '../../api/marketplace.api';
 import { recruiterApi } from '../../api/recruiter.api';
+import type { RecruiterJobView } from '../../types/recruiter.types';
+import { UserRole } from '../../types/roles.types';
 import { Button } from '../../components/ui/Button';
 import { Card } from '../../components/ui/Card';
 import { Input } from '../../components/ui/Input';
 import { Spinner } from '../../components/ui/Spinner';
-import { StartupSectionTabs } from '../startup/StartupSectionTabs';
-import { StudentWorkspaceTabs } from './StudentWorkspaceTabs';
 
 const tabs: Array<{
   id: MarketplaceRole;
@@ -44,15 +46,15 @@ const tabs: Array<{
   {
     id: 'mentor',
     label: 'Mentors',
-    eyebrow: 'Guidance',
+    eyebrow: 'Mentors',
     description: 'Find operators and advisors who can unblock decisions on product, execution, and launch.',
     accent: 'from-cyan-400/20 via-cyan-400/5 to-transparent',
     icon: Compass,
   },
   {
     id: 'investor',
-    label: 'Investors',
-    eyebrow: 'Capital',
+    label: 'Investor',
+    eyebrow: 'Investor',
     description: 'Review investors by sector fit, public proof, and startup readiness signals before outreach.',
     accent: 'from-emerald-400/20 via-emerald-400/5 to-transparent',
     icon: Building2,
@@ -60,7 +62,7 @@ const tabs: Array<{
   {
     id: 'recruiter',
     label: 'Recruiters',
-    eyebrow: 'Hiring',
+    eyebrow: 'Recruiters',
     description: 'Browse recruiters with live opportunities and move into applications or direct messages quickly.',
     accent: 'from-amber-400/20 via-amber-400/5 to-transparent',
     icon: BriefcaseBusiness,
@@ -71,6 +73,17 @@ const roleCopy: Record<MarketplaceRole, string> = {
   mentor: 'Discover mentors with real public context across skills, experience highlights, and project work.',
   investor: 'Review investors with clearer sector fit, public links, and richer readiness signals before you connect.',
   recruiter: 'Browse recruiters with live jobs, fuller public profiles, and one-click applications from the same workspace.',
+};
+
+type RecruiterBrowseMode = 'jobs' | 'recruiters';
+type JobPostedWindow = 'any' | '7d' | '30d';
+type JobSortBy = 'recommended' | 'recent' | 'score' | 'applicants';
+
+type MarketplaceRecruiterJob = RecruiterJobView & {
+  recruiterName: string;
+  recruiterAvatar?: string;
+  recruiterHeadline?: string;
+  recruiterLocation?: string;
 };
 
 const formatCompactNumber = (value: number) =>
@@ -127,6 +140,62 @@ const getMarketplaceSearchText = (profile: MarketplaceProfile) =>
     .join(' ')
     .toLowerCase();
 
+const getRecruiterJobSearchText = (job: MarketplaceRecruiterJob) =>
+  [
+    job.title,
+    job.company,
+    job.domain,
+    job.location,
+    job.type,
+    job.description,
+    job.recruiterName,
+    job.recruiterHeadline,
+    `innovation score ${job.minimumInnovationScore}`,
+  ]
+    .filter(Boolean)
+    .join(' ')
+    .toLowerCase();
+
+const formatRelativeDate = (value?: string) => {
+  if (!value) {
+    return null;
+  }
+
+  const date = new Date(value);
+
+  if (Number.isNaN(date.getTime())) {
+    return null;
+  }
+
+  const diff = Date.now() - date.getTime();
+  const day = 1000 * 60 * 60 * 24;
+
+  if (diff < day) {
+    return 'Posted today';
+  }
+
+  const days = Math.floor(diff / day);
+
+  if (days < 7) {
+    return `Posted ${days} day${days === 1 ? '' : 's'} ago`;
+  }
+
+  const weeks = Math.floor(days / 7);
+
+  if (weeks < 5) {
+    return `Posted ${weeks} week${weeks === 1 ? '' : 's'} ago`;
+  }
+
+  return `Posted ${date.toLocaleDateString('en-IN', { day: 'numeric', month: 'short' })}`;
+};
+
+const getJobDescriptionHighlights = (description: string) =>
+  description
+    .split(/[\n.]/)
+    .map((part) => part.trim())
+    .filter(Boolean)
+    .slice(0, 3);
+
 const getInsightCounts = (profile: MarketplaceProfile) => ({
   skills: profile.insightCounts?.skills ?? profile.skills?.length ?? 0,
   experience: profile.insightCounts?.experience ?? profile.experienceHighlights?.length ?? 0,
@@ -140,12 +209,14 @@ function ProfileAvatar({
   size = 'large',
 }: {
   profile: MarketplaceProfile;
-  size?: 'small' | 'large';
+  size?: 'compact' | 'small' | 'large';
 }) {
   const containerClassName =
-    size === 'small'
-      ? 'h-14 w-14 rounded-2xl text-lg'
-      : 'h-16 w-16 rounded-3xl text-xl';
+    size === 'compact'
+      ? 'h-12 w-12 rounded-xl text-base'
+      : size === 'small'
+        ? 'h-14 w-14 rounded-2xl text-lg'
+        : 'h-16 w-16 rounded-3xl text-xl';
 
   return (
     <div
@@ -184,7 +255,13 @@ function ProfileSection({
   );
 }
 
-function ProfileLinkChips({ profile }: { profile: MarketplaceProfile }) {
+function ProfileLinkChips({
+  profile,
+  tone = 'dark',
+}: {
+  profile: MarketplaceProfile;
+  tone?: 'dark' | 'light';
+}) {
   const linkItems = [
     profile.links?.websiteUrl
       ? { href: profile.links.websiteUrl, label: 'Website', icon: <Globe className="h-4 w-4" /> }
@@ -209,7 +286,11 @@ function ProfileLinkChips({ profile }: { profile: MarketplaceProfile }) {
           href={link.href}
           target="_blank"
           rel="noreferrer"
-          className="inline-flex items-center gap-2 rounded-full border border-slate-700 bg-slate-900/70 px-3 py-2 text-xs font-medium text-slate-200 transition hover:border-cyan-500/40 hover:text-white"
+          className={`inline-flex items-center gap-2 rounded-full px-3 py-2 text-xs font-medium transition ${
+            tone === 'light'
+              ? 'border border-slate-200 bg-slate-50 text-slate-700 hover:border-slate-300 hover:text-slate-950'
+              : 'border border-slate-700 bg-slate-900/70 text-slate-200 hover:border-cyan-500/40 hover:text-white'
+          }`}
         >
           {link.icon}
           <span>{link.label}</span>
@@ -580,7 +661,7 @@ function RecruiterJobCard({
   }
 
   return (
-    <div className="mt-4 space-y-3 border-t border-slate-800 pt-4">
+    <div className="mt-6 space-y-3 border-t border-slate-800/80 pt-4">
       <div className="text-xs uppercase tracking-[0.25em] text-cyan-300">Open Job Posts</div>
       {(jobsQuery.data ?? []).length > 0 ? (
         (jobsQuery.data ?? []).map((job) => {
@@ -588,27 +669,31 @@ function RecruiterJobCard({
           const isPending = pendingJobIds.includes(job._id);
 
           return (
-            <Card key={job._id} className="p-4">
+            <div key={job._id} className="border-b border-slate-800/80 py-4 last:border-b-0">
               <div className="flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
-                <div>
+                <div className="min-w-0">
                   <div className="font-semibold text-white">{job.title}</div>
                   <div className="mt-1 text-sm text-slate-400">
                     {job.company} - {job.location} - {job.type}
                   </div>
-                  <p className="mt-2 text-sm text-slate-300">{job.description}</p>
+                  <p className="mt-2 max-w-3xl text-sm leading-6 text-slate-300">{job.description}</p>
                 </div>
                 <div className="flex flex-wrap gap-2">
                   <Button
                     variant="secondary"
                     onClick={() => applyToJob(job._id)}
                     disabled={hasApplied || isPending}
-                    className={hasApplied ? 'border-emerald-500/40 bg-emerald-500/10 text-emerald-200 hover:border-emerald-500/40 hover:text-emerald-200' : ''}
+                    className={
+                      hasApplied
+                        ? 'border-emerald-500/40 bg-emerald-500/10 text-emerald-200 hover:border-emerald-500/40 hover:text-emerald-200'
+                        : 'border-slate-700 bg-transparent text-slate-200 hover:border-slate-500 hover:bg-slate-900/40'
+                    }
                   >
                     {isPending ? 'Applying...' : hasApplied ? 'Applied' : 'Apply'}
                   </Button>
                 </div>
               </div>
-            </Card>
+            </div>
           );
         })
       ) : (
@@ -618,31 +703,426 @@ function RecruiterJobCard({
   );
 }
 
+function MarketplaceRecruiterJobCard({
+  job,
+  recruiterProfileId,
+  onOpenRecruiter,
+  onOpenDetails,
+  onMessageRecruiter,
+  onApplyFeedback,
+}: {
+  job: MarketplaceRecruiterJob;
+  recruiterProfileId: string;
+  onOpenRecruiter: (profileId: string) => void;
+  onOpenDetails: (jobId: string) => void;
+  onMessageRecruiter: (profileId: string) => void;
+  onApplyFeedback: (tone: 'success' | 'error', message: string) => void;
+}) {
+  const [hasApplied, setHasApplied] = useState(Boolean(job.hasApplied));
+  const [isPending, setIsPending] = useState(false);
+  const postedLabel = formatRelativeDate(job.createdAt);
+  const expiresLabel = formatMonthYear(job.expiresAt);
+  const descriptionHighlights = getJobDescriptionHighlights(job.description);
+
+  const handleApply = async () => {
+    if (hasApplied || isPending) {
+      return;
+    }
+
+    setIsPending(true);
+
+    try {
+      await recruiterApi.applyToJob(job._id);
+      setHasApplied(true);
+      onApplyFeedback('success', 'Applied! The recruiter can now contact you.');
+    } catch {
+      onApplyFeedback('error', 'Unable to apply to this job right now.');
+    } finally {
+      setIsPending(false);
+    }
+  };
+
+  return (
+    <article className="border-b border-slate-800/80 py-6 last:border-b-0">
+      <div className="flex flex-col gap-5">
+        <div className="flex flex-col gap-4 xl:flex-row xl:items-start xl:justify-between">
+          <div className="min-w-0 xl:flex-1">
+            <div className="flex flex-wrap items-center gap-2 text-xs uppercase tracking-[0.24em] text-cyan-300">
+              <span>{job.type}</span>
+              <span className="text-slate-600">|</span>
+              <span>{job.domain}</span>
+              {postedLabel ? (
+                <>
+                  <span className="text-slate-600">|</span>
+                  <span>{postedLabel}</span>
+                </>
+              ) : null}
+            </div>
+
+            <button
+              type="button"
+              onClick={() => onOpenDetails(job._id)}
+              className="mt-3 text-left text-2xl font-semibold tracking-tight text-white transition hover:text-cyan-200"
+            >
+              {job.title}
+            </button>
+
+            <div className="mt-2 flex flex-wrap items-center gap-x-2 gap-y-1.5 text-sm text-slate-400">
+              <span className="font-medium text-slate-200">{job.company}</span>
+              <span className="text-slate-600">|</span>
+              <span>{job.recruiterName}</span>
+              <span className="text-slate-600">|</span>
+              <span className="inline-flex items-center gap-1.5">
+                <MapPin className="h-4 w-4 text-cyan-300" />
+                {job.location}
+              </span>
+            </div>
+
+            <div className="mt-4 grid gap-3 text-sm text-slate-300 md:grid-cols-2 xl:grid-cols-4">
+              <div className="border-l border-slate-700 pl-3">
+                <div className="text-[11px] uppercase tracking-[0.24em] text-slate-500">Min Score</div>
+                <div className="mt-1 inline-flex items-center gap-1.5 text-white">
+                  <Sparkles className="h-4 w-4 text-cyan-300" />
+                  {job.minimumInnovationScore}
+                </div>
+              </div>
+              <div className="border-l border-slate-700 pl-3">
+                <div className="text-[11px] uppercase tracking-[0.24em] text-slate-500">Applicants</div>
+                <div className="mt-1 inline-flex items-center gap-1.5 text-white">
+                  <Users className="h-4 w-4 text-cyan-300" />
+                  {job.applicantCount}
+                </div>
+              </div>
+              <div className="border-l border-slate-700 pl-3">
+                <div className="text-[11px] uppercase tracking-[0.24em] text-slate-500">Shortlisted</div>
+                <div className="mt-1 text-white">{job.shortlistedCount}</div>
+              </div>
+              <div className="border-l border-slate-700 pl-3">
+                <div className="text-[11px] uppercase tracking-[0.24em] text-slate-500">Status</div>
+                <div className={`mt-1 ${job.isActive ? 'text-emerald-300' : 'text-slate-400'}`}>
+                  {job.isActive ? 'Actively hiring' : 'Closed'}
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <div className="flex items-start gap-3 xl:ml-8">
+            <ProfileAvatar
+              profile={{
+                _id: recruiterProfileId,
+                displayName: job.recruiterName,
+                avatar: job.recruiterAvatar,
+                role: UserRole.RECRUITER,
+                headline: job.recruiterHeadline,
+                location: job.recruiterLocation,
+                insightCounts: { skills: 0, experience: 0, education: 0, portfolioProjects: 0 },
+              }}
+              size="compact"
+            />
+            <div className="text-[11px] uppercase tracking-[0.28em] text-slate-500">JD View</div>
+          </div>
+        </div>
+
+        {descriptionHighlights.length > 0 ? (
+          <div className="space-y-2 text-sm leading-6 text-slate-300">
+            {descriptionHighlights.map((line) => (
+              <div key={line} className="flex gap-3">
+                <span className="mt-2 h-1.5 w-1.5 rounded-full bg-cyan-300" />
+                <span>{line}</span>
+              </div>
+            ))}
+          </div>
+        ) : (
+          <p className="text-sm leading-6 text-slate-300">{job.description || 'Job description will appear here.'}</p>
+        )}
+
+        <div className="flex flex-col gap-3 xl:flex-row xl:items-center xl:justify-between">
+          <div className="flex flex-wrap gap-2 text-xs text-slate-400">
+            <span className="rounded-full border border-slate-700 px-3 py-1.5">{job.domain}</span>
+            <span className="rounded-full border border-slate-700 px-3 py-1.5">{job.type}</span>
+            <span className="rounded-full border border-slate-700 px-3 py-1.5">{job.location}</span>
+            {expiresLabel ? <span className="rounded-full border border-slate-700 px-3 py-1.5">Expires {expiresLabel}</span> : null}
+          </div>
+
+          <div className="flex flex-wrap gap-2 xl:justify-end">
+            <Button
+              className="h-10 rounded-full bg-gradient-to-r from-indigo-600 to-fuchsia-600 px-4 py-0 text-sm text-white hover:from-indigo-500 hover:to-fuchsia-500"
+              disabled={hasApplied || isPending || !job.isActive}
+              onClick={handleApply}
+            >
+              {isPending ? 'Applying...' : hasApplied ? 'Applied' : 'Apply now'}
+            </Button>
+            <Button
+              variant="secondary"
+              className="h-10 rounded-full border-slate-700 bg-transparent px-4 py-0 text-sm text-slate-200 hover:border-slate-500 hover:bg-slate-900/40"
+              onClick={() => onOpenDetails(job._id)}
+            >
+              View details
+            </Button>
+            <Button
+              variant="secondary"
+              className="h-10 rounded-full border-slate-700 bg-transparent px-4 py-0 text-sm text-slate-200 hover:border-slate-500 hover:bg-slate-900/40"
+              onClick={() => onOpenRecruiter(recruiterProfileId)}
+            >
+              <Eye className="mr-2 h-4 w-4" />
+              Recruiter
+            </Button>
+            <Button
+              variant="secondary"
+              className="h-10 rounded-full border-slate-700 bg-transparent px-4 py-0 text-sm text-slate-200 hover:border-slate-500 hover:bg-slate-900/40"
+              onClick={() => onMessageRecruiter(recruiterProfileId)}
+            >
+              <MessageCircle className="mr-2 h-4 w-4" />
+              Message
+            </Button>
+          </div>
+        </div>
+      </div>
+    </article>
+  );
+}
+
 export function Marketplace() {
   const navigate = useNavigate();
   const [role, setRole] = useState<MarketplaceRole>('recruiter');
+  const [recruiterBrowseMode, setRecruiterBrowseMode] = useState<RecruiterBrowseMode>('jobs');
   const [search, setSearch] = useState('');
+  const [selectedDomains, setSelectedDomains] = useState<string[]>([]);
+  const [selectedLocations, setSelectedLocations] = useState<string[]>([]);
+  const [selectedExperienceBand, setSelectedExperienceBand] = useState<'all' | '0-1' | '2-4' | '5+'>('all');
+  const [selectedDepthFilters, setSelectedDepthFilters] = useState<Array<'skills' | 'experience' | 'projects'>>([]);
+  const [selectedJobTypes, setSelectedJobTypes] = useState<RecruiterJobView['type'][]>([]);
+  const [selectedJobPostedWindow, setSelectedJobPostedWindow] = useState<JobPostedWindow>('any');
+  const [sortBy, setSortBy] = useState<'recommended' | 'name' | 'experience' | 'projects'>('recommended');
+  const [jobSortBy, setJobSortBy] = useState<JobSortBy>('recommended');
   const [expandedRecruiterId, setExpandedRecruiterId] = useState<string | null>(null);
   const [selectedProfileId, setSelectedProfileId] = useState<string | null>(null);
   const [banner, setBanner] = useState<{ tone: 'success' | 'error'; message: string } | null>(null);
   const deferredSearch = useDeferredValue(search.trim().toLowerCase());
   const activeTab = tabs.find((tab) => tab.id === role) ?? tabs[0];
-  const ActiveRoleIcon = activeTab.icon;
 
   const profilesQuery = useQuery({
     queryKey: ['marketplace', role],
     queryFn: () => marketplaceApi.list(role),
   });
 
-  const profileList = useMemo(() => {
-    const source = profilesQuery.data ?? [];
+  const recruiterJobsQuery = useQuery({
+    queryKey: ['marketplace', 'recruiter-jobs', (profilesQuery.data ?? []).map((profile) => profile._id).join(',')],
+    enabled: role === 'recruiter' && Boolean(profilesQuery.data?.length),
+    queryFn: async () => {
+      const recruiters = profilesQuery.data ?? [];
+      const jobGroups = await Promise.all(
+        recruiters.map(async (profile) => {
+          const jobs = await recruiterApi.getPublicJobs(profile._id);
 
-    if (!deferredSearch) {
-      return source;
+          return jobs.map((job) => ({
+            ...job,
+            recruiterName: profile.displayName,
+            recruiterAvatar: profile.avatar,
+            recruiterHeadline: profile.headline ?? profile.role,
+            recruiterLocation: profile.location,
+          }));
+        }),
+      );
+
+      return jobGroups.flat();
+    },
+  });
+
+  const filterOptions = useMemo(() => {
+    const profiles = profilesQuery.data ?? [];
+    const domainCounts = new Map<string, number>();
+    const locationCounts = new Map<string, number>();
+    const experienceCounts = {
+      '0-1': 0,
+      '2-4': 0,
+      '5+': 0,
+    };
+    const depthCounts = {
+      skills: 0,
+      experience: 0,
+      projects: 0,
+    };
+
+    for (const profile of profiles) {
+      const counts = getInsightCounts(profile);
+
+      if (profile.domain) {
+        domainCounts.set(profile.domain, (domainCounts.get(profile.domain) ?? 0) + 1);
+      }
+
+      if (profile.location) {
+        locationCounts.set(profile.location, (locationCounts.get(profile.location) ?? 0) + 1);
+      }
+
+      if (counts.experience <= 1) {
+        experienceCounts['0-1'] += 1;
+      } else if (counts.experience <= 4) {
+        experienceCounts['2-4'] += 1;
+      } else {
+        experienceCounts['5+'] += 1;
+      }
+
+      if (counts.skills > 0) {
+        depthCounts.skills += 1;
+      }
+
+      if (counts.experience > 0) {
+        depthCounts.experience += 1;
+      }
+
+      if (counts.portfolioProjects > 0) {
+        depthCounts.projects += 1;
+      }
     }
 
-    return source.filter((profile) => getMarketplaceSearchText(profile).includes(deferredSearch));
-  }, [deferredSearch, profilesQuery.data]);
+    return {
+      domains: [...domainCounts.entries()].sort((left, right) => right[1] - left[1] || left[0].localeCompare(right[0])),
+      locations: [...locationCounts.entries()].sort((left, right) => right[1] - left[1] || left[0].localeCompare(right[0])),
+      experienceCounts,
+      depthCounts,
+    };
+  }, [profilesQuery.data]);
+
+  const jobFilterOptions = useMemo(() => {
+    const jobs = recruiterJobsQuery.data ?? [];
+    const domainCounts = new Map<string, number>();
+    const locationCounts = new Map<string, number>();
+    const typeCounts = new Map<RecruiterJobView['type'], number>();
+
+    for (const job of jobs) {
+      domainCounts.set(job.domain, (domainCounts.get(job.domain) ?? 0) + 1);
+      locationCounts.set(job.location, (locationCounts.get(job.location) ?? 0) + 1);
+      typeCounts.set(job.type, (typeCounts.get(job.type) ?? 0) + 1);
+    }
+
+    return {
+      domains: [...domainCounts.entries()].sort((left, right) => right[1] - left[1] || left[0].localeCompare(right[0])),
+      locations: [...locationCounts.entries()].sort((left, right) => right[1] - left[1] || left[0].localeCompare(right[0])),
+      jobTypes: [...typeCounts.entries()].sort((left, right) => right[1] - left[1] || left[0].localeCompare(right[0])),
+    };
+  }, [recruiterJobsQuery.data]);
+
+  const profileList = useMemo(() => {
+    const source = profilesQuery.data ?? [];
+    let filtered = source;
+
+    if (deferredSearch) {
+      filtered = filtered.filter((profile) => getMarketplaceSearchText(profile).includes(deferredSearch));
+    }
+
+    if (selectedDomains.length > 0) {
+      filtered = filtered.filter((profile) => Boolean(profile.domain) && selectedDomains.includes(profile.domain!));
+    }
+
+    if (selectedLocations.length > 0) {
+      filtered = filtered.filter((profile) => Boolean(profile.location) && selectedLocations.includes(profile.location!));
+    }
+
+    if (selectedExperienceBand !== 'all') {
+      filtered = filtered.filter((profile) => {
+        const experienceCount = getInsightCounts(profile).experience;
+
+        if (selectedExperienceBand === '0-1') {
+          return experienceCount <= 1;
+        }
+
+        if (selectedExperienceBand === '2-4') {
+          return experienceCount >= 2 && experienceCount <= 4;
+        }
+
+        return experienceCount >= 5;
+      });
+    }
+
+    if (selectedDepthFilters.length > 0) {
+      filtered = filtered.filter((profile) => {
+        const counts = getInsightCounts(profile);
+
+        return selectedDepthFilters.every((filter) => {
+          if (filter === 'skills') {
+            return counts.skills > 0;
+          }
+
+          if (filter === 'experience') {
+            return counts.experience > 0;
+          }
+
+          return counts.portfolioProjects > 0;
+        });
+      });
+    }
+
+    const sortable = [...filtered];
+
+    if (sortBy === 'name') {
+      sortable.sort((left, right) => left.displayName.localeCompare(right.displayName));
+    }
+
+    if (sortBy === 'experience') {
+      sortable.sort((left, right) => getInsightCounts(right).experience - getInsightCounts(left).experience);
+    }
+
+    if (sortBy === 'projects') {
+      sortable.sort((left, right) => getInsightCounts(right).portfolioProjects - getInsightCounts(left).portfolioProjects);
+    }
+
+    return sortable;
+  }, [deferredSearch, profilesQuery.data, selectedDepthFilters, selectedDomains, selectedExperienceBand, selectedLocations, sortBy]);
+
+  const recruiterJobList = useMemo(() => {
+    const source = recruiterJobsQuery.data ?? [];
+    let filtered = source;
+
+    if (deferredSearch) {
+      filtered = filtered.filter((job) => getRecruiterJobSearchText(job).includes(deferredSearch));
+    }
+
+    if (selectedDomains.length > 0) {
+      filtered = filtered.filter((job) => selectedDomains.includes(job.domain));
+    }
+
+    if (selectedLocations.length > 0) {
+      filtered = filtered.filter((job) => selectedLocations.includes(job.location));
+    }
+
+    if (selectedJobTypes.length > 0) {
+      filtered = filtered.filter((job) => selectedJobTypes.includes(job.type));
+    }
+
+    if (selectedJobPostedWindow !== 'any') {
+      const cutoffDays = selectedJobPostedWindow === '7d' ? 7 : 30;
+      const cutoff = Date.now() - cutoffDays * 24 * 60 * 60 * 1000;
+      filtered = filtered.filter((job) => {
+        const createdAt = new Date(job.createdAt).getTime();
+        return !Number.isNaN(createdAt) && createdAt >= cutoff;
+      });
+    }
+
+    const sortable = [...filtered];
+
+    if (jobSortBy === 'recent' || jobSortBy === 'recommended') {
+      sortable.sort((left, right) => new Date(right.createdAt).getTime() - new Date(left.createdAt).getTime());
+    }
+
+    if (jobSortBy === 'score') {
+      sortable.sort((left, right) => left.minimumInnovationScore - right.minimumInnovationScore);
+    }
+
+    if (jobSortBy === 'applicants') {
+      sortable.sort((left, right) => right.applicantCount - left.applicantCount);
+    }
+
+    return sortable;
+  }, [
+    deferredSearch,
+    jobSortBy,
+    recruiterJobsQuery.data,
+    selectedDomains,
+    selectedJobPostedWindow,
+    selectedJobTypes,
+    selectedLocations,
+  ]);
 
   const marketplaceSummary = useMemo(() => {
     const profiles = profilesQuery.data ?? [];
@@ -671,352 +1151,633 @@ export function Marketplace() {
     };
   }, [profilesQuery.data]);
 
-  const spotlightProfile = profileList[0] ?? null;
+  const recruiterJobsSummary = useMemo(() => {
+    const jobs = recruiterJobsQuery.data ?? [];
+    const domains = new Set<string>();
+    const locations = new Set<string>();
+
+    for (const job of jobs) {
+      domains.add(job.domain);
+      locations.add(job.location);
+    }
+
+    return {
+      liveResults: jobs.length,
+      representedDomains: domains.size,
+      representedLocations: locations.size,
+    };
+  }, [recruiterJobsQuery.data]);
 
   const showBanner = (tone: 'success' | 'error', message: string) => {
     setBanner({ tone, message });
     window.setTimeout(() => setBanner(null), 3000);
   };
 
+  const hasActiveFilters = Boolean(
+    search.trim() ||
+      selectedDomains.length > 0 ||
+      selectedLocations.length > 0 ||
+      (role === 'recruiter' && recruiterBrowseMode === 'jobs'
+        ? selectedJobTypes.length > 0 || selectedJobPostedWindow !== 'any'
+        : selectedExperienceBand !== 'all' || selectedDepthFilters.length > 0),
+  );
+
+  const toggleArrayFilter = <T extends string>(
+    value: T,
+    current: T[],
+    setter: (value: T[]) => void,
+  ) => {
+    setter(current.includes(value) ? current.filter((item) => item !== value) : [...current, value]);
+  };
+
   return (
     <DashboardLayout role="student">
-      <div className="mx-auto max-w-7xl space-y-8 text-white">
-        <section className="space-y-3">
-          <div className="text-[11px] uppercase tracking-[0.34em] text-slate-500">Student Workspace</div>
-          <StudentWorkspaceTabs />
-        </section>
+      <div className="flex h-full min-h-0 w-full flex-col gap-4 overflow-hidden text-white">
+        <section className="flex-none overflow-x-auto">
+          <div className="flex min-w-max items-center gap-10 border-b border-slate-800/90">
+            {tabs.map((tab) => {
+              const isActive = tab.id === role;
 
-        <section className="space-y-3">
-          <div className="text-[11px] uppercase tracking-[0.34em] text-slate-500">Startup Workspace</div>
-          <StartupSectionTabs />
-        </section>
-
-        <section className="relative overflow-hidden rounded-[32px] border border-white/10 bg-[#070816] px-6 py-7 shadow-[0_30px_120px_rgba(15,23,42,0.45)] sm:px-8">
-          <div className={`pointer-events-none absolute inset-0 bg-gradient-to-br ${activeTab.accent}`} />
-          <div className="pointer-events-none absolute -right-12 top-0 h-48 w-48 rounded-full bg-white/10 blur-3xl" />
-          <div className="pointer-events-none absolute bottom-0 left-0 h-40 w-40 rounded-full bg-cyan-400/10 blur-3xl" />
-
-          <div className="relative grid gap-6 xl:grid-cols-[minmax(0,1.1fr),380px] xl:items-end">
-            <div className="space-y-5">
-              <div className="inline-flex items-center gap-2 rounded-full border border-cyan-400/20 bg-cyan-400/10 px-3 py-1 text-xs font-semibold uppercase tracking-[0.28em] text-cyan-100">
-                <Sparkles className="h-4 w-4" />
-                Student Marketplace
-              </div>
-
-              <div className="space-y-3">
-                <div className="flex items-center gap-3 text-sm uppercase tracking-[0.3em] text-slate-400">
-                  <ActiveRoleIcon className="h-4 w-4" />
-                  <span>{activeTab.eyebrow}</span>
-                </div>
-                <h1 className="max-w-4xl text-3xl font-semibold tracking-tight text-white sm:text-5xl">
-                  Find the right {activeTab.label.toLowerCase()} without leaving your startup workspace
-                </h1>
-                <p className="max-w-3xl text-base leading-7 text-slate-300">
-                  {roleCopy[role]} Search scans public bios, skills, experience, education, and project work so discovery
-                  stays fast while the startup navigation above stays unchanged.
-                </p>
-              </div>
-
-              <div className="flex flex-wrap gap-3 text-sm text-slate-300">
-                <div className="rounded-full border border-white/10 bg-white/5 px-4 py-2">
-                  <span className="text-white">{formatCompactNumber(marketplaceSummary.liveResults)}</span> live profiles
-                </div>
-                <div className="rounded-full border border-white/10 bg-white/5 px-4 py-2">
-                  <span className="text-white">{formatCompactNumber(marketplaceSummary.representedDomains)}</span> domains
-                </div>
-                <div className="rounded-full border border-white/10 bg-white/5 px-4 py-2">
-                  <span className="text-white">{formatCompactNumber(marketplaceSummary.portfolioProjects)}</span> portfolio
-                  projects
-                </div>
-                <div className="rounded-full border border-white/10 bg-white/5 px-4 py-2">
-                  <span className="text-white">{formatCompactNumber(marketplaceSummary.experienceSignals)}</span> experience
-                  signals
-                </div>
-              </div>
-            </div>
-
-            <div className="rounded-[28px] border border-white/10 bg-black/20 p-4 backdrop-blur">
-              <div className="mb-3 text-sm font-medium text-slate-300">Search the current lane</div>
-              <label className="relative block">
-                <Search className="pointer-events-none absolute left-4 top-1/2 h-5 w-5 -translate-y-1/2 text-slate-500" />
-                <Input
-                  value={search}
-                  onChange={(event) => {
-                    const { value } = event.target;
-                    startTransition(() => setSearch(value));
-                  }}
-                  placeholder="Search people, companies, skills, or domains"
-                  className="rounded-2xl border-white/10 bg-slate-950/80 py-3 pl-12 pr-4 focus:border-cyan-400/50"
-                />
-              </label>
-              <p className="mt-3 text-sm leading-6 text-slate-400">
-                Current lane: <span className="text-slate-200">{activeTab.label}</span>. Search remains local to this lane
-                so switching between mentors, investors, and recruiters stays predictable.
-              </p>
-            </div>
+              return (
+                <button
+                  key={tab.id}
+                  type="button"
+                  onClick={() =>
+                    startTransition(() => {
+                      setRole(tab.id);
+                      setSearch('');
+                      setSelectedDomains([]);
+                      setSelectedLocations([]);
+                      setSelectedExperienceBand('all');
+                      setSelectedDepthFilters([]);
+                      setSelectedJobTypes([]);
+                      setSelectedJobPostedWindow('any');
+                      setSortBy('recommended');
+                      setJobSortBy('recommended');
+                      setRecruiterBrowseMode(tab.id === 'recruiter' ? 'jobs' : 'recruiters');
+                      setExpandedRecruiterId(null);
+                    })
+                  }
+                  className={`inline-flex min-h-[3rem] items-center border-b-2 px-1 py-3 text-sm font-medium whitespace-nowrap transition-colors ${
+                    isActive
+                      ? 'border-cyan-400 text-cyan-300'
+                      : 'border-transparent text-slate-400 hover:border-slate-700 hover:text-slate-100'
+                  }`}
+                >
+                  {tab.label}
+                </button>
+              );
+            })}
           </div>
         </section>
 
-        <section className="grid gap-6 xl:grid-cols-[280px,minmax(0,1fr)]">
-          <aside className="overflow-hidden rounded-[28px] border border-white/10 bg-[#0a0d1d]">
-            <div className="border-b border-white/10 px-5 py-5">
-              <div className="text-xs uppercase tracking-[0.28em] text-slate-500">Browse By Type</div>
-              <div className="mt-2 text-lg font-semibold text-white">Marketplace lanes</div>
-            </div>
-
-            <div className="p-3">
-              <div className="space-y-2">
-                {tabs.map((tab) => {
-                  const Icon = tab.icon;
-                  const isActive = tab.id === role;
-
-                  return (
-                    <button
-                      key={tab.id}
-                      type="button"
-                      onClick={() =>
-                        startTransition(() => {
-                          setRole(tab.id);
-                          setExpandedRecruiterId(null);
-                        })
-                      }
-                      className={`w-full rounded-[22px] border px-4 py-4 text-left transition ${
-                        isActive
-                          ? 'border-cyan-400/30 bg-cyan-400/10 text-white'
-                          : 'border-transparent bg-transparent text-slate-400 hover:border-white/10 hover:bg-white/5 hover:text-white'
-                      }`}
-                    >
-                      <div className="flex items-start gap-3">
-                        <span
-                          className={`mt-0.5 inline-flex h-10 w-10 items-center justify-center rounded-2xl ${
-                            isActive ? 'bg-white/10 text-cyan-200' : 'bg-white/5 text-slate-300'
-                          }`}
-                        >
-                          <Icon className="h-5 w-5" />
-                        </span>
-                        <span className="space-y-1">
-                          <span className="block text-sm font-semibold">{tab.label}</span>
-                          <span className="block text-xs uppercase tracking-[0.22em] text-slate-500">{tab.eyebrow}</span>
-                          <span className="block text-xs leading-5 text-slate-400">{tab.description}</span>
-                        </span>
-                      </div>
-                    </button>
-                  );
-                })}
+        <section className="flex min-h-0 flex-1 overflow-hidden border-y border-slate-800/80 bg-[linear-gradient(180deg,#101624_0%,#0c1220_100%)] text-slate-100">
+          <div className="grid min-h-0 w-full gap-0 xl:grid-cols-[300px,minmax(0,1fr)] xl:divide-x xl:divide-slate-800/80">
+            <aside className="flex min-h-0 flex-col px-5 py-4">
+              <div className="flex items-center justify-between gap-3">
+                <div>
+                  <div className="text-xs uppercase tracking-[0.22em] text-slate-500">Filters</div>
+                  <h2 className="mt-2 text-2xl font-semibold text-white">All Filters</h2>
+                </div>
+                {hasActiveFilters ? (
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setSearch('');
+                      setSelectedDomains([]);
+                      setSelectedLocations([]);
+                      setSelectedExperienceBand('all');
+                      setSelectedDepthFilters([]);
+                      setSelectedJobTypes([]);
+                      setSelectedJobPostedWindow('any');
+                    }}
+                    className="text-sm font-medium text-cyan-300 transition hover:text-cyan-200"
+                  >
+                    Clear
+                  </button>
+                ) : null}
               </div>
 
-              <div className="mt-6 rounded-[22px] border border-white/10 bg-white/5 p-4">
-                <div className="text-xs uppercase tracking-[0.28em] text-slate-500">Current lens</div>
-                {spotlightProfile ? (
-                  <div className="mt-3 space-y-3">
-                    <div>
-                      <div className="text-sm font-semibold text-white">{spotlightProfile.displayName}</div>
-                      <div className="mt-1 text-xs uppercase tracking-[0.22em] text-cyan-300">{spotlightProfile.role}</div>
+              <div className="mt-6 min-h-0 flex-1 space-y-6 overflow-y-auto pr-1">
+                <div className="border-t border-slate-800/80 pt-5">
+                  <div className="mb-3 text-lg font-semibold text-white">Search</div>
+                  <label className="relative block">
+                    <Search className="pointer-events-none absolute left-4 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-500" />
+                    <Input
+                      value={search}
+                      onChange={(event) => {
+                        const { value } = event.target;
+                        startTransition(() => setSearch(value));
+                      }}
+                      placeholder={
+                        role === 'recruiter' && recruiterBrowseMode === 'jobs'
+                          ? 'Search job title, company or recruiter'
+                          : `Search ${activeTab.label.toLowerCase()}, company or skill`
+                      }
+                      className="h-12 rounded-none border-0 border-b border-slate-700 bg-transparent pl-10 text-slate-100 focus:border-cyan-400 focus-visible:ring-0"
+                    />
+                  </label>
+                </div>
+
+                <div className="border-t border-slate-800/80 pt-5">
+                  <div className="mb-3 text-lg font-semibold text-white">Domain</div>
+                  <div className="space-y-3">
+                    {(role === 'recruiter' && recruiterBrowseMode === 'jobs'
+                      ? jobFilterOptions.domains
+                      : filterOptions.domains
+                    )
+                      .slice(0, 5)
+                      .map(([domain, count]) => (
+                      <label key={domain} className="flex cursor-pointer items-center justify-between gap-3 text-sm text-slate-300">
+                        <span className="flex items-center gap-3">
+                          <input
+                            type="checkbox"
+                            checked={selectedDomains.includes(domain)}
+                            onChange={() => toggleArrayFilter(domain, selectedDomains, setSelectedDomains)}
+                            className="h-4 w-4 rounded border-slate-600 bg-transparent text-cyan-400 focus:ring-cyan-500"
+                          />
+                          <span>{domain}</span>
+                        </span>
+                        <span className="text-slate-500">({count})</span>
+                      </label>
+                    ))}
+                  </div>
+                </div>
+
+                <div className="border-t border-slate-800/80 pt-5">
+                  <div className="mb-3 text-lg font-semibold text-white">
+                    {role === 'recruiter' && recruiterBrowseMode === 'jobs' ? 'Job type' : 'Experience'}
+                  </div>
+                  <div className="space-y-3">
+                    {role === 'recruiter' && recruiterBrowseMode === 'jobs' ? (
+                      <>
+                        {jobFilterOptions.jobTypes.map(([jobType, count]) => (
+                          <label key={jobType} className="flex cursor-pointer items-center justify-between gap-3 text-sm text-slate-300">
+                            <span className="flex items-center gap-3">
+                              <input
+                                type="checkbox"
+                                checked={selectedJobTypes.includes(jobType)}
+                                onChange={() => toggleArrayFilter(jobType, selectedJobTypes, setSelectedJobTypes)}
+                                className="h-4 w-4 rounded border-slate-600 bg-transparent text-cyan-400 focus:ring-cyan-500"
+                              />
+                              <span>{jobType}</span>
+                            </span>
+                            <span className="text-slate-500">({count})</span>
+                          </label>
+                        ))}
+                      </>
+                    ) : (
+                      <>
+                        {[
+                          { label: '0-1 signals', value: '0-1' as const, count: filterOptions.experienceCounts['0-1'] },
+                          { label: '2-4 signals', value: '2-4' as const, count: filterOptions.experienceCounts['2-4'] },
+                          { label: '5+ signals', value: '5+' as const, count: filterOptions.experienceCounts['5+'] },
+                        ].map((option) => (
+                          <label key={option.value} className="flex cursor-pointer items-center justify-between gap-3 text-sm text-slate-300">
+                            <span className="flex items-center gap-3">
+                              <input
+                                type="radio"
+                                name="experience-band"
+                                checked={selectedExperienceBand === option.value}
+                                onChange={() => setSelectedExperienceBand(option.value)}
+                                className="h-4 w-4 border-slate-600 bg-transparent text-cyan-400 focus:ring-cyan-500"
+                              />
+                              <span>{option.label}</span>
+                            </span>
+                            <span className="text-slate-500">({option.count})</span>
+                          </label>
+                        ))}
+                        <button
+                          type="button"
+                          onClick={() => setSelectedExperienceBand('all')}
+                          className={`text-sm ${selectedExperienceBand === 'all' ? 'font-medium text-cyan-300' : 'text-slate-500 hover:text-slate-300'}`}
+                        >
+                          Any
+                        </button>
+                      </>
+                    )}
+                  </div>
+                </div>
+
+                <div className="border-t border-slate-800/80 pt-5">
+                  <div className="mb-3 text-lg font-semibold text-white">Location</div>
+                  <div className="space-y-3">
+                    {(role === 'recruiter' && recruiterBrowseMode === 'jobs'
+                      ? jobFilterOptions.locations
+                      : filterOptions.locations
+                    )
+                      .slice(0, 5)
+                      .map(([location, count]) => (
+                      <label key={location} className="flex cursor-pointer items-center justify-between gap-3 text-sm text-slate-300">
+                        <span className="flex items-center gap-3">
+                          <input
+                            type="checkbox"
+                            checked={selectedLocations.includes(location)}
+                            onChange={() => toggleArrayFilter(location, selectedLocations, setSelectedLocations)}
+                            className="h-4 w-4 rounded border-slate-600 bg-transparent text-cyan-400 focus:ring-cyan-500"
+                          />
+                          <span>{location}</span>
+                        </span>
+                        <span className="text-slate-500">({count})</span>
+                      </label>
+                    ))}
+                  </div>
+                </div>
+
+                <div className="border-t border-slate-800/80 pt-5">
+                  <div className="mb-3 text-lg font-semibold text-white">
+                    {role === 'recruiter' && recruiterBrowseMode === 'jobs' ? 'Posted' : 'Profile depth'}
+                  </div>
+                  <div className="space-y-3">
+                    {role === 'recruiter' && recruiterBrowseMode === 'jobs' ? (
+                      <>
+                        {[
+                          { label: 'Any time', value: 'any' as const },
+                          { label: 'Last 7 days', value: '7d' as const },
+                          { label: 'Last 30 days', value: '30d' as const },
+                        ].map((option) => (
+                          <label key={option.value} className="flex cursor-pointer items-center gap-3 text-sm text-slate-300">
+                            <input
+                              type="radio"
+                              name="job-posted-window"
+                              checked={selectedJobPostedWindow === option.value}
+                              onChange={() => setSelectedJobPostedWindow(option.value)}
+                              className="h-4 w-4 border-slate-600 bg-transparent text-cyan-400 focus:ring-cyan-500"
+                            />
+                            <span>{option.label}</span>
+                          </label>
+                        ))}
+                      </>
+                    ) : (
+                      <>
+                        {[
+                          { label: 'Has skills', value: 'skills' as const, count: filterOptions.depthCounts.skills },
+                          { label: 'Has experience', value: 'experience' as const, count: filterOptions.depthCounts.experience },
+                          { label: 'Has projects', value: 'projects' as const, count: filterOptions.depthCounts.projects },
+                        ].map((option) => (
+                          <label key={option.value} className="flex cursor-pointer items-center justify-between gap-3 text-sm text-slate-300">
+                            <span className="flex items-center gap-3">
+                              <input
+                                type="checkbox"
+                                checked={selectedDepthFilters.includes(option.value)}
+                                onChange={() =>
+                                  setSelectedDepthFilters((current) =>
+                                    current.includes(option.value)
+                                      ? current.filter((item) => item !== option.value)
+                                      : [...current, option.value],
+                                  )
+                                }
+                                className="h-4 w-4 rounded border-slate-600 bg-transparent text-cyan-400 focus:ring-cyan-500"
+                              />
+                              <span>{option.label}</span>
+                            </span>
+                            <span className="text-slate-500">({option.count})</span>
+                          </label>
+                        ))}
+                      </>
+                    )}
+                  </div>
+                </div>
+              </div>
+            </aside>
+
+            <div className="flex min-h-0 flex-col px-5 py-4">
+              <div className="flex-none border-b border-slate-800/80 pb-5">
+                <div className="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
+                  <div>
+                    <div className="text-sm text-slate-500">
+                      {role === 'recruiter' && recruiterBrowseMode === 'jobs'
+                        ? recruiterJobList.length > 0
+                          ? `1 - ${recruiterJobList.length} of ${recruiterJobsSummary.liveResults}`
+                          : '0'
+                        : profileList.length > 0
+                          ? `1 - ${profileList.length} of ${marketplaceSummary.liveResults}`
+                          : '0'}{' '}
+                      <span className="font-semibold text-white">{activeTab.label}</span>
                     </div>
-                    <p className="text-sm leading-6 text-slate-300">
-                      {spotlightProfile.headline ?? spotlightProfile.bio ?? 'Public profile details are available in the full profile view.'}
+                    <h1 className="mt-2 text-3xl font-semibold tracking-tight text-white">
+                      {role === 'recruiter' && recruiterBrowseMode === 'jobs'
+                        ? 'Explore recruiter jobs'
+                        : `Explore ${activeTab.label.toLowerCase()}`}
+                    </h1>
+                    <p className="mt-2 max-w-2xl text-sm leading-6 text-slate-400">
+                      {role === 'recruiter' && recruiterBrowseMode === 'jobs'
+                        ? 'Scan open roles with recruiter identity, location, minimum innovation score, and a usable JD before you apply.'
+                        : roleCopy[role]}
                     </p>
-                    <Button
-                      variant="secondary"
-                      className="w-full justify-center border-white/10 bg-white/5 hover:border-white/20"
-                      onClick={() => setSelectedProfileId(spotlightProfile._id)}
-                    >
-                      <Eye className="mr-2 h-4 w-4" />
-                      View Spotlight Profile
-                    </Button>
+                    {role === 'recruiter' ? (
+                      <div className="mt-4 inline-flex rounded-full border border-slate-800 bg-slate-950/70 p-1">
+                        {([
+                          { id: 'jobs', label: 'Jobs' },
+                          { id: 'recruiters', label: 'Recruiters' },
+                        ] as const).map((option) => (
+                          <button
+                            key={option.id}
+                            type="button"
+                            onClick={() => {
+                              setRecruiterBrowseMode(option.id);
+                              setSearch('');
+                              setSelectedDomains([]);
+                              setSelectedLocations([]);
+                              setSelectedExperienceBand('all');
+                              setSelectedDepthFilters([]);
+                              setSelectedJobTypes([]);
+                              setSelectedJobPostedWindow('any');
+                            }}
+                            className={`rounded-full px-4 py-2 text-sm transition ${
+                              recruiterBrowseMode === option.id
+                                ? 'bg-cyan-500/15 text-cyan-200'
+                                : 'text-slate-400 hover:text-slate-100'
+                            }`}
+                          >
+                            {option.label}
+                          </button>
+                        ))}
+                      </div>
+                    ) : null}
                   </div>
+
+                  <div className="flex flex-col gap-3 sm:flex-row sm:items-center">
+                    <div className="rounded-full border border-slate-700 bg-transparent px-4 py-2 text-sm text-slate-300">
+                      {hasActiveFilters ? 'Filters applied' : role === 'recruiter' && recruiterBrowseMode === 'jobs' ? 'All jobs' : 'All profiles'}
+                    </div>
+                    <label className="flex items-center gap-3 border-b border-slate-700 px-1 py-3 text-sm text-slate-400">
+                      <span>Sort by:</span>
+                      <select
+                        value={role === 'recruiter' && recruiterBrowseMode === 'jobs' ? jobSortBy : sortBy}
+                        onChange={(event) =>
+                          role === 'recruiter' && recruiterBrowseMode === 'jobs'
+                            ? setJobSortBy(event.target.value as JobSortBy)
+                            : setSortBy(event.target.value as 'recommended' | 'name' | 'experience' | 'projects')
+                        }
+                        className="bg-transparent font-medium text-white outline-none"
+                      >
+                        <option value="recommended">Recommended</option>
+                        {role === 'recruiter' && recruiterBrowseMode === 'jobs' ? (
+                          <>
+                            <option value="recent">Most recent</option>
+                            <option value="score">Lowest score</option>
+                            <option value="applicants">Most applicants</option>
+                          </>
+                        ) : (
+                          <>
+                            <option value="name">Name</option>
+                            <option value="experience">Experience</option>
+                            <option value="projects">Projects</option>
+                          </>
+                        )}
+                      </select>
+                    </label>
+                  </div>
+                </div>
+
+                {hasActiveFilters ? (
+                  <div className="mt-4 flex flex-wrap gap-2">
+                    {search.trim() ? (
+                      <span className="rounded-full border border-slate-700 px-3 py-1.5 text-xs text-slate-300">Search: {search.trim()}</span>
+                    ) : null}
+                    {selectedDomains.map((domain) => (
+                      <span key={domain} className="rounded-full border border-slate-700 px-3 py-1.5 text-xs text-slate-300">
+                        {domain}
+                      </span>
+                    ))}
+                    {selectedLocations.map((location) => (
+                      <span key={location} className="rounded-full border border-slate-700 px-3 py-1.5 text-xs text-slate-300">
+                        {location}
+                      </span>
+                    ))}
+                    {role === 'recruiter' && recruiterBrowseMode === 'jobs' ? (
+                      <>
+                        {selectedJobTypes.map((jobType) => (
+                          <span key={jobType} className="rounded-full border border-slate-700 px-3 py-1.5 text-xs text-slate-300">
+                            {jobType}
+                          </span>
+                        ))}
+                        {selectedJobPostedWindow !== 'any' ? (
+                          <span className="rounded-full border border-slate-700 px-3 py-1.5 text-xs text-slate-300">
+                            Posted: {selectedJobPostedWindow === '7d' ? 'Last 7 days' : 'Last 30 days'}
+                          </span>
+                        ) : null}
+                      </>
+                    ) : (
+                      <>
+                        {selectedDepthFilters.map((filter) => (
+                          <span key={filter} className="rounded-full border border-slate-700 px-3 py-1.5 text-xs text-slate-300">
+                            {filter === 'skills' ? 'Has skills' : filter === 'experience' ? 'Has experience' : 'Has projects'}
+                          </span>
+                        ))}
+                        {selectedExperienceBand !== 'all' ? (
+                          <span className="rounded-full border border-slate-700 px-3 py-1.5 text-xs text-slate-300">
+                            Experience: {selectedExperienceBand}
+                          </span>
+                        ) : null}
+                      </>
+                    )}
+                  </div>
+                ) : null}
+              </div>
+
+              <div className="min-h-0 flex-1 overflow-y-auto">
+                {role === 'recruiter' && recruiterBrowseMode === 'jobs' ? (
+                  <>
+                    {recruiterJobsQuery.isLoading ? (
+                      <div className="flex items-center justify-center border-b border-slate-800/80 px-6 py-16">
+                        <Spinner />
+                      </div>
+                    ) : null}
+
+                    {recruiterJobsQuery.isError ? (
+                      <div className="border-b border-rose-500/30 bg-rose-500/10 px-6 py-5 text-sm text-rose-200">
+                        Unable to load recruiter jobs right now.
+                      </div>
+                    ) : null}
+
+                    {!recruiterJobsQuery.isLoading && !recruiterJobsQuery.isError && recruiterJobList.length === 0 ? (
+                      <div className="border-b border-slate-800/80 px-8 py-10">
+                        <div className="max-w-2xl space-y-3">
+                          <div className="text-sm font-semibold text-cyan-300">No jobs found</div>
+                          <h2 className="text-2xl font-semibold text-white">No recruiter jobs match these filters.</h2>
+                          <p className="text-slate-400">
+                            Try another job title, location, or domain. You can also clear filters to see the full job feed.
+                          </p>
+                        </div>
+                      </div>
+                    ) : null}
+
+                    {!recruiterJobsQuery.isLoading &&
+                      !recruiterJobsQuery.isError &&
+                      recruiterJobList.map((job) => (
+                        <MarketplaceRecruiterJobCard
+                          key={job._id}
+                          job={job}
+                          recruiterProfileId={job.recruiterId}
+                          onOpenRecruiter={setSelectedProfileId}
+                          onOpenDetails={(targetJobId) => navigate(`/marketplace/jobs/${targetJobId}`)}
+                          onApplyFeedback={showBanner}
+                          onMessageRecruiter={(profileId) => {
+                            const storageKey = `dm_first_contact_${profileId}`;
+                            if (!localStorage.getItem(storageKey)) {
+                              localStorage.setItem(storageKey, 'true');
+                            }
+                            navigate(`/dashboard/messages/${profileId}`);
+                          }}
+                        />
+                      ))}
+                  </>
                 ) : (
-                  <div className="mt-2 text-sm leading-6 text-slate-400">
-                    Switch lanes or clear the search input to bring live marketplace results back into view.
-                  </div>
+                  <>
+                    {profilesQuery.isLoading ? (
+                      <div className="flex items-center justify-center border-b border-slate-800/80 px-6 py-16">
+                        <Spinner />
+                      </div>
+                    ) : null}
+
+                    {profilesQuery.isError ? (
+                      <div className="border-b border-rose-500/30 bg-rose-500/10 px-6 py-5 text-sm text-rose-200">
+                        Unable to load marketplace profiles right now.
+                      </div>
+                    ) : null}
+
+                    {!profilesQuery.isLoading && !profilesQuery.isError && profileList.length === 0 ? (
+                      <div className="border-b border-slate-800/80 px-8 py-10">
+                        <div className="max-w-2xl space-y-3">
+                          <div className="text-sm font-semibold text-cyan-300">No profiles found</div>
+                          <h2 className="text-2xl font-semibold text-white">No marketplace members match these filters.</h2>
+                          <p className="text-slate-400">
+                            Try another keyword, location, or domain. You can also clear filters to see the full lane.
+                          </p>
+                        </div>
+                      </div>
+                    ) : null}
+
+                    {!profilesQuery.isLoading &&
+                      !profilesQuery.isError &&
+                      profileList.map((profile) => {
+                        const counts = getInsightCounts(profile);
+                        const skillPreview = (profile.skills ?? []).slice(0, 4);
+
+                        return (
+                          <article
+                            key={profile._id}
+                            className="border-b border-slate-800/80 py-6 [content-visibility:auto] last:border-b-0"
+                          >
+                            <div className="flex flex-col gap-5">
+                              <div className="flex flex-col gap-4 xl:flex-row xl:items-start xl:justify-between">
+                                <div className="min-w-0 xl:flex-1">
+                                  <h3 className="text-2xl font-semibold tracking-tight text-white sm:text-[2rem]">
+                                    {profile.displayName}
+                                  </h3>
+                                  <div className="mt-2 flex flex-wrap items-center gap-x-2 gap-y-1.5 text-sm text-slate-400">
+                                    <span className="font-medium text-slate-200">{profile.headline ?? profile.role}</span>
+                                    {profile.location ? (
+                                      <>
+                                        <span className="text-slate-600">|</span>
+                                        <span className="inline-flex items-center gap-1.5">
+                                          <MapPin className="h-4 w-4 text-cyan-300" />
+                                          {profile.location}
+                                        </span>
+                                      </>
+                                    ) : null}
+                                    {profile.domain ? (
+                                      <>
+                                        <span className="text-slate-600">|</span>
+                                        <span>{profile.domain}</span>
+                                      </>
+                                    ) : null}
+                                  </div>
+
+                                  <div className="mt-3 flex flex-wrap gap-x-4 gap-y-2 text-sm text-slate-400">
+                                    <span>{counts.experience} experience items</span>
+                                    <span>{counts.skills} skills</span>
+                                    <span>{counts.portfolioProjects} projects</span>
+                                  </div>
+                                </div>
+
+                                <div className="flex flex-col gap-3 xl:ml-8 xl:items-end">
+                                  <div className="flex items-center gap-3 xl:justify-end">
+                                    <ProfileAvatar profile={profile} size="compact" />
+                                    <div className="text-[11px] uppercase tracking-[0.28em] text-slate-500">Quick actions</div>
+                                  </div>
+
+                                  <div className="flex flex-wrap gap-2 xl:justify-end">
+                                    <Button
+                                      className="h-10 rounded-full bg-gradient-to-r from-indigo-600 to-fuchsia-600 px-4 py-0 text-sm text-white hover:from-indigo-500 hover:to-fuchsia-500"
+                                      onClick={() => {
+                                        const storageKey = `dm_first_contact_${profile._id}`;
+                                        if (!localStorage.getItem(storageKey)) {
+                                          localStorage.setItem(storageKey, 'true');
+                                        }
+                                        navigate(`/dashboard/messages/${profile._id}`);
+                                      }}
+                                    >
+                                      <MessageCircle className="mr-2 h-4 w-4" />
+                                      Message
+                                    </Button>
+                                    <Button
+                                      variant="secondary"
+                                      className="h-10 rounded-full border-slate-700 bg-transparent px-4 py-0 text-sm text-slate-200 hover:border-slate-500 hover:bg-slate-900/40"
+                                      onClick={() => setSelectedProfileId(profile._id)}
+                                    >
+                                      <Eye className="mr-2 h-4 w-4" />
+                                      Profile
+                                    </Button>
+                                    {role === 'recruiter' ? (
+                                      <Button
+                                        variant="secondary"
+                                        className="h-10 rounded-full border-slate-700 bg-transparent px-4 py-0 text-sm text-slate-200 hover:border-slate-500 hover:bg-slate-900/40"
+                                        onClick={() =>
+                                          setExpandedRecruiterId(expandedRecruiterId === profile._id ? null : profile._id)
+                                        }
+                                      >
+                                        {expandedRecruiterId === profile._id ? (
+                                          <ChevronUp className="mr-2 h-4 w-4" />
+                                        ) : (
+                                          <ChevronDown className="mr-2 h-4 w-4" />
+                                        )}
+                                        {expandedRecruiterId === profile._id ? 'Hide Jobs' : 'Jobs'}
+                                      </Button>
+                                    ) : null}
+                                  </div>
+                                </div>
+                              </div>
+
+                              <p className="max-w-4xl text-sm leading-6 text-slate-300">
+                                {profile.bio ?? 'Public profile details will appear here as more marketplace members complete their profiles.'}
+                              </p>
+
+                              <div className="flex flex-col gap-4 xl:flex-row xl:items-end xl:justify-between">
+                                <div className="min-w-0 xl:flex-1">
+                                  {skillPreview.length > 0 ? (
+                                    <div className="flex flex-wrap gap-2 text-xs text-slate-400">
+                                      {skillPreview.map((skill) => (
+                                        <span key={`${profile._id}-${skill.name}`} className="rounded-full border border-slate-700 px-3 py-1.5">
+                                          {skill.name}
+                                        </span>
+                                      ))}
+                                    </div>
+                                  ) : null}
+                                </div>
+
+                                <div className="xl:ml-8 xl:max-w-[32rem] xl:flex-1 xl:self-end">
+                                  <ProfileLinkChips profile={profile} />
+                                </div>
+                              </div>
+                            </div>
+
+                            {role === 'recruiter' && expandedRecruiterId === profile._id ? (
+                              <RecruiterJobCard
+                                recruiterId={profile._id}
+                                recruiterName={profile.displayName}
+                                onApplyFeedback={showBanner}
+                              />
+                            ) : null}
+                          </article>
+                        );
+                      })}
+                  </>
                 )}
               </div>
             </div>
-          </aside>
-
-          <div className="space-y-4">
-            <div className="rounded-[28px] border border-white/10 bg-[#0a0d1d] px-5 py-5">
-              <div className="flex flex-col gap-4 lg:flex-row lg:items-end lg:justify-between">
-                <div>
-                  <div className="text-xs uppercase tracking-[0.28em] text-slate-500">Directory Results</div>
-                  <h2 className="mt-2 text-2xl font-semibold text-white">
-                    {profilesQuery.isLoading ? 'Loading marketplace profiles' : `${profileList.length} results in ${activeTab.label}`}
-                  </h2>
-                  <p className="mt-2 max-w-2xl text-sm leading-6 text-slate-400">
-                    Search indexes headlines, skills, work history, education, and project summaries so the directory stays
-                    useful even as profiles get richer.
-                  </p>
-                </div>
-                <div className="flex flex-wrap gap-2 text-sm text-slate-300">
-                  <span className="rounded-full border border-white/10 bg-white/5 px-4 py-2">
-                    {formatCompactNumber(marketplaceSummary.trackedSkills)} tracked skills
-                  </span>
-                  <span className="rounded-full border border-white/10 bg-white/5 px-4 py-2">
-                    {deferredSearch ? `Filtered by "${search.trim()}"` : 'No active text filter'}
-                  </span>
-                </div>
-              </div>
-            </div>
-
-            {profilesQuery.isLoading ? (
-              <div className="flex items-center justify-center rounded-[28px] border border-white/10 bg-[#0a0d1d] px-6 py-16">
-                <Spinner />
-              </div>
-            ) : null}
-
-            {profilesQuery.isError ? (
-              <div className="rounded-[28px] border border-rose-500/20 bg-rose-500/10 px-6 py-5 text-sm text-rose-100">
-                Unable to load marketplace profiles right now.
-              </div>
-            ) : null}
-
-            {!profilesQuery.isLoading && !profilesQuery.isError && profileList.length === 0 ? (
-              <Card className="rounded-[28px] border-white/10 bg-[#0a0d1d] p-8">
-                <div className="max-w-2xl space-y-3">
-                  <div className="text-sm uppercase tracking-[0.25em] text-cyan-300">No Profiles Found</div>
-                  <h2 className="text-2xl font-semibold text-white">No marketplace members match this search yet.</h2>
-                  <p className="text-slate-400">
-                    Try another keyword, domain, skill, or company name. Search now scans headlines, skills, work history,
-                    education, and project summaries.
-                  </p>
-                </div>
-              </Card>
-            ) : null}
-
-            {!profilesQuery.isLoading &&
-              !profilesQuery.isError &&
-              profileList.map((profile) => {
-                const counts = getInsightCounts(profile);
-                const skillPreview = (profile.skills ?? []).slice(0, 6);
-
-                return (
-                  <article
-                    key={profile._id}
-                    className="relative overflow-hidden rounded-[28px] border border-white/10 bg-[#0b1020]/95 p-5 shadow-[0_18px_60px_rgba(15,23,42,0.28)] [content-visibility:auto] sm:p-6"
-                  >
-                    <div className={`pointer-events-none absolute inset-x-0 top-0 h-px bg-gradient-to-r ${activeTab.accent}`} />
-
-                    <div className="grid gap-6 xl:grid-cols-[minmax(0,1fr),260px]">
-                      <div className="space-y-5">
-                        <div className="flex flex-col gap-4 sm:flex-row sm:items-start">
-                          <ProfileAvatar profile={profile} size="small" />
-
-                          <div className="min-w-0 flex-1">
-                            <div className="min-w-0">
-                              <h3 className="truncate text-2xl font-semibold text-white">{profile.displayName}</h3>
-                              <div className="mt-1 text-sm uppercase tracking-[0.24em] text-cyan-300">{profile.role}</div>
-                              {profile.headline ? (
-                                <div className="mt-3 max-w-3xl text-sm leading-6 text-slate-200">{profile.headline}</div>
-                              ) : null}
-                            </div>
-
-                            <div className="mt-4 flex flex-wrap gap-2 text-sm text-slate-300">
-                              <span className="rounded-full border border-white/10 bg-white/5 px-3 py-1.5">
-                                {profile.domain ?? 'General innovation support'}
-                              </span>
-                              {profile.location ? (
-                                <span className="inline-flex items-center gap-1 rounded-full border border-white/10 bg-white/5 px-3 py-1.5">
-                                  <MapPin className="h-4 w-4 text-cyan-300" />
-                                  {profile.location}
-                                </span>
-                              ) : null}
-                              <span className="rounded-full border border-white/10 bg-white/5 px-3 py-1.5">
-                                {counts.experience} experience items
-                              </span>
-                              <span className="rounded-full border border-white/10 bg-white/5 px-3 py-1.5">
-                                {counts.portfolioProjects} projects
-                              </span>
-                            </div>
-
-                            <p className="mt-4 max-w-3xl text-sm leading-7 text-slate-300">
-                              {profile.bio ?? 'Public profile details will appear here as more marketplace members complete their profiles.'}
-                            </p>
-
-                            {skillPreview.length > 0 ? (
-                              <div className="mt-4 flex flex-wrap gap-2">
-                                {skillPreview.map((skill) => (
-                                  <span
-                                    key={`${profile._id}-${skill.name}`}
-                                    className="rounded-full border border-cyan-500/20 bg-cyan-500/10 px-3 py-1 text-xs text-cyan-100"
-                                  >
-                                    {skill.name}
-                                  </span>
-                                ))}
-                              </div>
-                            ) : null}
-
-                            <div className="mt-4">
-                              <ProfileLinkChips profile={profile} />
-                            </div>
-                          </div>
-                        </div>
-                      </div>
-
-                      <div className="flex flex-col gap-4">
-                        <div className="grid grid-cols-2 gap-3">
-                          {[
-                            { label: 'Skills', value: counts.skills },
-                            { label: 'Experience', value: counts.experience },
-                            { label: 'Education', value: counts.education },
-                            { label: 'Projects', value: counts.portfolioProjects },
-                          ].map((stat) => (
-                            <div key={stat.label} className="rounded-2xl border border-white/10 bg-white/5 p-3">
-                              <div className="text-xs uppercase tracking-[0.22em] text-slate-500">{stat.label}</div>
-                              <div className="mt-2 text-xl font-semibold text-white">{stat.value}</div>
-                            </div>
-                          ))}
-                        </div>
-
-                        <div className="flex flex-col gap-2">
-                          <Button
-                            className="w-full justify-center"
-                            onClick={() => {
-                              const storageKey = `dm_first_contact_${profile._id}`;
-                              if (!localStorage.getItem(storageKey)) {
-                                localStorage.setItem(storageKey, 'true');
-                              }
-                              navigate(`/dashboard/messages/${profile._id}`);
-                            }}
-                          >
-                            <MessageCircle className="mr-2 h-4 w-4" />
-                            Message
-                          </Button>
-                          <Button
-                            variant="secondary"
-                            className="w-full justify-center border-white/10 bg-white/5 hover:border-white/20"
-                            onClick={() => setSelectedProfileId(profile._id)}
-                          >
-                            <Eye className="mr-2 h-4 w-4" />
-                            View Profile
-                          </Button>
-                          {role === 'recruiter' ? (
-                            <Button
-                              variant="secondary"
-                              className="w-full justify-center border-white/10 bg-white/5 hover:border-white/20"
-                              onClick={() => setExpandedRecruiterId(expandedRecruiterId === profile._id ? null : profile._id)}
-                            >
-                              {expandedRecruiterId === profile._id ? (
-                                <ChevronUp className="mr-2 h-4 w-4" />
-                              ) : (
-                                <ChevronDown className="mr-2 h-4 w-4" />
-                              )}
-                              {expandedRecruiterId === profile._id ? 'Hide Jobs' : 'View Jobs'}
-                            </Button>
-                          ) : null}
-                        </div>
-                      </div>
-                    </div>
-
-                    {role === 'recruiter' && expandedRecruiterId === profile._id ? (
-                      <RecruiterJobCard
-                        recruiterId={profile._id}
-                        recruiterName={profile.displayName}
-                        onApplyFeedback={showBanner}
-                      />
-                    ) : null}
-                  </article>
-                );
-              })}
           </div>
         </section>
       </div>

@@ -1,6 +1,9 @@
+import { useMemo } from "react";
 import { useQuery } from "@tanstack/react-query";
+import { useParams } from "react-router-dom";
 import { Briefcase, TrendingUp, CheckCircle2, Clock } from "lucide-react";
 import { dealApi } from "../../../api/deal.api";
+import { normalizeStartupRouteId } from "../../../features/startup/navigation";
 import { DealSummaryView } from "../../../types/deal.types";
 
 const stageLabels: Record<number, { label: string; description: string; color: string }> = {
@@ -81,6 +84,8 @@ function DealCard({ deal, index }: { deal: DealSummaryView; index: number }) {
 }
 
 export function StudentInvestorDeals() {
+  const { startupId } = useParams<{ startupId?: string }>();
+  const normalizedStartupId = normalizeStartupRouteId(startupId);
   const { data, isLoading } = useQuery({
     queryKey: ["student", "active-deals"],
     queryFn: dealApi.getMyDeals,
@@ -88,8 +93,13 @@ export function StudentInvestorDeals() {
   });
 
   const deals = data?.items ?? [];
-  const activeDeals = deals.filter((d) => d.status === "active");
-  const closedDeals = deals.filter((d) => d.status !== "active");
+  const scopedDeals = useMemo(
+    () =>
+      normalizedStartupId ? deals.filter((deal) => deal.startupId === normalizedStartupId) : deals,
+    [deals, normalizedStartupId],
+  );
+  const activeDeals = scopedDeals.filter((d) => d.status === "active");
+  const closedDeals = scopedDeals.filter((d) => d.status !== "active");
 
   return (
     <div className="space-y-8">
@@ -102,7 +112,7 @@ export function StudentInvestorDeals() {
 
       <div className="grid gap-4 sm:grid-cols-3">
         {[
-          { label: "Total Deals", count: deals.length, color: "text-white" },
+          { label: "Total Deals", count: scopedDeals.length, color: "text-white" },
           { label: "Active", count: activeDeals.length, color: "text-blue-400" },
           { label: "Closed", count: closedDeals.length, color: "text-emerald-400" },
         ].map((stat) => (
@@ -117,12 +127,16 @@ export function StudentInvestorDeals() {
         <div className="rounded-2xl border border-dashed border-slate-700 bg-slate-900 p-12 text-center text-slate-400">
           Loading deals...
         </div>
-      ) : deals.length === 0 ? (
+      ) : scopedDeals.length === 0 ? (
         <div className="rounded-2xl border border-dashed border-slate-700 bg-slate-900 p-12 text-center">
           <Briefcase className="mx-auto mb-4 h-10 w-10 text-slate-600" />
-          <h3 className="mb-2 text-lg font-semibold text-white">No investor deals yet</h3>
+          <h3 className="mb-2 text-lg font-semibold text-white">
+            {normalizedStartupId ? "No investor deals for this startup yet" : "No investor deals yet"}
+          </h3>
           <p className="text-slate-400">
-            Launch your startup to investors from the Startup Launch engine to begin deal flow.
+            {normalizedStartupId
+              ? "Launch this startup to investors from the Startup Launch engine to begin deal flow."
+              : "Launch your startup to investors from the Startup Launch engine to begin deal flow."}
           </p>
         </div>
       ) : (

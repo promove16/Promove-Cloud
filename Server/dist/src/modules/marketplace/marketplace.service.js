@@ -163,7 +163,6 @@ const buildStartupVisibilityQuery = (search) => ({
                 { launchedToInvestors: true },
                 { launchedToMentors: true },
                 { launchedToRecruiters: true },
-                { stage: 'Launched' },
             ],
         },
         ...(search

@@ -7,10 +7,12 @@ import { asyncHandler } from '../../utils/asyncHandler';
 import { ApiError } from '../../utils/ApiError';
 import {
   createStartup,
+  demoteFromCoFounderController,
   getMyStartupsController,
   getStartupByIdController,
   launchStartupController,
   patchStartup,
+  promoteToCoFounderController,
   removeStartupDocumentController,
   requestStartupReviewController,
   uploadStartupDocumentController,
@@ -33,7 +35,7 @@ const upload = multer({
 
 const documentUpload = multer({
   storage: multer.memoryStorage(),
-  limits: { fileSize: 10 * 1024 * 1024 },
+  limits: { fileSize: 3 * 1024 * 1024 },
   fileFilter: (_req, file, cb) => {
     const isPdf = file.mimetype === 'application/pdf' || pdfFileNamePattern.test(file.originalname);
     const isImage = file.mimetype.startsWith('image/');
@@ -56,6 +58,8 @@ router.post('/:id/request-review', asyncHandler(requestStartupReviewController))
 router.post('/:id/launch', asyncHandler(launchStartupController));
 router.post('/:id/upload-pitch', upload.single('file'), asyncHandler(uploadPitchController));
 router.post('/:id/documents', documentUpload.single('file'), asyncHandler(uploadStartupDocumentController));
+router.post('/:id/members/:memberId/promote', asyncHandler(promoteToCoFounderController));
+router.post('/:id/members/:memberId/demote', asyncHandler(demoteFromCoFounderController));
 router.delete('/:id/documents/:documentId', asyncHandler(removeStartupDocumentController));
 
 export default router;

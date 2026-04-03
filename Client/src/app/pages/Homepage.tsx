@@ -1,13 +1,87 @@
 import { Link } from "react-router-dom";
-import { Lightbulb, Rocket, Award, Globe, TrendingUp, Users, Building2, GraduationCap } from "lucide-react";
+import {
+  Award,
+  Building2,
+  Globe,
+  GraduationCap,
+  Lightbulb,
+  Rocket,
+  TrendingUp,
+  Users,
+} from "lucide-react";
 import { BusinessLogo } from "../../components/branding/BusinessLogo";
+
+const pipelineSteps = [
+  {
+    icon: Lightbulb,
+    title: "Identify Problems",
+    desc: "Submit and discover real-world challenges",
+    color: "from-yellow-500 to-orange-500",
+  },
+  {
+    icon: Rocket,
+    title: "Build Products",
+    desc: "Develop solutions with mentorship",
+    color: "from-blue-500 to-cyan-500",
+  },
+  {
+    icon: Award,
+    title: "File Patents",
+    desc: "Protect your intellectual property",
+    color: "from-purple-500 to-pink-500",
+  },
+  {
+    icon: TrendingUp,
+    title: "Launch Startups",
+    desc: "Turn innovations into businesses",
+    color: "from-green-500 to-emerald-500",
+  },
+];
+
+const platformModules = [
+  { title: "Problem Bank", desc: "Global problem repository", icon: Globe, link: "/problem-bank" },
+  { title: "Startup School", desc: "Learn and build startups", icon: GraduationCap, link: "/student" },
+  { title: "Instant Internship", desc: "Work on real projects", icon: Building2, link: "/product-workspace" },
+  { title: "Innovation Marketplace", desc: "License and sell innovations", icon: TrendingUp, link: "/marketplace" },
+  { title: "Product Workspace", desc: "Build and collaborate on your product", icon: Lightbulb, link: "/product-workspace" },
+  { title: "Patent Support", desc: "File patents with ease", icon: Award, link: "/patent-support" },
+  { title: "Startup Launch", desc: "Launch your startup", icon: Rocket, link: "/startup-launch" },
+  { title: "Leadership Profile", desc: "Track your innovation journey", icon: Users, link: "/leadership-profile" },
+];
+
+const stats = [
+  { value: "10K+", label: "Student Innovators" },
+  { value: "500+", label: "Innovation Problems" },
+  { value: "200+", label: "Patents Filed" },
+  { value: "100+", label: "Startups Launched" },
+];
+
+const successStories = [
+  {
+    name: "Sarah Chen",
+    innovation: "AgriSense IoT",
+    achievement: "Patent Filed and $50K Funded",
+    category: "Agriculture",
+  },
+  {
+    name: "Rajesh Kumar",
+    innovation: "EduBridge AI",
+    achievement: "Patent Pending and Incubated",
+    category: "Education",
+  },
+  {
+    name: "Maria Santos",
+    innovation: "HealthTrack",
+    achievement: "Licensed to MedTech Corp",
+    category: "Healthcare",
+  },
+];
 
 export function Homepage() {
   return (
     <div className="min-h-screen bg-gradient-to-b from-slate-950 via-slate-900 to-slate-950">
-      {/* Navigation */}
-      <nav className="border-b border-slate-800 bg-slate-950/50 backdrop-blur-xl sticky top-0 z-50">
-        <div className="max-w-7xl mx-auto px-6 py-4 flex items-center justify-between">
+      <nav className="sticky top-0 z-50 border-b border-slate-800 bg-slate-950/50 backdrop-blur-xl">
+        <div className="mx-auto flex max-w-7xl items-center justify-between px-6 py-4">
           <BusinessLogo
             to="/"
             imageWrapperClassName="h-10 w-10"
@@ -17,113 +91,96 @@ export function Homepage() {
           />
           <Link
             to="/login"
-            className="px-6 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-lg transition-colors"
+            className="rounded-lg bg-blue-600 px-6 py-2 text-white transition-colors hover:bg-blue-700"
           >
             Sign In
           </Link>
         </div>
       </nav>
 
-      {/* Hero Section */}
-      <section className="max-w-7xl mx-auto px-6 py-20 text-center">
-        <div className="inline-block px-4 py-2 bg-blue-500/10 border border-blue-500/20 rounded-full text-blue-400 text-sm mb-6">
-          🌍 The Global Infrastructure for Student Innovation
+      <section className="mx-auto max-w-7xl px-6 py-20 text-center">
+        <div className="mb-6 inline-block rounded-full border border-blue-500/20 bg-blue-500/10 px-4 py-2 text-sm text-blue-400">
+          Global infrastructure for student innovation
         </div>
-        <h1 className="text-6xl font-bold text-white mb-6 leading-tight">
+        <h1 className="mb-6 text-6xl font-bold leading-tight text-white">
           Where Problems Become
           <br />
           <span className="bg-gradient-to-r from-blue-500 via-purple-500 to-pink-500 bg-clip-text text-transparent">
             Products
           </span>
         </h1>
-        <p className="text-xl text-slate-400 mb-10 max-w-2xl mx-auto">
-          The world's first operating system for student innovators. Transform real-world problems into products, patents, and startups.
+        <p className="mx-auto mb-10 max-w-2xl text-xl text-slate-400">
+          The world&apos;s first operating system for student innovators. Transform real-world
+          problems into products, patents, and startups.
         </p>
-        <div className="flex gap-4 justify-center flex-wrap">
+        <div className="flex flex-wrap justify-center gap-4">
           <Link
             to="/login"
-            className="px-8 py-4 bg-gradient-to-r from-blue-600 to-purple-600 hover:from-blue-700 hover:to-purple-700 text-white rounded-xl font-semibold transition-all transform hover:scale-105"
+            className="transform rounded-xl bg-gradient-to-r from-blue-600 to-purple-600 px-8 py-4 font-semibold text-white transition-all hover:scale-105 hover:from-blue-700 hover:to-purple-700"
           >
             Join as Student
           </Link>
           <Link
             to="/login"
-            className="px-8 py-4 bg-slate-800 hover:bg-slate-700 text-white rounded-xl font-semibold border border-slate-700 transition-all"
+            className="rounded-xl border border-slate-700 bg-slate-800 px-8 py-4 font-semibold text-white transition-all hover:bg-slate-700"
           >
             Partner as Institution
           </Link>
           <Link
             to="/problem-bank"
-            className="px-8 py-4 bg-slate-800/50 hover:bg-slate-800 text-white rounded-xl font-semibold border border-slate-700 transition-all"
+            className="rounded-xl border border-slate-700 bg-slate-800/50 px-8 py-4 font-semibold text-white transition-all hover:bg-slate-800"
           >
             Submit a Problem
           </Link>
         </div>
       </section>
 
-      {/* Innovation Pipeline */}
-      <section className="max-w-7xl mx-auto px-6 py-20">
-        <div className="text-center mb-12">
-          <h2 className="text-4xl font-bold text-white mb-4">Innovation Pipeline</h2>
-          <p className="text-slate-400 text-lg">Problem → Product → Patent → Startup</p>
+      <section className="mx-auto max-w-7xl px-6 py-20">
+        <div className="mb-12 text-center">
+          <h2 className="mb-4 text-4xl font-bold text-white">Innovation Pipeline</h2>
+          <p className="text-lg text-slate-400">Problem - Product - Patent - Startup</p>
         </div>
-        <div className="grid md:grid-cols-4 gap-6">
-          {[
-            { icon: Lightbulb, title: "Identify Problems", desc: "Submit and discover real-world challenges", color: "from-yellow-500 to-orange-500" },
-            { icon: Rocket, title: "Build Products", desc: "Develop solutions with mentorship", color: "from-blue-500 to-cyan-500" },
-            { icon: Award, title: "File Patents", desc: "Protect your intellectual property", color: "from-purple-500 to-pink-500" },
-            { icon: TrendingUp, title: "Launch Startups", desc: "Turn innovations into businesses", color: "from-green-500 to-emerald-500" },
-          ].map((step, i) => (
-            <div key={i} className="bg-slate-900 border border-slate-800 rounded-xl p-6 hover:border-slate-700 transition-colors">
-              <div className={`w-14 h-14 bg-gradient-to-br ${step.color} rounded-lg flex items-center justify-center mb-4`}>
-                <step.icon className="w-7 h-7 text-white" />
+        <div className="grid gap-6 md:grid-cols-4">
+          {pipelineSteps.map((step) => (
+            <div
+              key={step.title}
+              className="rounded-xl border border-slate-800 bg-slate-900 p-6 transition-colors hover:border-slate-700"
+            >
+              <div
+                className={`mb-4 flex h-14 w-14 items-center justify-center rounded-lg bg-gradient-to-br ${step.color}`}
+              >
+                <step.icon className="h-7 w-7 text-white" />
               </div>
-              <h3 className="text-xl font-bold text-white mb-2">{step.title}</h3>
+              <h3 className="mb-2 text-xl font-bold text-white">{step.title}</h3>
               <p className="text-slate-400">{step.desc}</p>
             </div>
           ))}
         </div>
       </section>
 
-      {/* Platform Modules */}
-      <section className="max-w-7xl mx-auto px-6 py-20">
-        <h2 className="text-4xl font-bold text-white mb-12 text-center">Platform Modules</h2>
-        <div className="grid md:grid-cols-2 lg:grid-cols-4 gap-6">
-          {[
-            { title: "Problem Bank", desc: "Global problem repository", icon: Globe, link: "/problem-bank" },
-            { title: "Startup School", desc: "Learn and build startups", icon: GraduationCap, link: "/student" },
-            { title: "Instant Internship", desc: "Work on real projects", icon: Building2, link: "/product-workspace" },
-            { title: "Innovation Marketplace", desc: "License and sell innovations", icon: TrendingUp, link: "/marketplace" },
-            { title: "Product Workspace", desc: "Build and collaborate on your product", icon: Lightbulb, link: "/product-workspace" },
-            { title: "Patent Support", desc: "File patents with ease", icon: Award, link: "/patent-support" },
-            { title: "Startup Launch", desc: "Launch your startup", icon: Rocket, link: "/startup-launch" },
-            { title: "Leadership Profile", desc: "Track your innovation journey", icon: Users, link: "/leadership-profile" },
-          ].map((module, i) => (
+      <section className="mx-auto max-w-7xl px-6 py-20">
+        <h2 className="mb-12 text-center text-4xl font-bold text-white">Platform Modules</h2>
+        <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-4">
+          {platformModules.map((module) => (
             <Link
-              key={i}
+              key={module.title}
               to={module.link}
-              className="bg-slate-900/50 border border-slate-800 rounded-xl p-6 hover:bg-slate-900 hover:border-slate-700 transition-all group"
+              className="group rounded-xl border border-slate-800 bg-slate-900/50 p-6 transition-all hover:border-slate-700 hover:bg-slate-900"
             >
-              <module.icon className="w-10 h-10 text-blue-500 mb-4 group-hover:scale-110 transition-transform" />
-              <h3 className="text-lg font-bold text-white mb-2">{module.title}</h3>
-              <p className="text-slate-400 text-sm">{module.desc}</p>
+              <module.icon className="mb-4 h-10 w-10 text-blue-500 transition-transform group-hover:scale-110" />
+              <h3 className="mb-2 text-lg font-bold text-white">{module.title}</h3>
+              <p className="text-sm text-slate-400">{module.desc}</p>
             </Link>
           ))}
         </div>
       </section>
 
-      {/* Stats Section */}
-      <section className="max-w-7xl mx-auto px-6 py-20">
-        <div className="bg-gradient-to-r from-blue-900/20 to-purple-900/20 border border-blue-800/30 rounded-2xl p-12">
-          <div className="grid md:grid-cols-4 gap-8 text-center">
-            {[
-              { value: "10K+", label: "Student Innovators" },
-              { value: "500+", label: "Innovation Problems" },
-              { value: "200+", label: "Patents Filed" },
-              { value: "100+", label: "Startups Launched" },
-            ].map((stat, i) => (
-              <div key={i}>
-                <div className="text-5xl font-bold text-white mb-2">{stat.value}</div>
+      <section className="mx-auto max-w-7xl px-6 py-20">
+        <div className="rounded-2xl border border-blue-800/30 bg-gradient-to-r from-blue-900/20 to-purple-900/20 p-12">
+          <div className="grid gap-8 text-center md:grid-cols-4">
+            {stats.map((stat) => (
+              <div key={stat.label}>
+                <div className="mb-2 text-5xl font-bold text-white">{stat.value}</div>
                 <div className="text-slate-400">{stat.label}</div>
               </div>
             ))}
@@ -131,21 +188,18 @@ export function Homepage() {
         </div>
       </section>
 
-      {/* Success Stories */}
-      <section className="max-w-7xl mx-auto px-6 py-20">
-        <h2 className="text-4xl font-bold text-white mb-12 text-center">Innovation Success Stories</h2>
-        <div className="grid md:grid-cols-3 gap-6">
-          {[
-            { name: "Sarah Chen", innovation: "AgriSense IoT", achievement: "Patent Filed & $50K Funded", category: "Agriculture" },
-            { name: "Rajesh Kumar", innovation: "EduBridge AI", achievement: "Patent Pending & Incubated", category: "Education" },
-            { name: "Maria Santos", innovation: "HealthTrack", achievement: "Licensed to MedTech Corp", category: "Healthcare" },
-          ].map((story, i) => (
-            <div key={i} className="bg-slate-900 border border-slate-800 rounded-xl p-6">
-              <div className="w-12 h-12 bg-gradient-to-br from-blue-500 to-purple-500 rounded-full mb-4"></div>
-              <h3 className="text-xl font-bold text-white mb-1">{story.name}</h3>
-              <div className="text-blue-400 mb-2">{story.innovation}</div>
-              <div className="text-sm text-slate-400 mb-3">{story.achievement}</div>
-              <div className="inline-block px-3 py-1 bg-slate-800 rounded-full text-xs text-slate-300">
+      <section className="mx-auto max-w-7xl px-6 py-20">
+        <h2 className="mb-12 text-center text-4xl font-bold text-white">
+          Innovation Success Stories
+        </h2>
+        <div className="grid gap-6 md:grid-cols-3">
+          {successStories.map((story) => (
+            <div key={story.name} className="rounded-xl border border-slate-800 bg-slate-900 p-6">
+              <div className="mb-4 h-12 w-12 rounded-full bg-gradient-to-br from-blue-500 to-purple-500" />
+              <h3 className="mb-1 text-xl font-bold text-white">{story.name}</h3>
+              <div className="mb-2 text-blue-400">{story.innovation}</div>
+              <div className="mb-3 text-sm text-slate-400">{story.achievement}</div>
+              <div className="inline-block rounded-full bg-slate-800 px-3 py-1 text-xs text-slate-300">
                 {story.category}
               </div>
             </div>
@@ -153,26 +207,26 @@ export function Homepage() {
         </div>
       </section>
 
-      {/* CTA Section */}
-      <section className="max-w-5xl mx-auto px-6 py-20 text-center">
-        <div className="bg-gradient-to-r from-blue-600 to-purple-600 rounded-2xl p-12">
-          <h2 className="text-4xl font-bold text-white mb-4">Ready to Start Your Innovation Journey?</h2>
-          <p className="text-blue-100 text-lg mb-8">
+      <section className="mx-auto max-w-5xl px-6 py-20 text-center">
+        <div className="rounded-2xl bg-gradient-to-r from-blue-600 to-purple-600 p-12">
+          <h2 className="mb-4 text-4xl font-bold text-white">
+            Ready to Start Your Innovation Journey?
+          </h2>
+          <p className="mb-8 text-lg text-blue-100">
             Solve Problems. Build Products. Own Innovation.
           </p>
           <Link
             to="/login"
-            className="inline-block px-8 py-4 bg-white text-blue-600 rounded-xl font-semibold hover:bg-blue-50 transition-colors"
+            className="inline-block rounded-xl bg-white px-8 py-4 font-semibold text-blue-600 transition-colors hover:bg-blue-50"
           >
             Get Started Now
           </Link>
         </div>
       </section>
 
-      {/* Footer */}
       <footer className="border-t border-slate-800 bg-slate-950">
-        <div className="max-w-7xl mx-auto px-6 py-12">
-          <div className="grid md:grid-cols-4 gap-8">
+        <div className="mx-auto max-w-7xl px-6 py-12">
+          <div className="grid gap-8 md:grid-cols-4">
             <div>
               <BusinessLogo
                 to="/"
@@ -184,32 +238,68 @@ export function Homepage() {
               />
             </div>
             <div>
-              <h4 className="text-white font-semibold mb-4">Platform</h4>
-              <ul className="space-y-2 text-slate-400 text-sm">
-                <li><Link to="/problem-bank" className="hover:text-white">Problem Bank</Link></li>
-                <li><Link to="/marketplace" className="hover:text-white">Marketplace</Link></li>
-                <li><Link to="/startup-launch" className="hover:text-white">Startup Launch</Link></li>
+              <h4 className="mb-4 font-semibold text-white">Platform</h4>
+              <ul className="space-y-2 text-sm text-slate-400">
+                <li>
+                  <Link to="/problem-bank" className="hover:text-white">
+                    Problem Bank
+                  </Link>
+                </li>
+                <li>
+                  <Link to="/marketplace" className="hover:text-white">
+                    Marketplace
+                  </Link>
+                </li>
+                <li>
+                  <Link to="/startup-launch" className="hover:text-white">
+                    Startup Launch
+                  </Link>
+                </li>
               </ul>
             </div>
             <div>
-              <h4 className="text-white font-semibold mb-4">For Institutions</h4>
-              <ul className="space-y-2 text-slate-400 text-sm">
-                <li><a href="#" className="hover:text-white">Schools</a></li>
-                <li><a href="#" className="hover:text-white">Colleges</a></li>
-                <li><a href="#" className="hover:text-white">Mentors</a></li>
+              <h4 className="mb-4 font-semibold text-white">For Institutions</h4>
+              <ul className="space-y-2 text-sm text-slate-400">
+                <li>
+                  <a href="#" className="hover:text-white">
+                    Schools
+                  </a>
+                </li>
+                <li>
+                  <a href="#" className="hover:text-white">
+                    Colleges
+                  </a>
+                </li>
+                <li>
+                  <a href="#" className="hover:text-white">
+                    Mentors
+                  </a>
+                </li>
               </ul>
             </div>
             <div>
-              <h4 className="text-white font-semibold mb-4">Company</h4>
-              <ul className="space-y-2 text-slate-400 text-sm">
-                <li><a href="#" className="hover:text-white">About</a></li>
-                <li><a href="#" className="hover:text-white">Contact</a></li>
-                <li><a href="#" className="hover:text-white">Investors</a></li>
+              <h4 className="mb-4 font-semibold text-white">Company</h4>
+              <ul className="space-y-2 text-sm text-slate-400">
+                <li>
+                  <a href="#" className="hover:text-white">
+                    About
+                  </a>
+                </li>
+                <li>
+                  <a href="#" className="hover:text-white">
+                    Contact
+                  </a>
+                </li>
+                <li>
+                  <a href="#" className="hover:text-white">
+                    Investors
+                  </a>
+                </li>
               </ul>
             </div>
           </div>
-          <div className="border-t border-slate-800 mt-12 pt-8 text-center text-slate-400 text-sm">
-            © 2026 ProMove Innovation Cloud. All rights reserved.
+          <div className="mt-12 border-t border-slate-800 pt-8 text-center text-sm text-slate-400">
+            (c) 2026 ProMove Innovation Cloud. All rights reserved.
           </div>
         </div>
       </footer>

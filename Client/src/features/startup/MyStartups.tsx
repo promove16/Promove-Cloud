@@ -29,7 +29,7 @@ const reviewBadge: Record<StartupReviewStatus, { label: string; className: strin
 
 function StartupCard({ startup }: { startup: Startup }) {
   const navigate = useNavigate();
-  const badge = reviewBadge[startup.reviewStatus];
+  const badge = reviewBadge[startup.reviewStatus] ?? reviewBadge.draft;
   const BadgeIcon = badge.Icon;
   const isLive = startup.launchedToInvestors || startup.launchedToMentors;
 

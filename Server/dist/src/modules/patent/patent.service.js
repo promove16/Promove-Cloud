@@ -58,6 +58,7 @@ const PATENT_DOC_CATEGORIES = [
     'abstract_draft',
     'claims_draft',
     'drawings_diagrams',
+    'design_plan_sketch',
     'examination_request',
     'form3_foreign_filing',
     'cost_management',
@@ -65,21 +66,32 @@ const PATENT_DOC_CATEGORIES = [
 exports.patentSubmissionSchema = zod_1.z.object({
     projectTitle: zod_1.z.string().trim().min(2).max(200),
     workspaceId: zod_1.z.string().min(1),
+    coInventorIds: zod_1.z.array(zod_1.z.string().min(1)).max(4).default([]),
     documentUploads: zod_1.z
         .array(zod_1.z.object({
         uploadId: zod_1.z.string().min(1),
         category: zod_1.z.enum(PATENT_DOC_CATEGORIES),
     }))
-        .min(1)
+        .min(0)
         .max(9),
     questionnaire: zod_1.z.object({
-        whatIsYourInnovation: zod_1.z.string().trim().min(50),
-        noveltyExplanation: zod_1.z.string().trim().min(50),
-        technicalDetails: zod_1.z.string().trim().min(50),
-        marketUseCase: zod_1.z.string().trim().min(50),
-        priorArtAwareness: zod_1.z.string().trim().min(50),
+        problemStatement: zod_1.z.string().trim().min(40),
+        solutionDifferentiation: zod_1.z.string().trim().min(40),
+        coreInnovation: zod_1.z.string().trim().min(30),
+        priorArtStatus: zod_1.z.string().trim().min(20),
+        workingMechanism: zod_1.z.string().trim().min(40),
+        keyComponents: zod_1.z.string().trim().min(20),
+        developmentStage: zod_1.z.string().trim().min(1),
+        documentationReadiness: zod_1.z.string().trim().min(10),
+        inventorOwnership: zod_1.z.string().trim().min(1),
+        developmentContext: zod_1.z.string().trim().min(20),
+        targetMarkets: zod_1.z.string().trim().min(20),
+        commercializationStrategy: zod_1.z.string().trim().min(1),
+        publicDisclosureStatus: zod_1.z.string().trim().min(10),
+        legalAgreements: zod_1.z.string().trim().min(10),
+        ipProtectionType: zod_1.z.string().trim().min(1),
     }),
-    filingDocuments: filingDocumentsSchema,
+    filingDocuments: filingDocumentsSchema.optional(),
 });
 const submitPatent = async (userId, payload) => {
     const workspace = await workspace_model_1.Workspace.findOne({
@@ -88,6 +100,9 @@ const submitPatent = async (userId, payload) => {
     }).lean();
     if (!workspace) {
         throw new ApiError_1.ApiError(404, 'WORKSPACE_NOT_FOUND', 'Select a valid workspace before submitting for patent review.');
+    }
+    if (workspace.claimedProblemId) {
+        throw new ApiError_1.ApiError(400, 'PATENT_WORKSPACE_NOT_ELIGIBLE', 'Patent support is only available for your own product workspace. ProMove problem-bank workspaces are leaderboard-only.');
     }
     const supportingDocuments = payload.documentUploads.map((item) => {
         const upload = workspace.uploads.find((u) => String(u._id) === item.uploadId);
@@ -104,12 +119,19 @@ const submitPatent = async (userId, payload) => {
             ...(upload.note ? { note: upload.note } : {}),
         };
     });
+    // Validate co-inventors are workspace members (not the submitter)
+    const workspaceMemberIds = new Set([
+        String(workspace.ownerId),
+        ...workspace.teamMemberIds.map((id) => String(id)),
+    ]);
+    const validCoInventorIds = payload.coInventorIds.filter((id) => id !== userId && workspaceMemberIds.has(id));
     const patent = await patent_model_1.Patent.create({
         studentId: userId,
+        coInventorIds: validCoInventorIds,
         workspaceId: payload.workspaceId,
         projectTitle: payload.projectTitle,
         questionnaire: payload.questionnaire,
-        filingDocuments: payload.filingDocuments,
+        ...(payload.filingDocuments ? { filingDocuments: payload.filingDocuments } : {}),
         supportingDocuments,
         status: 'submitted',
         submittedAt: new Date(),
@@ -137,7 +159,7 @@ const submitPatent = async (userId, payload) => {
     return patent.toObject();
 };
 exports.submitPatent = submitPatent;
-const getMyPatents = async (userId) => patent_model_1.Patent.find({ studentId: userId }).sort({ createdAt: -1 }).lean();
+const getMyPatents = async (userId) => patent_model_1.Patent.find({ $or: [{ studentId: userId }, { coInventorIds: userId }] }).sort({ createdAt: -1 }).lean();
 exports.getMyPatents = getMyPatents;
 const togglePatentShowcase = async (userId, patentId) => {
     const patent = await patent_model_1.Patent.findOne({ _id: patentId, studentId: userId });

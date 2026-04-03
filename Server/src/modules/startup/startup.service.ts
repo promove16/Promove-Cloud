@@ -9,13 +9,10 @@ import { ApiError } from '../../utils/ApiError';
 import { PlacementRecord } from '../college/placementRecord.model';
 import { UserRole } from '../../types/roles.types';
 import { normalizeInnovationScore } from '../innovationScore/score.utils';
+import { Workspace } from '../workspace/workspace.model';
 import type { StartupDocumentCategory, StartupReadiness } from './startup.types';
 
 const pdfFileNamePattern = /\.pdf$/i;
-const panPattern = /^[A-Z]{5}[0-9]{4}[A-Z]$/;
-const tanPattern = /^[A-Z]{4}[0-9]{5}[A-Z]$/;
-const gstinPattern = /^[0-9A-Z]{15}$/;
-const pincodePattern = /^[1-9][0-9]{5}$/;
 
 const STARTUP_DOCUMENT_CATEGORIES = [
   'business_plan',
@@ -35,6 +32,11 @@ const STARTUP_DOCUMENT_CATEGORIES = [
   'patent_proof',
   'bank_account_proof',
   'regulatory_license',
+  'prototype_documentation',
+  'technical_documentation',
+  'drawings_diagrams',
+  'design_plan_sketch',
+  'prior_art_search',
 ] as const satisfies readonly StartupDocumentCategory[];
 
 const startupDocumentCategorySchema = z.enum(STARTUP_DOCUMENT_CATEGORIES);
@@ -49,32 +51,21 @@ const DEFAULT_BUSINESS_PROFILE = {
 } as const;
 
 const DEFAULT_REGISTRATION_PROFILE = {
-  legalStructure: 'private_limited',
-  registrationStage: 'idea',
-  proposedEntityName: '',
-  registeredEntityName: '',
-  businessObjective: '',
-  incorporationDate: '',
-  incorporationState: '',
-  registeredOfficeAddress: '',
-  registeredOfficeCity: '',
-  registeredOfficeState: '',
-  registeredOfficePincode: '',
-  cinOrLlpin: '',
-  companyPan: '',
-  tanNumber: '',
-  gstin: '',
-  startupIndiaStatus: 'not_started',
-  startupIndiaRecognitionNumber: '',
-  bankAccountOpened: false,
-  bankName: '',
-  dscReady: false,
-  founderAgreementSigned: false,
-  ndaReady: false,
-  employmentContractsReady: false,
-  operationalLicenses: '',
-  trademarkStatus: 'not_started',
-  patentStatus: 'not_started',
+  problemStatement: '',
+  solutionDifferentiation: '',
+  coreInnovation: '',
+  priorArtStatus: '',
+  workingMechanism: '',
+  keyComponents: '',
+  developmentStage: 'idea',
+  documentationReadiness: '',
+  inventorOwnership: 'individual',
+  developmentContext: '',
+  targetMarkets: '',
+  commercializationStrategy: 'build_startup',
+  publicDisclosureStatus: '',
+  legalAgreements: '',
+  ipProtectionType: 'patent',
 } as const;
 
 const documentLabelMap: Record<StartupDocumentCategory, string> = {
@@ -95,6 +86,11 @@ const documentLabelMap: Record<StartupDocumentCategory, string> = {
   patent_proof: 'patent proof',
   bank_account_proof: 'bank account proof',
   regulatory_license: 'regulatory license document',
+  prototype_documentation: 'prototype documentation',
+  technical_documentation: 'technical documentation',
+  drawings_diagrams: 'drawings or diagrams',
+  design_plan_sketch: 'design, plan, or pen-paper sketch',
+  prior_art_search: 'prior art search notes',
 };
 
 const buildTextField = (max: number) => z.string().trim().max(max).default('');
@@ -112,59 +108,21 @@ const startupBusinessProfileSchema = z
 
 const startupRegistrationProfileSchema = z
   .object({
-    legalStructure: z.enum(['private_limited', 'llp', 'partnership', 'opc']).default('private_limited'),
-    registrationStage: z
-      .enum(['idea', 'name_reserved', 'incorporation_in_progress', 'incorporated', 'startup_india_recognized'])
-      .default('idea'),
-    proposedEntityName: buildTextField(160),
-    registeredEntityName: buildTextField(160),
-    businessObjective: buildTextField(500),
-    incorporationDate: buildTextField(40),
-    incorporationState: buildTextField(120),
-    registeredOfficeAddress: buildTextField(500),
-    registeredOfficeCity: buildTextField(120),
-    registeredOfficeState: buildTextField(120),
-    registeredOfficePincode: buildTextField(6),
-    cinOrLlpin: buildTextField(50),
-    companyPan: buildTextField(20),
-    tanNumber: buildTextField(20),
-    gstin: buildTextField(20),
-    startupIndiaStatus: z.enum(['not_started', 'applied', 'recognized']).default('not_started'),
-    startupIndiaRecognitionNumber: buildTextField(80),
-    bankAccountOpened: z.boolean().default(false),
-    bankName: buildTextField(120),
-    dscReady: z.boolean().default(false),
-    founderAgreementSigned: z.boolean().default(false),
-    ndaReady: z.boolean().default(false),
-    employmentContractsReady: z.boolean().default(false),
-    operationalLicenses: buildTextField(500),
-    trademarkStatus: z.enum(['not_started', 'applied', 'registered']).default('not_started'),
-    patentStatus: z.enum(['not_started', 'drafting', 'filed', 'granted']).default('not_started'),
-  })
-  .superRefine((value, ctx) => {
-    const companyPan = value.companyPan.trim().toUpperCase();
-    if (companyPan && !panPattern.test(companyPan)) {
-      ctx.addIssue({ code: z.ZodIssueCode.custom, path: ['companyPan'], message: 'Company PAN must use the standard PAN format.' });
-    }
-
-    const tanNumber = value.tanNumber.trim().toUpperCase();
-    if (tanNumber && !tanPattern.test(tanNumber)) {
-      ctx.addIssue({ code: z.ZodIssueCode.custom, path: ['tanNumber'], message: 'TAN must use the standard TAN format.' });
-    }
-
-    const gstin = value.gstin.trim().toUpperCase();
-    if (gstin && !gstinPattern.test(gstin)) {
-      ctx.addIssue({ code: z.ZodIssueCode.custom, path: ['gstin'], message: 'GSTIN must be 15 alphanumeric characters.' });
-    }
-
-    const pincode = value.registeredOfficePincode.trim();
-    if (pincode && !pincodePattern.test(pincode)) {
-      ctx.addIssue({
-        code: z.ZodIssueCode.custom,
-        path: ['registeredOfficePincode'],
-        message: 'Registered office pincode must be a valid 6 digit Indian pincode.',
-      });
-    }
+    problemStatement: buildTextField(2500),
+    solutionDifferentiation: buildTextField(2500),
+    coreInnovation: buildTextField(2000),
+    priorArtStatus: buildTextField(2000),
+    workingMechanism: buildTextField(2500),
+    keyComponents: buildTextField(2000),
+    developmentStage: z.enum(['idea', 'prototype', 'mvp', 'market_ready']).default('idea'),
+    documentationReadiness: buildTextField(1500),
+    inventorOwnership: z.enum(['individual', 'team', 'organization']).default('individual'),
+    developmentContext: buildTextField(2000),
+    targetMarkets: buildTextField(2000),
+    commercializationStrategy: z.enum(['build_startup', 'license', 'sell', 'partnership']).default('build_startup'),
+    publicDisclosureStatus: buildTextField(1500),
+    legalAgreements: buildTextField(1500),
+    ipProtectionType: z.enum(['patent', 'copyright', 'trademark', 'design']).default('patent'),
   })
   .default(DEFAULT_REGISTRATION_PROFILE);
 
@@ -221,31 +179,18 @@ type StartupSchemaInput = z.input<typeof startupSchema>;
 type StartupBusinessProfileInput = z.input<typeof startupBusinessProfileSchema>;
 type StartupRegistrationProfileInput = z.input<typeof startupRegistrationProfileSchema>;
 
+type StartupLinkedWorkspace = {
+  _id: Types.ObjectId;
+  ownerId: Types.ObjectId;
+  teamMemberIds: Types.ObjectId[];
+  isActive?: boolean;
+};
+
 const clearReviewMetadata = (startup: InstanceType<typeof Startup>) => {
   startup.reviewRequestedAt = undefined;
   startup.adminReviewedAt = undefined;
   startup.adminReviewedBy = null;
   startup.adminNotes = undefined;
-};
-
-const normalizeOptionalText = (value?: string) => {
-  const normalized = value?.trim();
-  return normalized ? normalized : undefined;
-};
-
-const toInputDateString = (value?: Date | string | null) => {
-  if (!value) return '';
-  if (value instanceof Date) {
-    return value.toISOString().slice(0, 10);
-  }
-  return String(value);
-};
-
-const normalizeDate = (value?: string | Date | null) => {
-  const normalized = typeof value === 'string' ? value.trim() : toInputDateString(value).trim();
-  if (!normalized) return undefined;
-  const parsed = new Date(normalized);
-  return Number.isNaN(parsed.getTime()) ? undefined : parsed;
 };
 
 const normalizeRegistrationProfile = (
@@ -254,32 +199,21 @@ const normalizeRegistrationProfile = (
   const profile = startupRegistrationProfileSchema.parse(registrationProfile ?? DEFAULT_REGISTRATION_PROFILE);
 
   return {
-    legalStructure: profile.legalStructure,
-    registrationStage: profile.registrationStage,
-    proposedEntityName: profile.proposedEntityName.trim(),
-    registeredEntityName: normalizeOptionalText(profile.registeredEntityName),
-    businessObjective: profile.businessObjective.trim(),
-    incorporationDate: normalizeDate(profile.incorporationDate),
-    incorporationState: profile.incorporationState.trim(),
-    registeredOfficeAddress: profile.registeredOfficeAddress.trim(),
-    registeredOfficeCity: profile.registeredOfficeCity.trim(),
-    registeredOfficeState: profile.registeredOfficeState.trim(),
-    registeredOfficePincode: profile.registeredOfficePincode.trim(),
-    cinOrLlpin: normalizeOptionalText(profile.cinOrLlpin)?.toUpperCase(),
-    companyPan: normalizeOptionalText(profile.companyPan)?.toUpperCase(),
-    tanNumber: normalizeOptionalText(profile.tanNumber)?.toUpperCase(),
-    gstin: normalizeOptionalText(profile.gstin)?.toUpperCase(),
-    startupIndiaStatus: profile.startupIndiaStatus,
-    startupIndiaRecognitionNumber: normalizeOptionalText(profile.startupIndiaRecognitionNumber),
-    bankAccountOpened: profile.bankAccountOpened,
-    bankName: profile.bankAccountOpened ? normalizeOptionalText(profile.bankName) : undefined,
-    dscReady: profile.dscReady,
-    founderAgreementSigned: profile.founderAgreementSigned,
-    ndaReady: profile.ndaReady,
-    employmentContractsReady: profile.employmentContractsReady,
-    operationalLicenses: profile.operationalLicenses.trim(),
-    trademarkStatus: profile.trademarkStatus,
-    patentStatus: profile.patentStatus,
+    problemStatement: profile.problemStatement.trim(),
+    solutionDifferentiation: profile.solutionDifferentiation.trim(),
+    coreInnovation: profile.coreInnovation.trim(),
+    priorArtStatus: profile.priorArtStatus.trim(),
+    workingMechanism: profile.workingMechanism.trim(),
+    keyComponents: profile.keyComponents.trim(),
+    developmentStage: profile.developmentStage,
+    documentationReadiness: profile.documentationReadiness.trim(),
+    inventorOwnership: profile.inventorOwnership,
+    developmentContext: profile.developmentContext.trim(),
+    targetMarkets: profile.targetMarkets.trim(),
+    commercializationStrategy: profile.commercializationStrategy,
+    publicDisclosureStatus: profile.publicDisclosureStatus.trim(),
+    legalAgreements: profile.legalAgreements.trim(),
+    ipProtectionType: profile.ipProtectionType,
   };
 };
 
@@ -296,28 +230,6 @@ const buildStartupInput = (source: Partial<Record<string, any>>): StartupSchemaI
   const registrationProfile: StartupRegistrationProfileInput = {
     ...DEFAULT_REGISTRATION_PROFILE,
     ...registrationProfileSource,
-    proposedEntityName: registrationProfileSource.proposedEntityName ?? DEFAULT_REGISTRATION_PROFILE.proposedEntityName,
-    registeredEntityName: registrationProfileSource.registeredEntityName ?? DEFAULT_REGISTRATION_PROFILE.registeredEntityName,
-    businessObjective: registrationProfileSource.businessObjective ?? DEFAULT_REGISTRATION_PROFILE.businessObjective,
-    incorporationDate: toInputDateString(registrationProfileSource.incorporationDate),
-    incorporationState: registrationProfileSource.incorporationState ?? DEFAULT_REGISTRATION_PROFILE.incorporationState,
-    registeredOfficeAddress:
-      registrationProfileSource.registeredOfficeAddress ?? DEFAULT_REGISTRATION_PROFILE.registeredOfficeAddress,
-    registeredOfficeCity: registrationProfileSource.registeredOfficeCity ?? DEFAULT_REGISTRATION_PROFILE.registeredOfficeCity,
-    registeredOfficeState:
-      registrationProfileSource.registeredOfficeState ?? DEFAULT_REGISTRATION_PROFILE.registeredOfficeState,
-    registeredOfficePincode:
-      registrationProfileSource.registeredOfficePincode ?? DEFAULT_REGISTRATION_PROFILE.registeredOfficePincode,
-    cinOrLlpin: registrationProfileSource.cinOrLlpin ?? DEFAULT_REGISTRATION_PROFILE.cinOrLlpin,
-    companyPan: registrationProfileSource.companyPan ?? DEFAULT_REGISTRATION_PROFILE.companyPan,
-    tanNumber: registrationProfileSource.tanNumber ?? DEFAULT_REGISTRATION_PROFILE.tanNumber,
-    gstin: registrationProfileSource.gstin ?? DEFAULT_REGISTRATION_PROFILE.gstin,
-    startupIndiaRecognitionNumber:
-      registrationProfileSource.startupIndiaRecognitionNumber ??
-      DEFAULT_REGISTRATION_PROFILE.startupIndiaRecognitionNumber,
-    bankName: registrationProfileSource.bankName ?? DEFAULT_REGISTRATION_PROFILE.bankName,
-    operationalLicenses:
-      registrationProfileSource.operationalLicenses ?? DEFAULT_REGISTRATION_PROFILE.operationalLicenses,
   };
 
   return {
@@ -346,8 +258,6 @@ const normalizeStartupPayload = (payload: StartupSchemaInput) => {
     normalizedPayload.registrationProfile ?? DEFAULT_REGISTRATION_PROFILE,
   );
   const businessProfile = normalizedPayload.businessProfile ?? DEFAULT_BUSINESS_PROFILE;
-  const patentFiledByRegistration =
-    registrationProfile.patentStatus === 'filed' || registrationProfile.patentStatus === 'granted';
 
   return {
     ...normalizedPayload,
@@ -363,65 +273,104 @@ const normalizeStartupPayload = (payload: StartupSchemaInput) => {
       goToMarketPlan: businessProfile.goToMarketPlan.trim(),
     },
     registrationProfile,
-    traction: {
-      ...normalizedPayload.traction,
-      patentFiled: normalizedPayload.traction.patentFiled || patentFiledByRegistration,
-    },
+    traction: normalizedPayload.traction,
   };
 };
 
-const isIncorporatedStage = (registrationStage?: string) =>
-  registrationStage === 'incorporated' || registrationStage === 'startup_india_recognized';
+const getWorkspaceMemberIds = (workspace: StartupLinkedWorkspace, userId?: string) => {
+  const memberIds = [
+    String(workspace.ownerId),
+    ...workspace.teamMemberIds.map((memberId) => String(memberId)),
+  ];
+
+  if (userId) {
+    memberIds.push(String(userId));
+  }
+
+  return [...new Set(memberIds)].map((memberId) => new Types.ObjectId(memberId));
+};
+
+const resolveLinkedWorkspace = async (userId: string, projectId?: string) => {
+  if (!projectId) {
+    return null;
+  }
+
+  const workspace = await Workspace.findOne({
+    _id: projectId,
+    isActive: true,
+    $or: [{ ownerId: userId }, { teamMemberIds: userId }],
+  })
+    .select('_id ownerId teamMemberIds isActive')
+    .lean<StartupLinkedWorkspace | null>();
+
+  if (!workspace) {
+    throw new ApiError(
+      404,
+      'WORKSPACE_NOT_FOUND',
+      'Select a valid workspace that you belong to before saving this startup.',
+    );
+  }
+
+  return workspace;
+};
+
+const applyWorkspaceContextToStartupPayload = async (
+  userId: string,
+  payload: ReturnType<typeof normalizeStartupPayload>,
+) => {
+  const workspace = await resolveLinkedWorkspace(userId, payload.projectId);
+  const founderIds = [new Types.ObjectId(userId)];
+
+  const teamMemberIds: Types.ObjectId[] = [];
+  if (workspace) {
+    const allMemberIds = getWorkspaceMemberIds(workspace);
+    for (const memberId of allMemberIds) {
+      if (String(memberId) !== String(userId)) {
+        teamMemberIds.push(memberId);
+      }
+    }
+  }
+
+  const totalMembers = founderIds.length + teamMemberIds.length;
+  const teamSize = workspace ? Math.max(totalMembers, payload.teamSize || 1) : Math.max(payload.teamSize || 1, 1);
+
+  return {
+    ...payload,
+    projectId: workspace ? String(workspace._id) : undefined,
+    founderIds,
+    teamMemberIds,
+    teamSize,
+  };
+};
+
+const getAccessibleWorkspaceIds = async (userId: string) => {
+  const workspaces = await Workspace.find({
+    isActive: true,
+    $or: [{ ownerId: userId }, { teamMemberIds: userId }],
+  })
+    .select('_id')
+    .lean<Array<{ _id: Types.ObjectId }>>();
+
+  return workspaces.map((workspace) => workspace._id);
+};
+
+const buildAccessibleStartupQuery = (userId: string, workspaceIds: Types.ObjectId[]) => ({
+  isActive: true,
+  $or: [
+    { founderIds: userId },
+    { teamMemberIds: userId },
+    ...(workspaceIds.length > 0 ? [{ projectId: { $in: workspaceIds } }] : []),
+  ],
+});
 
 const getRequiredStartupDocumentCategories = (startup: {
   registrationProfile?: {
-    legalStructure?: string;
-    registrationStage?: string;
-    startupIndiaStatus?: string;
-    trademarkStatus?: string;
-    patentStatus?: string;
+    developmentStage?: string;
   };
 }): StartupDocumentCategory[] => {
-  const categories = new Set<StartupDocumentCategory>(['founder_agreement']);
-  const registrationProfile = startup.registrationProfile;
-
-  if (isIncorporatedStage(registrationProfile?.registrationStage)) {
-    categories.add('business_plan');
-    categories.add('incorporation_certificate');
-    categories.add('registered_office_proof');
-    categories.add('office_noc_or_utility_bill');
-    categories.add('company_pan');
-
-    if (registrationProfile?.legalStructure === 'private_limited' || registrationProfile?.legalStructure === 'opc') {
-      categories.add('moa');
-      categories.add('aoa');
-    }
-
-    if (registrationProfile?.legalStructure === 'llp') {
-      categories.add('llp_agreement');
-    }
-
-    if (registrationProfile?.legalStructure === 'partnership') {
-      categories.add('partnership_deed');
-    }
-  }
-
-  if (
-    registrationProfile?.startupIndiaStatus === 'recognized' ||
-    registrationProfile?.registrationStage === 'startup_india_recognized'
-  ) {
-    categories.add('startup_india_certificate');
-  }
-
-  if (registrationProfile?.trademarkStatus === 'registered') {
-    categories.add('trademark_certificate');
-  }
-
-  if (registrationProfile?.patentStatus === 'filed' || registrationProfile?.patentStatus === 'granted') {
-    categories.add('patent_proof');
-  }
-
-  return Array.from(categories);
+  return startup.registrationProfile?.developmentStage === 'idea'
+    ? ['design_plan_sketch']
+    : ['technical_documentation'];
 };
 
 const buildStartupReadiness = (startup: {
@@ -440,24 +389,21 @@ const buildStartupReadiness = (startup: {
     goToMarketPlan?: string;
   };
   registrationProfile?: {
-    legalStructure?: string;
-    registrationStage?: string;
-    proposedEntityName?: string;
-    registeredEntityName?: string;
-    businessObjective?: string;
-    incorporationState?: string;
-    registeredOfficeAddress?: string;
-    registeredOfficeCity?: string;
-    registeredOfficeState?: string;
-    registeredOfficePincode?: string;
-    cinOrLlpin?: string;
-    companyPan?: string;
-    startupIndiaStatus?: string;
-    startupIndiaRecognitionNumber?: string;
-    dscReady?: boolean;
-    founderAgreementSigned?: boolean;
-    bankAccountOpened?: boolean;
-    bankName?: string;
+    problemStatement?: string;
+    solutionDifferentiation?: string;
+    coreInnovation?: string;
+    priorArtStatus?: string;
+    workingMechanism?: string;
+    keyComponents?: string;
+    developmentStage?: string;
+    documentationReadiness?: string;
+    inventorOwnership?: string;
+    developmentContext?: string;
+    targetMarkets?: string;
+    commercializationStrategy?: string;
+    publicDisclosureStatus?: string;
+    legalAgreements?: string;
+    ipProtectionType?: string;
   };
 }): StartupReadiness => {
   const missingItems: string[] = [];
@@ -480,45 +426,25 @@ const buildStartupReadiness = (startup: {
   addMissing(!startup.tagline?.trim(), 'startup tagline');
   addMissing(!startup.category?.trim(), 'startup category');
   addMissing(startup.founderIds.length === 0, 'at least one founder');
-  addMissing((startup.businessProfile?.problemStatement?.trim().length ?? 0) < 30, 'problem statement');
-  addMissing((startup.businessProfile?.solutionSummary?.trim().length ?? 0) < 30, 'solution summary');
-  addMissing((startup.businessProfile?.targetCustomers?.trim().length ?? 0) < 20, 'target customers');
-  addMissing((startup.businessProfile?.marketAnalysis?.trim().length ?? 0) < 20, 'market analysis');
-  addMissing((startup.businessProfile?.revenueModel?.trim().length ?? 0) < 20, 'revenue model');
-  addMissing((startup.businessProfile?.goToMarketPlan?.trim().length ?? 0) < 20, 'go-to-market plan');
-  addMissing(!startup.registrationProfile?.legalStructure, 'legal structure');
-  addMissing(!startup.registrationProfile?.registrationStage, 'registration stage');
+  addMissing((startup.registrationProfile?.problemStatement?.trim().length ?? 0) < 40, 'IPR problem statement');
   addMissing(
-    !startup.registrationProfile?.proposedEntityName?.trim() &&
-      !startup.registrationProfile?.registeredEntityName?.trim(),
-    'proposed or registered entity name',
+    (startup.registrationProfile?.solutionDifferentiation?.trim().length ?? 0) < 40,
+    'solution differentiation',
   );
-  addMissing((startup.registrationProfile?.businessObjective?.trim().length ?? 0) < 20, 'business objective');
-  addMissing((startup.registrationProfile?.registeredOfficeAddress?.trim().length ?? 0) < 20, 'registered office address');
-  addMissing(!startup.registrationProfile?.registeredOfficeCity?.trim(), 'registered office city');
-  addMissing(!startup.registrationProfile?.registeredOfficeState?.trim(), 'registered office state');
-  addMissing(!pincodePattern.test(startup.registrationProfile?.registeredOfficePincode?.trim() ?? ''), 'registered office pincode');
-  addMissing(!startup.registrationProfile?.dscReady, 'digital signature certificate readiness');
-  addMissing(!startup.registrationProfile?.founderAgreementSigned, 'founder agreement confirmation');
+  addMissing((startup.registrationProfile?.coreInnovation?.trim().length ?? 0) < 30, 'core innovation');
+  addMissing((startup.registrationProfile?.priorArtStatus?.trim().length ?? 0) < 20, 'prior art status');
+  addMissing((startup.registrationProfile?.workingMechanism?.trim().length ?? 0) < 40, 'working mechanism');
+  addMissing((startup.registrationProfile?.keyComponents?.trim().length ?? 0) < 20, 'key components');
+  addMissing(!startup.registrationProfile?.developmentStage?.trim(), 'innovation stage');
+  addMissing((startup.registrationProfile?.documentationReadiness?.trim().length ?? 0) < 10, 'documentation readiness');
+  addMissing(!startup.registrationProfile?.inventorOwnership?.trim(), 'inventor ownership');
+  addMissing((startup.registrationProfile?.developmentContext?.trim().length ?? 0) < 20, 'development context');
+  addMissing((startup.registrationProfile?.targetMarkets?.trim().length ?? 0) < 20, 'target markets');
+  addMissing(!startup.registrationProfile?.commercializationStrategy?.trim(), 'commercialization strategy');
+  addMissing((startup.registrationProfile?.publicDisclosureStatus?.trim().length ?? 0) < 10, 'public disclosure status');
+  addMissing((startup.registrationProfile?.legalAgreements?.trim().length ?? 0) < 10, 'legal agreements');
+  addMissing(!startup.registrationProfile?.ipProtectionType?.trim(), 'IP protection type');
   addMissing(!startup.pitchDeckUrl && !uploadedCategorySet.has('business_plan'), 'business plan or pitch deck upload');
-  addMissing(!uploadedCategorySet.has('founder_agreement'), 'founder agreement upload');
-
-  if (isIncorporatedStage(startup.registrationProfile?.registrationStage)) {
-    addMissing(!startup.registrationProfile?.incorporationState?.trim(), 'incorporation state');
-    addMissing(!startup.registrationProfile?.cinOrLlpin?.trim(), 'CIN or LLPIN');
-    addMissing(!startup.registrationProfile?.companyPan?.trim(), 'company PAN');
-  }
-
-  if (
-    startup.registrationProfile?.startupIndiaStatus === 'recognized' ||
-    startup.registrationProfile?.registrationStage === 'startup_india_recognized'
-  ) {
-    addMissing(!startup.registrationProfile?.startupIndiaRecognitionNumber?.trim(), 'Startup India recognition number');
-  }
-
-  if (startup.registrationProfile?.bankAccountOpened && !startup.registrationProfile?.bankName?.trim()) {
-    addMissing(true, 'bank name');
-  }
 
   for (const category of requiredDocumentCategories) {
     addMissing(!uploadedCategorySet.has(category), documentLabelMap[category]);
@@ -564,21 +490,30 @@ const serializeStartup = (startup: { toObject?: () => Record<string, any> } | Re
 };
 
 export const createStartupProfile = async (userId: string, payload: z.infer<typeof startupSchema>) => {
+  const normalizedPayload = normalizeStartupPayload(buildStartupInput(payload));
+  const startupPayload = await applyWorkspaceContextToStartupPayload(userId, normalizedPayload);
+
   const startup = await Startup.create({
-    founderIds: [userId],
-    ...normalizeStartupPayload(buildStartupInput(payload)),
+    ...startupPayload,
   });
 
   return serializeStartup(startup);
 };
 
 export const getMyStartups = async (userId: string) => {
-  const startups = await Startup.find({ founderIds: userId, isActive: true }).sort({ updatedAt: -1 }).lean();
+  const workspaceIds = await getAccessibleWorkspaceIds(userId);
+  const startups = await Startup.find(buildAccessibleStartupQuery(userId, workspaceIds))
+    .sort({ updatedAt: -1 })
+    .lean();
   return startups.map((startup) => serializeStartup(startup));
 };
 
 export const getStartupById = async (startupId: string, userId: string) => {
-  const startup = await Startup.findOne({ _id: startupId, founderIds: userId, isActive: true }).lean();
+  const workspaceIds = await getAccessibleWorkspaceIds(userId);
+  const startup = await Startup.findOne({
+    _id: startupId,
+    ...buildAccessibleStartupQuery(userId, workspaceIds),
+  }).lean();
   if (!startup) {
     throw new ApiError(404, 'STARTUP_NOT_FOUND', 'Startup not found.');
   }
@@ -586,13 +521,12 @@ export const getStartupById = async (startupId: string, userId: string) => {
 };
 
 export const getStartupForFounder = async (startupId: string, userId: string) => {
-  const startup = await Startup.findById(startupId);
+  const workspaceIds = await getAccessibleWorkspaceIds(userId);
+  const startup = await Startup.findOne({
+    _id: startupId,
+    ...buildAccessibleStartupQuery(userId, workspaceIds),
+  });
   if (!startup) {
-    throw new ApiError(403, 'FORBIDDEN', 'Only founders can access this startup.');
-  }
-
-  const isFounder = startup.founderIds.some((founderId) => String(founderId) === String(userId));
-  if (!isFounder) {
     throw new ApiError(403, 'FORBIDDEN', 'Only founders can access this startup.');
   }
 
@@ -605,23 +539,43 @@ export const updateStartupProfile = async (
   payload: Partial<z.infer<typeof startupSchema>>,
 ) => {
   const startup = await getStartupForFounder(startupId, userId);
+  const startupSnapshot = startup.toObject();
   const mergedPayload = buildStartupInput({
-    ...startup.toObject(),
+    ...startupSnapshot,
     ...payload,
     businessProfile: {
-      ...(startup.toObject().businessProfile ?? {}),
+      ...(startupSnapshot.businessProfile ?? {}),
       ...(payload.businessProfile ?? {}),
     },
     registrationProfile: {
-      ...(startup.toObject().registrationProfile ?? {}),
+      ...(startupSnapshot.registrationProfile ?? {}),
       ...(payload.registrationProfile ?? {}),
     },
     traction: {
-      ...(startup.toObject().traction ?? {}),
+      ...(startupSnapshot.traction ?? {}),
       ...(payload.traction ?? {}),
     },
   });
-  Object.assign(startup, normalizeStartupPayload(mergedPayload));
+  const normalizedPayload = normalizeStartupPayload(mergedPayload);
+  const startupPayload = await applyWorkspaceContextToStartupPayload(userId, normalizedPayload);
+
+  // Preserve existing founderIds — don't demote co-founders on update
+  const existingFounderSet = new Set(startup.founderIds.map((id) => String(id)));
+  const combinedFounderIds = [...startup.founderIds];
+  for (const newId of startupPayload.founderIds) {
+    if (!existingFounderSet.has(String(newId))) {
+      combinedFounderIds.push(newId);
+    }
+  }
+  startupPayload.founderIds = combinedFounderIds;
+
+  // Team members = workspace members who are NOT founders
+  const founderSet = new Set(combinedFounderIds.map((id) => String(id)));
+  startupPayload.teamMemberIds = startupPayload.teamMemberIds.filter(
+    (id) => !founderSet.has(String(id)),
+  );
+
+  Object.assign(startup, startupPayload);
 
   if (startup.reviewStatus === 'review_requested') {
     startup.reviewStatus = 'draft';
@@ -873,6 +827,45 @@ export const deleteStartupDocument = async (startupId: string, userId: string, d
   return serializeStartup(startup);
 };
 
+export const promoteToCoFounder = async (startupId: string, userId: string, memberId: string) => {
+  const startup = await getStartupForFounder(startupId, userId);
+
+  const isTeamMember = startup.teamMemberIds.some((id) => String(id) === memberId);
+  if (!isTeamMember) {
+    throw new ApiError(400, 'NOT_A_TEAM_MEMBER', 'User is not a team member of this startup.');
+  }
+
+  const alreadyFounder = startup.founderIds.some((id) => String(id) === memberId);
+  if (alreadyFounder) {
+    throw new ApiError(400, 'ALREADY_FOUNDER', 'User is already a founder.');
+  }
+
+  startup.founderIds.push(new Types.ObjectId(memberId));
+  startup.teamMemberIds = startup.teamMemberIds.filter((id) => String(id) !== memberId);
+  await startup.save();
+
+  return serializeStartup(startup);
+};
+
+export const demoteFromCoFounder = async (startupId: string, userId: string, memberId: string) => {
+  const startup = await getStartupForFounder(startupId, userId);
+
+  if (String(memberId) === String(userId)) {
+    throw new ApiError(400, 'CANNOT_DEMOTE_SELF', 'You cannot demote yourself from founder.');
+  }
+
+  const isFounder = startup.founderIds.some((id) => String(id) === memberId);
+  if (!isFounder) {
+    throw new ApiError(400, 'NOT_A_FOUNDER', 'User is not a founder of this startup.');
+  }
+
+  startup.founderIds = startup.founderIds.filter((id) => String(id) !== memberId);
+  startup.teamMemberIds.push(new Types.ObjectId(memberId));
+  await startup.save();
+
+  return serializeStartup(startup);
+};
+
 export const listStartupsForAdmin = async (status?: 'draft' | 'review_requested' | 'changes_requested' | 'approved') => {
   const query = status ? { isActive: true, reviewStatus: status } : { isActive: true };
 
@@ -901,12 +894,21 @@ export const listStartupsForAdmin = async (status?: 'draft' | 'review_requested'
       pitchDeckUrl?: string;
       pitchDeckName?: string;
       registrationProfile: {
-        legalStructure: string;
-        registrationStage: string;
-        proposedEntityName?: string;
-        registeredEntityName?: string;
-        startupIndiaStatus?: string;
-        startupIndiaRecognitionNumber?: string;
+        problemStatement: string;
+        solutionDifferentiation: string;
+        coreInnovation: string;
+        priorArtStatus: string;
+        workingMechanism: string;
+        keyComponents: string;
+        developmentStage: string;
+        documentationReadiness: string;
+        inventorOwnership: string;
+        developmentContext: string;
+        targetMarkets: string;
+        commercializationStrategy: string;
+        publicDisclosureStatus: string;
+        legalAgreements: string;
+        ipProtectionType: string;
       };
       documents: Array<{
         _id: Types.ObjectId;
@@ -965,18 +967,7 @@ export const listStartupsForAdmin = async (status?: 'draft' | 'review_requested'
       ...(startup.pitchDeckUrl ? { pitchDeckUrl: startup.pitchDeckUrl } : {}),
       ...(startup.pitchDeckName ? { pitchDeckName: startup.pitchDeckName } : {}),
       traction: startup.traction,
-      registrationProfile: {
-        legalStructure: startup.registrationProfile.legalStructure,
-        registrationStage: startup.registrationProfile.registrationStage,
-        proposedEntityName: startup.registrationProfile.proposedEntityName,
-        ...(startup.registrationProfile.registeredEntityName
-          ? { registeredEntityName: startup.registrationProfile.registeredEntityName }
-          : {}),
-        startupIndiaStatus: startup.registrationProfile.startupIndiaStatus,
-        ...(startup.registrationProfile.startupIndiaRecognitionNumber
-          ? { startupIndiaRecognitionNumber: startup.registrationProfile.startupIndiaRecognitionNumber }
-          : {}),
-      },
+      registrationProfile: startup.registrationProfile,
       readiness,
       documents: startup.documents.map((document) => ({
         _id: String(document._id),

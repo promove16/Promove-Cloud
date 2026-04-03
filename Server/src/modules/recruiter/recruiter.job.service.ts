@@ -30,6 +30,23 @@ export const getPublicRecruiterJobs = async (
   );
 };
 
+export const getPublicRecruiterJob = async (
+  jobId: string,
+  studentId?: string,
+): Promise<RecruiterJobView> => {
+  const job = await JobPost.findOne({ _id: jobId, isActive: true }).lean();
+
+  if (!job) {
+    throw new ApiError(404, 'JOB_NOT_FOUND', 'Job post not found');
+  }
+
+  return mapJob(job, {
+    hasApplied: studentId
+      ? job.applicantIds.some((applicantId) => String(applicantId) === studentId)
+      : undefined,
+  });
+};
+
 export const createRecruiterJob = async (recruiterId: string, payload: z.infer<typeof jobCreateSchema>) => {
   const job = await JobPost.create({
     recruiterId,

@@ -126,6 +126,11 @@ const SettingsPage = lazy(() =>
     default: module.SettingsPage,
   })),
 );
+const Homepage = lazy(() =>
+  import("../app/pages/Homepage").then((module) => ({
+    default: module.Homepage,
+  })),
+);
 
 const LegacyStudentDashboard = lazy(() =>
   import("../app/pages/dashboards/StudentDashboard").then((module) => ({
@@ -170,6 +175,11 @@ const LeadershipProfile = lazy(() =>
 const Marketplace = lazy(() =>
   import("../features/student/Marketplace").then((module) => ({
     default: module.Marketplace,
+  })),
+);
+const MarketplaceJobDetail = lazy(() =>
+  import("../features/student/MarketplaceJobDetail").then((module) => ({
+    default: module.MarketplaceJobDetail,
   })),
 );
 const PublicStudentProfilePage = lazy(() =>
@@ -308,16 +318,16 @@ export const router = createBrowserRouter([
     errorElement: <RouteErrorPage />,
     children: [
       {
-        index: true,
-        element: <Navigate to="/login" replace />,
-      },
-      {
         path: "/students/:profileSlug",
         element: <LazyPage component={PublicStudentProfilePage} />,
       },
       {
         element: <PublicOnlyRoute />,
         children: [
+          {
+            index: true,
+            element: <LazyPage component={Homepage} />,
+          },
           {
             element: <AuthLayout />,
             children: [
@@ -443,6 +453,14 @@ export const router = createBrowserRouter([
         element: (
           <ProtectedRoleRoute role={UserRole.STUDENT}>
             <LazyPage component={Marketplace} />
+          </ProtectedRoleRoute>
+        ),
+      },
+      {
+        path: "/marketplace/jobs/:jobId",
+        element: (
+          <ProtectedRoleRoute role={UserRole.STUDENT}>
+            <LazyPage component={MarketplaceJobDetail} />
           </ProtectedRoleRoute>
         ),
       },

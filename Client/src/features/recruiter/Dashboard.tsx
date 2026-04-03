@@ -22,6 +22,17 @@ const initialJobForm = {
   minimumInnovationScore: '0',
   type: 'Full-time' as const,
   location: '',
+  workMode: 'On-site' as const,
+  salaryExpectation: '',
+  experienceLevel: '',
+  openings: '1',
+  companyOverview: '',
+  roleSummary: '',
+  keyResponsibilities: '',
+  requirements: '',
+  benefits: '',
+  applicationSteps: '',
+  expiresAt: '',
 };
 
 const initialDriveForm = {
@@ -32,6 +43,12 @@ const initialDriveForm = {
   description: '',
   minimumInnovationScore: '0',
 };
+
+const parseTextareaList = (value: string) =>
+  value
+    .split('\n')
+    .map((entry) => entry.trim())
+    .filter(Boolean);
 
 export default function RecruiterDashboard() {
   const navigate = useNavigate();
@@ -68,6 +85,17 @@ export default function RecruiterDashboard() {
       minimumInnovationScore: Number(jobForm.minimumInnovationScore),
       type: jobForm.type,
       location: jobForm.location,
+      workMode: jobForm.workMode,
+      salaryExpectation: jobForm.salaryExpectation.trim() || undefined,
+      experienceLevel: jobForm.experienceLevel.trim() || undefined,
+      openings: jobForm.openings ? Number(jobForm.openings) : undefined,
+      companyOverview: jobForm.companyOverview.trim() || undefined,
+      roleSummary: jobForm.roleSummary.trim() || undefined,
+      keyResponsibilities: parseTextareaList(jobForm.keyResponsibilities),
+      requirements: parseTextareaList(jobForm.requirements),
+      benefits: parseTextareaList(jobForm.benefits),
+      applicationSteps: parseTextareaList(jobForm.applicationSteps),
+      expiresAt: jobForm.expiresAt ? new Date(jobForm.expiresAt).toISOString() : undefined,
     });
     setJobForm(initialJobForm);
     setModalMode(null);
@@ -225,6 +253,22 @@ export default function RecruiterDashboard() {
                 <Input value={jobForm.company} onChange={(event) => setJobForm((current) => ({ ...current, company: event.target.value }))} placeholder="Company" />
                 <Input value={jobForm.domain} onChange={(event) => setJobForm((current) => ({ ...current, domain: event.target.value }))} placeholder="Domain" />
                 <Input value={jobForm.location} onChange={(event) => setJobForm((current) => ({ ...current, location: event.target.value }))} placeholder="Location" />
+                <div className="grid gap-4 md:grid-cols-2">
+                  <select
+                    value={jobForm.workMode}
+                    onChange={(event) => setJobForm((current) => ({ ...current, workMode: event.target.value as typeof current.workMode }))}
+                    className="rounded-xl border border-slate-800 bg-slate-900 px-4 py-3 text-white"
+                  >
+                    <option value="On-site">On-site</option>
+                    <option value="Hybrid">Hybrid</option>
+                    <option value="Remote">Remote</option>
+                  </select>
+                  <Input value={jobForm.salaryExpectation} onChange={(event) => setJobForm((current) => ({ ...current, salaryExpectation: event.target.value }))} placeholder="Salary expectation" />
+                </div>
+                <div className="grid gap-4 md:grid-cols-2">
+                  <Input value={jobForm.experienceLevel} onChange={(event) => setJobForm((current) => ({ ...current, experienceLevel: event.target.value }))} placeholder="Experience level" />
+                  <Input value={jobForm.openings} onChange={(event) => setJobForm((current) => ({ ...current, openings: event.target.value }))} placeholder="Openings count" />
+                </div>
                 <Input value={jobForm.minimumInnovationScore} onChange={(event) => setJobForm((current) => ({ ...current, minimumInnovationScore: event.target.value }))} placeholder="Minimum innovation score" />
                 <select
                   value={jobForm.type}
@@ -241,6 +285,51 @@ export default function RecruiterDashboard() {
                   onChange={(event) => setJobForm((current) => ({ ...current, description: event.target.value }))}
                   placeholder="Job description"
                   className="min-h-28 rounded-xl border border-slate-800 bg-slate-900 px-4 py-3 text-white outline-none"
+                />
+                <textarea
+                  value={jobForm.companyOverview}
+                  onChange={(event) => setJobForm((current) => ({ ...current, companyOverview: event.target.value }))}
+                  placeholder="About company"
+                  className="min-h-24 rounded-xl border border-slate-800 bg-slate-900 px-4 py-3 text-white outline-none"
+                />
+                <textarea
+                  value={jobForm.roleSummary}
+                  onChange={(event) => setJobForm((current) => ({ ...current, roleSummary: event.target.value }))}
+                  placeholder="Role summary"
+                  className="min-h-24 rounded-xl border border-slate-800 bg-slate-900 px-4 py-3 text-white outline-none"
+                />
+                <div className="grid gap-4 md:grid-cols-2">
+                  <textarea
+                    value={jobForm.keyResponsibilities}
+                    onChange={(event) => setJobForm((current) => ({ ...current, keyResponsibilities: event.target.value }))}
+                    placeholder="Key responsibilities, one per line"
+                    className="min-h-28 rounded-xl border border-slate-800 bg-slate-900 px-4 py-3 text-white outline-none"
+                  />
+                  <textarea
+                    value={jobForm.requirements}
+                    onChange={(event) => setJobForm((current) => ({ ...current, requirements: event.target.value }))}
+                    placeholder="Requirements, one per line"
+                    className="min-h-28 rounded-xl border border-slate-800 bg-slate-900 px-4 py-3 text-white outline-none"
+                  />
+                </div>
+                <div className="grid gap-4 md:grid-cols-2">
+                  <textarea
+                    value={jobForm.benefits}
+                    onChange={(event) => setJobForm((current) => ({ ...current, benefits: event.target.value }))}
+                    placeholder="Benefits and perks, one per line"
+                    className="min-h-24 rounded-xl border border-slate-800 bg-slate-900 px-4 py-3 text-white outline-none"
+                  />
+                  <textarea
+                    value={jobForm.applicationSteps}
+                    onChange={(event) => setJobForm((current) => ({ ...current, applicationSteps: event.target.value }))}
+                    placeholder="Application steps, one per line"
+                    className="min-h-24 rounded-xl border border-slate-800 bg-slate-900 px-4 py-3 text-white outline-none"
+                  />
+                </div>
+                <Input
+                  type="datetime-local"
+                  value={jobForm.expiresAt}
+                  onChange={(event) => setJobForm((current) => ({ ...current, expiresAt: event.target.value }))}
                 />
               </div>
               <DialogFooter>

@@ -1,7 +1,7 @@
 import { Schema, model } from 'mongoose';
 import { IPatent } from './patent.types';
 
-const filingDocumentsSchema = new Schema<IPatent['filingDocuments']>(
+const filingDocumentsSchema = new Schema<NonNullable<IPatent['filingDocuments']>>(
   {
     inventionCategory: {
       type: String,
@@ -48,7 +48,7 @@ const supportingDocumentSchema = new Schema<IPatent['supportingDocuments'][numbe
     note: { type: String, default: undefined },
     documentCategory: {
       type: String,
-      enum: ['inventor_journal', 'prior_art_search', 'specification_draft', 'abstract_draft', 'claims_draft', 'drawings_diagrams', 'examination_request', 'form3_foreign_filing', 'cost_management'],
+      enum: ['inventor_journal', 'prior_art_search', 'specification_draft', 'abstract_draft', 'claims_draft', 'drawings_diagrams', 'design_plan_sketch', 'examination_request', 'form3_foreign_filing', 'cost_management'],
       default: undefined,
     },
   },
@@ -58,16 +58,27 @@ const supportingDocumentSchema = new Schema<IPatent['supportingDocuments'][numbe
 const patentSchema = new Schema<IPatent>(
   {
     studentId: { type: Schema.Types.ObjectId, required: true, index: true },
+    coInventorIds: { type: [Schema.Types.ObjectId], default: [] },
     workspaceId: { type: Schema.Types.ObjectId, default: undefined },
     projectTitle: { type: String, required: true, trim: true },
     questionnaire: {
-      whatIsYourInnovation: { type: String, required: true },
-      noveltyExplanation: { type: String, required: true },
-      technicalDetails: { type: String, required: true },
-      marketUseCase: { type: String, required: true },
-      priorArtAwareness: { type: String, required: true },
+      problemStatement: { type: String, required: true },
+      solutionDifferentiation: { type: String, required: true },
+      coreInnovation: { type: String, required: true },
+      priorArtStatus: { type: String, required: true },
+      workingMechanism: { type: String, required: true },
+      keyComponents: { type: String, required: true },
+      developmentStage: { type: String, required: true },
+      documentationReadiness: { type: String, required: true },
+      inventorOwnership: { type: String, required: true },
+      developmentContext: { type: String, required: true },
+      targetMarkets: { type: String, required: true },
+      commercializationStrategy: { type: String, required: true },
+      publicDisclosureStatus: { type: String, required: true },
+      legalAgreements: { type: String, required: true },
+      ipProtectionType: { type: String, required: true },
     },
-    filingDocuments: { type: filingDocumentsSchema, required: true },
+    filingDocuments: { type: filingDocumentsSchema, default: undefined },
     supportingDocuments: { type: [supportingDocumentSchema], default: [] },
     status: {
       type: String,
@@ -85,5 +96,6 @@ const patentSchema = new Schema<IPatent>(
 );
 
 patentSchema.index({ studentId: 1, status: 1 });
+patentSchema.index({ coInventorIds: 1 });
 
 export const Patent = model<IPatent>('Patent', patentSchema);

@@ -8,6 +8,7 @@ import { UserRole } from '../../types/roles.types';
 import { ScoreEvent } from '../innovationScore/score.model';
 import { Startup } from '../startup/startup.model';
 import { User } from '../user/user.model';
+import { Workspace } from '../workspace/workspace.model';
 import { Deal } from './deal.model';
 import {
   CapTableResponse,
@@ -328,6 +329,26 @@ const ensureStudent = async (studentId: string) => {
   }
 
   return student;
+};
+
+const getAccessibleStartupIdsForStudent = async (userId: string) => {
+  const workspaces = await Workspace.find({
+    $or: [{ ownerId: userId }, { teamMemberIds: userId }],
+  })
+    .select('_id')
+    .lean<Array<{ _id: Types.ObjectId }>>();
+  const workspaceIds = workspaces.map((workspace) => workspace._id);
+
+  const startups = await Startup.find({
+    $or: [
+      { founderIds: userId },
+      ...(workspaceIds.length > 0 ? [{ projectId: { $in: workspaceIds } }] : []),
+    ],
+  })
+    .select('_id')
+    .lean<Array<{ _id: Types.ObjectId }>>();
+
+  return startups.map((startup) => startup._id);
 };
 
 const resolveNormalizedRole = (investorType: InvestorType, chosenRole?: InvestorRole): InvestorRole => {
@@ -696,8 +717,13 @@ export const listDealsForParticipant = async (userId: string, role: UserRole): P
   }
 
   await ensureStudent(userId);
+  const startupIds = await getAccessibleStartupIdsForStudent(userId);
 
-  const deals = await Deal.find({ studentId: userId, status: { $ne: 'cancelled' } })
+  if (startupIds.length === 0) {
+    return [];
+  }
+
+  const deals = await Deal.find({ startupId: { $in: startupIds }, status: { $ne: 'cancelled' } })
     .sort({ updatedAt: -1, createdAt: -1 })
     .lean<DealDocumentLike[]>();
 
@@ -719,9 +745,14 @@ export const getDealForParticipant = async (userId: string, role: UserRole, deal
     throw new ApiError(403, 'FORBIDDEN', 'You cannot access this deal');
   }
 
+  const studentStartupIds = role === UserRole.STUDENT ? await getAccessibleStartupIdsForStudent(userId) : [];
   const deal = await Deal.findOne({
     _id: dealId,
-    ...(role === UserRole.ADMIN ? {} : role === UserRole.INVESTOR ? { investorId: userId } : { studentId: userId }),
+    ...(role === UserRole.ADMIN
+      ? {}
+      : role === UserRole.INVESTOR
+        ? { investorId: userId }
+        : { startupId: { $in: studentStartupIds } }),
   }).lean<DealDocumentLike | null>();
 
   if (!deal || deal.status === 'cancelled') {

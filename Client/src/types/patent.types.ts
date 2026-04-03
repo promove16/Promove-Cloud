@@ -5,16 +5,27 @@ export type PatentDocumentCategory =
   | 'abstract_draft'
   | 'claims_draft'
   | 'drawings_diagrams'
+  | 'design_plan_sketch'
   | 'examination_request'
   | 'form3_foreign_filing'
   | 'cost_management';
 
 export interface PatentQuestionnaire {
-  whatIsYourInnovation: string;
-  noveltyExplanation: string;
-  technicalDetails: string;
-  marketUseCase: string;
-  priorArtAwareness: string;
+  problemStatement: string;
+  solutionDifferentiation: string;
+  coreInnovation: string;
+  priorArtStatus: string;
+  workingMechanism: string;
+  keyComponents: string;
+  developmentStage: string;
+  documentationReadiness: string;
+  inventorOwnership: string;
+  developmentContext: string;
+  targetMarkets: string;
+  commercializationStrategy: string;
+  publicDisclosureStatus: string;
+  legalAgreements: string;
+  ipProtectionType: string;
 }
 
 export type PatentInventionCategory =
@@ -67,6 +78,7 @@ export interface PatentSupportingDocument {
 export interface PatentSubmission {
   _id: string;
   studentId: string;
+  coInventorIds: string[];
   workspaceId?: string;
   projectTitle: string;
   questionnaire: PatentQuestionnaire;

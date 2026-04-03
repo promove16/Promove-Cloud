@@ -76,6 +76,12 @@ export const recruiterApi = {
     );
     return response.data.data;
   },
+  async getPublicJob(jobId: string) {
+    const response = await api.get<ApiSuccessResponse<RecruiterJobView>>(
+      `/api/recruiter/jobs/public/job/${jobId}`,
+    );
+    return response.data.data;
+  },
   async createJob(payload: {
     title: string;
     company: string;
@@ -84,6 +90,16 @@ export const recruiterApi = {
     minimumInnovationScore: number;
     type: 'Full-time' | 'Internship' | 'Contract' | 'Part-time';
     location: string;
+    workMode?: 'On-site' | 'Hybrid' | 'Remote';
+    salaryExpectation?: string;
+    experienceLevel?: string;
+    openings?: number;
+    companyOverview?: string;
+    roleSummary?: string;
+    keyResponsibilities?: string[];
+    requirements?: string[];
+    benefits?: string[];
+    applicationSteps?: string[];
     expiresAt?: string;
   }) {
     const response = await api.post<ApiSuccessResponse<RecruiterJobView>>('/api/recruiter/jobs', payload);
@@ -97,6 +113,16 @@ export const recruiterApi = {
     minimumInnovationScore: number;
     type: 'Full-time' | 'Internship' | 'Contract' | 'Part-time';
     location: string;
+    workMode: 'On-site' | 'Hybrid' | 'Remote';
+    salaryExpectation: string;
+    experienceLevel: string;
+    openings: number;
+    companyOverview: string;
+    roleSummary: string;
+    keyResponsibilities: string[];
+    requirements: string[];
+    benefits: string[];
+    applicationSteps: string[];
     isActive: boolean;
     expiresAt: string;
   }>) {

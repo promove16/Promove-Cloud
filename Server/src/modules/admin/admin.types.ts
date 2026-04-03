@@ -101,13 +101,23 @@ export interface AdminPatentItem {
     };
   };
   questionnaire: {
-    whatIsYourInnovation: string;
-    noveltyExplanation: string;
-    technicalDetails: string;
-    marketUseCase: string;
-    priorArtAwareness: string;
+    problemStatement: string;
+    solutionDifferentiation: string;
+    coreInnovation: string;
+    priorArtStatus: string;
+    workingMechanism: string;
+    keyComponents: string;
+    developmentStage: string;
+    documentationReadiness: string;
+    inventorOwnership: string;
+    developmentContext: string;
+    targetMarkets: string;
+    commercializationStrategy: string;
+    publicDisclosureStatus: string;
+    legalAgreements: string;
+    ipProtectionType: string;
   };
-  filingDocuments: {
+  filingDocuments?: {
     inventionCategory:
       | 'mobile_app_backend'
       | 'iot_hardware_interface'

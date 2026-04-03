@@ -41,7 +41,57 @@ const PROTOTYPE_STATUS_LABELS: Record<NonNullable<AdminPatentItem['filingDocumen
   validated_prototype: 'Validated prototype',
 };
 
+const QUESTION_LABELS: Record<keyof AdminPatentItem['questionnaire'], string> = {
+  problemStatement:
+    'What problem does your innovation solve, and who are the primary users or stakeholders affected by this problem?',
+  solutionDifferentiation: 'How is your solution different from existing solutions currently available in the market?',
+  coreInnovation: 'What is the core unique feature or innovation in your solution?',
+  priorArtStatus:
+    'Have you conducted any prior art search or reviewed similar patents? If yes, provide details or references. If not, say so clearly.',
+  workingMechanism: 'Explain the working mechanism or process flow of your innovation.',
+  keyComponents: 'What are the key components involved: hardware, software, process, or a combination?',
+  developmentStage: 'What is the current stage of your innovation?',
+  documentationReadiness:
+    'Do you have any prototypes, diagrams, or technical documentation ready? Mention what is available and upload supporting files if you have them.',
+  inventorOwnership: 'Who are the inventors or creators of this innovation?',
+  developmentContext: 'Was this innovation developed independently or under any institution, company, or funded program?',
+  targetMarkets: 'Which industries or markets can this innovation be applied to?',
+  commercializationStrategy: 'What is your intended commercialization strategy?',
+  publicDisclosureStatus:
+    'Have you publicly disclosed this innovation anywhere such as pitch events, social media, competitions, or publications?',
+  legalAgreements: 'Are there any existing NDAs or legal agreements related to this innovation?',
+  ipProtectionType: 'What type of intellectual property protection are you seeking?',
+};
+
+const QUESTION_VALUE_LABELS: Record<string, Record<string, string>> = {
+  developmentStage: {
+    idea: 'Idea',
+    prototype: 'Prototype',
+    mvp: 'MVP',
+    market_ready: 'Market-ready',
+  },
+  inventorOwnership: {
+    individual: 'Individual',
+    team: 'Team',
+    organization: 'Organization',
+  },
+  commercializationStrategy: {
+    build_startup: 'Build startup',
+    license: 'License',
+    sell: 'Sell',
+    partnership: 'Partnership',
+  },
+  ipProtectionType: {
+    patent: 'Patent',
+    copyright: 'Copyright',
+    trademark: 'Trademark',
+    design: 'Design',
+  },
+};
+
 const formatKey = (value: string) => value.replace(/([A-Z])/g, ' $1').replace(/_/g, ' ').trim();
+
+const formatQuestionValue = (key: string, value: string) => QUESTION_VALUE_LABELS[key]?.[value] ?? value;
 
 const formatBoolean = (value: boolean) => (value ? 'Yes' : 'No');
 
@@ -233,8 +283,8 @@ function ReviewModal({
                       key={label}
                       className={`px-5 py-5 ${index !== entries.length - 1 ? 'border-b border-slate-800' : ''}`}
                     >
-                      <div className="text-sm font-medium text-slate-500">{formatKey(label)}</div>
-                      <div className="mt-3 text-base leading-8 text-white">{value}</div>
+                      <div className="text-sm font-medium text-slate-500">{QUESTION_LABELS[label as keyof AdminPatentItem['questionnaire']] ?? formatKey(label)}</div>
+                      <div className="mt-3 text-base leading-8 text-white">{formatQuestionValue(label, value)}</div>
                     </div>
                   ))}
                 </div>

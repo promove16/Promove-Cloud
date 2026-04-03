@@ -20,6 +20,16 @@ export const jobCreateSchema = z.object({
   minimumInnovationScore: z.coerce.number().min(0).max(200).default(0),
   type: z.enum(['Full-time', 'Internship', 'Contract', 'Part-time']),
   location: z.string().trim().min(2).max(120),
+  workMode: z.enum(['On-site', 'Hybrid', 'Remote']).optional(),
+  salaryExpectation: z.string().trim().min(2).max(120).optional(),
+  experienceLevel: z.string().trim().min(2).max(120).optional(),
+  openings: z.coerce.number().int().min(1).max(500).optional(),
+  companyOverview: z.string().trim().min(10).max(1500).optional(),
+  roleSummary: z.string().trim().min(10).max(1200).optional(),
+  keyResponsibilities: z.array(z.string().trim().min(2).max(240)).max(12).default([]),
+  requirements: z.array(z.string().trim().min(2).max(240)).max(12).default([]),
+  benefits: z.array(z.string().trim().min(2).max(240)).max(12).default([]),
+  applicationSteps: z.array(z.string().trim().min(2).max(240)).max(8).default([]),
   expiresAt: z.string().datetime().optional(),
 });
 

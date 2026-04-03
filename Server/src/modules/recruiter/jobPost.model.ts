@@ -1,6 +1,7 @@
 import { Schema, Types, model } from 'mongoose';
 
 export type JobType = 'Full-time' | 'Internship' | 'Contract' | 'Part-time';
+export type JobWorkMode = 'On-site' | 'Hybrid' | 'Remote';
 
 export interface IJobPost {
   _id: Types.ObjectId;
@@ -12,6 +13,16 @@ export interface IJobPost {
   minimumInnovationScore: number;
   type: JobType;
   location: string;
+  workMode?: JobWorkMode;
+  salaryExpectation?: string;
+  experienceLevel?: string;
+  openings?: number;
+  companyOverview?: string;
+  roleSummary?: string;
+  keyResponsibilities: string[];
+  requirements: string[];
+  benefits: string[];
+  applicationSteps: string[];
   isActive: boolean;
   applicantIds: Types.ObjectId[];
   shortlistedIds: Types.ObjectId[];
@@ -65,6 +76,56 @@ const jobPostSchema = new Schema<IJobPost>(
       required: true,
       trim: true,
       maxlength: 120,
+    },
+    workMode: {
+      type: String,
+      enum: ['On-site', 'Hybrid', 'Remote'],
+      default: undefined,
+    },
+    salaryExpectation: {
+      type: String,
+      trim: true,
+      maxlength: 120,
+      default: undefined,
+    },
+    experienceLevel: {
+      type: String,
+      trim: true,
+      maxlength: 120,
+      default: undefined,
+    },
+    openings: {
+      type: Number,
+      min: 1,
+      default: undefined,
+    },
+    companyOverview: {
+      type: String,
+      trim: true,
+      maxlength: 1500,
+      default: undefined,
+    },
+    roleSummary: {
+      type: String,
+      trim: true,
+      maxlength: 1200,
+      default: undefined,
+    },
+    keyResponsibilities: {
+      type: [String],
+      default: [],
+    },
+    requirements: {
+      type: [String],
+      default: [],
+    },
+    benefits: {
+      type: [String],
+      default: [],
+    },
+    applicationSteps: {
+      type: [String],
+      default: [],
     },
     isActive: {
       type: Boolean,

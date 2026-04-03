@@ -19,11 +19,17 @@ const startupDocumentCategoryEnum = [
   'patent_proof',
   'bank_account_proof',
   'regulatory_license',
+  'prototype_documentation',
+  'technical_documentation',
+  'drawings_diagrams',
+  'design_plan_sketch',
+  'prior_art_search',
 ] as const;
 
 const startupSchema = new Schema<IStartup>(
   {
     founderIds: { type: [Schema.Types.ObjectId], required: true, default: [], index: true },
+    teamMemberIds: { type: [Schema.Types.ObjectId], default: [] },
     projectId: { type: Schema.Types.ObjectId, default: undefined },
     name: { type: String, required: true, trim: true, default: '' },
     tagline: { type: String, required: true, trim: true, default: '' },
@@ -47,51 +53,36 @@ const startupSchema = new Schema<IStartup>(
       goToMarketPlan: { type: String, trim: true, default: '' },
     },
     registrationProfile: {
-      legalStructure: {
+      problemStatement: { type: String, trim: true, default: '' },
+      solutionDifferentiation: { type: String, trim: true, default: '' },
+      coreInnovation: { type: String, trim: true, default: '' },
+      priorArtStatus: { type: String, trim: true, default: '' },
+      workingMechanism: { type: String, trim: true, default: '' },
+      keyComponents: { type: String, trim: true, default: '' },
+      developmentStage: {
         type: String,
-        enum: ['private_limited', 'llp', 'partnership', 'opc'],
-        default: 'private_limited',
-      },
-      registrationStage: {
-        type: String,
-        enum: ['idea', 'name_reserved', 'incorporation_in_progress', 'incorporated', 'startup_india_recognized'],
+        enum: ['idea', 'prototype', 'mvp', 'market_ready'],
         default: 'idea',
       },
-      proposedEntityName: { type: String, trim: true, default: '' },
-      registeredEntityName: { type: String, trim: true, default: undefined },
-      businessObjective: { type: String, trim: true, default: '' },
-      incorporationDate: { type: Date, default: undefined },
-      incorporationState: { type: String, trim: true, default: '' },
-      registeredOfficeAddress: { type: String, trim: true, default: '' },
-      registeredOfficeCity: { type: String, trim: true, default: '' },
-      registeredOfficeState: { type: String, trim: true, default: '' },
-      registeredOfficePincode: { type: String, trim: true, default: '' },
-      cinOrLlpin: { type: String, trim: true, default: undefined },
-      companyPan: { type: String, trim: true, default: undefined },
-      tanNumber: { type: String, trim: true, default: undefined },
-      gstin: { type: String, trim: true, default: undefined },
-      startupIndiaStatus: {
+      documentationReadiness: { type: String, trim: true, default: '' },
+      inventorOwnership: {
         type: String,
-        enum: ['not_started', 'applied', 'recognized'],
-        default: 'not_started',
+        enum: ['individual', 'team', 'organization'],
+        default: 'individual',
       },
-      startupIndiaRecognitionNumber: { type: String, trim: true, default: undefined },
-      bankAccountOpened: { type: Boolean, default: false },
-      bankName: { type: String, trim: true, default: undefined },
-      dscReady: { type: Boolean, default: false },
-      founderAgreementSigned: { type: Boolean, default: false },
-      ndaReady: { type: Boolean, default: false },
-      employmentContractsReady: { type: Boolean, default: false },
-      operationalLicenses: { type: String, trim: true, default: '' },
-      trademarkStatus: {
+      developmentContext: { type: String, trim: true, default: '' },
+      targetMarkets: { type: String, trim: true, default: '' },
+      commercializationStrategy: {
         type: String,
-        enum: ['not_started', 'applied', 'registered'],
-        default: 'not_started',
+        enum: ['build_startup', 'license', 'sell', 'partnership'],
+        default: 'build_startup',
       },
-      patentStatus: {
+      publicDisclosureStatus: { type: String, trim: true, default: '' },
+      legalAgreements: { type: String, trim: true, default: '' },
+      ipProtectionType: {
         type: String,
-        enum: ['not_started', 'drafting', 'filed', 'granted'],
-        default: 'not_started',
+        enum: ['patent', 'copyright', 'trademark', 'design'],
+        default: 'patent',
       },
     },
     documents: {
@@ -145,6 +136,7 @@ const startupSchema = new Schema<IStartup>(
   { timestamps: true },
 );
 
+startupSchema.index({ teamMemberIds: 1 });
 startupSchema.index({ launchedToInvestors: 1, innovationScoreAtLaunch: -1 });
 startupSchema.index({ launchedToMentors: 1 });
 startupSchema.index({ launchedToRecruiters: 1 });

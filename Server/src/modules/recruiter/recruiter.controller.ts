@@ -11,6 +11,7 @@ import {
   driveIdSchema,
   driveScoreSchema,
   getPublicRecruiterJobs,
+  getPublicRecruiterJob,
   getRecruiterColleges,
   getRecruiterDashboard,
   getRecruiterDrives,
@@ -81,6 +82,13 @@ export const getPublicJobsController = async (req: Request, res: Response) => {
   const { recruiterId } = publicJobsQuerySchema.parse(req.params);
   const studentId = req.user?.role === UserRole.STUDENT ? req.user._id : undefined;
   const data = await getPublicRecruiterJobs(recruiterId, studentId);
+  res.status(200).json(new ApiResponse(data));
+};
+
+export const getPublicJobController = async (req: Request, res: Response) => {
+  const { jobId } = jobIdSchema.parse(req.params);
+  const studentId = req.user?.role === UserRole.STUDENT ? req.user._id : undefined;
+  const data = await getPublicRecruiterJob(jobId, studentId);
   res.status(200).json(new ApiResponse(data));
 };
 

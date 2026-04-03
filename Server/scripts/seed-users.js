@@ -62,6 +62,57 @@ const DEFAULT_BOARD_COLUMNS = [
 const clone = (value) => (value === undefined ? undefined : JSON.parse(JSON.stringify(value)));
 const createScoreBreakdown = (value) => ({ ...DEFAULT_SCORE_BREAKDOWN, ...(value ?? {}) });
 
+const DEFAULT_PATENT_QUESTIONNAIRE = {
+  problemStatement: '',
+  solutionDifferentiation: '',
+  coreInnovation: '',
+  priorArtStatus: '',
+  workingMechanism: '',
+  keyComponents: '',
+  developmentStage: 'prototype',
+  documentationReadiness: '',
+  inventorOwnership: 'individual',
+  developmentContext: '',
+  targetMarkets: '',
+  commercializationStrategy: 'build_startup',
+  publicDisclosureStatus: '',
+  legalAgreements: '',
+  ipProtectionType: 'patent',
+};
+
+const normalizePatentQuestionnaire = (questionnaire = {}) => ({
+  ...DEFAULT_PATENT_QUESTIONNAIRE,
+  problemStatement:
+    questionnaire.problemStatement ?? questionnaire.whatIsYourInnovation ?? DEFAULT_PATENT_QUESTIONNAIRE.problemStatement,
+  solutionDifferentiation:
+    questionnaire.solutionDifferentiation ??
+    questionnaire.noveltyExplanation ??
+    DEFAULT_PATENT_QUESTIONNAIRE.solutionDifferentiation,
+  coreInnovation:
+    questionnaire.coreInnovation ?? questionnaire.noveltyExplanation ?? DEFAULT_PATENT_QUESTIONNAIRE.coreInnovation,
+  priorArtStatus:
+    questionnaire.priorArtStatus ?? questionnaire.priorArtAwareness ?? DEFAULT_PATENT_QUESTIONNAIRE.priorArtStatus,
+  workingMechanism:
+    questionnaire.workingMechanism ?? questionnaire.technicalDetails ?? DEFAULT_PATENT_QUESTIONNAIRE.workingMechanism,
+  keyComponents:
+    questionnaire.keyComponents ?? questionnaire.technicalDetails ?? DEFAULT_PATENT_QUESTIONNAIRE.keyComponents,
+  developmentStage: questionnaire.developmentStage ?? DEFAULT_PATENT_QUESTIONNAIRE.developmentStage,
+  documentationReadiness:
+    questionnaire.documentationReadiness ?? questionnaire.technicalDetails ?? DEFAULT_PATENT_QUESTIONNAIRE.documentationReadiness,
+  inventorOwnership: questionnaire.inventorOwnership ?? DEFAULT_PATENT_QUESTIONNAIRE.inventorOwnership,
+  developmentContext: questionnaire.developmentContext ?? 'Developed by the seeded student team inside ProMove.',
+  targetMarkets:
+    questionnaire.targetMarkets ?? questionnaire.marketUseCase ?? DEFAULT_PATENT_QUESTIONNAIRE.targetMarkets,
+  commercializationStrategy:
+    questionnaire.commercializationStrategy ?? DEFAULT_PATENT_QUESTIONNAIRE.commercializationStrategy,
+  publicDisclosureStatus:
+    questionnaire.publicDisclosureStatus ??
+    'No broad public disclosure beyond guided product and mentor review sessions.',
+  legalAgreements:
+    questionnaire.legalAgreements ?? 'No conflicting legal agreements recorded in the seed environment.',
+  ipProtectionType: questionnaire.ipProtectionType ?? DEFAULT_PATENT_QUESTIONNAIRE.ipProtectionType,
+});
+
 const cloneInstitutionProfile = (profile) =>
   profile
     ? {
@@ -727,6 +778,7 @@ const STARTUP_SEEDS = [
   {
     key: 'agrisense',
     founderKey: 'arjun',
+    workspaceKey: 'arjun_agrisense',
     name: 'AgriSense AI',
     tagline: 'AI crop diagnostics for small and mid-sized farms.',
     category: 'AgriTech',
@@ -758,6 +810,7 @@ const STARTUP_SEEDS = [
   {
     key: 'soilmesh',
     founderKey: 'priya',
+    workspaceKey: 'priya_soilmesh',
     name: 'SoilMesh Systems',
     tagline: 'Resilient sensor networks for irrigation visibility.',
     category: 'AgriTech',
@@ -788,6 +841,7 @@ const STARTUP_SEEDS = [
   {
     key: 'solarnest',
     founderKey: 'rohit',
+    workspaceKey: 'rohit_solarnest',
     name: 'SolarNest Junior',
     tagline: 'A school-built solar analytics kit for energy learning.',
     category: 'CleanTech',
@@ -1798,18 +1852,24 @@ const seedStartupArtifacts = async (studentsByKey, usersByKey, workspacesByKey) 
 
   for (const startupSeed of STARTUP_SEEDS) {
     const founder = studentsByKey[startupSeed.founderKey];
+    const workspace = startupSeed.workspaceKey ? workspacesByKey[startupSeed.workspaceKey] ?? null : null;
     const soleInvestor = startupSeed.soleInvestorKey ? usersByKey[startupSeed.soleInvestorKey] : null;
+    const founderIds = workspace
+      ? Array.from(new Map([workspace.ownerId, ...(workspace.teamMemberIds ?? [])].map((memberId) => [String(memberId), memberId])).values())
+      : [founder._id];
+    const teamSize = founderIds.length || startupSeed.teamSize;
 
     const startupDoc = await Startup.findOneAndUpdate(
       { name: startupSeed.name, founderIds: founder._id },
       {
-        founderIds: [founder._id],
+        founderIds,
+        projectId: workspace?._id ?? undefined,
         name: startupSeed.name,
         tagline: startupSeed.tagline,
         category: startupSeed.category,
         stage: startupSeed.stage,
         pitchDeckUrl: startupSeed.pitchDeckUrl,
-        teamSize: startupSeed.teamSize,
+        teamSize,
         fundingNeeded: startupSeed.fundingNeeded,
         activeProducts: startupSeed.activeProducts,
         launchedToInvestors: startupSeed.launchedToInvestors,
@@ -1842,7 +1902,7 @@ const seedStartupArtifacts = async (studentsByKey, usersByKey, workspacesByKey) 
         studentId: student._id,
         workspaceId: workspace?._id ?? undefined,
         projectTitle: patentSeed.projectTitle,
-        questionnaire: clone(patentSeed.questionnaire),
+        questionnaire: normalizePatentQuestionnaire(clone(patentSeed.questionnaire)),
         filingDocuments: clone(patentSeed.filingDocuments),
         supportingDocuments: clone(patentSeed.supportingDocuments ?? []),
         status: patentSeed.status,

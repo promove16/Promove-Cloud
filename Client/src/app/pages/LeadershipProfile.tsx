@@ -7,9 +7,9 @@ import { studentApi } from "../../api/student.api";
 import { scoreApi } from "../../api/score.api";
 import { startupApi } from "../../api/startup.api";
 import { workspaceApi } from "../../api/workspace.api";
-import { StudentWorkspaceTabs } from "../../features/student/StudentWorkspaceTabs";
 import { useAuthStore } from "../../store/authStore";
 import { useInnovationScore } from "../../hooks/useInnovationScore";
+import { DEFAULT_STARTUP_IPR_PROFILE } from "../../features/startup/iprIntake";
 
 const eventLabel: Record<string, string> = {
   PROBLEM_CLAIMED: "Claimed a new problem",
@@ -41,6 +41,8 @@ export function LeadershipProfile() {
     authUser?.profileSlug && typeof window !== "undefined"
       ? `${window.location.origin}/students/${authUser.profileSlug}`
       : "";
+  const launchSourceWorkspace =
+    (workspaces.data ?? []).length === 1 ? workspaces.data?.[0] : null;
   const canShareProfile = Boolean(
     authUser?.verificationStatus === "verified" &&
       authUser?.profileComplete &&
@@ -62,13 +64,13 @@ export function LeadershipProfile() {
     try {
       if ((startups.data?.length ?? 0) === 0) {
         await startupApi.create({
-          projectId: workspaces.data?.[0]?._id,
-          name: workspaces.data?.[0]?.title ?? "Student Innovation Profile",
+          projectId: launchSourceWorkspace?._id,
+          name: launchSourceWorkspace?.title ?? "Student Innovation Profile",
           tagline: "Leadership profile launch",
-          category: workspaces.data?.[0]?.category ?? "Innovation",
+          category: launchSourceWorkspace?.category ?? "Innovation",
           stage: "Pre-Launch",
           activeProducts: 1,
-          teamSize: workspaces.data?.[0]?.teamMembers?.length ?? 1,
+          teamSize: launchSourceWorkspace?.teamMembers?.length ?? 1,
           traction: { patentFiled: false, mvpBuilt: false, revenueGenerating: false },
           businessProfile: {
             problemStatement: "",
@@ -78,26 +80,7 @@ export function LeadershipProfile() {
             revenueModel: "",
             goToMarketPlan: "",
           },
-          registrationProfile: {
-            legalStructure: "private_limited",
-            registrationStage: "idea",
-            proposedEntityName: "",
-            businessObjective: "",
-            incorporationState: "",
-            registeredOfficeAddress: "",
-            registeredOfficeCity: "",
-            registeredOfficeState: "",
-            registeredOfficePincode: "",
-            startupIndiaStatus: "not_started",
-            bankAccountOpened: false,
-            dscReady: false,
-            founderAgreementSigned: false,
-            ndaReady: false,
-            employmentContractsReady: false,
-            operationalLicenses: "",
-            trademarkStatus: "not_started",
-            patentStatus: "not_started",
-          },
+          registrationProfile: { ...DEFAULT_STARTUP_IPR_PROFILE },
         });
       }
       const result = await studentApi.launchToRecruiters();
@@ -145,8 +128,6 @@ export function LeadershipProfile() {
   return (
     <DashboardLayout role="student">
       <div className="space-y-8">
-        <StudentWorkspaceTabs />
-
         {toast ? <div className="p-4 bg-blue-500/10 border border-blue-500/20 rounded-lg text-blue-300 text-sm">{toast}</div> : null}
 
         <div>

@@ -651,7 +651,7 @@ export function RecruiterMessagesPage() {
   const newUsers = userSearchResults.filter((u) => !existingPartnerIds.has(u._id));
 
   return (
-    <div className="flex h-full min-h-0 overflow-hidden rounded-2xl border border-slate-800 bg-slate-950">
+    <div className="-mx-4 -my-6 flex h-[calc(100%+3rem)] min-h-0 overflow-hidden bg-slate-950 lg:-mx-8">
       {/* Sidebar — conversation list */}
       <div
         className={`flex min-h-0 flex-col border-r border-slate-800 bg-slate-900/50 ${

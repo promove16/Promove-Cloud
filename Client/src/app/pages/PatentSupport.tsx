@@ -22,19 +22,198 @@ import { workspaceApi } from '../../api/workspace.api';
 import type {
   PatentDocumentCategory,
   PatentFilingDocuments,
+  PatentQuestionnaire,
   PatentSubmission,
 } from '../../types/patent.types';
 import { DashboardLayout } from '../components/DashboardLayout';
 
 // ─── Constants ───────────────────────────────────────────────────────────────
 
-const QUESTIONS = [
-  { key: 'whatIsYourInnovation', label: 'What is your innovation? Describe it in simple terms.' },
-  { key: 'noveltyExplanation', label: 'What makes it novel or unique? How is it different from existing solutions?' },
-  { key: 'technicalDetails', label: 'Explain the technical details of how your innovation works.' },
-  { key: 'marketUseCase', label: 'What is the real-world market use case for your innovation?' },
-  { key: 'priorArtAwareness', label: 'Are you aware of any prior art or similar existing patents/products?' },
+const PATENT_SUPPORT_UPLOAD_MAX_BYTES = 3 * 1024 * 1024;
+
+type PatentQuestionOption = {
+  value: string;
+  label: string;
+};
+
+type PatentQuestionConfig =
+  | {
+      key: keyof PatentQuestionnaire;
+      label: string;
+      minLength: number;
+      type?: 'textarea';
+      options?: never;
+    }
+  | {
+      key: keyof PatentQuestionnaire;
+      label: string;
+      type: 'select';
+      options: readonly PatentQuestionOption[];
+      minLength?: never;
+    };
+
+type PatentQuestionSection = {
+  title: string;
+  questions: readonly PatentQuestionConfig[];
+};
+
+const DEVELOPMENT_STAGE_OPTIONS = [
+  { value: 'idea', label: 'Idea' },
+  { value: 'prototype', label: 'Prototype' },
+  { value: 'mvp', label: 'MVP' },
+  { value: 'market_ready', label: 'Market-ready' },
 ] as const;
+
+const OWNERSHIP_OPTIONS = [
+  { value: 'individual', label: 'Individual' },
+  { value: 'team', label: 'Team' },
+  { value: 'organization', label: 'Organization' },
+] as const;
+
+const COMMERCIALIZATION_OPTIONS = [
+  { value: 'build_startup', label: 'Build startup' },
+  { value: 'license', label: 'License' },
+  { value: 'sell', label: 'Sell' },
+  { value: 'partnership', label: 'Partnership' },
+] as const;
+
+const IP_PROTECTION_OPTIONS = [
+  { value: 'patent', label: 'Patent' },
+  { value: 'copyright', label: 'Copyright' },
+  { value: 'trademark', label: 'Trademark' },
+  { value: 'design', label: 'Design' },
+] as const;
+
+const QUESTION_SECTIONS: readonly PatentQuestionSection[] = [
+  {
+    title: 'Innovation & Problem Clarity',
+    questions: [
+      {
+        key: 'problemStatement',
+        label:
+          'What problem does your innovation solve, and who are the primary users or stakeholders affected by this problem?',
+        minLength: 40,
+      },
+      {
+        key: 'solutionDifferentiation',
+        label: 'How is your solution different from existing solutions currently available in the market?',
+        minLength: 40,
+      },
+    ],
+  },
+  {
+    title: 'Novelty & Uniqueness',
+    questions: [
+      {
+        key: 'coreInnovation',
+        label: 'What is the core unique feature or innovation in your solution?',
+        minLength: 30,
+      },
+      {
+        key: 'priorArtStatus',
+        label:
+          'Have you conducted any prior art search or reviewed similar patents? If yes, provide details or references. If not, say so clearly.',
+        minLength: 20,
+      },
+    ],
+  },
+  {
+    title: 'Technical Understanding',
+    questions: [
+      {
+        key: 'workingMechanism',
+        label: 'Explain the working mechanism or process flow of your innovation.',
+        minLength: 40,
+      },
+      {
+        key: 'keyComponents',
+        label: 'What are the key components involved: hardware, software, process, or a combination?',
+        minLength: 20,
+      },
+    ],
+  },
+  {
+    title: 'Development Stage',
+    questions: [
+      {
+        key: 'developmentStage',
+        label: 'What is the current stage of your innovation?',
+        type: 'select',
+        options: DEVELOPMENT_STAGE_OPTIONS,
+      },
+      {
+        key: 'documentationReadiness',
+        label:
+          'Do you have any prototypes, diagrams, or technical documentation ready? Mention what is available and upload supporting files if you have them.',
+        minLength: 10,
+      },
+    ],
+  },
+  {
+    title: 'Ownership & Rights',
+    questions: [
+      {
+        key: 'inventorOwnership',
+        label: 'Who are the inventors or creators of this innovation?',
+        type: 'select',
+        options: OWNERSHIP_OPTIONS,
+      },
+      {
+        key: 'developmentContext',
+        label:
+          'Was this innovation developed independently or under any institution, company, or funded program?',
+        minLength: 20,
+      },
+    ],
+  },
+  {
+    title: 'Commercial Potential',
+    questions: [
+      {
+        key: 'targetMarkets',
+        label: 'Which industries or markets can this innovation be applied to?',
+        minLength: 20,
+      },
+      {
+        key: 'commercializationStrategy',
+        label: 'What is your intended commercialization strategy?',
+        type: 'select',
+        options: COMMERCIALIZATION_OPTIONS,
+      },
+    ],
+  },
+  {
+    title: 'Confidentiality & Disclosure',
+    questions: [
+      {
+        key: 'publicDisclosureStatus',
+        label:
+          'Have you publicly disclosed this innovation anywhere such as pitch events, social media, competitions, or publications?',
+        minLength: 10,
+      },
+      {
+        key: 'legalAgreements',
+        label: 'Are there any existing NDAs or legal agreements related to this innovation?',
+        minLength: 10,
+      },
+    ],
+  },
+  {
+    title: 'Strategic Intent',
+    questions: [
+      {
+        key: 'ipProtectionType',
+        label: 'What type of intellectual property protection are you seeking?',
+        type: 'select',
+        options: IP_PROTECTION_OPTIONS,
+      },
+    ],
+  },
+] as const;
+
+const QUESTION_LABELS = Object.fromEntries(
+  QUESTION_SECTIONS.flatMap((section) => section.questions.map((question) => [question.key, question.label])),
+) as Record<string, string>;
 
 const INVENTION_CATEGORIES: Array<{ value: PatentFilingDocuments['inventionCategory']; label: string }> = [
   { value: 'mobile_app_backend', label: 'Mobile app with unique backend' },
@@ -62,24 +241,35 @@ const GOVT_DOCS: Array<{
   required: boolean;
   hint: string;
 }> = [
-  { category: 'prior_art_search', label: 'Prior art search', required: true, hint: 'USPTO, WIPO, IPO search result document' },
-  { category: 'specification_draft', label: 'Specification draft', required: true, hint: 'Background, working principle, components, best method' },
-  { category: 'abstract_draft', label: 'Abstract draft', required: true, hint: 'Concise technical summary — max 300 words' },
-  { category: 'claims_draft', label: 'Claims draft', required: true, hint: 'Document defining the legal scope of protection' },
+  { category: 'design_plan_sketch', label: 'Design, plan, or pen-paper sketch', required: false, hint: 'Recommended for rough concepts, paper sketches, hand-drawn plans, or lightweight images' },
+  { category: 'prior_art_search', label: 'Prior art search', required: false, hint: 'Search notes, patent references, or prior-art report' },
+  { category: 'specification_draft', label: 'Specification draft', required: false, hint: 'Background, working principle, components, or best method draft' },
+  { category: 'abstract_draft', label: 'Abstract draft', required: false, hint: 'Short technical summary or invention overview' },
+  { category: 'claims_draft', label: 'Claims draft', required: false, hint: 'Draft claims or early scope definition, if available' },
   { category: 'drawings_diagrams', label: 'Drawings, block diagrams, or flowcharts', required: false, hint: 'PDF or image of technical drawings' },
   { category: 'examination_request', label: 'Examination request plan', required: false, hint: 'Form 18 or equivalent examination request preparation' },
   { category: 'form3_foreign_filing', label: 'Form 3 foreign filing', required: false, hint: 'Required only if filing in foreign jurisdictions' },
   { category: 'cost_management', label: 'Cost management notes', required: false, hint: 'Budget plan, provisional-first strategy, funding notes' },
 ];
 
-type QuestionKey = (typeof QUESTIONS)[number]['key'];
+type QuestionKey = keyof PatentQuestionnaire;
 
-const DEFAULT_ANSWERS: Record<QuestionKey, string> = {
-  whatIsYourInnovation: '',
-  noveltyExplanation: '',
-  technicalDetails: '',
-  marketUseCase: '',
-  priorArtAwareness: '',
+const DEFAULT_ANSWERS: PatentQuestionnaire = {
+  problemStatement: '',
+  solutionDifferentiation: '',
+  coreInnovation: '',
+  priorArtStatus: '',
+  workingMechanism: '',
+  keyComponents: '',
+  developmentStage: '',
+  documentationReadiness: '',
+  inventorOwnership: '',
+  developmentContext: '',
+  targetMarkets: '',
+  commercializationStrategy: '',
+  publicDisclosureStatus: '',
+  legalAgreements: '',
+  ipProtectionType: '',
 };
 
 const DEFAULT_FILING: PatentFilingDocuments = {
@@ -115,6 +305,15 @@ const formatFileSize = (bytes: number) => {
 const formatKey = (value: string) =>
   value.replace(/([A-Z])/g, ' $1').replace(/_/g, ' ').trim();
 
+const formatQuestionValue = (key: string, value: string) => {
+  if (!value) return value;
+  if (key === 'developmentStage') return DEVELOPMENT_STAGE_OPTIONS.find((option) => option.value === value)?.label ?? value;
+  if (key === 'inventorOwnership') return OWNERSHIP_OPTIONS.find((option) => option.value === value)?.label ?? value;
+  if (key === 'commercializationStrategy') return COMMERCIALIZATION_OPTIONS.find((option) => option.value === value)?.label ?? value;
+  if (key === 'ipProtectionType') return IP_PROTECTION_OPTIONS.find((option) => option.value === value)?.label ?? value;
+  return value;
+};
+
 const formatBoolean = (value: boolean) => (value ? 'Yes' : 'No');
 
 const STATUS_STYLES: Record<string, string> = {
@@ -135,7 +334,16 @@ type SlotState = {
   fileName: string | null;
   uploading: boolean;
   error: string;
+  workspaceId: string | null;
 };
+
+const createEmptySlotState = (workspaceId: string | null = null): SlotState => ({
+  uploadId: null,
+  fileName: null,
+  uploading: false,
+  error: '',
+  workspaceId,
+});
 
 // ─── Document preview modal (for student detail view) ────────────────────────
 
@@ -284,15 +492,15 @@ function PatentDetailModal({
                     key={key}
                     className={`px-5 py-4 ${i !== arr.length - 1 ? 'border-b border-slate-800' : ''}`}
                   >
-                    <div className="mb-2 text-xs font-medium text-slate-500">{formatKey(key)}</div>
-                    <div className="text-sm leading-7 text-white">{value as string}</div>
+                    <div className="mb-2 text-xs font-medium text-slate-500">{QUESTION_LABELS[key] ?? formatKey(key)}</div>
+                    <div className="text-sm leading-7 text-white">{formatQuestionValue(key, value as string)}</div>
                   </div>
                 )) : (
                   <div className="px-5 py-6 text-sm text-slate-500">No questionnaire data available.</div>
                 )}
               </div>
 
-              <div className="text-xs uppercase tracking-[0.3em] text-cyan-300">Filing Checklist</div>
+              <div className="text-xs uppercase tracking-[0.3em] text-cyan-300">Legacy Filing Checklist</div>
               {patent.filingDocuments ? (
               <div className="overflow-hidden rounded-2xl border border-slate-800 bg-slate-950/60">
                 {[
@@ -331,7 +539,7 @@ function PatentDetailModal({
               ) : (
               <div className="flex flex-col items-center justify-center rounded-2xl border border-dashed border-slate-800 py-8 text-slate-500">
                 <FileText className="mb-2 h-6 w-6 opacity-40" />
-                <div className="text-sm">Filing checklist was not included with this submission.</div>
+                <div className="text-sm">No legacy filing checklist was included with this submission.</div>
               </div>
               )}
             </section>
@@ -366,6 +574,8 @@ export function PatentSupport() {
   const [viewPatent, setViewPatent] = useState<PatentSubmission | null>(null);
 
   const fileInputRefs = useRef<Record<string, HTMLInputElement | null>>({});
+  const categorySlotsRef = useRef(categorySlots);
+  const selectedWorkspaceIdRef = useRef('');
 
   const [showcaseError, setShowcaseError] = useState('');
 
@@ -419,10 +629,60 @@ export function PatentSupport() {
     }
   }, [patentEligibleWorkspaces, preferredWorkspaceId, workspaceId]);
 
-  // Clear slots that were uploaded to a workspace that changed
   useEffect(() => {
-    setCategorySlots({});
+    categorySlotsRef.current = categorySlots;
+  }, [categorySlots]);
+
+  useEffect(() => {
+    const previousWorkspaceId = selectedWorkspaceIdRef.current;
+    if (previousWorkspaceId && previousWorkspaceId !== selectedWorkspaceId) {
+      const uploadsToCleanup = Object.values(categorySlotsRef.current).filter(
+        (slot): slot is SlotState & { uploadId: string; workspaceId: string } =>
+          Boolean(slot.uploadId && slot.workspaceId === previousWorkspaceId),
+      );
+
+      if (uploadsToCleanup.length > 0) {
+        void Promise.allSettled(
+          uploadsToCleanup.map((slot) => workspaceApi.removeUpload(previousWorkspaceId, slot.uploadId)),
+        );
+      }
+
+      setCategorySlots((current) => {
+        const next = { ...current };
+        for (const [slotKey, slot] of Object.entries(next)) {
+          if (slot.workspaceId === previousWorkspaceId) {
+            delete next[slotKey];
+          }
+        }
+        return next;
+      });
+    }
+
+    selectedWorkspaceIdRef.current = selectedWorkspaceId;
   }, [selectedWorkspaceId]);
+
+  useEffect(
+    () => () => {
+      const currentWorkspaceId = selectedWorkspaceIdRef.current;
+      if (!currentWorkspaceId) {
+        return;
+      }
+
+      const uploadsToCleanup = Object.values(categorySlotsRef.current).filter(
+        (slot): slot is SlotState & { uploadId: string; workspaceId: string } =>
+          Boolean(slot.uploadId && slot.workspaceId === currentWorkspaceId),
+      );
+
+      if (uploadsToCleanup.length === 0) {
+        return;
+      }
+
+      void Promise.allSettled(
+        uploadsToCleanup.map((slot) => workspaceApi.removeUpload(currentWorkspaceId, slot.uploadId)),
+      );
+    },
+    [],
+  );
 
   const updateFiling = <K extends keyof PatentFilingDocuments>(key: K, value: PatentFilingDocuments[K]) =>
     setFiling((prev) => ({ ...prev, [key]: value }));
@@ -430,31 +690,101 @@ export function PatentSupport() {
   // ── File upload per category ────────────────────────────────────────────────
 
   const handleFileSelect = async (category: PatentDocumentCategory, file: File) => {
-    if (!selectedWorkspaceId) return;
+    const targetWorkspaceId = selectedWorkspaceIdRef.current;
+    if (!targetWorkspaceId) return;
+
+    if (file.size > PATENT_SUPPORT_UPLOAD_MAX_BYTES) {
+      setCategorySlots((prev) => ({
+        ...prev,
+        [category]: {
+          ...createEmptySlotState(targetWorkspaceId),
+          error: `File must be ${formatFileSize(PATENT_SUPPORT_UPLOAD_MAX_BYTES)} or less.`,
+        },
+      }));
+      if (fileInputRefs.current[category]) {
+        fileInputRefs.current[category]!.value = '';
+      }
+      return;
+    }
+
+    const existingSlot = categorySlotsRef.current[category];
+    if (existingSlot?.uploadId && existingSlot.workspaceId) {
+      try {
+        await workspaceApi.removeUpload(existingSlot.workspaceId, existingSlot.uploadId);
+      } catch (_error) {
+        setCategorySlots((prev) => ({
+          ...prev,
+          [category]: {
+            ...(prev[category] ?? createEmptySlotState(existingSlot.workspaceId)),
+            uploading: false,
+            error: 'Unable to remove the previous upload. Please try again.',
+          },
+        }));
+        return;
+      }
+    }
+
     setCategorySlots((prev) => ({
       ...prev,
-      [category]: { uploadId: null, fileName: null, uploading: true, error: '' },
+      [category]: {
+        uploadId: null,
+        fileName: null,
+        uploading: true,
+        error: '',
+        workspaceId: targetWorkspaceId,
+      },
     }));
     try {
       const uploads = await workspaceApi.upload(
-        selectedWorkspaceId,
+        targetWorkspaceId,
         file,
         GOVT_DOCS.find((d) => d.category === category)?.label,
       );
       const newUpload = uploads[uploads.length - 1];
+      if (selectedWorkspaceIdRef.current !== targetWorkspaceId) {
+        await workspaceApi.removeUpload(targetWorkspaceId, newUpload._id).catch(() => undefined);
+        return;
+      }
       setCategorySlots((prev) => ({
         ...prev,
-        [category]: { uploadId: newUpload._id, fileName: newUpload.fileName, uploading: false, error: '' },
+        [category]: {
+          uploadId: newUpload._id,
+          fileName: newUpload.fileName,
+          uploading: false,
+          error: '',
+          workspaceId: targetWorkspaceId,
+        },
       }));
-    } catch {
+    } catch (error) {
+      const apiMessage =
+        (error as { response?: { data?: { error?: { message?: string } } } })?.response?.data?.error?.message ??
+        'Upload failed. Try again.';
       setCategorySlots((prev) => ({
         ...prev,
-        [category]: { uploadId: null, fileName: null, uploading: false, error: 'Upload failed. Try again.' },
+        [category]: { ...createEmptySlotState(targetWorkspaceId), error: apiMessage },
       }));
     }
   };
 
-  const clearSlot = (category: PatentDocumentCategory) => {
+  const clearSlot = async (category: PatentDocumentCategory) => {
+    const slot = categorySlotsRef.current[category];
+
+    if (slot?.uploadId && slot.workspaceId) {
+      try {
+        await workspaceApi.removeUpload(slot.workspaceId, slot.uploadId);
+      } catch (_error) {
+        setCategorySlots((prev) => ({
+          ...prev,
+          [category]: {
+            ...(prev[category] ?? createEmptySlotState(slot.workspaceId)),
+            uploading: false,
+            error: 'Unable to remove the uploaded file. Please try again.',
+          },
+        }));
+        return;
+      }
+    }
+
     setCategorySlots((prev) => {
       const next = { ...prev };
       delete next[category];
@@ -475,30 +805,24 @@ export function PatentSupport() {
       })),
     [categorySlots],
   );
+  const uploadedSupportCount = documentUploads.length;
+  const requiredDocsUploaded = uploadedSupportCount > 0;
 
-  const allQuestionsValid = Object.values(answers).every((v) => v.trim().length >= 50);
-  const hasAtLeastOneDoc = documentUploads.length >= 1;
-  const requiredDocsUploaded = GOVT_DOCS.filter((d) => d.required).every(
-    (d) => categorySlots[d.category]?.uploadId,
+  const allQuestionsValid = QUESTION_SECTIONS.every((section) =>
+    section.questions.every((question) => {
+      const value = answers[question.key].trim();
+      if (question.type === 'select') {
+        return value.length > 0;
+      }
+      return value.length >= question.minLength;
+    }),
   );
   const anySlotUploading = Object.values(categorySlots).some((s) => s.uploading);
 
   const canSubmit =
     Boolean(selectedWorkspaceId) &&
-    hasAtLeastOneDoc &&
     allQuestionsValid &&
-    filing.form1ApplicantDetailsConfirmed &&
-    filing.form5InventorshipConfirmed &&
-    filing.publicDisclosureChecked &&
-    !anySlotUploading &&
-    filing.inventorJournalSummary.trim().length >= 50 &&
-    filing.priorArtSearchSummary.trim().length >= 50 &&
-    filing.specificationDraft.trim().length >= 80 &&
-    filing.abstractDraft.trim().length >= 30 &&
-    filing.claimsDraft.trim().length >= 50 &&
-    filing.drawingsNotes.trim().length >= 20 &&
-    filing.examinationRequestPlan.trim().length >= 30 &&
-    (!filing.form26PowerOfAttorneyRequired || (filing.form26PowerOfAttorneyDetails?.trim().length ?? 0) > 0);
+    !anySlotUploading;
 
   // ── Submit ──────────────────────────────────────────────────────────────────
 
@@ -509,13 +833,11 @@ export function PatentSupport() {
         workspaceId: selectedWorkspaceId,
         documentUploads,
         questionnaire: answers,
-        filingDocuments: filing,
       }),
     onSuccess: async () => {
       setSubmitted(true);
       setFormError('');
       setAnswers(DEFAULT_ANSWERS);
-      setFiling(DEFAULT_FILING);
       setCategorySlots({});
       await queryClient.invalidateQueries({ queryKey: ['patents', 'mine'] });
       await queryClient.invalidateQueries({ queryKey: ['score', 'me'] });
@@ -535,7 +857,7 @@ export function PatentSupport() {
       if (apiErr?.details?.length) {
         setFormError(apiErr.details.map((d) => `${d.path}: ${d.message}`).join(' · '));
       } else {
-        setFormError(apiErr?.message ?? 'Unable to submit your patent questionnaire right now.');
+        setFormError(apiErr?.message ?? 'Unable to submit your patent intake request right now.');
       }
     },
   });
@@ -548,13 +870,13 @@ export function PatentSupport() {
         {/* Page header */}
         <div className="flex flex-col gap-4 md:flex-row md:items-start md:justify-between">
           <div>
-            <h1 className="mb-2 text-3xl font-bold text-white">Patent Support System</h1>
+            <h1 className="mb-2 text-3xl font-bold text-white">IPR / Patent Intake Request</h1>
             <p className="text-slate-400">
-              Choose your own product workspace, upload the filing documents, and submit your invention for patent review. ProMove problem-bank workspaces are for leaderboard points and are not eligible for patent filing.
+              Choose your own product workspace, answer the admin intake questions, and attach light supporting files for IPR review. ProMove problem-bank workspaces are for leaderboard points and are not eligible for patent filing.
             </p>
           </div>
           <div className="rounded-2xl border border-cyan-500/20 bg-cyan-500/10 px-4 py-3 text-sm text-cyan-200">
-            Patent support is only for self-created student products, brands, and startup workspaces. Upload the 4 required filing documents and answer all 5 questionnaire fields to unlock submission.
+            This request is only for self-created student products, brands, and startup workspaces. Complete the intake questions and upload sketches, plans, diagrams, or drafts up to {formatFileSize(PATENT_SUPPORT_UPLOAD_MAX_BYTES)} each when available.
           </div>
         </div>
 
@@ -581,9 +903,9 @@ export function PatentSupport() {
             <div className="mx-auto mb-4 flex h-16 w-16 items-center justify-center rounded-full bg-green-500/10">
               <CheckCircle className="h-8 w-8 text-green-500" />
             </div>
-            <h2 className="mb-3 text-2xl font-bold text-white">Patent filing package submitted</h2>
+            <h2 className="mb-3 text-2xl font-bold text-white">Patent intake request submitted</h2>
             <p className="mx-auto max-w-2xl text-slate-300">
-              Your patent support request now includes the uploaded government documents, questionnaire, and filing declarations. The admin and IPR review team can pick it up without asking you for the basics again.
+              Your student patent request now includes the intake questionnaire and any supporting files attached from the selected workspace. The admin and IPR review team can start from this package without asking for the same basics again.
             </p>
           </div>
         ) : (
@@ -628,21 +950,21 @@ export function PatentSupport() {
 
             {/* ── Government Filing Documents ───────────────────────── */}
             <div className="rounded-3xl border border-cyan-800/40 bg-slate-900/90 p-5">
-              <div className="mb-1 text-xs uppercase tracking-[0.3em] text-cyan-300">Official Government Filing Documents</div>
+              <div className="mb-1 text-xs uppercase tracking-[0.3em] text-cyan-300">Supporting Files</div>
 
               {/* Security notice */}
               <div className="mb-5 flex items-start gap-3 rounded-2xl border border-cyan-500/20 bg-cyan-500/8 px-4 py-3">
                 <ShieldCheck className="mt-0.5 h-5 w-5 shrink-0 text-cyan-400" />
                 <div>
-                  <div className="text-sm font-semibold text-cyan-200">Secure Document Vault — Official & Government Docs Only</div>
+                  <div className="text-sm font-semibold text-cyan-200">Attach lightweight supporting evidence</div>
                   <p className="mt-0.5 text-xs text-slate-400">
-                    This section is exclusively for official patent-related documents: prior art search reports, specification drafts, government forms, and IPR filings. Do <span className="text-white font-medium">not</span> upload work-in-progress files, screenshots, or bug reports here — use the <span className="text-orange-300 font-medium">Work Logs</span> section in your Project Workspace for those.
+                    Upload sketches, design plans, process diagrams, prior-art notes, or early patent drafts that help the admin understand your innovation. Keep each file within <span className="font-medium text-white">{formatFileSize(PATENT_SUPPORT_UPLOAD_MAX_BYTES)}</span>.
                   </p>
                 </div>
               </div>
 
               <p className="mb-5 text-sm text-slate-400">
-                Upload each official document as a PDF or image. The 4 marked <span className="text-red-400">*</span> are required before submission.
+                Upload PDF or image evidence when available. The design, plan, or pen-paper sketch slot is intended for light concept files, and none of these uploads are mandatory for submitting the request.
               </p>
               <div className="grid gap-4 md:grid-cols-2">
                 {GOVT_DOCS.map(({ category, label, required, hint }) => {
@@ -651,11 +973,17 @@ export function PatentSupport() {
                   const isUploading = Boolean(slot?.uploading);
                   const slotError = slot?.error ?? '';
                   const isDisabled = !selectedWorkspaceId || isUploading;
+                  const isSketchUpload = category === 'design_plan_sketch';
 
                   return (
                     <div key={category} className="rounded-2xl border border-slate-800 bg-slate-950/60 p-4">
                       <div className="mb-1 flex items-center gap-1 text-sm font-semibold text-white">
                         {label}
+                        {isSketchUpload ? (
+                          <span className="rounded-full border border-cyan-500/30 bg-cyan-500/10 px-2 py-0.5 text-[10px] uppercase tracking-[0.2em] text-cyan-200">
+                            Recommended
+                          </span>
+                        ) : null}
                         {required && <span className="text-red-400">*</span>}
                       </div>
                       <p className="mb-3 text-xs text-slate-500">{hint}</p>
@@ -667,7 +995,9 @@ export function PatentSupport() {
                             <span className="truncate text-sm text-white">{slot!.fileName}</span>
                           </div>
                           <button
-                            onClick={() => clearSlot(category)}
+                            onClick={() => {
+                              void clearSlot(category);
+                            }}
                             className="shrink-0 rounded-lg p-1 text-slate-400 hover:text-red-400 transition-colors"
                             title="Remove and re-upload"
                           >
@@ -691,7 +1021,7 @@ export function PatentSupport() {
                             <>
                               <Upload className="h-5 w-5 text-slate-500" />
                               <span className="text-xs text-slate-400">
-                                {!selectedWorkspaceId ? 'Select a workspace first' : 'Click to upload PDF or image'}
+                                {!selectedWorkspaceId ? 'Select a workspace first' : `Click to upload PDF or image up to ${formatFileSize(PATENT_SUPPORT_UPLOAD_MAX_BYTES)}`}
                               </span>
                             </>
                           )}
@@ -719,12 +1049,12 @@ export function PatentSupport() {
 
               {/* Upload progress summary */}
               <div className="mt-4 flex items-center gap-3 rounded-2xl border border-slate-800 bg-slate-950/50 px-4 py-3 text-sm">
-                <div className={`flex h-2 w-2 rounded-full ${requiredDocsUploaded ? 'bg-green-400' : 'bg-yellow-400'}`} />
+                <div className={`flex h-2 w-2 rounded-full ${uploadedSupportCount > 0 ? 'bg-green-400' : 'bg-cyan-400'}`} />
                 <span className="text-slate-300">
-                  {GOVT_DOCS.filter((d) => categorySlots[d.category]?.uploadId).length} of {GOVT_DOCS.length} documents uploaded
-                  {requiredDocsUploaded
-                    ? ' — all required documents present'
-                    : ` — ${GOVT_DOCS.filter((d) => d.required && !categorySlots[d.category]?.uploadId).length} required still missing`}
+                  {uploadedSupportCount} of {GOVT_DOCS.length} support slots used
+                  {uploadedSupportCount > 0
+                    ? ` — every upload respects the ${formatFileSize(PATENT_SUPPORT_UPLOAD_MAX_BYTES)} page limit`
+                    : ''}
                 </span>
               </div>
             </div>
@@ -733,32 +1063,86 @@ export function PatentSupport() {
             <div className="grid gap-6 xl:grid-cols-[1.15fr,0.85fr]">
               {/* Patent Questionnaire */}
               <div className="rounded-3xl border border-slate-800 bg-slate-900/90 p-5">
-                <div className="mb-4 text-xs uppercase tracking-[0.3em] text-cyan-300">Patent Questionnaire</div>
-                <div className="space-y-5">
-                  {QUESTIONS.map((q, i) => (
-                    <div key={q.key}>
-                      <label className="mb-2 block text-sm font-semibold text-white">
-                        {i + 1}. {q.label}
-                      </label>
-                      <textarea
-                        value={answers[q.key]}
-                        onChange={(e) => setAnswers((prev) => ({ ...prev, [q.key]: e.target.value }))}
-                        className={textAreaCls}
-                      />
-                      <div
-                        className={`mt-1.5 text-xs ${
-                          answers[q.key].trim().length >= 50 ? 'text-green-400' : 'text-slate-500'
-                        }`}
-                      >
-                        {answers[q.key].trim().length} / 50 minimum
+                <div className="mb-4 text-xs uppercase tracking-[0.3em] text-cyan-300">Patent Intake Questions</div>
+                <div className="space-y-6">
+                  {QUESTION_SECTIONS.map((section) => (
+                    <div key={section.title} className="rounded-2xl border border-slate-800 bg-slate-950/40 p-4">
+                      <div className="mb-4 text-sm font-semibold text-cyan-200">{section.title}</div>
+                      <div className="space-y-5">
+                        {section.questions.map((question) => {
+                          const value = answers[question.key];
+                          const valueLength = value.trim().length;
+                          const minLength = question.type === 'select' ? 1 : question.minLength;
+                          const isValid = valueLength >= minLength;
+
+                          return (
+                            <div key={question.key}>
+                              <label className="mb-2 block text-sm font-semibold text-white">
+                                {QUESTION_LABELS[question.key]}
+                              </label>
+                              {question.type === 'select' ? (
+                                <select
+                                  value={value}
+                                  onChange={(e) => setAnswers((prev) => ({ ...prev, [question.key]: e.target.value }))}
+                                  className={fieldCls}
+                                >
+                                  <option value="">Select an option</option>
+                                  {question.options.map((option) => (
+                                    <option key={option.value} value={option.value}>{option.label}</option>
+                                  ))}
+                                </select>
+                              ) : (
+                                <textarea
+                                  value={value}
+                                  onChange={(e) => setAnswers((prev) => ({ ...prev, [question.key]: e.target.value }))}
+                                  className={textAreaCls}
+                                />
+                              )}
+                              <div className={`mt-1.5 text-xs ${isValid ? 'text-green-400' : 'text-slate-500'}`}>
+                                {question.type === 'select' ? (isValid ? 'Selected' : 'Selection required') : `${valueLength} / ${question.minLength} minimum`}
+                              </div>
+                            </div>
+                          );
+                        })}
                       </div>
                     </div>
                   ))}
                 </div>
               </div>
 
-              {/* Filing Readiness */}
               <div className="rounded-3xl border border-slate-800 bg-slate-900/90 p-5">
+                <div className="mb-4 text-xs uppercase tracking-[0.3em] text-cyan-300">Intake Guidance</div>
+                <div className="space-y-4">
+                  <div className="rounded-2xl border border-cyan-500/20 bg-cyan-500/10 p-4">
+                    <div className="text-sm font-semibold text-cyan-200">What to attach</div>
+                    <p className="mt-2 text-sm leading-6 text-slate-300">
+                      Add sketches, design plans, diagrams, prior-art notes, or draft descriptions only if they help explain the invention faster. The design, plan, or pen-paper sketch slot is the best place for early rough material.
+                    </p>
+                  </div>
+                  <div className="rounded-2xl border border-slate-800 bg-slate-950/60 p-4">
+                    <div className="text-sm font-semibold text-white">What happens after submission</div>
+                    <div className="mt-3 space-y-3 text-sm text-slate-300">
+                      <div className="flex items-start gap-3">
+                        <CheckCircle className="mt-0.5 h-4 w-4 shrink-0 text-green-400" />
+                        <span>Admins review the problem clarity, novelty, ownership, and disclosure status from this questionnaire.</span>
+                      </div>
+                      <div className="flex items-start gap-3">
+                        <Upload className="mt-0.5 h-4 w-4 shrink-0 text-cyan-400" />
+                        <span>Supporting files stay linked to the selected workspace so the review team can inspect the same evidence package later.</span>
+                      </div>
+                      <div className="flex items-start gap-3">
+                        <Clock className="mt-0.5 h-4 w-4 shrink-0 text-yellow-400" />
+                        <span>Status updates appear in the submissions list once the request moves into review.</span>
+                      </div>
+                    </div>
+                  </div>
+                  <div className="rounded-2xl border border-dashed border-slate-700 p-4 text-sm text-slate-400">
+                    Keep answers concrete. Mention the user group, the differentiator, and whether you have already shown the idea publicly.
+                  </div>
+                </div>
+              </div>
+
+              <div className="hidden rounded-3xl border border-slate-800 bg-slate-900/90 p-5">
                 <div className="mb-4 text-xs uppercase tracking-[0.3em] text-cyan-300">Filing Readiness</div>
                 <div className="space-y-4">
                   <div>
@@ -955,7 +1339,7 @@ export function PatentSupport() {
               <div className="flex items-start gap-3 text-sm text-slate-400">
                 <AlertCircle className="mt-0.5 h-4 w-4 shrink-0 text-cyan-300" />
                 <div>
-                  Patent support packages are reviewed after the questionnaire, filing checklist, and government documents are complete for the selected workspace.
+                  Patent intake requests are reviewed after the questionnaire is complete. Supporting uploads are optional but useful for faster admin review.
                 </div>
               </div>
               <button
@@ -968,7 +1352,7 @@ export function PatentSupport() {
                 ) : (
                   <Send className="h-4 w-4" />
                 )}
-                Submit for Patent Review
+                Submit IPR / Patent Request
               </button>
             </div>
           </div>
@@ -1072,15 +1456,15 @@ export function PatentSupport() {
               <div className="space-y-3 text-sm text-slate-300">
                 <div className="flex items-center gap-3">
                   <Upload className="h-4 w-4 text-blue-400" />
-                  Government documents uploaded per category
+                  Supporting sketches, drafts, and diagrams uploaded by category
                 </div>
                 <div className="flex items-center gap-3">
                   <FileText className="h-4 w-4 text-cyan-400" />
-                  Questionnaire and filing checklist completed
+                  Intake questionnaire completed with innovation, novelty, rights, and market context
                 </div>
                 <div className="flex items-center gap-3">
                   <ShieldCheck className="h-4 w-4 text-purple-400" />
-                  Forms 1, 5, and disclosure confirmed
+                  Disclosure and legal-agreement status captured for IPR review
                 </div>
                 <div className="flex items-center gap-3">
                   <Clock className="h-4 w-4 text-yellow-400" />

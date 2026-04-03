@@ -4,6 +4,7 @@ import app from '../../src/app';
 import { env } from '../../src/config/env';
 import { Startup } from '../../src/modules/startup/startup.model';
 import { User } from '../../src/modules/user/user.model';
+import { Workspace } from '../../src/modules/workspace/workspace.model';
 import { UserRole } from '../../src/types/roles.types';
 
 const makeAccessToken = (user: { _id: { toString(): string }; email: string; role: UserRole }) =>
@@ -253,6 +254,63 @@ describe('investment workflow integration', () => {
     expect(pennyView.body.data.pennyInvestors).toHaveLength(1);
     expect(pennyView.body.data.pennyInvestors[0].name).toBe('Penny Backer');
     expect(pennyView.body.data.soleInvestor.name).toBeUndefined();
+  });
+
+  it('allows a workspace teammate to view startup deal lists and details', async () => {
+    const founder = await createUser(UserRole.STUDENT, { displayName: 'Deal Founder' });
+    const teammate = await createUser(UserRole.STUDENT, { displayName: 'Deal Teammate' });
+    const investor = await createUser(UserRole.INVESTOR, { displayName: 'Deal Investor' });
+
+    const workspace = await Workspace.create({
+      ownerId: founder._id,
+      teamMemberIds: [teammate._id],
+      title: 'Shared Deal Workspace',
+      category: 'FinTech',
+      stage: 'Launch',
+    });
+
+    const startup = await createStartup(founder._id.toString(), {
+      founderIds: [founder._id, teammate._id],
+      projectId: workspace._id,
+    });
+
+    const expressResponse = await request(app)
+      .post(`/api/investor/express-interest/${startup._id}`)
+      .set(authHeader(investor))
+      .send({
+        investorType: 'penny',
+        proposedAmountINR: 20000,
+        proposedEquityPercent: 2,
+        chosenRole: 'shareholder',
+      });
+
+    expect(expressResponse.status).toBe(201);
+
+    const listResponse = await request(app)
+      .get('/api/deals')
+      .set(authHeader(teammate));
+
+    expect(listResponse.status).toBe(200);
+    expect(listResponse.body.data.items).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({
+          _id: expressResponse.body.data._id,
+          startupId: startup._id.toString(),
+        }),
+      ]),
+    );
+
+    const detailResponse = await request(app)
+      .get(`/api/deals/${expressResponse.body.data._id}`)
+      .set(authHeader(teammate));
+
+    expect(detailResponse.status).toBe(200);
+    expect(detailResponse.body.data).toEqual(
+      expect.objectContaining({
+        _id: expressResponse.body.data._id,
+        startupId: startup._id.toString(),
+      }),
+    );
   });
 
   it('returns veto authority only for a sole director', async () => {

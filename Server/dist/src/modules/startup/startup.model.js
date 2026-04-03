@@ -2,8 +2,33 @@
 Object.defineProperty(exports, "__esModule", { value: true });
 exports.Startup = void 0;
 const mongoose_1 = require("mongoose");
+const startupDocumentCategoryEnum = [
+    'business_plan',
+    'incorporation_certificate',
+    'moa',
+    'aoa',
+    'llp_agreement',
+    'partnership_deed',
+    'founder_agreement',
+    'company_pan',
+    'tan_allotment',
+    'gst_registration',
+    'registered_office_proof',
+    'office_noc_or_utility_bill',
+    'startup_india_certificate',
+    'trademark_certificate',
+    'patent_proof',
+    'bank_account_proof',
+    'regulatory_license',
+    'prototype_documentation',
+    'technical_documentation',
+    'drawings_diagrams',
+    'design_plan_sketch',
+    'prior_art_search',
+];
 const startupSchema = new mongoose_1.Schema({
     founderIds: { type: [mongoose_1.Schema.Types.ObjectId], required: true, default: [], index: true },
+    teamMemberIds: { type: [mongoose_1.Schema.Types.ObjectId], default: [] },
     projectId: { type: mongoose_1.Schema.Types.ObjectId, default: undefined },
     name: { type: String, required: true, trim: true, default: '' },
     tagline: { type: String, required: true, trim: true, default: '' },
@@ -18,6 +43,63 @@ const startupSchema = new mongoose_1.Schema({
     teamSize: { type: Number, default: 1 },
     fundingNeeded: { type: Number, default: undefined },
     activeProducts: { type: Number, default: 1 },
+    businessProfile: {
+        problemStatement: { type: String, trim: true, default: '' },
+        solutionSummary: { type: String, trim: true, default: '' },
+        targetCustomers: { type: String, trim: true, default: '' },
+        marketAnalysis: { type: String, trim: true, default: '' },
+        revenueModel: { type: String, trim: true, default: '' },
+        goToMarketPlan: { type: String, trim: true, default: '' },
+    },
+    registrationProfile: {
+        problemStatement: { type: String, trim: true, default: '' },
+        solutionDifferentiation: { type: String, trim: true, default: '' },
+        coreInnovation: { type: String, trim: true, default: '' },
+        priorArtStatus: { type: String, trim: true, default: '' },
+        workingMechanism: { type: String, trim: true, default: '' },
+        keyComponents: { type: String, trim: true, default: '' },
+        developmentStage: {
+            type: String,
+            enum: ['idea', 'prototype', 'mvp', 'market_ready'],
+            default: 'idea',
+        },
+        documentationReadiness: { type: String, trim: true, default: '' },
+        inventorOwnership: {
+            type: String,
+            enum: ['individual', 'team', 'organization'],
+            default: 'individual',
+        },
+        developmentContext: { type: String, trim: true, default: '' },
+        targetMarkets: { type: String, trim: true, default: '' },
+        commercializationStrategy: {
+            type: String,
+            enum: ['build_startup', 'license', 'sell', 'partnership'],
+            default: 'build_startup',
+        },
+        publicDisclosureStatus: { type: String, trim: true, default: '' },
+        legalAgreements: { type: String, trim: true, default: '' },
+        ipProtectionType: {
+            type: String,
+            enum: ['patent', 'copyright', 'trademark', 'design'],
+            default: 'patent',
+        },
+    },
+    documents: {
+        type: [
+            new mongoose_1.Schema({
+                category: { type: String, enum: startupDocumentCategoryEnum, required: true },
+                fileUrl: { type: String, required: true },
+                fileType: { type: String, enum: ['pdf', 'image'], required: true },
+                fileName: { type: String, required: true },
+                fileSizeBytes: { type: Number, required: true },
+                uploadedAt: { type: Date, default: () => new Date() },
+                uploadedBy: { type: mongoose_1.Schema.Types.ObjectId, required: true },
+                note: { type: String, trim: true, default: undefined },
+                cloudinaryPublicId: { type: String, default: undefined },
+            }, { _id: true }),
+        ],
+        default: [],
+    },
     launchedToInvestors: { type: Boolean, default: false },
     launchedToMentors: { type: Boolean, default: false },
     launchedToRecruiters: { type: Boolean, default: false },
@@ -47,6 +129,7 @@ const startupSchema = new mongoose_1.Schema({
     adminNotes: { type: String, default: undefined },
     isActive: { type: Boolean, default: true },
 }, { timestamps: true });
+startupSchema.index({ teamMemberIds: 1 });
 startupSchema.index({ launchedToInvestors: 1, innovationScoreAtLaunch: -1 });
 startupSchema.index({ launchedToMentors: 1 });
 startupSchema.index({ launchedToRecruiters: 1 });

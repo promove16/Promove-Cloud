@@ -3,10 +3,12 @@ import { ApiResponse } from '../../utils/ApiResponse';
 import {
   createStartupProfile,
   deleteStartupDocument,
+  demoteFromCoFounder,
   getStartupById,
   getMyStartups,
   launchSchema,
   launchStartup,
+  promoteToCoFounder,
   requestStartupReview,
   startupDocumentUploadSchema,
   startupSchema,
@@ -84,7 +86,7 @@ export const uploadPitchController = async (req: Request, res: Response) => {
 
 export const uploadStartupDocumentController = async (req: Request, res: Response) => {
   if (!req.file) {
-    throw new ApiError(400, 'FILE_REQUIRED', 'A startup registration document is required');
+    throw new ApiError(400, 'FILE_REQUIRED', 'An IPR supporting document is required');
   }
   const startupId = getRequiredObjectIdParam(req.params.id, 'STARTUP_REQUIRED', 'Startup id is required');
   const startup = await uploadStartupDocument(
@@ -93,6 +95,20 @@ export const uploadStartupDocumentController = async (req: Request, res: Respons
     req.file,
     startupDocumentUploadSchema.parse(req.body),
   );
+  res.json(new ApiResponse(startup));
+};
+
+export const promoteToCoFounderController = async (req: Request, res: Response) => {
+  const startupId = getRequiredObjectIdParam(req.params.id, 'STARTUP_REQUIRED', 'Startup id is required');
+  const memberId = getRequiredObjectIdParam(req.params.memberId, 'MEMBER_REQUIRED', 'Member id is required');
+  const startup = await promoteToCoFounder(startupId, req.user!._id, memberId);
+  res.json(new ApiResponse(startup));
+};
+
+export const demoteFromCoFounderController = async (req: Request, res: Response) => {
+  const startupId = getRequiredObjectIdParam(req.params.id, 'STARTUP_REQUIRED', 'Startup id is required');
+  const memberId = getRequiredObjectIdParam(req.params.memberId, 'MEMBER_REQUIRED', 'Member id is required');
+  const startup = await demoteFromCoFounder(startupId, req.user!._id, memberId);
   res.json(new ApiResponse(startup));
 };
 

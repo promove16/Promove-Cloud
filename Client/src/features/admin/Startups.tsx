@@ -8,6 +8,10 @@ import { Button } from '../../components/ui/Button';
 import { Card } from '../../components/ui/Card';
 import { Spinner } from '../../components/ui/Spinner';
 import { StartupReviewStatus } from '../../types/startup.types';
+import {
+  STARTUP_IPR_QUESTION_LABELS,
+  formatStartupIprValue,
+} from '../startup/iprIntake';
 
 const reviewTone: Record<StartupReviewStatus, string> = {
   draft: 'border-slate-700 bg-slate-900 text-slate-300',
@@ -23,27 +27,6 @@ const statusOptions: Array<{ value: StartupReviewStatus | 'all'; label: string }
   { value: 'draft', label: 'Drafts' },
   { value: 'all', label: 'All Startups' },
 ];
-
-const legalStructureLabel: Record<AdminStartupReviewItem['registrationProfile']['legalStructure'], string> = {
-  private_limited: 'Private Limited',
-  llp: 'LLP',
-  partnership: 'Partnership',
-  opc: 'OPC',
-};
-
-const registrationStageLabel: Record<AdminStartupReviewItem['registrationProfile']['registrationStage'], string> = {
-  idea: 'Idea',
-  name_reserved: 'Name Reserved',
-  incorporation_in_progress: 'Incorporation In Progress',
-  incorporated: 'Incorporated',
-  startup_india_recognized: 'Startup India Recognized',
-};
-
-const startupIndiaStatusLabel: Record<AdminStartupReviewItem['registrationProfile']['startupIndiaStatus'], string> = {
-  not_started: 'Not started',
-  applied: 'Applied',
-  recognized: 'Recognized',
-};
 
 const getErrorMessage = (error: unknown) => {
   if (isAxiosError<{ error?: { message?: string } }>(error)) {
@@ -156,7 +139,7 @@ export default function Startups() {
                     <Badge>{startup.stage}</Badge>
                     <Badge className="border-slate-700 bg-slate-900 text-slate-300">{startup.category}</Badge>
                     <Badge className="border-slate-700 bg-slate-900 text-slate-300">
-                      {legalStructureLabel[startup.registrationProfile.legalStructure]}
+                      {formatStartupIprValue('ipProtectionType', startup.registrationProfile.ipProtectionType)}
                     </Badge>
                     {startup.launchedToInvestors ? (
                       <Badge className="border-cyan-500/30 bg-cyan-500/10 text-cyan-300">Investor marketplace live</Badge>
@@ -194,25 +177,27 @@ export default function Startups() {
 
                   <div className="grid gap-3 md:grid-cols-2">
                     <div className="rounded-2xl border border-slate-800 bg-slate-950/70 px-4 py-4">
-                      <div className="text-xs uppercase tracking-[0.22em] text-slate-500">Registration Profile</div>
+                      <div className="text-xs uppercase tracking-[0.22em] text-slate-500">IPR Intake Summary</div>
                       <div className="mt-3 space-y-2 text-sm text-slate-300">
                         <div>
-                          <span className="text-slate-500">Stage:</span> {registrationStageLabel[startup.registrationProfile.registrationStage]}
+                          <span className="text-slate-500">Innovation stage:</span>{' '}
+                          {formatStartupIprValue('developmentStage', startup.registrationProfile.developmentStage)}
                         </div>
                         <div>
-                          <span className="text-slate-500">Entity:</span>{' '}
-                          {startup.registrationProfile.registeredEntityName || startup.registrationProfile.proposedEntityName || 'Not provided'}
+                          <span className="text-slate-500">Inventors:</span>{' '}
+                          {formatStartupIprValue('inventorOwnership', startup.registrationProfile.inventorOwnership)}
                         </div>
                         <div>
-                          <span className="text-slate-500">Startup India:</span>{' '}
-                          {startupIndiaStatusLabel[startup.registrationProfile.startupIndiaStatus]}
+                          <span className="text-slate-500">Commercialization:</span>{' '}
+                          {formatStartupIprValue(
+                            'commercializationStrategy',
+                            startup.registrationProfile.commercializationStrategy,
+                          )}
                         </div>
-                        {startup.registrationProfile.startupIndiaRecognitionNumber ? (
-                          <div>
-                            <span className="text-slate-500">Recognition No:</span>{' '}
-                            {startup.registrationProfile.startupIndiaRecognitionNumber}
-                          </div>
-                        ) : null}
+                        <div>
+                          <span className="text-slate-500">Protection sought:</span>{' '}
+                          {formatStartupIprValue('ipProtectionType', startup.registrationProfile.ipProtectionType)}
+                        </div>
                       </div>
                     </div>
 
@@ -248,6 +233,25 @@ export default function Startups() {
                       <Button variant="secondary">Open Pitch Deck</Button>
                     </a>
                   ) : null}
+
+                  <div className="rounded-2xl border border-slate-800 bg-slate-950/70 px-4 py-4">
+                    <div className="mb-3 flex items-center gap-2 text-xs uppercase tracking-[0.22em] text-slate-500">
+                      <FileText className="h-4 w-4" />
+                      IPR Intake Answers
+                    </div>
+                    <div className="grid gap-3 md:grid-cols-2">
+                      {Object.entries(startup.registrationProfile).map(([key, value]) => (
+                        <div key={key} className="rounded-xl border border-slate-800 bg-slate-900 px-3 py-3 text-sm text-slate-200">
+                          <div className="text-xs uppercase tracking-[0.15em] text-slate-500">
+                            {STARTUP_IPR_QUESTION_LABELS[key as keyof typeof STARTUP_IPR_QUESTION_LABELS]}
+                          </div>
+                          <div className="mt-2 whitespace-pre-wrap text-white">
+                            {formatStartupIprValue(key as keyof AdminStartupReviewItem['registrationProfile'], value)}
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
 
                   <div className="rounded-2xl border border-slate-800 bg-slate-950/70 px-4 py-4">
                     <div className="mb-3 flex items-center gap-2 text-xs uppercase tracking-[0.22em] text-slate-500">

@@ -14,6 +14,7 @@ import {
   getCollegesController,
   getDashboardController,
   getDrivesController,
+  getPublicJobController,
   getJobsController,
   getOnboardingController,
   getPublicJobsController,
@@ -60,6 +61,12 @@ router.post(
   asyncHandler(sendMessageController),
 );
 router.get('/jobs', authenticate, authorize(UserRole.RECRUITER), asyncHandler(getJobsController));
+router.get(
+  '/jobs/public/job/:jobId',
+  authenticate,
+  authorize(UserRole.STUDENT, UserRole.RECRUITER, UserRole.COLLEGE, UserRole.SCHOOL),
+  asyncHandler(getPublicJobController),
+);
 router.get(
   '/jobs/public/:recruiterId',
   authenticate,

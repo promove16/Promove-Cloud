@@ -57,6 +57,7 @@ const PATENT_DOC_CATEGORIES = [
   'abstract_draft',
   'claims_draft',
   'drawings_diagrams',
+  'design_plan_sketch',
   'examination_request',
   'form3_foreign_filing',
   'cost_management',
@@ -65,6 +66,7 @@ const PATENT_DOC_CATEGORIES = [
 export const patentSubmissionSchema = z.object({
   projectTitle: z.string().trim().min(2).max(200),
   workspaceId: z.string().min(1),
+  coInventorIds: z.array(z.string().min(1)).max(4).default([]),
   documentUploads: z
     .array(
       z.object({
@@ -72,16 +74,26 @@ export const patentSubmissionSchema = z.object({
         category: z.enum(PATENT_DOC_CATEGORIES),
       }),
     )
-    .min(1)
+    .min(0)
     .max(9),
   questionnaire: z.object({
-    whatIsYourInnovation: z.string().trim().min(50),
-    noveltyExplanation: z.string().trim().min(50),
-    technicalDetails: z.string().trim().min(50),
-    marketUseCase: z.string().trim().min(50),
-    priorArtAwareness: z.string().trim().min(50),
+    problemStatement: z.string().trim().min(40),
+    solutionDifferentiation: z.string().trim().min(40),
+    coreInnovation: z.string().trim().min(30),
+    priorArtStatus: z.string().trim().min(20),
+    workingMechanism: z.string().trim().min(40),
+    keyComponents: z.string().trim().min(20),
+    developmentStage: z.string().trim().min(1),
+    documentationReadiness: z.string().trim().min(10),
+    inventorOwnership: z.string().trim().min(1),
+    developmentContext: z.string().trim().min(20),
+    targetMarkets: z.string().trim().min(20),
+    commercializationStrategy: z.string().trim().min(1),
+    publicDisclosureStatus: z.string().trim().min(10),
+    legalAgreements: z.string().trim().min(10),
+    ipProtectionType: z.string().trim().min(1),
   }),
-  filingDocuments: filingDocumentsSchema,
+  filingDocuments: filingDocumentsSchema.optional(),
 });
 
 export const submitPatent = async (userId: string, payload: z.infer<typeof patentSubmissionSchema>) => {
@@ -119,12 +131,22 @@ export const submitPatent = async (userId: string, payload: z.infer<typeof paten
     };
   });
 
+  // Validate co-inventors are workspace members (not the submitter)
+  const workspaceMemberIds = new Set([
+    String(workspace.ownerId),
+    ...workspace.teamMemberIds.map((id: any) => String(id)),
+  ]);
+  const validCoInventorIds = payload.coInventorIds.filter(
+    (id) => id !== userId && workspaceMemberIds.has(id),
+  );
+
   const patent = await Patent.create({
     studentId: userId,
+    coInventorIds: validCoInventorIds,
     workspaceId: payload.workspaceId,
     projectTitle: payload.projectTitle,
     questionnaire: payload.questionnaire,
-    filingDocuments: payload.filingDocuments,
+    ...(payload.filingDocuments ? { filingDocuments: payload.filingDocuments } : {}),
     supportingDocuments,
     status: 'submitted',
     submittedAt: new Date(),
@@ -161,7 +183,7 @@ export const submitPatent = async (userId: string, payload: z.infer<typeof paten
 };
 
 export const getMyPatents = async (userId: string) =>
-  Patent.find({ studentId: userId }).sort({ createdAt: -1 }).lean();
+  Patent.find({ $or: [{ studentId: userId }, { coInventorIds: userId }] }).sort({ createdAt: -1 }).lean();
 
 export const togglePatentShowcase = async (userId: string, patentId: string) => {
   const patent = await Patent.findOne({ _id: patentId, studentId: userId });

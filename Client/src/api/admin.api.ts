@@ -96,11 +96,21 @@ export interface AdminPatentItem {
     scoreBreakdown: MentorStudentProfile['student']['scoreBreakdown'];
   };
   questionnaire: {
-    whatIsYourInnovation: string;
-    noveltyExplanation: string;
-    technicalDetails: string;
-    marketUseCase: string;
-    priorArtAwareness: string;
+    problemStatement: string;
+    solutionDifferentiation: string;
+    coreInnovation: string;
+    priorArtStatus: string;
+    workingMechanism: string;
+    keyComponents: string;
+    developmentStage: string;
+    documentationReadiness: string;
+    inventorOwnership: string;
+    developmentContext: string;
+    targetMarkets: string;
+    commercializationStrategy: string;
+    publicDisclosureStatus: string;
+    legalAgreements: string;
+    ipProtectionType: string;
   };
   filingDocuments?: PatentFilingDocuments;
   supportingDocuments: PatentSupportingDocument[];
@@ -267,10 +277,7 @@ export interface AdminStartupReviewItem {
   adminNotes?: string;
   pitchDeckUrl?: string;
   pitchDeckName?: string;
-  registrationProfile: Pick<
-    StartupRegistrationProfile,
-    'legalStructure' | 'registrationStage' | 'proposedEntityName' | 'registeredEntityName' | 'startupIndiaStatus' | 'startupIndiaRecognitionNumber'
-  >;
+  registrationProfile: StartupRegistrationProfile;
   readiness: StartupReadiness;
   documents: StartupDocument[];
   traction: {

@@ -112,7 +112,9 @@ export function InvestorOutreach() {
   }, [deferredSearch, investorsQuery.data]);
 
   const startup = startupQuery.data;
-  const deals = dealsQuery.data?.items ?? [];
+  const deals = (dealsQuery.data?.items ?? []).filter((deal) =>
+    normalizedStartupId ? deal.startupId === normalizedStartupId : true,
+  );
   const activeDeals = deals.filter((deal) => deal.status === 'active');
   const canPitchFromStartup =
     Boolean(startup?.name?.trim() && startup?.tagline?.trim() && startup?.category?.trim()) ||

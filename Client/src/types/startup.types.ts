@@ -6,16 +6,10 @@ export interface StartupTraction {
 }
 
 export type StartupReviewStatus = 'draft' | 'review_requested' | 'changes_requested' | 'approved';
-export type StartupLegalStructure = 'private_limited' | 'llp' | 'partnership' | 'opc';
-export type StartupRegistrationStage =
-  | 'idea'
-  | 'name_reserved'
-  | 'incorporation_in_progress'
-  | 'incorporated'
-  | 'startup_india_recognized';
-export type StartupIndiaStatus = 'not_started' | 'applied' | 'recognized';
-export type StartupTrademarkStatus = 'not_started' | 'applied' | 'registered';
-export type StartupPatentStatus = 'not_started' | 'drafting' | 'filed' | 'granted';
+export type StartupInnovationStage = 'idea' | 'prototype' | 'mvp' | 'market_ready';
+export type StartupInventorOwnership = 'individual' | 'team' | 'organization';
+export type StartupCommercializationStrategy = 'build_startup' | 'license' | 'sell' | 'partnership';
+export type StartupIpProtectionType = 'patent' | 'copyright' | 'trademark' | 'design';
 export type StartupDocumentCategory =
   | 'business_plan'
   | 'incorporation_certificate'
@@ -33,7 +27,12 @@ export type StartupDocumentCategory =
   | 'trademark_certificate'
   | 'patent_proof'
   | 'bank_account_proof'
-  | 'regulatory_license';
+  | 'regulatory_license'
+  | 'prototype_documentation'
+  | 'technical_documentation'
+  | 'drawings_diagrams'
+  | 'design_plan_sketch'
+  | 'prior_art_search';
 
 export interface StartupBusinessProfile {
   problemStatement: string;
@@ -45,32 +44,21 @@ export interface StartupBusinessProfile {
 }
 
 export interface StartupRegistrationProfile {
-  legalStructure: StartupLegalStructure;
-  registrationStage: StartupRegistrationStage;
-  proposedEntityName: string;
-  registeredEntityName?: string;
-  businessObjective: string;
-  incorporationDate?: string;
-  incorporationState: string;
-  registeredOfficeAddress: string;
-  registeredOfficeCity: string;
-  registeredOfficeState: string;
-  registeredOfficePincode: string;
-  cinOrLlpin?: string;
-  companyPan?: string;
-  tanNumber?: string;
-  gstin?: string;
-  startupIndiaStatus: StartupIndiaStatus;
-  startupIndiaRecognitionNumber?: string;
-  bankAccountOpened: boolean;
-  bankName?: string;
-  dscReady: boolean;
-  founderAgreementSigned: boolean;
-  ndaReady: boolean;
-  employmentContractsReady: boolean;
-  operationalLicenses: string;
-  trademarkStatus: StartupTrademarkStatus;
-  patentStatus: StartupPatentStatus;
+  problemStatement: string;
+  solutionDifferentiation: string;
+  coreInnovation: string;
+  priorArtStatus: string;
+  workingMechanism: string;
+  keyComponents: string;
+  developmentStage: StartupInnovationStage;
+  documentationReadiness: string;
+  inventorOwnership: StartupInventorOwnership;
+  developmentContext: string;
+  targetMarkets: string;
+  commercializationStrategy: StartupCommercializationStrategy;
+  publicDisclosureStatus: string;
+  legalAgreements: string;
+  ipProtectionType: StartupIpProtectionType;
 }
 
 export interface StartupDocument {
@@ -94,6 +82,7 @@ export interface StartupReadiness {
 export interface Startup {
   _id: string;
   founderIds: string[];
+  teamMemberIds: string[];
   projectId?: string;
   name: string;
   tagline: string;

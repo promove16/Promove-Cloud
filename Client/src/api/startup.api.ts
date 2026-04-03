@@ -62,6 +62,14 @@ export const startupApi = {
     const response = await api.delete<ApiSuccessResponse<Startup>>(`/api/startup/${startupId}/documents/${documentId}`);
     return response.data.data;
   },
+  async promoteToCoFounder(startupId: string, memberId: string) {
+    const response = await api.post<ApiSuccessResponse<Startup>>(`/api/startup/${startupId}/members/${memberId}/promote`);
+    return response.data.data;
+  },
+  async demoteFromCoFounder(startupId: string, memberId: string) {
+    const response = await api.post<ApiSuccessResponse<Startup>>(`/api/startup/${startupId}/members/${memberId}/demote`);
+    return response.data.data;
+  },
   async getCapTable(startupId: string) {
     const response = await api.get<ApiSuccessResponse<CapTableResponse>>(`/api/startups/${startupId}/cap-table`);
     return response.data.data;
