@@ -326,6 +326,7 @@ const applyWorkspaceContextToStartupPayload = async (
     const allMemberIds = getWorkspaceMemberIds(workspace);
     for (const memberId of allMemberIds) {
       if (String(memberId) !== String(userId)) {
+        founderIds.push(new Types.ObjectId(String(memberId)));
         teamMemberIds.push(memberId);
       }
     }
