@@ -332,7 +332,7 @@ const applyWorkspaceContextToStartupPayload = async (
     }
   }
 
-  const totalMembers = founderIds.length + teamMemberIds.length;
+  const totalMembers = founderIds.length;
   const teamSize = workspace ? Math.max(totalMembers, payload.teamSize || 1) : Math.max(payload.teamSize || 1, 1);
 
   return {

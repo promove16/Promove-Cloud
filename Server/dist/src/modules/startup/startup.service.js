@@ -275,11 +275,12 @@ const applyWorkspaceContextToStartupPayload = async (userId, payload) => {
         const allMemberIds = getWorkspaceMemberIds(workspace);
         for (const memberId of allMemberIds) {
             if (String(memberId) !== String(userId)) {
+                founderIds.push(new mongoose_1.Types.ObjectId(String(memberId)));
                 teamMemberIds.push(memberId);
             }
         }
     }
-    const totalMembers = founderIds.length + teamMemberIds.length;
+    const totalMembers = founderIds.length;
     const teamSize = workspace ? Math.max(totalMembers, payload.teamSize || 1) : Math.max(payload.teamSize || 1, 1);
     return {
         ...payload,
