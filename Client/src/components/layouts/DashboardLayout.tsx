@@ -135,6 +135,17 @@ export function DashboardLayout({ children, role }: PropsWithChildren<DashboardL
   const hasMessagesItem = navItems.some(
     (item) => item.kind === 'link' && item.label === 'Messages',
   );
+  const exactMatchPaths = useMemo(
+    () =>
+      new Set(
+        navItems.flatMap((item) =>
+          item.kind === 'group'
+            ? item.children.filter((child) => child.path === item.path).map((child) => child.path)
+            : [],
+        ),
+      ),
+    [navItems],
+  );
 
   const conversationsQuery = useQuery({
     queryKey: ['dm', 'conversations'],
@@ -152,15 +163,16 @@ export function DashboardLayout({ children, role }: PropsWithChildren<DashboardL
     location.pathname === path || (!exact && location.pathname.startsWith(`${path}/`));
 
   const isHomePath = (path: string) => path === dashboardHomePath;
+  const shouldMatchExactly = (path: string) => isHomePath(path) || exactMatchPaths.has(path);
 
   const currentLabel = useMemo(() => {
     for (const item of navItems) {
-      if (item.kind === 'link' && isPathActive(item.path, isHomePath(item.path))) {
+      if (item.kind === 'link' && isPathActive(item.path, shouldMatchExactly(item.path))) {
         return item.label;
       }
 
       if (item.kind === 'group') {
-        const activeChild = item.children.find((child) => isPathActive(child.path));
+        const activeChild = item.children.find((child) => isPathActive(child.path, shouldMatchExactly(child.path)));
         if (activeChild) {
           return activeChild.label;
         }
@@ -172,7 +184,7 @@ export function DashboardLayout({ children, role }: PropsWithChildren<DashboardL
     }
 
     return 'Dashboard';
-  }, [location.pathname, navItems]);
+  }, [location.pathname, navItems, exactMatchPaths]);
 
   if (!user) {
     return null;
@@ -194,14 +206,14 @@ export function DashboardLayout({ children, role }: PropsWithChildren<DashboardL
     <NavLink
       key={label}
       to={path}
-      end={isHomePath(path)}
+      end={shouldMatchExactly(path)}
       onClick={() => {
         trackNavigationClick(path, label);
         setSidebarOpen(false);
       }}
       className={({ isActive }) =>
         `flex items-center gap-3 rounded-2xl px-4 py-3 transition ${
-          isActive || isPathActive(path, isHomePath(path))
+          isActive || isPathActive(path, shouldMatchExactly(path))
             ? ACTIVE_NAV_ITEM_CLASS
             : 'text-slate-300 hover:bg-slate-900 hover:text-white'
         }`
@@ -266,13 +278,14 @@ export function DashboardLayout({ children, role }: PropsWithChildren<DashboardL
               <NavLink
                 key={child.path}
                 to={child.path}
+                end={shouldMatchExactly(child.path)}
                 onClick={() => {
                   trackNavigationClick(child.path, `${item.label}: ${child.label}`);
                   setSidebarOpen(false);
                 }}
                 className={({ isActive }) =>
                   `flex rounded-xl px-3 py-2 text-sm transition ${
-                    isActive || isPathActive(child.path)
+                    isActive || isPathActive(child.path, shouldMatchExactly(child.path))
                       ? 'bg-slate-900 text-cyan-200'
                       : 'text-slate-400 hover:bg-slate-900 hover:text-white'
                   }`

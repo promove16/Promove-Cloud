@@ -116,6 +116,7 @@ export interface DashboardEventView {
 
 export interface SchoolDashboardStats {
   totalStudents: number;
+  activeProjects: number;
   totalInnovationActivities: number;
   patentsFiled: number;
   totalMentoringHours: number;
@@ -127,6 +128,40 @@ export interface RecentActivityCounts {
   scoreEventsLast30Days: number;
   patentsLast30Days: number;
   startupsLast30Days: number;
+}
+
+export interface RecentProjectView {
+  _id: string;
+  studentId: string;
+  studentName: string;
+  title: string;
+  category: string;
+  stage: string;
+  progressPercent: number;
+  updatedAt: string;
+}
+
+export interface InstitutionPatentView {
+  _id: string;
+  studentId: string;
+  studentName: string;
+  projectTitle: string;
+  status: string;
+  submittedAt: string;
+}
+
+export interface InstitutionStartupView {
+  _id: string;
+  name: string;
+  tagline: string;
+  category: string;
+  stage: string;
+  founderNames: string[];
+  activeProducts: number;
+  teamSize: number;
+  reviewStatus: string;
+  launchedAt?: string;
+  updatedAt: string;
 }
 
 export interface StudentJourneyPayload {
@@ -173,4 +208,5 @@ export interface SchoolDashboardPayload {
   recentActivityCounts: RecentActivityCounts;
   upcomingEvents: DashboardEventView[];
   topStudents: StudentLeaderboardItem[];
+  recentProjects: RecentProjectView[];
 }

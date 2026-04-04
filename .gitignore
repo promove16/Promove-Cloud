@@ -10,6 +10,8 @@ docs/docs/
 .tmp-*.json
 .postman/
 postman/
+output/
+test-results/
 
 # One-off test scripts and results
 Server/scripts/verify-*.mjs

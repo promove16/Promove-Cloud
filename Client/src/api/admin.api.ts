@@ -1,5 +1,10 @@
 import api from './axiosInstance';
-import { ApiSuccessResponse, InstitutionProfileInput, RegistrationRequestStatus } from '../types/auth.types';
+import {
+  ApiSuccessResponse,
+  InstitutionProfileInput,
+  InstitutionVerificationProfile,
+  RegistrationRequestStatus,
+} from '../types/auth.types';
 import {
   CapTableResponse,
   DealMediationStatus,
@@ -67,6 +72,7 @@ export interface AdminRegistrationRequestItem {
   domain?: string;
   bio?: string;
   institutionProfile?: InstitutionProfileInput;
+  institutionVerification?: InstitutionVerificationProfile;
   requestedAt: string;
   reviewedAt?: string;
   reviewedBy?: string;

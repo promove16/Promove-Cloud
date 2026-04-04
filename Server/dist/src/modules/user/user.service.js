@@ -116,6 +116,35 @@ const toSanitizedConnectedAccounts = (connectedAccounts) => ({
         lastSyncedAt: connectedAccounts.linkedin.lastSyncedAt ?? null,
     },
 });
+const toSanitizedInstitutionVerification = (institutionVerification) => {
+    if (!institutionVerification) {
+        return undefined;
+    }
+    return {
+        regulatoryBodies: institutionVerification.regulatoryBodies ?? [],
+        ...(institutionVerification.affiliationName
+            ? { affiliationName: institutionVerification.affiliationName }
+            : {}),
+        ...(institutionVerification.websiteUrl
+            ? { websiteUrl: institutionVerification.websiteUrl }
+            : {}),
+        ...(institutionVerification.referenceCode
+            ? { referenceCode: institutionVerification.referenceCode }
+            : {}),
+        ...(institutionVerification.notes ? { notes: institutionVerification.notes } : {}),
+        documents: (institutionVerification.documents ?? []).map((document) => ({
+            _id: document._id.toString(),
+            category: document.category,
+            fileUrl: document.fileUrl,
+            fileType: document.fileType,
+            fileName: document.fileName,
+            fileSizeBytes: document.fileSizeBytes,
+            uploadedAt: document.uploadedAt,
+            uploadedBy: document.uploadedBy.toString(),
+        })),
+        readiness: institutionVerification.readiness,
+    };
+};
 const toSanitizedUser = (user) => ({
     _id: user._id.toString(),
     email: user.email,
@@ -145,6 +174,9 @@ const toSanitizedUser = (user) => ({
     ...(user.institutionToken !== undefined ? { institutionToken: user.institutionToken ?? null } : {}),
     ...(user.institutionId ? { institutionId: user.institutionId.toString() } : { institutionId: null }),
     ...(user.institutionProfile ? { institutionProfile: user.institutionProfile } : {}),
+    ...(user.institutionVerification
+        ? { institutionVerification: toSanitizedInstitutionVerification(user.institutionVerification) }
+        : {}),
     institutionVerifiedAt: user.institutionVerifiedAt ?? null,
     institutionVerificationStatus: user.institutionVerificationStatus,
     verificationStatus: user.verificationStatus,

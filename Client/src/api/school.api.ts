@@ -3,9 +3,13 @@ import { ApiSuccessResponse } from '../types/auth.types';
 import {
   BulkCredentialImportResult,
   ComplianceReportRecord,
+  DashboardEvent,
   DirectoryInvestor,
+  InstitutionPatent,
+  InstitutionStartup,
   LeaderboardPage,
   PendingStudentVerification,
+  RecentProject,
   SchoolDashboardData,
   StudentAccessToken,
   StudentJourney,
@@ -39,6 +43,22 @@ export const schoolApi = {
   },
   async getInvestors() {
     const response = await api.get<ApiSuccessResponse<DirectoryInvestor[]>>('/api/school/investors');
+    return response.data.data;
+  },
+  async getProjects() {
+    const response = await api.get<ApiSuccessResponse<RecentProject[]>>('/api/school/projects');
+    return response.data.data;
+  },
+  async getPatents() {
+    const response = await api.get<ApiSuccessResponse<InstitutionPatent[]>>('/api/school/patents');
+    return response.data.data;
+  },
+  async getStartups() {
+    const response = await api.get<ApiSuccessResponse<InstitutionStartup[]>>('/api/school/startups');
+    return response.data.data;
+  },
+  async getEvents() {
+    const response = await api.get<ApiSuccessResponse<DashboardEvent[]>>('/api/school/events');
     return response.data.data;
   },
   async generateComplianceReport() {

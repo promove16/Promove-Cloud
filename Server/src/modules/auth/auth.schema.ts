@@ -1,4 +1,5 @@
 import { z } from 'zod';
+import { institutionVerificationInputSchema } from '../institution/institutionVerification.service';
 import { UserRole } from '../../types/roles.types';
 
 const optionalProfileString = (max: number) =>
@@ -60,6 +61,7 @@ export const registrationRequestSchema = z
     domain: optionalProfileString(120),
     bio: optionalProfileString(500),
     institutionProfile: institutionProfileInputSchema.optional(),
+    institutionVerification: institutionVerificationInputSchema.optional(),
   })
   .superRefine((value, ctx) => {
     if (
@@ -70,6 +72,17 @@ export const registrationRequestSchema = z
         code: z.ZodIssueCode.custom,
         path: ['institutionProfile'],
         message: 'Institution details are required for this role',
+      });
+    }
+
+    if (
+      (value.role === UserRole.SCHOOL || value.role === UserRole.COLLEGE) &&
+      !value.institutionVerification
+    ) {
+      ctx.addIssue({
+        code: z.ZodIssueCode.custom,
+        path: ['institutionVerification'],
+        message: 'Institution verification details are required for this role',
       });
     }
 

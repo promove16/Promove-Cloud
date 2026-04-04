@@ -4,6 +4,7 @@ import { adminApi } from '../../api/admin.api';
 import { Button } from '../../components/ui/Button';
 import { Card } from '../../components/ui/Card';
 import { UserRole } from '../../types/roles.types';
+import { getApiErrorMessage } from '../../utils/apiError';
 import {
   emptyProgramForm,
   formLabelClassName,
@@ -14,6 +15,10 @@ import {
 export default function MentorshipProgramCreation() {
   const queryClient = useQueryClient();
   const [programForm, setProgramForm] = useState<ProgramFormState>(emptyProgramForm());
+  const [feedback, setFeedback] = useState<{
+    tone: 'success' | 'error';
+    message: string;
+  } | null>(null);
 
   const mentorsQuery = useQuery({
     queryKey: ['admin-mentors'],
@@ -30,12 +35,25 @@ export default function MentorshipProgramCreation() {
 
   const createProgramMutation = useMutation({
     mutationFn: adminApi.createMentorshipProgram,
+    onMutate: () => {
+      setFeedback(null);
+    },
     onSuccess: async () => {
       setProgramForm(emptyProgramForm());
+      setFeedback({
+        tone: 'success',
+        message: 'Mentorship programme created and assigned successfully.',
+      });
       await Promise.all([
         queryClient.invalidateQueries({ queryKey: ['admin-mentorship-programs'] }),
         queryClient.invalidateQueries({ queryKey: ['admin-mentors'] }),
       ]);
+    },
+    onError: (error) => {
+      setFeedback({
+        tone: 'error',
+        message: getApiErrorMessage(error, 'Unable to create the mentorship programme right now.'),
+      });
     },
   });
 
@@ -86,6 +104,18 @@ export default function MentorshipProgramCreation() {
           Build a mentorship programme on behalf of an institution and assign an available mentor in the same step.
         </p>
       </div>
+
+      {feedback ? (
+        <div
+          className={`mt-6 rounded-2xl border px-4 py-3 text-sm ${
+            feedback.tone === 'success'
+              ? 'border-emerald-500/30 bg-emerald-500/10 text-emerald-200'
+              : 'border-rose-500/30 bg-rose-500/10 text-rose-200'
+          }`}
+        >
+          {feedback.message}
+        </div>
+      ) : null}
 
       <form className="mt-6 space-y-4" onSubmit={handleCreateProgram}>
         <div className="grid gap-3 md:grid-cols-2">

@@ -9,9 +9,14 @@ import { Startup } from '../modules/startup/startup.model';
 import { User } from '../modules/user/user.model';
 import { Event } from '../modules/event/event.model';
 import { ComplianceReport } from '../modules/institution/complianceReport.model';
+import {
+  calculateEstimatedIicRating,
+  getInstitutionIicTelemetry,
+} from '../modules/institution/iicRating.service';
 import { PlacementRecord } from '../modules/college/placementRecord.model';
 import { getStudentLeaderboard } from '../modules/school/school.service';
 import { UserRole } from '../types/roles.types';
+import { Workspace } from '../modules/workspace/workspace.model';
 
 cloudinary.config({
   cloud_name: env.CLOUDINARY_CLOUD_NAME,
@@ -78,12 +83,15 @@ const loadReportMetrics = async (
     score: student.innovationScore,
   }));
 
-  const [totalInnovationActivities, patentsFiled, startupsLaunched, placements] = await Promise.all([
-    studentIds.length > 0 ? ScoreEvent.countDocuments({ userId: { $in: studentIds } }) : 0,
-    studentIds.length > 0 ? Patent.countDocuments({ studentId: { $in: studentIds } }) : 0,
-    studentIds.length > 0 ? Startup.countDocuments({ founderIds: { $in: studentIds } }) : 0,
-    institutionType === 'college' ? PlacementRecord.find({ collegeId: institutionId }).lean() : [],
-  ]);
+  const [activeProjects, totalInnovationActivities, patentsFiled, startupsLaunched, placements, iicTelemetry] =
+    await Promise.all([
+      studentIds.length > 0 ? Workspace.countDocuments({ ownerId: { $in: studentIds }, isActive: true }) : 0,
+      studentIds.length > 0 ? ScoreEvent.countDocuments({ userId: { $in: studentIds } }) : 0,
+      studentIds.length > 0 ? Patent.countDocuments({ studentId: { $in: studentIds } }) : 0,
+      studentIds.length > 0 ? Startup.countDocuments({ founderIds: { $in: studentIds } }) : 0,
+      institutionType === 'college' ? PlacementRecord.find({ collegeId: institutionId }).lean() : [],
+      getInstitutionIicTelemetry(institutionId, institutionType),
+    ]);
 
   const recruiterIds = new Set(
     placements
@@ -126,13 +134,26 @@ const loadReportMetrics = async (
     institution.institutionProfile?.stats.industryCollaborations ??
     (await Event.countDocuments({ institutionId }));
 
+  const iicRating = calculateEstimatedIicRating({
+    totalStudents: students.length,
+    activeProjects,
+    totalInnovationActivities,
+    patentsFiled,
+    totalMentoringHours: institution.institutionProfile?.stats.totalMentoringHours ?? 0,
+    startupsLaunched,
+    industryCollaborations,
+    structuredActivityCount: iicTelemetry.structuredActivityCount,
+    activeQuarterCount: iicTelemetry.activeQuarterCount,
+    policies: institution.institutionProfile?.policies ?? [],
+  });
+
   return {
     institutionType,
     institutionName: institution.institutionProfile?.institutionName ?? 'Institution',
     location: institution.institutionProfile?.location ?? 'Not provided',
     academicYear: institution.institutionProfile?.academicYear ?? 'Current AY',
     generatedAt: new Date(),
-    iicStarRating: institution.institutionProfile?.iicStarRating ?? 0,
+    iicStarRating: iicRating.starRating,
     policies: institution.institutionProfile?.policies ?? [],
     totalStudents: students.length,
     totalInnovationActivities,

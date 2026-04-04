@@ -10,6 +10,7 @@ import { NotificationService } from '../notification/notification.service';
 import { Startup } from '../startup/startup.model';
 import { User } from '../user/user.model';
 import { Workspace } from '../workspace/workspace.model';
+import { MentorSession } from './mentorSession.model';
 import {
   AdminCreateInstitutionMentorshipProgramInput,
   AdminProjectMentorshipItem,
@@ -30,8 +31,29 @@ import {
 import { InstitutionMentorshipProgram } from './mentorshipProgram.model';
 
 const MS_IN_YEAR = 365 * 24 * 60 * 60 * 1000;
+const MAX_MENTOR_SCHEDULE_LOOKBACK_MINUTES = 8 * 60;
 
 const toIso = (value: Date | string) => new Date(value).toISOString();
+
+const formatScheduleWindow = (startsAt: Date, durationMinutes: number) => {
+  const endsAt = new Date(startsAt.getTime() + durationMinutes * 60 * 1000);
+  return {
+    startsAt: toIso(startsAt),
+    endsAt: toIso(endsAt),
+  };
+};
+
+const windowsOverlap = (
+  leftStart: Date,
+  leftDurationMinutes: number,
+  rightStart: Date,
+  rightDurationMinutes: number,
+) => {
+  const leftEnd = leftStart.getTime() + leftDurationMinutes * 60 * 1000;
+  const rightEnd = rightStart.getTime() + rightDurationMinutes * 60 * 1000;
+
+  return leftStart.getTime() < rightEnd && rightStart.getTime() < leftEnd;
+};
 
 const slugifyDisplayName = (displayName: string) => {
   const normalized = displayName
@@ -210,12 +232,12 @@ const buildStats = (programs: InstitutionMentorshipProgramItem[]): InstitutionMe
 type WorkspaceMentorSnapshot = {
   _id: Types.ObjectId;
   ownerId: Types.ObjectId;
-  teamMemberIds: Types.ObjectId[];
+  teamMemberIds?: Types.ObjectId[];
   title: string;
   category: string;
   stage: string;
   progressPercent: number;
-  chatParticipants: Array<{
+  chatParticipants?: Array<{
     _id: Types.ObjectId;
     userId: Types.ObjectId;
     role: 'mentor' | 'investor';
@@ -238,11 +260,21 @@ type AssignmentUser = {
   };
 };
 
+const getWorkspaceTeamMemberIds = (
+  workspace: Pick<WorkspaceMentorSnapshot, 'teamMemberIds'>,
+) => (Array.isArray(workspace.teamMemberIds) ? workspace.teamMemberIds : []);
+
+const getWorkspaceChatParticipants = (
+  workspace: Pick<WorkspaceMentorSnapshot, 'chatParticipants'>,
+) => (Array.isArray(workspace.chatParticipants) ? workspace.chatParticipants : []);
+
 const getWorkspaceStudentIds = (workspace: Pick<WorkspaceMentorSnapshot, 'ownerId' | 'teamMemberIds'>) =>
-  Array.from(new Set([String(workspace.ownerId), ...workspace.teamMemberIds.map((memberId) => String(memberId))]));
+  Array.from(
+    new Set([String(workspace.ownerId), ...getWorkspaceTeamMemberIds(workspace).map((memberId) => String(memberId))]),
+  );
 
 const getWorkspaceMentorParticipant = (workspace: Pick<WorkspaceMentorSnapshot, 'chatParticipants'>) =>
-  workspace.chatParticipants.find((participant) => participant.role === 'mentor');
+  getWorkspaceChatParticipants(workspace).find((participant) => participant.role === 'mentor');
 
 const loadAssignmentUsers = async (userIds: string[]) => {
   if (userIds.length === 0) {
@@ -495,6 +527,105 @@ const assertAssignableMentor = async (mentorId: string) => {
   return mentor;
 };
 
+export const assertMentorAvailability = async ({
+  mentorId,
+  scheduledAt,
+  durationMinutes,
+  excludeInstitutionProgramId,
+  excludeSessionId,
+}: {
+  mentorId: string;
+  scheduledAt: Date;
+  durationMinutes: number;
+  excludeInstitutionProgramId?: string;
+  excludeSessionId?: string;
+}) => {
+  const windowStart = new Date(
+    scheduledAt.getTime() - MAX_MENTOR_SCHEDULE_LOOKBACK_MINUTES * 60 * 1000,
+  );
+  const windowEnd = new Date(scheduledAt.getTime() + durationMinutes * 60 * 1000);
+
+  const [institutionPrograms, mentorSessions] = await Promise.all([
+    InstitutionMentorshipProgram.find({
+      mentorId: new Types.ObjectId(mentorId),
+      status: 'Assigned',
+      scheduledAt: {
+        $gte: windowStart,
+        $lt: windowEnd,
+      },
+      ...(excludeInstitutionProgramId
+        ? { _id: { $ne: new Types.ObjectId(excludeInstitutionProgramId) } }
+        : {}),
+    })
+      .select('_id title institutionId scheduledAt durationMinutes')
+      .lean(),
+    MentorSession.find({
+      mentorId: new Types.ObjectId(mentorId),
+      status: 'Scheduled',
+      scheduledAt: {
+        $gte: windowStart,
+        $lt: windowEnd,
+      },
+      ...(excludeSessionId ? { _id: { $ne: new Types.ObjectId(excludeSessionId) } } : {}),
+    })
+      .select('_id title studentId scheduledAt durationMinutes')
+      .lean(),
+  ]);
+
+  const overlappingPrograms = institutionPrograms.filter((program) =>
+    program.scheduledAt
+      ? windowsOverlap(scheduledAt, durationMinutes, new Date(program.scheduledAt), program.durationMinutes)
+      : false,
+  );
+  const overlappingSessions = mentorSessions.filter((session) =>
+    windowsOverlap(scheduledAt, durationMinutes, new Date(session.scheduledAt), session.durationMinutes),
+  );
+
+  if (overlappingPrograms.length === 0 && overlappingSessions.length === 0) {
+    return;
+  }
+
+  const institutionIds = overlappingPrograms.map((program) => String(program.institutionId));
+  const studentIds = overlappingSessions.map((session) => String(session.studentId));
+  const relatedUsers =
+    institutionIds.length > 0 || studentIds.length > 0
+      ? await User.find({ _id: { $in: [...institutionIds, ...studentIds] } })
+          .select('_id displayName institutionProfile')
+          .lean()
+      : [];
+  const userMap = new Map(relatedUsers.map((user) => [String(user._id), user]));
+
+  const details = [
+    ...overlappingPrograms.map((program) => {
+      const institution = userMap.get(String(program.institutionId));
+      const schedule = formatScheduleWindow(new Date(program.scheduledAt!), program.durationMinutes);
+      return {
+        path: 'mentorId',
+        message: `Institution mentorship "${program.title}" for ${
+          institution?.institutionProfile?.institutionName ?? institution?.displayName ?? 'Institution'
+        } already uses this mentor from ${schedule.startsAt} to ${schedule.endsAt}.`,
+      };
+    }),
+    ...overlappingSessions.map((session) => {
+      const student = userMap.get(String(session.studentId));
+      const schedule = formatScheduleWindow(new Date(session.scheduledAt), session.durationMinutes);
+      return {
+        path: 'mentorId',
+        message: `Student session "${session.title}" with ${
+          student?.displayName ?? 'Student'
+        } already uses this mentor from ${schedule.startsAt} to ${schedule.endsAt}.`,
+      };
+    }),
+  ];
+
+  throw new ApiError(
+    409,
+    'MENTOR_SCHEDULE_CONFLICT',
+    'Selected mentor is already booked for the requested time.',
+    details,
+  );
+};
+
 export const createInstitutionMentorshipProgram = async (
   institutionId: string,
   institutionType: 'school' | 'college',
@@ -568,6 +699,13 @@ export const createAdminInstitutionMentorshipProgram = async (
     assertInstitutionAccount(payload.institutionId),
     assertAssignableMentor(payload.mentorId),
   ]);
+  const scheduledAt = new Date(payload.scheduledAt);
+
+  await assertMentorAvailability({
+    mentorId: payload.mentorId,
+    scheduledAt,
+    durationMinutes: payload.durationMinutes,
+  });
 
   const created = await InstitutionMentorshipProgram.create({
     institutionId: institution._id,
@@ -577,7 +715,7 @@ export const createAdminInstitutionMentorshipProgram = async (
     title: sanitizePlainText(payload.title),
     objective: sanitizePlainText(payload.objective),
     preferredDate: new Date(payload.preferredDate),
-    scheduledAt: new Date(payload.scheduledAt),
+    scheduledAt,
     durationMinutes: payload.durationMinutes,
     expectedParticipants: payload.expectedParticipants,
     deliveryMode: payload.deliveryMode,
@@ -778,10 +916,18 @@ export const reviewInstitutionMentorshipProgram = async (
     program.rejectionReason = sanitizePlainText(payload.rejectionReason);
   } else {
     const mentor = await assertAssignableMentor(payload.mentorId);
+    const scheduledAt = new Date(payload.scheduledAt);
+
+    await assertMentorAvailability({
+      mentorId: payload.mentorId,
+      scheduledAt,
+      durationMinutes: program.durationMinutes,
+      excludeInstitutionProgramId: programId,
+    });
 
     program.status = 'Assigned';
     program.mentorId = new Types.ObjectId(payload.mentorId);
-    program.scheduledAt = new Date(payload.scheduledAt);
+    program.scheduledAt = scheduledAt;
     program.deliveryMode = payload.deliveryMode;
     program.platform = payload.platform;
     program.meetingLink = payload.meetingLink || undefined;
@@ -857,10 +1003,11 @@ export const assignProjectMentor = async (
     ownerId: workspace.ownerId,
     teamMemberIds: workspace.teamMemberIds,
   });
-  const existingMentor = workspace.chatParticipants.find((participant) => participant.role === 'mentor');
+  const existingParticipants = getWorkspaceChatParticipants(workspace);
+  const existingMentor = existingParticipants.find((participant) => participant.role === 'mentor');
 
   if (payload.decision === 'unassigned') {
-    workspace.chatParticipants = workspace.chatParticipants.filter((participant) => participant.role !== 'mentor');
+    workspace.chatParticipants = existingParticipants.filter((participant) => participant.role !== 'mentor');
     await workspace.save();
 
     if (existingMentor) {
@@ -888,7 +1035,7 @@ export const assignProjectMentor = async (
       throw new ApiError(404, 'MENTOR_NOT_FOUND', 'Assigned mentor not found');
     }
 
-    workspace.chatParticipants = workspace.chatParticipants.filter((participant) => participant.role !== 'mentor');
+    workspace.chatParticipants = existingParticipants.filter((participant) => participant.role !== 'mentor');
     workspace.chatParticipants.push({
       _id: new Types.ObjectId(),
       userId: new Types.ObjectId(payload.mentorId),

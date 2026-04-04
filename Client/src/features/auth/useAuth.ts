@@ -1,17 +1,3 @@
-export const useRegisterRequestMutation = () => {
-  return useMutation({
-    mutationFn: async (payload: Omit<SignupInput, "institutionToken">) => {
-      const response = await api.post<ApiSuccessResponse<SignupResponse>>(
-        "/api/auth/register-request",
-        payload,
-      );
-      return response.data.data;
-    },
-    meta: {
-      parseError,
-    },
-  });
-};
 import { PropsWithChildren, ReactElement, useEffect } from "react";
 import { useMutation } from "@tanstack/react-query";
 import axios, { isAxiosError } from "axios";
@@ -22,8 +8,8 @@ import {
   ApiSuccessResponse,
   AuthPayload,
   LoginInput,
-  SignupResponse,
   SignupInput,
+  SignupResponse,
 } from "../../types/auth.types";
 import { UserRole } from "../../types/roles.types";
 
@@ -79,6 +65,23 @@ export const useSignupMutation = () => {
       if ("accessToken" in payload) {
         setAuth(payload.user, payload.accessToken);
       }
+    },
+    meta: {
+      parseError,
+    },
+  });
+};
+
+export const useRegisterRequestMutation = () => {
+  return useMutation({
+    mutationFn: async (
+      payload: Omit<SignupInput, "institutionToken"> | FormData,
+    ) => {
+      const response = await api.post<ApiSuccessResponse<SignupResponse>>(
+        "/api/auth/register-request",
+        payload,
+      );
+      return response.data.data;
     },
     meta: {
       parseError,
@@ -163,7 +166,7 @@ export const useBootstrapAuth = () => {
         } else {
           clearAuth();
         }
-      } catch (error) {
+      } catch (_error) {
         if (active) {
           clearAuth();
         }

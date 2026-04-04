@@ -164,6 +164,72 @@ describe('admin mentorship integration', () => {
     expect(mentorDashboardResponse.body.data.activeStudentCount).toBe(1);
   });
 
+  it('lists project mentorship candidates even when legacy workspaces are missing mentorship arrays', async () => {
+    const { email: adminEmail } = await createApprovedUser({
+      role: UserRole.ADMIN,
+      displayName: 'Legacy Admin',
+    });
+    const { user: studentUser } = await createApprovedUser({
+      role: UserRole.STUDENT,
+      displayName: 'Legacy Student',
+    });
+
+    const workspace = new Workspace({
+      ownerId: studentUser._id,
+      title: 'Legacy Workspace',
+      category: 'DeepTech',
+      stage: 'Build',
+      progressPercent: 48,
+      isActive: true,
+    });
+
+    await Workspace.collection.insertOne({
+      _id: workspace._id,
+      ownerId: workspace.ownerId,
+      title: workspace.title,
+      category: workspace.category,
+      stage: workspace.stage,
+      progressPercent: workspace.progressPercent,
+      isActive: true,
+      createdAt: new Date(),
+      updatedAt: new Date(),
+    });
+
+    await Startup.create({
+      founderIds: [studentUser._id],
+      projectId: workspace._id,
+      name: 'Legacy Startup',
+      tagline: 'Built from an older workspace record',
+      category: 'DeepTech',
+      stage: 'MVP',
+      launchedToMentors: true,
+      launchedAt: new Date(),
+      innovationScoreAtLaunch: 96,
+      isActive: true,
+    });
+
+    const adminAccessToken = await loginAs(adminEmail);
+    const response = await request(app)
+      .get('/api/admin/project-mentorships')
+      .set('Authorization', `Bearer ${adminAccessToken}`);
+
+    expect(response.status).toBe(200);
+    expect(response.body.data.items).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({
+          workspaceId: workspace._id.toString(),
+          title: 'Legacy Workspace',
+          students: expect.arrayContaining([
+            expect.objectContaining({
+              _id: studentUser._id.toString(),
+              displayName: 'Legacy Student',
+            }),
+          ]),
+        }),
+      ]),
+    );
+  });
+
   it('only allows admin-approved mentors to be assigned to institution mentorship requests', async () => {
     const { email: adminEmail } = await createApprovedUser({
       role: UserRole.ADMIN,
@@ -373,5 +439,186 @@ describe('admin mentorship integration', () => {
         }),
       ]),
     );
+  });
+
+  it('rejects overlapping institution mentorship assignments for the same mentor', async () => {
+    const { email: adminEmail } = await createApprovedUser({
+      role: UserRole.ADMIN,
+      displayName: 'Conflict Admin',
+    });
+    const { user: schoolOne, email: schoolOneEmail } = await createApprovedUser({
+      role: UserRole.SCHOOL,
+      displayName: 'School One',
+    });
+    const { user: schoolTwo, email: schoolTwoEmail } = await createApprovedUser({
+      role: UserRole.SCHOOL,
+      displayName: 'School Two',
+    });
+    const { user: mentorUser } = await createApprovedUser({
+      role: UserRole.MENTOR,
+      displayName: 'Booked Mentor',
+    });
+
+    const adminAccessToken = await loginAs(adminEmail);
+    const schoolOneAccessToken = await loginAs(schoolOneEmail);
+    const schoolTwoAccessToken = await loginAs(schoolTwoEmail);
+
+    const firstRequest = await request(app)
+      .post('/api/school/mentorship-programs')
+      .set('Authorization', `Bearer ${schoolOneAccessToken}`)
+      .send({
+        title: 'School One Innovation Day',
+        objective: 'A mentoring day for startup idea validation and pitch readiness.',
+        preferredDate: new Date('2026-04-15T10:00:00.000Z').toISOString(),
+        durationMinutes: 90,
+        expectedParticipants: 80,
+        deliveryMode: 'Online',
+        platform: 'Google Meet',
+      });
+
+    expect(firstRequest.status).toBe(201);
+
+    const firstAssignment = await request(app)
+      .patch(`/api/admin/mentorship-programs/${firstRequest.body.data._id as string}`)
+      .set('Authorization', `Bearer ${adminAccessToken}`)
+      .send({
+        decision: 'assigned',
+        mentorId: mentorUser._id.toString(),
+        scheduledAt: new Date('2026-04-16T10:00:00.000Z').toISOString(),
+        deliveryMode: 'Online',
+        platform: 'Google Meet',
+        meetingLink: 'https://meet.google.com/school-one',
+      });
+
+    expect(firstAssignment.status).toBe(200);
+
+    const secondRequest = await request(app)
+      .post('/api/school/mentorship-programs')
+      .set('Authorization', `Bearer ${schoolTwoAccessToken}`)
+      .send({
+        title: 'School Two Innovation Day',
+        objective: 'A follow-up mentoring day for prototype validation and roadmap planning.',
+        preferredDate: new Date('2026-04-15T11:00:00.000Z').toISOString(),
+        durationMinutes: 60,
+        expectedParticipants: 60,
+        deliveryMode: 'Online',
+        platform: 'Google Meet',
+      });
+
+    expect(secondRequest.status).toBe(201);
+
+    const conflictingAssignment = await request(app)
+      .patch(`/api/admin/mentorship-programs/${secondRequest.body.data._id as string}`)
+      .set('Authorization', `Bearer ${adminAccessToken}`)
+      .send({
+        decision: 'assigned',
+        mentorId: mentorUser._id.toString(),
+        scheduledAt: new Date('2026-04-16T10:30:00.000Z').toISOString(),
+        deliveryMode: 'Online',
+        platform: 'Google Meet',
+        meetingLink: 'https://meet.google.com/school-two',
+      });
+
+    expect(conflictingAssignment.status).toBe(409);
+    expect(conflictingAssignment.body.error.code).toBe('MENTOR_SCHEDULE_CONFLICT');
+
+    const secondProgram = await InstitutionMentorshipProgram.findById(secondRequest.body.data._id).lean();
+    expect(secondProgram?.status).toBe('Pending');
+    expect(secondProgram?.mentorId).toBeUndefined();
+
+    expect(conflictingAssignment.body.error.details).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({
+          path: 'mentorId',
+        }),
+      ]),
+    );
+  });
+
+  it('blocks mentor sessions that overlap with an assigned institution mentorship program', async () => {
+    const { email: adminEmail } = await createApprovedUser({
+      role: UserRole.ADMIN,
+      displayName: 'Scheduling Admin',
+    });
+    const { user: schoolUser } = await createApprovedUser({
+      role: UserRole.SCHOOL,
+      displayName: 'Scheduled School',
+    });
+    const { user: mentorUser, email: mentorEmail } = await createApprovedUser({
+      role: UserRole.MENTOR,
+      displayName: 'Session Mentor',
+    });
+    const { user: studentUser } = await createApprovedUser({
+      role: UserRole.STUDENT,
+      displayName: 'Session Student',
+    });
+
+    const workspace = await Workspace.create({
+      ownerId: studentUser._id,
+      teamMemberIds: [],
+      title: 'Mentored Workspace',
+      category: 'EdTech',
+      stage: 'Build',
+      progressPercent: 40,
+      chatParticipants: [
+        {
+          userId: mentorUser._id,
+          role: 'mentor',
+          addedBy: studentUser._id,
+          addedAt: new Date(),
+        },
+      ],
+    });
+
+    const adminAccessToken = await loginAs(adminEmail);
+    const mentorAccessToken = await loginAs(mentorEmail);
+
+    const createProgramResponse = await request(app)
+      .post('/api/admin/mentorship-programs')
+      .set('Authorization', `Bearer ${adminAccessToken}`)
+      .send({
+        institutionId: schoolUser._id.toString(),
+        mentorId: mentorUser._id.toString(),
+        title: 'Institution Booking',
+        objective: 'A scheduled institution mentorship booking.',
+        preferredDate: new Date('2026-04-20T09:00:00.000Z').toISOString(),
+        scheduledAt: new Date('2026-04-20T10:00:00.000Z').toISOString(),
+        durationMinutes: 120,
+        expectedParticipants: 100,
+        deliveryMode: 'Online',
+        platform: 'Google Meet',
+        meetingLink: 'https://meet.google.com/institution-booking',
+      });
+
+    expect(createProgramResponse.status).toBe(201);
+
+    const createSessionResponse = await request(app)
+      .post('/api/mentor/sessions')
+      .set('Authorization', `Bearer ${mentorAccessToken}`)
+      .send({
+        studentId: studentUser._id.toString(),
+        workspaceId: workspace._id.toString(),
+        title: 'Overlapping Student Session',
+        scheduledAt: new Date('2026-04-20T10:30:00.000Z').toISOString(),
+        durationMinutes: 45,
+        meetLink: 'https://meet.google.com/student-session',
+      });
+
+    expect(createSessionResponse.status).toBe(409);
+    expect(createSessionResponse.body.error.code).toBe('MENTOR_SCHEDULE_CONFLICT');
+    expect(createSessionResponse.body.error.details).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({
+          path: 'mentorId',
+        }),
+      ]),
+    );
+
+    const storedSessions = await request(app)
+      .get('/api/mentor/sessions')
+      .set('Authorization', `Bearer ${mentorAccessToken}`);
+
+    expect(storedSessions.status).toBe(200);
+    expect(storedSessions.body.data.upcoming).toHaveLength(0);
   });
 });

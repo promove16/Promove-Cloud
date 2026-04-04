@@ -4,6 +4,7 @@ exports.User = void 0;
 const mongoose_1 = require("mongoose");
 const roles_types_1 = require("../../types/roles.types");
 const score_utils_1 = require("../innovationScore/score.utils");
+const institutionVerification_constants_1 = require("../institution/institutionVerification.constants");
 const scoreBreakdownSchema = new mongoose_1.Schema({
     problemsClaimed: { type: Number, default: 0 },
     skillsCompleted: { type: Number, default: 0 },
@@ -90,6 +91,105 @@ const institutionProfileSchema = new mongoose_1.Schema({
             totalMentoringHours: 0,
             startupsLaunched: 0,
             industryCollaborations: 0,
+        }),
+    },
+}, { _id: false });
+const institutionVerificationReadinessSchema = new mongoose_1.Schema({
+    isReadyForReview: {
+        type: Boolean,
+        default: false,
+    },
+    requiredDocumentCategories: {
+        type: [{ type: String, enum: institutionVerification_constants_1.INSTITUTION_DOCUMENT_CATEGORIES }],
+        default: [],
+    },
+    uploadedDocumentCategories: {
+        type: [{ type: String, enum: institutionVerification_constants_1.INSTITUTION_DOCUMENT_CATEGORIES }],
+        default: [],
+    },
+    missingItems: {
+        type: [String],
+        default: [],
+    },
+}, { _id: false });
+const institutionVerificationDocumentSchema = new mongoose_1.Schema({
+    category: {
+        type: String,
+        enum: institutionVerification_constants_1.INSTITUTION_DOCUMENT_CATEGORIES,
+        required: true,
+    },
+    fileUrl: {
+        type: String,
+        required: true,
+    },
+    fileType: {
+        type: String,
+        enum: ['pdf', 'image'],
+        required: true,
+    },
+    fileName: {
+        type: String,
+        required: true,
+        trim: true,
+        maxlength: 200,
+    },
+    fileSizeBytes: {
+        type: Number,
+        required: true,
+        min: 1,
+    },
+    uploadedAt: {
+        type: Date,
+        default: () => new Date(),
+    },
+    uploadedBy: {
+        type: mongoose_1.Schema.Types.ObjectId,
+        ref: 'User',
+        required: true,
+    },
+    cloudinaryPublicId: {
+        type: String,
+        default: undefined,
+    },
+}, { _id: true });
+const institutionVerificationSchema = new mongoose_1.Schema({
+    regulatoryBodies: {
+        type: [{ type: String, enum: institutionVerification_constants_1.INSTITUTION_REGULATORY_BODIES }],
+        default: [],
+    },
+    affiliationName: {
+        type: String,
+        trim: true,
+        maxlength: 160,
+        default: undefined,
+    },
+    websiteUrl: {
+        type: String,
+        default: undefined,
+    },
+    referenceCode: {
+        type: String,
+        trim: true,
+        maxlength: 80,
+        default: undefined,
+    },
+    notes: {
+        type: String,
+        trim: true,
+        maxlength: 500,
+        default: undefined,
+    },
+    documents: {
+        type: [institutionVerificationDocumentSchema],
+        default: [],
+    },
+    readiness: {
+        type: institutionVerificationReadinessSchema,
+        default: () => ({
+            isReadyForReview: false,
+            requiredDocumentCategories: [],
+            uploadedDocumentCategories: [],
+            missingItems: [],
         }),
     },
 }, { _id: false });
@@ -741,6 +841,10 @@ const userSchema = new mongoose_1.Schema({
     },
     institutionProfile: {
         type: institutionProfileSchema,
+        default: undefined,
+    },
+    institutionVerification: {
+        type: institutionVerificationSchema,
         default: undefined,
     },
     institutionVerifiedAt: {

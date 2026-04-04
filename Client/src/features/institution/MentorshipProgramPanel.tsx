@@ -3,6 +3,7 @@ import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { CalendarDays, GraduationCap, Users } from 'lucide-react';
 import { Card } from '../../components/ui/Card';
 import { Button } from '../../components/ui/Button';
+import { getApiErrorMessage } from '../../utils/apiError';
 import {
   CreateInstitutionMentorshipProgramInput,
   InstitutionMentorshipProgramView,
@@ -49,6 +50,10 @@ export function MentorshipProgramPanel({
 }) {
   const queryClient = useQueryClient();
   const [form, setForm] = useState<FormState>(emptyState());
+  const [submissionFeedback, setSubmissionFeedback] = useState<{
+    tone: 'success' | 'error';
+    message: string;
+  } | null>(null);
 
   const programsQuery = useQuery({
     queryKey: [queryKey],
@@ -57,9 +62,22 @@ export function MentorshipProgramPanel({
 
   const createMutation = useMutation({
     mutationFn: createProgram,
+    onMutate: () => {
+      setSubmissionFeedback(null);
+    },
     onSuccess: async () => {
       setForm(emptyState());
+      setSubmissionFeedback({
+        tone: 'success',
+        message: 'Mentorship request sent to admin. You can track approval and mentor assignment below.',
+      });
       await queryClient.invalidateQueries({ queryKey: [queryKey] });
+    },
+    onError: (error) => {
+      setSubmissionFeedback({
+        tone: 'error',
+        message: getApiErrorMessage(error, 'Unable to submit the mentorship request right now.'),
+      });
     },
   });
 
@@ -92,7 +110,7 @@ export function MentorshipProgramPanel({
       <Card className="p-6">
         <div className="flex items-start justify-between gap-4">
           <div>
-            <div className="text-xs uppercase tracking-[0.3em] text-cyan-300">Mentorship Programs</div>
+            <div className="text-xs uppercase tracking-[0.3em] text-cyan-300">Mentorship Requests</div>
             <h2 className="mt-2 text-2xl font-bold text-white">{heading}</h2>
             <p className="mt-2 text-sm text-slate-400">{description}</p>
           </div>
@@ -162,8 +180,22 @@ export function MentorshipProgramPanel({
       </Card>
 
       <Card className="p-6">
-        <div className="text-xs uppercase tracking-[0.3em] text-cyan-300">Request A Mentor</div>
-        <h2 className="mt-2 text-2xl font-bold text-white">Submit a mentorship session</h2>
+        <div className="text-xs uppercase tracking-[0.3em] text-cyan-300">Request To Admin</div>
+        <h2 className="mt-2 text-2xl font-bold text-white">Submit a mentorship request</h2>
+        <p className="mt-2 text-sm text-slate-400">
+          Admin will review the request, approve it, and assign an available mentor without schedule conflicts.
+        </p>
+        {submissionFeedback ? (
+          <div
+            className={`mt-4 rounded-2xl border px-4 py-3 text-sm ${
+              submissionFeedback.tone === 'success'
+                ? 'border-emerald-500/30 bg-emerald-500/10 text-emerald-200'
+                : 'border-rose-500/30 bg-rose-500/10 text-rose-200'
+            }`}
+          >
+            {submissionFeedback.message}
+          </div>
+        ) : null}
         <form className="mt-6 space-y-4" onSubmit={handleSubmit}>
           <input
             value={form.title}

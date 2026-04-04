@@ -25,6 +25,9 @@ import {
   importCollegeStudentRosterEntries,
   listStudentRosterQuerySchema,
   listCollegeEvents,
+  getCollegePatents,
+  getCollegeProjects,
+  getCollegeStartups,
   manualStudentRosterEntrySchema,
   placementStatusSchema,
   reviewCollegeStudentVerification,
@@ -64,6 +67,21 @@ export const listCollegeInvestorsController = async (_req: Request, res: Respons
 
 export const listCollegeRecruitersController = async (_req: Request, res: Response) => {
   const data = await getRecruiterDirectory();
+  res.status(200).json(new ApiResponse(data));
+};
+
+export const listCollegeProjectsController = async (req: Request, res: Response) => {
+  const data = await getCollegeProjects(req.user!._id);
+  res.status(200).json(new ApiResponse(data));
+};
+
+export const listCollegePatentsController = async (req: Request, res: Response) => {
+  const data = await getCollegePatents(req.user!._id);
+  res.status(200).json(new ApiResponse(data));
+};
+
+export const listCollegeStartupsController = async (req: Request, res: Response) => {
+  const data = await getCollegeStartups(req.user!._id);
   res.status(200).json(new ApiResponse(data));
 };
 

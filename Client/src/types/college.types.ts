@@ -1,8 +1,11 @@
 import {
   ComplianceReportRecord,
   DashboardEvent,
+  InstitutionPatent,
   InstitutionProfile,
+  InstitutionStartup,
   PendingStudentVerification,
+  RecentProject,
   TemporaryStudentCredentials,
   StudentRosterEntry,
   StudentRosterImportResult,
@@ -24,6 +27,7 @@ export interface RecruiterDirectoryItem {
 
 export interface CollegeDashboardStats {
   totalStudents: number;
+  activeProjects: number;
   totalInnovationActivities: number;
   patentsFiled: number;
   totalMentoringHours: number;
@@ -44,6 +48,7 @@ export interface CollegeDashboardData {
   };
   upcomingEvents: DashboardEvent[];
   topStudents: StudentLeaderboardItem[];
+  recentProjects: RecentProject[];
 }
 
 export interface EventRanking {
@@ -92,9 +97,12 @@ export interface PlacementStatusUpdateResponse {
 
 export type {
   ComplianceReportRecord,
+  InstitutionPatent,
+  InstitutionStartup,
   HiringPartner,
   PendingStudentVerification,
   PlacementTrackerData,
+  RecentProject,
   TemporaryStudentCredentials,
   StudentRosterEntry,
   StudentRosterImportResult,

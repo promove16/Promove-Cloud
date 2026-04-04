@@ -4,6 +4,7 @@ import { CalendarDays, GraduationCap, Users } from 'lucide-react';
 import { adminApi } from '../../api/admin.api';
 import { Button } from '../../components/ui/Button';
 import { Card } from '../../components/ui/Card';
+import { getApiErrorMessage } from '../../utils/apiError';
 import {
   emptyAssignmentDraft,
   formLabelClassName,
@@ -13,6 +14,10 @@ import {
 export default function MentorshipRequests() {
   const queryClient = useQueryClient();
   const [assignmentDrafts, setAssignmentDrafts] = useState<Record<string, AssignmentDraft>>({});
+  const [feedback, setFeedback] = useState<{
+    tone: 'success' | 'error';
+    message: string;
+  } | null>(null);
 
   const programsQuery = useQuery({
     queryKey: ['admin-mentorship-programs'],
@@ -31,11 +36,24 @@ export default function MentorshipRequests() {
       id: string;
       payload: Parameters<typeof adminApi.reviewMentorshipProgram>[1];
     }) => adminApi.reviewMentorshipProgram(id, payload),
+    onMutate: () => {
+      setFeedback(null);
+    },
     onSuccess: async () => {
+      setFeedback({
+        tone: 'success',
+        message: 'Mentorship request reviewed successfully.',
+      });
       await Promise.all([
         queryClient.invalidateQueries({ queryKey: ['admin-mentorship-programs'] }),
         queryClient.invalidateQueries({ queryKey: ['admin-mentors'] }),
       ]);
+    },
+    onError: (error) => {
+      setFeedback({
+        tone: 'error',
+        message: getApiErrorMessage(error, 'Unable to review the mentorship request right now.'),
+      });
     },
   });
 
@@ -71,6 +89,18 @@ export default function MentorshipRequests() {
           </div>
         ))}
       </div>
+
+      {feedback ? (
+        <div
+          className={`mt-6 rounded-2xl border px-4 py-3 text-sm ${
+            feedback.tone === 'success'
+              ? 'border-emerald-500/30 bg-emerald-500/10 text-emerald-200'
+              : 'border-rose-500/30 bg-rose-500/10 text-rose-200'
+          }`}
+        >
+          {feedback.message}
+        </div>
+      ) : null}
 
       <div className="mt-6 space-y-4">
         {programsQuery.isLoading ? (

@@ -54,6 +54,7 @@ export interface PlacementTrackerPayload {
 
 export interface CollegeDashboardStats {
   totalStudents: number;
+  activeProjects: number;
   totalInnovationActivities: number;
   patentsFiled: number;
   totalMentoringHours: number;

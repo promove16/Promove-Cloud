@@ -22,6 +22,10 @@ import {
   resolveInstitutionToken,
 } from '../institution/institutionAccess.service';
 import {
+  buildInstitutionVerificationProfile,
+  cleanupInstitutionVerificationDocuments,
+} from '../institution/institutionVerification.service';
+import {
   findInstitutionRosterMatchByEmail,
   markStudentRosterEntryRegistered,
 } from '../institution/studentRoster.service';
@@ -397,7 +401,24 @@ export const submitRegistrationRequest = async (payload: {
     academicYear: string;
     iicStarRating?: number;
   };
-}): Promise<PendingRegisterResult> => {
+  institutionVerification?: {
+    regulatoryBodies: Array<
+      | 'AICTE'
+      | 'UGC'
+      | 'NAAC'
+      | 'NBA'
+      | 'CBSE'
+      | 'ICSE'
+      | 'STATE_BOARD'
+      | 'STATE_EDUCATION_DEPARTMENT'
+      | 'UDISE'
+    >;
+    affiliationName?: string;
+    websiteUrl?: string;
+    referenceCode?: string;
+    notes?: string;
+  };
+}, files: Express.Multer.File[] = []): Promise<PendingRegisterResult> => {
   const normalizedEmail = payload.email.toLowerCase();
   const existingUser = await User.findOne({ email: normalizedEmail }).select('+passwordHash');
 
@@ -421,6 +442,18 @@ export const submitRegistrationRequest = async (payload: {
         'This email already has a registration request for a different role.',
       );
     }
+  }
+
+  if (
+    payload.role !== UserRole.SCHOOL &&
+    payload.role !== UserRole.COLLEGE &&
+    files.length > 0
+  ) {
+    throw new ApiError(
+      400,
+      'UNEXPECTED_INSTITUTION_DOCUMENTS',
+      'Institution document uploads are only supported for school and college requests.',
+    );
   }
 
   const passwordHash = await bcrypt.hash(payload.password, 12);
@@ -452,7 +485,7 @@ export const submitRegistrationRequest = async (payload: {
   user.bio = sanitizedBio;
   user.profileComplete =
     payload.role === UserRole.SCHOOL || payload.role === UserRole.COLLEGE
-      ? Boolean(institutionProfile)
+      ? false
       : Boolean(sanitizedDomain || sanitizedBio);
   user.registrationStage =
     payload.role === UserRole.SCHOOL || payload.role === UserRole.COLLEGE ? 'complete' : 'basic';
@@ -496,7 +529,24 @@ export const submitRegistrationRequest = async (payload: {
     user.institutionProfile = undefined;
   }
 
+  const previousInstitutionDocuments = existingUser?.institutionVerification?.documents ?? [];
+  if (payload.role === UserRole.SCHOOL || payload.role === UserRole.COLLEGE) {
+    user.institutionVerification = await buildInstitutionVerificationProfile({
+      role: payload.role,
+      userId: String(user._id),
+      verificationInput: payload.institutionVerification,
+      files,
+    });
+    user.profileComplete =
+      Boolean(institutionProfile) && user.institutionVerification.readiness.isReadyForReview;
+  } else {
+    user.institutionVerification = undefined;
+  }
+
   await user.save();
+  if (existingUser && previousInstitutionDocuments.length > 0) {
+    await cleanupInstitutionVerificationDocuments(previousInstitutionDocuments);
+  }
 
   await queueWelcomeEmail(String(user._id));
   await queueProfileCompletionMilestoneEmail(

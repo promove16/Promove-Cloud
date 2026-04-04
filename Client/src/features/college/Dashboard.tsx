@@ -1,409 +1,87 @@
-import { FormEvent, useState } from 'react';
-import { isAxiosError } from 'axios';
-import { Link } from 'react-router-dom';
-import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
+import { useQuery } from '@tanstack/react-query';
 import {
+  BarChart3,
   BriefcaseBusiness,
-  CalendarDays,
-  KeyRound,
-  Rocket,
-  Sparkles,
-  UserCheck,
+  Target,
   Users,
 } from 'lucide-react';
-import { Card } from '../../components/ui/Card';
-import { Button } from '../../components/ui/Button';
 import { collegeApi } from '../../api/college.api';
-import { MentorshipProgramPanel } from '../institution/MentorshipProgramPanel';
-import { StudentIntakePanel } from '../institution/StudentIntakePanel';
-import { PatentShowcase } from '../shared/PatentShowcase';
-import { ApiErrorResponse } from '../../types/auth.types';
-import { TemporaryStudentCredentials } from '../../types/college.types';
-import { BulkCredentialImportResult } from '../../types/school.types';
-import { useAuthStore } from '../../store/authStore';
+import { InstitutionOverviewDashboard } from '../institution/InstitutionOverviewDashboard';
 
 export default function Dashboard() {
-  const queryClient = useQueryClient();
-  const authUser = useAuthStore((state) => state.user);
-  const [tokenLabel, setTokenLabel] = useState('');
-  const [latestTemporaryCredential, setLatestTemporaryCredential] = useState<TemporaryStudentCredentials | null>(null);
-  const [bulkCredentialResult, setBulkCredentialResult] = useState<BulkCredentialImportResult | null>(null);
-  const [rosterNotice, setRosterNotice] = useState('');
   const dashboardQuery = useQuery({
     queryKey: ['college-dashboard'],
     queryFn: collegeApi.getDashboard,
   });
-  const tokenQuery = useQuery({
-    queryKey: ['college-student-access-tokens'],
-    queryFn: collegeApi.getStudentAccessTokens,
-  });
-  const pendingStudentsQuery = useQuery({
-    queryKey: ['college-student-verifications'],
-    queryFn: collegeApi.getPendingStudentVerifications,
-  });
-  const rosterQuery = useQuery({
-    queryKey: ['college-student-roster'],
-    queryFn: () => collegeApi.getStudentRoster(),
-  });
-  const createTokenMutation = useMutation({
-    mutationFn: collegeApi.createStudentAccessToken,
-    onSuccess: () => {
-      setTokenLabel('');
-      void queryClient.invalidateQueries({ queryKey: ['college-student-access-tokens'] });
-    },
-  });
-  const createRosterEntryMutation = useMutation({
-    mutationFn: collegeApi.createStudentRosterEntry,
-    onSuccess: () => {
-      void Promise.all([
-        queryClient.invalidateQueries({ queryKey: ['college-student-roster'] }),
-        queryClient.invalidateQueries({ queryKey: ['college-dashboard'] }),
-      ]);
-    },
-  });
-  const cancelInviteMutation = useMutation({
-    mutationFn: collegeApi.cancelStudentInvite,
-    onSuccess: () => {
-      setRosterNotice('Student invite cancelled.');
-      void queryClient.invalidateQueries({ queryKey: ['college-student-roster'] });
-    },
-    onError: (error) => {
-      const message =
-        isAxiosError<ApiErrorResponse>(error) && error.response?.data?.error?.message
-          ? error.response.data.error.message
-          : 'Unable to cancel this invite.';
-      setRosterNotice(message);
-      void queryClient.invalidateQueries({ queryKey: ['college-student-roster'] });
-    },
-  });
-  const createTemporaryCredentialMutation = useMutation({
-    mutationFn: collegeApi.createTemporaryStudentCredentials,
-    onSuccess: (credential) => {
-      setLatestTemporaryCredential(credential);
-      void Promise.all([
-        queryClient.invalidateQueries({ queryKey: ['college-student-roster'] }),
-        queryClient.invalidateQueries({ queryKey: ['college-dashboard'] }),
-        queryClient.invalidateQueries({ queryKey: ['college-student-verifications'] }),
-      ]);
-    },
-  });
-  const importRosterMutation = useMutation({
-    mutationFn: collegeApi.importStudentRoster,
-    onSuccess: () => {
-      void Promise.all([
-        queryClient.invalidateQueries({ queryKey: ['college-student-roster'] }),
-        queryClient.invalidateQueries({ queryKey: ['college-dashboard'] }),
-      ]);
-    },
-  });
-  const importRosterWithCredentialsMutation = useMutation({
-    mutationFn: collegeApi.importStudentRosterWithCredentials,
-    onSuccess: (result) => {
-      setBulkCredentialResult(result);
-      void Promise.all([
-        queryClient.invalidateQueries({ queryKey: ['college-student-roster'] }),
-        queryClient.invalidateQueries({ queryKey: ['college-dashboard'] }),
-      ]);
-    },
-  });
-  const reviewMutation = useMutation({
-    mutationFn: ({ studentId, decision, reason }: { studentId: string; decision: 'approved' | 'rejected'; reason?: string }) =>
-      collegeApi.reviewStudentVerification(studentId, { decision, reason }),
-    onSuccess: () => {
-      void Promise.all([
-        queryClient.invalidateQueries({ queryKey: ['college-student-verifications'] }),
-        queryClient.invalidateQueries({ queryKey: ['college-dashboard'] }),
-        queryClient.invalidateQueries({ queryKey: ['college-students'] }),
-      ]);
-    },
-  });
 
   const data = dashboardQuery.data;
-  const institutionDomainHint = authUser?.email?.split('@')[1];
-
-  const handleCreateToken = (event: FormEvent<HTMLFormElement>) => {
-    event.preventDefault();
-    createTokenMutation.mutate({
-      ...(tokenLabel.trim() ? { label: tokenLabel.trim() } : {}),
-    });
-  };
-
-  const handleReject = (studentId: string) => {
-    const reason = window.prompt('Add a short reason for rejection (optional):')?.trim();
-    reviewMutation.mutate({
-      studentId,
-      decision: 'rejected',
-      ...(reason ? { reason } : {}),
-    });
-  };
+  const stats = data?.stats;
+  const recentActivity = data?.recentActivityCounts;
+  const institutionName = data?.institutionProfile?.institutionName ?? 'College Dashboard';
+  const academicYear = data?.institutionProfile?.academicYear ?? 'Current academic year';
 
   return (
-    <div className="space-y-6">
-      <div>
-        <div className="mb-2 text-xs uppercase tracking-[0.3em] text-cyan-300">College Overview</div>
-        <h1 className="text-3xl font-bold text-white">
-          {data?.institutionProfile?.institutionName ?? 'College Dashboard'}
-        </h1>
-        <p className="mt-2 text-slate-400">
-          Track innovation performance, hiring movement, and event momentum in one place.
-        </p>
-      </div>
-
-      <div className="grid gap-4 xl:grid-cols-6">
-        {[
-          { label: 'Total Students', value: data?.stats.totalStudents ?? 0, icon: Users },
-          { label: 'Innovation Activities', value: data?.stats.totalInnovationActivities ?? 0, icon: Sparkles },
-          { label: 'Patents Filed', value: data?.stats.patentsFiled ?? 0, icon: Rocket },
-          { label: 'Startups Launched', value: data?.stats.startupsLaunched ?? 0, icon: Rocket },
-          { label: 'Students Placed', value: data?.stats.studentsPlaced ?? 0, icon: BriefcaseBusiness },
-          { label: 'Active HR Partners', value: data?.stats.activeHRPartners ?? 0, icon: CalendarDays },
-        ].map((stat) => (
-          <Card key={stat.label} className="p-5">
-            <div className="mb-4 flex h-12 w-12 items-center justify-center rounded-2xl bg-slate-900">
-              <stat.icon className="h-6 w-6 text-cyan-300" />
-            </div>
-            <div className="text-3xl font-bold text-white">{stat.value}</div>
-            <div className="mt-2 text-sm text-slate-400">{stat.label}</div>
-          </Card>
-        ))}
-      </div>
-
-      <div className="grid gap-6 xl:grid-cols-[1fr,1.4fr]">
-        <Card className="p-6">
-          <div className="text-xs uppercase tracking-[0.3em] text-cyan-300">IIC Rating</div>
-          <div className="mt-4 text-4xl font-bold text-white">
-            {(data?.institutionProfile?.iicStarRating ?? 0).toFixed(1)} / 5.0
-          </div>
-          <p className="mt-3 max-w-sm text-sm leading-6 text-slate-400">
-            Current estimated rating for AY {data?.institutionProfile?.academicYear ?? 'current'}.
-          </p>
-        </Card>
-
-        <Card className="p-6">
-          <div className="mb-4 flex items-center justify-between">
-            <div>
-              <div className="text-xs uppercase tracking-[0.3em] text-cyan-300">Policy Compliance</div>
-              <h2 className="mt-2 text-xl font-semibold text-white">Current policy breakdown</h2>
-            </div>
-            <Link to="/dashboard/college/compliance">
-              <Button>Download Full Report</Button>
-            </Link>
-          </div>
-          <div className="space-y-3">
-            {(data?.institutionProfile?.policies ?? []).map((policy) => (
-              <div key={policy.name} className="rounded-2xl border border-slate-800 bg-slate-900/70 px-4 py-4">
-                <div className="flex items-center justify-between gap-3">
-                  <div className="font-medium text-white">{policy.name}</div>
-                  <div className="text-sm text-slate-400">{policy.status}</div>
-                </div>
-              </div>
-            ))}
-          </div>
-        </Card>
-      </div>
-
-      <Card className="p-6">
-        <div className="text-xs uppercase tracking-[0.3em] text-cyan-300">Placement Velocity</div>
-        <div className="mt-4 text-4xl font-bold text-white">{data?.stats.placementVelocity ?? 0}%</div>
-        <p className="mt-3 text-sm text-slate-400">Of student innovators placed this year.</p>
-      </Card>
-
-      <Card className="p-6">
-        <div className="mb-4 flex items-center justify-between">
-          <div>
-            <div className="text-xs uppercase tracking-[0.3em] text-cyan-300">Recent Events</div>
-            <h2 className="mt-2 text-xl font-semibold text-white">Latest institution events</h2>
-          </div>
-          <Link to="/dashboard/college/events">
-            <Button>Create Event</Button>
-          </Link>
-        </div>
-        <div className="space-y-3">
-          {(data?.upcomingEvents ?? []).map((event) => (
-            <div key={event._id} className="rounded-2xl border border-slate-800 bg-slate-900/70 px-4 py-4">
-              <div className="flex flex-wrap items-center justify-between gap-3">
-                <div>
-                  <div className="font-semibold text-white">{event.title}</div>
-                  <div className="mt-1 text-sm text-slate-400">{event.description}</div>
-                </div>
-                <div className="text-right text-sm text-slate-400">
-                  <div>{new Date(event.scheduledAt).toLocaleDateString('en-IN')}</div>
-                  <div>{event.type}</div>
-                </div>
-              </div>
-            </div>
-          ))}
-        </div>
-      </Card>
-
-      <div className="grid gap-4 xl:grid-cols-2">
-        <Link to="/dashboard/college/placement">
-          <Card className="p-6">
-            <div className="text-xl font-semibold text-white">Open Placement Tracker</div>
-            <div className="mt-2 text-sm text-slate-400">Review recruiter-driven placement progress.</div>
-          </Card>
-        </Link>
-        <Link to="/dashboard/college/students">
-          <Card className="p-6">
-            <div className="text-xl font-semibold text-white">Open Student Innovators</div>
-            <div className="mt-2 text-sm text-slate-400">See the latest leaderboard movement.</div>
-          </Card>
-        </Link>
-      </div>
-
-      <MentorshipProgramPanel
-        queryKey="college-mentorship-programs"
-        heading="Request a college mentorship program"
-        description="Send a mentorship request to admin, specify Google Meet, Teams, Zoom, or offline delivery, and track assigned mentors."
-        fetchPrograms={collegeApi.getMentorshipPrograms}
-        createProgram={collegeApi.createMentorshipProgram}
-      />
-
-      <StudentIntakePanel
-        heading="Feed student intake data for your college"
-        description="Build a managed roster, create temporary student credentials with your institutional domain, or issue tokens for self-service student signup."
-        secondaryFieldLabel="Program / Year"
-        secondaryFieldPlaceholder="B.Tech CSE - 3rd Year"
-        roster={rosterQuery.data ?? []}
-        institutionDomainHint={institutionDomainHint}
-        isRosterLoading={rosterQuery.isLoading}
-        isManualSubmitting={createRosterEntryMutation.isPending}
-        isImportSubmitting={importRosterMutation.isPending}
-        isImportWithCredentialsSubmitting={importRosterWithCredentialsMutation.isPending}
-        isTemporaryCredentialSubmitting={createTemporaryCredentialMutation.isPending}
-        temporaryCredential={latestTemporaryCredential}
-        bulkCredentialResult={bulkCredentialResult}
-        onCreateManualEntry={(payload) => createRosterEntryMutation.mutate(payload)}
-        onCancelInvite={(rosterEntryId) => {
-          if (window.confirm('Cancel this student invite?')) {
-            cancelInviteMutation.mutate(rosterEntryId);
-          }
-        }}
-        cancellingInviteId={cancelInviteMutation.isPending ? cancelInviteMutation.variables : null}
-        onImportFile={(file) => importRosterMutation.mutate(file)}
-        onImportFileWithCredentials={(file) => importRosterWithCredentialsMutation.mutate(file)}
-        onCreateTemporaryCredentials={(payload) => createTemporaryCredentialMutation.mutate(payload)}
-      />
-      {rosterNotice ? (
-        <div className="rounded-2xl border border-cyan-500/30 bg-cyan-500/10 px-4 py-3 text-sm text-cyan-200">
-          {rosterNotice}
-        </div>
-      ) : null}
-
-      <div className="grid gap-6 xl:grid-cols-2">
-        <Card className="p-6">
-          <div className="mb-4 flex items-start justify-between gap-4">
-            <div>
-              <div className="text-xs uppercase tracking-[0.3em] text-cyan-300">Student Token Desk</div>
-              <h2 className="mt-2 text-xl font-semibold text-white">Issue college verification tokens</h2>
-              <p className="mt-2 text-sm text-slate-400">
-                Students can use these tokens during signup or submit them later from their profile when they are ready for college verification.
-              </p>
-            </div>
-            <div className="flex h-12 w-12 items-center justify-center rounded-2xl bg-slate-900">
-              <KeyRound className="h-6 w-6 text-cyan-300" />
-            </div>
-          </div>
-
-          <form onSubmit={handleCreateToken} className="mb-4 flex flex-col gap-3 md:flex-row">
-            <input
-              type="text"
-              value={tokenLabel}
-              onChange={(event) => setTokenLabel(event.target.value)}
-              placeholder="2026 incubator cohort"
-              className="flex-1 rounded-lg border border-slate-800 bg-slate-950 px-4 py-3 text-white placeholder-slate-500 focus:border-cyan-500 focus:outline-none"
-            />
-            <Button type="submit" disabled={createTokenMutation.isPending}>
-              {createTokenMutation.isPending ? 'Generating...' : 'Generate Token'}
-            </Button>
-          </form>
-
-          <div className="space-y-3">
-            {(tokenQuery.data ?? []).slice(0, 4).map((token) => (
-              <div key={token._id} className="rounded-2xl border border-slate-800 bg-slate-900/70 px-4 py-4">
-                <div className="flex flex-wrap items-center justify-between gap-3">
-                  <div>
-                    <div className="font-mono text-sm font-semibold text-cyan-300">{token.token}</div>
-                    <div className="mt-1 text-sm text-slate-400">
-                      {token.label ?? 'General college onboarding token'}
-                    </div>
-                  </div>
-                  <div className="text-right text-sm text-slate-400">
-                    <div>{token.usageCount} registrations</div>
-                    <div>
-                      {token.expiresAt
-                        ? `Expires ${new Date(token.expiresAt).toLocaleDateString('en-IN')}`
-                        : 'No expiry'}
-                    </div>
-                  </div>
-                </div>
-              </div>
-            ))}
-            {(tokenQuery.data ?? []).length === 0 ? (
-              <div className="rounded-2xl border border-dashed border-slate-800 px-4 py-6 text-sm text-slate-400">
-                No student tokens issued yet.
-              </div>
-            ) : null}
-          </div>
-        </Card>
-
-        <Card className="p-6">
-          <div className="mb-4 flex items-start justify-between gap-4">
-            <div>
-              <div className="text-xs uppercase tracking-[0.3em] text-cyan-300">Pending Approval</div>
-              <h2 className="mt-2 text-xl font-semibold text-white">Review student registrations</h2>
-              <p className="mt-2 text-sm text-slate-400">
-                Review students who have submitted a valid institution token. Institution-created temporary accounts are already active.
-              </p>
-            </div>
-            <div className="flex h-12 w-12 items-center justify-center rounded-2xl bg-slate-900">
-              <UserCheck className="h-6 w-6 text-cyan-300" />
-            </div>
-          </div>
-
-          <div className="space-y-3">
-            {(pendingStudentsQuery.data ?? []).map((student) => (
-              <div key={student._id} className="rounded-2xl border border-slate-800 bg-slate-900/70 px-4 py-4">
-                <div className="flex flex-wrap items-start justify-between gap-4">
-                  <div>
-                    <div className="font-semibold text-white">{student.displayName}</div>
-                    <div className="mt-1 text-sm text-slate-400">{student.email}</div>
-                    <div className="mt-1 text-sm text-slate-500">
-                      Requested{' '}
-                      {new Date(student.verificationRequestedAt ?? student.createdAt).toLocaleString('en-IN')}
-                    </div>
-                    {student.domain ? (
-                      <div className="mt-2 text-sm text-cyan-200">Focus: {student.domain}</div>
-                    ) : null}
-                  </div>
-                  <div className="flex gap-2">
-                    <Button
-                      onClick={() => reviewMutation.mutate({ studentId: student._id, decision: 'approved' })}
-                      disabled={reviewMutation.isPending}
-                    >
-                      Approve
-                    </Button>
-                    <Button
-                      variant="secondary"
-                      onClick={() => handleReject(student._id)}
-                      disabled={reviewMutation.isPending}
-                    >
-                      Reject
-                    </Button>
-                  </div>
-                </div>
-              </div>
-            ))}
-            {(pendingStudentsQuery.data ?? []).length === 0 ? (
-              <div className="rounded-2xl border border-dashed border-slate-800 px-4 py-6 text-sm text-slate-400">
-                No student verifications are waiting right now.
-              </div>
-            ) : null}
-          </div>
-        </Card>
-
-        <PatentShowcase />
-      </div>
-    </div>
+    <InstitutionOverviewDashboard
+      institutionLabel="College Overview"
+      institutionName={institutionName}
+      subtitle={`Track innovation output, placement momentum, and recruiter activity for ${academicYear}.`}
+      statCards={[
+        {
+          label: 'Total Students',
+          value: stats?.totalStudents ?? 0,
+          badge: `${stats?.activeProjects ?? 0} active`,
+          icon: Users,
+          color: 'from-blue-500 to-cyan-500',
+          to: '/dashboard/college/students',
+        },
+        {
+          label: 'Active Projects',
+          value: stats?.activeProjects ?? 0,
+          badge: `${recentActivity?.scoreEventsLast30Days ?? 0} score events / 30d`,
+          icon: Target,
+          color: 'from-violet-500 to-fuchsia-500',
+          to: '/dashboard/college/projects',
+        },
+        {
+          label: 'Students Placed',
+          value: stats?.studentsPlaced ?? 0,
+          badge: `${stats?.placementVelocity ?? 0}% velocity`,
+          icon: BriefcaseBusiness,
+          color: 'from-emerald-500 to-teal-500',
+          to: '/dashboard/college/placement',
+        },
+        {
+          label: 'Active HR Partners',
+          value: stats?.activeHRPartners ?? 0,
+          badge: `${stats?.industryCollaborations ?? 0} collaborations`,
+          icon: BarChart3,
+          color: 'from-amber-500 to-orange-500',
+          to: '/dashboard/college/recruiters',
+        },
+      ]}
+      topInnovatorsTitle="Top Student Innovators"
+      topInnovatorsAction={{ label: 'View Students', to: '/dashboard/college/students' }}
+      topInnovatorsEmptyMessage="No ranked student activity is available yet."
+      eventsTitle="Upcoming Events"
+      eventsEmptyMessage="No upcoming events are scheduled yet."
+      recentProjectsTitle="Recent Projects"
+      recentProjectsAction={{ label: 'Open Operations', to: '/dashboard/college/operations' }}
+      recentProjectsEmptyMessage="No active student projects are available yet."
+      announcementTitle="Placement pipeline is live"
+      announcementBody={`${stats?.studentsPlaced ?? 0} students are already marked as placed, with ${stats?.activeHRPartners ?? 0} active hiring partners and ${recentActivity?.startupsLast30Days ?? 0} startup launches recorded in the last 30 days. Use the placement tracker for recruiter outcomes and the operations workspace for intake management.`}
+      announcementAction={{ label: 'Open Placement Tracker', to: '/dashboard/college/placement' }}
+      quickStats={[
+        { label: 'Placement Velocity', value: `${stats?.placementVelocity ?? 0}%` },
+        { label: 'Innovation Activities', value: String(stats?.totalInnovationActivities ?? 0) },
+        { label: 'Mentoring Hours', value: String(stats?.totalMentoringHours ?? 0) },
+      ]}
+      topStudents={data?.topStudents ?? []}
+      upcomingEvents={data?.upcomingEvents ?? []}
+      recentProjects={data?.recentProjects ?? []}
+      studentTo={(student) => `/dashboard/college/students/${student._id}`}
+      eventTo={() => '/dashboard/college/events'}
+      projectTo={(project) => `/dashboard/college/projects/${project._id}`}
+      isLoading={dashboardQuery.isLoading}
+    />
   );
 }

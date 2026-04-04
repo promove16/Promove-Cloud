@@ -8,6 +8,61 @@ export interface InstitutionProfileInput {
   iicStarRating?: number;
 }
 
+export type InstitutionRegulatoryBody =
+  | 'AICTE'
+  | 'UGC'
+  | 'NAAC'
+  | 'NBA'
+  | 'CBSE'
+  | 'ICSE'
+  | 'STATE_BOARD'
+  | 'STATE_EDUCATION_DEPARTMENT'
+  | 'UDISE';
+
+export type InstitutionVerificationDocumentCategory =
+  | 'governing_body_registration_certificate'
+  | 'authorized_signatory_letter'
+  | 'address_proof'
+  | 'pan_or_tax_registration'
+  | 'recognition_certificate'
+  | 'board_affiliation_certificate'
+  | 'udise_certificate'
+  | 'affiliation_letter'
+  | 'aicte_approval_letter'
+  | 'ugc_recognition_letter'
+  | 'accreditation_certificate';
+
+export interface InstitutionVerificationInput {
+  regulatoryBodies: InstitutionRegulatoryBody[];
+  affiliationName?: string;
+  websiteUrl?: string;
+  referenceCode?: string;
+  notes?: string;
+}
+
+export interface InstitutionVerificationDocument {
+  _id: string;
+  category: InstitutionVerificationDocumentCategory;
+  fileUrl: string;
+  fileType: 'pdf' | 'image';
+  fileName: string;
+  fileSizeBytes: number;
+  uploadedAt: string;
+  uploadedBy: string;
+}
+
+export interface InstitutionVerificationReadiness {
+  isReadyForReview: boolean;
+  requiredDocumentCategories: InstitutionVerificationDocumentCategory[];
+  uploadedDocumentCategories: InstitutionVerificationDocumentCategory[];
+  missingItems: string[];
+}
+
+export interface InstitutionVerificationProfile extends InstitutionVerificationInput {
+  documents: InstitutionVerificationDocument[];
+  readiness: InstitutionVerificationReadiness;
+}
+
 export type RegistrationRequestStatus = 'pending' | 'approved' | 'rejected';
 
 export interface RegistrationRequestSummary {
@@ -122,6 +177,7 @@ export interface AuthUser {
     academicYear?: string;
     iicStarRating?: number;
   };
+  institutionVerification?: InstitutionVerificationProfile;
   institutionVerificationStatus?: 'none' | 'pending' | 'verified' | 'failed';
   verificationStatus?: 'not_required' | 'pending' | 'verified' | 'rejected';
   verificationRequestedAt?: string;
@@ -168,6 +224,7 @@ export interface SignupInput {
   domain?: string;
   bio?: string;
   institutionProfile?: InstitutionProfileInput;
+  institutionVerification?: InstitutionVerificationInput;
 }
 
 export type SignupResponse = AuthPayload | PendingSignupPayload;

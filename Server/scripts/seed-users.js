@@ -1189,6 +1189,7 @@ const WORKSPACE_SEEDS = [
   {
     key: 'arjun_agrisense',
     ownerKey: 'arjun',
+    mentorKey: 'mentor',
     teamMemberKeys: ['priya'],
     title: 'AgriSense AI — Edge Disease Detection',
     category: 'AgriTech',
@@ -1221,6 +1222,7 @@ const WORKSPACE_SEEDS = [
   {
     key: 'priya_soilmesh',
     ownerKey: 'priya',
+    mentorKey: 'mentor',
     teamMemberKeys: [],
     title: 'SoilMesh — Distributed Soil Monitoring Network',
     category: 'AgriTech',
@@ -1252,6 +1254,7 @@ const WORKSPACE_SEEDS = [
   {
     key: 'rohit_solarnest',
     ownerKey: 'rohit',
+    mentorKey: 'mentor',
     teamMemberKeys: [],
     title: 'SolarNest — Clean Energy Platform',
     category: 'CleanTech',
@@ -1967,12 +1970,13 @@ const seedStartupArtifacts = async (studentsByKey, usersByKey, workspacesByKey) 
   }
 };
 
-const seedWorkspaceArtifacts = async (studentsByKey, problemsByKey) => {
+const seedWorkspaceArtifacts = async (studentsByKey, problemsByKey, usersByKey) => {
   const workspacesByKey = {};
 
   for (const wsSeed of WORKSPACE_SEEDS) {
     const owner = studentsByKey[wsSeed.ownerKey];
     const teamMemberIds = (wsSeed.teamMemberKeys ?? []).map((k) => studentsByKey[k]._id);
+    const mentor = wsSeed.mentorKey ? usersByKey[wsSeed.mentorKey] ?? null : null;
 
     const wsDoc = await Workspace.findOneAndUpdate(
       { ownerId: owner._id, title: wsSeed.title },
@@ -2017,6 +2021,32 @@ const seedWorkspaceArtifacts = async (studentsByKey, problemsByKey) => {
       },
       { upsert: true, new: true, setDefaultsOnInsert: true, runValidators: true },
     );
+
+    if (mentor) {
+      await Workspace.updateOne(
+        {
+          _id: wsDoc._id,
+          chatParticipants: {
+            $not: {
+              $elemMatch: {
+                userId: mentor._id,
+                role: 'mentor',
+              },
+            },
+          },
+        },
+        {
+          $push: {
+            chatParticipants: {
+              userId: mentor._id,
+              role: 'mentor',
+              addedBy: usersByKey.admin?._id ?? owner._id,
+              addedAt: new Date('2026-01-05T09:00:00.000Z'),
+            },
+          },
+        },
+      );
+    }
 
     workspacesByKey[wsSeed.key] = wsDoc;
   }
@@ -2237,7 +2267,7 @@ const seedUsers = async () => {
     const problemsByKey = await seedProblemBankArtifacts({ ...usersByKey, ...institutionsByKey });
     console.log('OK [artifacts ] Demo problem bank entries');
 
-    const workspacesByKey = await seedWorkspaceArtifacts(studentsByKey, problemsByKey);
+    const workspacesByKey = await seedWorkspaceArtifacts(studentsByKey, problemsByKey, usersByKey);
     console.log('OK [artifacts ] Demo workspaces with milestones, tasks, and submissions');
 
     await seedStartupArtifacts(studentsByKey, usersByKey, workspacesByKey);

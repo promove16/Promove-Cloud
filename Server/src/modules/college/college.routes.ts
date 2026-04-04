@@ -22,11 +22,14 @@ import {
   importCollegeStudentRosterController,
   listCollegeMentorshipProgramsController,
   listCollegePendingStudentVerificationsController,
+  listCollegePatentsController,
+  listCollegeProjectsController,
   listCollegeStudentRosterController,
   listCollegeStudentAccessTokensController,
   listCollegeEventsController,
   listCollegeInvestorsController,
   listCollegeRecruitersController,
+  listCollegeStartupsController,
   listCollegeStudentsController,
   reviewCollegeStudentVerificationController,
   updatePlacementStatusController,
@@ -42,6 +45,9 @@ router.use(authenticate);
 
 router.get('/dashboard', authorize(UserRole.COLLEGE), asyncHandler(getCollegeDashboardController));
 router.get('/students', authorize(UserRole.COLLEGE), asyncHandler(listCollegeStudentsController));
+router.get('/projects', authorize(UserRole.COLLEGE), asyncHandler(listCollegeProjectsController));
+router.get('/patents', authorize(UserRole.COLLEGE), asyncHandler(listCollegePatentsController));
+router.get('/startups', authorize(UserRole.COLLEGE), asyncHandler(listCollegeStartupsController));
 router.get(
   '/students/:id/journey',
   authorize(UserRole.COLLEGE),

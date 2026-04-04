@@ -77,6 +77,80 @@ export interface InstitutionProfile {
   stats: InstitutionStats;
 }
 
+export type InstitutionRegulatoryBody =
+  | 'AICTE'
+  | 'UGC'
+  | 'NAAC'
+  | 'NBA'
+  | 'CBSE'
+  | 'ICSE'
+  | 'STATE_BOARD'
+  | 'STATE_EDUCATION_DEPARTMENT'
+  | 'UDISE';
+
+export type InstitutionVerificationDocumentCategory =
+  | 'governing_body_registration_certificate'
+  | 'authorized_signatory_letter'
+  | 'address_proof'
+  | 'pan_or_tax_registration'
+  | 'recognition_certificate'
+  | 'board_affiliation_certificate'
+  | 'udise_certificate'
+  | 'affiliation_letter'
+  | 'aicte_approval_letter'
+  | 'ugc_recognition_letter'
+  | 'accreditation_certificate';
+
+export interface InstitutionVerificationDocument {
+  _id: Types.ObjectId;
+  category: InstitutionVerificationDocumentCategory;
+  fileUrl: string;
+  fileType: 'pdf' | 'image';
+  fileName: string;
+  fileSizeBytes: number;
+  uploadedAt: Date;
+  uploadedBy: Types.ObjectId;
+  cloudinaryPublicId?: string;
+}
+
+export interface InstitutionVerificationReadiness {
+  isReadyForReview: boolean;
+  requiredDocumentCategories: InstitutionVerificationDocumentCategory[];
+  uploadedDocumentCategories: InstitutionVerificationDocumentCategory[];
+  missingItems: string[];
+}
+
+export interface InstitutionVerificationProfile {
+  regulatoryBodies: InstitutionRegulatoryBody[];
+  affiliationName?: string;
+  websiteUrl?: string;
+  referenceCode?: string;
+  notes?: string;
+  documents: InstitutionVerificationDocument[];
+  readiness: InstitutionVerificationReadiness;
+}
+
+export interface SanitizedInstitutionVerificationDocument {
+  _id: string;
+  category: InstitutionVerificationDocumentCategory;
+  fileUrl: string;
+  fileType: 'pdf' | 'image';
+  fileName: string;
+  fileSizeBytes: number;
+  uploadedAt: Date;
+  uploadedBy: string;
+}
+
+export interface SanitizedInstitutionVerificationProfile {
+  regulatoryBodies: InstitutionRegulatoryBody[];
+  affiliationName?: string;
+  websiteUrl?: string;
+  referenceCode?: string;
+  notes?: string;
+  documents: SanitizedInstitutionVerificationDocument[];
+  readiness: InstitutionVerificationReadiness;
+}
+
 export interface ConnectedAccount {
   userId: string | null;
   username?: string | null;
@@ -273,6 +347,7 @@ export interface IUser {
   institutionToken: string | null;
   institutionId?: Types.ObjectId | null;
   institutionProfile?: InstitutionProfile;
+  institutionVerification?: InstitutionVerificationProfile;
   institutionVerifiedAt: Date | null;
   institutionVerificationStatus: InstitutionVerificationStatus;
   verificationStatus: StudentVerificationStatus;
@@ -330,6 +405,7 @@ export interface SanitizedUser {
   institutionToken?: string | null;
   institutionId?: string | null;
   institutionProfile?: InstitutionProfile;
+  institutionVerification?: SanitizedInstitutionVerificationProfile;
   institutionVerifiedAt: Date | null;
   institutionVerificationStatus: InstitutionVerificationStatus;
   verificationStatus: StudentVerificationStatus;

@@ -1,6 +1,10 @@
 import { HydratedDocument, Schema, model } from 'mongoose';
 import { USER_ROLES } from '../../types/roles.types';
 import { createDefaultScoreBreakdown } from '../innovationScore/score.utils';
+import {
+  INSTITUTION_DOCUMENT_CATEGORIES,
+  INSTITUTION_REGULATORY_BODIES,
+} from '../institution/institutionVerification.constants';
 import { IUser } from './user.types';
 
 const scoreBreakdownSchema = new Schema<IUser['scoreBreakdown']>(
@@ -102,6 +106,121 @@ const institutionProfileSchema = new Schema<NonNullable<IUser['institutionProfil
         totalMentoringHours: 0,
         startupsLaunched: 0,
         industryCollaborations: 0,
+      }),
+    },
+  },
+  { _id: false },
+);
+
+const institutionVerificationReadinessSchema = new Schema<
+  NonNullable<IUser['institutionVerification']>['readiness']
+>(
+  {
+    isReadyForReview: {
+      type: Boolean,
+      default: false,
+    },
+    requiredDocumentCategories: {
+      type: [{ type: String, enum: INSTITUTION_DOCUMENT_CATEGORIES }],
+      default: [],
+    },
+    uploadedDocumentCategories: {
+      type: [{ type: String, enum: INSTITUTION_DOCUMENT_CATEGORIES }],
+      default: [],
+    },
+    missingItems: {
+      type: [String],
+      default: [],
+    },
+  },
+  { _id: false },
+);
+
+const institutionVerificationDocumentSchema = new Schema<
+  NonNullable<IUser['institutionVerification']>['documents'][number]
+>(
+  {
+    category: {
+      type: String,
+      enum: INSTITUTION_DOCUMENT_CATEGORIES,
+      required: true,
+    },
+    fileUrl: {
+      type: String,
+      required: true,
+    },
+    fileType: {
+      type: String,
+      enum: ['pdf', 'image'],
+      required: true,
+    },
+    fileName: {
+      type: String,
+      required: true,
+      trim: true,
+      maxlength: 200,
+    },
+    fileSizeBytes: {
+      type: Number,
+      required: true,
+      min: 1,
+    },
+    uploadedAt: {
+      type: Date,
+      default: () => new Date(),
+    },
+    uploadedBy: {
+      type: Schema.Types.ObjectId,
+      ref: 'User',
+      required: true,
+    },
+    cloudinaryPublicId: {
+      type: String,
+      default: undefined,
+    },
+  },
+  { _id: true },
+);
+
+const institutionVerificationSchema = new Schema<NonNullable<IUser['institutionVerification']>>(
+  {
+    regulatoryBodies: {
+      type: [{ type: String, enum: INSTITUTION_REGULATORY_BODIES }],
+      default: [],
+    },
+    affiliationName: {
+      type: String,
+      trim: true,
+      maxlength: 160,
+      default: undefined,
+    },
+    websiteUrl: {
+      type: String,
+      default: undefined,
+    },
+    referenceCode: {
+      type: String,
+      trim: true,
+      maxlength: 80,
+      default: undefined,
+    },
+    notes: {
+      type: String,
+      trim: true,
+      maxlength: 500,
+      default: undefined,
+    },
+    documents: {
+      type: [institutionVerificationDocumentSchema],
+      default: [],
+    },
+    readiness: {
+      type: institutionVerificationReadinessSchema,
+      default: () => ({
+        isReadyForReview: false,
+        requiredDocumentCategories: [],
+        uploadedDocumentCategories: [],
+        missingItems: [],
       }),
     },
   },
@@ -809,6 +928,10 @@ const userSchema = new Schema<IUser>(
     },
     institutionProfile: {
       type: institutionProfileSchema,
+      default: undefined,
+    },
+    institutionVerification: {
+      type: institutionVerificationSchema,
       default: undefined,
     },
     institutionVerifiedAt: {

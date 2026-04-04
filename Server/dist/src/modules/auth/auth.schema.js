@@ -2,6 +2,7 @@
 Object.defineProperty(exports, "__esModule", { value: true });
 exports.loginSchema = exports.submitInstitutionTokenSchema = exports.registrationRequestSchema = exports.registerSchema = void 0;
 const zod_1 = require("zod");
+const institutionVerification_service_1 = require("../institution/institutionVerification.service");
 const roles_types_1 = require("../../types/roles.types");
 const optionalProfileString = (max) => zod_1.z
     .union([zod_1.z.string().trim().max(max), zod_1.z.literal('')])
@@ -55,6 +56,7 @@ exports.registrationRequestSchema = zod_1.z
     domain: optionalProfileString(120),
     bio: optionalProfileString(500),
     institutionProfile: institutionProfileInputSchema.optional(),
+    institutionVerification: institutionVerification_service_1.institutionVerificationInputSchema.optional(),
 })
     .superRefine((value, ctx) => {
     if ((value.role === roles_types_1.UserRole.SCHOOL || value.role === roles_types_1.UserRole.COLLEGE) &&
@@ -63,6 +65,14 @@ exports.registrationRequestSchema = zod_1.z
             code: zod_1.z.ZodIssueCode.custom,
             path: ['institutionProfile'],
             message: 'Institution details are required for this role',
+        });
+    }
+    if ((value.role === roles_types_1.UserRole.SCHOOL || value.role === roles_types_1.UserRole.COLLEGE) &&
+        !value.institutionVerification) {
+        ctx.addIssue({
+            code: zod_1.z.ZodIssueCode.custom,
+            path: ['institutionVerification'],
+            message: 'Institution verification details are required for this role',
         });
     }
     if ([roles_types_1.UserRole.MENTOR, roles_types_1.UserRole.INVESTOR, roles_types_1.UserRole.RECRUITER].includes(value.role) &&

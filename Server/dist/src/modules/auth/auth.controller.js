@@ -14,6 +14,29 @@ const cookieOptions = {
     sameSite: 'strict',
     maxAge: COOKIE_MAX_AGE,
 };
+const parseJsonField = (value, fieldName) => {
+    if (value === undefined || value === null || value === '') {
+        return undefined;
+    }
+    if (typeof value === 'string') {
+        try {
+            return JSON.parse(value);
+        }
+        catch (_error) {
+            throw new ApiError_1.ApiError(400, 'INVALID_MULTIPART_FIELD', `${fieldName} must be valid JSON when submitted as multipart form data.`);
+        }
+    }
+    return value;
+};
+const normalizeRegistrationRequestBody = (body) => {
+    const role = typeof body.role === 'string' ? body.role : undefined;
+    return {
+        ...body,
+        role,
+        institutionProfile: parseJsonField(body.institutionProfile, 'institutionProfile'),
+        institutionVerification: parseJsonField(body.institutionVerification, 'institutionVerification'),
+    };
+};
 const register = async (req, res) => {
     const payload = auth_schema_1.registerSchema.parse(req.body);
     const result = await (0, auth_service_1.registerUser)(payload);
@@ -26,8 +49,10 @@ const register = async (req, res) => {
 };
 exports.register = register;
 const registerRequest = async (req, res) => {
-    const payload = auth_schema_1.registrationRequestSchema.parse(req.body);
-    const result = await (0, auth_service_1.submitRegistrationRequest)(payload);
+    const normalizedBody = normalizeRegistrationRequestBody(req.body);
+    const payload = auth_schema_1.registrationRequestSchema.parse(normalizedBody);
+    const files = req.files ?? [];
+    const result = await (0, auth_service_1.submitRegistrationRequest)(payload, files);
     res.status(201).json(new ApiResponse_1.ApiResponse(result));
 };
 exports.registerRequest = registerRequest;

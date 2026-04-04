@@ -14,7 +14,12 @@ import { NotificationService } from '../notification/notification.service';
 import { Patent } from '../patent/patent.model';
 import { Startup } from '../startup/startup.model';
 import { User } from '../user/user.model';
-import { RegistrationStage } from '../user/user.types';
+import {
+  InstitutionRegulatoryBody,
+  InstitutionVerificationDocumentCategory,
+  RegistrationStage,
+} from '../user/user.types';
+import { assertInstitutionVerificationReadyForApproval } from '../institution/institutionVerification.service';
 import { UserRole } from '../../types/roles.types';
 import { Workspace } from '../workspace/workspace.model';
 import { ScoreEvent } from '../innovationScore/score.model';
@@ -135,6 +140,9 @@ const toIso = (value: Date | string) => new Date(value).toISOString();
 const round = (value: number) => Number(value.toFixed(2));
 const calculateRoyaltyAmount = (amountINR: number, royaltyPercentage: number) =>
   round((amountINR * royaltyPercentage) / 100);
+type AdminInstitutionVerification = NonNullable<
+  AdminRegistrationRequestItem['institutionVerification']
+>;
 
 const slugifyDisplayName = (displayName: string) => {
   const normalized = displayName
@@ -298,6 +306,29 @@ const registrationRequestItem = (user: {
     academicYear: string;
     iicStarRating: number;
   };
+  institutionVerification?: {
+    regulatoryBodies: InstitutionRegulatoryBody[];
+    affiliationName?: string;
+    websiteUrl?: string;
+    referenceCode?: string;
+    notes?: string;
+    documents: Array<{
+      _id: Types.ObjectId;
+      category: InstitutionVerificationDocumentCategory;
+      fileUrl: string;
+      fileType: 'pdf' | 'image';
+      fileName: string;
+      fileSizeBytes: number;
+      uploadedAt: Date;
+      uploadedBy: Types.ObjectId;
+    }>;
+    readiness: {
+      isReadyForReview: boolean;
+      requiredDocumentCategories: InstitutionVerificationDocumentCategory[];
+      uploadedDocumentCategories: InstitutionVerificationDocumentCategory[];
+      missingItems: string[];
+    };
+  };
 }): AdminRegistrationRequestItem => ({
   _id: user._id.toString(),
   displayName: user.displayName,
@@ -310,6 +341,43 @@ const registrationRequestItem = (user: {
   ...(user.domain ? { domain: user.domain } : {}),
   ...(user.bio ? { bio: user.bio } : {}),
   ...(user.institutionProfile ? { institutionProfile: user.institutionProfile } : {}),
+  ...(user.institutionVerification
+    ? {
+        institutionVerification: {
+          regulatoryBodies: user.institutionVerification.regulatoryBodies ?? [],
+          ...(user.institutionVerification.affiliationName
+            ? { affiliationName: user.institutionVerification.affiliationName }
+            : {}),
+          ...(user.institutionVerification.websiteUrl
+            ? { websiteUrl: user.institutionVerification.websiteUrl }
+            : {}),
+          ...(user.institutionVerification.referenceCode
+            ? { referenceCode: user.institutionVerification.referenceCode }
+            : {}),
+          ...(user.institutionVerification.notes
+            ? { notes: user.institutionVerification.notes }
+            : {}),
+          documents: (user.institutionVerification.documents ?? []).map((document) => ({
+            _id: document._id.toString(),
+            category: document.category as AdminInstitutionVerification['documents'][number]['category'],
+            fileUrl: document.fileUrl,
+            fileType: document.fileType,
+            fileName: document.fileName,
+            fileSizeBytes: document.fileSizeBytes,
+            uploadedAt: toIso(document.uploadedAt),
+            uploadedBy: document.uploadedBy.toString(),
+          })),
+          readiness: {
+            isReadyForReview: user.institutionVerification.readiness?.isReadyForReview ?? false,
+            requiredDocumentCategories:
+              user.institutionVerification.readiness?.requiredDocumentCategories ?? [],
+            uploadedDocumentCategories:
+              user.institutionVerification.readiness?.uploadedDocumentCategories ?? [],
+            missingItems: user.institutionVerification.readiness?.missingItems ?? [],
+          },
+        },
+      }
+    : {}),
   ...(user.adminApprovedAt ? { reviewedAt: toIso(user.adminApprovedAt) } : {}),
   ...(user.adminApprovalRejectedAt ? { reviewedAt: toIso(user.adminApprovalRejectedAt) } : {}),
   ...(user.adminApprovalRejectedReason
@@ -854,7 +922,7 @@ export const listRegistrationRequests = async (params: {
 
   const items = await User.find(filter)
     .select(
-      '_id displayName email role isActive createdAt adminApprovalStatus adminApprovalRequestedAt adminApprovedAt adminApprovalRejectedAt adminApprovalRejectedReason domain bio institutionProfile',
+      '_id displayName email role isActive createdAt adminApprovalStatus adminApprovalRequestedAt adminApprovedAt adminApprovalRejectedAt adminApprovalRejectedReason domain bio institutionProfile institutionVerification',
     )
     .sort({ adminApprovalRequestedAt: -1, createdAt: -1 })
     .lean();
@@ -914,6 +982,10 @@ export const reviewRegistrationRequest = async (
       'REGISTRATION_REQUEST_ALREADY_REVIEWED',
       'This registration request has already been reviewed.',
     );
+  }
+
+  if (payload.decision === 'approved' && (user.role === UserRole.SCHOOL || user.role === UserRole.COLLEGE)) {
+    assertInstitutionVerificationReadyForApproval(user.role, user.institutionVerification);
   }
 
   if (payload.decision === 'approved') {

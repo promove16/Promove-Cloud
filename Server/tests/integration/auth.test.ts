@@ -11,6 +11,14 @@ import { UserRole } from '../../src/types/roles.types';
 
 const PASSWORD = 'Password123!';
 
+jest.mock('../../src/services/cloudinaryService', () => ({
+  uploadToCloudinary: jest.fn(async (_buffer: Buffer, folder: string) => ({
+    secure_url: `https://cloudinary.test/${folder}/${randomUUID()}`,
+    public_id: `mock-${randomUUID()}`,
+  })),
+  deleteFromCloudinary: jest.fn(async () => undefined),
+}));
+
 const createApprovedUser = async (input: {
   role: UserRole;
   email?: string;
@@ -77,6 +85,23 @@ const createInstitutionToken = async (role: UserRole.SCHOOL | UserRole.COLLEGE, 
     token: response.body.data.token as string,
     accessToken: login.accessToken!,
   };
+};
+
+const attachInstitutionDocuments = (
+  req: request.Test,
+  categories: string[],
+) => {
+  let currentRequest = req;
+
+  for (const category of categories) {
+    currentRequest = currentRequest.attach(
+      `institutionDocument:${category}`,
+      Buffer.from(`mock-${category}`),
+      `${category}.pdf`,
+    );
+  }
+
+  return currentRequest;
 };
 
 describe('auth integration', () => {
@@ -310,6 +335,94 @@ describe('auth integration', () => {
       expect(response.status).toBe(403);
       expect(response.body.error.code).toBe('ADMIN_APPROVAL_PENDING');
     });
+
+    it('accepts a college registration request only when required verification documents are uploaded', async () => {
+      const email = `college-${randomUUID()}@example.com`;
+      const requiredCategories = [
+        'governing_body_registration_certificate',
+        'authorized_signatory_letter',
+        'address_proof',
+        'pan_or_tax_registration',
+        'affiliation_letter',
+        'aicte_approval_letter',
+        'ugc_recognition_letter',
+      ];
+
+      const response = await attachInstitutionDocuments(
+        request(app)
+          .post('/api/auth/register-request')
+          .field('email', email)
+          .field('password', PASSWORD)
+          .field('displayName', 'Future Engineering College')
+          .field('role', 'college')
+          .field('domain', 'Engineering Innovation')
+          .field(
+            'institutionProfile',
+            JSON.stringify({
+              institutionName: 'Future Engineering College',
+              location: 'Bengaluru',
+              totalStudentsEnrolled: 2400,
+              academicYear: '2025-26',
+              iicStarRating: 3,
+            }),
+          )
+          .field(
+            'institutionVerification',
+            JSON.stringify({
+              regulatoryBodies: ['AICTE', 'UGC'],
+              affiliationName: 'Visvesvaraya Technological University',
+              referenceCode: 'AISHE-987654',
+            }),
+          ),
+        requiredCategories,
+      );
+
+      expect(response.status).toBe(201);
+      expect(response.body.data.pendingApproval).toBe(true);
+      expect(response.body.data.user.adminApprovalStatus).toBe('pending');
+      expect(response.body.data.user.institutionVerification.readiness.isReadyForReview).toBe(true);
+      expect(response.body.data.user.institutionVerification.documents).toHaveLength(
+        requiredCategories.length,
+      );
+    });
+
+    it('rejects institution registration requests when required legal documents are missing', async () => {
+      const response = await attachInstitutionDocuments(
+        request(app)
+          .post('/api/auth/register-request')
+          .field('email', `college-missing-${randomUUID()}@example.com`)
+          .field('password', PASSWORD)
+          .field('displayName', 'Incomplete Technical College')
+          .field('role', 'college')
+          .field(
+            'institutionProfile',
+            JSON.stringify({
+              institutionName: 'Incomplete Technical College',
+              location: 'Chennai',
+              totalStudentsEnrolled: 1600,
+              academicYear: '2025-26',
+            }),
+          )
+          .field(
+            'institutionVerification',
+            JSON.stringify({
+              regulatoryBodies: ['AICTE'],
+              affiliationName: 'Anna University',
+            }),
+          ),
+        [
+          'governing_body_registration_certificate',
+          'authorized_signatory_letter',
+          'address_proof',
+          'pan_or_tax_registration',
+          'affiliation_letter',
+        ],
+      );
+
+      expect(response.status).toBe(400);
+      expect(response.body.error.code).toBe('MISSING_INSTITUTION_DOCUMENTS');
+      expect(response.body.error.message).toContain('AICTE approval');
+    });
   });
 
   describe('admin registration review', () => {
@@ -395,6 +508,58 @@ describe('auth integration', () => {
 
       expect(loginResponse.status).toBe(403);
       expect(loginResponse.body.error.code).toBe('ADMIN_APPROVAL_REJECTED');
+    });
+
+    it('blocks admin approval for institution requests that do not have a complete verification packet', async () => {
+      const { email: adminEmail } = await createApprovedUser({
+        role: UserRole.ADMIN,
+        email: `admin-${randomUUID()}@example.com`,
+        displayName: 'Platform Admin',
+      });
+      const adminLogin = await loginAs(adminEmail);
+      const passwordHash = await bcrypt.hash(PASSWORD, 12);
+      const collegeEmail = `pending-college-${randomUUID()}@example.com`;
+
+      const pendingCollege = await User.create({
+        email: collegeEmail,
+        passwordHash,
+        role: UserRole.COLLEGE,
+        displayName: 'Pending College',
+        profileComplete: false,
+        registrationStage: 'complete',
+        accessGrantedBy: 'admin',
+        accessExpiresAt: new Date(Date.now() + 365 * 24 * 60 * 60 * 1000),
+        isActive: false,
+        institutionToken: null,
+        institutionId: null,
+        institutionVerificationStatus: 'none',
+        verificationStatus: 'not_required',
+        adminApprovalStatus: 'pending',
+        adminApprovalRequestedAt: new Date(),
+        institutionProfile: {
+          institutionName: 'Pending College',
+          location: 'Hyderabad',
+          totalStudentsEnrolled: 1800,
+          academicYear: '2025-26',
+          iicStarRating: 0,
+          policies: [],
+          stats: {
+            totalInnovationActivities: 0,
+            patentsFiled: 0,
+            totalMentoringHours: 0,
+            startupsLaunched: 0,
+            industryCollaborations: 0,
+          },
+        },
+      });
+
+      const approveResponse = await request(app)
+        .patch(`/api/admin/registration-requests/${pendingCollege._id.toString()}/approve`)
+        .set('Authorization', `Bearer ${adminLogin.accessToken}`)
+        .send({});
+
+      expect(approveResponse.status).toBe(400);
+      expect(approveResponse.body.error.code).toBe('INSTITUTION_DOCUMENTS_REQUIRED');
     });
   });
 

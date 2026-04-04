@@ -18,11 +18,15 @@ import {
   getSchoolStudentJourneyController,
   importSchoolStudentCredentialsController,
   importSchoolStudentRosterController,
+  listSchoolEventsController,
   listSchoolMentorshipProgramsController,
+  listSchoolPatentsController,
+  listSchoolProjectsController,
   listSchoolStudentRosterController,
   listSchoolPendingStudentVerificationsController,
   listSchoolStudentAccessTokensController,
   listSchoolInvestorsController,
+  listSchoolStartupsController,
   listSchoolStudentsController,
   reviewSchoolStudentVerificationController,
 } from './school.controller';
@@ -55,6 +59,10 @@ router.use(authenticate, authorize(UserRole.SCHOOL), rejectRecruiterTargets);
 router.get('/dashboard', asyncHandler(getSchoolDashboardController));
 router.get('/students', asyncHandler(listSchoolStudentsController));
 router.get('/students/:id/journey', asyncHandler(getSchoolStudentJourneyController));
+router.get('/projects', asyncHandler(listSchoolProjectsController));
+router.get('/patents', asyncHandler(listSchoolPatentsController));
+router.get('/startups', asyncHandler(listSchoolStartupsController));
+router.get('/events', asyncHandler(listSchoolEventsController));
 router.get(
   '/investors',
   connectionGuard(UserRole.INVESTOR),

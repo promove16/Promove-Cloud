@@ -32,10 +32,20 @@ import {
 import {
   getDashboardStats,
   getInvestorDirectory,
+  getInstitutionUpcomingEvents,
   getLatestComplianceReport,
+  getRecentActivityCounts,
+  getRecentInstitutionProjects,
+  listInstitutionPatents,
+  listInstitutionProjects,
+  listInstitutionStartups,
   getStudentJourney,
   getStudentLeaderboard,
 } from '../school/school.service';
+import {
+  calculateEstimatedIicRating,
+  getInstitutionIicTelemetry,
+} from '../institution/iicRating.service';
 import { TemporaryStudentCredentialsView } from '../school/school.types';
 import { PlacementRecord } from './placementRecord.model';
 import {
@@ -224,11 +234,24 @@ export const getCollegeDashboard = async (institutionId: string): Promise<Colleg
     throw new ApiError(404, 'INSTITUTION_NOT_FOUND', 'College account not found');
   }
 
-  const [schoolStats, placement, topStudentsPage, recentEvents] = await Promise.all([
-    getDashboardStats(institutionId),
+  const studentIds = await getCollegeStudentIds(institutionId);
+
+  const [
+    schoolStats,
+    placement,
+    topStudentsPage,
+    upcomingEvents,
+    recentActivityCounts,
+    recentProjects,
+    iicTelemetry,
+  ] = await Promise.all([
+    getDashboardStats(institutionId, studentIds),
     getPlacementTracker(institutionId),
     getStudentLeaderboard(institutionId, undefined, 5),
-    Event.find({ institutionId }).sort({ scheduledAt: -1 }).limit(5).lean(),
+    getInstitutionUpcomingEvents(institutionId),
+    getRecentActivityCounts(studentIds),
+    getRecentInstitutionProjects(studentIds),
+    getInstitutionIicTelemetry(institutionId, 'college'),
   ]);
 
   const stats: CollegeDashboardStats = {
@@ -238,23 +261,44 @@ export const getCollegeDashboard = async (institutionId: string): Promise<Colleg
     placementVelocity: placement.placementVelocity,
   };
 
+  const iicRating = calculateEstimatedIicRating({
+    totalStudents: stats.totalStudents,
+    activeProjects: stats.activeProjects,
+    totalInnovationActivities: stats.totalInnovationActivities,
+    patentsFiled: stats.patentsFiled,
+    totalMentoringHours: stats.totalMentoringHours,
+    startupsLaunched: stats.startupsLaunched,
+    industryCollaborations: stats.industryCollaborations,
+    structuredActivityCount: iicTelemetry.structuredActivityCount,
+    activeQuarterCount: iicTelemetry.activeQuarterCount,
+    policies: institution.institutionProfile?.policies ?? [],
+  });
+
   const payload: CollegeDashboardPayload = {
-    institutionProfile: institution.institutionProfile,
+    institutionProfile: institution.institutionProfile
+      ? {
+          ...institution.institutionProfile,
+          iicStarRating: iicRating.starRating,
+          iicLastUpdated: new Date(),
+          stats: {
+            ...institution.institutionProfile.stats,
+            totalInnovationActivities: stats.totalInnovationActivities,
+            patentsFiled: stats.patentsFiled,
+            totalMentoringHours: stats.totalMentoringHours,
+            startupsLaunched: stats.startupsLaunched,
+            industryCollaborations: stats.industryCollaborations,
+            totalHRConnections: placement.hiringPartners.length,
+            studentsPlaced: placement.studentsPlaced,
+            directShortlistsThisQuarter: placement.placementTable.filter((item) => item.status === 'Shortlisted').length,
+            topHiringSector: placement.hiringPartners[0]?.domains[0],
+          },
+        }
+      : undefined,
     stats,
-    recentActivityCounts: {
-      scoreEventsLast30Days: schoolStats.totalInnovationActivities,
-      patentsLast30Days: schoolStats.patentsFiled,
-      startupsLast30Days: schoolStats.startupsLaunched,
-    },
-    upcomingEvents: recentEvents.map((event) => ({
-      _id: String(event._id),
-      title: event.title,
-      type: event.type,
-      description: event.description,
-      scheduledAt: event.scheduledAt.toISOString(),
-      participantsCount: event.participants.length,
-    })),
+    recentActivityCounts,
+    upcomingEvents,
     topStudents: topStudentsPage.items,
+    recentProjects,
   };
 
   await redis.set(cacheKey, JSON.stringify(payload), { ex: 60 * 10 });
@@ -361,6 +405,9 @@ export const addCollegeEventSubmissionScore = addSubmissionScore;
 export const computeCollegeEventRankings = computeEventRankings;
 export const getCollegeEventRankings = getEventRankings;
 export const getCollegeInvestors = getInvestorDirectory;
+export const getCollegeProjects = (collegeId: string) => listInstitutionProjects(collegeId);
+export const getCollegePatents = (collegeId: string) => listInstitutionPatents(collegeId);
+export const getCollegeStartups = (collegeId: string) => listInstitutionStartups(collegeId);
 export const getCollegeStudentJourney = getStudentJourney;
 export const getCollegeStudentLeaderboard = getStudentLeaderboard;
 export const getLatestCollegeComplianceReport = (institutionId: string) =>

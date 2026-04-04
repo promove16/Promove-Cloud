@@ -1,5 +1,9 @@
 import { UserRole } from '../../types/roles.types';
 import {
+  InstitutionRegulatoryBody,
+  InstitutionVerificationDocumentCategory,
+} from '../user/user.types';
+import {
   DealMediationStatus,
   DealRequestOrigin,
   DealRoyalty,
@@ -68,6 +72,29 @@ export interface AdminRegistrationRequestItem {
     totalStudentsEnrolled: number;
     academicYear: string;
     iicStarRating: number;
+  };
+  institutionVerification?: {
+    regulatoryBodies: InstitutionRegulatoryBody[];
+    affiliationName?: string;
+    websiteUrl?: string;
+    referenceCode?: string;
+    notes?: string;
+    documents: Array<{
+      _id: string;
+      category: InstitutionVerificationDocumentCategory;
+      fileUrl: string;
+      fileType: 'pdf' | 'image';
+      fileName: string;
+      fileSizeBytes: number;
+      uploadedAt: string;
+      uploadedBy: string;
+    }>;
+    readiness: {
+      isReadyForReview: boolean;
+      requiredDocumentCategories: InstitutionVerificationDocumentCategory[];
+      uploadedDocumentCategories: InstitutionVerificationDocumentCategory[];
+      missingItems: string[];
+    };
   };
   reviewedAt?: string;
   rejectionReason?: string;

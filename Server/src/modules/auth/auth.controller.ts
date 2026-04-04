@@ -28,6 +28,40 @@ const cookieOptions = {
   maxAge: COOKIE_MAX_AGE,
 };
 
+const parseJsonField = <T>(value: unknown, fieldName: string): T | undefined => {
+  if (value === undefined || value === null || value === '') {
+    return undefined;
+  }
+
+  if (typeof value === 'string') {
+    try {
+      return JSON.parse(value) as T;
+    } catch (_error) {
+      throw new ApiError(
+        400,
+        'INVALID_MULTIPART_FIELD',
+        `${fieldName} must be valid JSON when submitted as multipart form data.`,
+      );
+    }
+  }
+
+  return value as T;
+};
+
+const normalizeRegistrationRequestBody = (body: Request['body']) => {
+  const role = typeof body.role === 'string' ? body.role : undefined;
+
+  return {
+    ...body,
+    role,
+    institutionProfile: parseJsonField(body.institutionProfile, 'institutionProfile'),
+    institutionVerification: parseJsonField(
+      body.institutionVerification,
+      'institutionVerification',
+    ),
+  };
+};
+
 export const register = async (req: Request, res: Response) => {
   const payload = registerSchema.parse(req.body);
   const result = await registerUser(payload);
@@ -42,8 +76,10 @@ export const register = async (req: Request, res: Response) => {
 };
 
 export const registerRequest = async (req: Request, res: Response) => {
-  const payload = registrationRequestSchema.parse(req.body);
-  const result = await submitRegistrationRequest(payload);
+  const normalizedBody = normalizeRegistrationRequestBody(req.body);
+  const payload = registrationRequestSchema.parse(normalizedBody);
+  const files = (req.files as Express.Multer.File[] | undefined) ?? [];
+  const result = await submitRegistrationRequest(payload, files);
 
   res.status(201).json(new ApiResponse(result));
 };

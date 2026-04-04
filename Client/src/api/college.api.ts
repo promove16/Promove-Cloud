@@ -4,9 +4,12 @@ import {
   CollegeDashboardData,
   CollegeEvent,
   CollegeEventRankingsResponse,
+  InstitutionPatent,
+  InstitutionStartup,
   PendingStudentVerification,
   PlacementStatusUpdateResponse,
   RecruiterDirectoryItem,
+  RecentProject,
   StudentRosterEntry,
   StudentRosterImportResult,
   StudentAccessToken,
@@ -57,6 +60,18 @@ export const collegeApi = {
   },
   async getPlacementTracker() {
     const response = await api.get<ApiSuccessResponse<PlacementTrackerData>>('/api/college/placement');
+    return response.data.data;
+  },
+  async getProjects() {
+    const response = await api.get<ApiSuccessResponse<RecentProject[]>>('/api/college/projects');
+    return response.data.data;
+  },
+  async getPatents() {
+    const response = await api.get<ApiSuccessResponse<InstitutionPatent[]>>('/api/college/patents');
+    return response.data.data;
+  },
+  async getStartups() {
+    const response = await api.get<ApiSuccessResponse<InstitutionStartup[]>>('/api/college/startups');
     return response.data.data;
   },
   async updatePlacementStatus(studentId: string, status: Exclude<PlacementStatus, 'Discovered' | 'In Progress'>) {

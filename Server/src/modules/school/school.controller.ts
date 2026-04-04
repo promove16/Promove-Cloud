@@ -10,6 +10,7 @@ import {
   createStudentAccessTokenSchema,
   getInvestorDirectory,
   getLatestComplianceReport,
+  getInstitutionUpcomingEvents,
   getSchoolMentorshipPrograms,
   getSchoolPendingStudentVerifications,
   getSchoolStudentRoster,
@@ -19,6 +20,9 @@ import {
   getStudentLeaderboard,
   importSchoolStudentCredentials,
   importSchoolStudentRosterEntries,
+  listInstitutionPatents,
+  listInstitutionProjects,
+  listInstitutionStartups,
   listStudentRosterQuerySchema,
   manualStudentRosterEntrySchema,
   reviewSchoolStudentVerification,
@@ -47,6 +51,26 @@ export const getSchoolStudentJourneyController = async (req: Request, res: Respo
 
 export const listSchoolInvestorsController = async (_req: Request, res: Response) => {
   const data = await getInvestorDirectory();
+  res.status(200).json(new ApiResponse(data));
+};
+
+export const listSchoolProjectsController = async (req: Request, res: Response) => {
+  const data = await listInstitutionProjects(req.user!._id);
+  res.status(200).json(new ApiResponse(data));
+};
+
+export const listSchoolPatentsController = async (req: Request, res: Response) => {
+  const data = await listInstitutionPatents(req.user!._id);
+  res.status(200).json(new ApiResponse(data));
+};
+
+export const listSchoolStartupsController = async (req: Request, res: Response) => {
+  const data = await listInstitutionStartups(req.user!._id);
+  res.status(200).json(new ApiResponse(data));
+};
+
+export const listSchoolEventsController = async (req: Request, res: Response) => {
+  const data = await getInstitutionUpcomingEvents(req.user!._id);
   res.status(200).json(new ApiResponse(data));
 };
 

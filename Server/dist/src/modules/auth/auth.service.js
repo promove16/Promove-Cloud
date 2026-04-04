@@ -20,6 +20,7 @@ const activity_service_1 = require("../analytics/activity.service");
 const retentionEmailService_1 = require("../../services/retentionEmailService");
 const scoreEngine_1 = require("../../services/scoreEngine");
 const institutionAccess_service_1 = require("../institution/institutionAccess.service");
+const institutionVerification_service_1 = require("../institution/institutionVerification.service");
 const studentRoster_service_1 = require("../institution/studentRoster.service");
 const REFRESH_TTL_SECONDS = 30 * 24 * 60 * 60;
 const MS_IN_YEAR = 365 * 24 * 60 * 60 * 1000;
@@ -246,7 +247,7 @@ const registerUser = async (payload) => {
     };
 };
 exports.registerUser = registerUser;
-const submitRegistrationRequest = async (payload) => {
+const submitRegistrationRequest = async (payload, files = []) => {
     const normalizedEmail = payload.email.toLowerCase();
     const existingUser = await user_model_1.User.findOne({ email: normalizedEmail }).select('+passwordHash');
     if (existingUser) {
@@ -259,6 +260,11 @@ const submitRegistrationRequest = async (payload) => {
         if (existingUser.role !== payload.role) {
             throw new ApiError_1.ApiError(409, 'ROLE_MISMATCH', 'This email already has a registration request for a different role.');
         }
+    }
+    if (payload.role !== roles_types_1.UserRole.SCHOOL &&
+        payload.role !== roles_types_1.UserRole.COLLEGE &&
+        files.length > 0) {
+        throw new ApiError_1.ApiError(400, 'UNEXPECTED_INSTITUTION_DOCUMENTS', 'Institution document uploads are only supported for school and college requests.');
     }
     const passwordHash = await bcrypt_1.default.hash(payload.password, 12);
     const sanitizedDisplayName = (0, sanitizeText_1.sanitizePlainText)(payload.displayName);
@@ -285,7 +291,7 @@ const submitRegistrationRequest = async (payload) => {
     user.bio = sanitizedBio;
     user.profileComplete =
         payload.role === roles_types_1.UserRole.SCHOOL || payload.role === roles_types_1.UserRole.COLLEGE
-            ? Boolean(institutionProfile)
+            ? false
             : Boolean(sanitizedDomain || sanitizedBio);
     user.registrationStage =
         payload.role === roles_types_1.UserRole.SCHOOL || payload.role === roles_types_1.UserRole.COLLEGE ? 'complete' : 'basic';
@@ -328,7 +334,24 @@ const submitRegistrationRequest = async (payload) => {
     else {
         user.institutionProfile = undefined;
     }
+    const previousInstitutionDocuments = existingUser?.institutionVerification?.documents ?? [];
+    if (payload.role === roles_types_1.UserRole.SCHOOL || payload.role === roles_types_1.UserRole.COLLEGE) {
+        user.institutionVerification = await (0, institutionVerification_service_1.buildInstitutionVerificationProfile)({
+            role: payload.role,
+            userId: String(user._id),
+            verificationInput: payload.institutionVerification,
+            files,
+        });
+        user.profileComplete =
+            Boolean(institutionProfile) && user.institutionVerification.readiness.isReadyForReview;
+    }
+    else {
+        user.institutionVerification = undefined;
+    }
     await user.save();
+    if (existingUser && previousInstitutionDocuments.length > 0) {
+        await (0, institutionVerification_service_1.cleanupInstitutionVerificationDocuments)(previousInstitutionDocuments);
+    }
     await (0, retentionEmailService_1.queueWelcomeEmail)(String(user._id));
     await (0, retentionEmailService_1.queueProfileCompletionMilestoneEmail)(String(user._id), 0, (0, profileCompletion_1.getProfileCompletionProgress)(user.toObject()).percent);
     return {

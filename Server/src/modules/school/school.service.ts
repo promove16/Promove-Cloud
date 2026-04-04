@@ -16,6 +16,10 @@ import {
 import { Workspace } from '../workspace/workspace.model';
 import { ComplianceReport } from '../institution/complianceReport.model';
 import {
+  calculateEstimatedIicRating,
+  getInstitutionIicTelemetry,
+} from '../institution/iicRating.service';
+import {
   normalizeInnovationScore,
   normalizeScoreBreakdown,
 } from '../innovationScore/score.utils';
@@ -40,9 +44,13 @@ import {
 } from '../institution/studentRoster.service';
 import {
   DashboardEventView,
+  InstitutionPatentView,
+  InstitutionStartupView,
   InvestorProfileView,
   LeaderboardPage,
   PendingStudentVerificationView,
+  RecentActivityCounts,
+  RecentProjectView,
   SchoolDashboardPayload,
   SchoolDashboardStats,
   StudentAccessTokenView,
@@ -100,6 +108,40 @@ const getStudentIdsForInstitution = async (institutionId: string) => {
     .lean();
 
   return students.map((student) => student._id);
+};
+
+const countRecentInstitutionActivity = async (
+  studentIds: Types.ObjectId[],
+): Promise<RecentActivityCounts> => {
+  if (studentIds.length === 0) {
+    return {
+      scoreEventsLast30Days: 0,
+      patentsLast30Days: 0,
+      startupsLast30Days: 0,
+    };
+  }
+
+  const rollingWindow = new Date(Date.now() - 30 * 24 * 60 * 60 * 1000);
+  const [scoreEventsLast30Days, patentsLast30Days, startupsLast30Days] = await Promise.all([
+    ScoreEvent.countDocuments({
+      userId: { $in: studentIds },
+      createdAt: { $gte: rollingWindow },
+    }),
+    Patent.countDocuments({
+      studentId: { $in: studentIds },
+      createdAt: { $gte: rollingWindow },
+    }),
+    Startup.countDocuments({
+      founderIds: { $in: studentIds },
+      createdAt: { $gte: rollingWindow },
+    }),
+  ]);
+
+  return {
+    scoreEventsLast30Days,
+    patentsLast30Days,
+    startupsLast30Days,
+  };
 };
 
 export const rebuildInstitutionLeaderboard = async (institutionId: string): Promise<void> => {
@@ -197,7 +239,7 @@ const mapLeaderboardUsers = async (
     .filter((item): item is StudentLeaderboardItem => item !== null);
 };
 
-const getInstitutionUpcomingEvents = async (institutionId: string): Promise<DashboardEventView[]> => {
+export const getInstitutionUpcomingEvents = async (institutionId: string): Promise<DashboardEventView[]> => {
   const events = await Event.find({
     institutionId,
     scheduledAt: { $gte: new Date() },
@@ -217,20 +259,33 @@ const getInstitutionUpcomingEvents = async (institutionId: string): Promise<Dash
   }));
 };
 
-export const getDashboardStats = async (institutionId: string): Promise<SchoolDashboardStats> => {
+export const getDashboardStats = async (
+  institutionId: string,
+  studentIdsInput?: Types.ObjectId[],
+): Promise<SchoolDashboardStats> => {
   const cacheKey = `school:stats:${institutionId}`;
-  const cached = await redis.get<string>(cacheKey);
+  const shouldUseCache = !studentIdsInput;
+  const cached = shouldUseCache ? await redis.get<string>(cacheKey) : null;
 
   const cachedStats = readRedisJson<SchoolDashboardStats>(cached);
   if (cachedStats) {
     return cachedStats;
   }
 
-  const studentIds = await getStudentIdsForInstitution(institutionId);
+  const studentIds = studentIdsInput ?? (await getStudentIdsForInstitution(institutionId));
 
-  const [totalStudents, totalInnovationActivities, patentsFiled, startupsLaunched, institution, completedMentoringMinutes] =
+  const [
+    totalStudents,
+    activeProjects,
+    totalInnovationActivities,
+    patentsFiled,
+    startupsLaunched,
+    institution,
+    completedMentoringMinutes,
+  ] =
     await Promise.all([
       User.countDocuments({ institutionId, role: UserRole.STUDENT, isActive: true }),
+      studentIds.length > 0 ? Workspace.countDocuments({ ownerId: { $in: studentIds }, isActive: true }) : 0,
       studentIds.length > 0 ? ScoreEvent.countDocuments({ userId: { $in: studentIds } }) : 0,
       studentIds.length > 0 ? Patent.countDocuments({ studentId: { $in: studentIds } }) : 0,
       studentIds.length > 0 ? Startup.countDocuments({ founderIds: { $in: studentIds } }) : 0,
@@ -254,6 +309,7 @@ export const getDashboardStats = async (institutionId: string): Promise<SchoolDa
 
   const stats: SchoolDashboardStats = {
     totalStudents,
+    activeProjects,
     totalInnovationActivities,
     patentsFiled,
     totalMentoringHours:
@@ -266,9 +322,147 @@ export const getDashboardStats = async (institutionId: string): Promise<SchoolDa
       (await Event.countDocuments({ institutionId })),
   };
 
-  await redis.set(cacheKey, JSON.stringify(stats), { ex: STATS_TTL_SECONDS });
+  if (shouldUseCache) {
+    await redis.set(cacheKey, JSON.stringify(stats), { ex: STATS_TTL_SECONDS });
+  }
 
   return stats;
+};
+
+export const getRecentInstitutionProjects = async (
+  studentIds: Types.ObjectId[],
+  limit = 4,
+): Promise<RecentProjectView[]> => {
+  if (studentIds.length === 0) {
+    return [];
+  }
+
+  const workspaces = await Workspace.find({
+    ownerId: { $in: studentIds },
+    isActive: true,
+  })
+    .select('_id ownerId title category stage progressPercent updatedAt')
+    .sort({ updatedAt: -1 })
+    .limit(limit)
+    .lean();
+
+  if (workspaces.length === 0) {
+    return [];
+  }
+
+  const studentMap = new Map(
+    (
+      await User.find({ _id: { $in: workspaces.map((workspace) => workspace.ownerId) } })
+        .select('_id displayName')
+        .lean()
+    ).map((student) => [String(student._id), student.displayName]),
+  );
+
+  return workspaces.map((workspace) => ({
+    _id: String(workspace._id),
+    studentId: String(workspace.ownerId),
+    studentName: studentMap.get(String(workspace.ownerId)) ?? 'Student',
+    title: workspace.title,
+    category: workspace.category,
+    stage: workspace.stage,
+    progressPercent: workspace.progressPercent,
+    updatedAt: workspace.updatedAt.toISOString(),
+  }));
+};
+
+export const getRecentActivityCounts = (studentIds: Types.ObjectId[]) =>
+  countRecentInstitutionActivity(studentIds);
+
+export const listInstitutionProjects = async (
+  institutionId: string,
+  limit = 50,
+): Promise<RecentProjectView[]> => {
+  const studentIds = await getStudentIdsForInstitution(institutionId);
+  return getRecentInstitutionProjects(studentIds, limit);
+};
+
+export const listInstitutionPatents = async (
+  institutionId: string,
+  limit = 50,
+): Promise<InstitutionPatentView[]> => {
+  const studentIds = await getStudentIdsForInstitution(institutionId);
+
+  if (studentIds.length === 0) {
+    return [];
+  }
+
+  const patents = await Patent.find({
+    studentId: { $in: studentIds },
+  })
+    .select('_id studentId projectTitle status submittedAt')
+    .sort({ submittedAt: -1, createdAt: -1 })
+    .limit(limit)
+    .lean();
+
+  const studentMap = new Map(
+    (
+      await User.find({ _id: { $in: patents.map((patent) => patent.studentId) } })
+        .select('_id displayName')
+        .lean()
+    ).map((student) => [String(student._id), student.displayName]),
+  );
+
+  return patents.map((patent) => ({
+    _id: String(patent._id),
+    studentId: String(patent.studentId),
+    studentName: studentMap.get(String(patent.studentId)) ?? 'Student',
+    projectTitle: patent.projectTitle,
+    status: patent.status,
+    submittedAt: patent.submittedAt.toISOString(),
+  }));
+};
+
+export const listInstitutionStartups = async (
+  institutionId: string,
+  limit = 50,
+): Promise<InstitutionStartupView[]> => {
+  const studentIds = await getStudentIdsForInstitution(institutionId);
+
+  if (studentIds.length === 0) {
+    return [];
+  }
+
+  const startups = await Startup.find({
+    founderIds: { $in: studentIds },
+    isActive: true,
+  })
+    .select('name tagline category stage founderIds activeProducts teamSize reviewStatus launchedAt updatedAt')
+    .sort({ updatedAt: -1 })
+    .limit(limit)
+    .lean();
+
+  const founderMap = new Map(
+    (
+      await User.find({
+        _id: {
+          $in: startups.flatMap((startup) => startup.founderIds),
+        },
+      })
+        .select('_id displayName')
+        .lean()
+    ).map((founder) => [String(founder._id), founder.displayName]),
+  );
+
+  return startups.map((startup) => ({
+    _id: String(startup._id),
+    name: startup.name,
+    tagline: startup.tagline,
+    category: startup.category,
+    stage: startup.stage,
+    founderNames: startup.founderIds
+      .map((founderId) => founderMap.get(String(founderId)))
+      .filter((name): name is string => Boolean(name)),
+    activeProducts: startup.activeProducts,
+    teamSize: startup.teamSize,
+    reviewStatus: startup.reviewStatus,
+    ...(startup.launchedAt ? { launchedAt: startup.launchedAt.toISOString() } : {}),
+    updatedAt: startup.updatedAt.toISOString(),
+  }));
 };
 
 export const getStudentLeaderboard = async (
@@ -410,42 +604,50 @@ export const getSchoolDashboard = async (institutionId: string): Promise<SchoolD
   }
 
   const studentIds = await getStudentIdsForInstitution(institutionId);
-  const rollingWindow = new Date(Date.now() - 30 * 24 * 60 * 60 * 1000);
-  const [stats, topStudentsPage, upcomingEvents, scoreEventsLast30Days, patentsLast30Days, startupsLast30Days] =
+  const [stats, topStudentsPage, upcomingEvents, recentActivityCounts, recentProjects, iicTelemetry] =
     await Promise.all([
-      getDashboardStats(institutionId),
+      getDashboardStats(institutionId, studentIds),
       getStudentLeaderboard(institutionId, undefined, 5),
       getInstitutionUpcomingEvents(institutionId),
-      studentIds.length > 0
-        ? ScoreEvent.countDocuments({
-            userId: { $in: studentIds },
-            createdAt: { $gte: rollingWindow },
-          })
-        : 0,
-      studentIds.length > 0
-        ? Patent.countDocuments({
-            studentId: { $in: studentIds },
-            createdAt: { $gte: rollingWindow },
-          })
-        : 0,
-      studentIds.length > 0
-        ? Startup.countDocuments({
-            founderIds: { $in: studentIds },
-            createdAt: { $gte: rollingWindow },
-          })
-        : 0,
+      getRecentActivityCounts(studentIds),
+      getRecentInstitutionProjects(studentIds),
+      getInstitutionIicTelemetry(institutionId, 'school'),
     ]);
 
+  const iicRating = calculateEstimatedIicRating({
+    totalStudents: stats.totalStudents,
+    activeProjects: stats.activeProjects,
+    totalInnovationActivities: stats.totalInnovationActivities,
+    patentsFiled: stats.patentsFiled,
+    totalMentoringHours: stats.totalMentoringHours,
+    startupsLaunched: stats.startupsLaunched,
+    industryCollaborations: stats.industryCollaborations,
+    structuredActivityCount: iicTelemetry.structuredActivityCount,
+    activeQuarterCount: iicTelemetry.activeQuarterCount,
+    policies: institution.institutionProfile?.policies ?? [],
+  });
+
   const payload: SchoolDashboardPayload = {
-    institutionProfile: institution.institutionProfile,
+    institutionProfile: institution.institutionProfile
+      ? {
+          ...institution.institutionProfile,
+          iicStarRating: iicRating.starRating,
+          iicLastUpdated: new Date(),
+          stats: {
+            ...institution.institutionProfile.stats,
+            totalInnovationActivities: stats.totalInnovationActivities,
+            patentsFiled: stats.patentsFiled,
+            totalMentoringHours: stats.totalMentoringHours,
+            startupsLaunched: stats.startupsLaunched,
+            industryCollaborations: stats.industryCollaborations,
+          },
+        }
+      : undefined,
     stats,
-    recentActivityCounts: {
-      scoreEventsLast30Days,
-      patentsLast30Days,
-      startupsLast30Days,
-    },
+    recentActivityCounts,
     upcomingEvents,
     topStudents: topStudentsPage.items,
+    recentProjects,
   };
 
   await redis.set(cacheKey, JSON.stringify(payload), { ex: DASHBOARD_TTL_SECONDS });

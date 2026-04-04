@@ -14,6 +14,7 @@ import { Workspace } from '../workspace/workspace.model';
 import { MentorSession } from './mentorSession.model';
 import { MentorFeedback } from './mentorFeedback.model';
 import {
+  assertMentorAvailability,
   listMentorAssignedInstitutionPrograms,
   listMentorAssignedProjects,
 } from './mentorshipProgram.service';
@@ -126,13 +127,16 @@ const getStudentSummary = async (studentId: string) => {
 type MentorWorkspaceAccess = {
   _id: Types.ObjectId;
   ownerId: Types.ObjectId;
-  teamMemberIds: Types.ObjectId[];
+  teamMemberIds?: Types.ObjectId[];
   title: string;
   category: string;
   stage: string;
   progressPercent: number;
   updatedAt: Date;
 };
+
+const getWorkspaceTeamMemberIds = (workspace: Pick<MentorWorkspaceAccess, 'teamMemberIds'>) =>
+  Array.isArray(workspace.teamMemberIds) ? workspace.teamMemberIds : [];
 
 const getMentorAssignedWorkspaces = async (mentorId: string): Promise<MentorWorkspaceAccess[]> =>
   Workspace.find({
@@ -153,7 +157,7 @@ const getMentorAssignedStudentIds = (workspaces: MentorWorkspaceAccess[]) =>
     new Set(
       workspaces.flatMap((workspace) => [
         String(workspace.ownerId),
-        ...workspace.teamMemberIds.map((memberId) => String(memberId)),
+        ...getWorkspaceTeamMemberIds(workspace).map((memberId) => String(memberId)),
       ]),
     ),
   );
@@ -192,7 +196,7 @@ const assertMentorWorkspaceAccess = async (mentorId: string, studentId: string, 
   }
 
   const isOwner = String(workspace.ownerId) === studentId;
-  const isMember = workspace.teamMemberIds.some((memberId) => String(memberId) === studentId);
+  const isMember = getWorkspaceTeamMemberIds(workspace).some((memberId) => String(memberId) === studentId);
   if (!isOwner && !isMember) {
     throw new ApiError(403, 'FORBIDDEN', 'Workspace is not available to this student');
   }
@@ -422,6 +426,7 @@ export const getMentorWorkspace = async (
 
 export const createMentorSession = async (mentorId: string, payload: CreateMentorSessionInput) => {
   await assertMentorStudentAccess(mentorId, payload.studentId);
+  const scheduledAt = new Date(payload.scheduledAt);
 
   const [student, mentor, workspace] = await Promise.all([
     User.findById(payload.studentId).select('_id displayName avatar role').lean(),
@@ -436,12 +441,19 @@ export const createMentorSession = async (mentorId: string, payload: CreateMento
   if (!mentor || mentor.role !== UserRole.MENTOR) {
     throw new ApiError(404, 'MENTOR_NOT_FOUND', 'Mentor not found');
   }
+
+  await assertMentorAvailability({
+    mentorId,
+    scheduledAt,
+    durationMinutes: payload.durationMinutes,
+  });
+
   const session = await MentorSession.create({
     mentorId,
     studentId: payload.studentId,
     ...(payload.workspaceId ? { workspaceId: payload.workspaceId } : {}),
     title: payload.title,
-    scheduledAt: new Date(payload.scheduledAt),
+    scheduledAt,
     durationMinutes: payload.durationMinutes,
     ...(payload.meetLink ? { meetLink: payload.meetLink } : {}),
     status: 'Scheduled',
