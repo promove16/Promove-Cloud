@@ -53,7 +53,7 @@ const BREAKDOWN_FIELD_MAP: Record<ScoreTrigger, keyof IUser['scoreBreakdown'] | 
   ONBOARDING_SHARE:       null,
 };
 
-const ONE_TIME_SCORE_TRIGGERS: ScoreTrigger[] = [
+export const ONE_TIME_SCORE_TRIGGERS: ScoreTrigger[] = [
   'GITHUB_CONNECTED',
   'LINKEDIN_CONNECTED',
   'RESUME_UPLOADED',

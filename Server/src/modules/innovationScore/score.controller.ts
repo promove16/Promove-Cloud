@@ -7,6 +7,11 @@ import { User } from '../user/user.model';
 import { ScoreEvent } from './score.model';
 import { applyScore, SCORE_DELTAS, ScoreTrigger } from '../../services/scoreEngine';
 import {
+  buildScoreBreakdownDetails,
+  buildScoreImprovementTips,
+  ScoreEventStats,
+} from './scoreInsights';
+import {
   normalizeInnovationScore,
   normalizeScoreBreakdown,
 } from './score.utils';
@@ -83,7 +88,7 @@ export const getMyScore = async (req: Request, res: Response) => {
   }
 
   const weekAgo = new Date(Date.now() - 7 * 24 * 60 * 60 * 1000);
-  const [recentEvents, leaderboardUser] = await Promise.all([
+  const [recentEvents, leaderboardUser, allTimeEventStats] = await Promise.all([
     ScoreEvent.find({
       userId: req.user._id,
       createdAt: { $gte: weekAgo },
@@ -91,6 +96,22 @@ export const getMyScore = async (req: Request, res: Response) => {
       .select('delta')
       .lean(),
     User.findById(req.user._id).select('institutionId createdAt').lean(),
+    ScoreEvent.aggregate<{
+      _id: ScoreTrigger;
+      occurrences: number;
+      totalPoints: number;
+      lastAwardedAt: Date | null;
+    }>([
+      { $match: { userId: req.user._id } },
+      {
+        $group: {
+          _id: '$trigger',
+          occurrences: { $sum: 1 },
+          totalPoints: { $sum: '$delta' },
+          lastAwardedAt: { $max: '$createdAt' },
+        },
+      },
+    ]),
   ]);
 
   if (!leaderboardUser) {
@@ -118,12 +139,25 @@ export const getMyScore = async (req: Request, res: Response) => {
   }
 
   const weeklyDelta = recentEvents.reduce((sum, event) => sum + (event.delta ?? 0), 0);
+  const eventStats = allTimeEventStats.reduce<ScoreEventStats>((accumulator, item) => {
+    accumulator[item._id] = {
+      occurrences: item.occurrences,
+      totalPoints: item.totalPoints,
+      lastAwardedAt: item.lastAwardedAt,
+    };
+    return accumulator;
+  }, {});
+  const breakdownDetails = buildScoreBreakdownDetails(eventStats);
+  const trackedPoints = breakdownDetails.reduce((sum, item) => sum + item.totalPoints, 0);
 
   res.json(
     new ApiResponse({
       ...scorePayload,
       weeklyDelta,
       rankPercentile: percentileFromRank(rank, total),
+      breakdownDetails,
+      improvementTips: buildScoreImprovementTips(eventStats),
+      untrackedPoints: Math.max(scorePayload.score - trackedPoints, 0),
     }),
   );
 };

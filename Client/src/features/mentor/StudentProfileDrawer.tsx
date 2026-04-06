@@ -62,7 +62,7 @@ export function StudentProfileDrawer({ open, studentId, onClose, onSchedule }: P
         <div className="mb-6 flex items-start justify-between gap-4">
           <div>
             <div className="text-xs uppercase tracking-[0.3em] text-cyan-300">Student Profile</div>
-            <h2 className="mt-2 text-3xl font-bold text-white">Leadership Profile</h2>
+            <h2 className="mt-2 text-3xl font-bold text-white">Portfolio</h2>
           </div>
           <Button variant="ghost" className="rounded-full p-3" onClick={onClose}>
             <X className="h-5 w-5" />

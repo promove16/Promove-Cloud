@@ -172,14 +172,19 @@ const StartupLaunch = lazy(() =>
     default: module.StartupLaunch,
   })),
 );
-const LeadershipProfile = lazy(() =>
+const PortfolioPage = lazy(() =>
   import("../app/pages/LeadershipProfile").then((module) => ({
     default: module.LeadershipProfile,
   })),
 );
 const Marketplace = lazy(() =>
-  import("../features/student/Marketplace").then((module) => ({
+  import("../app/pages/Marketplace").then((module) => ({
     default: module.Marketplace,
+  })),
+);
+const MarketplaceDetail = lazy(() =>
+  import("../app/pages/MarketplaceDetail").then((module) => ({
+    default: module.MarketplaceDetail,
   })),
 );
 const MarketplaceJobDetail = lazy(() =>
@@ -452,18 +457,30 @@ export const router = createBrowserRouter([
       },
       {
         path: "/leadership-profile",
+        element: <Navigate to="/portfolio" replace />,
+      },
+      {
+        path: "/portfolio",
         element: (
           <ProtectedRoleRoute role={UserRole.STUDENT}>
-            <LazyPage component={LeadershipProfile} />
+            <LazyPage component={PortfolioPage} />
           </ProtectedRoleRoute>
         ),
       },
       {
         path: "/marketplace",
         element: (
-          <ProtectedRoleRoute role={UserRole.STUDENT}>
+          <ProtectedAnyRoute>
             <LazyPage component={Marketplace} />
-          </ProtectedRoleRoute>
+          </ProtectedAnyRoute>
+        ),
+      },
+      {
+        path: "/marketplace/view/:entityType/:entityId",
+        element: (
+          <ProtectedAnyRoute>
+            <LazyPage component={MarketplaceDetail} />
+          </ProtectedAnyRoute>
         ),
       },
       {

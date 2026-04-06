@@ -1,5 +1,6 @@
 import { Schema, model } from 'mongoose';
 import { IWorkspace } from './workspace.types';
+import { DEFAULT_TEMPORARY_MEMORY_MODE } from '../temporaryMemory/temporaryMemory.constants';
 
 const milestoneNames = [
   'Research & Planning',
@@ -71,6 +72,12 @@ const workspaceSchema = new Schema(
             uploadedAt: { type: Date, default: () => new Date() },
             note: { type: String, default: undefined },
             category: { type: String, enum: ['bug_report', 'error_log', 'screenshot', 'test_result', 'design_mockup', 'other'], default: 'other' },
+            memoryMode: {
+              type: String,
+              enum: ['standard', 'temporary'],
+              default: DEFAULT_TEMPORARY_MEMORY_MODE,
+            },
+            expiresAt: { type: Date, default: undefined },
             cloudinaryPublicId: { type: String, default: undefined },
           },
           { _id: true },

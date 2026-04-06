@@ -4,6 +4,10 @@ import jwt from 'jsonwebtoken';
 import { env } from '../config/env';
 import { Workspace } from '../modules/workspace/workspace.model';
 import { ChatMessage } from '../modules/chat/chat.model';
+import {
+  buildTemporaryMemoryMetadata,
+  isTemporaryMemoryMode,
+} from '../modules/temporaryMemory/temporaryMemory.constants';
 
 const canAccessWorkspace = async (workspaceId: string, userId: string) =>
   Workspace.exists({
@@ -67,7 +71,7 @@ export const initChatSocket = (io: Server) => {
       socket.emit('presence:list', { onlineUserIds: onlineInRoom });
     });
 
-    socket.on('chat:message', async ({ workspaceId, message, attachmentUrl, attachmentType }) => {
+    socket.on('chat:message', async ({ workspaceId, message, attachmentUrl, attachmentType, memoryMode }) => {
       try {
         if (!workspaceId || !Types.ObjectId.isValid(workspaceId)) {
           socket.emit('chat:error', { message: 'Workspace not found' });
@@ -90,10 +94,16 @@ export const initChatSocket = (io: Server) => {
           return;
         }
 
+        if (memoryMode !== undefined && !isTemporaryMemoryMode(memoryMode)) {
+          socket.emit('chat:error', { message: 'Invalid temporary memory mode' });
+          return;
+        }
+
         const msg = await ChatMessage.create({
           workspaceId,
           senderId: socket.data.userId,
           message: normalizedMessage,
+          ...buildTemporaryMemoryMetadata(memoryMode),
           ...(attachmentUrl ? { attachmentUrl } : {}),
           ...(attachmentType ? { attachmentType } : {}),
         });

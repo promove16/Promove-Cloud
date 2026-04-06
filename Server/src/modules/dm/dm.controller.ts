@@ -4,9 +4,20 @@ import { DirectMessage } from './dm.model';
 import { User } from '../user/user.model';
 import { ApiError } from '../../utils/ApiError';
 import { uploadToCloudinary } from '../../services/cloudinaryService';
+import {
+  buildTemporaryMemoryMetadata,
+  isTemporaryMemoryMode,
+} from '../temporaryMemory/temporaryMemory.constants';
 const allowedMimeTypes = new Set(['image/jpeg', 'image/png', 'image/gif', 'image/webp', 'application/pdf']);
 const pdfFileNamePattern = /\.pdf$/i;
 const allowedQueryTypes = new Set(['project_mentor', 'investor', 'recruiter', 'general'] as const);
+
+const activeTemporaryMemoryFilter = (now = new Date()) => ({
+  $or: [
+    { memoryMode: { $ne: 'temporary' } },
+    { expiresAt: { $gt: now } },
+  ],
+});
 
 /** Shared online-users set — populated by dmSocket */
 export const onlineUsers = new Set<string>();
@@ -55,12 +66,16 @@ export const uploadAttachment = async (req: Request, res: Response) => {
 /** GET /api/dm/conversations — list recent conversation partners */
 export const listConversations = async (req: Request, res: Response) => {
   const myId = new Types.ObjectId(req.user!._id);
+  const now = new Date();
 
   // Find the most recent message per conversation partner
   const recent = await DirectMessage.aggregate([
     {
       $match: {
-        $or: [{ senderId: myId }, { recipientId: myId }],
+        $and: [
+          { $or: [{ senderId: myId }, { recipientId: myId }] },
+          activeTemporaryMemoryFilter(now),
+        ],
       },
     },
     { $sort: { sentAt: -1 } },
@@ -149,6 +164,7 @@ export const getPartnerProfile = async (req: Request, res: Response) => {
 export const getThread = async (req: Request, res: Response) => {
   const myId = new Types.ObjectId(req.user!._id);
   const { userId } = req.params;
+  const now = new Date();
 
   if (!Types.ObjectId.isValid(userId as string)) {
     throw new ApiError(400, 'INVALID_ID', 'Invalid user ID');
@@ -158,14 +174,19 @@ export const getThread = async (req: Request, res: Response) => {
 
   // Mark messages from partner as read
   await DirectMessage.updateMany(
-    { senderId: partnerId, recipientId: myId, readAt: null },
+    { senderId: partnerId, recipientId: myId, readAt: null, ...activeTemporaryMemoryFilter(now) },
     { $set: { readAt: new Date() } },
   );
 
   const messages = await DirectMessage.find({
-    $or: [
-      { senderId: myId, recipientId: partnerId },
-      { senderId: partnerId, recipientId: myId },
+    $and: [
+      {
+        $or: [
+          { senderId: myId, recipientId: partnerId },
+          { senderId: partnerId, recipientId: myId },
+        ],
+      },
+      activeTemporaryMemoryFilter(now),
     ],
   })
     .sort({ sentAt: 1 })
@@ -179,6 +200,7 @@ export const getThread = async (req: Request, res: Response) => {
 export const markAsRead = async (req: Request, res: Response) => {
   const myId = new Types.ObjectId(req.user!._id);
   const { userId } = req.params;
+  const now = new Date();
 
   if (!Types.ObjectId.isValid(userId as string)) {
     throw new ApiError(400, 'INVALID_ID', 'Invalid user ID');
@@ -187,7 +209,7 @@ export const markAsRead = async (req: Request, res: Response) => {
   const partnerId = new Types.ObjectId(userId as string);
 
   const result = await DirectMessage.updateMany(
-    { senderId: partnerId, recipientId: myId, readAt: null },
+    { senderId: partnerId, recipientId: myId, readAt: null, ...activeTemporaryMemoryFilter(now) },
     { $set: { readAt: new Date() } },
   );
 
@@ -205,6 +227,7 @@ export const sendMessage = async (req: Request, res: Response) => {
 
   const recipientId = new Types.ObjectId(userId as string);
   const { message, messageType, scheduledAt, meetLink, attachmentUrl, attachmentType, attachmentName, queryType } = req.body as {
+    attachmentPublicId?: string;
     message?: string;
     messageType?: 'text' | 'interview_request';
     scheduledAt?: string;
@@ -212,7 +235,15 @@ export const sendMessage = async (req: Request, res: Response) => {
     attachmentUrl?: string;
     attachmentType?: 'image' | 'pdf';
     attachmentName?: string;
+    memoryMode?: 'standard' | 'temporary';
     queryType?: 'project_mentor' | 'investor' | 'recruiter' | 'general';
+  };
+  const {
+    attachmentPublicId,
+    memoryMode,
+  } = req.body as {
+    attachmentPublicId?: string;
+    memoryMode?: 'standard' | 'temporary';
   };
 
   const normalizedMessage = typeof message === 'string' ? message.trim() : '';
@@ -230,6 +261,10 @@ export const sendMessage = async (req: Request, res: Response) => {
     throw new ApiError(400, 'INVALID_QUERY_TYPE', 'Invalid message query type');
   }
 
+  if (memoryMode !== undefined && !isTemporaryMemoryMode(memoryMode)) {
+    throw new ApiError(400, 'INVALID_MEMORY_MODE', 'Invalid temporary memory mode');
+  }
+
   if (myId.toString() === userId) {
     throw new ApiError(400, 'SELF_MESSAGE', 'You cannot send a message to yourself');
   }
@@ -245,11 +280,13 @@ export const sendMessage = async (req: Request, res: Response) => {
     message: normalizedMessage,
     messageType: type,
     queryType: queryType || 'general',
+    ...buildTemporaryMemoryMetadata(memoryMode),
     ...(scheduledAt ? { scheduledAt: new Date(scheduledAt) } : {}),
     ...(meetLink ? { meetLink } : {}),
     ...(attachmentUrl ? { attachmentUrl } : {}),
     ...(attachmentType ? { attachmentType } : {}),
     ...(attachmentName ? { attachmentName } : {}),
+    ...(attachmentPublicId ? { attachmentPublicId } : {}),
   });
 
   res.status(201).json({ success: true, data: msg });

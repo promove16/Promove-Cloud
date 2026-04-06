@@ -1,5 +1,6 @@
 import api from './axiosInstance';
 import { ApiSuccessResponse } from '../types/auth.types';
+import { TemporaryMemoryMode } from '../lib/temporaryMemory';
 
 export type QueryType = 'project_mentor' | 'investor' | 'recruiter' | 'general';
 
@@ -15,6 +16,9 @@ export interface DMMessage {
   attachmentUrl?: string;
   attachmentType?: 'image' | 'pdf';
   attachmentName?: string;
+  attachmentPublicId?: string;
+  memoryMode?: TemporaryMemoryMode;
+  expiresAt?: string;
   readAt?: string | null;
   sentAt: string;
   isOptimistic?: boolean;
@@ -66,6 +70,8 @@ export const dmApi = {
     attachmentUrl?: string;
     attachmentType?: 'image' | 'pdf';
     attachmentName?: string;
+    attachmentPublicId?: string;
+    memoryMode?: TemporaryMemoryMode;
   }) {
     const response = await api.post<ApiSuccessResponse<DMMessage>>(`/api/dm/${userId}`, payload);
     return response.data.data;

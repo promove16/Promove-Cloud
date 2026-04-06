@@ -1,17 +1,48 @@
 import { Request, Response } from 'express';
 import { ApiResponse } from '../../utils/ApiResponse';
+import { ApiError } from '../../utils/ApiError';
 import { getMarketplaceEntity, getMarketplaceUser, listMarketplaceUsers, MarketplaceEntityType } from './marketplace.service';
 import { UserRole } from '../../types/roles.types';
 
 const getParam = (value: string | string[] | undefined) =>
   Array.isArray(value) ? value[0] : value;
 
+const normalizeMarketplaceEntityType = (
+  value?: string,
+): MarketplaceEntityType | undefined => {
+  if (!value) {
+    return undefined;
+  }
+
+  const normalized = value.trim().toLowerCase();
+
+  if (normalized === 'hr' || normalized === 'hrs') {
+    return UserRole.RECRUITER;
+  }
+
+  if (
+    normalized === UserRole.MENTOR ||
+    normalized === UserRole.INVESTOR ||
+    normalized === UserRole.RECRUITER ||
+    normalized === 'startup'
+  ) {
+    return normalized as MarketplaceEntityType;
+  }
+
+  throw new ApiError(400, 'INVALID_MARKETPLACE_ENTITY', 'Unsupported marketplace entity');
+};
+
 export const getMarketplace = async (req: Request, res: Response) => {
-  const role = getParam(req.query.role as string | string[] | undefined);
+  const role = normalizeMarketplaceEntityType(getParam(req.query.role as string | string[] | undefined));
+  const search =
+    getParam(req.query.search as string | string[] | undefined) ??
+    getParam(req.query.q as string | string[] | undefined) ??
+    getParam(req.query.domain as string | string[] | undefined);
+
   const users = await listMarketplaceUsers(
     req.user!.role,
-    (role as MarketplaceEntityType | undefined) ?? UserRole.MENTOR,
-    typeof req.query.domain === 'string' ? req.query.domain : undefined,
+    role ?? UserRole.MENTOR,
+    search,
     Number(req.query.page ?? 1),
     Number(req.query.limit ?? 20),
   );
@@ -19,7 +50,7 @@ export const getMarketplace = async (req: Request, res: Response) => {
 };
 
 export const getMarketplaceEntityDetail = async (req: Request, res: Response) => {
-  const entityType = getParam(req.params.entityType) as MarketplaceEntityType | undefined;
+  const entityType = normalizeMarketplaceEntityType(getParam(req.params.entityType));
   const entityId = getParam(req.params.entityId);
 
   if (!entityType || !entityId) {

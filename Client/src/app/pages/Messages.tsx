@@ -13,11 +13,19 @@ import { useAuthStore } from '../../store/authStore';
 import { QueryTypeModal } from '../../components/messaging/QueryTypeModal';
 import { ReportUserModal } from '../../components/messaging/ReportUserModal';
 import { InvestorProposalModal, InvestorProposalReplyActions } from '../../components/messaging/InvestorProposalModal';
+import { TemporaryMemoryMenu } from '../../components/messaging/TemporaryMemoryMenu';
 import { getVisibleAssociationQueryTypes, isAssociationQueryType } from '../../components/messaging/queryTypeVisibility';
+import {
+  TemporaryMemoryMode,
+  formatTemporaryMemoryExpiry,
+  getTemporaryMemorySummary,
+  isTemporaryMemory,
+} from '../../lib/temporaryMemory';
 
 type PendingAttachmentState = {
   previewUrl: string;
   uploadedUrl?: string;
+  uploadedPublicId?: string;
   localObjectUrl: string;
   fileType: 'image' | 'pdf';
   fileName: string;
@@ -673,6 +681,11 @@ function MessageBubble({
           </span>
           {!statusText ? <ReadReceipt readAt={msg.readAt} isMine={isMine} /> : null}
         </div>
+        {isTemporaryMemory(msg.memoryMode) ? (
+          <div className={`mt-1 text-[11px] ${isMine ? 'text-cyan-200/70' : 'text-amber-300/80'}`}>
+            Temporary memory - {formatTemporaryMemoryExpiry(msg.expiresAt)}
+          </div>
+        ) : null}
 
         {/* Investor proposal quick-reply — shown only to the recipient */}
         {!isMine && msg.queryType === 'investor' && onQuickReply && (
@@ -715,6 +728,7 @@ function ChatPanel({ partnerId, partnerName, partnerRole, isFirstContact, onSend
   const [pendingAttachment, setPendingAttachment] = useState<PendingAttachmentState | null>(null);
   const [isUploading, setIsUploading] = useState(false);
   const [attachmentError, setAttachmentError] = useState('');
+  const [memoryMode, setMemoryMode] = useState<TemporaryMemoryMode>('standard');
   const threadRef = useRef<HTMLDivElement>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const textareaRef = useRef<HTMLTextAreaElement>(null);
@@ -757,6 +771,8 @@ function ChatPanel({ partnerId, partnerName, partnerRole, isFirstContact, onSend
       attachmentUrl: pendingAttachment?.uploadedUrl,
       attachmentType: pendingAttachment?.fileType,
       attachmentName: pendingAttachment?.fileName,
+      attachmentPublicId: pendingAttachment?.uploadedPublicId,
+      memoryMode,
     });
     setDraft('');
     removeAttachment();
@@ -817,6 +833,7 @@ function ChatPanel({ partnerId, partnerName, partnerRole, isFirstContact, onSend
           ...current,
           previewUrl: upload.url,
           uploadedUrl: upload.url,
+          uploadedPublicId: upload.publicId,
           fileType: upload.fileType,
           fileName: upload.fileName,
           fileSize: upload.fileSize,
@@ -863,6 +880,7 @@ function ChatPanel({ partnerId, partnerName, partnerRole, isFirstContact, onSend
         attachmentUrl: pendingAttachment.previewUrl,
         attachmentType: pendingAttachment.fileType,
         attachmentName: pendingAttachment.fileName,
+        memoryMode,
         readAt: null,
         sentAt: new Date().toISOString(),
         isOptimistic: true,
@@ -946,6 +964,10 @@ function ChatPanel({ partnerId, partnerName, partnerRole, isFirstContact, onSend
 
       {/* Input bar */}
       <div className="border-t border-slate-800 px-4 py-3">
+        <div className="mb-3 flex flex-wrap items-center gap-2">
+          <TemporaryMemoryMenu value={memoryMode} onChange={setMemoryMode} />
+          <span className="text-xs text-slate-400">{getTemporaryMemorySummary(memoryMode)}</span>
+        </div>
         {/* Attachment picker */}
         {showAttachments && (
           <div className="mb-3 flex gap-3">

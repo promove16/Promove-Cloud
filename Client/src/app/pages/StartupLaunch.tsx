@@ -844,7 +844,7 @@ export function StartupLaunch() {
                     <li key={item}>{item}</li>
                   ))}
                   <li>Investor Outreach lets you shortlist investors and send pitch requests for this startup directly</li>
-                  <li>Launch to recruiters is available from Leadership Profile too</li>
+                  <li>Launch to recruiters is available from Portfolio too</li>
                 </ul>
                 {readiness?.requiredDocumentCategories.length ? (
                   <div className="mt-4 rounded-xl border border-slate-800 bg-slate-950/70 px-4 py-3">

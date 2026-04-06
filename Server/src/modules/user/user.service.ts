@@ -226,7 +226,7 @@ export const toSanitizedUser = (user: UserLike): SanitizedUser => ({
   mustChangePasswordOnNextLogin: user.mustChangePasswordOnNextLogin ?? false,
   termsAcceptance: user.termsAcceptance ?? null,
   termsCurrentVersion: CURRENT_TERMS_VERSION,
-  hasAcceptedCurrentTerms: hasAcceptedCurrentTerms(user.termsAcceptance),
+  hasAcceptedCurrentTerms: hasAcceptedCurrentTerms(user.role, user.termsAcceptance),
   ...(user.institutionToken !== undefined ? { institutionToken: user.institutionToken ?? null } : {}),
   ...(user.institutionId ? { institutionId: user.institutionId.toString() } : { institutionId: null }),
   ...(user.institutionProfile ? { institutionProfile: user.institutionProfile } : {}),

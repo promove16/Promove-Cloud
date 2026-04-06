@@ -23,10 +23,17 @@ import {
   X,
 } from "lucide-react";
 import type { WorkspaceTask, WorkspaceUploadCategory } from "../../types/workspace.types";
+import { TemporaryMemoryMenu } from "../../components/messaging/TemporaryMemoryMenu";
 import { DashboardLayout } from "../components/DashboardLayout";
 import { workspaceApi } from "../../api/workspace.api";
 import { useWorkspaceChat } from "../../hooks/useWorkspaceChat";
 import { useAuthStore } from "../../store/authStore";
+import {
+  TemporaryMemoryMode,
+  formatTemporaryMemoryExpiry,
+  getTemporaryMemorySummary,
+  isTemporaryMemory,
+} from "../../lib/temporaryMemory";
 
 const d = (value?: string) =>
   value
@@ -74,6 +81,7 @@ export function ProductWorkspace() {
   const [inviteEmail, setInviteEmail] = useState("");
   const [uploadNote, setUploadNote] = useState("");
   const [uploadCategory, setUploadCategory] = useState<WorkspaceUploadCategory>("other");
+  const [uploadMemoryMode, setUploadMemoryMode] = useState<TemporaryMemoryMode>("standard");
   const [repoForm, setRepoForm] = useState({ repoUrl: "", branch: "", commitHash: "", note: "" });
   const [codeForm, setCodeForm] = useState({
     title: "",
@@ -83,6 +91,7 @@ export function ProductWorkspace() {
   });
   const [chatDraft, setChatDraft] = useState("");
   const [chatAttachment, setChatAttachment] = useState<File | null>(null);
+  const [chatMemoryMode, setChatMemoryMode] = useState<TemporaryMemoryMode>("standard");
   const [progressForm, setProgressForm] = useState({
     note: "",
     milestoneRef: "",
@@ -322,7 +331,13 @@ export function ProductWorkspace() {
     }
 
     try {
-      await workspaceApi.upload(workspaceId!, file, uploadNote || undefined, uploadCategory);
+      await workspaceApi.upload(
+        workspaceId!,
+        file,
+        uploadNote || undefined,
+        uploadCategory,
+        uploadMemoryMode,
+      );
       setUploadNote("");
       setUploadCategory("other");
       setToast("File uploaded.");
@@ -342,7 +357,13 @@ export function ProductWorkspace() {
       let attachmentType: "pdf" | "image" | undefined;
 
       if (chatAttachment) {
-        const uploads = await workspaceApi.upload(workspaceId, chatAttachment, "Chat attachment");
+        const uploads = await workspaceApi.upload(
+          workspaceId,
+          chatAttachment,
+          "Chat attachment",
+          undefined,
+          chatMemoryMode,
+        );
         const latest = uploads[uploads.length - 1];
         attachmentUrl = latest?.fileUrl;
         attachmentType = latest?.fileType;
@@ -354,6 +375,7 @@ export function ProductWorkspace() {
         message: chatDraft.trim(),
         attachmentUrl,
         attachmentType,
+        memoryMode: chatMemoryMode,
       });
       setChatDraft("");
       setChatAttachment(null);
@@ -627,6 +649,10 @@ export function ProductWorkspace() {
                             <option value="test_result">Test result</option>
                             <option value="design_mockup">Design mockup</option>
                           </select>
+                          <div className="flex flex-wrap items-center gap-2">
+                            <TemporaryMemoryMenu value={uploadMemoryMode} onChange={setUploadMemoryMode} />
+                            <span className="text-xs text-slate-400">{getTemporaryMemorySummary(uploadMemoryMode)}</span>
+                          </div>
                           <input value={uploadNote} onChange={(event) => setUploadNote(event.target.value)} placeholder="Upload note" className="w-full rounded-xl border border-slate-800 bg-slate-950 px-4 py-3 text-white" />
                           <label className="flex cursor-pointer items-center gap-2 rounded-xl border border-dashed border-slate-700 px-4 py-4 text-sm text-slate-300">
                             <Upload className="h-4 w-4" />
@@ -651,6 +677,11 @@ export function ProductWorkspace() {
                           <div key={upload._id} className="flex items-center justify-between rounded-2xl border border-slate-800 bg-slate-950/70 p-4">
                             <div>
                               <div className="font-semibold text-white">{upload.fileName}</div>
+                              {isTemporaryMemory(upload.memoryMode) ? (
+                                <div className="mt-1 text-[11px] text-amber-300/80">
+                                  Temporary memory - {formatTemporaryMemoryExpiry(upload.expiresAt)}
+                                </div>
+                              ) : null}
                               <div className="text-xs text-slate-500">{upload.category ?? "other"} • {dt(upload.uploadedAt)}</div>
                             </div>
                             <div className="flex gap-2">
@@ -688,11 +719,15 @@ export function ProductWorkspace() {
                     <div className="space-y-4">
                       <div className="flex items-center justify-between">
                         <div className="text-sm text-slate-400">Team chat and invited mentor/investor participants</div>
-                        <button onClick={() => setShowNegotiationPanel((value) => !value)} className="inline-flex items-center gap-2 rounded-xl border border-amber-800/40 bg-amber-950/20 px-4 py-2 text-sm font-semibold text-amber-200">
-                          <Users2 className="h-4 w-4" />
-                          Chat Access
-                        </button>
+                        <div className="flex flex-wrap items-center gap-2">
+                          <TemporaryMemoryMenu value={chatMemoryMode} onChange={setChatMemoryMode} align="end" />
+                          <button onClick={() => setShowNegotiationPanel((value) => !value)} className="inline-flex items-center gap-2 rounded-xl border border-amber-800/40 bg-amber-950/20 px-4 py-2 text-sm font-semibold text-amber-200">
+                            <Users2 className="h-4 w-4" />
+                            Chat Access
+                          </button>
+                        </div>
                       </div>
+                      <div className="text-xs text-slate-500">{getTemporaryMemorySummary(chatMemoryMode)}</div>
                       <div className="h-[360px] space-y-3 overflow-y-auto rounded-2xl border border-slate-800 bg-slate-950/70 p-4">
                         {chat.messages.map((message) => {
                           const sender = teamMembers.find((member) => member._id === message.senderId) ?? (workspace.chatParticipants ?? []).find((participant) => participant.userId === message.senderId);
@@ -702,6 +737,11 @@ export function ProductWorkspace() {
                               <div className="mb-1 text-xs text-slate-500">{isOwn ? "You" : sender?.displayName ?? "Member"} • {dt(message.sentAt)}</div>
                               {message.message ? <div className="text-sm text-slate-200">{message.message}</div> : null}
                               {message.attachmentUrl ? <a href={message.attachmentUrl} target="_blank" rel="noreferrer" className="mt-2 inline-flex text-xs text-sky-300">{message.attachmentType === "image" ? "Open image" : "Open PDF"}</a> : null}
+                              {isTemporaryMemory(message.memoryMode) ? (
+                                <div className="mt-2 text-[11px] text-amber-300/80">
+                                  Temporary memory - {formatTemporaryMemoryExpiry(message.expiresAt)}
+                                </div>
+                              ) : null}
                             </div>
                           );
                         })}

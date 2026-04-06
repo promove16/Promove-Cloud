@@ -26,6 +26,7 @@ import {
   MarketplaceStartupItem,
   MarketplaceUserDetail,
   marketplaceApi,
+  normalizeMarketplaceEntityType,
 } from "../../api/marketplace.api";
 import { useAuthStore } from "../../store/authStore";
 import { UserRole } from "../../types/roles.types";
@@ -42,13 +43,11 @@ const dateFormatter = new Intl.DateTimeFormat("en-IN", {
   year: "numeric",
 });
 
-const validEntityTypes = new Set<MarketplaceEntityType>(["mentor", "investor", "recruiter", "startup"]);
-
 const getDashboardRole = (role?: UserRole) => role ?? UserRole.STUDENT;
 
 const formatDate = (value?: string) => (value ? dateFormatter.format(new Date(value)) : "Not specified");
 
-const formatRole = (value: string) => value.charAt(0).toUpperCase() + value.slice(1);
+const formatRole = (value: string) => (value === "recruiter" ? "HR" : value.charAt(0).toUpperCase() + value.slice(1));
 
 const isStartupDetail = (entity: MarketplaceEntityDetail): entity is MarketplaceStartupDetail => entity.entityType === "startup";
 
@@ -78,10 +77,7 @@ export function MarketplaceDetail() {
   const { entityType: entityTypeParam, entityId } = useParams();
 
   const entityType = useMemo(
-    () =>
-      entityTypeParam && validEntityTypes.has(entityTypeParam as MarketplaceEntityType)
-        ? (entityTypeParam as MarketplaceEntityType)
-        : null,
+    () => normalizeMarketplaceEntityType(entityTypeParam) ?? null,
     [entityTypeParam],
   );
 
@@ -430,7 +426,7 @@ function ProfileDetailView({
                       <div>
                         <div className="text-lg font-semibold text-white">{experience.title}</div>
                         <div className="mt-1 text-sm text-cyan-200">
-                          {experience.company} - {experience.type.replaceAll("_", " ")}
+                          {experience.company} - {experience.type.replace(/_/g, " ")}
                         </div>
                         <div className="mt-2 flex flex-wrap gap-2 text-xs text-slate-400">
                           {experience.location ? <span>{experience.location}</span> : null}

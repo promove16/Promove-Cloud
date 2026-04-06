@@ -1,5 +1,4 @@
 import { Types } from 'mongoose';
-import { ALLOWED_CONNECTIONS } from '../../middleware/connectionGuard';
 import { ApiError } from '../../utils/ApiError';
 import { User } from '../user/user.model';
 import { UserRole } from '../../types/roles.types';
@@ -166,6 +165,33 @@ const MARKETPLACE_USER_ROLES = new Set<MarketplaceEntityType>([
 const compactString = (value?: string | null) => {
   const trimmed = value?.trim();
   return trimmed ? trimmed : undefined;
+};
+
+const escapeRegex = (value: string) => value.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+
+const buildUserSearchQuery = (search?: string) => {
+  const normalizedSearch = compactString(search);
+
+  if (!normalizedSearch) {
+    return {};
+  }
+
+  const regex = new RegExp(escapeRegex(normalizedSearch), 'i');
+
+  return {
+    $or: [
+      { displayName: regex },
+      { domain: regex },
+      { bio: regex },
+      { headline: regex },
+      { location: regex },
+      { 'skills.name': regex },
+      { 'experience.title': regex },
+      { 'experience.company': regex },
+      { 'portfolioProjects.title': regex },
+      { 'portfolioProjects.techStack': regex },
+    ],
+  };
 };
 
 const mapLinkSet = (user: PublicUser): PublicLinkSet | undefined => {
@@ -382,24 +408,20 @@ const attachUserCardMetadata = (
 });
 
 export const listMarketplaceUsers = async (
-  requesterRole: UserRole,
+  _requesterRole: UserRole,
   role: MarketplaceEntityType,
-  domain?: string,
+  search?: string,
   page = 1,
   limit = 20,
 ) => {
   if (role === 'startup') {
-    return listMarketplaceStartups(domain, page, limit);
-  }
-
-  if (!(ALLOWED_CONNECTIONS[requesterRole] ?? []).includes(role)) {
-    throw new ApiError(403, 'CONNECTION_FORBIDDEN', `Your role cannot connect with ${role}`);
+    return listMarketplaceStartups(search, page, limit);
   }
 
   const users = await User.find({
     role,
     isActive: true,
-    ...(domain ? { domain: new RegExp(domain, 'i') } : {}),
+    ...buildUserSearchQuery(search),
   })
     .select(
       'displayName avatar role domain bio headline location websiteUrl githubUrl linkedinUrl skills experience education portfolioProjects githubStats lastLogin',
@@ -488,7 +510,7 @@ const listMarketplaceStartups = async (search?: string, page = 1, limit = 20) =>
   );
 };
 
-const getMarketplaceUserDetail = async (requesterRole: UserRole, userId: string) => {
+const getMarketplaceUserDetail = async (_requesterRole: UserRole, userId: string) => {
   const user = await User.findById(userId)
     .select(
       'displayName avatar role domain bio headline location websiteUrl githubUrl linkedinUrl skills experience education portfolioProjects githubStats',
@@ -497,10 +519,6 @@ const getMarketplaceUserDetail = async (requesterRole: UserRole, userId: string)
 
   if (!user) {
     throw new ApiError(404, 'USER_NOT_FOUND', 'User not found');
-  }
-
-  if (!(ALLOWED_CONNECTIONS[requesterRole] ?? []).includes(user.role)) {
-    throw new ApiError(403, 'CONNECTION_FORBIDDEN', `Your role cannot connect with ${user.role}`);
   }
 
   const [jobs, startups] = await Promise.all([
@@ -600,7 +618,7 @@ const getMarketplaceStartupDetail = async (startupId: string) => {
 };
 
 export const getMarketplaceEntity = async (
-  requesterRole: UserRole,
+  _requesterRole: UserRole,
   entityType: MarketplaceEntityType,
   entityId: string,
 ) => {
@@ -612,7 +630,7 @@ export const getMarketplaceEntity = async (
     throw new ApiError(400, 'INVALID_MARKETPLACE_ENTITY', 'Unsupported marketplace entity');
   }
 
-  return getMarketplaceUserDetail(requesterRole, entityId);
+  return getMarketplaceUserDetail(_requesterRole, entityId);
 };
 
 export const getMarketplaceUser = async (requesterRole: UserRole, userId: string) =>

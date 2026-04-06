@@ -10,19 +10,43 @@ const router = Router();
 router.get(
   '/',
   authenticate,
-  authorize(UserRole.STUDENT, UserRole.SCHOOL, UserRole.COLLEGE),
+  authorize(
+    UserRole.STUDENT,
+    UserRole.SCHOOL,
+    UserRole.COLLEGE,
+    UserRole.MENTOR,
+    UserRole.INVESTOR,
+    UserRole.RECRUITER,
+    UserRole.ADMIN,
+  ),
   asyncHandler(getMarketplace),
 );
 router.get(
   '/entities/:entityType/:entityId',
   authenticate,
-  authorize(UserRole.STUDENT, UserRole.SCHOOL, UserRole.COLLEGE),
+  authorize(
+    UserRole.STUDENT,
+    UserRole.SCHOOL,
+    UserRole.COLLEGE,
+    UserRole.MENTOR,
+    UserRole.INVESTOR,
+    UserRole.RECRUITER,
+    UserRole.ADMIN,
+  ),
   asyncHandler(getMarketplaceEntityDetail),
 );
 router.get(
   '/:userId',
   authenticate,
-  authorize(UserRole.STUDENT, UserRole.SCHOOL, UserRole.COLLEGE),
+  authorize(
+    UserRole.STUDENT,
+    UserRole.SCHOOL,
+    UserRole.COLLEGE,
+    UserRole.MENTOR,
+    UserRole.INVESTOR,
+    UserRole.RECRUITER,
+    UserRole.ADMIN,
+  ),
   asyncHandler(getMarketplaceProfile),
 );
 

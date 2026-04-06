@@ -94,7 +94,14 @@ export const uploadWorkspaceAsset = async (req: Request, res: Response) => {
     throw new ApiError(400, 'FILE_REQUIRED', 'A file is required');
   }
   const workspaceId = getParam(req.params.id, 'WORKSPACE_REQUIRED', 'Workspace id is required');
-  const uploads = await uploadWorkspaceFile(workspaceId, userId, req.file, req.body.note, req.body.category);
+  const uploads = await uploadWorkspaceFile(
+    workspaceId,
+    userId,
+    req.file,
+    req.body.note,
+    req.body.category,
+    req.body.memoryMode,
+  );
   res.json(new ApiResponse(uploads));
 };
 

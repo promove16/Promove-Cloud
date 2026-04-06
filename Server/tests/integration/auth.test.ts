@@ -826,5 +826,23 @@ describe('auth integration', () => {
         }),
       );
     });
+
+    it('does not require terms acceptance for admins', async () => {
+      const { email } = await createApprovedUser({
+        role: UserRole.ADMIN,
+        email: `admin-${randomUUID()}@example.com`,
+        displayName: 'Terms Admin',
+      });
+
+      const loginResponse = await request(app).post('/api/auth/login').send({
+        email,
+        password: PASSWORD,
+      });
+
+      expect(loginResponse.status).toBe(200);
+      expect(loginResponse.body.data.user.termsAcceptance).toBeNull();
+      expect(loginResponse.body.data.user.hasAcceptedCurrentTerms).toBe(true);
+      expect(loginResponse.body.data.user.termsCurrentVersion).toBe('2026-04-06');
+    });
   });
 });

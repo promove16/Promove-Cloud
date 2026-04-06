@@ -117,6 +117,7 @@ export function TermsAcceptanceGate() {
     isLoading ||
     !isAuthenticated ||
     !user ||
+    user.role === UserRole.ADMIN ||
     user.hasAcceptedCurrentTerms ||
     !content
   ) {

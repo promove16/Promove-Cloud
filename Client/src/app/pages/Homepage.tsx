@@ -46,7 +46,7 @@ const platformModules = [
   { title: "Product Workspace", desc: "Build and collaborate on your product", icon: Lightbulb, link: "/product-workspace" },
   { title: "Patent Support", desc: "File patents with ease", icon: Award, link: "/patent-support" },
   { title: "Startup Launch", desc: "Launch your startup", icon: Rocket, link: "/startup-launch" },
-  { title: "Leadership Profile", desc: "Track your innovation journey", icon: Users, link: "/leadership-profile" },
+  { title: "Portfolio", desc: "Track your innovation journey", icon: Users, link: "/portfolio" },
 ];
 
 const stats = [

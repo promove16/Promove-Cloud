@@ -299,8 +299,8 @@ export function StudentDashboard() {
       <div className="rounded-2xl border border-slate-800 bg-slate-900 p-6">
         <div className="mb-6 flex items-center justify-between">
           <h3 className="text-xl font-bold text-white">Your Portfolio</h3>
-          <Link to="/leadership-profile" className="text-sm font-semibold text-blue-400 hover:text-blue-300">
-            View Leadership Profile
+          <Link to="/portfolio" className="text-sm font-semibold text-blue-400 hover:text-blue-300">
+            View Portfolio
           </Link>
         </div>
         <div className="grid gap-4 md:grid-cols-2">

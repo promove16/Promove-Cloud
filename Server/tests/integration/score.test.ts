@@ -110,6 +110,41 @@ describe('score integration', () => {
       startupsLaunched: 0,
       awardsApproved: 0,
     });
+    expect(response.body.data.breakdownDetails).toEqual([
+      expect.objectContaining({
+        trigger: 'PROGRESS_UPLOADED',
+        label: 'Progress Uploads',
+        occurrences: 1,
+        pointsPerOccurrence: 3,
+        totalPoints: 15,
+        repeatable: true,
+      }),
+      expect.objectContaining({
+        trigger: 'PROBLEM_CLAIMED',
+        label: 'Problems Claimed',
+        occurrences: 1,
+        pointsPerOccurrence: 5,
+        totalPoints: 5,
+        repeatable: true,
+      }),
+    ]);
+    expect(response.body.data.improvementTips).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({
+          trigger: 'ONBOARDING_GITHUB',
+          label: 'Finish GitHub onboarding',
+          points: 30,
+          category: 'quick_win',
+        }),
+        expect.objectContaining({
+          trigger: 'MARKET_READY_VERIFIED',
+          label: 'Reach market-ready verification',
+          points: 30,
+          category: 'milestone',
+        }),
+      ]),
+    );
+    expect(response.body.data.untrackedPoints).toBe(340);
 
     const updatedUser = await User.findById(user._id).lean();
     expect(updatedUser?.innovationScore).toBe(360);
