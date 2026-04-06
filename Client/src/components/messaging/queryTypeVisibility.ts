@@ -1,9 +1,10 @@
 import { QueryType } from '../../api/dm.api';
 
-export type AssociationQueryType = Extract<QueryType, 'project_mentor' | 'investor' | 'recruiter'>;
+export type AssociationQueryType = Extract<QueryType, 'project_mentor' | 'project_join' | 'investor' | 'recruiter'>;
 
 const associationRoleMap: Record<AssociationQueryType, string[]> = {
   project_mentor: ['mentor'],
+  project_join: ['student'],
   investor: ['investor'],
   recruiter: ['recruiter'],
 };
@@ -18,7 +19,10 @@ export const normalizeMessagingRole = (role?: string | null) => {
 };
 
 export const isAssociationQueryType = (queryType: QueryType): queryType is AssociationQueryType =>
-  queryType === 'project_mentor' || queryType === 'investor' || queryType === 'recruiter';
+  queryType === 'project_mentor' ||
+  queryType === 'project_join' ||
+  queryType === 'investor' ||
+  queryType === 'recruiter';
 
 export const getVisibleAssociationQueryTypes = (recipientRole?: string | null): AssociationQueryType[] => {
   const normalizedRole = normalizeMessagingRole(recipientRole);

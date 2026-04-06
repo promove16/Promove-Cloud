@@ -17,7 +17,6 @@ router.get(
     UserRole.MENTOR,
     UserRole.INVESTOR,
     UserRole.RECRUITER,
-    UserRole.ADMIN,
   ),
   asyncHandler(getMarketplace),
 );
@@ -31,7 +30,6 @@ router.get(
     UserRole.MENTOR,
     UserRole.INVESTOR,
     UserRole.RECRUITER,
-    UserRole.ADMIN,
   ),
   asyncHandler(getMarketplaceEntityDetail),
 );
@@ -45,7 +43,6 @@ router.get(
     UserRole.MENTOR,
     UserRole.INVESTOR,
     UserRole.RECRUITER,
-    UserRole.ADMIN,
   ),
   asyncHandler(getMarketplaceProfile),
 );

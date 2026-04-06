@@ -10,38 +10,11 @@ export interface ScoreBreakdown {
   awardsApproved: number;
 }
 
-export interface ScoreBreakdownDetail {
-  trigger: ScoreEvent['trigger'];
-  label: string;
-  description: string;
-  occurrences: number;
-  pointsPerOccurrence: number;
-  totalPoints: number;
-  repeatable: boolean;
-  actionPath?: string;
-  lastAwardedAt: string | null;
-}
-
-export interface ScoreImprovementTip {
-  trigger: ScoreEvent['trigger'];
-  label: string;
-  description: string;
-  points: number;
-  repeatable: boolean;
-  actionPath?: string;
-  category: 'quick_win' | 'milestone' | 'consistency';
-  currentCount: number;
-  alreadyClaimed: boolean;
-}
-
 export interface ScoreResponse {
   score: number;
   breakdown: ScoreBreakdown;
   weeklyDelta: number;
   rankPercentile: number;
-  breakdownDetails: ScoreBreakdownDetail[];
-  improvementTips: ScoreImprovementTip[];
-  untrackedPoints: number;
 }
 
 export interface ScoreEvent {

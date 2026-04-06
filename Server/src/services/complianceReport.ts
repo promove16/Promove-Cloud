@@ -17,6 +17,7 @@ import { PlacementRecord } from '../modules/college/placementRecord.model';
 import { getStudentLeaderboard } from '../modules/school/school.service';
 import { UserRole } from '../types/roles.types';
 import { Workspace } from '../modules/workspace/workspace.model';
+import { MAX_INNOVATION_SCORE } from '../modules/innovationScore/score.utils';
 
 cloudinary.config({
   cloud_name: env.CLOUDINARY_CLOUD_NAME,
@@ -328,7 +329,10 @@ const buildSchoolDocument = (metrics: ReportMetrics) => {
 
   drawSectionTitle(doc, 'SECTION IV: TOP 5 STUDENT INNOVATORS');
   metrics.topStudents.forEach((student) => {
-    doc.fillColor('#E2E8F0').fontSize(11).text(`${student.rank}. ${student.name} - ${student.score}/1000`);
+    doc
+      .fillColor('#E2E8F0')
+      .fontSize(11)
+      .text(`${student.rank}. ${student.name} - ${student.score}/${MAX_INNOVATION_SCORE}`);
   });
 
   addFooter(doc);

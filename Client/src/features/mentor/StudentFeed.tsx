@@ -8,8 +8,8 @@ import { Badge } from '../../components/ui/Badge';
 import { Button } from '../../components/ui/Button';
 import { Card } from '../../components/ui/Card';
 import { Input } from '../../components/ui/Input';
-import { StudentProfileDrawer } from './StudentProfileDrawer';
 import { MAX_INNOVATION_SCORE } from '../../constants/score';
+import { StudentProfileDrawer } from './StudentProfileDrawer';
 
 type SessionFormState = {
   studentId: string;

@@ -11,7 +11,7 @@ import { UserRole } from '../../types/roles.types';
 import { normalizeInnovationScore } from '../innovationScore/score.utils';
 import { Workspace } from '../workspace/workspace.model';
 import type { StartupDocumentCategory, StartupReadiness } from './startup.types';
-import { calculateStartupInnovationScore } from './startupScore.utils';
+
 const pdfFileNamePattern = /\.pdf$/i;
 
 const STARTUP_DOCUMENT_CATEGORIES = [
@@ -467,6 +467,86 @@ const formatReadinessErrorMessage = (readiness: StartupReadiness) => {
     : `Startup profile is incomplete for review. Complete: ${topItems}.`;
 };
 
+const completionScore = (checks: boolean[], maxScore: number) => {
+  if (checks.length === 0) {
+    return 0;
+  }
+
+  const completed = checks.filter(Boolean).length;
+  return Math.round((completed / checks.length) * maxScore);
+};
+
+const calculateStartupInnovationScore = (startup: Record<string, any>) => {
+  const readiness = buildStartupReadiness(startup as never);
+  const businessProfile = startup.businessProfile ?? {};
+  const registrationProfile = startup.registrationProfile ?? {};
+  const traction = startup.traction ?? {};
+  const requiredDocuments = readiness.requiredDocumentCategories ?? [];
+  const uploadedDocuments = new Set(readiness.uploadedDocumentCategories ?? []);
+  const uploadedRequiredDocuments =
+    requiredDocuments.length > 0
+      ? requiredDocuments.filter((category) => uploadedDocuments.has(category)).length
+      : 0;
+  const businessPitchReady =
+    Boolean(startup.pitchDeckUrl) || uploadedDocuments.has('business_plan');
+
+  const businessScore = completionScore(
+    [
+      Boolean(startup.name?.trim()),
+      Boolean(startup.tagline?.trim()),
+      Boolean(startup.category?.trim()),
+      Boolean(businessProfile.problemStatement?.trim()),
+      Boolean(businessProfile.solutionSummary?.trim()),
+      Boolean(businessProfile.targetCustomers?.trim()),
+      Boolean(businessProfile.marketAnalysis?.trim()),
+      Boolean(businessProfile.revenueModel?.trim()),
+      Boolean(businessProfile.goToMarketPlan?.trim()),
+    ],
+    250,
+  );
+
+  const registrationScore = completionScore(
+    [
+      Boolean(registrationProfile.problemStatement?.trim()),
+      Boolean(registrationProfile.solutionDifferentiation?.trim()),
+      Boolean(registrationProfile.coreInnovation?.trim()),
+      Boolean(registrationProfile.priorArtStatus?.trim()),
+      Boolean(registrationProfile.workingMechanism?.trim()),
+      Boolean(registrationProfile.keyComponents?.trim()),
+      Boolean(registrationProfile.developmentStage?.trim()),
+      Boolean(registrationProfile.documentationReadiness?.trim()),
+      Boolean(registrationProfile.developmentContext?.trim()),
+      Boolean(registrationProfile.targetMarkets?.trim()),
+      Boolean(registrationProfile.publicDisclosureStatus?.trim()),
+      Boolean(registrationProfile.legalAgreements?.trim()),
+    ],
+    250,
+  );
+
+  const documentationScore =
+    Math.round(
+      ((requiredDocuments.length > 0 ? uploadedRequiredDocuments / requiredDocuments.length : 1) * 100),
+    ) + (businessPitchReady ? 50 : 0);
+
+  const tractionScore =
+    (traction.patentFiled ? 60 : 0) +
+    (traction.mvpBuilt ? 90 : 0) +
+    (traction.revenueGenerating ? 70 : 0) +
+    Math.round((Math.min(traction.usersCount ?? 0, 1000) / 1000) * 30);
+
+  const teamScore = Math.min(
+    100,
+    Math.min(startup.founderIds?.length ?? 0, 4) * 15 +
+      Math.min(startup.teamSize ?? startup.founderIds?.length ?? 0, 8) * 5 +
+      (readiness.isReviewReady ? 20 : 0) +
+      (startup.reviewStatus === 'approved' ? 20 : 0),
+  );
+
+  return normalizeInnovationScore(
+    businessScore + registrationScore + documentationScore + tractionScore + teamScore,
+  );
+};
+
 const sanitizeStartupForClient = (startup: Record<string, any>) => ({
   ...startup,
   documents: (startup.documents ?? []).map((document: Record<string, any>) => ({
@@ -495,7 +575,6 @@ export const createStartupProfile = async (userId: string, payload: z.infer<type
   const startupPayload = await applyWorkspaceContextToStartupPayload(userId, normalizedPayload);
 
   const startup = await Startup.create({
-    innovationScore: calculateStartupInnovationScore(startupPayload),
     ...startupPayload,
   });
 
@@ -583,12 +662,7 @@ export const updateStartupProfile = async (
     startup.reviewStatus = 'draft';
     clearReviewMetadata(startup);
   }
-  startup.innovationScore = calculateStartupInnovationScore({
-    stage: startup.stage,
-    teamSize: startup.teamSize,
-    activeProducts: startup.activeProducts,
-    traction: startup.traction,
-  });
+
   await startup.save();
   return serializeStartup(startup);
 };
@@ -639,21 +713,16 @@ export const launchStartup = async (
     );
   }
 
+  const score = calculateStartupInnovationScore(startup.toObject());
+
   startup.launchedToInvestors = payload.launchTo === 'investors' || payload.launchTo === 'both';
   startup.launchedToMentors = payload.launchTo === 'mentors' || payload.launchTo === 'both';
   startup.launchedToRecruiters = payload.launchTo === 'recruiters';
   startup.launchedAt = new Date();
+  startup.innovationScoreAtLaunch = score;
   if (payload.launchTo !== 'recruiters') {
     startup.stage = 'Launched';
   }
-  const startupScore = calculateStartupInnovationScore({
-    stage: startup.stage,
-    teamSize: startup.teamSize,
-    activeProducts: startup.activeProducts,
-    traction: startup.traction,
-  });
-  startup.innovationScore = startupScore;
-  startup.innovationScoreAtLaunch = startupScore;
   await startup.save();
 
   if (payload.launchTo === 'recruiters') {

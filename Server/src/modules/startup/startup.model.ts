@@ -108,7 +108,6 @@ const startupSchema = new Schema<IStartup>(
     launchedToMentors: { type: Boolean, default: false },
     launchedToRecruiters: { type: Boolean, default: false },
     launchedAt: { type: Date, default: undefined },
-    innovationScore: { type: Number, default: 0 },
     innovationScoreAtLaunch: { type: Number, default: 0 },
     totalShares: { type: Number, default: 1000, min: 1 },
     availableShares: { type: Number, default: 1000, min: 0 },
@@ -139,8 +138,7 @@ const startupSchema = new Schema<IStartup>(
 
 startupSchema.index({ teamMemberIds: 1 });
 startupSchema.index({ launchedToInvestors: 1, innovationScoreAtLaunch: -1 });
-startupSchema.index({ launchedToInvestors: 1, innovationScore: -1 });
-startupSchema.index({ launchedToMentors: 1, innovationScore: -1 });
+startupSchema.index({ launchedToMentors: 1 });
 startupSchema.index({ launchedToRecruiters: 1 });
 startupSchema.index({ reviewStatus: 1, updatedAt: -1 });
 

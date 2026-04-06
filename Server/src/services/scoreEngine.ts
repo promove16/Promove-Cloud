@@ -8,25 +8,25 @@ import { ScoreEvent } from '../modules/innovationScore/score.model';
 import { normalizeInnovationScore } from '../modules/innovationScore/score.utils';
 
 export const SCORE_DELTAS = {
-  PROBLEM_CLAIMED:         5,
-  PROBLEM_COMPLETED:       20,
-  SKILL_COMPLETED:         8,
-  PROGRESS_UPLOADED:       3,
-  PATENT_SUBMITTED:        15,
-  PATENT_APPROVED:         25,
-  MVP_VERIFIED:            20,
-  MARKET_READY_VERIFIED:   30,
-  STARTUP_LAUNCHED:        10,
+  PROBLEM_CLAIMED:         25,
+  PROBLEM_COMPLETED:       100,
+  SKILL_COMPLETED:         40,
+  PROGRESS_UPLOADED:       15,
+  PATENT_SUBMITTED:        75,
+  PATENT_APPROVED:         125,
+  MVP_VERIFIED:            100,
+  MARKET_READY_VERIFIED:   150,
+  STARTUP_LAUNCHED:        50,
   AWARD_SUBMITTED:         0,
-  AWARD_APPROVED:          15,
-  GITHUB_CONNECTED:        5,
-  LINKEDIN_CONNECTED:      5,
-  RESUME_UPLOADED:         3,
-  PROFILE_COMPLETE:        10,
-  ONBOARDING_PROFILE:      10,
-  ONBOARDING_PROJECT:      20,
-  ONBOARDING_GITHUB:       30,
-  ONBOARDING_SHARE:        10,
+  AWARD_APPROVED:          75,
+  GITHUB_CONNECTED:        25,
+  LINKEDIN_CONNECTED:      25,
+  RESUME_UPLOADED:         15,
+  PROFILE_COMPLETE:        50,
+  ONBOARDING_PROFILE:      50,
+  ONBOARDING_PROJECT:      100,
+  ONBOARDING_GITHUB:       150,
+  ONBOARDING_SHARE:        50,
 } as const;
 
 export type ScoreTrigger = keyof typeof SCORE_DELTAS;
@@ -53,7 +53,7 @@ const BREAKDOWN_FIELD_MAP: Record<ScoreTrigger, keyof IUser['scoreBreakdown'] | 
   ONBOARDING_SHARE:       null,
 };
 
-export const ONE_TIME_SCORE_TRIGGERS: ScoreTrigger[] = [
+const ONE_TIME_SCORE_TRIGGERS: ScoreTrigger[] = [
   'GITHUB_CONNECTED',
   'LINKEDIN_CONNECTED',
   'RESUME_UPLOADED',

@@ -3,7 +3,6 @@ import { useQuery } from '@tanstack/react-query';
 import { chatApi } from '../api/chat.api';
 import { getChatSocket } from '../lib/socket';
 import { ChatMessage } from '../types/workspace.types';
-import { TemporaryMemoryMode } from '../lib/temporaryMemory';
 
 export const useWorkspaceChat = (workspaceId?: string) => {
   const [liveMessages, setLiveMessages] = useState<ChatMessage[]>([]);
@@ -107,7 +106,6 @@ export const useWorkspaceChat = (workspaceId?: string) => {
     message: string;
     attachmentUrl?: string;
     attachmentType?: 'pdf' | 'image';
-    memoryMode?: TemporaryMemoryMode;
   }) => {
     const socket = getChatSocket();
     if (!socket.connected) {

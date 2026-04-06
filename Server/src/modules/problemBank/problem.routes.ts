@@ -13,10 +13,44 @@ import {
 
 const router = Router();
 
-router.use(authenticate, authorize(UserRole.STUDENT));
-router.get('/', asyncHandler(getProblems));
-router.get('/:id', asyncHandler(getProblem));
-router.get('/:id/leaderboard', asyncHandler(getProblemLeaderboardController));
+router.use(authenticate);
+router.get(
+  '/',
+  authorize(
+    UserRole.STUDENT,
+    UserRole.SCHOOL,
+    UserRole.COLLEGE,
+    UserRole.MENTOR,
+    UserRole.INVESTOR,
+    UserRole.RECRUITER,
+  ),
+  asyncHandler(getProblems),
+);
+router.get(
+  '/:id',
+  authorize(
+    UserRole.STUDENT,
+    UserRole.SCHOOL,
+    UserRole.COLLEGE,
+    UserRole.MENTOR,
+    UserRole.INVESTOR,
+    UserRole.RECRUITER,
+  ),
+  asyncHandler(getProblem),
+);
+router.get(
+  '/:id/leaderboard',
+  authorize(
+    UserRole.STUDENT,
+    UserRole.SCHOOL,
+    UserRole.COLLEGE,
+    UserRole.MENTOR,
+    UserRole.INVESTOR,
+    UserRole.RECRUITER,
+  ),
+  asyncHandler(getProblemLeaderboardController),
+);
+router.use(authorize(UserRole.STUDENT));
 router.post('/:id/claim', asyncHandler(claimProblemController));
 router.post('/:id/review-request', asyncHandler(requestProblemReviewController));
 

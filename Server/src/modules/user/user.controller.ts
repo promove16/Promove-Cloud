@@ -2,10 +2,10 @@ import { Request, Response } from 'express';
 import { ApiResponse } from '../../utils/ApiResponse';
 import { ApiError } from '../../utils/ApiError';
 import {
-  beginGithubOauthForCurrentUser,
-  connectGithubForCurrentUserFromCallback,
   acceptCurrentTerms,
   acceptTermsSchema,
+  beginGithubOauthForCurrentUser,
+  connectGithubForCurrentUserFromCallback,
   enrichCurrentUserFromSocialLinks,
   getCurrentUser,
   getPublicStudentProfileBySlug,

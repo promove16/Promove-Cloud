@@ -3,11 +3,6 @@ import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { dmApi, DMMessage, DMPartner, QueryType } from '../api/dm.api';
 import { getDmSocket } from '../lib/socket';
 import { useAuthStore } from '../store/authStore';
-import {
-  TemporaryMemoryMode,
-  TEMPORARY_MEMORY_RETENTION_HOURS,
-  isTemporaryMemory,
-} from '../lib/temporaryMemory';
 
 const normalizeQueryType = (queryType?: QueryType) => queryType ?? 'general';
 
@@ -21,8 +16,7 @@ const isSameOutgoingMessage = (left: DMMessage, right: DMMessage) =>
   left.meetLink === right.meetLink &&
   left.attachmentUrl === right.attachmentUrl &&
   left.attachmentType === right.attachmentType &&
-  left.attachmentName === right.attachmentName &&
-  left.memoryMode === right.memoryMode;
+  left.attachmentName === right.attachmentName;
 
 export const useDM = (partnerId?: string) => {
   const queryClient = useQueryClient();
@@ -170,7 +164,7 @@ export const useDM = (partnerId?: string) => {
 
   // Secure send - use ref for current partnerId
   const sendMessage = useCallback(
-    (payload: { message?: string; messageType?: 'text' | 'interview_request'; scheduledAt?: string; meetLink?: string; queryType?: QueryType; attachmentUrl?: string; attachmentType?: 'image' | 'pdf'; attachmentName?: string; attachmentPublicId?: string; memoryMode?: TemporaryMemoryMode }) => {
+    (payload: { message?: string; messageType?: 'text' | 'interview_request'; scheduledAt?: string; meetLink?: string; queryType?: QueryType; attachmentUrl?: string; attachmentType?: 'image' | 'pdf'; attachmentName?: string }) => {
       const currentPartnerId = partnerIdRef.current;
       if (!currentPartnerId) {
         console.error('[DM] Cannot send: no partnerId');
@@ -190,11 +184,6 @@ export const useDM = (partnerId?: string) => {
           attachmentUrl: payload.attachmentUrl,
           attachmentType: payload.attachmentType,
           attachmentName: payload.attachmentName,
-          attachmentPublicId: payload.attachmentPublicId,
-          memoryMode: payload.memoryMode ?? 'standard',
-          expiresAt: isTemporaryMemory(payload.memoryMode)
-            ? new Date(Date.now() + TEMPORARY_MEMORY_RETENTION_HOURS * 60 * 60 * 1000).toISOString()
-            : undefined,
           readAt: null,
           sentAt: new Date().toISOString(),
           isOptimistic: true,

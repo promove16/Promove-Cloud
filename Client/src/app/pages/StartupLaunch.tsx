@@ -17,7 +17,6 @@ import { getStartupSectionPath, normalizeStartupRouteId } from "../../features/s
 import { Card } from "../../components/ui/Card";
 import { Spinner } from "../../components/ui/Spinner";
 import type { StartupDocumentCategory, StartupRegistrationProfile } from "../../types/startup.types";
-import { MAX_INNOVATION_SCORE } from "../../constants/score";
 
 const createEmptyPayload = (): StartupPayload => ({
   name: "",
@@ -391,12 +390,7 @@ export function StartupLaunch() {
           : "Draft";
   const summaryStats = [
     { label: "Team members", value: String(formTeamSize), icon: Users, tone: "text-cyan-300" },
-    {
-      label: "Startup score",
-      value: `${startup?.innovationScore ?? 0}/${MAX_INNOVATION_SCORE}`,
-      icon: TrendingUp,
-      tone: "text-emerald-300",
-    },
+    { label: "Launch score", value: String(startup?.innovationScoreAtLaunch ?? 0), icon: TrendingUp, tone: "text-emerald-300" },
     { label: "Active products", value: String(startup?.activeProducts ?? form.activeProducts), icon: Target, tone: "text-violet-300" },
     { label: "Status", value: profileStatusLabel, icon: CheckCircle, tone: "text-amber-300" },
   ] as const;
@@ -844,7 +838,7 @@ export function StartupLaunch() {
                     <li key={item}>{item}</li>
                   ))}
                   <li>Investor Outreach lets you shortlist investors and send pitch requests for this startup directly</li>
-                  <li>Launch to recruiters is available from Portfolio too</li>
+                  <li>Launch to recruiters is available from your Portfolio too</li>
                 </ul>
                 {readiness?.requiredDocumentCategories.length ? (
                   <div className="mt-4 rounded-xl border border-slate-800 bg-slate-950/70 px-4 py-3">

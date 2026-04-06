@@ -47,7 +47,6 @@ const createStartup = async (
     category: 'Software',
     stage: 'Launched',
     launchedToInvestors: true,
-    innovationScore: 395,
     innovationScoreAtLaunch: 88,
     traction: {
       patentFiled: false,

@@ -1,7 +1,6 @@
 "use strict";
 Object.defineProperty(exports, "__esModule", { value: true });
-exports.getMarketplaceUser = exports.getMarketplaceEntity = exports.listMarketplaceUsers = void 0;
-const connectionGuard_1 = require("../../middleware/connectionGuard");
+exports.getMarketplaceUser = exports.getMarketplaceEntity = exports.listMarketplaceUsers = exports.normalizeMarketplaceEntityType = void 0;
 const ApiError_1 = require("../../utils/ApiError");
 const user_model_1 = require("../user/user.model");
 const roles_types_1 = require("../../types/roles.types");
@@ -10,10 +9,36 @@ const recruiter_mappers_1 = require("../recruiter/recruiter.mappers");
 const startup_model_1 = require("../startup/startup.model");
 const workspace_model_1 = require("../workspace/workspace.model");
 const MARKETPLACE_USER_ROLES = new Set([
+    roles_types_1.UserRole.STUDENT,
     roles_types_1.UserRole.MENTOR,
     roles_types_1.UserRole.INVESTOR,
     roles_types_1.UserRole.RECRUITER,
 ]);
+const MARKETPLACE_BROWSABLE_ROLES = new Set([
+    roles_types_1.UserRole.STUDENT,
+    roles_types_1.UserRole.SCHOOL,
+    roles_types_1.UserRole.COLLEGE,
+    roles_types_1.UserRole.MENTOR,
+    roles_types_1.UserRole.INVESTOR,
+    roles_types_1.UserRole.RECRUITER,
+]);
+const MARKETPLACE_ENTITY_TYPES = new Set([
+    roles_types_1.UserRole.STUDENT,
+    roles_types_1.UserRole.MENTOR,
+    roles_types_1.UserRole.INVESTOR,
+    roles_types_1.UserRole.RECRUITER,
+    'startup',
+]);
+const normalizeMarketplaceEntityType = (value) => {
+    const normalized = value?.trim().toLowerCase();
+    if (!normalized) {
+        return undefined;
+    }
+    return MARKETPLACE_ENTITY_TYPES.has(normalized)
+        ? normalized
+        : undefined;
+};
+exports.normalizeMarketplaceEntityType = normalizeMarketplaceEntityType;
 const compactString = (value) => {
     const trimmed = value?.trim();
     return trimmed ? trimmed : undefined;
@@ -45,6 +70,7 @@ const mapPublicUser = (user) => ({
     displayName: user.displayName,
     ...(user.avatar ? { avatar: user.avatar } : {}),
     role: user.role,
+    innovationScore: user.innovationScore ?? 0,
     ...(compactString(user.domain) ? { domain: compactString(user.domain) } : {}),
     ...(compactString(user.bio) ? { bio: compactString(user.bio) } : {}),
     ...(compactString(user.headline) ? { headline: compactString(user.headline) } : {}),
@@ -208,18 +234,24 @@ const attachUserCardMetadata = (user, relatedCounts) => ({
     relatedCounts,
 });
 const listMarketplaceUsers = async (requesterRole, role, domain, page = 1, limit = 20) => {
+    if (!MARKETPLACE_ENTITY_TYPES.has(role)) {
+        throw new ApiError_1.ApiError(400, 'INVALID_MARKETPLACE_ENTITY', 'Unsupported marketplace entity');
+    }
+    if (requesterRole === roles_types_1.UserRole.RECRUITER && role !== roles_types_1.UserRole.STUDENT) {
+        throw new ApiError_1.ApiError(403, 'CONNECTION_FORBIDDEN', 'Recruiters can only browse student profiles in the marketplace');
+    }
     if (role === 'startup') {
         return listMarketplaceStartups(domain, page, limit);
     }
-    if (!(connectionGuard_1.ALLOWED_CONNECTIONS[requesterRole] ?? []).includes(role)) {
-        throw new ApiError_1.ApiError(403, 'CONNECTION_FORBIDDEN', `Your role cannot connect with ${role}`);
+    if (!MARKETPLACE_BROWSABLE_ROLES.has(requesterRole)) {
+        throw new ApiError_1.ApiError(403, 'CONNECTION_FORBIDDEN', 'Your role cannot browse the marketplace');
     }
     const users = await user_model_1.User.find({
         role,
         isActive: true,
         ...(domain ? { domain: new RegExp(domain, 'i') } : {}),
     })
-        .select('displayName avatar role domain bio headline location websiteUrl githubUrl linkedinUrl skills experience education portfolioProjects githubStats lastLogin')
+        .select('displayName avatar role innovationScore domain bio headline location websiteUrl githubUrl linkedinUrl skills experience education portfolioProjects githubStats lastLogin')
         .sort({ lastLogin: -1, updatedAt: -1 })
         .skip((page - 1) * limit)
         .limit(limit)
@@ -285,13 +317,13 @@ const listMarketplaceStartups = async (search, page = 1, limit = 20) => {
 };
 const getMarketplaceUserDetail = async (requesterRole, userId) => {
     const user = await user_model_1.User.findById(userId)
-        .select('displayName avatar role domain bio headline location websiteUrl githubUrl linkedinUrl skills experience education portfolioProjects githubStats')
+        .select('displayName avatar role innovationScore domain bio headline location websiteUrl githubUrl linkedinUrl skills experience education portfolioProjects githubStats')
         .lean();
     if (!user) {
         throw new ApiError_1.ApiError(404, 'USER_NOT_FOUND', 'User not found');
     }
-    if (!(connectionGuard_1.ALLOWED_CONNECTIONS[requesterRole] ?? []).includes(user.role)) {
-        throw new ApiError_1.ApiError(403, 'CONNECTION_FORBIDDEN', `Your role cannot connect with ${user.role}`);
+    if (!MARKETPLACE_BROWSABLE_ROLES.has(requesterRole) || !MARKETPLACE_USER_ROLES.has(user.role)) {
+        throw new ApiError_1.ApiError(403, 'CONNECTION_FORBIDDEN', 'This profile is not available in the marketplace');
     }
     const [jobs, startups] = await Promise.all([
         user.role === roles_types_1.UserRole.RECRUITER
@@ -371,6 +403,9 @@ const getMarketplaceStartupDetail = async (startupId) => {
     };
 };
 const getMarketplaceEntity = async (requesterRole, entityType, entityId) => {
+    if (requesterRole === roles_types_1.UserRole.RECRUITER && entityType !== roles_types_1.UserRole.STUDENT) {
+        throw new ApiError_1.ApiError(403, 'CONNECTION_FORBIDDEN', 'Recruiters can only view student profiles in the marketplace');
+    }
     if (entityType === 'startup') {
         return getMarketplaceStartupDetail(entityId);
     }

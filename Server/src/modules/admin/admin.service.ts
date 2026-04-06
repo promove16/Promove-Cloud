@@ -21,10 +21,6 @@ import {
 } from '../user/user.types';
 import { assertInstitutionVerificationReadyForApproval } from '../institution/institutionVerification.service';
 import { UserRole } from '../../types/roles.types';
-import {
-  getInnovationScoreDistributionBucket,
-  SCORE_DISTRIBUTION_BUCKETS,
-} from '../innovationScore/score.utils';
 import { Workspace } from '../workspace/workspace.model';
 import { ScoreEvent } from '../innovationScore/score.model';
 import { Deal } from '../deal/deal.model';
@@ -1552,18 +1548,12 @@ export const getAnalytics = async (): Promise<AdminAnalyticsData> => {
     dealConversionRate: deals.length > 0 ? Number(((dealsByStage['4'] / deals.length) * 100).toFixed(2)) : 0,
     totalPatents: patents.length,
     patentsByStatus,
-    scoreDistribution: users.reduce<Record<(typeof SCORE_DISTRIBUTION_BUCKETS)[number], number>>(
-      (distribution, user) => {
-        distribution[getInnovationScoreDistributionBucket(user.innovationScore)] += 1;
-        return distribution;
-      },
-      {
-        '0-250': 0,
-        '251-500': 0,
-        '501-750': 0,
-        '751-1000': 0,
-      },
-    ),
+    scoreDistribution: {
+      '0-50': users.filter((user) => user.innovationScore <= 50).length,
+      '51-100': users.filter((user) => user.innovationScore > 50 && user.innovationScore <= 100).length,
+      '101-150': users.filter((user) => user.innovationScore > 100 && user.innovationScore <= 150).length,
+      '151-200': users.filter((user) => user.innovationScore > 150).length,
+    },
     topInnovators: topInnovators.map((user) => userListItem(user)),
     recentAdminActions: auditLogs.map((entry) => ({
       _id: String(entry._id),

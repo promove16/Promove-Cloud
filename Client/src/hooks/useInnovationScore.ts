@@ -42,6 +42,9 @@ export const useInnovationScore = () => {
             }
           : previous,
       );
+
+      void queryClient.invalidateQueries({ queryKey: ['score', 'me'] });
+      void queryClient.invalidateQueries({ queryKey: ['score', 'history', 'me'] });
     };
 
     socket.on('score:updated', handleUpdate);

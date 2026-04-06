@@ -100,7 +100,6 @@ export interface Startup {
   launchedToMentors: boolean;
   launchedToRecruiters?: boolean;
   launchedAt?: string;
-  innovationScore: number;
   innovationScoreAtLaunch: number;
   totalShares: number;
   availableShares: number;

@@ -362,6 +362,60 @@ const formatReadinessErrorMessage = (readiness) => {
         ? `Startup profile is incomplete for review. Complete: ${topItems}, and ${readiness.missingItems.length - 5} more.`
         : `Startup profile is incomplete for review. Complete: ${topItems}.`;
 };
+const completionScore = (checks, maxScore) => {
+    if (checks.length === 0) {
+        return 0;
+    }
+    const completed = checks.filter(Boolean).length;
+    return Math.round((completed / checks.length) * maxScore);
+};
+const calculateStartupInnovationScore = (startup) => {
+    const readiness = buildStartupReadiness(startup);
+    const businessProfile = startup.businessProfile ?? {};
+    const registrationProfile = startup.registrationProfile ?? {};
+    const traction = startup.traction ?? {};
+    const requiredDocuments = readiness.requiredDocumentCategories ?? [];
+    const uploadedDocuments = new Set(readiness.uploadedDocumentCategories ?? []);
+    const uploadedRequiredDocuments = requiredDocuments.length > 0
+        ? requiredDocuments.filter((category) => uploadedDocuments.has(category)).length
+        : 0;
+    const businessPitchReady = Boolean(startup.pitchDeckUrl) || uploadedDocuments.has('business_plan');
+    const businessScore = completionScore([
+        Boolean(startup.name?.trim()),
+        Boolean(startup.tagline?.trim()),
+        Boolean(startup.category?.trim()),
+        Boolean(businessProfile.problemStatement?.trim()),
+        Boolean(businessProfile.solutionSummary?.trim()),
+        Boolean(businessProfile.targetCustomers?.trim()),
+        Boolean(businessProfile.marketAnalysis?.trim()),
+        Boolean(businessProfile.revenueModel?.trim()),
+        Boolean(businessProfile.goToMarketPlan?.trim()),
+    ], 250);
+    const registrationScore = completionScore([
+        Boolean(registrationProfile.problemStatement?.trim()),
+        Boolean(registrationProfile.solutionDifferentiation?.trim()),
+        Boolean(registrationProfile.coreInnovation?.trim()),
+        Boolean(registrationProfile.priorArtStatus?.trim()),
+        Boolean(registrationProfile.workingMechanism?.trim()),
+        Boolean(registrationProfile.keyComponents?.trim()),
+        Boolean(registrationProfile.developmentStage?.trim()),
+        Boolean(registrationProfile.documentationReadiness?.trim()),
+        Boolean(registrationProfile.developmentContext?.trim()),
+        Boolean(registrationProfile.targetMarkets?.trim()),
+        Boolean(registrationProfile.publicDisclosureStatus?.trim()),
+        Boolean(registrationProfile.legalAgreements?.trim()),
+    ], 250);
+    const documentationScore = Math.round(((requiredDocuments.length > 0 ? uploadedRequiredDocuments / requiredDocuments.length : 1) * 100)) + (businessPitchReady ? 50 : 0);
+    const tractionScore = (traction.patentFiled ? 60 : 0) +
+        (traction.mvpBuilt ? 90 : 0) +
+        (traction.revenueGenerating ? 70 : 0) +
+        Math.round((Math.min(traction.usersCount ?? 0, 1000) / 1000) * 30);
+    const teamScore = Math.min(100, Math.min(startup.founderIds?.length ?? 0, 4) * 15 +
+        Math.min(startup.teamSize ?? startup.founderIds?.length ?? 0, 8) * 5 +
+        (readiness.isReviewReady ? 20 : 0) +
+        (startup.reviewStatus === 'approved' ? 20 : 0));
+    return (0, score_utils_1.normalizeInnovationScore)(businessScore + registrationScore + documentationScore + tractionScore + teamScore);
+};
 const sanitizeStartupForClient = (startup) => ({
     ...startup,
     documents: (startup.documents ?? []).map((document) => ({
@@ -495,8 +549,7 @@ const launchStartup = async (startupId, userId, payload) => {
     if (payload.launchTo !== 'recruiters' && startup.reviewStatus !== 'approved') {
         throw new ApiError_1.ApiError(403, 'STARTUP_REVIEW_REQUIRED', 'Startup must be approved by admin before it can be launched to the marketplace.');
     }
-    const user = await user_model_1.User.findById(userId).select('innovationScore').lean();
-    const score = (0, score_utils_1.normalizeInnovationScore)(user?.innovationScore ?? 0);
+    const score = calculateStartupInnovationScore(startup.toObject());
     startup.launchedToInvestors = payload.launchTo === 'investors' || payload.launchTo === 'both';
     startup.launchedToMentors = payload.launchTo === 'mentors' || payload.launchTo === 'both';
     startup.launchedToRecruiters = payload.launchTo === 'recruiters';

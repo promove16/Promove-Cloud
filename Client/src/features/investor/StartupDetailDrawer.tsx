@@ -5,9 +5,9 @@ import { Button } from '../../components/ui/Button';
 import { Card } from '../../components/ui/Card';
 import { Input } from '../../components/ui/Input';
 import { Spinner } from '../../components/ui/Spinner';
+import { MAX_INNOVATION_SCORE } from '../../constants/score';
 import { investorApi } from '../../api/investor.api';
 import { InvestorStartupDetailResponse } from '../../types/investor.types';
-import { MAX_INNOVATION_SCORE } from '../../constants/score';
 
 type Props = {
   startupId: string | null;
@@ -150,7 +150,7 @@ export function StartupDetailDrawer({
           <div>
             <div className="text-2xl font-bold text-white">Full Startup Profile</div>
             <div className="mt-2 text-sm text-slate-400">
-              Review the startup score and founder breakdown before expressing interest.
+              Review the complete founder score breakdown before expressing interest.
             </div>
           </div>
           <Button variant="ghost" onClick={() => onOpenChange(false)}>
@@ -175,7 +175,7 @@ export function StartupDetailDrawer({
                   <div className="flex flex-wrap gap-2">
                     <Badge>{detail.startup.stage}</Badge>
                     <Badge className="border-emerald-500/30 bg-emerald-500/10 text-emerald-300">
-                      Startup score {detail.startup.innovationScore}/{MAX_INNOVATION_SCORE}
+                      Score {detail.startup.innovationScoreAtLaunch}/{MAX_INNOVATION_SCORE}
                     </Badge>
                   </div>
                 </div>
@@ -232,7 +232,7 @@ export function StartupDetailDrawer({
                     <div className="flex items-center justify-between gap-3">
                       <div>
                         <div className="font-semibold text-white">{founder.displayName}</div>
-                        <div className="text-sm text-slate-400">Founder score {founder.innovationScore}/{MAX_INNOVATION_SCORE}</div>
+                        <div className="text-sm text-slate-400">Live score {founder.innovationScore}/{MAX_INNOVATION_SCORE}</div>
                       </div>
                       <Badge>{founder.domain ?? 'Founder'}</Badge>
                     </div>
@@ -251,7 +251,7 @@ export function StartupDetailDrawer({
 
             <Card className="p-5">
               <div className="text-sm font-semibold uppercase tracking-[0.2em] text-slate-400">
-                Founder Score Timeline
+                Score Timeline
               </div>
               <div className="mt-4 space-y-4">
                 {detail.scoreEvents.map((event) => (

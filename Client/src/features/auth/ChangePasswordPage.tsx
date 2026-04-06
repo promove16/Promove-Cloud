@@ -7,6 +7,7 @@ import { Button } from '../../components/ui/Button';
 import { Card } from '../../components/ui/Card';
 import { ApiSuccessResponse } from '../../types/auth.types';
 import { roleRedirect } from '../../utils/roleRedirect';
+import { AuthPasswordField } from './AuthPasswordField';
 
 export function ChangePasswordPage() {
   const navigate = useNavigate();
@@ -68,42 +69,36 @@ export function ChangePasswordPage() {
         </p>
 
         <form onSubmit={handleSubmit} className="mt-8 space-y-4">
-          <div>
-            <label className="mb-1.5 block text-xs text-slate-400">Current (temporary) password</label>
-            <input
-              type="password"
-              value={form.currentPassword}
-              onChange={(e) => setForm((c) => ({ ...c, currentPassword: e.target.value }))}
-              placeholder="Enter temporary password"
-              className={inputCls}
-              required
-              autoComplete="current-password"
-            />
-          </div>
-          <div>
-            <label className="mb-1.5 block text-xs text-slate-400">New password</label>
-            <input
-              type="password"
-              value={form.newPassword}
-              onChange={(e) => setForm((c) => ({ ...c, newPassword: e.target.value }))}
-              placeholder="Min. 8 characters"
-              className={inputCls}
-              required
-              autoComplete="new-password"
-            />
-          </div>
-          <div>
-            <label className="mb-1.5 block text-xs text-slate-400">Confirm new password</label>
-            <input
-              type="password"
-              value={form.confirm}
-              onChange={(e) => setForm((c) => ({ ...c, confirm: e.target.value }))}
-              placeholder="Repeat new password"
-              className={inputCls}
-              required
-              autoComplete="new-password"
-            />
-          </div>
+          <AuthPasswordField
+            label="Current (temporary) password"
+            value={form.currentPassword}
+            onChange={(e) => setForm((c) => ({ ...c, currentPassword: e.target.value }))}
+            placeholder="Enter temporary password"
+            labelClassName="mb-1.5 block text-xs text-slate-400"
+            inputClassName={`${inputCls} pr-12`}
+            required
+            autoComplete="current-password"
+          />
+          <AuthPasswordField
+            label="New password"
+            value={form.newPassword}
+            onChange={(e) => setForm((c) => ({ ...c, newPassword: e.target.value }))}
+            placeholder="Min. 8 characters"
+            labelClassName="mb-1.5 block text-xs text-slate-400"
+            inputClassName={`${inputCls} pr-12`}
+            required
+            autoComplete="new-password"
+          />
+          <AuthPasswordField
+            label="Confirm new password"
+            value={form.confirm}
+            onChange={(e) => setForm((c) => ({ ...c, confirm: e.target.value }))}
+            placeholder="Repeat new password"
+            labelClassName="mb-1.5 block text-xs text-slate-400"
+            inputClassName={`${inputCls} pr-12`}
+            required
+            autoComplete="new-password"
+          />
 
           {error && (
             <div className="rounded-lg border border-rose-500/20 bg-rose-500/10 px-4 py-3 text-sm text-rose-300">

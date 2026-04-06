@@ -6,9 +6,9 @@ import { Button } from '../../components/ui/Button';
 import { Card } from '../../components/ui/Card';
 import { Input } from '../../components/ui/Input';
 import { Spinner } from '../../components/ui/Spinner';
+import { MAX_INNOVATION_SCORE } from '../../constants/score';
 import { investorApi } from '../../api/investor.api';
 import { StartupDetailDrawer } from './StartupDetailDrawer';
-import { MAX_INNOVATION_SCORE } from '../../constants/score';
 
 const categories = ['Agriculture', 'Health', 'Education', 'Energy', 'Software', 'Other'];
 const stages = ['Pre-Idea', 'Ideation', 'MVP', 'Pre-Launch', 'Launched'];
@@ -218,8 +218,7 @@ export default function StartupMarketplace() {
         <div className="grid gap-4 xl:grid-cols-2">
           {startups.map((startup) => {
             const canExpressInterest = viewedStartupIds.has(startup._id);
-            const startupScore = startup.innovationScore;
-            const founderScore = startup.founder?.innovationScore ?? 0;
+            const liveScore = startup.founder?.innovationScore ?? startup.innovationScoreAtLaunch;
 
             return (
               <Card key={startup._id} className="p-5">
@@ -229,18 +228,16 @@ export default function StartupMarketplace() {
                     <div className="mt-1 text-sm text-cyan-300">{startup.category}</div>
                     <div className="mt-2 text-sm leading-6 text-slate-400">{startup.tagline}</div>
                     <p className="mt-3 line-clamp-2 text-sm leading-6 text-slate-400">
-                      Startup score {startupScore}/{MAX_INNOVATION_SCORE}.
-                      {startup.founder ? (
-                        <span className="ml-2 text-slate-500">
-                          Founder: {startup.founder.displayName} at {founderScore}/{MAX_INNOVATION_SCORE}.
-                        </span>
-                      ) : null}
+                      {startup.founder?.displayName ?? 'Founding team'} is currently at {liveScore}/{MAX_INNOVATION_SCORE}.
+                      <span className="ml-2 text-slate-500">
+                        Launch snapshot: {startup.innovationScoreAtLaunch}/{MAX_INNOVATION_SCORE}.
+                      </span>
                     </p>
                   </div>
                   <div className="flex flex-col items-end gap-2">
                     <Badge>{startup.stage}</Badge>
                     <div className="rounded-full border border-emerald-500/30 bg-emerald-500/10 px-3 py-1 text-xs font-semibold text-emerald-300">
-                      Startup score {startupScore}/{MAX_INNOVATION_SCORE}
+                      Live score {liveScore}/{MAX_INNOVATION_SCORE}
                     </div>
                   </div>
                 </div>

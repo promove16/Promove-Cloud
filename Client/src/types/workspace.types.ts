@@ -1,5 +1,3 @@
-import { TemporaryMemoryMode } from '../lib/temporaryMemory';
-
 export type WorkspaceStage = 'Ideation' | 'Problem' | 'Build' | 'Patent' | 'Launch';
 
 export interface WorkspaceMilestone {
@@ -38,8 +36,6 @@ export interface WorkspaceUpload {
   uploadedAt: string;
   note?: string;
   category?: WorkspaceUploadCategory;
-  memoryMode?: TemporaryMemoryMode;
-  expiresAt?: string;
 }
 
 export interface WorkspaceRepoSubmission {
@@ -117,7 +113,5 @@ export interface ChatMessage {
   message: string;
   attachmentUrl?: string;
   attachmentType?: 'pdf' | 'image';
-  memoryMode?: TemporaryMemoryMode;
-  expiresAt?: string;
   sentAt: string;
 }

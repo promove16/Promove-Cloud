@@ -2,7 +2,7 @@ import api from './axiosInstance';
 import { ApiSuccessResponse } from '../types/auth.types';
 import { UserRole } from '../types/roles.types';
 
-export type MarketplaceRole = 'mentor' | 'investor' | 'recruiter';
+export type MarketplaceRole = 'student' | 'mentor' | 'investor' | 'recruiter';
 export type MarketplaceEntityType = MarketplaceRole | 'startup';
 
 export interface MarketplaceLinkSet {
@@ -74,6 +74,7 @@ export interface MarketplaceProfile {
   displayName: string;
   avatar?: string;
   role: UserRole;
+  innovationScore?: number;
   domain?: string;
   bio?: string;
   headline?: string;
@@ -190,34 +191,12 @@ export interface MarketplaceUserDetail extends MarketplaceUserItem {
 export type MarketplaceDirectoryItem = MarketplaceUserItem | MarketplaceStartupItem;
 export type MarketplaceEntityDetail = MarketplaceUserDetail | MarketplaceStartupDetail;
 
-export const normalizeMarketplaceEntityType = (value?: string | null): MarketplaceEntityType | undefined => {
-  if (!value) {
-    return undefined;
-  }
-
-  const normalized = value.trim().toLowerCase();
-
-  if (normalized === 'hr' || normalized === 'hrs') {
-    return 'recruiter';
-  }
-
-  if (
-    normalized === 'mentor' ||
-    normalized === 'investor' ||
-    normalized === 'recruiter' ||
-    normalized === 'startup'
-  ) {
-    return normalized;
-  }
-
-  return undefined;
-};
-
 const normalizeMarketplaceProfile = (profile: Partial<MarketplaceProfile>): MarketplaceProfile => ({
   _id: profile._id ?? '',
   displayName: profile.displayName ?? 'Unknown profile',
   ...(profile.avatar ? { avatar: profile.avatar } : {}),
   role: profile.role ?? UserRole.MENTOR,
+  ...(typeof profile.innovationScore === 'number' ? { innovationScore: profile.innovationScore } : {}),
   ...(profile.domain ? { domain: profile.domain } : {}),
   ...(profile.bio ? { bio: profile.bio } : {}),
   ...(profile.headline ? { headline: profile.headline } : {}),
@@ -362,18 +341,18 @@ const normalizeEntityDetail = (item: Partial<MarketplaceEntityDetail>): Marketpl
   };
 };
 
-function listMarketplaceEntities(role: "startup", params?: { search?: string; page?: number; limit?: number }): Promise<MarketplaceStartupItem[]>;
-function listMarketplaceEntities(role: MarketplaceRole, params?: { search?: string; page?: number; limit?: number }): Promise<MarketplaceUserItem[]>;
+function listMarketplaceEntities(role: "startup", params?: { domain?: string; page?: number; limit?: number }): Promise<MarketplaceStartupItem[]>;
+function listMarketplaceEntities(role: MarketplaceRole, params?: { domain?: string; page?: number; limit?: number }): Promise<MarketplaceUserItem[]>;
 function listMarketplaceEntities(
   role: MarketplaceEntityType,
-  params?: { search?: string; page?: number; limit?: number },
+  params?: { domain?: string; page?: number; limit?: number },
 ): Promise<MarketplaceDirectoryItem[]>;
 async function listMarketplaceEntities(
   role: MarketplaceEntityType,
-  params?: { search?: string; page?: number; limit?: number },
+  params?: { domain?: string; page?: number; limit?: number },
 ) {
   const response = await api.get<ApiSuccessResponse<MarketplaceDirectoryItem[]>>('/api/marketplace', {
-    params: { role, ...(params?.search ? { search: params.search } : {}), page: params?.page, limit: params?.limit },
+    params: { role, ...params },
   });
   return (response.data.data ?? []).map((profile) => normalizeEntityDirectoryItem(profile));
 }

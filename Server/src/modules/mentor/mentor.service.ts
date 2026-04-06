@@ -259,7 +259,7 @@ export const getMentorStudents = async (mentorId: string): Promise<MentorFeedStu
   const startups =
     workspaceIds.length > 0
       ? await Startup.find({ projectId: { $in: workspaceIds }, isActive: true })
-          .sort({ innovationScore: -1, createdAt: -1 })
+          .sort({ innovationScoreAtLaunch: -1, createdAt: -1 })
           .lean()
       : [];
   const startupMap = new Map(
@@ -281,7 +281,7 @@ export const getMentorStudents = async (mentorId: string): Promise<MentorFeedStu
       ...(leadStudent?.avatar ? { avatar: leadStudent.avatar } : {}),
       startupName: startup?.name ?? workspace.title,
       category: startup?.category ?? workspace.category,
-      innovationScore: startup?.innovationScore ?? startup?.innovationScoreAtLaunch ?? leadStudent?.innovationScore ?? 0,
+      innovationScore: startup?.innovationScoreAtLaunch ?? leadStudent?.innovationScore ?? 0,
       recentActivitySummary: summary,
       isWatched: watched.has(leadStudentId),
       activeSince: leadStudent?.createdAt ? toIso(leadStudent.createdAt) : toIso(workspace.updatedAt),
@@ -376,7 +376,6 @@ export const getMentorStudentProfile = async (mentorId: string, studentId: strin
       category: startup.category,
       stage: startup.stage,
       ...(startup.launchedAt ? { launchedAt: toIso(startup.launchedAt) } : {}),
-      innovationScore: startup.innovationScore ?? 0,
       innovationScoreAtLaunch: startup.innovationScoreAtLaunch ?? 0,
     })),
   };

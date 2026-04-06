@@ -56,7 +56,7 @@ describe('user profile flow integration', () => {
 
     expect(firstResponse.status).toBe(200);
     expect(firstResponse.body.data.profileComplete).toBe(true);
-    expect(firstResponse.body.data.innovationScore).toBe(10);
+    expect(firstResponse.body.data.innovationScore).toBe(50);
     expect(scoreAddSpy).not.toHaveBeenCalled();
 
     scoreAddSpy.mockClear();

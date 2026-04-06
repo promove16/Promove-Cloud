@@ -26,17 +26,17 @@ describe('score engine one-time triggers', () => {
     const firstCompletionScore = await applyScore({ userId: String(user._id), trigger: 'PROFILE_COMPLETE' });
     const secondCompletionScore = await applyScore({ userId: String(user._id), trigger: 'PROFILE_COMPLETE' });
 
-    expect(firstGithubScore).toBe(5);
-    expect(secondGithubScore).toBe(5);
-    expect(firstLinkedInScore).toBe(10);
-    expect(secondLinkedInScore).toBe(10);
-    expect(firstResumeScore).toBe(13);
-    expect(secondResumeScore).toBe(13);
-    expect(firstCompletionScore).toBe(23);
-    expect(secondCompletionScore).toBe(23);
+    expect(firstGithubScore).toBe(25);
+    expect(secondGithubScore).toBe(25);
+    expect(firstLinkedInScore).toBe(50);
+    expect(secondLinkedInScore).toBe(50);
+    expect(firstResumeScore).toBe(65);
+    expect(secondResumeScore).toBe(65);
+    expect(firstCompletionScore).toBe(115);
+    expect(secondCompletionScore).toBe(115);
 
     const finalUser = await User.findById(user._id).lean();
-    expect(finalUser?.innovationScore).toBe(23);
+    expect(finalUser?.innovationScore).toBe(115);
 
     const events = await ScoreEvent.find({ userId: user._id }).sort({ createdAt: 1 }).lean();
     expect(events).toHaveLength(4);

@@ -162,6 +162,13 @@ export interface UserProfile extends AuthUser {
   websiteUrl?: string | null;
   githubUrl?: string | null;
   linkedinUrl?: string | null;
+  twitterUrl?: string | null;
+  youtubeUrl?: string | null;
+  behanceUrl?: string | null;
+  dribbbleUrl?: string | null;
+  instagramUrl?: string | null;
+  researchGateUrl?: string | null;
+  mediumUrl?: string | null;
   isActive?: boolean;
   accessExpiresAt?: string;
   discoverableToRecruiters?: boolean;
@@ -193,6 +200,14 @@ export interface UpdateUserProfilePayload {
   domain?: string;
   githubUrl?: string;
   linkedinUrl?: string;
+  websiteUrl?: string;
+  twitterUrl?: string;
+  youtubeUrl?: string;
+  behanceUrl?: string;
+  dribbbleUrl?: string;
+  instagramUrl?: string;
+  researchGateUrl?: string;
+  mediumUrl?: string;
   profileComplete?: boolean;
   discoverableToRecruiters?: boolean;
 }

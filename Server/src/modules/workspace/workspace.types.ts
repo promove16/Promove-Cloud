@@ -1,5 +1,4 @@
 import { Types } from 'mongoose';
-import { TemporaryMemoryMode } from '../temporaryMemory/temporaryMemory.constants';
 
 export type WorkspaceStage = 'Ideation' | 'Problem' | 'Build' | 'Patent' | 'Launch';
 
@@ -39,8 +38,6 @@ export interface IWorkspace {
     uploadedAt: Date;
     note?: string;
     category: string;
-    memoryMode: TemporaryMemoryMode;
-    expiresAt?: Date;
     cloudinaryPublicId?: string;
   }>;
   repoSubmissions: Array<{

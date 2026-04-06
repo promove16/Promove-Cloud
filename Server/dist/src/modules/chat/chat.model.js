@@ -11,4 +11,5 @@ const chatMessageSchema = new mongoose_1.Schema({
     sentAt: { type: Date, default: () => new Date() },
 }, { timestamps: false });
 chatMessageSchema.index({ workspaceId: 1, sentAt: -1 });
+chatMessageSchema.index({ sentAt: 1 }, { expireAfterSeconds: 48 * 60 * 60 });
 exports.ChatMessage = (0, mongoose_1.model)('ChatMessage', chatMessageSchema);

@@ -1,6 +1,5 @@
 import api from './axiosInstance';
 import { ApiSuccessResponse } from '../types/auth.types';
-import { TemporaryMemoryMode } from '../lib/temporaryMemory';
 import {
   ChatMessage,
   Workspace,
@@ -68,13 +67,7 @@ export const workspaceApi = {
     const response = await api.post<ApiSuccessResponse<Workspace>>(`/api/workspace/${workspaceId}/progress`, payload);
     return response.data.data;
   },
-  async upload(
-    workspaceId: string,
-    file: File,
-    note?: string,
-    category?: string,
-    memoryMode?: TemporaryMemoryMode,
-  ) {
+  async upload(workspaceId: string, file: File, note?: string, category?: string) {
     const body = new FormData();
     body.append('file', file);
     if (note) {
@@ -82,9 +75,6 @@ export const workspaceApi = {
     }
     if (category) {
       body.append('category', category);
-    }
-    if (memoryMode) {
-      body.append('memoryMode', memoryMode);
     }
 
     const response = await api.post<ApiSuccessResponse<WorkspaceUpload[]>>(

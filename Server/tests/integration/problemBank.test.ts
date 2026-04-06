@@ -72,7 +72,7 @@ describe('problem bank integration', () => {
       .post(`/api/problems/${problemId}/claim`)
       .set('Authorization', `Bearer ${studentToken}`);
 
-    expect(claimResponse.status).toBe(201);
+    expect(claimResponse.status).toBe(200);
     const workspaceId = claimResponse.body.data._id as string;
 
     const progressResponse = await request(app)
@@ -143,6 +143,6 @@ describe('problem bank integration', () => {
     expect(detailResponse.body.data.viewerState.pointsAwarded).toBe(40);
 
     const updatedStudent = await User.findById(studentUser._id).lean();
-    expect(updatedStudent?.innovationScore).toBe(20);
+    expect(updatedStudent?.innovationScore).toBe(100);
   });
 });

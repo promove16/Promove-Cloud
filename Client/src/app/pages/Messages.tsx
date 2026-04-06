@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState, useCallback } from 'react';
-import { useParams, useNavigate } from 'react-router-dom';
+import { useParams, useNavigate, useSearchParams } from 'react-router-dom';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { isAxiosError } from 'axios';
 import { 
@@ -13,19 +13,11 @@ import { useAuthStore } from '../../store/authStore';
 import { QueryTypeModal } from '../../components/messaging/QueryTypeModal';
 import { ReportUserModal } from '../../components/messaging/ReportUserModal';
 import { InvestorProposalModal, InvestorProposalReplyActions } from '../../components/messaging/InvestorProposalModal';
-import { TemporaryMemoryMenu } from '../../components/messaging/TemporaryMemoryMenu';
 import { getVisibleAssociationQueryTypes, isAssociationQueryType } from '../../components/messaging/queryTypeVisibility';
-import {
-  TemporaryMemoryMode,
-  formatTemporaryMemoryExpiry,
-  getTemporaryMemorySummary,
-  isTemporaryMemory,
-} from '../../lib/temporaryMemory';
 
 type PendingAttachmentState = {
   previewUrl: string;
   uploadedUrl?: string;
-  uploadedPublicId?: string;
   localObjectUrl: string;
   fileType: 'image' | 'pdf';
   fileName: string;
@@ -81,6 +73,18 @@ const timeAgo = (value: string) => {
 
 const initials = (name: string) =>
   name.split(' ').map((p) => p[0]).join('').slice(0, 2).toUpperCase();
+
+const isValidQueryType = (value: string | null): value is QueryType =>
+  value === 'project_mentor' ||
+  value === 'project_join' ||
+  value === 'investor' ||
+  value === 'recruiter' ||
+  value === 'general';
+
+const getAutoQueryTypeForRole = (role?: string | null): QueryType | null => {
+  const visibleTypes = getVisibleAssociationQueryTypes(role);
+  return visibleTypes[0] ?? null;
+};
 
 function OnlineDot({ className = '' }: { className?: string }) {
   return (
@@ -409,10 +413,11 @@ interface FirstContactPanelProps {
   partnerName: string;
   partnerRole?: string;
   onSend: (message: string, queryType: QueryType) => void;
+  initialQueryType?: QueryType | null;
 }
 
-function FirstContactPanel({ partnerName, partnerRole, onSend }: FirstContactPanelProps) {
-  const [selectedType, setSelectedType] = useState<QueryType | null>(null);
+function FirstContactPanel({ partnerName, partnerRole, onSend, initialQueryType }: FirstContactPanelProps) {
+  const [selectedType, setSelectedType] = useState<QueryType | null>(initialQueryType ?? null);
   const [customMessage, setCustomMessage] = useState('');
   const visibleAssociationTypes = new Set(getVisibleAssociationQueryTypes(partnerRole));
 
@@ -425,6 +430,16 @@ function FirstContactPanel({ partnerName, partnerRole, onSend }: FirstContactPan
       autoMessages: [
         'Hi! I am working on a project and would love to get your guidance and mentorship.',
         'I am looking for a mentor who can help me with my startup project.',
+      ],
+    },
+    {
+      type: 'project_join',
+      label: 'Project Join',
+      icon: <Users className="h-5 w-5" />,
+      color: 'from-fuchsia-500 to-indigo-500',
+      autoMessages: [
+        'Hi! I came across your project on ProMove and would love to join your team if you are open to collaborators.',
+        'Hello! Your project looks exciting. I would like to contribute and explore joining the team.',
       ],
     },
     {
@@ -477,6 +492,12 @@ function FirstContactPanel({ partnerName, partnerRole, onSend }: FirstContactPan
       setSelectedType(null);
     }
   }, [selectedType, visibleQueryTypes]);
+
+  useEffect(() => {
+    if (initialQueryType && visibleQueryTypes.some((queryType) => queryType.type === initialQueryType)) {
+      setSelectedType(initialQueryType);
+    }
+  }, [initialQueryType, visibleQueryTypes]);
 
   if (!selectedType) {
     return (
@@ -681,11 +702,6 @@ function MessageBubble({
           </span>
           {!statusText ? <ReadReceipt readAt={msg.readAt} isMine={isMine} /> : null}
         </div>
-        {isTemporaryMemory(msg.memoryMode) ? (
-          <div className={`mt-1 text-[11px] ${isMine ? 'text-cyan-200/70' : 'text-amber-300/80'}`}>
-            Temporary memory - {formatTemporaryMemoryExpiry(msg.expiresAt)}
-          </div>
-        ) : null}
 
         {/* Investor proposal quick-reply — shown only to the recipient */}
         {!isMine && msg.queryType === 'investor' && onQuickReply && (
@@ -714,12 +730,20 @@ function DateSeparator({ date }: { date: string }) {
   );
 }
 
-function ChatPanel({ partnerId, partnerName, partnerRole, isFirstContact, onSendWithQuery }: { 
-  partnerId: string; 
+function ChatPanel({
+  partnerId,
+  partnerName,
+  partnerRole,
+  isFirstContact,
+  onSendWithQuery,
+  initialQueryType,
+}: {
+  partnerId: string;
   partnerName: string;
   partnerRole?: string;
   isFirstContact?: boolean;
   onSendWithQuery?: (message: string, queryType: QueryType) => void;
+  initialQueryType?: QueryType | null;
 }) {
   const currentUser = useAuthStore((s) => s.user);
   const { messages, sendMessage, sendTyping, typingFromPartner, isLoading } = useDM(partnerId);
@@ -728,7 +752,6 @@ function ChatPanel({ partnerId, partnerName, partnerRole, isFirstContact, onSend
   const [pendingAttachment, setPendingAttachment] = useState<PendingAttachmentState | null>(null);
   const [isUploading, setIsUploading] = useState(false);
   const [attachmentError, setAttachmentError] = useState('');
-  const [memoryMode, setMemoryMode] = useState<TemporaryMemoryMode>('standard');
   const threadRef = useRef<HTMLDivElement>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const textareaRef = useRef<HTMLTextAreaElement>(null);
@@ -771,8 +794,6 @@ function ChatPanel({ partnerId, partnerName, partnerRole, isFirstContact, onSend
       attachmentUrl: pendingAttachment?.uploadedUrl,
       attachmentType: pendingAttachment?.fileType,
       attachmentName: pendingAttachment?.fileName,
-      attachmentPublicId: pendingAttachment?.uploadedPublicId,
-      memoryMode,
     });
     setDraft('');
     removeAttachment();
@@ -833,7 +854,6 @@ function ChatPanel({ partnerId, partnerName, partnerRole, isFirstContact, onSend
           ...current,
           previewUrl: upload.url,
           uploadedUrl: upload.url,
-          uploadedPublicId: upload.publicId,
           fileType: upload.fileType,
           fileName: upload.fileName,
           fileSize: upload.fileSize,
@@ -880,7 +900,6 @@ function ChatPanel({ partnerId, partnerName, partnerRole, isFirstContact, onSend
         attachmentUrl: pendingAttachment.previewUrl,
         attachmentType: pendingAttachment.fileType,
         attachmentName: pendingAttachment.fileName,
-        memoryMode,
         readAt: null,
         sentAt: new Date().toISOString(),
         isOptimistic: true,
@@ -901,7 +920,12 @@ function ChatPanel({ partnerId, partnerName, partnerRole, isFirstContact, onSend
         ) : messages.length === 0 ? (
           isFirstContact && onSendWithQuery ? (
             <div className="min-h-0 flex-1 overflow-y-auto">
-              <FirstContactPanel partnerName={partnerName} partnerRole={partnerRole} onSend={onSendWithQuery} />
+              <FirstContactPanel
+                partnerName={partnerName}
+                partnerRole={partnerRole}
+                onSend={onSendWithQuery}
+                initialQueryType={initialQueryType}
+              />
             </div>
           ) : (
             <div className="flex min-h-0 flex-1 items-center justify-center gap-3 text-slate-500">
@@ -964,10 +988,6 @@ function ChatPanel({ partnerId, partnerName, partnerRole, isFirstContact, onSend
 
       {/* Input bar */}
       <div className="border-t border-slate-800 px-4 py-3">
-        <div className="mb-3 flex flex-wrap items-center gap-2">
-          <TemporaryMemoryMenu value={memoryMode} onChange={setMemoryMode} />
-          <span className="text-xs text-slate-400">{getTemporaryMemorySummary(memoryMode)}</span>
-        </div>
         {/* Attachment picker */}
         {showAttachments && (
           <div className="mb-3 flex gap-3">
@@ -1044,6 +1064,7 @@ function ChatPanel({ partnerId, partnerName, partnerRole, isFirstContact, onSend
 export function MessagesPage() {
   const { partnerId } = useParams<{ partnerId?: string }>();
   const navigate = useNavigate();
+  const [searchParams, setSearchParams] = useSearchParams();
   const currentUser = useAuthStore((s) => s.user);
   const queryClient = useQueryClient();
   const [search, setSearch] = useState('');
@@ -1053,6 +1074,7 @@ export function MessagesPage() {
   const [pendingPartnerId, setPendingPartnerId] = useState<string | null>(null);
   const [pendingPartnerName, setPendingPartnerName] = useState<string>('');
   const [pendingPartnerRole, setPendingPartnerRole] = useState<string>('');
+  const [pendingQueryType, setPendingQueryType] = useState<QueryType | null>(null);
   const [showReportModal, setShowReportModal] = useState(false);
   const [showInvestorModal, setShowInvestorModal] = useState(false);
   const [showMenu, setShowMenu] = useState(false);
@@ -1090,6 +1112,14 @@ export function MessagesPage() {
   const partnerAvatar = activeConvo?.partner?.avatar ?? partnerProfile?.avatar;
   const partnerOnline = activeConvo?.isOnline || isPartnerOnline;
   const visibleAssociationTypes = new Set(getVisibleAssociationQueryTypes(partnerRole));
+  const requestedQueryType = (() => {
+    const rawType = searchParams.get('queryType');
+    return isValidQueryType(rawType) ? rawType : null;
+  })();
+  const contextualQueryType =
+    requestedQueryType && (requestedQueryType === 'general' || visibleAssociationTypes.has(requestedQueryType))
+      ? requestedQueryType
+      : getAutoQueryTypeForRole(partnerRole);
 
   const getFirstContactKey = (userId: string) => `dm_first_contact_${userId}_${currentUser?._id}`;
 
@@ -1104,6 +1134,7 @@ export function MessagesPage() {
       setPendingPartnerId(pid);
       setPendingPartnerName(pname);
       setPendingPartnerRole(prole ?? '');
+      setPendingQueryType(getAutoQueryTypeForRole(prole));
       setShowQueryModal(true);
     } else {
       navigate(`/dashboard/messages/${pid}`);
@@ -1138,6 +1169,7 @@ export function MessagesPage() {
     setPendingPartnerId(null);
     setPendingPartnerName('');
     setPendingPartnerRole('');
+    setPendingQueryType(null);
   };
 
   const handleReportUser = () => {
@@ -1357,6 +1389,22 @@ export function MessagesPage() {
                                 Project Mentor
                               </button>
                             ) : null}
+                            {visibleAssociationTypes.has('project_join') ? (
+                              <button
+                                type="button"
+                                disabled={!partnerId}
+                                onClick={() => {
+                                  if (partnerId) {
+                                    sendMessage({ message: 'Hi! I would love to join your project if you are open to collaborators.', messageType: 'text', queryType: 'project_join' });
+                                    setShowMenu(false);
+                                  }
+                                }}
+                                className="flex w-full items-center gap-2 rounded-lg px-2 py-1.5 text-left text-sm text-fuchsia-300 transition hover:bg-slate-800 disabled:cursor-not-allowed disabled:opacity-50"
+                              >
+                                <Users className="h-4 w-4" />
+                                Project Join
+                              </button>
+                            ) : null}
                             {visibleAssociationTypes.has('investor') ? (
                               <button
                                 type="button"
@@ -1400,8 +1448,14 @@ export function MessagesPage() {
               partnerName={partnerName} 
               partnerRole={partnerRole}
               isFirstContact={isFirstContact}
+              initialQueryType={isFirstContact ? contextualQueryType : null}
               onSendWithQuery={(message, queryType) => {
                 markAsContacted(partnerId);
+                if (searchParams.has('queryType')) {
+                  const nextParams = new URLSearchParams(searchParams);
+                  nextParams.delete('queryType');
+                  setSearchParams(nextParams, { replace: true });
+                }
                 sendMessage({ message, messageType: 'text', queryType });
               }}
             />
@@ -1430,6 +1484,7 @@ export function MessagesPage() {
         onSelect={handleQuerySelect}
         recipientName={pendingPartnerName}
         recipientRole={pendingPartnerRole}
+        initialQueryType={pendingQueryType}
       />
 
       {partnerId && (

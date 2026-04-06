@@ -462,7 +462,7 @@ const claimProblem = async (problemId, userId) => {
         throw new ApiError_1.ApiError(404, 'PROBLEM_NOT_FOUND', 'Problem not found');
     }
     if (existingWorkspace) {
-        throw new ApiError_1.ApiError(400, 'PROBLEM_ALREADY_STARTED', 'You already started this problem in an active workspace.');
+        return existingWorkspace;
     }
     if (activeCount >= 3) {
         throw new ApiError_1.ApiError(400, 'WORKSPACE_LIMIT_REACHED', 'You can only have 3 active workspaces.');

@@ -10,8 +10,8 @@ import {
 import { Badge } from '../../components/ui/Badge';
 import { Button } from '../../components/ui/Button';
 import { Card } from '../../components/ui/Card';
-import { StudentJourney } from '../../types/school.types';
 import { MAX_INNOVATION_SCORE } from '../../constants/score';
+import { StudentJourney } from '../../types/school.types';
 
 type Props = {
   journey?: StudentJourney;

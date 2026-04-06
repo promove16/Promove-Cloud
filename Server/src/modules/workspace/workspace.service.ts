@@ -8,10 +8,6 @@ import { User } from '../user/user.model';
 import { ChatMessage } from '../chat/chat.model';
 import { Workspace } from './workspace.model';
 import { ApiError } from '../../utils/ApiError';
-import {
-  buildTemporaryMemoryMetadata,
-  isTemporaryMemoryExpired,
-} from '../temporaryMemory/temporaryMemory.constants';
 
 const objectId = (value: string) => new Types.ObjectId(value);
 
@@ -147,9 +143,6 @@ type WorkspaceSnapshot = {
 export const serializeWorkspace = async (workspace: WorkspaceSnapshot) => {
   const baseWorkspace: any =
     typeof workspace.toObject === 'function' ? workspace.toObject() : workspace;
-  const visibleUploads = (baseWorkspace.uploads || []).filter(
-    (upload: any) => !isTemporaryMemoryExpired(upload),
-  );
   const memberIds = Array.from(
     new Set([
       String(baseWorkspace.ownerId),
@@ -176,7 +169,7 @@ export const serializeWorkspace = async (workspace: WorkspaceSnapshot) => {
   return {
     ...baseWorkspace,
     tasks: baseWorkspace.tasks || [],
-    uploads: visibleUploads,
+    uploads: baseWorkspace.uploads || [],
     repoSubmissions: baseWorkspace.repoSubmissions || [],
     codeSubmissions: baseWorkspace.codeSubmissions || [],
     progressUpdates: baseWorkspace.progressUpdates || [],
@@ -344,7 +337,6 @@ export const uploadWorkspaceFile = async (
   file: Express.Multer.File,
   note?: string,
   category?: string,
-  memoryMode?: string,
 ) => {
   const workspace = await getWorkspaceForMember(workspaceId, userId);
   const fileType = file.mimetype === 'application/pdf' ? 'pdf' : 'image';
@@ -368,7 +360,6 @@ export const uploadWorkspaceFile = async (
     uploadedAt: new Date(),
     note,
     category: safeCategory,
-    ...buildTemporaryMemoryMetadata(memoryMode),
     cloudinaryPublicId: upload.public_id,
   });
   await workspace.save();
@@ -584,13 +575,7 @@ export const removeMember = async (workspaceId: string, memberId: string, ownerI
 
 export const getWorkspaceChatHistory = async (workspaceId: string, userId: string, before?: string, limit = 50) => {
   await getWorkspaceForChatAccess(workspaceId, userId);
-  const filter: Record<string, unknown> = {
-    workspaceId,
-    $or: [
-      { memoryMode: { $ne: 'temporary' } },
-      { expiresAt: { $gt: new Date() } },
-    ],
-  };
+  const filter: Record<string, unknown> = { workspaceId };
   if (before) {
     filter._id = { $lt: before };
   }

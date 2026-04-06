@@ -1,1 +1,1 @@
-export { LeadershipProfile } from "./LeadershipProfile";
+export { Portfolio } from "./Portfolio";

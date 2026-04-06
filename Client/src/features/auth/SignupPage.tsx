@@ -182,34 +182,30 @@ export function SignupPage() {
               </div>
 
               <div>
-                <label className="mb-2 block text-sm font-semibold text-white">
-                  Password <span className="text-red-400">*</span>
-                </label>
                 <AuthPasswordField
+                  label="Password *"
                   value={formData.password}
-                  onChange={(event) =>
-                    updateField("password", event.target.value)
-                  }
+                  onChange={(event) => updateField("password", event.target.value)}
                   placeholder="********"
-                  autoComplete="new-password"
+                  labelClassName="mb-2 block text-sm font-semibold text-white"
+                  inputClassName="w-full rounded-lg border border-slate-800 bg-slate-950 py-3 pl-4 pr-12 text-white placeholder-slate-500 focus:border-blue-500 focus:outline-none"
                   required
                   minLength={8}
+                  autoComplete="new-password"
                 />
               </div>
 
               <div>
-                <label className="mb-2 block text-sm font-semibold text-white">
-                  Confirm Password <span className="text-red-400">*</span>
-                </label>
                 <AuthPasswordField
+                  label="Confirm Password *"
                   value={formData.confirmPassword}
-                  onChange={(event) =>
-                    updateField("confirmPassword", event.target.value)
-                  }
+                  onChange={(event) => updateField("confirmPassword", event.target.value)}
                   placeholder="********"
-                  autoComplete="new-password"
+                  labelClassName="mb-2 block text-sm font-semibold text-white"
+                  inputClassName="w-full rounded-lg border border-slate-800 bg-slate-950 py-3 pl-4 pr-12 text-white placeholder-slate-500 focus:border-blue-500 focus:outline-none"
                   required
                   minLength={8}
+                  autoComplete="new-password"
                 />
               </div>
             </div>

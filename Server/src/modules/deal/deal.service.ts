@@ -88,7 +88,6 @@ type LeanStartup = {
   pitchDeckUrl?: string;
   launchedToInvestors?: boolean;
   launchedAt?: Date;
-  innovationScore: number;
   innovationScoreAtLaunch: number;
   founderIds: Types.ObjectId[];
   totalShares: number;
@@ -291,7 +290,7 @@ const buildDetail = (
 const fetchDealContext = async (deal: DealDocumentLike) => {
   const [startup, student, investor] = await Promise.all([
     Startup.findById(deal.startupId)
-      .select('_id name tagline category stage pitchDeckUrl founderIds launchedToInvestors launchedAt innovationScore innovationScoreAtLaunch traction totalShares availableShares reservedForSole maxPennyInvestors currentPennyCount hasSoleInvestor soleInvestorId')
+      .select('_id name tagline category stage pitchDeckUrl founderIds launchedToInvestors launchedAt innovationScoreAtLaunch traction totalShares availableShares reservedForSole maxPennyInvestors currentPennyCount hasSoleInvestor soleInvestorId')
       .lean<LeanStartup>(),
     User.findById(deal.studentId)
       .select('_id displayName avatar role innovationScore scoreBreakdown')
@@ -538,7 +537,7 @@ export const createInvestorDealFromInterest = async (
   const investor = await ensureInvestor(investorId);
 
   const startup = await Startup.findById(startupId)
-    .select('_id name category stage pitchDeckUrl founderIds launchedToInvestors launchedAt innovationScore innovationScoreAtLaunch traction totalShares availableShares reservedForSole maxPennyInvestors currentPennyCount hasSoleInvestor soleInvestorId')
+    .select('_id name category stage pitchDeckUrl founderIds launchedToInvestors launchedAt innovationScoreAtLaunch traction totalShares availableShares reservedForSole maxPennyInvestors currentPennyCount hasSoleInvestor soleInvestorId')
     .lean<LeanStartup>();
 
   if (!startup || !startup.launchedToInvestors) {
@@ -842,7 +841,7 @@ export const advanceDealStage = async (
 
   if (parsed.newStage === 3) {
     const startup = await Startup.findById(deal.startupId)
-      .select('_id name tagline category stage pitchDeckUrl founderIds launchedToInvestors launchedAt innovationScore innovationScoreAtLaunch traction totalShares availableShares reservedForSole maxPennyInvestors currentPennyCount hasSoleInvestor soleInvestorId')
+      .select('_id name tagline category stage pitchDeckUrl founderIds launchedToInvestors launchedAt innovationScoreAtLaunch traction totalShares availableShares reservedForSole maxPennyInvestors currentPennyCount hasSoleInvestor soleInvestorId')
       .lean<LeanStartup>();
 
     if (!startup) {
@@ -1012,7 +1011,7 @@ export const listInvestorStartups = async (
   }
 
   if (typeof filters.minScore === 'number' || typeof filters.maxScore === 'number') {
-    query.innovationScore = {
+    query.innovationScoreAtLaunch = {
       ...(typeof filters.minScore === 'number' ? { $gte: filters.minScore } : {}),
       ...(typeof filters.maxScore === 'number' ? { $lte: filters.maxScore } : {}),
     };
@@ -1034,7 +1033,7 @@ export const listInvestorStartups = async (
   const [total, startups] = await Promise.all([
     Startup.countDocuments(query),
     Startup.find(query)
-      .sort({ innovationScore: -1, createdAt: 1 })
+      .sort({ innovationScoreAtLaunch: -1, createdAt: 1 })
       .skip((page - 1) * limit)
       .limit(limit)
       .lean<LeanStartup[]>(),
@@ -1059,7 +1058,6 @@ export const listInvestorStartups = async (
       category: startup.category,
       stage: startup.stage,
       ...(startup.launchedAt ? { launchedAt: startup.launchedAt.toISOString() } : {}),
-      innovationScore: startup.innovationScore ?? startup.innovationScoreAtLaunch,
       innovationScoreAtLaunch: startup.innovationScoreAtLaunch,
       teamSize: startup.founderIds.length,
       ...(startup.pitchDeckUrl ? { pitchDeckUrl: startup.pitchDeckUrl } : {}),
@@ -1100,7 +1098,7 @@ export const getInvestorStartup = async (investorId: string, startupId: string) 
     _id: startupId,
     launchedToInvestors: true,
   })
-    .select('_id name tagline category stage pitchDeckUrl founderIds launchedToInvestors launchedAt innovationScore innovationScoreAtLaunch traction totalShares availableShares reservedForSole maxPennyInvestors currentPennyCount hasSoleInvestor soleInvestorId')
+    .select('_id name tagline category stage pitchDeckUrl founderIds launchedToInvestors launchedAt innovationScoreAtLaunch traction totalShares availableShares reservedForSole maxPennyInvestors currentPennyCount hasSoleInvestor soleInvestorId')
     .lean<LeanStartup>();
 
   if (!startup) {
@@ -1127,7 +1125,6 @@ export const getInvestorStartup = async (investorId: string, startupId: string) 
       category: startup.category,
       stage: startup.stage,
       ...(startup.launchedAt ? { launchedAt: startup.launchedAt.toISOString() } : {}),
-      innovationScore: startup.innovationScore ?? startup.innovationScoreAtLaunch,
       innovationScoreAtLaunch: startup.innovationScoreAtLaunch,
       teamSize: startup.founderIds.length,
       ...(startup.pitchDeckUrl ? { pitchDeckUrl: startup.pitchDeckUrl } : {}),

@@ -2,6 +2,7 @@ import { ChangeEvent, FormEvent, useMemo, useState } from "react";
 import { isAxiosError } from "axios";
 import { Link, useNavigate } from "react-router-dom";
 import { BusinessLogo } from "../../components/branding/BusinessLogo";
+import { AuthPasswordField } from "./AuthPasswordField";
 import { useRegisterRequestMutation } from "./useAuth";
 import {
   InstitutionRegulatoryBody,
@@ -348,21 +349,21 @@ export function RequestAccessPage() {
               className="w-full rounded border border-slate-300 p-2.5 text-slate-950"
               required
             />
-            <input
-              type="password"
-              placeholder="Password"
+            <AuthPasswordField
               value={formData.password}
               onChange={(e) => updateField("password", e.target.value)}
-              className="w-full rounded border border-slate-300 p-2.5 text-slate-950"
+              placeholder="Password"
+              inputClassName="w-full rounded border border-slate-300 p-2.5 pr-12 text-slate-950"
               required
+              autoComplete="new-password"
             />
-            <input
-              type="password"
-              placeholder="Confirm Password"
+            <AuthPasswordField
               value={formData.confirmPassword}
               onChange={(e) => updateField("confirmPassword", e.target.value)}
-              className="w-full rounded border border-slate-300 p-2.5 text-slate-950"
+              placeholder="Confirm Password"
+              inputClassName="w-full rounded border border-slate-300 p-2.5 pr-12 text-slate-950"
               required
+              autoComplete="new-password"
             />
           </div>
 

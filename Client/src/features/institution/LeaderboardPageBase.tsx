@@ -6,10 +6,10 @@ import { Button } from '../../components/ui/Button';
 import { Card } from '../../components/ui/Card';
 import { Input } from '../../components/ui/Input';
 import { Spinner } from '../../components/ui/Spinner';
+import { MAX_INNOVATION_SCORE } from '../../constants/score';
 import { StudentJourneyDrawerBase } from './StudentJourneyDrawerBase';
 import { getScoreSocket } from '../../lib/socket';
 import { LeaderboardPage, StudentJourney, StudentLeaderboardItem } from '../../types/school.types';
-import { MAX_INNOVATION_SCORE } from '../../constants/score';
 
 type Props = {
   mode: 'school' | 'college';

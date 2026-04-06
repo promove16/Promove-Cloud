@@ -22,6 +22,8 @@ import {
 import { DashboardLayout } from "../components/DashboardLayout";
 import { problemBankApi } from "../../api/problemBank.api";
 import { Problem, ProblemLeaderboardEntry } from "../../types/problem.types";
+import { useAuthStore } from "../../store/authStore";
+import { UserRole } from "../../types/roles.types";
 
 const categoryOptions = [
   "All Problems",
@@ -97,12 +99,15 @@ const leaderboardRow = (entry: ProblemLeaderboardEntry) => (
 export function ProblemBank() {
   const navigate = useNavigate();
   const queryClient = useQueryClient();
+  const authUser = useAuthStore((state) => state.user);
   const [selectedCategory, setSelectedCategory] = useState("All Problems");
   const [searchValue, setSearchValue] = useState("");
   const [selectedProblemId, setSelectedProblemId] = useState<string | null>(null);
   const [feedback, setFeedback] = useState("");
   const [reviewNote, setReviewNote] = useState("");
   const deferredSearchQuery = useDeferredValue(searchValue.trim());
+  const viewerRole = authUser?.role ?? UserRole.STUDENT;
+  const canClaimProblems = viewerRole === UserRole.STUDENT;
 
   const problemsQuery = useInfiniteQuery({
     queryKey: ["problems", selectedCategory, deferredSearchQuery],
@@ -216,17 +221,19 @@ export function ProblemBank() {
   };
 
   return (
-    <DashboardLayout role="student">
+    <DashboardLayout role={viewerRole}>
       <div className="space-y-6">
         <div className="flex flex-col gap-4 md:flex-row md:items-center md:justify-between">
           <div>
             <h1 className="mb-2 text-3xl font-bold text-white">Problem Bank</h1>
             <p className="text-slate-400">
-              Admin-curated assignments with team review and per-problem ranking.
+              Admin-curated challenges with leaderboard ranking and workspace-linked review.
             </p>
           </div>
           <div className="rounded-xl border border-slate-800 bg-slate-900 px-5 py-3 text-sm text-slate-300">
-            Complete the problem, request admin review, and earn leaderboard points.
+            {canClaimProblems
+              ? "Complete the problem, request admin review, and earn innovation points."
+              : "Browse admin-provided challenges, review requirements, and track approved leaderboard entries."}
           </div>
         </div>
 
@@ -360,7 +367,7 @@ export function ProblemBank() {
                         </div>
                         {problem.stats.topPointsAwarded > 0 ? (
                           <div className="text-cyan-300">
-                            Top score: {problem.stats.topPointsAwarded} pts
+                            Top score: {problem.stats.topPointsAwarded} innovation points
                           </div>
                         ) : null}
                       </div>
@@ -386,7 +393,7 @@ export function ProblemBank() {
                       >
                         Open Workspace
                       </button>
-                    ) : (
+                    ) : canClaimProblems ? (
                       <button
                         onClick={() => claimMutation.mutate(problem._id)}
                         disabled={claimMutation.isPending}
@@ -394,6 +401,10 @@ export function ProblemBank() {
                       >
                         {startingProblemId === problem._id ? "Starting..." : "Start Problem"}
                       </button>
+                    ) : (
+                      <div className="flex flex-1 items-center justify-center rounded-lg border border-slate-800 bg-slate-950 px-6 py-3 text-sm text-slate-400">
+                        View-only access
+                      </div>
                     )}
                   </div>
                 </div>
@@ -494,7 +505,7 @@ export function ProblemBank() {
                   </div>
                   <div className="rounded-xl border border-slate-800 bg-slate-950 p-4">
                     <div className="mb-2 text-xs uppercase tracking-[0.25em] text-slate-500">
-                      Best Score
+                      Best Innovation Points
                     </div>
                     <div className="text-2xl font-bold text-cyan-300">
                       {selectedProblem.stats.topPointsAwarded} pts
@@ -562,13 +573,12 @@ export function ProblemBank() {
                     {selectedProblem.viewerState.status === "approved" ? (
                       <div className="mt-4 rounded-lg border border-emerald-500/20 bg-emerald-500/10 p-3 text-sm text-emerald-200">
                         Approved. Your team earned{" "}
-                        {selectedProblem.viewerState.pointsAwarded ?? 0} leaderboard
-                        points for this problem.
+                        {selectedProblem.viewerState.pointsAwarded ?? 0} innovation points for this problem.
                       </div>
                     ) : selectedProblem.viewerState.status === "review_requested" ? (
                       <div className="mt-4 rounded-lg border border-amber-500/20 bg-amber-500/10 p-3 text-sm text-amber-200">
                         Review request sent. The admin team will verify your
-                        completion and award points.
+                        completion and award innovation points.
                       </div>
                     ) : (
                       <div className="mt-4 space-y-3">
@@ -750,7 +760,7 @@ export function ProblemBank() {
                   >
                     Open Workspace
                   </button>
-                ) : (
+                ) : canClaimProblems ? (
                   <button
                     type="button"
                     onClick={() => claimMutation.mutate(selectedProblem._id)}
@@ -759,7 +769,7 @@ export function ProblemBank() {
                   >
                     {startingProblemId === selectedProblem._id ? "Starting..." : "Start Problem"}
                   </button>
-                )}
+                ) : null}
               </div>
             </div>
           </div>

@@ -254,6 +254,27 @@ const connectedAccountSchema = new Schema<IUser['connectedAccounts']['github']>(
   { _id: false },
 );
 
+const termsAcceptanceSchema = new Schema<NonNullable<IUser['termsAcceptance']>>(
+  {
+    version: {
+      type: String,
+      required: true,
+      trim: true,
+      maxlength: 50,
+    },
+    acceptedAt: {
+      type: Date,
+      required: true,
+    },
+    sector: {
+      type: String,
+      enum: USER_ROLES,
+      required: true,
+    },
+  },
+  { _id: false },
+);
+
 const skillSchema = new Schema<IUser['skills'][number]>(
   {
     name: {
@@ -791,27 +812,6 @@ const githubProofSchema = new Schema<IUser['githubProof']>(
     lastSyncedAt: {
       type: Date,
       default: null,
-    },
-  },
-  { _id: false },
-);
-
-const termsAcceptanceSchema = new Schema<NonNullable<IUser['termsAcceptance']>>(
-  {
-    version: {
-      type: String,
-      required: true,
-      trim: true,
-      maxlength: 50,
-    },
-    acceptedAt: {
-      type: Date,
-      required: true,
-    },
-    sector: {
-      type: String,
-      enum: USER_ROLES,
-      required: true,
     },
   },
   { _id: false },

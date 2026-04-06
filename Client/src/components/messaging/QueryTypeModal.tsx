@@ -1,5 +1,5 @@
-import { useState } from 'react';
-import { X, MessageSquare, GraduationCap, TrendingUp, Building2, ChevronRight } from 'lucide-react';
+import { useEffect, useState } from 'react';
+import { X, MessageSquare, GraduationCap, TrendingUp, Building2, ChevronRight, Users } from 'lucide-react';
 import { QueryType } from '../../api/dm.api';
 import { getVisibleAssociationQueryTypes, isAssociationQueryType } from './queryTypeVisibility';
 
@@ -9,6 +9,7 @@ interface QueryTypeModalProps {
   onSelect: (queryType: QueryType, customMessage?: string) => void;
   recipientName: string;
   recipientRole?: string;
+  initialQueryType?: QueryType | null;
 }
 
 interface QueryTemplate {
@@ -31,6 +32,18 @@ const queryTemplates: QueryTemplate[] = [
       'Hi! I am working on a project and would love to get your guidance and mentorship. Would you be interested in helping me navigate the challenges?',
       'Hello! I came across your profile and I am impressed by your experience. I am looking for a mentor who can help me with my startup project. Would you have some time to connect?',
       'Hi! I believe your expertise would be valuable for my project. I am looking for a mentor who can provide insights and direction. Are you open to mentoring?',
+    ],
+  },
+  {
+    type: 'project_join',
+    label: 'Project Join',
+    description: 'Request to join their project or startup',
+    icon: <Users className="h-5 w-5" />,
+    color: 'from-fuchsia-500 to-indigo-500',
+    autoMessages: [
+      'Hi! I came across your work on ProMove and would love to join your project if you are open to collaborators.',
+      'Hello! Your project looks interesting. I would like to contribute and explore joining your team.',
+      'Hi! I am interested in joining your project and can contribute across execution, research, or product work. Would you be open to discussing it?',
     ],
   },
   {
@@ -71,7 +84,14 @@ const queryTemplates: QueryTemplate[] = [
   },
 ];
 
-export function QueryTypeModal({ isOpen, onClose, onSelect, recipientName, recipientRole }: QueryTypeModalProps) {
+export function QueryTypeModal({
+  isOpen,
+  onClose,
+  onSelect,
+  recipientName,
+  recipientRole,
+  initialQueryType,
+}: QueryTypeModalProps) {
   const [selectedType, setSelectedType] = useState<QueryTemplate | null>(null);
   const [customMessage, setCustomMessage] = useState('');
   const [showCustomInput, setShowCustomInput] = useState(false);
@@ -83,6 +103,30 @@ export function QueryTypeModal({ isOpen, onClose, onSelect, recipientName, recip
 
     return visibleAssociationTypes.has(template.type);
   });
+
+  useEffect(() => {
+    if (!isOpen) {
+      return;
+    }
+
+    if (initialQueryType) {
+      const initialTemplate =
+        visibleTemplates.find((template) => template.type === initialQueryType) ?? null;
+
+      if (initialTemplate && selectedType?.type !== initialTemplate.type) {
+        setSelectedType(initialTemplate);
+        setShowCustomInput(true);
+        setCustomMessage('');
+        return;
+      }
+    }
+
+    if (!initialQueryType) {
+      setSelectedType(null);
+      setShowCustomInput(false);
+      setCustomMessage('');
+    }
+  }, [initialQueryType, isOpen, recipientRole, selectedType?.type]);
 
   if (!isOpen) return null;
 

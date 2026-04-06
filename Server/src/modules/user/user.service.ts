@@ -306,12 +306,6 @@ export const getCurrentUser = async (userId: string) => {
   return toSanitizedUser(user.toObject() as UserLike);
 };
 
-export const recordCurrentUserActivity = async (userId: string, payload: unknown) => {
-  const parsed = recordClientActivitySchema.parse(payload);
-  await recordClientActivity(userId, parsed);
-  return { tracked: true };
-};
-
 export const acceptCurrentTerms = async (
   userId: string,
   payload: z.infer<typeof acceptTermsSchema>,
@@ -334,6 +328,12 @@ export const acceptCurrentTerms = async (
   await user.save();
 
   return toSanitizedUser(user.toObject() as UserLike);
+};
+
+export const recordCurrentUserActivity = async (userId: string, payload: unknown) => {
+  const parsed = recordClientActivitySchema.parse(payload);
+  await recordClientActivity(userId, parsed);
+  return { tracked: true };
 };
 
 const extractGithubUsername = (githubUrl: string) => {

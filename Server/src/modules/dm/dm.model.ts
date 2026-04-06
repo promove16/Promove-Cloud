@@ -1,7 +1,6 @@
 import { Schema, model, Document, Types } from 'mongoose';
-import { TemporaryMemoryMode, DEFAULT_TEMPORARY_MEMORY_MODE } from '../temporaryMemory/temporaryMemory.constants';
 
-export type QueryType = 'project_mentor' | 'investor' | 'recruiter' | 'general';
+export type QueryType = 'project_mentor' | 'project_join' | 'investor' | 'recruiter' | 'general';
 
 export interface IDirectMessage extends Document {
   senderId: Types.ObjectId;
@@ -10,14 +9,11 @@ export interface IDirectMessage extends Document {
   attachmentUrl?: string;
   attachmentType?: 'image' | 'pdf';
   attachmentName?: string;
-  attachmentPublicId?: string;
   /** ISO string for interview scheduling messages */
   scheduledAt?: Date;
   meetLink?: string;
   messageType: 'text' | 'interview_request';
   queryType?: QueryType;
-  memoryMode: TemporaryMemoryMode;
-  expiresAt?: Date;
   readAt?: Date;
   sentAt: Date;
 }
@@ -30,17 +26,14 @@ const directMessageSchema = new Schema<IDirectMessage>(
     attachmentUrl: { type: String, default: undefined },
     attachmentType: { type: String, enum: ['image', 'pdf'], default: undefined },
     attachmentName: { type: String, default: undefined },
-    attachmentPublicId: { type: String, default: undefined },
     scheduledAt: { type: Date, default: undefined },
     meetLink: { type: String, default: undefined },
     messageType: { type: String, enum: ['text', 'interview_request'], default: 'text' },
-    queryType: { type: String, enum: ['project_mentor', 'investor', 'recruiter', 'general'], default: 'general' },
-    memoryMode: {
+    queryType: {
       type: String,
-      enum: ['standard', 'temporary'],
-      default: DEFAULT_TEMPORARY_MEMORY_MODE,
+      enum: ['project_mentor', 'project_join', 'investor', 'recruiter', 'general'],
+      default: 'general',
     },
-    expiresAt: { type: Date, default: undefined },
     readAt: { type: Date, default: undefined },
     sentAt: { type: Date, default: () => new Date() },
   },
@@ -50,6 +43,6 @@ const directMessageSchema = new Schema<IDirectMessage>(
 // Index for fetching conversation between two users
 directMessageSchema.index({ senderId: 1, recipientId: 1, sentAt: -1 });
 directMessageSchema.index({ recipientId: 1, sentAt: -1 });
-directMessageSchema.index({ memoryMode: 1, expiresAt: 1 });
+directMessageSchema.index({ sentAt: 1 }, { expireAfterSeconds: 48 * 60 * 60 });
 
 export const DirectMessage = model<IDirectMessage>('DirectMessage', directMessageSchema);

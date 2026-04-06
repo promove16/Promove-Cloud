@@ -216,6 +216,23 @@ const connectedAccountSchema = new mongoose_1.Schema({
         default: null,
     },
 }, { _id: false });
+const termsAcceptanceSchema = new mongoose_1.Schema({
+    version: {
+        type: String,
+        required: true,
+        trim: true,
+        maxlength: 50,
+    },
+    acceptedAt: {
+        type: Date,
+        required: true,
+    },
+    sector: {
+        type: String,
+        enum: roles_types_1.USER_ROLES,
+        required: true,
+    },
+}, { _id: false });
 const skillSchema = new mongoose_1.Schema({
     name: {
         type: String,
@@ -829,6 +846,10 @@ const userSchema = new mongoose_1.Schema({
     mustChangePasswordOnNextLogin: {
         type: Boolean,
         default: false,
+    },
+    termsAcceptance: {
+        type: termsAcceptanceSchema,
+        default: null,
     },
     institutionToken: {
         type: String,

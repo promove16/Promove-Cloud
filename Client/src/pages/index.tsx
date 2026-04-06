@@ -172,9 +172,14 @@ const StartupLaunch = lazy(() =>
     default: module.StartupLaunch,
   })),
 );
-const PortfolioPage = lazy(() =>
-  import("../app/pages/LeadershipProfile").then((module) => ({
-    default: module.LeadershipProfile,
+const Portfolio = lazy(() =>
+  import("../app/pages/Portfolio").then((module) => ({
+    default: module.Portfolio,
+  })),
+);
+const InnovationScorePage = lazy(() =>
+  import("../app/pages/InnovationScore").then((module) => ({
+    default: module.InnovationScorePage,
   })),
 );
 const Marketplace = lazy(() =>
@@ -185,11 +190,6 @@ const Marketplace = lazy(() =>
 const MarketplaceDetail = lazy(() =>
   import("../app/pages/MarketplaceDetail").then((module) => ({
     default: module.MarketplaceDetail,
-  })),
-);
-const MarketplaceJobDetail = lazy(() =>
-  import("../features/student/MarketplaceJobDetail").then((module) => ({
-    default: module.MarketplaceJobDetail,
   })),
 );
 const PublicStudentProfilePage = lazy(() =>
@@ -298,6 +298,27 @@ function ProtectedRoleRoute({
   return children ? <>{children}</> : <Outlet />;
 }
 
+function ProtectedRolesRoute({
+  roles,
+  children,
+}: PropsWithChildren<{ roles: UserRole[] }>) {
+  const route = useProtectedRoute(roles);
+
+  if (route.status === "loading") {
+    return (
+      <div className="flex min-h-[40vh] items-center justify-center">
+        <Spinner />
+      </div>
+    );
+  }
+
+  if (route.status !== "authorized") {
+    return <Navigate to={route.redirectTo} replace />;
+  }
+
+  return children ? <>{children}</> : <Outlet />;
+}
+
 function ProtectedAnyRoute({ children }: PropsWithChildren) {
   const route = useProtectedRoute();
 
@@ -325,6 +346,15 @@ function DashboardIndexRedirect() {
 
   return <Navigate to={roleRedirect(user.role)} replace />;
 }
+
+const NON_ADMIN_DASHBOARD_ROLES = [
+  UserRole.STUDENT,
+  UserRole.SCHOOL,
+  UserRole.COLLEGE,
+  UserRole.MENTOR,
+  UserRole.INVESTOR,
+  UserRole.RECRUITER,
+];
 
 export const router = createBrowserRouter([
   {
@@ -399,9 +429,9 @@ export const router = createBrowserRouter([
       {
         path: "/problem-bank",
         element: (
-          <ProtectedRoleRoute role={UserRole.STUDENT}>
+          <ProtectedRolesRoute roles={NON_ADMIN_DASHBOARD_ROLES}>
             <LazyPage component={ProblemBank} />
-          </ProtectedRoleRoute>
+          </ProtectedRolesRoute>
         ),
       },
       {
@@ -456,39 +486,27 @@ export const router = createBrowserRouter([
         ],
       },
       {
-        path: "/leadership-profile",
-        element: <Navigate to="/portfolio" replace />,
-      },
-      {
         path: "/portfolio",
         element: (
-          <ProtectedRoleRoute role={UserRole.STUDENT}>
-            <LazyPage component={PortfolioPage} />
-          </ProtectedRoleRoute>
+          <ProtectedAnyRoute>
+            <LazyPage component={Portfolio} />
+          </ProtectedAnyRoute>
         ),
       },
       {
         path: "/marketplace",
         element: (
-          <ProtectedAnyRoute>
+          <ProtectedRolesRoute roles={NON_ADMIN_DASHBOARD_ROLES}>
             <LazyPage component={Marketplace} />
-          </ProtectedAnyRoute>
+          </ProtectedRolesRoute>
         ),
       },
       {
         path: "/marketplace/view/:entityType/:entityId",
         element: (
-          <ProtectedAnyRoute>
+          <ProtectedRolesRoute roles={NON_ADMIN_DASHBOARD_ROLES}>
             <LazyPage component={MarketplaceDetail} />
-          </ProtectedAnyRoute>
-        ),
-      },
-      {
-        path: "/marketplace/jobs/:jobId",
-        element: (
-          <ProtectedRoleRoute role={UserRole.STUDENT}>
-            <LazyPage component={MarketplaceJobDetail} />
-          </ProtectedRoleRoute>
+          </ProtectedRolesRoute>
         ),
       },
       {
@@ -516,6 +534,7 @@ export const router = createBrowserRouter([
             element: <ProtectedRoleRoute role={UserRole.STUDENT} />,
             children: [
               { index: true, element: <LazyPage component={LegacyStudentDashboard} /> },
+              { path: "score", element: <LazyPage component={InnovationScorePage} /> },
               { path: "mentor-sessions", element: <LazyPage component={StudentMentorSessions} /> },
               { path: "investor-deals", element: <Navigate to="/startup-launch" replace /> },
             ],

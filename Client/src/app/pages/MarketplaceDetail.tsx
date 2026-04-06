@@ -26,7 +26,6 @@ import {
   MarketplaceStartupItem,
   MarketplaceUserDetail,
   marketplaceApi,
-  normalizeMarketplaceEntityType,
 } from "../../api/marketplace.api";
 import { useAuthStore } from "../../store/authStore";
 import { UserRole } from "../../types/roles.types";
@@ -43,11 +42,21 @@ const dateFormatter = new Intl.DateTimeFormat("en-IN", {
   year: "numeric",
 });
 
+const validEntityTypes = new Set<MarketplaceEntityType>(["student", "mentor", "investor", "recruiter", "startup"]);
+
+const getMarketplaceQueryType = (role?: string | null) => {
+  if (role === UserRole.MENTOR) return "project_mentor" as const;
+  if (role === UserRole.INVESTOR) return "investor" as const;
+  if (role === UserRole.RECRUITER) return "recruiter" as const;
+  if (role === UserRole.STUDENT) return "project_join" as const;
+  return "general" as const;
+};
+
 const getDashboardRole = (role?: UserRole) => role ?? UserRole.STUDENT;
 
 const formatDate = (value?: string) => (value ? dateFormatter.format(new Date(value)) : "Not specified");
 
-const formatRole = (value: string) => (value === "recruiter" ? "HR" : value.charAt(0).toUpperCase() + value.slice(1));
+const formatRole = (value: string) => value.charAt(0).toUpperCase() + value.slice(1);
 
 const isStartupDetail = (entity: MarketplaceEntityDetail): entity is MarketplaceStartupDetail => entity.entityType === "startup";
 
@@ -77,7 +86,10 @@ export function MarketplaceDetail() {
   const { entityType: entityTypeParam, entityId } = useParams();
 
   const entityType = useMemo(
-    () => normalizeMarketplaceEntityType(entityTypeParam) ?? null,
+    () =>
+      entityTypeParam && validEntityTypes.has(entityTypeParam as MarketplaceEntityType)
+        ? (entityTypeParam as MarketplaceEntityType)
+        : null,
     [entityTypeParam],
   );
 
@@ -89,12 +101,11 @@ export function MarketplaceDetail() {
 
   const entity = detailQuery.data;
 
-  const handleMessage = (targetId: string) => {
-    const storageKey = `dm_first_contact_${targetId}`;
-    if (!localStorage.getItem(storageKey)) {
-      localStorage.setItem(storageKey, "true");
-    }
-    navigate(`/dashboard/messages/${targetId}`);
+  const handleMessage = (targetId: string, queryType?: string) => {
+    const nextPath = queryType
+      ? `/dashboard/messages/${targetId}?queryType=${encodeURIComponent(queryType)}`
+      : `/dashboard/messages/${targetId}`;
+    navigate(nextPath);
   };
 
   if (!entityType || !entityId) {
@@ -134,9 +145,19 @@ export function MarketplaceDetail() {
 
         {entity ? (
           isStartupDetail(entity) ? (
-            <StartupDetailView entity={entity} onMessage={handleMessage} />
+            <StartupDetailView
+              entity={entity}
+              onMessage={handleMessage}
+              isStudentViewer={authUser?.role === UserRole.STUDENT}
+              currentUserId={authUser?._id}
+            />
           ) : (
-            <ProfileDetailView entity={entity} onMessage={handleMessage} />
+            <ProfileDetailView
+              entity={entity}
+              onMessage={handleMessage}
+              isStudentViewer={authUser?.role === UserRole.STUDENT}
+              currentUserId={authUser?._id}
+            />
           )
         ) : null}
       </div>
@@ -147,10 +168,16 @@ export function MarketplaceDetail() {
 function StartupDetailView({
   entity,
   onMessage,
+  isStudentViewer,
+  currentUserId,
 }: {
   entity: MarketplaceStartupDetail;
-  onMessage: (targetId: string) => void;
+  onMessage: (targetId: string, queryType?: string) => void;
+  isStudentViewer: boolean;
+  currentUserId?: string;
 }) {
+  const canRequestJoin = Boolean(isStudentViewer && entity.primaryFounderId && entity.primaryFounderId !== currentUserId);
+
   return (
     <div className="space-y-6">
       <section className="relative overflow-hidden rounded-[32px] border border-white/10 bg-[#070816] px-6 py-7 shadow-[0_30px_120px_rgba(15,23,42,0.45)] sm:px-8">
@@ -174,9 +201,18 @@ function StartupDetailView({
           </div>
 
           <div className="flex flex-wrap items-center gap-3">
+            {canRequestJoin ? (
+              <button
+                onClick={() => onMessage(entity.primaryFounderId!, "project_join")}
+                className="inline-flex items-center gap-2 rounded-full border border-fuchsia-400/30 bg-fuchsia-400/10 px-4 py-2 text-sm font-semibold text-fuchsia-100 transition hover:bg-fuchsia-400/20"
+              >
+                <Users className="h-4 w-4" />
+                Request to Join
+              </button>
+            ) : null}
             {entity.primaryFounderId ? (
               <button
-                onClick={() => onMessage(entity.primaryFounderId!)}
+                onClick={() => onMessage(entity.primaryFounderId!, "general")}
                 className="inline-flex items-center gap-2 rounded-full border border-white/10 bg-white/5 px-4 py-2 text-sm font-medium text-white transition hover:border-white/20 hover:bg-white/10"
               >
                 <MessageCircle className="h-4 w-4" />
@@ -310,11 +346,18 @@ function StartupDetailView({
 function ProfileDetailView({
   entity,
   onMessage,
+  isStudentViewer,
+  currentUserId,
 }: {
   entity: MarketplaceUserDetail;
-  onMessage: (targetId: string) => void;
+  onMessage: (targetId: string, queryType?: string) => void;
+  isStudentViewer: boolean;
+  currentUserId?: string;
 }) {
   const links = linkList(entity);
+  const isSelfProfile = entity._id === currentUserId;
+  const canRequestJoin = isStudentViewer && entity.entityType === "student" && !isSelfProfile;
+  const canMessage = !isSelfProfile;
 
   return (
     <div className="space-y-6">
@@ -352,13 +395,24 @@ function ProfileDetailView({
           </div>
 
           <div className="flex flex-wrap items-center gap-3">
-            <button
-              onClick={() => onMessage(entity._id)}
-              className="inline-flex items-center gap-2 rounded-full border border-white/10 bg-white/5 px-4 py-2 text-sm font-medium text-white transition hover:border-white/20 hover:bg-white/10"
-            >
-              <MessageCircle className="h-4 w-4" />
-              Message
-            </button>
+            {canRequestJoin ? (
+              <button
+                onClick={() => onMessage(entity._id, "project_join")}
+                className="inline-flex items-center gap-2 rounded-full border border-fuchsia-400/30 bg-fuchsia-400/10 px-4 py-2 text-sm font-semibold text-fuchsia-100 transition hover:bg-fuchsia-400/20"
+              >
+                <Users className="h-4 w-4" />
+                Request to Join
+              </button>
+            ) : null}
+            {canMessage ? (
+              <button
+                onClick={() => onMessage(entity._id, getMarketplaceQueryType(entity.role))}
+                className="inline-flex items-center gap-2 rounded-full border border-white/10 bg-white/5 px-4 py-2 text-sm font-medium text-white transition hover:border-white/20 hover:bg-white/10"
+              >
+                <MessageCircle className="h-4 w-4" />
+                Message
+              </button>
+            ) : null}
             {links.map((link) => {
               const Icon = link.icon;
               return (
@@ -426,7 +480,7 @@ function ProfileDetailView({
                       <div>
                         <div className="text-lg font-semibold text-white">{experience.title}</div>
                         <div className="mt-1 text-sm text-cyan-200">
-                          {experience.company} - {experience.type.replace(/_/g, " ")}
+                          {experience.company} - {experience.type.split("_").join(" ")}
                         </div>
                         <div className="mt-2 flex flex-wrap gap-2 text-xs text-slate-400">
                           {experience.location ? <span>{experience.location}</span> : null}

@@ -1,10 +1,11 @@
 "use strict";
 Object.defineProperty(exports, "__esModule", { value: true });
-exports.getPublicStudentProfileBySlug = exports.updateCurrentUser = exports.launchCurrentUserToRecruiters = exports.getCurrentUserMentorSessions = exports.importCurrentUserGithubRepositories = exports.listCurrentUserGithubRepositories = exports.syncCurrentUserGithubProof = exports.connectGithubForCurrentUserFromCallback = exports.beginGithubOauthForCurrentUser = exports.enrichCurrentUserFromSocialLinks = exports.recordCurrentUserActivity = exports.getCurrentUser = exports.toSanitizedUser = exports.importGithubRepositoriesSchema = exports.socialEnrichSchema = exports.updateMeSchema = void 0;
+exports.getPublicStudentProfileBySlug = exports.updateCurrentUser = exports.launchCurrentUserToRecruiters = exports.getCurrentUserMentorSessions = exports.importCurrentUserGithubRepositories = exports.listCurrentUserGithubRepositories = exports.syncCurrentUserGithubProof = exports.connectGithubForCurrentUserFromCallback = exports.beginGithubOauthForCurrentUser = exports.enrichCurrentUserFromSocialLinks = exports.recordCurrentUserActivity = exports.acceptCurrentTerms = exports.getCurrentUser = exports.toSanitizedUser = exports.acceptTermsSchema = exports.importGithubRepositoriesSchema = exports.socialEnrichSchema = exports.updateMeSchema = void 0;
 const mongoose_1 = require("mongoose");
 const zod_1 = require("zod");
 const crypto_1 = require("crypto");
 const user_model_1 = require("./user.model");
+const user_terms_1 = require("./user.terms");
 const ApiError_1 = require("../../utils/ApiError");
 const activity_service_1 = require("../analytics/activity.service");
 const mentorSession_model_1 = require("../mentor/mentorSession.model");
@@ -42,6 +43,9 @@ exports.socialEnrichSchema = zod_1.z.object({
 });
 exports.importGithubRepositoriesSchema = zod_1.z.object({
     repoIds: zod_1.z.array(zod_1.z.string().trim().min(1)).min(1).max(8),
+});
+exports.acceptTermsSchema = zod_1.z.object({
+    version: zod_1.z.string().trim().min(1).max(50),
 });
 const GITHUB_PROFILE_ROLES = new Set([roles_types_1.UserRole.STUDENT, roles_types_1.UserRole.MENTOR]);
 const supportsGithubProfile = (role) => GITHUB_PROFILE_ROLES.has(role);
@@ -171,6 +175,9 @@ const toSanitizedUser = (user) => ({
     ...(user.lastLogin ? { lastLogin: user.lastLogin } : {}),
     discoverableToRecruiters: user.discoverableToRecruiters ?? false,
     mustChangePasswordOnNextLogin: user.mustChangePasswordOnNextLogin ?? false,
+    termsAcceptance: user.termsAcceptance ?? null,
+    termsCurrentVersion: user_terms_1.CURRENT_TERMS_VERSION,
+    hasAcceptedCurrentTerms: (0, user_terms_1.hasAcceptedCurrentTerms)(user.role, user.termsAcceptance),
     ...(user.institutionToken !== undefined ? { institutionToken: user.institutionToken ?? null } : {}),
     ...(user.institutionId ? { institutionId: user.institutionId.toString() } : { institutionId: null }),
     ...(user.institutionProfile ? { institutionProfile: user.institutionProfile } : {}),
@@ -247,6 +254,19 @@ const getCurrentUser = async (userId) => {
     return (0, exports.toSanitizedUser)(user.toObject());
 };
 exports.getCurrentUser = getCurrentUser;
+const acceptCurrentTerms = async (userId, payload) => {
+    if (payload.version !== user_terms_1.CURRENT_TERMS_VERSION) {
+        throw new ApiError_1.ApiError(409, 'TERMS_VERSION_MISMATCH', 'The Terms & Conditions were updated. Please reload and review the latest version.');
+    }
+    const user = await user_model_1.User.findById(userId);
+    if (!user) {
+        throw new ApiError_1.ApiError(404, 'USER_NOT_FOUND', 'User not found');
+    }
+    user.termsAcceptance = (0, user_terms_1.buildTermsAcceptance)(user.role);
+    await user.save();
+    return (0, exports.toSanitizedUser)(user.toObject());
+};
+exports.acceptCurrentTerms = acceptCurrentTerms;
 const recordCurrentUserActivity = async (userId, payload) => {
     const parsed = activity_service_1.recordClientActivitySchema.parse(payload);
     await (0, activity_service_1.recordClientActivity)(userId, parsed);

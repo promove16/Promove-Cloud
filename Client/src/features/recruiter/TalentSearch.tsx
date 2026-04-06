@@ -8,8 +8,10 @@ import { Button } from '../../components/ui/Button';
 import { Card } from '../../components/ui/Card';
 import { Input } from '../../components/ui/Input';
 import { Spinner } from '../../components/ui/Spinner';
+import { MAX_INNOVATION_SCORE } from '../../constants/score';
 import { StudentProfileDrawer } from './StudentProfileDrawer';
-import { MAX_INNOVATION_SCORE, SCORE_MARKS } from '../../constants/score';
+
+const scoreMarks = [0, 250, 500, 750, 1000];
 
 export default function TalentSearch() {
   const navigate = useNavigate();
@@ -17,7 +19,7 @@ export default function TalentSearch() {
   const [domain, setDomain] = useState('');
   const [institution, setInstitution] = useState('');
   const [minScore, setMinScore] = useState(0);
-  const [maxScore, setMaxScore] = useState(200);
+  const [maxScore, setMaxScore] = useState(MAX_INNOVATION_SCORE);
   const [selectedStudentId, setSelectedStudentId] = useState<string | null>(null);
 
   const params = useMemo(
@@ -173,7 +175,7 @@ export default function TalentSearch() {
               className="w-full"
             />
             <div className="mt-2 flex justify-between text-xs text-slate-500">
-              {SCORE_MARKS.map((mark) => (
+              {scoreMarks.map((mark) => (
                 <span key={mark}>{mark}</span>
               ))}
             </div>

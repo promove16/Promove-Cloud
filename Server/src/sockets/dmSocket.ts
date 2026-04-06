@@ -5,14 +5,10 @@ import { env } from '../config/env';
 import { DirectMessage } from '../modules/dm/dm.model';
 import { onlineUsers } from '../modules/dm/dm.controller';
 import { User } from '../modules/user/user.model';
-import {
-  buildTemporaryMemoryMetadata,
-  isTemporaryMemoryMode,
-} from '../modules/temporaryMemory/temporaryMemory.constants';
 
 // Map to store userId -> socket mapping for secure message routing
 const userSockets = new Map<string, Set<Socket>>();
-const allowedQueryTypes = new Set<string>(['project_mentor', 'investor', 'recruiter', 'general']);
+const allowedQueryTypes = new Set<string>(['project_mentor', 'project_join', 'investor', 'recruiter', 'general']);
 
 export const initDmSocket = (io: Server) => {
   const dm = io.of('/dm');
@@ -54,15 +50,13 @@ export const initDmSocket = (io: Server) => {
       attachmentUrl?: string; 
       attachmentType?: string; 
       attachmentName?: string;
-      attachmentPublicId?: string;
-      memoryMode?: string;
       queryType?: string;
     }) => {
       try {
         // CRITICAL: Use the socket's authenticated userId as sender, NOT from payload
         const senderId = userId;
         
-        const { recipientId, message, messageType, scheduledAt, meetLink, attachmentUrl, attachmentType, attachmentName, attachmentPublicId, memoryMode, queryType } = data;
+        const { recipientId, message, messageType, scheduledAt, meetLink, attachmentUrl, attachmentType, attachmentName, queryType } = data;
 
         if (!recipientId || !Types.ObjectId.isValid(recipientId)) {
           socket.emit('dm:error', { message: 'Invalid recipient' });
@@ -93,11 +87,6 @@ export const initDmSocket = (io: Server) => {
           return;
         }
 
-        if (memoryMode !== undefined && !isTemporaryMemoryMode(memoryMode)) {
-          socket.emit('dm:error', { message: 'Invalid temporary memory mode' });
-          return;
-        }
-
         const recipientExists = await User.exists({ _id: recipientId });
         if (!recipientExists) {
           socket.emit('dm:error', { message: 'Recipient not found' });
@@ -111,13 +100,11 @@ export const initDmSocket = (io: Server) => {
           message: normalizedMessage,
           messageType: type,
           queryType: queryType || 'general',
-          ...buildTemporaryMemoryMetadata(memoryMode),
           ...(scheduledAt ? { scheduledAt: new Date(scheduledAt) } : {}),
           ...(meetLink ? { meetLink } : {}),
           ...(attachmentUrl ? { attachmentUrl } : {}),
           ...(attachmentType ? { attachmentType } : {}),
           ...(attachmentName ? { attachmentName } : {}),
-          ...(attachmentPublicId ? { attachmentPublicId } : {}),
         });
 
         // Send ONLY to the intended recipient

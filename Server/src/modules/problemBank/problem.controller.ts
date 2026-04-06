@@ -49,7 +49,7 @@ export const claimProblemController = async (req: Request, res: Response) => {
     throw new ApiError(400, 'PROBLEM_REQUIRED', 'Problem id is required');
   }
   const workspace = await claimProblem(problemId, req.user!._id);
-  res.status(201).json(new ApiResponse(workspace));
+  res.status(200).json(new ApiResponse(workspace));
 };
 
 export const requestProblemReviewController = async (req: Request, res: Response) => {

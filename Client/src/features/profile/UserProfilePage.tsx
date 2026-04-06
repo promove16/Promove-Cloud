@@ -8,11 +8,16 @@ import {
   ExternalLink,
   GitCommitHorizontal,
   Github,
+  Globe,
+  Instagram,
   Linkedin,
+  Link2,
   Mail,
   RefreshCw,
   ShieldCheck,
   Sparkles,
+  Twitter,
+  Youtube,
 } from 'lucide-react';
 import { authApi } from '../../api/auth.api';
 import { GithubRepositoryChoice, SocialEnrichSummary, UserProfile, userApi } from '../../api/user.api';
@@ -99,6 +104,14 @@ type ProfileForm = {
   bio: string;
   domain: string;
   linkedinUrl: string;
+  websiteUrl: string;
+  twitterUrl: string;
+  youtubeUrl: string;
+  behanceUrl: string;
+  dribbbleUrl: string;
+  instagramUrl: string;
+  researchGateUrl: string;
+  mediumUrl: string;
   discoverableToRecruiters: boolean;
 };
 
@@ -157,6 +170,14 @@ export function UserProfilePage() {
     bio: '',
     domain: '',
     linkedinUrl: '',
+    websiteUrl: '',
+    twitterUrl: '',
+    youtubeUrl: '',
+    behanceUrl: '',
+    dribbbleUrl: '',
+    instagramUrl: '',
+    researchGateUrl: '',
+    mediumUrl: '',
     discoverableToRecruiters: false,
   });
 
@@ -171,6 +192,14 @@ export function UserProfilePage() {
       bio: profileQuery.data.bio ?? '',
       domain: profileQuery.data.domain ?? '',
       linkedinUrl: profileQuery.data.linkedinUrl ?? '',
+      websiteUrl: profileQuery.data.websiteUrl ?? '',
+      twitterUrl: profileQuery.data.twitterUrl ?? '',
+      youtubeUrl: profileQuery.data.youtubeUrl ?? '',
+      behanceUrl: profileQuery.data.behanceUrl ?? '',
+      dribbbleUrl: profileQuery.data.dribbbleUrl ?? '',
+      instagramUrl: profileQuery.data.instagramUrl ?? '',
+      researchGateUrl: profileQuery.data.researchGateUrl ?? '',
+      mediumUrl: profileQuery.data.mediumUrl ?? '',
       discoverableToRecruiters: profileQuery.data.discoverableToRecruiters ?? false,
     });
   }, [profileQuery.data]);
@@ -297,13 +326,18 @@ export function UserProfilePage() {
   const githubTopLanguages = profile?.githubStats?.topLanguages ?? [];
   const githubSkills = (profile?.skills ?? []).filter((skill) => skill.source === 'github');
   const githubProjects = (profile?.portfolioProjects ?? []).filter((project) => project.source === 'github');
+  const allSocialLinks = [
+    form.linkedinUrl, form.websiteUrl, form.twitterUrl, form.youtubeUrl,
+    form.behanceUrl, form.dribbbleUrl, form.instagramUrl, form.researchGateUrl, form.mediumUrl,
+    profile?.githubUrl,
+  ];
+  const hasAnySocialLink = allSocialLinks.some((url) => Boolean((url ?? '').trim()));
   const completionItems = [
     Boolean(form.displayName.trim()),
     Boolean(form.bio.trim()),
     Boolean(form.domain.trim()),
     Boolean(form.avatar.trim() || profile?.avatar),
-    !githubRoleSupported || !githubOauthAvailable || githubConnected,
-    Boolean((form.linkedinUrl || profile?.linkedinUrl || '').trim()),
+    hasAnySocialLink,
   ];
   const completionPct = Math.round((completionItems.filter(Boolean).length / completionItems.length) * 100);
   const publicProfileUrl =
@@ -326,6 +360,14 @@ export function UserProfilePage() {
       bio: form.bio.trim() || '',
       domain: form.domain.trim() || '',
       linkedinUrl: form.linkedinUrl.trim() || '',
+      websiteUrl: form.websiteUrl.trim() || '',
+      twitterUrl: form.twitterUrl.trim() || '',
+      youtubeUrl: form.youtubeUrl.trim() || '',
+      behanceUrl: form.behanceUrl.trim() || '',
+      dribbbleUrl: form.dribbbleUrl.trim() || '',
+      instagramUrl: form.instagramUrl.trim() || '',
+      researchGateUrl: form.researchGateUrl.trim() || '',
+      mediumUrl: form.mediumUrl.trim() || '',
       discoverableToRecruiters: currentUser.role === UserRole.STUDENT ? form.discoverableToRecruiters : undefined,
     });
   };
@@ -505,85 +547,135 @@ export function UserProfilePage() {
         </Card>
 
         <Card className="p-6">
-          <div className="mb-4 flex items-center justify-between">
-            <h3 className="text-lg font-semibold text-white">{githubEnabled ? 'Proof Layer' : 'Profile Links'}</h3>
+          <div className="mb-4">
+            <h3 className="text-lg font-semibold text-white">Profile Links</h3>
+            <p className="mt-1 text-sm text-slate-400">Add links relevant to your background — fill in what applies to you.</p>
+          </div>
+
+          <form className="space-y-3" onSubmit={saveProfile}>
+            {/* LinkedIn + fetch */}
+            <div className="rounded-2xl border border-slate-800 bg-slate-950 p-4 space-y-3">
+              <div className="flex items-center gap-2 text-sm font-semibold text-white"><Linkedin className="h-4 w-4 text-cyan-300" />LinkedIn</div>
+              <input type="url" value={form.linkedinUrl} onChange={(event) => setForm((current) => ({ ...current, linkedinUrl: event.target.value }))} className="w-full rounded-xl border border-slate-800 bg-slate-900 px-3 py-2 text-sm text-white outline-none focus:border-cyan-500" placeholder="https://linkedin.com/in/your-profile" />
+              <div className="flex flex-wrap items-center justify-between gap-2">
+                <label className="flex items-center gap-2 text-sm text-slate-400 cursor-pointer">
+                  <input type="checkbox" checked={confirmLinkedinFetch} onChange={(event) => setConfirmLinkedinFetch(event.target.checked)} className="h-4 w-4 rounded border-slate-600 bg-slate-900 text-cyan-500 focus:ring-cyan-500" />
+                  Import public LinkedIn data
+                </label>
+                <Button variant="secondary" className="px-3 py-2 text-xs" onClick={() => socialMutation.mutate({ ...(form.linkedinUrl.trim() ? { linkedinUrl: form.linkedinUrl.trim(), confirmLinkedinFetch } : {}) })} disabled={isBusy || !form.linkedinUrl.trim()}>
+                  {socialMutation.isPending ? 'Fetching...' : 'Fetch'}
+                </Button>
+              </div>
+            </div>
+
+            {/* Website */}
+            <label className="block rounded-2xl border border-slate-800 bg-slate-950 p-4 space-y-2">
+              <div className="flex items-center gap-2 text-sm font-semibold text-white"><Globe className="h-4 w-4 text-cyan-300" />Personal Website / Portfolio</div>
+              <input type="url" value={form.websiteUrl} onChange={(event) => setForm((current) => ({ ...current, websiteUrl: event.target.value }))} className="w-full rounded-xl border border-slate-800 bg-slate-900 px-3 py-2 text-sm text-white outline-none focus:border-cyan-500" placeholder="https://yourportfolio.com" />
+            </label>
+
+            {/* Twitter/X */}
+            <label className="block rounded-2xl border border-slate-800 bg-slate-950 p-4 space-y-2">
+              <div className="flex items-center gap-2 text-sm font-semibold text-white"><Twitter className="h-4 w-4 text-cyan-300" />Twitter / X</div>
+              <input type="url" value={form.twitterUrl} onChange={(event) => setForm((current) => ({ ...current, twitterUrl: event.target.value }))} className="w-full rounded-xl border border-slate-800 bg-slate-900 px-3 py-2 text-sm text-white outline-none focus:border-cyan-500" placeholder="https://twitter.com/yourhandle" />
+            </label>
+
+            {/* Creative platforms row */}
+            <div className="grid gap-3 sm:grid-cols-2">
+              <label className="block rounded-2xl border border-slate-800 bg-slate-950 p-4 space-y-2">
+                <div className="flex items-center gap-2 text-sm font-semibold text-white">
+                  <Link2 className="h-4 w-4 text-cyan-300" />Behance
+                </div>
+                <input type="url" value={form.behanceUrl} onChange={(event) => setForm((current) => ({ ...current, behanceUrl: event.target.value }))} className="w-full rounded-xl border border-slate-800 bg-slate-900 px-3 py-2 text-sm text-white outline-none focus:border-cyan-500" placeholder="https://behance.net/you" />
+              </label>
+              <label className="block rounded-2xl border border-slate-800 bg-slate-950 p-4 space-y-2">
+                <div className="flex items-center gap-2 text-sm font-semibold text-white">
+                  <Link2 className="h-4 w-4 text-cyan-300" />Dribbble
+                </div>
+                <input type="url" value={form.dribbbleUrl} onChange={(event) => setForm((current) => ({ ...current, dribbbleUrl: event.target.value }))} className="w-full rounded-xl border border-slate-800 bg-slate-900 px-3 py-2 text-sm text-white outline-none focus:border-cyan-500" placeholder="https://dribbble.com/you" />
+              </label>
+              <label className="block rounded-2xl border border-slate-800 bg-slate-950 p-4 space-y-2">
+                <div className="flex items-center gap-2 text-sm font-semibold text-white">
+                  <Youtube className="h-4 w-4 text-cyan-300" />YouTube
+                </div>
+                <input type="url" value={form.youtubeUrl} onChange={(event) => setForm((current) => ({ ...current, youtubeUrl: event.target.value }))} className="w-full rounded-xl border border-slate-800 bg-slate-900 px-3 py-2 text-sm text-white outline-none focus:border-cyan-500" placeholder="https://youtube.com/@yourchannel" />
+              </label>
+              <label className="block rounded-2xl border border-slate-800 bg-slate-950 p-4 space-y-2">
+                <div className="flex items-center gap-2 text-sm font-semibold text-white">
+                  <Instagram className="h-4 w-4 text-cyan-300" />Instagram
+                </div>
+                <input type="url" value={form.instagramUrl} onChange={(event) => setForm((current) => ({ ...current, instagramUrl: event.target.value }))} className="w-full rounded-xl border border-slate-800 bg-slate-900 px-3 py-2 text-sm text-white outline-none focus:border-cyan-500" placeholder="https://instagram.com/yourhandle" />
+              </label>
+              <label className="block rounded-2xl border border-slate-800 bg-slate-950 p-4 space-y-2">
+                <div className="flex items-center gap-2 text-sm font-semibold text-white">
+                  <Link2 className="h-4 w-4 text-cyan-300" />ResearchGate
+                </div>
+                <input type="url" value={form.researchGateUrl} onChange={(event) => setForm((current) => ({ ...current, researchGateUrl: event.target.value }))} className="w-full rounded-xl border border-slate-800 bg-slate-900 px-3 py-2 text-sm text-white outline-none focus:border-cyan-500" placeholder="https://researchgate.net/profile/you" />
+              </label>
+              <label className="block rounded-2xl border border-slate-800 bg-slate-950 p-4 space-y-2">
+                <div className="flex items-center gap-2 text-sm font-semibold text-white">
+                  <Link2 className="h-4 w-4 text-cyan-300" />Medium / Blog
+                </div>
+                <input type="url" value={form.mediumUrl} onChange={(event) => setForm((current) => ({ ...current, mediumUrl: event.target.value }))} className="w-full rounded-xl border border-slate-800 bg-slate-900 px-3 py-2 text-sm text-white outline-none focus:border-cyan-500" placeholder="https://medium.com/@you" />
+              </label>
+            </div>
+
+            {/* GitHub — optional, only shown when OAuth is available for this role */}
             {githubEnabled ? (
-              <span className={`rounded-full px-3 py-1 text-xs font-semibold ${githubConnected ? 'bg-emerald-500/10 text-emerald-300' : 'bg-amber-500/10 text-amber-300'}`}>
-                {githubConnected ? 'Connected' : 'Not Connected'}
-              </span>
+              <div className="rounded-2xl border border-slate-800 bg-slate-950 p-4 space-y-3">
+                <div className="flex items-center justify-between gap-3">
+                  <div className="flex items-center gap-2 text-sm font-semibold text-white">
+                    <Github className="h-4 w-4 text-cyan-300" />GitHub
+                    {githubConnected ? (
+                      <span className="rounded-full bg-emerald-500/10 px-2 py-0.5 text-xs font-semibold text-emerald-300">Connected</span>
+                    ) : (
+                      <span className="rounded-full bg-slate-800 px-2 py-0.5 text-xs text-slate-400">Optional</span>
+                    )}
+                  </div>
+                  <div className="flex gap-2">
+                    {githubOauthAvailable ? (
+                      <Button variant="secondary" className="px-3 py-2 text-xs" onClick={() => startGithubMutation.mutate(undefined)} disabled={startGithubMutation.isPending}>
+                        {startGithubMutation.isPending ? 'Redirecting...' : githubConnected ? 'Reconnect' : 'Connect GitHub'}
+                      </Button>
+                    ) : null}
+                    {githubConnected ? (
+                      <Button className="px-3 py-2 text-xs" onClick={() => syncGithubMutation.mutate(undefined)} disabled={syncGithubMutation.isPending}>
+                        {syncGithubMutation.isPending ? 'Refreshing...' : 'Sync Repos'}
+                      </Button>
+                    ) : null}
+                  </div>
+                </div>
+                {githubConnected ? (
+                  <div className="text-xs text-slate-500">
+                    @{profile?.connectedAccounts?.github.username} · {importedRepos.length} repos imported · Last sync {profile?.githubProof?.lastSyncedAt ? new Date(profile.githubProof.lastSyncedAt).toLocaleString('en-IN') : 'never'}
+                  </div>
+                ) : !githubOauthAvailable ? (
+                  <div className="text-xs text-slate-500">GitHub OAuth is unavailable in this environment.</div>
+                ) : (
+                  <div className="text-xs text-slate-500">Connect to import repositories and auto-populate skills from your code activity.</div>
+                )}
+                {githubConnected && repoChoices.length > 0 ? (
+                  <div className="space-y-2">
+                    <div className="flex items-center justify-between">
+                      <span className="text-xs text-slate-400">Select repos to import as proof</span>
+                      <Button className="px-3 py-2 text-xs" onClick={() => importGithubMutation.mutate(selectedRepoIds)} disabled={importGithubMutation.isPending || selectedRepoIds.length === 0}>
+                        {importGithubMutation.isPending ? 'Importing...' : 'Save'}
+                      </Button>
+                    </div>
+                    <div className="max-h-56 space-y-2 overflow-y-auto pr-1">
+                      {repoChoices.map((repo) => (
+                        <RepoRow key={repo.repoId} repo={repo} checked={selectedRepoIds.includes(repo.repoId)} onToggle={() => setSelectedRepoIds((current) => current.includes(repo.repoId) ? current.filter((value) => value !== repo.repoId) : [...current, repo.repoId])} />
+                      ))}
+                    </div>
+                  </div>
+                ) : null}
+              </div>
             ) : null}
-          </div>
 
-          {githubEnabled ? (
-            <div className="rounded-2xl border border-slate-800 bg-slate-950 p-4">
-              <div className="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
-                <div>
-                  <div className="flex items-center gap-2 font-semibold text-white"><Github className="h-4 w-4 text-cyan-300" />GitHub OAuth</div>
-                  <p className="mt-2 text-sm text-slate-400">Connect GitHub, import repos, and show commits/activity so the product becomes a proof layer.</p>
-                  {githubConnected ? (
-                    <div className="mt-3 text-xs text-slate-500">
-                      @{profile?.connectedAccounts?.github.username} • Imported repos {importedRepos.length} • Last sync {profile?.githubProof?.lastSyncedAt ? new Date(profile.githubProof.lastSyncedAt).toLocaleString('en-IN') : 'never'}
-                    </div>
-                  ) : !githubOauthAvailable ? (
-                    <div className="mt-3 text-xs text-slate-500">
-                      GitHub proof is unavailable in this environment right now. You can continue with manual profile and LinkedIn signals.
-                    </div>
-                  ) : null}
-                </div>
-                <div className="flex flex-wrap gap-3">
-                  {githubOauthAvailable ? (
-                    <Button variant="secondary" onClick={() => startGithubMutation.mutate(undefined)} disabled={startGithubMutation.isPending || updateMutation.isPending}>
-                      {startGithubMutation.isPending ? 'Redirecting...' : githubConnected ? 'Reconnect GitHub' : 'Connect GitHub'}
-                    </Button>
-                  ) : null}
-                  {githubConnected ? <Button onClick={() => syncGithubMutation.mutate(undefined)} disabled={syncGithubMutation.isPending || importGithubMutation.isPending}>{syncGithubMutation.isPending ? 'Refreshing...' : 'Refresh Proof'}</Button> : null}
-                </div>
-              </div>
-
-              {githubConnected ? (
-                <div className="mt-5 space-y-3">
-                  <div className="flex items-center justify-between">
-                    <div>
-                      <div className="font-semibold text-white">Import repositories</div>
-                      <div className="text-xs text-slate-500">Select the repos that should represent your work on ProMove.</div>
-                    </div>
-                    <Button onClick={() => importGithubMutation.mutate(selectedRepoIds)} disabled={importGithubMutation.isPending || selectedRepoIds.length === 0}>
-                      {importGithubMutation.isPending ? 'Importing...' : 'Save Imported Repos'}
-                    </Button>
-                  </div>
-                  {githubRepositoriesQuery.isLoading ? <div className="text-sm text-slate-400">Loading repositories...</div> : null}
-                  <div className="max-h-72 space-y-3 overflow-y-auto pr-1">
-                    {repoChoices.map((repo) => (
-                      <RepoRow key={repo.repoId} repo={repo} checked={selectedRepoIds.includes(repo.repoId)} onToggle={() => setSelectedRepoIds((current) => current.includes(repo.repoId) ? current.filter((value) => value !== repo.repoId) : [...current, repo.repoId])} />
-                    ))}
-                    {!githubRepositoriesQuery.isLoading && repoChoices.length === 0 ? <div className="text-sm text-slate-400">No repositories found on the connected account.</div> : null}
-                  </div>
-                </div>
-              ) : null}
+            <div className="flex justify-end">
+              <Button type="submit" disabled={isBusy}>{updateMutation.isPending ? 'Saving...' : 'Save Links'}</Button>
             </div>
-          ) : null}
-
-          <div className="mt-5 space-y-4">
-            <label className="block rounded-2xl border border-slate-800 bg-slate-950 p-4">
-              <div className="mb-2 flex items-center gap-2 text-sm font-semibold text-white"><Linkedin className="h-4 w-4 text-cyan-300" />LinkedIn URL</div>
-              <input type="url" value={form.linkedinUrl} onChange={(event) => setForm((current) => ({ ...current, linkedinUrl: event.target.value }))} className="w-full rounded-2xl border border-slate-800 bg-slate-950 px-4 py-3 text-white outline-none focus:border-cyan-500" placeholder="https://www.linkedin.com/in/your-profile" />
-            </label>
-            <label className="flex items-start gap-3 rounded-2xl border border-slate-800 bg-slate-950 p-4">
-              <input type="checkbox" checked={confirmLinkedinFetch} onChange={(event) => setConfirmLinkedinFetch(event.target.checked)} className="mt-1 h-4 w-4 rounded border-slate-600 bg-slate-900 text-cyan-500 focus:ring-cyan-500" />
-              <div>
-                <div className="font-semibold text-white">Fetch public LinkedIn data</div>
-                <div className="mt-1 text-sm text-slate-400">Without confirmation, the URL is saved but LinkedIn profile data is not imported.</div>
-              </div>
-            </label>
-            <div className="flex flex-wrap justify-end gap-3">
-              <Button variant="secondary" onClick={() => socialMutation.mutate({ ...(form.linkedinUrl.trim() ? { linkedinUrl: form.linkedinUrl.trim(), confirmLinkedinFetch } : {}) })} disabled={isBusy || !form.linkedinUrl.trim()}>
-                {socialMutation.isPending ? 'Fetching...' : 'Fetch LinkedIn Data'}
-              </Button>
-              <Button onClick={() => updateMutation.mutate({ linkedinUrl: form.linkedinUrl.trim() || '' })} disabled={isBusy}>
-                {updateMutation.isPending ? 'Saving...' : 'Save LinkedIn'}
-              </Button>
-            </div>
-          </div>
+          </form>
         </Card>
       </div>
 

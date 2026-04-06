@@ -28,7 +28,6 @@ import {
   MentorshipAdminMentorItem,
   ProjectMentorAssignmentInput,
 } from '../mentor/mentor.types';
-import { InnovationScoreDistributionBucket } from '../innovationScore/score.utils';
 
 export interface AdminUserListItem {
   _id: string;
@@ -362,7 +361,7 @@ export interface AdminAnalyticsData {
   dealConversionRate: number;
   totalPatents: number;
   patentsByStatus: Record<'submitted' | 'under_review' | 'approved' | 'rejected', number>;
-  scoreDistribution: Record<InnovationScoreDistributionBucket, number>;
+  scoreDistribution: Record<'0-50' | '51-100' | '101-150' | '151-200', number>;
   topInnovators: AdminUserListItem[];
   recentAdminActions: Array<{
     _id: string;

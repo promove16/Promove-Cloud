@@ -12,6 +12,7 @@ router.get('/public/:profileSlug', (0, asyncHandler_1.asyncHandler)(user_control
 router.get('/search', authenticate_1.authenticate, (0, asyncHandler_1.asyncHandler)(user_controller_1.searchUsers));
 router.get('/me', authenticate_1.authenticate, (0, asyncHandler_1.asyncHandler)(user_controller_1.getMe));
 router.patch('/me', authenticate_1.authenticate, (0, asyncHandler_1.asyncHandler)(user_controller_1.patchMe));
+router.post('/me/terms-acceptance', authenticate_1.authenticate, (0, asyncHandler_1.asyncHandler)(user_controller_1.acceptMyTerms));
 router.post('/me/activity', authenticate_1.authenticate, (0, asyncHandler_1.asyncHandler)(user_controller_1.trackMeActivity));
 router.post('/me/social-enrich', authenticate_1.authenticate, (0, asyncHandler_1.asyncHandler)(user_controller_1.enrichMeFromSocialLinks));
 router.get('/me/github/oauth/start', authenticate_1.authenticate, (0, asyncHandler_1.asyncHandler)(user_controller_1.startGithubOauth));

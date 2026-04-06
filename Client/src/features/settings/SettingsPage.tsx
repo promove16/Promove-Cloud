@@ -1,5 +1,7 @@
 import { useEffect, useState } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { useForm } from 'react-hook-form';
+import { useQueryClient } from '@tanstack/react-query';
 import { User, Bell, Shield, Palette, Settings2, Save, Loader2, Check, Lock, Globe, Monitor, Moon, Sun } from 'lucide-react';
 import { userApi } from '../../api/user.api';
 import type { UserSettings } from '../../types/settings.types';
@@ -105,6 +107,25 @@ const defaultRole: RoleState = {
   publicProfile: true, allowStudentApplications: true,
 };
 
+const TEMPORARY_MEMORY_PREFIXES = ['promove-', 'dm_first_contact_'];
+
+const clearBrowserTemporaryMemory = () => {
+  const clearStorage = (storage: Storage) => {
+    const keys = Array.from({ length: storage.length }, (_, index) => storage.key(index)).filter(
+      (key): key is string => Boolean(key),
+    );
+
+    keys.forEach((key) => {
+      if (TEMPORARY_MEMORY_PREFIXES.some((prefix) => key.startsWith(prefix))) {
+        storage.removeItem(key);
+      }
+    });
+  };
+
+  clearStorage(localStorage);
+  clearStorage(sessionStorage);
+};
+
 const buildRoleSettingsPayload = (role: UserRole, roleState: RoleState): UserSettings['roleSettings'] => {
   switch (role) {
     case UserRole.STUDENT:
@@ -165,11 +186,15 @@ function SettingsSkeleton() {
 
 export function SettingsPage() {
   const { settings, isLoading, updateSettingsAsync, isSaving } = useSettings();
+  const navigate = useNavigate();
+  const queryClient = useQueryClient();
   const authUser = useAuthStore((s) => s.user);
   const setAuthUser = useAuthStore((s) => s.setUser);
+  const clearAuth = useAuthStore((s) => s.clearAuth);
   const [activeTab, setActiveTab] = useState<TabId>('account');
   const [savedTab, setSavedTab] = useState<TabId | null>(null);
   const [savingTab, setSavingTab] = useState<TabId | null>(null);
+  const [isClearingCache, setIsClearingCache] = useState(false);
   const [notif, setNotif] = useState<NotifMatrix>(defaultNotif);
   const [privacy, setPrivacy] = useState<PrivacyState>(defaultPrivacy);
   const [appearance, setAppearance] = useState<AppearanceState>(defaultAppearance);
@@ -357,6 +382,32 @@ export function SettingsPage() {
     });
   };
 
+  const onClearTemporaryCache = async () => {
+    if (isClearingCache) {
+      return;
+    }
+
+    const confirmed = window.confirm(
+      'Clear temporary browser memory and cached dashboard state? This will sign you out and reload the app.',
+    );
+
+    if (!confirmed) {
+      return;
+    }
+
+    setIsClearingCache(true);
+
+    try {
+      queryClient.clear();
+      clearBrowserTemporaryMemory();
+      clearAuth();
+      navigate('/login', { replace: true });
+      window.location.replace('/login');
+    } finally {
+      setIsClearingCache(false);
+    }
+  };
+
   function SaveBtn({ tab, onSave }: { tab: TabId; onSave: () => void }) {
     const saved = savedTab === tab;
     const isTabSaving = savingTab === tab || isSaving;
@@ -520,11 +571,25 @@ export function SettingsPage() {
             <div className={`${card} border-slate-700`}>
               <p className={sectionHdr}>Password &amp; Security</p>
               <p className="text-sm text-slate-400 mb-4">Keep your account secure by updating your password regularly. We recommend using a unique, strong password.</p>
-              <button type="button" disabled title="Coming soon"
-                className="flex items-center gap-2 bg-slate-800 text-slate-400 border border-slate-700 font-semibold rounded-xl px-5 py-2.5 text-sm cursor-not-allowed opacity-70">
-                <Lock className="w-4 h-4" />Change Password
-                <span className="ml-2 text-xs bg-slate-700 text-slate-400 rounded-md px-1.5 py-0.5">Coming soon</span>
-              </button>
+              <div className="flex flex-wrap items-center gap-3">
+                <button type="button" disabled title="Coming soon"
+                  className="flex items-center gap-2 bg-slate-800 text-slate-400 border border-slate-700 font-semibold rounded-xl px-5 py-2.5 text-sm cursor-not-allowed opacity-70">
+                  <Lock className="w-4 h-4" />Change Password
+                  <span className="ml-2 text-xs bg-slate-700 text-slate-400 rounded-md px-1.5 py-0.5">Coming soon</span>
+                </button>
+                <button
+                  type="button"
+                  onClick={onClearTemporaryCache}
+                  disabled={isClearingCache}
+                  className="flex items-center gap-2 rounded-xl border border-amber-500/30 bg-amber-500/10 px-5 py-2.5 text-sm font-semibold text-amber-200 transition hover:border-amber-400/50 hover:bg-amber-500/15 disabled:opacity-60"
+                >
+                  <Shield className="h-4 w-4" />
+                  {isClearingCache ? 'Clearing Cache...' : 'Clear Temporary Cache'}
+                </button>
+              </div>
+              <p className="mt-4 text-xs leading-5 text-slate-500">
+                Removes temporary browser memory, cached dashboard state, and first-contact messaging hints. The current session will be cleared.
+              </p>
             </div>
             <div className="flex justify-end"><SaveBtn tab="privacy" onSave={onSavePrivacy} /></div>
           </div>

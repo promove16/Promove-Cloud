@@ -563,11 +563,7 @@ export const claimProblem = async (problemId: string, userId: string) => {
   }
 
   if (existingWorkspace) {
-    throw new ApiError(
-      400,
-      'PROBLEM_ALREADY_STARTED',
-      'You already started this problem in an active workspace.',
-    );
+    return existingWorkspace;
   }
 
   if (activeCount >= 3) {
