@@ -43,7 +43,7 @@ export function SchoolDashboard() {
     { 
       name: "NIRF (Innovation Ranking)", 
       status: "In Progress", 
-      score: "Band 51-100", 
+      score: "Band 251-500", 
       lastUpdated: "Mar 5, 2026",
       color: "yellow" 
     },

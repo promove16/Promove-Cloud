@@ -9,8 +9,7 @@ import { Card } from '../../components/ui/Card';
 import { Input } from '../../components/ui/Input';
 import { Spinner } from '../../components/ui/Spinner';
 import { StudentProfileDrawer } from './StudentProfileDrawer';
-
-const scoreMarks = [0, 50, 100, 150, 200];
+import { MAX_INNOVATION_SCORE, SCORE_MARKS } from '../../constants/score';
 
 export default function TalentSearch() {
   const navigate = useNavigate();
@@ -115,7 +114,7 @@ export default function TalentSearch() {
       <div className="mt-4 h-2 rounded-full bg-slate-800">
         <div
           className="h-2 rounded-full bg-gradient-to-r from-cyan-400 to-emerald-400"
-          style={{ width: `${Math.min((student.innovationScore / 200) * 100, 100)}%` }}
+          style={{ width: `${Math.min((student.innovationScore / MAX_INNOVATION_SCORE) * 100, 100)}%` }}
         />
       </div>
     </Card>
@@ -167,14 +166,14 @@ export default function TalentSearch() {
             <input
               type="range"
               min={0}
-              max={200}
+              max={MAX_INNOVATION_SCORE}
               step={1}
               value={minScore}
               onChange={(event) => setMinScore(Math.min(Number(event.target.value), maxScore))}
               className="w-full"
             />
             <div className="mt-2 flex justify-between text-xs text-slate-500">
-              {scoreMarks.map((mark) => (
+              {SCORE_MARKS.map((mark) => (
                 <span key={mark}>{mark}</span>
               ))}
             </div>
@@ -184,7 +183,7 @@ export default function TalentSearch() {
             <input
               type="range"
               min={0}
-              max={200}
+              max={MAX_INNOVATION_SCORE}
               step={1}
               value={maxScore}
               onChange={(event) => setMaxScore(Math.max(Number(event.target.value), minScore))}

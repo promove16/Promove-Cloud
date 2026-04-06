@@ -469,6 +469,27 @@ const githubStatsSchema = new Schema<IUser['githubStats']>(
   { _id: false },
 );
 
+const termsAcceptanceSchema = new Schema<NonNullable<IUser['termsAcceptance']>>(
+  {
+    version: {
+      type: String,
+      required: true,
+      trim: true,
+      maxlength: 50,
+    },
+    acceptedAt: {
+      type: Date,
+      required: true,
+    },
+    sector: {
+      type: String,
+      enum: USER_ROLES,
+      required: true,
+    },
+  },
+  { _id: false },
+);
+
 const userSchema = new Schema<IUser>(
   {
     email: {
@@ -589,6 +610,10 @@ const userSchema = new Schema<IUser>(
     mustChangePasswordOnNextLogin: {
       type: Boolean,
       default: false,
+    },
+    termsAcceptance: {
+      type: termsAcceptanceSchema,
+      default: null,
     },
     institutionToken: {
       type: String,

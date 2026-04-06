@@ -4,8 +4,9 @@ import { adminApi } from '../../api/admin.api';
 import { Badge } from '../../components/ui/Badge';
 import { Card } from '../../components/ui/Card';
 import { Spinner } from '../../components/ui/Spinner';
+import { SCORE_BUCKETS } from '../../constants/score';
 
-const scoreBuckets = ['0-50', '51-100', '101-150', '151-200'] as const;
+const scoreBuckets = SCORE_BUCKETS;
 
 export default function Analytics() {
   const analyticsQuery = useQuery({

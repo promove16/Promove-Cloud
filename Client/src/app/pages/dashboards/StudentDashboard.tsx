@@ -19,8 +19,7 @@ import { workspaceApi } from "../../../api/workspace.api";
 import { useInnovationScore } from "../../../hooks/useInnovationScore";
 import { useAuthStore } from "../../../store/authStore";
 import { Workspace } from "../../../types/workspace.types";
-
-const MAX_INNOVATION_SCORE = 200;
+import { MAX_INNOVATION_SCORE } from "../../../constants/score";
 
 const formatDate = (value?: string) =>
   value
@@ -197,9 +196,9 @@ export function StudentDashboard() {
                 strokeDasharray={`${2 * Math.PI * 70}`}
                 strokeDashoffset={`${2 * Math.PI * 70 * (1 - scoreProgress)}`}
                 className={`${
-                  innovationScore > 150
+                  innovationScore >= 750
                     ? "text-green-400"
-                    : innovationScore >= 80
+                    : innovationScore >= 400
                       ? "text-blue-300"
                       : "text-amber-400"
                 }`}

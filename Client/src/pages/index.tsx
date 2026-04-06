@@ -1,6 +1,7 @@
 import { PropsWithChildren } from "react";
 import { RequestAccessPage } from "../features/auth/RequestAccessPage";
 import { ChangePasswordPage } from "../features/auth/ChangePasswordPage";
+import { TermsAcceptanceGate } from "../features/auth/TermsAcceptanceGate";
 import {
   Link,
   Navigate,
@@ -66,7 +67,12 @@ import { RecruiterMessagesPage } from "../app/pages/RecruiterMessages";
 import { SettingsPage } from "../features/settings/SettingsPage";
 
 function RootLayout() {
-  return <Outlet />;
+  return (
+    <>
+      <Outlet />
+      <TermsAcceptanceGate />
+    </>
+  );
 }
 
 function RouteErrorPage() {

@@ -4,6 +4,7 @@ import { CapTableResponse } from '../types/deal.types';
 import { PatentFilingDocuments, PatentSupportingDocument } from '../types/patent.types';
 import { UserRole } from '../types/roles.types';
 import { MentorStudentProfile } from './mentor.api';
+import { SCORE_BUCKETS } from '../constants/score';
 
 export interface AdminUserListItem {
   _id: string;
@@ -159,7 +160,7 @@ export interface AdminAnalyticsData {
   dealConversionRate: number;
   totalPatents: number;
   patentsByStatus: Record<'submitted' | 'under_review' | 'approved' | 'rejected', number>;
-  scoreDistribution: Record<'0-50' | '51-100' | '101-150' | '151-200', number>;
+  scoreDistribution: Record<(typeof SCORE_BUCKETS)[number], number>;
   topInnovators: AdminUserListItem[];
   recentAdminActions: Array<{
     _id: string;

@@ -85,7 +85,7 @@ describe('score integration', () => {
       },
     ]);
 
-    await redis.zadd('lb:global', { member: String(user._id), score: 200 });
+    await redis.zadd('lb:global', { member: String(user._id), score: 360 });
     await redis.zadd('lb:global', { member: String(secondUser._id), score: 120 });
     await redis.zadd('lb:global', { member: String(thirdUser._id), score: 80 });
 
@@ -96,7 +96,7 @@ describe('score integration', () => {
       .set('Authorization', `Bearer ${accessToken}`);
 
     expect(response.status).toBe(200);
-    expect(response.body.data.score).toBe(200);
+    expect(response.body.data.score).toBe(360);
     expect(response.body.data.weeklyDelta).toBe(15);
     expect(response.body.data.rankPercentile).toBe(33);
     expect(response.body.data.breakdown).toEqual({
@@ -112,6 +112,6 @@ describe('score integration', () => {
     });
 
     const updatedUser = await User.findById(user._id).lean();
-    expect(updatedUser?.innovationScore).toBe(200);
+    expect(updatedUser?.innovationScore).toBe(360);
   });
 });

@@ -25,6 +25,12 @@ export interface RegistrationRequestSummary {
   rejectionReason?: string;
 }
 
+export interface TermsAcceptance {
+  version: string;
+  acceptedAt: string;
+  sector: UserRole;
+}
+
 export interface AuthUser {
   _id: string;
   email: string;
@@ -66,6 +72,9 @@ export interface AuthUser {
   verificationRejectedReason?: string;
   institutionId?: string;
   mustChangePasswordOnNextLogin?: boolean;
+  termsAcceptance: TermsAcceptance | null;
+  termsCurrentVersion: string;
+  hasAcceptedCurrentTerms: boolean;
   createdAt?: string;
   updatedAt?: string;
 }

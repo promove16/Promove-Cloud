@@ -79,6 +79,7 @@ export interface MentorStudentProfile {
     category: string;
     stage: string;
     launchedAt?: string;
+    innovationScore: number;
     innovationScoreAtLaunch: number;
   }>;
 }

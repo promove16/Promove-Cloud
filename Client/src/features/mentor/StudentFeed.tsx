@@ -9,6 +9,7 @@ import { Button } from '../../components/ui/Button';
 import { Card } from '../../components/ui/Card';
 import { Input } from '../../components/ui/Input';
 import { StudentProfileDrawer } from './StudentProfileDrawer';
+import { MAX_INNOVATION_SCORE } from '../../constants/score';
 
 type SessionFormState = {
   studentId: string;
@@ -223,7 +224,7 @@ export default function StudentFeed() {
                   <div className="mt-1 text-sm text-cyan-300">{student.startupName}</div>
                   <div className="mt-3 flex flex-wrap gap-2">
                     <Badge>{student.category}</Badge>
-                    <Badge>{student.innovationScore}/200</Badge>
+                    <Badge>{student.innovationScore}/{MAX_INNOVATION_SCORE}</Badge>
                     <Badge>{student.isWatched ? 'Watching' : 'Discovering'}</Badge>
                   </div>
                   <p className="mt-3 text-sm leading-6 text-slate-400">{student.recentActivitySummary}</p>

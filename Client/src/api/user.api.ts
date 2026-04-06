@@ -120,4 +120,10 @@ export const userApi = {
     const response = await api.post<ApiSuccessResponse<SocialEnrichResponse>>('/api/users/me/social-enrich', payload);
     return response.data.data;
   },
+  async acceptTerms(version: string) {
+    const response = await api.post<ApiSuccessResponse<AuthUser>>('/api/users/me/terms-acceptance', {
+      version,
+    });
+    return response.data.data;
+  },
 };

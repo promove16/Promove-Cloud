@@ -11,6 +11,7 @@ import { Badge } from '../../components/ui/Badge';
 import { Button } from '../../components/ui/Button';
 import { Card } from '../../components/ui/Card';
 import { StudentJourney } from '../../types/school.types';
+import { MAX_INNOVATION_SCORE } from '../../constants/score';
 
 type Props = {
   journey?: StudentJourney;
@@ -78,7 +79,7 @@ export function StudentJourneyDrawerBase({ journey, open, onClose }: Props) {
             <div>
               <h2 className="text-2xl font-bold text-white">{journey.student.displayName}</h2>
               <div className="mt-2 flex items-center gap-3">
-                <Badge>{journey.student.innovationScore}/200</Badge>
+                <Badge>{journey.student.innovationScore}/{MAX_INNOVATION_SCORE}</Badge>
                 {currentStage ? <Badge className="border-emerald-500/30 bg-emerald-500/10 text-emerald-300">{currentStage}</Badge> : null}
               </div>
             </div>

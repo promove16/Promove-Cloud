@@ -19,6 +19,7 @@ import { Button } from '../../components/ui/Button';
 import { Card } from '../../components/ui/Card';
 import { Spinner } from '../../components/ui/Spinner';
 import { CapTableInvestorRow } from '../../types/deal.types';
+import { MAX_INNOVATION_SCORE } from '../../constants/score';
 
 const formatCurrency = new Intl.NumberFormat('en-IN', {
   style: 'currency',
@@ -94,7 +95,7 @@ function PartyPanel({
       <div className="mt-2 text-sm text-slate-400">{subtitle}</div>
       <div className="mt-5 flex flex-wrap gap-2">
         <Badge>{roleLabel(role)}</Badge>
-        <Badge className="border-cyan-500/30 bg-cyan-500/10 text-cyan-300">{score}/200 score</Badge>
+        <Badge className="border-cyan-500/30 bg-cyan-500/10 text-cyan-300">{score}/{MAX_INNOVATION_SCORE} score</Badge>
       </div>
     </div>
   );

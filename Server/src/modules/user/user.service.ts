@@ -2,6 +2,7 @@ import { Types } from 'mongoose';
 import { z } from 'zod';
 import { User } from './user.model';
 import { IUser, LaunchToRecruitersResult, SanitizedUser, StudentMentorSessionView } from './user.types';
+import { buildTermsAcceptance, CURRENT_TERMS_VERSION, hasAcceptedCurrentTerms } from './user.terms';
 import { ApiError } from '../../utils/ApiError';
 import { MentorSession } from '../mentor/mentorSession.model';
 import { UserRole } from '../../types/roles.types';
@@ -32,6 +33,10 @@ export const updateMeSchema = z
 export const socialEnrichSchema = z.object({
   githubUrl: z.string().trim().url().optional(),
   linkedinUrl: z.string().trim().url().optional(),
+});
+
+export const acceptTermsSchema = z.object({
+  version: z.string().trim().min(1).max(50),
 });
 
 type UserLike = Omit<IUser, '_id' | 'institutionId'> & {
@@ -91,6 +96,9 @@ export const toSanitizedUser = (user: UserLike): SanitizedUser => ({
   ...(user.lastLogin ? { lastLogin: user.lastLogin } : {}),
   discoverableToRecruiters: user.discoverableToRecruiters ?? false,
   mustChangePasswordOnNextLogin: user.mustChangePasswordOnNextLogin ?? false,
+  termsAcceptance: user.termsAcceptance ?? null,
+  termsCurrentVersion: CURRENT_TERMS_VERSION,
+  hasAcceptedCurrentTerms: hasAcceptedCurrentTerms(user.termsAcceptance),
   ...(user.institutionToken !== undefined ? { institutionToken: user.institutionToken ?? null } : {}),
   ...(user.institutionId ? { institutionId: user.institutionId.toString() } : { institutionId: null }),
   ...(user.institutionProfile ? { institutionProfile: user.institutionProfile } : {}),
@@ -149,6 +157,30 @@ export const getCurrentUser = async (userId: string) => {
   }
 
   return toSanitizedUser(user as UserLike);
+};
+
+export const acceptCurrentTerms = async (
+  userId: string,
+  payload: z.infer<typeof acceptTermsSchema>,
+) => {
+  if (payload.version !== CURRENT_TERMS_VERSION) {
+    throw new ApiError(
+      409,
+      'TERMS_VERSION_MISMATCH',
+      'The Terms & Conditions were updated. Please reload and review the latest version.',
+    );
+  }
+
+  const user = await User.findById(userId);
+
+  if (!user) {
+    throw new ApiError(404, 'USER_NOT_FOUND', 'User not found');
+  }
+
+  user.termsAcceptance = buildTermsAcceptance(user.role);
+  await user.save();
+
+  return toSanitizedUser(user.toObject() as UserLike);
 };
 
 const extractGithubUsername = (githubUrl: string) => {

@@ -159,7 +159,7 @@ export const getMentorDashboard = async (mentorId: string): Promise<MentorDashbo
 export const getMentorStudents = async (mentorId: string): Promise<MentorFeedStudent[]> => {
   const watched = new Set((await redis.smembers(`mentor:watch:${mentorId}`)) as string[]);
   const startups = await Startup.find({ launchedToMentors: true, isActive: true })
-    .sort({ innovationScoreAtLaunch: -1, createdAt: -1 })
+    .sort({ innovationScore: -1, createdAt: -1 })
     .lean();
 
   return Promise.all(startups.map(async (startup) => {
@@ -172,7 +172,7 @@ export const getMentorStudents = async (mentorId: string): Promise<MentorFeedStu
       ...(founder?.avatar ? { avatar: founder.avatar } : {}),
       startupName: startup.name,
       category: startup.category,
-      innovationScore: startup.innovationScoreAtLaunch ?? founder?.innovationScore ?? 0,
+      innovationScore: startup.innovationScore ?? startup.innovationScoreAtLaunch ?? founder?.innovationScore ?? 0,
       recentActivitySummary: summary,
       isWatched: founderId ? watched.has(founderId) : false,
       activeSince: founder?.createdAt ? toIso(founder.createdAt) : toIso(startup.createdAt),
@@ -235,6 +235,7 @@ export const getMentorStudentProfile = async (studentId: string): Promise<Mentor
       category: startup.category,
       stage: startup.stage,
       ...(startup.launchedAt ? { launchedAt: toIso(startup.launchedAt) } : {}),
+      innovationScore: startup.innovationScore ?? 0,
       innovationScoreAtLaunch: startup.innovationScoreAtLaunch ?? 0,
     })),
   };

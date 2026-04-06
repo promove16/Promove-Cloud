@@ -6,6 +6,7 @@ import { DashboardLayout } from "../components/DashboardLayout";
 import { dealApi } from "../../api/deal.api";
 import { startupApi, StartupPayload } from "../../api/startup.api";
 import { workspaceApi } from "../../api/workspace.api";
+import { MAX_INNOVATION_SCORE } from "../../constants/score";
 
 const emptyPayload: StartupPayload = {
   name: "",
@@ -175,7 +176,14 @@ export function StartupLaunch() {
           </div>
           <div className="grid md:grid-cols-4 gap-6 pt-6 border-t border-blue-800/30">
             <div className="text-center"><Users className="w-8 h-8 text-blue-400 mx-auto mb-2" /><div className="text-2xl font-bold text-white mb-1">{teamSize}</div><div className="text-sm text-slate-400">Team Members</div></div>
-            <div className="text-center"><TrendingUp className="w-8 h-8 text-green-400 mx-auto mb-2" /><div className="text-2xl font-bold text-white mb-1">{startup?.innovationScoreAtLaunch ?? 0}</div><div className="text-sm text-slate-400">Launch Score Snapshot</div></div>
+            <div className="text-center">
+              <TrendingUp className="w-8 h-8 text-green-400 mx-auto mb-2" />
+              <div className="text-2xl font-bold text-white mb-1">{startup?.innovationScore ?? 0}</div>
+              <div className="text-sm text-slate-400">Startup Score / {MAX_INNOVATION_SCORE}</div>
+              {startup?.launchedAt ? (
+                <div className="mt-1 text-xs text-slate-500">Launch snapshot: {startup.innovationScoreAtLaunch}</div>
+              ) : null}
+            </div>
             <div className="text-center"><Target className="w-8 h-8 text-purple-400 mx-auto mb-2" /><div className="text-2xl font-bold text-white mb-1">{startup?.activeProducts ?? hydratedForm.activeProducts}</div><div className="text-sm text-slate-400">Active Products</div></div>
             <div className="text-center"><CheckCircle className="w-8 h-8 text-yellow-400 mx-auto mb-2" /><div className="text-2xl font-bold text-white mb-1">{startup?.launchedAt ? "Live" : "Draft"}</div><div className="text-sm text-slate-400">Status</div></div>
           </div>

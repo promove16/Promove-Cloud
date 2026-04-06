@@ -7,8 +7,9 @@ import { Card } from '../../components/ui/Card';
 import { Spinner } from '../../components/ui/Spinner';
 import { Badge } from '../../components/ui/Badge';
 import { useNavigate } from 'react-router-dom';
+import { MAX_INNOVATION_SCORE, SCORE_BUCKETS } from '../../constants/score';
 
-const scoreBuckets = ['0-50', '51-100', '101-150', '151-200'] as const;
+const scoreBuckets = SCORE_BUCKETS;
 
 export default function Dashboard() {
   const navigate = useNavigate();
@@ -123,7 +124,7 @@ export default function Dashboard() {
                     </div>
                     <div className="text-sm text-slate-400">{user.role}</div>
                   </div>
-                  <Badge>{user.innovationScore}/200</Badge>
+                  <Badge>{user.innovationScore}/{MAX_INNOVATION_SCORE}</Badge>
                 </div>
               ))}
             </div>

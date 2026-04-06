@@ -1,10 +1,11 @@
 import { z } from 'zod';
+import { MAX_INNOVATION_SCORE } from '../innovationScore/score.utils';
 
 export const objectIdSchema = z.string().regex(/^[0-9a-fA-F]{24}$/, 'Invalid ID format');
 
 export const talentQuerySchema = z.object({
-  minScore: z.coerce.number().min(0).max(200).optional(),
-  maxScore: z.coerce.number().min(0).max(200).optional(),
+  minScore: z.coerce.number().min(0).max(MAX_INNOVATION_SCORE).optional(),
+  maxScore: z.coerce.number().min(0).max(MAX_INNOVATION_SCORE).optional(),
   domain: z.string().trim().min(1).max(120).optional(),
   institution: z.string().trim().min(1).max(160).optional(),
   search: z.string().trim().min(1).max(160).optional(),
@@ -17,7 +18,7 @@ export const jobCreateSchema = z.object({
   company: z.string().trim().min(2).max(160),
   description: z.string().trim().min(10).max(4000),
   domain: z.string().trim().min(2).max(120),
-  minimumInnovationScore: z.coerce.number().min(0).max(200).default(0),
+  minimumInnovationScore: z.coerce.number().min(0).max(MAX_INNOVATION_SCORE).default(0),
   type: z.enum(['Full-time', 'Internship', 'Contract', 'Part-time']),
   location: z.string().trim().min(2).max(120),
   expiresAt: z.string().datetime().optional(),
@@ -33,7 +34,7 @@ export const driveCreateSchema = z.object({
   type: z.enum(['Placement Drive', 'Internship Drive', 'Hackathon']),
   scheduledAt: z.string().datetime(),
   description: z.string().trim().min(10).max(4000),
-  minimumInnovationScore: z.coerce.number().min(0).max(200).default(0),
+  minimumInnovationScore: z.coerce.number().min(0).max(MAX_INNOVATION_SCORE).default(0),
 });
 
 export const driveScoreSchema = z.object({
