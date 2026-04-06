@@ -5,6 +5,7 @@ import {
   Suspense,
   lazy,
 } from "react";
+import { TermsAcceptanceGate } from "../features/auth/TermsAcceptanceGate";
 import {
   Link,
   Navigate,
@@ -204,7 +205,12 @@ const RecruiterMessagesPage = lazy(() =>
 
 function RootLayout() {
   useRouteActivityTracking();
-  return <Outlet />;
+  return (
+    <>
+      <Outlet />
+      <TermsAcceptanceGate />
+    </>
+  );
 }
 
 function RouteErrorPage() {

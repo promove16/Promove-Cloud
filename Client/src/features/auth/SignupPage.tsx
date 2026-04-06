@@ -2,7 +2,6 @@ import { FormEvent, useState } from "react";
 import { isAxiosError } from "axios";
 import {
   GraduationCap,
-  Lock,
   Mail,
   NotebookPen,
   Ticket,
@@ -10,6 +9,7 @@ import {
 } from "lucide-react";
 import { Link, useNavigate } from "react-router-dom";
 import { BusinessLogo } from "../../components/branding/BusinessLogo";
+import { AuthPasswordField } from "./AuthPasswordField";
 import { useSignupMutation } from "./useAuth";
 import { UserRole } from "../../types/roles.types";
 import { roleRedirect } from "../../utils/roleRedirect";
@@ -185,40 +185,32 @@ export function SignupPage() {
                 <label className="mb-2 block text-sm font-semibold text-white">
                   Password <span className="text-red-400">*</span>
                 </label>
-                <div className="relative">
-                  <Lock className="absolute left-4 top-1/2 h-5 w-5 -translate-y-1/2 text-slate-400" />
-                  <input
-                    type="password"
-                    value={formData.password}
-                    onChange={(event) =>
-                      updateField("password", event.target.value)
-                    }
-                    placeholder="********"
-                    className="w-full rounded-lg border border-slate-800 bg-slate-950 py-3 pl-12 pr-4 text-white placeholder-slate-500 focus:border-blue-500 focus:outline-none"
-                    required
-                    minLength={8}
-                  />
-                </div>
+                <AuthPasswordField
+                  value={formData.password}
+                  onChange={(event) =>
+                    updateField("password", event.target.value)
+                  }
+                  placeholder="********"
+                  autoComplete="new-password"
+                  required
+                  minLength={8}
+                />
               </div>
 
               <div>
                 <label className="mb-2 block text-sm font-semibold text-white">
                   Confirm Password <span className="text-red-400">*</span>
                 </label>
-                <div className="relative">
-                  <Lock className="absolute left-4 top-1/2 h-5 w-5 -translate-y-1/2 text-slate-400" />
-                  <input
-                    type="password"
-                    value={formData.confirmPassword}
-                    onChange={(event) =>
-                      updateField("confirmPassword", event.target.value)
-                    }
-                    placeholder="********"
-                    className="w-full rounded-lg border border-slate-800 bg-slate-950 py-3 pl-12 pr-4 text-white placeholder-slate-500 focus:border-blue-500 focus:outline-none"
-                    required
-                    minLength={8}
-                  />
-                </div>
+                <AuthPasswordField
+                  value={formData.confirmPassword}
+                  onChange={(event) =>
+                    updateField("confirmPassword", event.target.value)
+                  }
+                  placeholder="********"
+                  autoComplete="new-password"
+                  required
+                  minLength={8}
+                />
               </div>
             </div>
             <p className="mt-2 text-xs text-slate-500">

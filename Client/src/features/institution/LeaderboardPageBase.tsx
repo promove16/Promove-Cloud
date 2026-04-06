@@ -9,6 +9,7 @@ import { Spinner } from '../../components/ui/Spinner';
 import { StudentJourneyDrawerBase } from './StudentJourneyDrawerBase';
 import { getScoreSocket } from '../../lib/socket';
 import { LeaderboardPage, StudentJourney, StudentLeaderboardItem } from '../../types/school.types';
+import { MAX_INNOVATION_SCORE } from '../../constants/score';
 
 type Props = {
   mode: 'school' | 'college';
@@ -159,12 +160,12 @@ export function LeaderboardPageBase({
                       <div className="flex h-12 w-12 items-center justify-center rounded-full border border-cyan-500/30 bg-cyan-500/10 text-sm font-semibold text-cyan-200">
                         {student.innovationScore}
                       </div>
-                      <span className="text-sm text-slate-400">/ 200</span>
+                      <span className="text-sm text-slate-400">/ {MAX_INNOVATION_SCORE}</span>
                     </div>
                     <div className="h-2 rounded-full bg-slate-800">
                       <div
                         className="h-2 rounded-full bg-gradient-to-r from-cyan-400 to-emerald-400"
-                        style={{ width: `${Math.min((student.innovationScore / 200) * 100, 100)}%` }}
+                        style={{ width: `${Math.min((student.innovationScore / MAX_INNOVATION_SCORE) * 100, 100)}%` }}
                       />
                     </div>
                   </div>

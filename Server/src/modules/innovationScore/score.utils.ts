@@ -1,6 +1,9 @@
 import { ScoreBreakdown } from '../user/user.types';
 
-export const MAX_INNOVATION_SCORE = 200;
+export const MAX_INNOVATION_SCORE = 1000;
+export const SCORE_DISTRIBUTION_BUCKETS = ['0-250', '251-500', '501-750', '751-1000'] as const;
+
+export type InnovationScoreDistributionBucket = (typeof SCORE_DISTRIBUTION_BUCKETS)[number];
 
 export const createDefaultScoreBreakdown = (): ScoreBreakdown => ({
   problemsClaimed: 0,
@@ -28,6 +31,26 @@ export const normalizeInnovationScore = (value: unknown) => {
   }
 
   return Math.min(MAX_INNOVATION_SCORE, Math.max(0, value));
+};
+
+export const getInnovationScoreDistributionBucket = (
+  value: unknown,
+): InnovationScoreDistributionBucket => {
+  const score = normalizeInnovationScore(value);
+
+  if (score <= 250) {
+    return '0-250';
+  }
+
+  if (score <= 500) {
+    return '251-500';
+  }
+
+  if (score <= 750) {
+    return '501-750';
+  }
+
+  return '751-1000';
 };
 
 export const normalizeScoreBreakdown = (value: Partial<ScoreBreakdown> | null | undefined): ScoreBreakdown => {

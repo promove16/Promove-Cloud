@@ -10,6 +10,7 @@ import { workspaceApi } from "../../api/workspace.api";
 import { useAuthStore } from "../../store/authStore";
 import { useInnovationScore } from "../../hooks/useInnovationScore";
 import { DEFAULT_STARTUP_IPR_PROFILE } from "../../features/startup/iprIntake";
+import { MAX_INNOVATION_SCORE } from "../../constants/score";
 
 const eventLabel: Record<string, string> = {
   PROBLEM_CLAIMED: "Claimed a new problem",
@@ -146,11 +147,18 @@ export function LeadershipProfile() {
               <div className="flex items-center gap-4">
                 <div className="flex items-center gap-2">
                   <Award className="w-5 h-5 text-yellow-500" />
-                  <span className="text-white font-bold text-xl">Innovation Score: {score.data?.score ?? 0}</span>
+                  <span className="text-white font-bold text-xl">Innovation Score: {score.data?.score ?? 0}/{MAX_INNOVATION_SCORE}</span>
                 </div>
                 <div className="flex items-center gap-1">
                   {[...Array(5)].map((_, index) => (
-                    <Star key={index} className={`w-4 h-4 ${index < Math.max(1, Math.round((score.data?.score ?? 0) / 50)) ? "text-yellow-500 fill-yellow-500" : "text-slate-600"}`} />
+                    <Star
+                      key={index}
+                      className={`w-4 h-4 ${
+                        index < Math.max(1, Math.round(((score.data?.score ?? 0) / MAX_INNOVATION_SCORE) * 5))
+                          ? "text-yellow-500 fill-yellow-500"
+                          : "text-slate-600"
+                      }`}
+                    />
                   ))}
                 </div>
               </div>

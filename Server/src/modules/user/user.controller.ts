@@ -4,6 +4,8 @@ import { ApiError } from '../../utils/ApiError';
 import {
   beginGithubOauthForCurrentUser,
   connectGithubForCurrentUserFromCallback,
+  acceptCurrentTerms,
+  acceptTermsSchema,
   enrichCurrentUserFromSocialLinks,
   getCurrentUser,
   getPublicStudentProfileBySlug,
@@ -43,6 +45,16 @@ export const patchMe = async (req: Request, res: Response) => {
 
   const payload = updateMeSchema.parse(req.body);
   const user = await updateCurrentUser(req.user._id, payload);
+  res.status(200).json(new ApiResponse(user));
+};
+
+export const acceptMyTerms = async (req: Request, res: Response) => {
+  if (!req.user) {
+    throw new ApiError(401, 'UNAUTHORIZED', 'Invalid or expired token');
+  }
+
+  const payload = acceptTermsSchema.parse(req.body);
+  const user = await acceptCurrentTerms(req.user._id, payload);
   res.status(200).json(new ApiResponse(user));
 };
 

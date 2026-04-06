@@ -8,6 +8,7 @@ import { Input } from '../../components/ui/Input';
 import { Spinner } from '../../components/ui/Spinner';
 import { investorApi } from '../../api/investor.api';
 import { StartupDetailDrawer } from './StartupDetailDrawer';
+import { MAX_INNOVATION_SCORE } from '../../constants/score';
 
 const categories = ['Agriculture', 'Health', 'Education', 'Energy', 'Software', 'Other'];
 const stages = ['Pre-Idea', 'Ideation', 'MVP', 'Pre-Launch', 'Launched'];
@@ -26,7 +27,7 @@ export default function StartupMarketplace() {
   const [category, setCategory] = useState<string>('all');
   const [stage, setStage] = useState<string>('all');
   const [minScore, setMinScore] = useState(0);
-  const [maxScore, setMaxScore] = useState(200);
+  const [maxScore, setMaxScore] = useState(MAX_INNOVATION_SCORE);
   const [acceptingPenny, setAcceptingPenny] = useState(true);
   const [acceptingSole, setAcceptingSole] = useState(true);
   const [selectedStartupId, setSelectedStartupId] = useState<string | null>(null);
@@ -159,7 +160,7 @@ export default function StartupMarketplace() {
           <Input
             type="range"
             min={0}
-            max={200}
+            max={MAX_INNOVATION_SCORE}
             value={minScore}
             onChange={(event) => setMinScore(Number(event.target.value))}
           />
@@ -172,7 +173,7 @@ export default function StartupMarketplace() {
           <Input
             type="range"
             min={0}
-            max={200}
+            max={MAX_INNOVATION_SCORE}
             value={maxScore}
             onChange={(event) => setMaxScore(Number(event.target.value))}
           />
@@ -217,7 +218,8 @@ export default function StartupMarketplace() {
         <div className="grid gap-4 xl:grid-cols-2">
           {startups.map((startup) => {
             const canExpressInterest = viewedStartupIds.has(startup._id);
-            const liveScore = startup.founder?.innovationScore ?? startup.innovationScoreAtLaunch;
+            const startupScore = startup.innovationScore;
+            const founderScore = startup.founder?.innovationScore ?? 0;
 
             return (
               <Card key={startup._id} className="p-5">
@@ -227,16 +229,18 @@ export default function StartupMarketplace() {
                     <div className="mt-1 text-sm text-cyan-300">{startup.category}</div>
                     <div className="mt-2 text-sm leading-6 text-slate-400">{startup.tagline}</div>
                     <p className="mt-3 line-clamp-2 text-sm leading-6 text-slate-400">
-                      {startup.founder?.displayName ?? 'Founding team'} is currently at {liveScore}/200.
-                      <span className="ml-2 text-slate-500">
-                        Launch snapshot: {startup.innovationScoreAtLaunch}/200.
-                      </span>
+                      Startup score {startupScore}/{MAX_INNOVATION_SCORE}.
+                      {startup.founder ? (
+                        <span className="ml-2 text-slate-500">
+                          Founder: {startup.founder.displayName} at {founderScore}/{MAX_INNOVATION_SCORE}.
+                        </span>
+                      ) : null}
                     </p>
                   </div>
                   <div className="flex flex-col items-end gap-2">
                     <Badge>{startup.stage}</Badge>
                     <div className="rounded-full border border-emerald-500/30 bg-emerald-500/10 px-3 py-1 text-xs font-semibold text-emerald-300">
-                      Live score {liveScore}/200
+                      Startup score {startupScore}/{MAX_INNOVATION_SCORE}
                     </div>
                   </div>
                 </div>

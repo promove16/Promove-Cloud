@@ -328,7 +328,7 @@ const buildSchoolDocument = (metrics: ReportMetrics) => {
 
   drawSectionTitle(doc, 'SECTION IV: TOP 5 STUDENT INNOVATORS');
   metrics.topStudents.forEach((student) => {
-    doc.fillColor('#E2E8F0').fontSize(11).text(`${student.rank}. ${student.name} - ${student.score}/200`);
+    doc.fillColor('#E2E8F0').fontSize(11).text(`${student.rank}. ${student.name} - ${student.score}/1000`);
   });
 
   addFooter(doc);

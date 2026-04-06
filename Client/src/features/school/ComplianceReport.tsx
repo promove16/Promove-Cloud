@@ -4,6 +4,7 @@ import { Card } from '../../components/ui/Card';
 import { Button } from '../../components/ui/Button';
 import { schoolApi } from '../../api/school.api';
 import { ComplianceReportRecord } from '../../types/school.types';
+import { MAX_INNOVATION_SCORE } from '../../constants/score';
 
 const statusTone: Record<string, string> = {
   Active: 'text-emerald-300 bg-emerald-500/10 border-emerald-500/30',
@@ -125,7 +126,7 @@ export default function ComplianceReport() {
               <div className="font-semibold text-white">
                 {student.rank}. {student.displayName}
               </div>
-              <div className="text-cyan-300">{student.innovationScore}/200</div>
+              <div className="text-cyan-300">{student.innovationScore}/{MAX_INNOVATION_SCORE}</div>
             </div>
           ))}
         </div>

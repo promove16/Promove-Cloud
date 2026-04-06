@@ -4,6 +4,7 @@ import { authorize } from '../../middleware/authorize';
 import { UserRole } from '../../types/roles.types';
 import { asyncHandler } from '../../utils/asyncHandler';
 import {
+  acceptMyTerms,
   enrichMeFromSocialLinks,
   getMe,
   getPublicStudentProfile,
@@ -28,6 +29,7 @@ router.get('/public/:profileSlug', asyncHandler(getPublicStudentProfile));
 router.get('/search', authenticate, asyncHandler(searchUsers));
 router.get('/me', authenticate, asyncHandler(getMe));
 router.patch('/me', authenticate, asyncHandler(patchMe));
+router.post('/me/terms-acceptance', authenticate, asyncHandler(acceptMyTerms));
 router.post('/me/activity', authenticate, asyncHandler(trackMeActivity));
 router.post('/me/social-enrich', authenticate, asyncHandler(enrichMeFromSocialLinks));
 router.get('/me/github/oauth/start', authenticate, asyncHandler(startGithubOauth));

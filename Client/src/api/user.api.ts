@@ -347,4 +347,10 @@ export const userApi = {
     const response = await api.post<ApiSuccessResponse<{ awarded: number }>>(`/api/users/me/onboarding/claim/${stepId}`);
     return response.data.data;
   },
+  async acceptTerms(version: string) {
+    const response = await api.post<ApiSuccessResponse<AuthUser>>('/api/users/me/terms-acceptance', {
+      version,
+    });
+    return response.data.data;
+  },
 };

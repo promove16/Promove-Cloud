@@ -97,6 +97,7 @@ export interface IStartup {
   launchedToMentors: boolean;
   launchedToRecruiters: boolean;
   launchedAt?: Date;
+  innovationScore: number;
   innovationScoreAtLaunch: number;
   totalShares: number;
   availableShares: number;

@@ -11,7 +11,7 @@ import { UserRole } from '../../types/roles.types';
 import { normalizeInnovationScore } from '../innovationScore/score.utils';
 import { Workspace } from '../workspace/workspace.model';
 import type { StartupDocumentCategory, StartupReadiness } from './startup.types';
-
+import { calculateStartupInnovationScore } from './startupScore.utils';
 const pdfFileNamePattern = /\.pdf$/i;
 
 const STARTUP_DOCUMENT_CATEGORIES = [
@@ -495,6 +495,7 @@ export const createStartupProfile = async (userId: string, payload: z.infer<type
   const startupPayload = await applyWorkspaceContextToStartupPayload(userId, normalizedPayload);
 
   const startup = await Startup.create({
+    innovationScore: calculateStartupInnovationScore(startupPayload),
     ...startupPayload,
   });
 
@@ -582,7 +583,12 @@ export const updateStartupProfile = async (
     startup.reviewStatus = 'draft';
     clearReviewMetadata(startup);
   }
-
+  startup.innovationScore = calculateStartupInnovationScore({
+    stage: startup.stage,
+    teamSize: startup.teamSize,
+    activeProducts: startup.activeProducts,
+    traction: startup.traction,
+  });
   await startup.save();
   return serializeStartup(startup);
 };
@@ -633,17 +639,21 @@ export const launchStartup = async (
     );
   }
 
-  const user = await User.findById(userId).select('innovationScore').lean();
-  const score = normalizeInnovationScore(user?.innovationScore ?? 0);
-
   startup.launchedToInvestors = payload.launchTo === 'investors' || payload.launchTo === 'both';
   startup.launchedToMentors = payload.launchTo === 'mentors' || payload.launchTo === 'both';
   startup.launchedToRecruiters = payload.launchTo === 'recruiters';
   startup.launchedAt = new Date();
-  startup.innovationScoreAtLaunch = score;
   if (payload.launchTo !== 'recruiters') {
     startup.stage = 'Launched';
   }
+  const startupScore = calculateStartupInnovationScore({
+    stage: startup.stage,
+    teamSize: startup.teamSize,
+    activeProducts: startup.activeProducts,
+    traction: startup.traction,
+  });
+  startup.innovationScore = startupScore;
+  startup.innovationScoreAtLaunch = startupScore;
   await startup.save();
 
   if (payload.launchTo === 'recruiters') {

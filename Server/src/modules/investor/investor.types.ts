@@ -21,6 +21,7 @@ export interface InvestorStartupCard {
   category: string;
   stage: string;
   launchedAt?: string;
+  innovationScore: number;
   innovationScoreAtLaunch: number;
   teamSize: number;
   pitchDeckUrl?: string;

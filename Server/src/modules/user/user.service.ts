@@ -9,6 +9,7 @@ import {
   SanitizedUser,
   StudentMentorSessionView,
 } from './user.types';
+import { buildTermsAcceptance, CURRENT_TERMS_VERSION, hasAcceptedCurrentTerms } from './user.terms';
 import { ApiError } from '../../utils/ApiError';
 import { recordClientActivity, recordClientActivitySchema } from '../analytics/activity.service';
 import { MentorSession } from '../mentor/mentorSession.model';
@@ -58,6 +59,10 @@ export const socialEnrichSchema = z.object({
 
 export const importGithubRepositoriesSchema = z.object({
   repoIds: z.array(z.string().trim().min(1)).min(1).max(8),
+});
+
+export const acceptTermsSchema = z.object({
+  version: z.string().trim().min(1).max(50),
 });
 
 type UserLike = Omit<IUser, '_id' | 'institutionId'> & {
@@ -219,6 +224,9 @@ export const toSanitizedUser = (user: UserLike): SanitizedUser => ({
   ...(user.lastLogin ? { lastLogin: user.lastLogin } : {}),
   discoverableToRecruiters: user.discoverableToRecruiters ?? false,
   mustChangePasswordOnNextLogin: user.mustChangePasswordOnNextLogin ?? false,
+  termsAcceptance: user.termsAcceptance ?? null,
+  termsCurrentVersion: CURRENT_TERMS_VERSION,
+  hasAcceptedCurrentTerms: hasAcceptedCurrentTerms(user.termsAcceptance),
   ...(user.institutionToken !== undefined ? { institutionToken: user.institutionToken ?? null } : {}),
   ...(user.institutionId ? { institutionId: user.institutionId.toString() } : { institutionId: null }),
   ...(user.institutionProfile ? { institutionProfile: user.institutionProfile } : {}),
@@ -302,6 +310,30 @@ export const recordCurrentUserActivity = async (userId: string, payload: unknown
   const parsed = recordClientActivitySchema.parse(payload);
   await recordClientActivity(userId, parsed);
   return { tracked: true };
+};
+
+export const acceptCurrentTerms = async (
+  userId: string,
+  payload: z.infer<typeof acceptTermsSchema>,
+) => {
+  if (payload.version !== CURRENT_TERMS_VERSION) {
+    throw new ApiError(
+      409,
+      'TERMS_VERSION_MISMATCH',
+      'The Terms & Conditions were updated. Please reload and review the latest version.',
+    );
+  }
+
+  const user = await User.findById(userId);
+
+  if (!user) {
+    throw new ApiError(404, 'USER_NOT_FOUND', 'User not found');
+  }
+
+  user.termsAcceptance = buildTermsAcceptance(user.role);
+  await user.save();
+
+  return toSanitizedUser(user.toObject() as UserLike);
 };
 
 const extractGithubUsername = (githubUrl: string) => {

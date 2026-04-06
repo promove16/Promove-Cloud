@@ -9,9 +9,10 @@ import {
   Users,
 } from 'lucide-react';
 import { type AdminAnalyticsData } from '../../api/admin.api';
+import { SCORE_BUCKETS } from '../../constants/score';
 import { useAdminAnalyticsContext } from './Analytics';
 
-const scoreBuckets = ['0-50', '51-100', '101-150', '151-200'] as const;
+const scoreBuckets = SCORE_BUCKETS;
 const roleColors = ['bg-cyan-400', 'bg-emerald-400', 'bg-amber-400', 'bg-pink-400', 'bg-blue-400', 'bg-violet-400', 'bg-slate-400'];
 
 const numberFormatter = new Intl.NumberFormat('en-IN');

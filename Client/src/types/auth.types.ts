@@ -137,6 +137,12 @@ export interface GithubProof {
   lastSyncedAt: string | null;
 }
 
+export interface TermsAcceptance {
+  version: string;
+  acceptedAt: string;
+  sector: UserRole;
+}
+
 export interface AuthUser {
   _id: string;
   email: string;
@@ -193,6 +199,9 @@ export interface AuthUser {
     linkedin: SocialConnection;
   };
   githubProof?: GithubProof;
+  termsAcceptance: TermsAcceptance | null;
+  termsCurrentVersion: string;
+  hasAcceptedCurrentTerms: boolean;
   createdAt?: string;
   updatedAt?: string;
 }

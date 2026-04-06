@@ -1,8 +1,9 @@
 import { FormEvent, useState } from 'react';
 import { isAxiosError } from 'axios';
-import { Lock, Mail } from 'lucide-react';
+import { Mail } from 'lucide-react';
 import { Link, useNavigate } from 'react-router-dom';
 import { BusinessLogo } from '../../components/branding/BusinessLogo';
+import { AuthPasswordField } from './AuthPasswordField';
 import { useLoginMutation } from './useAuth';
 import { getPostLoginRedirect } from '../../utils/postLoginRedirect';
 
@@ -93,19 +94,18 @@ export function LoginPage() {
 
           <div className="mb-8">
             <label className="mb-3 block text-lg font-semibold text-white">Password</label>
-            <div className="relative">
-              <Lock className="absolute left-5 top-1/2 h-5 w-5 -translate-y-1/2 text-slate-400" />
-              <input
-                type="password"
-                value={formData.password}
-                onChange={(event) =>
-                  setFormData((current) => ({ ...current, password: event.target.value }))
-                }
-                placeholder="••••••••"
-                className="w-full rounded-xl border border-slate-800 bg-slate-950 py-4 pl-14 pr-4 text-lg text-white placeholder-slate-500 focus:border-blue-500 focus:outline-none"
-                required
-              />
-            </div>
+            <AuthPasswordField
+              value={formData.password}
+              onChange={(event) =>
+                setFormData((current) => ({ ...current, password: event.target.value }))
+              }
+              placeholder="********"
+              className="rounded-xl py-4 pl-14 pr-14 text-lg"
+              iconClassName="left-5"
+              toggleClassName="right-5"
+              autoComplete="current-password"
+              required
+            />
           </div>
 
           {error ? (

@@ -6,6 +6,7 @@ import { Badge } from '../../components/ui/Badge';
 import { Button } from '../../components/ui/Button';
 import { Card } from '../../components/ui/Card';
 import { Spinner } from '../../components/ui/Spinner';
+import { MAX_INNOVATION_SCORE } from '../../constants/score';
 
 type Props = {
   open: boolean;
@@ -91,7 +92,7 @@ export function StudentProfileDrawer({ open, studentId, onClose, onSchedule }: P
                   <div>
                     <h3 className="text-2xl font-bold text-white">{profileQuery.data.student.displayName}</h3>
                     <div className="mt-2 flex flex-wrap gap-2">
-                      <Badge>{profileQuery.data.student.innovationScore}/200</Badge>
+                      <Badge>{profileQuery.data.student.innovationScore}/{MAX_INNOVATION_SCORE}</Badge>
                       {profileQuery.data.student.domain ? <Badge>{profileQuery.data.student.domain}</Badge> : null}
                       {profileQuery.data.student.institutionName ? <Badge>{profileQuery.data.student.institutionName}</Badge> : null}
                     </div>

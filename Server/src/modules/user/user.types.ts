@@ -318,6 +318,12 @@ export interface GithubProof {
   lastSyncedAt: Date | null;
 }
 
+export interface TermsAcceptance {
+  version: string;
+  acceptedAt: Date;
+  sector: UserRole;
+}
+
 export interface IUser {
   _id: Types.ObjectId;
   email: string;
@@ -344,6 +350,7 @@ export interface IUser {
   lastLogin?: Date;
   discoverableToRecruiters?: boolean;
   mustChangePasswordOnNextLogin?: boolean;
+  termsAcceptance?: TermsAcceptance | null;
   institutionToken: string | null;
   institutionId?: Types.ObjectId | null;
   institutionProfile?: InstitutionProfile;
@@ -402,6 +409,9 @@ export interface SanitizedUser {
   lastLogin?: Date;
   discoverableToRecruiters?: boolean;
   mustChangePasswordOnNextLogin?: boolean;
+  termsAcceptance: TermsAcceptance | null;
+  termsCurrentVersion: string;
+  hasAcceptedCurrentTerms: boolean;
   institutionToken?: string | null;
   institutionId?: string | null;
   institutionProfile?: InstitutionProfile;
