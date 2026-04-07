@@ -6,12 +6,13 @@ import { Button } from '../../components/ui/Button';
 import { Card } from '../../components/ui/Card';
 import { Input } from '../../components/ui/Input';
 import { Spinner } from '../../components/ui/Spinner';
-import { MAX_INNOVATION_SCORE } from '../../constants/score';
 import { investorApi } from '../../api/investor.api';
 import { StartupDetailDrawer } from './StartupDetailDrawer';
 
 const categories = ['Agriculture', 'Health', 'Education', 'Energy', 'Software', 'Other'];
 const stages = ['Pre-Idea', 'Ideation', 'MVP', 'Pre-Launch', 'Launched'];
+const scoreRangeMin = 0;
+const scoreRangeMax = 200;
 
 const getInvestorWorkflowErrorMessage = (error: unknown) => {
   if (isAxiosError<{ error?: { message?: string } }>(error)) {
@@ -26,8 +27,7 @@ export default function StartupMarketplace() {
   const [search, setSearch] = useState('');
   const [category, setCategory] = useState<string>('all');
   const [stage, setStage] = useState<string>('all');
-  const [minScore, setMinScore] = useState(0);
-  const [maxScore, setMaxScore] = useState(MAX_INNOVATION_SCORE);
+  const [scoreRange, setScoreRange] = useState({ min: scoreRangeMin, max: scoreRangeMax });
   const [acceptingPenny, setAcceptingPenny] = useState(true);
   const [acceptingSole, setAcceptingSole] = useState(true);
   const [selectedStartupId, setSelectedStartupId] = useState<string | null>(null);
@@ -35,13 +35,13 @@ export default function StartupMarketplace() {
   const [feedback, setFeedback] = useState<{ type: 'success' | 'error'; message: string } | null>(null);
 
   const startupsQuery = useQuery({
-    queryKey: ['investor-startups', { category, stage, minScore, maxScore, acceptingPenny, acceptingSole }],
+    queryKey: ['investor-startups', { category, stage, scoreRange, acceptingPenny, acceptingSole }],
     queryFn: () =>
       investorApi.getStartups({
         category: category === 'all' ? undefined : category,
         stage: stage === 'all' ? undefined : stage,
-        minScore,
-        maxScore,
+        minScore: scoreRange.min,
+        maxScore: scoreRange.max,
         acceptingPenny: acceptingPenny || undefined,
         acceptingSole: acceptingSole || undefined,
         page: 1,
@@ -153,30 +153,37 @@ export default function StartupMarketplace() {
           </select>
         </div>
 
-        <div>
-          <div className="mb-2 text-xs uppercase tracking-[0.2em] text-slate-400">
-            Min score {minScore}
+        <div className="lg:col-span-2">
+          <div className="mb-2 flex items-center justify-between gap-3 text-xs uppercase tracking-[0.2em] text-slate-400">
+            <span>Score range</span>
+            <span className="text-slate-300">
+              {scoreRange.min} - {scoreRange.max}
+            </span>
           </div>
-          <Input
-            type="range"
-            min={0}
-            max={MAX_INNOVATION_SCORE}
-            value={minScore}
-            onChange={(event) => setMinScore(Number(event.target.value))}
-          />
-        </div>
-
-        <div>
-          <div className="mb-2 text-xs uppercase tracking-[0.2em] text-slate-400">
-            Max score {maxScore}
+          <div className="space-y-3">
+            <Input
+              aria-label="Minimum innovation score"
+              type="range"
+              min={scoreRangeMin}
+              max={scoreRangeMax}
+              value={scoreRange.min}
+              onChange={(event) => {
+                const nextValue = Number(event.target.value);
+                setScoreRange((current) => ({ ...current, min: Math.min(nextValue, current.max) }));
+              }}
+            />
+            <Input
+              aria-label="Maximum innovation score"
+              type="range"
+              min={scoreRangeMin}
+              max={scoreRangeMax}
+              value={scoreRange.max}
+              onChange={(event) => {
+                const nextValue = Number(event.target.value);
+                setScoreRange((current) => ({ ...current, max: Math.max(nextValue, current.min) }));
+              }}
+            />
           </div>
-          <Input
-            type="range"
-            min={0}
-            max={MAX_INNOVATION_SCORE}
-            value={maxScore}
-            onChange={(event) => setMaxScore(Number(event.target.value))}
-          />
         </div>
 
         <div className="lg:col-span-4">
@@ -228,16 +235,16 @@ export default function StartupMarketplace() {
                     <div className="mt-1 text-sm text-cyan-300">{startup.category}</div>
                     <div className="mt-2 text-sm leading-6 text-slate-400">{startup.tagline}</div>
                     <p className="mt-3 line-clamp-2 text-sm leading-6 text-slate-400">
-                      {startup.founder?.displayName ?? 'Founding team'} is currently at {liveScore}/{MAX_INNOVATION_SCORE}.
+                      {startup.founder?.displayName ?? 'Founding team'} is currently at {liveScore}/200.
                       <span className="ml-2 text-slate-500">
-                        Launch snapshot: {startup.innovationScoreAtLaunch}/{MAX_INNOVATION_SCORE}.
+                        Launch snapshot: {startup.innovationScoreAtLaunch}/200.
                       </span>
                     </p>
                   </div>
                   <div className="flex flex-col items-end gap-2">
                     <Badge>{startup.stage}</Badge>
                     <div className="rounded-full border border-emerald-500/30 bg-emerald-500/10 px-3 py-1 text-xs font-semibold text-emerald-300">
-                      Live score {liveScore}/{MAX_INNOVATION_SCORE}
+                      Live score {liveScore}/200
                     </div>
                   </div>
                 </div>

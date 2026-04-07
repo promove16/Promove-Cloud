@@ -2,7 +2,7 @@ import bcrypt from 'bcrypt';
 import { randomBytes } from 'crypto';
 import { open } from 'fs/promises';
 import path from 'path';
-import { Types } from 'mongoose';
+import { ClientSession, Types } from 'mongoose';
 import { logError } from '../../config/logger';
 import { redis } from '../../config/redis';
 import { io } from '../../config/socket';
@@ -27,11 +27,14 @@ import { Deal } from '../deal/deal.model';
 import {
   getInvestmentTypeAnalytics as getDealInvestmentTypeAnalytics,
   getStartupCapTable,
+  invalidateInvestmentCaches,
   resetSoleInvestorForStartup,
+  validateInvestmentTerms,
   updateInvestmentRole,
 } from '../deal/deal.service';
 import { AdminAuditLog } from './adminAuditLog.model';
 import { AdminAward } from './award.model';
+import { runMongoTransaction } from '../../utils/runMongoTransaction';
 import {
   getPlatformUsageAnalytics,
   getUserActivityDetail,
@@ -68,6 +71,8 @@ import {
 } from '../mentor/mentorshipProgram.service';
 
 type AuditAction =
+  | 'STARTUP_APPROVED'
+  | 'STARTUP_CHANGES_REQUESTED'
   | 'PATENT_APPROVED'
   | 'PATENT_REJECTED'
   | 'AWARD_APPROVED'
@@ -80,6 +85,7 @@ type AuditAction =
   | 'USER_ROLE_CHANGED'
   | 'USER_DEACTIVATED'
   | 'USER_ACTIVATED'
+  | 'DEAL_REJECTED'
   | 'DEAL_REVIEW_UPDATED'
   | 'MENTOR_PROFILE_CREATED'
   | 'PROJECT_MENTOR_ASSIGNED'
@@ -405,14 +411,26 @@ const pushNotification = async (
   }
 };
 
-const createAudit = (adminId: string, action: AuditAction, targetId: string, targetModel: string, metadata?: Record<string, unknown>) =>
-  AdminAuditLog.create({
-    adminId,
-    action,
-    targetId,
-    targetModel,
-    ...(metadata ? { metadata } : {}),
-  });
+const createAudit = (
+  adminId: string,
+  action: AuditAction,
+  targetId: string,
+  targetModel: string,
+  metadata?: Record<string, unknown>,
+  session?: ClientSession,
+) =>
+  AdminAuditLog.create(
+    [
+      {
+        adminId,
+        action,
+        targetId,
+        targetModel,
+        ...(metadata ? { metadata } : {}),
+      },
+    ],
+    session ? { session } : undefined,
+  );
 
 const getAdminStockDetails = (deal: {
   amountINR?: number;
@@ -437,7 +455,7 @@ const getAdminStockDetails = (deal: {
 const getAdminStockTransfer = (deal: {
   stage: number;
   stockTransfer?: {
-    status?: 'not_started' | 'pending_review' | 'under_review' | 'approved';
+    status?: 'not_started' | 'pending_review' | 'under_review' | 'approved' | 'rejected';
     requestedAt?: Date | null;
     requestedByRole?: 'investor' | 'student' | 'admin';
     requestSummary?: string;
@@ -483,7 +501,7 @@ const buildAdminDealItem = (
     studentId: Types.ObjectId;
     mediatorLabel?: string;
     requestOrigin?: 'investor' | 'student';
-    mediationStatus?: 'intake' | 'under_review' | 'approved';
+    mediationStatus?: 'intake' | 'under_review' | 'approved' | 'rejected';
     investorType: 'penny' | 'sole';
     stage: number;
     amountINR?: number;
@@ -502,7 +520,7 @@ const buildAdminDealItem = (
       totalSharesConsidered?: number;
     };
     stockTransfer?: {
-      status?: 'not_started' | 'pending_review' | 'under_review' | 'approved';
+      status?: 'not_started' | 'pending_review' | 'under_review' | 'approved' | 'rejected';
       requestedAt?: Date | null;
       requestedByRole?: 'investor' | 'student' | 'admin';
       requestSummary?: string;
@@ -549,6 +567,8 @@ const buildAdminDealItem = (
   nextActionLabel:
     deal.stage < 3
       ? 'Waiting for stock transfer request'
+      : deal.stockTransfer?.status === 'rejected'
+        ? 'Transfer rejected - awaiting resubmission'
       : deal.adminApprovedAt
         ? 'Transfer verified by ProMove'
         : 'Review stock transfer',
@@ -565,7 +585,7 @@ const buildAdminDealReviewItem = (
     studentId: Types.ObjectId;
     mediatorLabel?: string;
     requestOrigin?: 'investor' | 'student';
-    mediationStatus?: 'intake' | 'under_review' | 'approved';
+    mediationStatus?: 'intake' | 'under_review' | 'approved' | 'rejected';
     investorType: 'penny' | 'sole';
     stage: number;
     amountINR?: number;
@@ -584,7 +604,7 @@ const buildAdminDealReviewItem = (
       totalSharesConsidered?: number;
     };
     stockTransfer?: {
-      status?: 'not_started' | 'pending_review' | 'under_review' | 'approved';
+      status?: 'not_started' | 'pending_review' | 'under_review' | 'approved' | 'rejected';
       requestedAt?: Date | null;
       requestedByRole?: 'investor' | 'student' | 'admin';
       requestSummary?: string;
@@ -1343,118 +1363,217 @@ export const reviewDeal = async (
   dealId: string,
   payload: AdminDealReviewPayload,
 ): Promise<AdminDealReviewItem> => {
-  const deal = await Deal.findById(dealId);
-  if (!deal || deal.status === 'cancelled') {
-    throw new ApiError(404, 'DEAL_NOT_FOUND', 'Deal not found');
-  }
+  const reviewResult = await runMongoTransaction(async (session) => {
+    const deal = await Deal.findById(dealId).session(session);
+    if (!deal || deal.status === 'cancelled') {
+      throw new ApiError(404, 'DEAL_NOT_FOUND', 'Deal not found');
+    }
 
-  if (deal.stage < 2) {
-    throw new ApiError(400, 'DEAL_NOT_READY_FOR_REVIEW', 'This deal has not reached the mediation workflow yet');
-  }
+    if (deal.stage < 2) {
+      throw new ApiError(400, 'DEAL_NOT_READY_FOR_REVIEW', 'This deal has not reached the mediation workflow yet');
+    }
 
-  const reviewTouched =
-    payload.stockTransferStatus !== undefined ||
-    payload.reviewNotes !== undefined;
-  const royaltyPercentage = payload.royaltyPercentage ?? deal.royalty?.promovePercentage ?? DEFAULT_PROMOVE_ROYALTY_PERCENTAGE;
+    if (payload.stockTransferStatus !== undefined && deal.stage < 3) {
+      throw new ApiError(400, 'STOCK_TRANSFER_NOT_SUBMITTED', 'Stock transfer review starts after the deal reaches stage 3');
+    }
 
-  deal.mediatorLabel = deal.mediatorLabel || 'ProMove';
-  deal.royalty = {
-    promovePercentage: royaltyPercentage,
-    promoveAmountINR: calculateRoyaltyAmount(deal.amountINR ?? 0, royaltyPercentage),
-    status: payload.royaltyStatus ?? deal.royalty?.status ?? 'pending',
-    ...(payload.royaltyStatus === 'received'
-      ? { settledAt: new Date() }
-      : deal.royalty?.settledAt
-        ? { settledAt: deal.royalty.settledAt }
-        : {}),
-  };
+    const reviewTouched =
+      payload.stockTransferStatus !== undefined ||
+      payload.reviewNotes !== undefined;
+    const royaltyPercentage =
+      payload.royaltyPercentage ?? deal.royalty?.promovePercentage ?? DEFAULT_PROMOVE_ROYALTY_PERCENTAGE;
 
-  if (deal.stage >= 3) {
-    deal.stockTransfer = {
-      status: payload.stockTransferStatus ?? deal.stockTransfer?.status ?? 'pending_review',
-      requestedAt: deal.stockTransfer?.requestedAt ?? new Date(),
-      requestedByRole: deal.stockTransfer?.requestedByRole ?? deal.requestOrigin ?? 'investor',
-      requestSummary:
-        deal.stockTransfer?.requestSummary ??
-        `${deal.mediatorLabel || 'ProMove'} mediation review opened for the stock transfer.`,
-      reviewNotes:
-        payload.reviewNotes !== undefined
-          ? payload.reviewNotes
-          : deal.stockTransfer?.reviewNotes,
-      ...(reviewTouched ? { reviewedAt: new Date(), reviewedBy: new Types.ObjectId(adminId) } : {}),
-      ...(deal.stockTransfer?.reviewedAt && !reviewTouched ? { reviewedAt: deal.stockTransfer.reviewedAt } : {}),
-      ...(deal.stockTransfer?.reviewedBy && !reviewTouched ? { reviewedBy: deal.stockTransfer.reviewedBy } : {}),
+    deal.mediatorLabel = deal.mediatorLabel || 'ProMove';
+    deal.royalty = {
+      promovePercentage: royaltyPercentage,
+      promoveAmountINR: calculateRoyaltyAmount(deal.amountINR ?? 0, royaltyPercentage),
+      status: payload.royaltyStatus ?? deal.royalty?.status ?? 'pending',
+      ...(payload.royaltyStatus === 'received'
+        ? { settledAt: new Date() }
+        : deal.royalty?.settledAt
+          ? { settledAt: deal.royalty.settledAt }
+          : {}),
     };
-    deal.mediationStatus = deal.adminApprovedAt ? 'approved' : 'under_review';
-  }
 
-  deal.stockDetails = {
-    shareClassLabel: deal.stockDetails?.shareClassLabel ?? DEFAULT_SHARE_CLASS_LABEL,
-    sharePriceInr:
-      deal.sharesAllocated > 0 && typeof deal.amountINR === 'number'
-        ? round(deal.amountINR / deal.sharesAllocated)
-        : deal.stockDetails?.sharePriceInr ?? 0,
-    transferValueInr: deal.amountINR ?? deal.stockDetails?.transferValueInr ?? 0,
-    totalSharesConsidered: deal.sharesAllocated ?? deal.stockDetails?.totalSharesConsidered ?? 0,
-  };
+    if (deal.stage >= 3) {
+      const nextStockTransferStatus = payload.stockTransferStatus ?? deal.stockTransfer?.status ?? 'pending_review';
+      deal.stockTransfer = {
+        status: nextStockTransferStatus,
+        requestedAt: deal.stockTransfer?.requestedAt ?? new Date(),
+        requestedByRole: deal.stockTransfer?.requestedByRole ?? deal.requestOrigin ?? 'investor',
+        requestSummary:
+          deal.stockTransfer?.requestSummary ??
+          `${deal.mediatorLabel || 'ProMove'} mediation review opened for the stock transfer.`,
+        reviewNotes:
+          payload.reviewNotes !== undefined
+            ? payload.reviewNotes
+            : deal.stockTransfer?.reviewNotes,
+        ...(reviewTouched ? { reviewedAt: new Date(), reviewedBy: new Types.ObjectId(adminId) } : {}),
+        ...(deal.stockTransfer?.reviewedAt && !reviewTouched ? { reviewedAt: deal.stockTransfer.reviewedAt } : {}),
+        ...(deal.stockTransfer?.reviewedBy && !reviewTouched ? { reviewedBy: deal.stockTransfer.reviewedBy } : {}),
+      };
+      if (nextStockTransferStatus === 'rejected') {
+        deal.adminApprovalRequired = false;
+        deal.adminApprovedAt = undefined;
+        deal.adminApprovedBy = undefined;
+        deal.mediationStatus = 'rejected';
 
-  await deal.save();
+      } else {
+        deal.mediationStatus = deal.adminApprovedAt ? 'approved' : 'under_review';
+      }
+    }
 
-  await createAudit(adminId, 'DEAL_REVIEW_UPDATED', String(deal._id), 'Deal', {
-    stage: deal.stage,
-    ...(payload.stockTransferStatus ? { stockTransferStatus: payload.stockTransferStatus } : {}),
-    ...(payload.royaltyStatus ? { royaltyStatus: payload.royaltyStatus } : {}),
-    ...(payload.royaltyPercentage !== undefined ? { royaltyPercentage: payload.royaltyPercentage } : {}),
+    deal.stockDetails = {
+      shareClassLabel: deal.stockDetails?.shareClassLabel ?? DEFAULT_SHARE_CLASS_LABEL,
+      sharePriceInr:
+        deal.sharesAllocated > 0 && typeof deal.amountINR === 'number'
+          ? round(deal.amountINR / deal.sharesAllocated)
+          : deal.stockDetails?.sharePriceInr ?? 0,
+      transferValueInr: deal.amountINR ?? deal.stockDetails?.transferValueInr ?? 0,
+      totalSharesConsidered: deal.sharesAllocated ?? deal.stockDetails?.totalSharesConsidered ?? 0,
+    };
+
+    await deal.save({ session });
+
+    await createAudit(
+      adminId,
+      payload.stockTransferStatus === 'rejected' ? 'DEAL_REJECTED' : 'DEAL_REVIEW_UPDATED',
+      String(deal._id),
+      'Deal',
+      {
+        stage: deal.stage,
+        ...(payload.stockTransferStatus ? { stockTransferStatus: payload.stockTransferStatus } : {}),
+        ...(payload.royaltyStatus ? { royaltyStatus: payload.royaltyStatus } : {}),
+        ...(payload.royaltyPercentage !== undefined ? { royaltyPercentage: payload.royaltyPercentage } : {}),
+        ...(payload.reviewNotes ? { reviewNotes: payload.reviewNotes } : {}),
+      },
+      session,
+    );
+
+    return {
+      dealId: String(deal._id),
+      studentId: String(deal.studentId),
+      investorId: String(deal.investorId),
+    };
   });
 
-  return getDealAwaitingApproval(String(deal._id));
+  if (payload.stockTransferStatus === 'rejected') {
+    await Promise.all([
+      pushNotification(
+        reviewResult.studentId,
+        'system',
+        'Equity transfer requires changes',
+        payload.reviewNotes || 'ProMove admin requested changes before the deal can be finalized.',
+      ),
+      pushNotification(
+        reviewResult.investorId,
+        'system',
+        'Equity transfer requires changes',
+        payload.reviewNotes || 'ProMove admin requested changes before the deal can be finalized.',
+      ),
+    ]);
+  }
+
+  return getDealAwaitingApproval(reviewResult.dealId);
 };
 
 export const approveDealStage = async (adminId: string, dealId: string) => {
-  const deal = await Deal.findById(dealId);
-  if (!deal || deal.status === 'cancelled') throw new ApiError(404, 'DEAL_NOT_FOUND', 'Deal not found');
-  if (!deal.adminApprovalRequired || deal.stage !== 3) {
-    throw new ApiError(400, 'DEAL_NOT_PENDING_APPROVAL', 'Deal is not awaiting admin approval');
-  }
-  const approvedAt = new Date();
-  const reviewedBy = new Types.ObjectId(adminId);
-  const royaltyPercentage = deal.royalty?.promovePercentage ?? DEFAULT_PROMOVE_ROYALTY_PERCENTAGE;
-  deal.adminApprovedAt = approvedAt;
-  deal.adminApprovedBy = new Types.ObjectId(adminId);
-  deal.adminApprovalRequired = false;
-  deal.mediatorLabel = deal.mediatorLabel || 'ProMove';
-  deal.mediationStatus = 'approved';
-  deal.stockDetails = {
-    shareClassLabel: deal.stockDetails?.shareClassLabel ?? DEFAULT_SHARE_CLASS_LABEL,
-    sharePriceInr:
-      deal.sharesAllocated > 0 && typeof deal.amountINR === 'number'
-        ? round(deal.amountINR / deal.sharesAllocated)
-        : deal.stockDetails?.sharePriceInr ?? 0,
-    transferValueInr: deal.amountINR ?? deal.stockDetails?.transferValueInr ?? 0,
-    totalSharesConsidered: deal.sharesAllocated ?? deal.stockDetails?.totalSharesConsidered ?? 0,
-  };
-  deal.stockTransfer = {
-    status: 'approved',
-    requestedAt: deal.stockTransfer?.requestedAt ?? approvedAt,
-    requestedByRole: deal.stockTransfer?.requestedByRole ?? deal.requestOrigin ?? 'investor',
-    requestSummary:
-      deal.stockTransfer?.requestSummary ??
-      `${deal.mediatorLabel || 'ProMove'} mediation approved the stock transfer.`,
-    reviewNotes: deal.stockTransfer?.reviewNotes,
-    reviewedAt: approvedAt,
-    reviewedBy,
-  };
-  deal.royalty = {
-    promovePercentage: royaltyPercentage,
-    promoveAmountINR: calculateRoyaltyAmount(deal.amountINR ?? 0, royaltyPercentage),
-    status: deal.royalty?.status ?? 'pending',
-    ...(deal.royalty?.settledAt ? { settledAt: deal.royalty.settledAt } : {}),
-  };
-  await deal.save();
+  const approvalResult = await runMongoTransaction(async (session) => {
+    const deal = await Deal.findById(dealId).session(session);
+    if (!deal || deal.status === 'cancelled') throw new ApiError(404, 'DEAL_NOT_FOUND', 'Deal not found');
+    if (!deal.adminApprovalRequired || deal.stage !== 3) {
+      throw new ApiError(400, 'DEAL_NOT_PENDING_APPROVAL', 'Deal is not awaiting admin approval');
+    }
+
+    const startup = await Startup.findById(deal.startupId)
+      .session(session)
+      .select(
+        '_id name tagline category stage pitchDeckUrl founderIds launchedToInvestors launchedAt innovationScoreAtLaunch traction totalShares availableShares reservedForSole maxPennyInvestors currentPennyCount hasSoleInvestor soleInvestorId',
+      )
+      .lean<Parameters<typeof validateInvestmentTerms>[0]['startup'] | null>();
+
+    if (!startup) {
+      throw new ApiError(404, 'STARTUP_NOT_FOUND', 'Startup not found');
+    }
+
+    if (
+      deal.investorType === 'sole' &&
+      startup.hasSoleInvestor &&
+      (!startup.soleInvestorId || String(startup.soleInvestorId) !== String(deal.investorId))
+    ) {
+      throw new ApiError(409, 'SOLE_INVESTOR_EXISTS', 'This startup already has a sole investor');
+    }
+
+    await validateInvestmentTerms({
+      startup,
+      investorType: deal.investorType,
+      equityPercent: deal.equityPercent,
+      chosenRole: deal.investorRole,
+      excludeId: String(deal._id),
+      currentSharesAllocated: deal.sharesAllocated,
+      session,
+    });
+
+    const approvedAt = new Date();
+    const reviewedBy = new Types.ObjectId(adminId);
+    const royaltyPercentage = deal.royalty?.promovePercentage ?? DEFAULT_PROMOVE_ROYALTY_PERCENTAGE;
+    deal.adminApprovedAt = approvedAt;
+    deal.adminApprovedBy = new Types.ObjectId(adminId);
+    deal.adminApprovalRequired = false;
+    deal.mediatorLabel = deal.mediatorLabel || 'ProMove';
+    deal.mediationStatus = 'approved';
+    deal.stockDetails = {
+      shareClassLabel: deal.stockDetails?.shareClassLabel ?? DEFAULT_SHARE_CLASS_LABEL,
+      sharePriceInr:
+        deal.sharesAllocated > 0 && typeof deal.amountINR === 'number'
+          ? round(deal.amountINR / deal.sharesAllocated)
+          : deal.stockDetails?.sharePriceInr ?? 0,
+      transferValueInr: deal.amountINR ?? deal.stockDetails?.transferValueInr ?? 0,
+      totalSharesConsidered: deal.sharesAllocated ?? deal.stockDetails?.totalSharesConsidered ?? 0,
+    };
+    deal.stockTransfer = {
+      status: 'approved',
+      requestedAt: deal.stockTransfer?.requestedAt ?? approvedAt,
+      requestedByRole: deal.stockTransfer?.requestedByRole ?? deal.requestOrigin ?? 'investor',
+      requestSummary:
+        deal.stockTransfer?.requestSummary ??
+        `${deal.mediatorLabel || 'ProMove'} mediation approved the stock transfer.`,
+      reviewNotes: deal.stockTransfer?.reviewNotes,
+      reviewedAt: approvedAt,
+      reviewedBy,
+    };
+    deal.royalty = {
+      promovePercentage: royaltyPercentage,
+      promoveAmountINR: calculateRoyaltyAmount(deal.amountINR ?? 0, royaltyPercentage),
+      status: deal.royalty?.status ?? 'pending',
+      ...(deal.royalty?.settledAt ? { settledAt: deal.royalty.settledAt } : {}),
+    };
+
+    await deal.save({ session });
+    await createAudit(
+      adminId,
+      'DEAL_STAGE_APPROVED',
+      String(deal._id),
+      'Deal',
+      {
+        studentId: String(deal.studentId),
+        investorId: String(deal.investorId),
+      },
+      session,
+    );
+
+    return {
+      startupId: String(deal.startupId),
+      investorId: String(deal.investorId),
+      studentId: String(deal.studentId),
+    };
+  });
+
+  await invalidateInvestmentCaches(approvalResult.startupId, approvalResult.investorId);
 
   const [student, investor] = await Promise.all([
-    User.findById(deal.studentId).select('_id displayName').lean(),
-    User.findById(deal.investorId).select('_id displayName').lean(),
+    User.findById(approvalResult.studentId).select('_id displayName').lean(),
+    User.findById(approvalResult.investorId).select('_id displayName').lean(),
   ]);
 
   if (student) {
@@ -1473,11 +1592,6 @@ export const approveDealStage = async (adminId: string, dealId: string) => {
       'You may now close the deal.',
     );
   }
-
-  await createAudit(adminId, 'DEAL_STAGE_APPROVED', String(deal._id), 'Deal', {
-    studentId: String(deal.studentId),
-    investorId: String(deal.investorId),
-  });
 };
 
 export const getAdminCapTable = async (startupId: string) => getStartupCapTable(startupId, '', UserRole.ADMIN);

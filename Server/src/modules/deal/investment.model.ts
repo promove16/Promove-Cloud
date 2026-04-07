@@ -31,7 +31,7 @@ const investmentSchema = new Schema<IInvestment>(
     },
     mediationStatus: {
       type: String,
-      enum: ['intake', 'under_review', 'approved'],
+      enum: ['intake', 'under_review', 'approved', 'rejected'],
       default: 'intake',
       required: true,
     },
@@ -92,7 +92,7 @@ const investmentSchema = new Schema<IInvestment>(
     stockTransfer: {
       status: {
         type: String,
-        enum: ['not_started', 'pending_review', 'under_review', 'approved'],
+        enum: ['not_started', 'pending_review', 'under_review', 'approved', 'rejected'],
         default: 'not_started',
         required: true,
       },
@@ -145,6 +145,28 @@ const investmentSchema = new Schema<IInvestment>(
       },
       settledAt: {
         type: Date,
+        default: undefined,
+      },
+    },
+    founderDecision: {
+      status: {
+        type: String,
+        enum: ['pending', 'accepted', 'rejected'],
+        default: 'pending',
+        required: true,
+      },
+      respondedAt: {
+        type: Date,
+        default: undefined,
+      },
+      respondedBy: {
+        type: Schema.Types.ObjectId,
+        ref: 'User',
+        default: undefined,
+      },
+      note: {
+        type: String,
+        trim: true,
         default: undefined,
       },
     },

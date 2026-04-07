@@ -743,19 +743,21 @@ This module helps a student transform work into a structured startup record, req
 
 #### Feature: Request Review and Launch Startup
 
-**Description:** Moves the startup into admin review and then into launch visibility.  
-**Preconditions:** Startup is sufficiently complete.  
+**Description:** Moves the startup through project completion, patent approval, investor pitch listing, and marketplace visibility.
+**Preconditions:** Startup is sufficiently complete and linked to a completed project workspace.
 **Steps:**
 
 1. Open the startup overview.
-2. Select **Request Review**.
-3. Wait for admin decision.
-4. Once approved, launch to investors, mentors, and/or recruiters from the startup flow.
+2. Complete the linked project workspace and sync any needed workspace members.
+3. Submit the patent request from Patent Support and wait for admin approval.
+4. Select **Request Review** for the startup profile.
+5. Once the startup and patent approvals are complete, launch to investors for pitch listing.
+6. Track investor approval and deal activity from Investor Outreach, Investor Deals, and Cap Table.
 
 **Expected result:** Review status changes and launch targets become visible on the platform.  
 **Success / failure messages:**  
 - Success: review request accepted, launch flags updated.  
-- Failure: `STARTUP_INCOMPLETE` or blocked review/launch action.
+- Failure: `STARTUP_INCOMPLETE`, `PROJECT_NOT_COMPLETE`, `PATENT_APPROVAL_REQUIRED`, or another blocked review/launch action.
 
 **Role permissions:** Student only; admin reviews the startup separately.
 
@@ -764,17 +766,18 @@ This module helps a student transform work into a structured startup record, req
 ```mermaid
 flowchart TD
     A[Open My Startups] --> B[Create New Startup]
-    B --> C[Fill Startup Overview and Registration Data]
-    C --> D[Upload Pitch Deck and Documents]
-    D --> E[Request Review]
-    E --> F{Review Ready?}
-    F -- No --> G[Show Missing Items Error]
-    F -- Yes --> H[Set Review Requested Status]
-    H --> I{Admin Approves?}
-    I -- No --> J[Changes Requested or Rejected]
-    I -- Yes --> K[Launch Startup]
-    K --> L[Expose to Investors, Mentors, or Recruiters]
-    L --> M[View Cap Table and Deal Activity]
+    B --> C[Fill Startup Launch Profile]
+    C --> D[Add Workspace Members if Needed]
+    D --> E[Complete Linked Project Workspace]
+    E --> F[Submit Patent Request]
+    F --> G{Admin Patent Approved?}
+    G -- No --> H[Show Patent Gate]
+    G -- Yes --> I[Request Startup Review]
+    I --> J{Admin Startup Approved?}
+    J -- No --> K[Changes Requested]
+    J -- Yes --> L[Launch to Investor Pitch Listing]
+    L --> M[Investor Expresses Interest]
+    M --> N[Track Marketplace, Deals, and Cap Table]
 ```
 
 ### 10.5 Browser Test Screenshots

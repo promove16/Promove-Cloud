@@ -12,6 +12,7 @@ import {
   Outlet,
   createBrowserRouter,
   isRouteErrorResponse,
+  useParams,
   useRouteError,
 } from "react-router-dom";
 import { AuthLayout } from "../components/layouts/AuthLayout";
@@ -27,6 +28,7 @@ import { useRouteActivityTracking } from "../hooks/useRouteActivityTracking";
 import { useAuthStore } from "../store/authStore";
 import { UserRole } from "../types/roles.types";
 import { roleRedirect } from "../utils/roleRedirect";
+import { getMarketplaceBasePath, getMarketplaceDetailPath } from "../features/marketplace/navigation";
 
 function LazyPage({ component: Component }: { component: LazyExoticComponent<ComponentType> }) {
   return (
@@ -88,16 +90,33 @@ const AdminProblemBank = lazy(() => import("../features/admin/ProblemBank"));
 const AdminProblemLibrary = lazy(() => import("../features/admin/ProblemLibrary"));
 const AdminProblemReviewQueue = lazy(() => import("../features/admin/ProblemReviewQueue"));
 
-const RecruiterDashboard = lazy(() => import("../features/recruiter/Dashboard"));
-const RecruiterTalentSearch = lazy(() => import("../features/recruiter/TalentSearch"));
-const RecruiterCollegeConnect = lazy(() => import("../features/recruiter/CollegeConnect"));
-const RecruiterActiveDrives = lazy(() => import("../features/recruiter/ActiveDrives"));
-const RecruiterOnboardingTracker = lazy(() => import("../features/recruiter/OnboardingTracker"));
+const RecruiterDashboard = lazy(() => import("../features/recruiter/RecruiterDashboardExperience"));
+const RecruiterTalentSearch = lazy(() =>
+  import("../features/recruiter/RecruiterDashboardExperience").then((module) => ({
+    default: module.RecruiterTalentSearchView,
+  })),
+);
+const RecruiterCollegeConnect = lazy(() =>
+  import("../features/recruiter/RecruiterDashboardExperience").then((module) => ({
+    default: module.RecruiterCollegeConnectView,
+  })),
+);
+const RecruiterActiveDrives = lazy(() =>
+  import("../features/recruiter/RecruiterDashboardExperience").then((module) => ({
+    default: module.RecruiterActiveDrivesView,
+  })),
+);
+const RecruiterOnboardingTracker = lazy(() =>
+  import("../features/recruiter/RecruiterDashboardExperience").then((module) => ({
+    default: module.RecruiterOnboardingTrackerView,
+  })),
+);
 
 const InvestorDashboard = lazy(() => import("../features/investor/Dashboard"));
 const InvestorStartupMarketplace = lazy(() => import("../features/investor/StartupMarketplace"));
 const InvestorInstitutions = lazy(() => import("../features/investor/Institutions"));
 const InvestorPortfolio = lazy(() => import("../features/investor/Portfolio"));
+const InvestorPaymentPage = lazy(() => import("../features/investor/InvestorPaymentPage"));
 
 const StartupCapTable = lazy(() => import("../features/startup/CapTable"));
 const MyStartups = lazy(() =>
@@ -347,6 +366,27 @@ function DashboardIndexRedirect() {
   return <Navigate to={roleRedirect(user.role)} replace />;
 }
 
+function MarketplaceIndexRedirect() {
+  const user = useAuthStore((state) => state.user);
+
+  if (!user) {
+    return <Navigate to="/login" replace />;
+  }
+
+  return <Navigate to={getMarketplaceBasePath(user.role)} replace />;
+}
+
+function MarketplaceDetailRedirect() {
+  const user = useAuthStore((state) => state.user);
+  const { entityType, entityId } = useParams<{ entityType?: string; entityId?: string }>();
+
+  if (!user || !entityType || !entityId) {
+    return <Navigate to="/login" replace />;
+  }
+
+  return <Navigate to={getMarketplaceDetailPath(user.role, entityType as "student" | "school" | "college" | "mentor" | "investor" | "recruiter" | "startup", entityId)} replace />;
+}
+
 const NON_ADMIN_DASHBOARD_ROLES = [
   UserRole.STUDENT,
   UserRole.SCHOOL,
@@ -497,7 +537,7 @@ export const router = createBrowserRouter([
         path: "/marketplace",
         element: (
           <ProtectedRolesRoute roles={NON_ADMIN_DASHBOARD_ROLES}>
-            <LazyPage component={Marketplace} />
+            <MarketplaceIndexRedirect />
           </ProtectedRolesRoute>
         ),
       },
@@ -505,7 +545,7 @@ export const router = createBrowserRouter([
         path: "/marketplace/view/:entityType/:entityId",
         element: (
           <ProtectedRolesRoute roles={NON_ADMIN_DASHBOARD_ROLES}>
-            <LazyPage component={MarketplaceDetail} />
+            <MarketplaceDetailRedirect />
           </ProtectedRolesRoute>
         ),
       },
@@ -537,6 +577,8 @@ export const router = createBrowserRouter([
               { path: "score", element: <LazyPage component={InnovationScorePage} /> },
               { path: "mentor-sessions", element: <LazyPage component={StudentMentorSessions} /> },
               { path: "investor-deals", element: <Navigate to="/startup-launch" replace /> },
+              { path: "marketplace", element: <LazyPage component={Marketplace} /> },
+              { path: "marketplace/view/:entityType/:entityId", element: <LazyPage component={MarketplaceDetail} /> },
             ],
           },
           {
@@ -547,6 +589,8 @@ export const router = createBrowserRouter([
               { path: "students", element: <LazyPage component={MentorStudentFeed} /> },
               { path: "students/:id", element: <LazyPage component={MentorStudentFeed} /> },
               { path: "sessions", element: <LazyPage component={MentorSessions} /> },
+              { path: "marketplace", element: <LazyPage component={Marketplace} /> },
+              { path: "marketplace/view/:entityType/:entityId", element: <LazyPage component={MarketplaceDetail} /> },
             ],
           },
           {
@@ -557,6 +601,9 @@ export const router = createBrowserRouter([
               { path: "startups", element: <LazyPage component={InvestorStartupMarketplace} /> },
               { path: "institutions", element: <LazyPage component={InvestorInstitutions} /> },
               { path: "portfolio", element: <LazyPage component={InvestorPortfolio} /> },
+              { path: "deals/:dealId/payment", element: <LazyPage component={InvestorPaymentPage} /> },
+              { path: "marketplace", element: <LazyPage component={Marketplace} /> },
+              { path: "marketplace/view/:entityType/:entityId", element: <LazyPage component={MarketplaceDetail} /> },
               {
                 path: "settings",
                 element: <ProtectedAnyRoute />,
@@ -569,6 +616,8 @@ export const router = createBrowserRouter([
             element: <ProtectedRoleRoute role={UserRole.RECRUITER} />,
             children: [
               { index: true, element: <LazyPage component={RecruiterDashboard} /> },
+              { path: "marketplace", element: <LazyPage component={Marketplace} /> },
+              { path: "marketplace/view/:entityType/:entityId", element: <LazyPage component={MarketplaceDetail} /> },
               { path: "talent", element: <LazyPage component={RecruiterTalentSearch} /> },
               { path: "colleges", element: <LazyPage component={RecruiterCollegeConnect} /> },
               { path: "drives", element: <LazyPage component={RecruiterActiveDrives} /> },
@@ -655,6 +704,8 @@ export const router = createBrowserRouter([
             element: <ProtectedRoleRoute role={UserRole.SCHOOL} />,
             children: [
               { index: true, element: <LazyPage component={SchoolDashboard} /> },
+              { path: "marketplace", element: <LazyPage component={Marketplace} /> },
+              { path: "marketplace/view/:entityType/:entityId", element: <LazyPage component={MarketplaceDetail} /> },
               { path: "operations", element: <LazyPage component={SchoolOperationsPage} /> },
               { path: "projects", element: <LazyPage component={SchoolProjectsPage} /> },
               { path: "projects/:projectId", element: <LazyPage component={SchoolProjectsPage} /> },
@@ -676,6 +727,8 @@ export const router = createBrowserRouter([
             element: <ProtectedRoleRoute role={UserRole.COLLEGE} />,
             children: [
               { index: true, element: <LazyPage component={CollegeDashboard} /> },
+              { path: "marketplace", element: <LazyPage component={Marketplace} /> },
+              { path: "marketplace/view/:entityType/:entityId", element: <LazyPage component={MarketplaceDetail} /> },
               { path: "operations", element: <LazyPage component={CollegeOperationsPage} /> },
               { path: "projects", element: <LazyPage component={CollegeProjectsPage} /> },
               { path: "projects/:projectId", element: <LazyPage component={CollegeProjectsPage} /> },

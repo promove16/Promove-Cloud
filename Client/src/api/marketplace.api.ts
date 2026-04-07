@@ -2,7 +2,7 @@ import api from './axiosInstance';
 import { ApiSuccessResponse } from '../types/auth.types';
 import { UserRole } from '../types/roles.types';
 
-export type MarketplaceRole = 'student' | 'mentor' | 'investor' | 'recruiter';
+export type MarketplaceRole = 'student' | 'school' | 'college' | 'mentor' | 'investor' | 'recruiter';
 export type MarketplaceEntityType = MarketplaceRole | 'startup';
 
 export interface MarketplaceLinkSet {
@@ -74,7 +74,6 @@ export interface MarketplaceProfile {
   displayName: string;
   avatar?: string;
   role: UserRole;
-  innovationScore?: number;
   domain?: string;
   bio?: string;
   headline?: string;
@@ -150,7 +149,7 @@ export interface MarketplaceStartupItem {
 }
 
 export interface MarketplaceStartupDetail extends MarketplaceStartupItem {
-  sharePool: {
+  sharePool?: {
     totalShares: number;
     availableShares: number;
     reservedForSole: number;
@@ -196,7 +195,6 @@ const normalizeMarketplaceProfile = (profile: Partial<MarketplaceProfile>): Mark
   displayName: profile.displayName ?? 'Unknown profile',
   ...(profile.avatar ? { avatar: profile.avatar } : {}),
   role: profile.role ?? UserRole.MENTOR,
-  ...(typeof profile.innovationScore === 'number' ? { innovationScore: profile.innovationScore } : {}),
   ...(profile.domain ? { domain: profile.domain } : {}),
   ...(profile.bio ? { bio: profile.bio } : {}),
   ...(profile.headline ? { headline: profile.headline } : {}),
@@ -321,14 +319,18 @@ const normalizeEntityDetail = (item: Partial<MarketplaceEntityDetail>): Marketpl
   if (item.entityType === 'startup' || 'name' in item) {
     return {
       ...normalizeStartupItem(item as Partial<MarketplaceStartupItem>),
-      sharePool: {
-        totalShares: (item as Partial<MarketplaceStartupDetail>).sharePool?.totalShares ?? 0,
-        availableShares: (item as Partial<MarketplaceStartupDetail>).sharePool?.availableShares ?? 0,
-        reservedForSole: (item as Partial<MarketplaceStartupDetail>).sharePool?.reservedForSole ?? 0,
-        currentPennyCount: (item as Partial<MarketplaceStartupDetail>).sharePool?.currentPennyCount ?? 0,
-        maxPennyInvestors: (item as Partial<MarketplaceStartupDetail>).sharePool?.maxPennyInvestors ?? 0,
-        hasSoleInvestor: (item as Partial<MarketplaceStartupDetail>).sharePool?.hasSoleInvestor ?? false,
-      },
+      ...((item as Partial<MarketplaceStartupDetail>).sharePool
+        ? {
+            sharePool: {
+              totalShares: (item as Partial<MarketplaceStartupDetail>).sharePool?.totalShares ?? 0,
+              availableShares: (item as Partial<MarketplaceStartupDetail>).sharePool?.availableShares ?? 0,
+              reservedForSole: (item as Partial<MarketplaceStartupDetail>).sharePool?.reservedForSole ?? 0,
+              currentPennyCount: (item as Partial<MarketplaceStartupDetail>).sharePool?.currentPennyCount ?? 0,
+              maxPennyInvestors: (item as Partial<MarketplaceStartupDetail>).sharePool?.maxPennyInvestors ?? 0,
+              hasSoleInvestor: (item as Partial<MarketplaceStartupDetail>).sharePool?.hasSoleInvestor ?? false,
+            },
+          }
+        : {}),
     };
   }
 

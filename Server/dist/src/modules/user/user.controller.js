@@ -6,6 +6,8 @@ const ApiError_1 = require("../../utils/ApiError");
 const user_service_1 = require("./user.service");
 const onboarding_service_1 = require("./onboarding.service");
 const user_model_1 = require("./user.model");
+const connectionGuard_1 = require("../../middleware/connectionGuard");
+const dm_permissions_1 = require("../dm/dm.permissions");
 const getMe = async (req, res) => {
     if (!req.user) {
         throw new ApiError_1.ApiError(401, 'UNAUTHORIZED', 'Invalid or expired token');
@@ -161,13 +163,16 @@ const searchUsers = async (req, res) => {
     }
     // Escape regex special characters to prevent ReDoS
     const escaped = q.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
-    const users = await user_model_1.User.find({
+    const candidateRoles = connectionGuard_1.ALLOWED_CONNECTIONS[req.user.role] ?? [];
+    const candidates = await user_model_1.User.find({
         displayName: { $regex: escaped, $options: 'i' },
         isActive: true,
+        role: { $in: candidateRoles },
         _id: { $ne: req.user._id },
     }, { _id: 1, displayName: 1, avatar: 1, role: 1 })
         .limit(10)
         .lean();
-    res.status(200).json(new ApiResponse_1.ApiResponse(users));
+    const allowedFlags = await Promise.all(candidates.map((candidate) => (0, dm_permissions_1.canSearchUserForDm)(req.user._id, String(candidate._id))));
+    res.status(200).json(new ApiResponse_1.ApiResponse(candidates.filter((_candidate, index) => allowedFlags[index])));
 };
 exports.searchUsers = searchUsers;

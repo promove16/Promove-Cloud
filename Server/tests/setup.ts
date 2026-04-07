@@ -1,6 +1,6 @@
 import { generateKeyPairSync } from 'crypto';
 import mongoose from 'mongoose';
-import { MongoMemoryServer } from 'mongodb-memory-server';
+import { MongoMemoryReplSet } from 'mongodb-memory-server';
 
 jest.setTimeout(180_000);
 
@@ -230,7 +230,7 @@ jest.mock('@upstash/ratelimit', () => {
   return { Ratelimit: MockRatelimit };
 });
 
-let mongoServer: MongoMemoryServer;
+let mongoServer: MongoMemoryReplSet;
 
 const wait = (ms: number) => new Promise((resolve) => setTimeout(resolve, ms));
 
@@ -252,7 +252,9 @@ const dropDatabaseWithRetry = async (attempts = 5) => {
 };
 
 beforeAll(async () => {
-  mongoServer = await MongoMemoryServer.create();
+  mongoServer = await MongoMemoryReplSet.create({
+    replSet: { count: 1 },
+  });
   await mongoose.connect(mongoServer.getUri());
 });
 

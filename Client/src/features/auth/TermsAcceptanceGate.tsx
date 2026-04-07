@@ -131,7 +131,7 @@ export function TermsAcceptanceGate() {
       : '';
 
   return (
-    <div className="fixed inset-0 z-[120] flex items-center justify-center bg-slate-950/88 p-4 backdrop-blur-md">
+    <div className="fixed inset-0 z-[120] flex items-center justify-center overflow-y-auto bg-slate-950 p-4">
       <div
         role="dialog"
         aria-modal="true"

@@ -1,8 +1,8 @@
 import bcrypt from 'bcrypt';
+import ExcelJS from 'exceljs';
 import jwt from 'jsonwebtoken';
 import { randomUUID } from 'crypto';
 import request from 'supertest';
-import * as XLSX from 'xlsx';
 import app from '../../src/app';
 import { env } from '../../src/config/env';
 import { InstitutionStudentRosterEntry } from '../../src/modules/institution/studentRoster.model';
@@ -686,7 +686,8 @@ describe('auth integration', () => {
       });
 
       const schoolLogin = await loginAs(schoolEmail);
-      const workbook = XLSX.utils.book_new();
+      const workbook = new ExcelJS.Workbook();
+      const worksheet = workbook.addWorksheet('Students');
       const rows = [
         {
           displayName: 'Excel Student One',
@@ -701,9 +702,14 @@ describe('auth integration', () => {
           rollNumber: 'EX-002',
         },
       ];
-      const worksheet = XLSX.utils.json_to_sheet(rows);
-      XLSX.utils.book_append_sheet(workbook, worksheet, 'Students');
-      const workbookBuffer = XLSX.write(workbook, { type: 'buffer', bookType: 'xlsx' });
+      worksheet.columns = [
+        { header: 'displayName', key: 'displayName' },
+        { header: 'email', key: 'email' },
+        { header: 'gradeOrProgram', key: 'gradeOrProgram' },
+        { header: 'rollNumber', key: 'rollNumber' },
+      ];
+      worksheet.addRows(rows);
+      const workbookBuffer = Buffer.from(await workbook.xlsx.writeBuffer());
 
       const importResponse = await request(app)
         .post('/api/school/student-roster/import-credentials')

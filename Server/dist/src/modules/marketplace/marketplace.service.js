@@ -1,6 +1,7 @@
 "use strict";
 Object.defineProperty(exports, "__esModule", { value: true });
-exports.getMarketplaceUser = exports.getMarketplaceEntity = exports.listMarketplaceUsers = exports.normalizeMarketplaceEntityType = void 0;
+exports.getMarketplaceUser = exports.getMarketplaceEntity = exports.listMarketplaceUsers = void 0;
+const connectionGuard_1 = require("../../middleware/connectionGuard");
 const ApiError_1 = require("../../utils/ApiError");
 const user_model_1 = require("../user/user.model");
 const roles_types_1 = require("../../types/roles.types");
@@ -10,35 +11,12 @@ const startup_model_1 = require("../startup/startup.model");
 const workspace_model_1 = require("../workspace/workspace.model");
 const MARKETPLACE_USER_ROLES = new Set([
     roles_types_1.UserRole.STUDENT,
-    roles_types_1.UserRole.MENTOR,
-    roles_types_1.UserRole.INVESTOR,
-    roles_types_1.UserRole.RECRUITER,
-]);
-const MARKETPLACE_BROWSABLE_ROLES = new Set([
-    roles_types_1.UserRole.STUDENT,
     roles_types_1.UserRole.SCHOOL,
     roles_types_1.UserRole.COLLEGE,
     roles_types_1.UserRole.MENTOR,
     roles_types_1.UserRole.INVESTOR,
     roles_types_1.UserRole.RECRUITER,
 ]);
-const MARKETPLACE_ENTITY_TYPES = new Set([
-    roles_types_1.UserRole.STUDENT,
-    roles_types_1.UserRole.MENTOR,
-    roles_types_1.UserRole.INVESTOR,
-    roles_types_1.UserRole.RECRUITER,
-    'startup',
-]);
-const normalizeMarketplaceEntityType = (value) => {
-    const normalized = value?.trim().toLowerCase();
-    if (!normalized) {
-        return undefined;
-    }
-    return MARKETPLACE_ENTITY_TYPES.has(normalized)
-        ? normalized
-        : undefined;
-};
-exports.normalizeMarketplaceEntityType = normalizeMarketplaceEntityType;
 const compactString = (value) => {
     const trimmed = value?.trim();
     return trimmed ? trimmed : undefined;
@@ -70,7 +48,6 @@ const mapPublicUser = (user) => ({
     displayName: user.displayName,
     ...(user.avatar ? { avatar: user.avatar } : {}),
     role: user.role,
-    innovationScore: user.innovationScore ?? 0,
     ...(compactString(user.domain) ? { domain: compactString(user.domain) } : {}),
     ...(compactString(user.bio) ? { bio: compactString(user.bio) } : {}),
     ...(compactString(user.headline) ? { headline: compactString(user.headline) } : {}),
@@ -152,14 +129,14 @@ const mapFounder = (founder) => ({
     ...(compactString(founder.location) ? { location: compactString(founder.location) } : {}),
     ...(compactString(founder.bio) ? { bio: compactString(founder.bio) } : {}),
 });
-const mapWorkspace = (workspace) => {
+const mapWorkspace = (requesterRole, workspace) => {
     if (!workspace) {
         return undefined;
     }
     const lastUpdate = workspace.progressUpdates
         .slice()
         .sort((left, right) => right.submittedAt.getTime() - left.submittedAt.getTime())[0];
-    return {
+    const baseWorkspaceView = {
         _id: String(workspace._id),
         title: workspace.title,
         category: workspace.category,
@@ -169,8 +146,6 @@ const mapWorkspace = (workspace) => {
         completedMilestones: workspace.milestones.filter((milestone) => milestone.isCompleted).length,
         totalMilestones: workspace.milestones.length,
         openTasks: workspace.tasks.filter((task) => !task.done).length,
-        assetCount: workspace.uploads.length,
-        repoCount: workspace.repoSubmissions.length,
         ...(lastUpdate
             ? {
                 lastUpdate: {
@@ -180,16 +155,40 @@ const mapWorkspace = (workspace) => {
             }
             : {}),
     };
+    if (requesterRole === roles_types_1.UserRole.RECRUITER) {
+        return undefined;
+    }
+    if (requesterRole === roles_types_1.UserRole.MENTOR) {
+        return baseWorkspaceView;
+    }
+    return {
+        ...baseWorkspaceView,
+        assetCount: workspace.uploads.length,
+        repoCount: workspace.repoSubmissions.length,
+    };
 };
-const buildStartupVisibilityQuery = (search) => ({
+const getStartupVisibilityClauses = (requesterRole) => {
+    if (requesterRole === roles_types_1.UserRole.INVESTOR) {
+        return [{ launchedToInvestors: true }];
+    }
+    if (requesterRole === roles_types_1.UserRole.MENTOR) {
+        return [{ launchedToMentors: true }];
+    }
+    if (requesterRole === roles_types_1.UserRole.RECRUITER) {
+        return [{ launchedToRecruiters: true }];
+    }
+    return [
+        { launchedToInvestors: true },
+        { launchedToMentors: true },
+        { launchedToRecruiters: true },
+    ];
+};
+const buildStartupVisibilityQuery = (requesterRole, search) => ({
     isActive: true,
+    reviewStatus: 'approved',
     $and: [
         {
-            $or: [
-                { launchedToInvestors: true },
-                { launchedToMentors: true },
-                { launchedToRecruiters: true },
-            ],
+            $or: getStartupVisibilityClauses(requesterRole),
         },
         ...(search
             ? [
@@ -204,54 +203,60 @@ const buildStartupVisibilityQuery = (search) => ({
             : []),
     ],
 });
-const buildStartupView = (startup, founders, workspace) => ({
-    _id: String(startup._id),
-    entityType: 'startup',
-    name: startup.name,
-    tagline: startup.tagline,
-    category: startup.category,
-    stage: startup.stage,
-    ...(startup.pitchDeckUrl ? { pitchDeckUrl: startup.pitchDeckUrl } : {}),
-    teamSize: startup.teamSize || startup.founderIds.length,
-    activeProducts: startup.activeProducts,
-    innovationScoreAtLaunch: startup.innovationScoreAtLaunch,
-    ...(typeof startup.fundingNeeded === 'number' ? { fundingNeeded: startup.fundingNeeded } : {}),
-    ...(startup.launchedAt ? { launchedAt: startup.launchedAt.toISOString() } : {}),
-    traction: {
-        patentFiled: startup.traction?.patentFiled ?? false,
-        mvpBuilt: startup.traction?.mvpBuilt ?? false,
-        revenueGenerating: startup.traction?.revenueGenerating ?? false,
-        ...(typeof startup.traction?.usersCount === 'number' ? { usersCount: startup.traction.usersCount } : {}),
-    },
-    launchTargets: toStartupVisibility(startup),
-    founders: founders.map(mapFounder),
-    ...(founders[0] ? { primaryFounderId: String(founders[0]._id) } : {}),
-    ...(mapWorkspace(workspace) ? { project: mapWorkspace(workspace) } : {}),
-});
+const buildStartupView = (requesterRole, startup, founders, workspace) => {
+    const project = mapWorkspace(requesterRole, workspace);
+    return {
+        _id: String(startup._id),
+        entityType: 'startup',
+        name: startup.name,
+        tagline: startup.tagline,
+        category: startup.category,
+        stage: startup.stage,
+        ...(startup.pitchDeckUrl ? { pitchDeckUrl: startup.pitchDeckUrl } : {}),
+        teamSize: startup.teamSize || startup.founderIds.length,
+        activeProducts: startup.activeProducts,
+        innovationScoreAtLaunch: startup.innovationScoreAtLaunch,
+        ...(typeof startup.fundingNeeded === 'number' ? { fundingNeeded: startup.fundingNeeded } : {}),
+        ...(startup.launchedAt ? { launchedAt: startup.launchedAt.toISOString() } : {}),
+        traction: {
+            patentFiled: startup.traction?.patentFiled ?? false,
+            mvpBuilt: startup.traction?.mvpBuilt ?? false,
+            revenueGenerating: startup.traction?.revenueGenerating ?? false,
+            ...(typeof startup.traction?.usersCount === 'number' ? { usersCount: startup.traction.usersCount } : {}),
+        },
+        launchTargets: toStartupVisibility(startup),
+        founders: founders.map(mapFounder),
+        ...(founders[0] ? { primaryFounderId: String(founders[0]._id) } : {}),
+        ...(project ? { project } : {}),
+    };
+};
 const attachUserCardMetadata = (user, relatedCounts) => ({
     entityType: user.role,
     ...mapPublicUser(user),
     relatedCounts,
 });
+const applyMarketplaceUserVisibility = (requesterRole, targetRole, query) => {
+    if (requesterRole === roles_types_1.UserRole.RECRUITER && targetRole === roles_types_1.UserRole.STUDENT) {
+        query.discoverableToRecruiters = true;
+    }
+    return query;
+};
 const listMarketplaceUsers = async (requesterRole, role, domain, page = 1, limit = 20) => {
-    if (!MARKETPLACE_ENTITY_TYPES.has(role)) {
+    if (role === 'startup') {
+        return listMarketplaceStartups(requesterRole, domain, page, limit);
+    }
+    if (!MARKETPLACE_USER_ROLES.has(role)) {
         throw new ApiError_1.ApiError(400, 'INVALID_MARKETPLACE_ENTITY', 'Unsupported marketplace entity');
     }
-    if (requesterRole === roles_types_1.UserRole.RECRUITER && role !== roles_types_1.UserRole.STUDENT) {
-        throw new ApiError_1.ApiError(403, 'CONNECTION_FORBIDDEN', 'Recruiters can only browse student profiles in the marketplace');
+    if (!(connectionGuard_1.ALLOWED_CONNECTIONS[requesterRole] ?? []).includes(role)) {
+        throw new ApiError_1.ApiError(403, 'CONNECTION_FORBIDDEN', `Your role cannot connect with ${role}`);
     }
-    if (role === 'startup') {
-        return listMarketplaceStartups(domain, page, limit);
-    }
-    if (!MARKETPLACE_BROWSABLE_ROLES.has(requesterRole)) {
-        throw new ApiError_1.ApiError(403, 'CONNECTION_FORBIDDEN', 'Your role cannot browse the marketplace');
-    }
-    const users = await user_model_1.User.find({
+    const users = await user_model_1.User.find(applyMarketplaceUserVisibility(requesterRole, role, {
         role,
         isActive: true,
         ...(domain ? { domain: new RegExp(domain, 'i') } : {}),
-    })
-        .select('displayName avatar role innovationScore domain bio headline location websiteUrl githubUrl linkedinUrl skills experience education portfolioProjects githubStats lastLogin')
+    }))
+        .select('displayName avatar role domain bio headline location websiteUrl githubUrl linkedinUrl skills experience education portfolioProjects githubStats lastLogin discoverableToRecruiters')
         .sort({ lastLogin: -1, updatedAt: -1 })
         .skip((page - 1) * limit)
         .limit(limit)
@@ -267,7 +272,7 @@ const listMarketplaceUsers = async (requesterRole, role, domain, page = 1, limit
         startup_model_1.Startup.aggregate([
             {
                 $match: {
-                    ...buildStartupVisibilityQuery(),
+                    ...buildStartupVisibilityQuery(requesterRole),
                     founderIds: { $in: userIds },
                 },
             },
@@ -284,8 +289,8 @@ const listMarketplaceUsers = async (requesterRole, role, domain, page = 1, limit
     }));
 };
 exports.listMarketplaceUsers = listMarketplaceUsers;
-const listMarketplaceStartups = async (search, page = 1, limit = 20) => {
-    const query = buildStartupVisibilityQuery(search);
+const listMarketplaceStartups = async (requesterRole, search, page = 1, limit = 20) => {
+    const query = buildStartupVisibilityQuery(requesterRole, search);
     const [startups, total] = await Promise.all([
         startup_model_1.Startup.find(query)
             .select('_id founderIds projectId name tagline category stage pitchDeckUrl teamSize fundingNeeded activeProducts launchedToInvestors launchedToMentors launchedToRecruiters launchedAt innovationScoreAtLaunch totalShares availableShares reservedForSole maxPennyInvestors currentPennyCount hasSoleInvestor traction isActive createdAt updatedAt')
@@ -311,19 +316,25 @@ const listMarketplaceStartups = async (search, page = 1, limit = 20) => {
     ]);
     const founderMap = new Map(founders.map((founder) => [String(founder._id), founder]));
     const workspaceMap = new Map(workspaces.map((workspace) => [String(workspace._id), workspace]));
-    return startups.map((startup) => buildStartupView(startup, startup.founderIds
+    return startups.map((startup) => buildStartupView(requesterRole, startup, startup.founderIds
         .map((founderId) => founderMap.get(String(founderId)))
         .filter((founder) => Boolean(founder)), startup.projectId ? workspaceMap.get(String(startup.projectId)) : undefined));
 };
 const getMarketplaceUserDetail = async (requesterRole, userId) => {
     const user = await user_model_1.User.findById(userId)
-        .select('displayName avatar role innovationScore domain bio headline location websiteUrl githubUrl linkedinUrl skills experience education portfolioProjects githubStats')
+        .select('displayName avatar role domain bio headline location websiteUrl githubUrl linkedinUrl skills experience education portfolioProjects githubStats discoverableToRecruiters')
         .lean();
     if (!user) {
         throw new ApiError_1.ApiError(404, 'USER_NOT_FOUND', 'User not found');
     }
-    if (!MARKETPLACE_BROWSABLE_ROLES.has(requesterRole) || !MARKETPLACE_USER_ROLES.has(user.role)) {
-        throw new ApiError_1.ApiError(403, 'CONNECTION_FORBIDDEN', 'This profile is not available in the marketplace');
+    if (!MARKETPLACE_USER_ROLES.has(user.role)) {
+        throw new ApiError_1.ApiError(400, 'INVALID_MARKETPLACE_ENTITY', 'Unsupported marketplace entity');
+    }
+    if (!(connectionGuard_1.ALLOWED_CONNECTIONS[requesterRole] ?? []).includes(user.role)) {
+        throw new ApiError_1.ApiError(403, 'CONNECTION_FORBIDDEN', `Your role cannot connect with ${user.role}`);
+    }
+    if (requesterRole === roles_types_1.UserRole.RECRUITER && user.role === roles_types_1.UserRole.STUDENT && !user.discoverableToRecruiters) {
+        throw new ApiError_1.ApiError(404, 'USER_NOT_FOUND', 'User not found');
     }
     const [jobs, startups] = await Promise.all([
         user.role === roles_types_1.UserRole.RECRUITER
@@ -333,7 +344,7 @@ const getMarketplaceUserDetail = async (requesterRole, userId) => {
                 .lean()
             : Promise.resolve([]),
         startup_model_1.Startup.find({
-            ...buildStartupVisibilityQuery(),
+            ...buildStartupVisibilityQuery(requesterRole),
             founderIds: userId,
         })
             .select('_id founderIds projectId name tagline category stage pitchDeckUrl teamSize fundingNeeded activeProducts launchedToInvestors launchedToMentors launchedToRecruiters launchedAt innovationScoreAtLaunch totalShares availableShares reservedForSole maxPennyInvestors currentPennyCount hasSoleInvestor traction isActive createdAt updatedAt')
@@ -363,15 +374,15 @@ const getMarketplaceUserDetail = async (requesterRole, userId) => {
             startups: startups.length,
         }),
         relatedJobs: jobs.map((job) => (0, recruiter_mappers_1.mapJob)(job)),
-        relatedStartups: startups.map((startup) => buildStartupView(startup, startup.founderIds
+        relatedStartups: startups.map((startup) => buildStartupView(requesterRole, startup, startup.founderIds
             .map((founderId) => founderMap.get(String(founderId)))
             .filter((founder) => Boolean(founder)), startup.projectId ? workspaceMap.get(String(startup.projectId)) : undefined)),
     };
 };
-const getMarketplaceStartupDetail = async (startupId) => {
+const getMarketplaceStartupDetail = async (requesterRole, startupId) => {
     const startup = await startup_model_1.Startup.findOne({
         _id: startupId,
-        ...buildStartupVisibilityQuery(),
+        ...buildStartupVisibilityQuery(requesterRole),
     })
         .select('_id founderIds projectId name tagline category stage pitchDeckUrl teamSize fundingNeeded activeProducts launchedToInvestors launchedToMentors launchedToRecruiters launchedAt innovationScoreAtLaunch totalShares availableShares reservedForSole maxPennyInvestors currentPennyCount hasSoleInvestor traction isActive createdAt updatedAt')
         .lean();
@@ -391,23 +402,24 @@ const getMarketplaceStartupDetail = async (startupId) => {
             : Promise.resolve(null),
     ]);
     return {
-        ...buildStartupView(startup, founders, workspace),
-        sharePool: {
-            totalShares: startup.totalShares,
-            availableShares: startup.availableShares,
-            reservedForSole: startup.reservedForSole,
-            currentPennyCount: startup.currentPennyCount,
-            maxPennyInvestors: startup.maxPennyInvestors,
-            hasSoleInvestor: startup.hasSoleInvestor,
-        },
+        ...buildStartupView(requesterRole, startup, founders, workspace),
+        ...(requesterRole === roles_types_1.UserRole.INVESTOR
+            ? {
+                sharePool: {
+                    totalShares: startup.totalShares,
+                    availableShares: startup.availableShares,
+                    reservedForSole: startup.reservedForSole,
+                    currentPennyCount: startup.currentPennyCount,
+                    maxPennyInvestors: startup.maxPennyInvestors,
+                    hasSoleInvestor: startup.hasSoleInvestor,
+                },
+            }
+            : {}),
     };
 };
 const getMarketplaceEntity = async (requesterRole, entityType, entityId) => {
-    if (requesterRole === roles_types_1.UserRole.RECRUITER && entityType !== roles_types_1.UserRole.STUDENT) {
-        throw new ApiError_1.ApiError(403, 'CONNECTION_FORBIDDEN', 'Recruiters can only view student profiles in the marketplace');
-    }
     if (entityType === 'startup') {
-        return getMarketplaceStartupDetail(entityId);
+        return getMarketplaceStartupDetail(requesterRole, entityId);
     }
     if (!MARKETPLACE_USER_ROLES.has(entityType)) {
         throw new ApiError_1.ApiError(400, 'INVALID_MARKETPLACE_ENTITY', 'Unsupported marketplace entity');

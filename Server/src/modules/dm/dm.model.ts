@@ -1,6 +1,13 @@
 import { Schema, model, Document, Types } from 'mongoose';
 
-export type QueryType = 'project_mentor' | 'project_join' | 'investor' | 'recruiter' | 'general';
+export type QueryType =
+  | 'project_mentor'
+  | 'project_join'
+  | 'investor'
+  | 'recruiter'
+  | 'hiring_event'
+  | 'mentorship_program'
+  | 'general';
 
 export interface IDirectMessage extends Document {
   senderId: Types.ObjectId;
@@ -31,7 +38,7 @@ const directMessageSchema = new Schema<IDirectMessage>(
     messageType: { type: String, enum: ['text', 'interview_request'], default: 'text' },
     queryType: {
       type: String,
-      enum: ['project_mentor', 'project_join', 'investor', 'recruiter', 'general'],
+      enum: ['project_mentor', 'project_join', 'investor', 'recruiter', 'hiring_event', 'mentorship_program', 'general'],
       default: 'general',
     },
     readAt: { type: Date, default: undefined },

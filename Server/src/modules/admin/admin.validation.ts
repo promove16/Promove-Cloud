@@ -63,9 +63,19 @@ export const analyticsUsersQuerySchema = z.object({
   limit: z.coerce.number().int().positive().max(10).default(8),
 });
 
-export const dealReviewSchema = z.object({
-  stockTransferStatus: z.enum(['pending_review', 'under_review']).optional(),
-  reviewNotes: z.string().trim().max(1500).optional(),
-  royaltyPercentage: z.number().min(0).max(100).optional(),
-  royaltyStatus: z.enum(['pending', 'invoiced', 'received']).optional(),
-});
+export const dealReviewSchema = z
+  .object({
+    stockTransferStatus: z.enum(['pending_review', 'under_review', 'rejected']).optional(),
+    reviewNotes: z.string().trim().max(1500).optional(),
+    royaltyPercentage: z.number().min(0).max(100).optional(),
+    royaltyStatus: z.enum(['pending', 'invoiced', 'received']).optional(),
+  })
+  .superRefine((value, ctx) => {
+    if (value.stockTransferStatus === 'rejected' && (!value.reviewNotes || value.reviewNotes.length < 10)) {
+      ctx.addIssue({
+        code: z.ZodIssueCode.custom,
+        path: ['reviewNotes'],
+        message: 'Review notes are required when rejecting a stock transfer.',
+      });
+    }
+  });

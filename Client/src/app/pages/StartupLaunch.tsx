@@ -1,9 +1,10 @@
-import { ChangeEvent, useEffect, useState } from "react";
+import { ChangeEvent, useEffect, useMemo, useState } from "react";
 import { useNavigate, useOutletContext, useParams } from "react-router-dom";
 import { isAxiosError } from "axios";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { CheckCircle, Download, FileText, Rocket, Send, ShieldCheck, Target, TrendingUp, Upload, Users, X } from "lucide-react";
 import { dealApi } from "../../api/deal.api";
+import { patentApi } from "../../api/patent.api";
 import { startupApi, StartupPayload } from "../../api/startup.api";
 import { workspaceApi } from "../../api/workspace.api";
 import {
@@ -49,6 +50,22 @@ const getStartupActionErrorMessage = (error: unknown, fallback: string) => {
   return error instanceof Error ? error.message : fallback;
 };
 
+type WorkflowStepStatus = "complete" | "current" | "blocked" | "optional";
+
+const workflowStatusClassName: Record<WorkflowStepStatus, string> = {
+  complete: "border-emerald-500/30 bg-emerald-500/10 text-emerald-200",
+  current: "border-cyan-500/30 bg-cyan-500/10 text-cyan-100",
+  blocked: "border-slate-800 bg-slate-950/70 text-slate-400",
+  optional: "border-amber-500/30 bg-amber-500/10 text-amber-100",
+};
+
+const workflowStatusLabel: Record<WorkflowStepStatus, string> = {
+  complete: "Complete",
+  current: "Next",
+  blocked: "Blocked",
+  optional: "Optional",
+};
+
 export function StartupLaunch() {
   const maxPitchDeckSizeBytes = 10 * 1024 * 1024;
   const maxIprUploadSizeBytes = STARTUP_IPR_UPLOAD_MAX_BYTES;
@@ -78,6 +95,11 @@ export function StartupLaunch() {
     queryFn: dealApi.getMyDeals,
     refetchInterval: 60_000,
   });
+  const patentsQuery = useQuery({
+    queryKey: ["patents", "mine"],
+    queryFn: patentApi.mine,
+    enabled: !isNew,
+  });
 
   const startup = startupQuery.data;
   const workspaces = workspaceQuery.data ?? [];
@@ -87,6 +109,19 @@ export function StartupLaunch() {
     activeWorkspace?.teamMembers?.length ??
     activeWorkspace?.teamMemberIds?.length ??
     0;
+  const linkedWorkspaceId = startup?.projectId ?? form.projectId ?? selectedWorkspaceId;
+  const linkedPatents = useMemo(
+    () => (patentsQuery.data ?? []).filter((patent) => patent.workspaceId === linkedWorkspaceId),
+    [linkedWorkspaceId, patentsQuery.data],
+  );
+  const approvedPatent = linkedPatents.find((patent) => patent.status === "approved");
+  const latestPatent = linkedPatents[0];
+  const projectComplete = Boolean(
+    activeWorkspace &&
+      (activeWorkspace.stage === "Launch" ||
+        activeWorkspace.progressPercent >= 100 ||
+        (activeWorkspace.milestones.length > 0 && activeWorkspace.milestones.every((milestone) => milestone.isCompleted))),
+  );
 
   useEffect(() => {
     if (!startup) {
@@ -394,6 +429,77 @@ export function StartupLaunch() {
     { label: "Active products", value: String(startup?.activeProducts ?? form.activeProducts), icon: Target, tone: "text-violet-300" },
     { label: "Status", value: profileStatusLabel, icon: CheckCircle, tone: "text-amber-300" },
   ] as const;
+  const investorPitchListed = Boolean(startup?.launchedToInvestors);
+  const investorApprovalReceived = activeDeals.some((deal) => deal.status === "active" || deal.status === "closed");
+  const marketplaceLive = Boolean(startup?.launchedToInvestors || startup?.launchedToMentors);
+  const launchBlockedReason = !canLaunch
+    ? "Complete the startup name, tagline, category, and founder team before launch."
+    : !isApproved
+      ? "Admin startup review must be approved before marketplace launch."
+      : !activeWorkspace
+        ? "Link a project workspace before investor pitch listing."
+        : !projectComplete
+          ? "Complete the linked project workspace before investor pitch listing."
+          : !approvedPatent
+            ? "An approved patent for the linked project is required before investor pitch listing."
+            : "";
+  const canOpenLaunchModal = !launchBlockedReason;
+  const patentStatusLabel = approvedPatent
+    ? "Patent approved"
+    : latestPatent
+      ? latestPatent.status.replace(/_/g, " ")
+      : "No patent request";
+  const workflowSteps: Array<{
+    label: string;
+    detail: string;
+    status: WorkflowStepStatus;
+  }> = [
+    {
+      label: "Create startup project",
+      detail: activeWorkspace ? activeWorkspace.title : "Link a workspace for project evidence and team context.",
+      status: activeWorkspace ? "complete" : "blocked",
+    },
+    {
+      label: "Create launch profile",
+      detail: canLaunch ? "Core startup identity is ready." : "Name, tagline, category, and team are required.",
+      status: canLaunch ? "complete" : "current",
+    },
+    {
+      label: "Add members from marketplace",
+      detail:
+        formTeamSize > 1
+          ? `${formTeamSize} members are synced from the linked workspace.`
+          : "Optional: add collaborators to the workspace before launch.",
+      status: formTeamSize > 1 ? "complete" : "optional",
+    },
+    {
+      label: "Complete the project",
+      detail: activeWorkspace
+        ? `${activeWorkspace.progressPercent}% complete in ${activeWorkspace.stage}.`
+        : "No project workspace is linked yet.",
+      status: projectComplete ? "complete" : activeWorkspace ? "current" : "blocked",
+    },
+    {
+      label: "Request admin for patent",
+      detail: patentStatusLabel,
+      status: approvedPatent ? "complete" : latestPatent?.status === "rejected" ? "blocked" : latestPatent ? "current" : "blocked",
+    },
+    {
+      label: "List for investor pitch",
+      detail: investorPitchListed ? "Investors can discover and pitch from the marketplace." : "Launch to investors after the prior gates are complete.",
+      status: investorPitchListed ? "complete" : canOpenLaunchModal ? "current" : "blocked",
+    },
+    {
+      label: "Investor approval",
+      detail: investorApprovalReceived ? "Investor interest is active for this startup." : "Investor approval appears after a pitch receives interest.",
+      status: investorApprovalReceived ? "complete" : investorPitchListed ? "current" : "blocked",
+    },
+    {
+      label: "Launch to marketplace",
+      detail: marketplaceLive ? "Marketplace visibility is live." : "Final launch is blocked until review and approval gates are complete.",
+      status: marketplaceLive ? "complete" : canOpenLaunchModal ? "current" : "blocked",
+    },
+  ];
   const checklistItems = [
     canLaunch ? "Core basics are filled in for launch." : "Name, tagline, category, and at least one founder are required.",
     isNew
@@ -408,6 +514,12 @@ export function StartupLaunch() {
     readiness?.isReviewReady
       ? "Required IPR intake answers and document uploads are complete."
       : `Still missing: ${readiness?.missingItems.slice(0, 3).join(", ") || "IPR details"}`,
+    projectComplete
+      ? "The linked project is complete for investor pitch listing."
+      : "Complete the linked workspace before investor pitch listing.",
+    approvedPatent
+      ? "An approved patent is attached to the linked workspace."
+      : "Request admin patent approval before investor pitch listing.",
     requiredDocumentCategories.length > 0
       ? `${requiredDocumentCategories.length} IPR supporting upload ${requiredDocumentCategories.length === 1 ? "is" : "are"} required at the current stage.`
       : "No mandatory IPR uploads are required at the current stage yet.",
@@ -599,6 +711,50 @@ export function StartupLaunch() {
                 Reviewed: {startup?.adminReviewedAt ? new Date(startup.adminReviewedAt).toLocaleString("en-IN") : "Pending"}
               </div>
             </div>
+          </div>
+        </div>
+      ) : null}
+
+      {!isNew ? (
+        <div className="rounded-2xl border border-slate-800/70 bg-slate-900/40 p-5">
+          <div className="flex flex-col gap-2 sm:flex-row sm:items-end sm:justify-between">
+            <div>
+              <div className="text-xs font-semibold uppercase tracking-[0.25em] text-cyan-300">
+                Startup Workflow
+              </div>
+              <h2 className="mt-2 text-xl font-semibold text-white">
+                Project to marketplace path
+              </h2>
+            </div>
+            {launchBlockedReason ? (
+              <div className="max-w-xl rounded-xl border border-amber-500/20 bg-amber-500/10 px-4 py-3 text-sm text-amber-100">
+                {launchBlockedReason}
+              </div>
+            ) : (
+              <div className="rounded-xl border border-emerald-500/20 bg-emerald-500/10 px-4 py-3 text-sm text-emerald-100">
+                Investor pitch listing is ready.
+              </div>
+            )}
+          </div>
+
+          <div className="mt-5 grid gap-3 md:grid-cols-2 xl:grid-cols-4">
+            {workflowSteps.map((step, index) => (
+              <div
+                key={step.label}
+                className={`rounded-xl border px-4 py-4 ${workflowStatusClassName[step.status]}`}
+              >
+                <div className="flex items-center justify-between gap-3">
+                  <div className="text-[11px] font-semibold uppercase tracking-[0.22em] text-slate-400">
+                    Step {index + 1}
+                  </div>
+                  <span className="rounded-full border border-white/10 bg-slate-950/40 px-2 py-0.5 text-[11px] font-semibold uppercase tracking-[0.18em]">
+                    {workflowStatusLabel[step.status]}
+                  </span>
+                </div>
+                <div className="mt-3 font-semibold text-white">{step.label}</div>
+                <div className="mt-2 text-sm leading-6">{step.detail}</div>
+              </div>
+            ))}
           </div>
         </div>
       ) : null}
@@ -907,7 +1063,7 @@ export function StartupLaunch() {
             <p className="mt-1 text-sm text-slate-400">
               {isNew
                 ? "Create the startup first, then return here to submit it for review."
-                : "Save changes after reviewing the full profile, then request review and launch from here."}
+                : launchBlockedReason || "Save changes after reviewing the full profile, then launch to investor marketplace from here."}
             </p>
           </div>
           <div className="flex flex-wrap items-center gap-3 sm:justify-end">
@@ -924,7 +1080,8 @@ export function StartupLaunch() {
                 <button
                   type="button"
                   onClick={() => setShowLaunchModal(true)}
-                  disabled={!canLaunch || !isApproved}
+                  disabled={!canOpenLaunchModal}
+                  title={launchBlockedReason || "Launch to investor marketplace"}
                   className="inline-flex items-center gap-2 rounded-xl bg-gradient-to-r from-blue-600 to-purple-600 px-5 py-3 text-sm font-semibold text-white disabled:cursor-not-allowed disabled:opacity-50"
                 >
                   <Rocket className="h-4 w-4" />
@@ -951,7 +1108,7 @@ export function StartupLaunch() {
                 <button type="button" onClick={() => setShowLaunchModal(false)} className="text-slate-400 hover:text-white"><X className="w-5 h-5" /></button>
               </div>
               <div className="mb-5 rounded-lg border border-cyan-500/20 bg-cyan-500/10 px-4 py-3 text-sm text-cyan-100">
-                Approved startups launched to investors will appear in the investor marketplace. You can then continue outreach for this startup from Investor Outreach.
+                Startups with completed projects and approved patents can be listed for investor pitch. You can then continue outreach and track investor approval from this workspace.
               </div>
               <div className="space-y-3 mb-6">
                 {[

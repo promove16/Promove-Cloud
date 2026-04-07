@@ -36,6 +36,53 @@ const categoryOptions = [
   "Other",
 ];
 
+const allDifficultyFilter = "All Difficulties";
+const allDomainFilter = "All Domains";
+const difficultyOptions = [
+  allDifficultyFilter,
+  "Easy",
+  "Medium",
+  "Hard",
+] as const;
+
+const domainFiltersByCategory: Record<
+  Problem["category"] | "All Problems",
+  string[]
+> = {
+  "All Problems": [
+    "Agritech",
+    "Supply Chain",
+    "FinTech",
+    "Accessibility",
+    "EdTech",
+    "HealthTech",
+    "Sustainability",
+    "Climate",
+    "Hardware",
+    "IoT",
+    "Software",
+    "Employment",
+    "Commerce",
+    "Mobility",
+  ],
+  Agriculture: ["Agritech", "Supply Chain", "FinTech", "Climate", "IoT"],
+  Environment: ["Sustainability", "Climate", "Hardware", "Water", "IoT"],
+  Healthcare: ["HealthTech", "Diagnostics", "Accessibility", "IoT"],
+  Technology: ["IoT", "Software", "Hardware", "AI", "Automation"],
+  Education: ["EdTech", "Accessibility", "Learning", "Software"],
+  "Rural Development": [
+    "Employment",
+    "Commerce",
+    "Supply Chain",
+    "Accessibility",
+  ],
+  Other: ["Mobility", "Accessibility", "Commerce", "Safety"],
+};
+
+const getDomainFilters = (category: string) =>
+  domainFiltersByCategory[category as Problem["category"] | "All Problems"] ??
+  domainFiltersByCategory["All Problems"];
+
 const timeAgo = (value: string) => {
   const milliseconds = Date.now() - new Date(value).getTime();
   const days = Math.max(1, Math.round(milliseconds / (1000 * 60 * 60 * 24)));
@@ -80,7 +127,9 @@ const leaderboardRow = (entry: ProblemLeaderboardEntry) => (
           {entry.rank}
         </div>
         <div className="min-w-0">
-          <div className="truncate font-semibold text-white">{entry.teamName}</div>
+          <div className="truncate font-semibold text-white">
+            {entry.teamName}
+          </div>
           <div className="truncate text-xs text-slate-400">
             {entry.teamMembers.map((member) => member.displayName).join(", ")}
           </div>
@@ -88,7 +137,9 @@ const leaderboardRow = (entry: ProblemLeaderboardEntry) => (
       </div>
     </div>
     <div className="text-right">
-      <div className="font-semibold text-cyan-300">{entry.pointsAwarded} pts</div>
+      <div className="font-semibold text-cyan-300">
+        {entry.pointsAwarded} pts
+      </div>
       <div className="text-xs text-slate-500">
         {new Date(entry.reviewedAt).toLocaleDateString("en-IN")}
       </div>
@@ -101,16 +152,40 @@ export function ProblemBank() {
   const queryClient = useQueryClient();
   const authUser = useAuthStore((state) => state.user);
   const [selectedCategory, setSelectedCategory] = useState("All Problems");
+  const [selectedDifficulty, setSelectedDifficulty] =
+    useState<(typeof difficultyOptions)[number]>(allDifficultyFilter);
+  const [selectedDomain, setSelectedDomain] = useState(allDomainFilter);
+  const [showMoreFilters, setShowMoreFilters] = useState(false);
   const [searchValue, setSearchValue] = useState("");
-  const [selectedProblemId, setSelectedProblemId] = useState<string | null>(null);
+  const [selectedProblemId, setSelectedProblemId] = useState<string | null>(
+    null,
+  );
   const [feedback, setFeedback] = useState("");
   const [reviewNote, setReviewNote] = useState("");
   const deferredSearchQuery = useDeferredValue(searchValue.trim());
   const viewerRole = authUser?.role ?? UserRole.STUDENT;
   const canClaimProblems = viewerRole === UserRole.STUDENT;
+  const domainOptions = useMemo(
+    () => getDomainFilters(selectedCategory),
+    [selectedCategory],
+  );
+  const hasMoreFilters =
+    selectedDifficulty !== allDifficultyFilter ||
+    selectedDomain !== allDomainFilter;
+  const activeFilterCount =
+    (selectedCategory === "All Problems" ? 0 : 1) +
+    (selectedDifficulty === allDifficultyFilter ? 0 : 1) +
+    (selectedDomain === allDomainFilter ? 0 : 1) +
+    (deferredSearchQuery ? 1 : 0);
 
   const problemsQuery = useInfiniteQuery({
-    queryKey: ["problems", selectedCategory, deferredSearchQuery],
+    queryKey: [
+      "problems",
+      selectedCategory,
+      selectedDifficulty,
+      selectedDomain,
+      deferredSearchQuery,
+    ],
     queryFn: ({ pageParam = 1 }) =>
       problemBankApi.list({
         page: pageParam,
@@ -118,6 +193,11 @@ export function ProblemBank() {
         search: deferredSearchQuery || undefined,
         category:
           selectedCategory === "All Problems" ? undefined : selectedCategory,
+        difficulty:
+          selectedDifficulty === allDifficultyFilter
+            ? undefined
+            : selectedDifficulty,
+        domain: selectedDomain === allDomainFilter ? undefined : selectedDomain,
       }),
     getNextPageParam: (lastPage) => {
       const { meta } = lastPage;
@@ -133,6 +213,15 @@ export function ProblemBank() {
 
   const selectedProblem =
     problems.find((problem) => problem._id === selectedProblemId) ?? null;
+
+  useEffect(() => {
+    if (
+      selectedDomain !== allDomainFilter &&
+      !domainOptions.includes(selectedDomain)
+    ) {
+      setSelectedDomain(allDomainFilter);
+    }
+  }, [domainOptions, selectedDomain]);
 
   useEffect(() => {
     setReviewNote("");
@@ -159,10 +248,16 @@ export function ProblemBank() {
       setFeedback(message);
     },
   });
-  const startingProblemId = claimMutation.isPending ? claimMutation.variables : null;
+  const startingProblemId = claimMutation.isPending
+    ? claimMutation.variables
+    : null;
 
   const reviewMutation = useMutation({
-    mutationFn: (payload: { problemId: string; workspaceId: string; requestNote: string }) =>
+    mutationFn: (payload: {
+      problemId: string;
+      workspaceId: string;
+      requestNote: string;
+    }) =>
       problemBankApi.requestReview(payload.problemId, {
         workspaceId: payload.workspaceId,
         requestNote: payload.requestNote,
@@ -220,14 +315,33 @@ export function ProblemBank() {
     setSelectedProblemId(null);
   };
 
+  const resetFilters = () => {
+    setSelectedCategory("All Problems");
+    setSelectedDifficulty(allDifficultyFilter);
+    setSelectedDomain(allDomainFilter);
+    setSearchValue("");
+  };
+
+  const selectCategory = (category: string) => {
+    setSelectedCategory(category);
+    if (
+      selectedDomain !== allDomainFilter &&
+      !getDomainFilters(category).includes(selectedDomain)
+    ) {
+      setSelectedDomain(allDomainFilter);
+    }
+    setShowMoreFilters(true);
+  };
+
   return (
     <DashboardLayout role={viewerRole}>
-      <div className="space-y-6">
+      <div className="-mx-4 -my-6 min-h-full space-y-6 bg-black px-4 py-6 lg:-mx-8 lg:px-8">
         <div className="flex flex-col gap-4 md:flex-row md:items-center md:justify-between">
           <div>
             <h1 className="mb-2 text-3xl font-bold text-white">Problem Bank</h1>
             <p className="text-slate-400">
-              Admin-curated challenges with leaderboard ranking and workspace-linked review.
+              Admin-curated challenges with leaderboard ranking and
+              workspace-linked review.
             </p>
           </div>
           <div className="rounded-xl border border-slate-800 bg-slate-900 px-5 py-3 text-sm text-slate-300">
@@ -237,7 +351,7 @@ export function ProblemBank() {
           </div>
         </div>
 
-        <div className="rounded-xl border border-slate-800 bg-slate-900 p-6">
+        <div className="rounded-xl border border-slate-800 bg-zinc-950 p-6">
           <div className="flex flex-col gap-4 md:flex-row">
             <div className="relative flex-1">
               <Search className="absolute left-4 top-1/2 h-5 w-5 -translate-y-1/2 text-slate-400" />
@@ -249,28 +363,140 @@ export function ProblemBank() {
                 className="w-full rounded-lg border border-slate-800 bg-slate-950 py-3 pl-12 pr-4 text-white placeholder-slate-500 focus:border-blue-500 focus:outline-none"
               />
             </div>
-            <button className="flex items-center gap-2 rounded-lg bg-slate-800 px-6 py-3 font-semibold text-white transition-colors hover:bg-slate-700">
+            <button
+              type="button"
+              onClick={() => setShowMoreFilters((current) => !current)}
+              className="flex items-center justify-center gap-2 rounded-lg bg-slate-800 px-6 py-3 font-semibold text-white transition-colors hover:bg-slate-700"
+              aria-expanded={showMoreFilters}
+            >
               <Filter className="h-5 w-5" />
-              Filter
+              More Filters
+              {activeFilterCount > 0 ? (
+                <span className="rounded-full bg-cyan-500 px-2 py-0.5 text-xs font-bold text-slate-950">
+                  {activeFilterCount}
+                </span>
+              ) : null}
             </button>
           </div>
+
+          {showMoreFilters ? (
+            <div className="mt-5 space-y-5 border-t border-slate-800 pt-5">
+              <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
+                <div>
+                  <div className="text-xs uppercase tracking-[0.24em] text-slate-500">
+                    More Filters
+                  </div>
+                  <h2 className="mt-1 text-lg font-semibold text-white">
+                    {selectedCategory === "All Problems"
+                      ? "Filters across all categories"
+                      : `${selectedCategory} filters`}
+                  </h2>
+                </div>
+                {activeFilterCount > 0 ? (
+                  <button
+                    type="button"
+                    onClick={resetFilters}
+                    className="self-start rounded-lg border border-slate-800 px-4 py-2 text-sm font-semibold text-slate-300 transition hover:border-slate-600 hover:text-white sm:self-auto"
+                  >
+                    Clear filters
+                  </button>
+                ) : null}
+              </div>
+
+              <div className="grid gap-5 lg:grid-cols-[0.85fr_1.15fr]">
+                <div>
+                  <div className="mb-3 text-sm font-semibold text-slate-300">
+                    Difficulty
+                  </div>
+                  <div className="flex flex-wrap gap-2">
+                    {difficultyOptions.map((difficulty) => (
+                      <button
+                        key={difficulty}
+                        type="button"
+                        onClick={() => setSelectedDifficulty(difficulty)}
+                        className={`rounded-lg border px-3 py-2 text-sm font-medium transition ${
+                          selectedDifficulty === difficulty
+                            ? "border-cyan-400 bg-cyan-500/15 text-cyan-200"
+                            : "border-slate-800 bg-black text-slate-400 hover:border-slate-700 hover:text-slate-200"
+                        }`}
+                      >
+                        {difficulty}
+                      </button>
+                    ))}
+                  </div>
+                </div>
+
+                <div>
+                  <div className="mb-3 text-sm font-semibold text-slate-300">
+                    Domain presets
+                  </div>
+                  <div className="flex flex-wrap gap-2">
+                    {[allDomainFilter, ...domainOptions].map((domain) => (
+                      <button
+                        key={domain}
+                        type="button"
+                        onClick={() => setSelectedDomain(domain)}
+                        className={`rounded-lg border px-3 py-2 text-sm font-medium transition ${
+                          selectedDomain === domain
+                            ? "border-blue-400 bg-blue-500/15 text-blue-200"
+                            : "border-slate-800 bg-black text-slate-400 hover:border-slate-700 hover:text-slate-200"
+                        }`}
+                      >
+                        {domain}
+                      </button>
+                    ))}
+                  </div>
+                  <p className="mt-3 text-xs leading-5 text-slate-500">
+                    Domain presets change with the selected category so the
+                    result list stays focused.
+                  </p>
+                </div>
+              </div>
+            </div>
+          ) : null}
         </div>
 
         <div className="flex flex-wrap gap-2">
           {categoryOptions.map((category) => (
             <button
               key={category}
-              onClick={() => setSelectedCategory(category)}
+              onClick={() => selectCategory(category)}
               className={`rounded-lg px-4 py-2 font-medium transition-all ${
                 selectedCategory === category
                   ? "bg-blue-600 text-white"
-                  : "border border-slate-800 bg-slate-900 text-slate-400 hover:bg-slate-800"
+                  : "border border-slate-800 bg-zinc-950 text-slate-400 hover:bg-slate-900"
               }`}
             >
               {category}
             </button>
           ))}
         </div>
+
+        {hasMoreFilters ? (
+          <div className="flex flex-wrap items-center gap-2 text-sm text-slate-400">
+            <span>Active filters:</span>
+            {selectedDifficulty !== allDifficultyFilter ? (
+              <button
+                type="button"
+                onClick={() => setSelectedDifficulty(allDifficultyFilter)}
+                className="inline-flex items-center gap-2 rounded-full border border-cyan-500/30 bg-cyan-500/10 px-3 py-1.5 text-xs font-semibold text-cyan-200"
+              >
+                {selectedDifficulty}
+                <X className="h-3.5 w-3.5" />
+              </button>
+            ) : null}
+            {selectedDomain !== allDomainFilter ? (
+              <button
+                type="button"
+                onClick={() => setSelectedDomain(allDomainFilter)}
+                className="inline-flex items-center gap-2 rounded-full border border-blue-500/30 bg-blue-500/10 px-3 py-1.5 text-xs font-semibold text-blue-200"
+              >
+                {selectedDomain}
+                <X className="h-3.5 w-3.5" />
+              </button>
+            ) : null}
+          </div>
+        ) : null}
 
         {feedback ? (
           <div className="rounded-lg border border-blue-500/20 bg-blue-500/10 p-4 text-sm text-blue-300">
@@ -367,7 +593,8 @@ export function ProblemBank() {
                         </div>
                         {problem.stats.topPointsAwarded > 0 ? (
                           <div className="text-cyan-300">
-                            Top score: {problem.stats.topPointsAwarded} innovation points
+                            Top score: {problem.stats.topPointsAwarded}{" "}
+                            innovation points
                           </div>
                         ) : null}
                       </div>
@@ -399,7 +626,9 @@ export function ProblemBank() {
                         disabled={claimMutation.isPending}
                         className="flex-1 rounded-lg bg-gradient-to-r from-blue-600 to-purple-600 px-6 py-3 font-semibold text-white transition-all disabled:opacity-60"
                       >
-                        {startingProblemId === problem._id ? "Starting..." : "Start Problem"}
+                        {startingProblemId === problem._id
+                          ? "Starting..."
+                          : "Start Problem"}
                       </button>
                     ) : (
                       <div className="flex flex-1 items-center justify-center rounded-lg border border-slate-800 bg-slate-950 px-6 py-3 text-sm text-slate-400">
@@ -433,15 +662,21 @@ export function ProblemBank() {
             <div className="text-2xl font-bold text-white">
               {problemsQuery.data?.pages[0]?.meta.total ?? 0}
             </div>
-            <div className="mt-2 text-sm text-slate-400">Published Problems</div>
+            <div className="mt-2 text-sm text-slate-400">
+              Published Problems
+            </div>
           </div>
           <div className="rounded-xl border border-slate-800 bg-slate-900 p-6 text-center">
             <div className="text-2xl font-bold text-white">{activeTeams}</div>
-            <div className="mt-2 text-sm text-slate-400">Active Team Attempts</div>
+            <div className="mt-2 text-sm text-slate-400">
+              Active Team Attempts
+            </div>
           </div>
           <div className="rounded-xl border border-slate-800 bg-slate-900 p-6 text-center">
             <div className="text-2xl font-bold text-white">{approvedTeams}</div>
-            <div className="mt-2 text-sm text-slate-400">Approved Team Solutions</div>
+            <div className="mt-2 text-sm text-slate-400">
+              Approved Team Solutions
+            </div>
           </div>
         </div>
 
@@ -540,7 +775,10 @@ export function ProblemBank() {
                     <div className="grid gap-3 text-sm text-slate-300 md:grid-cols-3">
                       <div>
                         <span className="text-slate-500">Status:</span>{" "}
-                        {getViewerStatusStyles(selectedProblem.viewerState)?.label}
+                        {
+                          getViewerStatusStyles(selectedProblem.viewerState)
+                            ?.label
+                        }
                       </div>
                       <div>
                         <span className="text-slate-500">Progress:</span>{" "}
@@ -573,9 +811,11 @@ export function ProblemBank() {
                     {selectedProblem.viewerState.status === "approved" ? (
                       <div className="mt-4 rounded-lg border border-emerald-500/20 bg-emerald-500/10 p-3 text-sm text-emerald-200">
                         Approved. Your team earned{" "}
-                        {selectedProblem.viewerState.pointsAwarded ?? 0} innovation points for this problem.
+                        {selectedProblem.viewerState.pointsAwarded ?? 0}{" "}
+                        innovation points for this problem.
                       </div>
-                    ) : selectedProblem.viewerState.status === "review_requested" ? (
+                    ) : selectedProblem.viewerState.status ===
+                      "review_requested" ? (
                       <div className="mt-4 rounded-lg border border-amber-500/20 bg-amber-500/10 p-3 text-sm text-amber-200">
                         Review request sent. The admin team will verify your
                         completion and award innovation points.
@@ -583,13 +823,16 @@ export function ProblemBank() {
                     ) : (
                       <div className="mt-4 space-y-3">
                         <div className="text-sm text-slate-400">
-                          {selectedProblem.viewerState.status === "changes_requested"
+                          {selectedProblem.viewerState.status ===
+                          "changes_requested"
                             ? "Update the workspace evidence if needed, then request another review."
                             : "When your team is done, send a review request to the admin team."}
                         </div>
                         <textarea
                           value={reviewNote}
-                          onChange={(event) => setReviewNote(event.target.value)}
+                          onChange={(event) =>
+                            setReviewNote(event.target.value)
+                          }
                           placeholder="Summarize what your team completed, what evidence is available in the workspace, and what the admin should review."
                           className="min-h-[120px] w-full rounded-xl border border-slate-800 bg-slate-950 px-4 py-3 text-sm text-white placeholder-slate-500 focus:border-cyan-500 focus:outline-none"
                         />
@@ -597,7 +840,8 @@ export function ProblemBank() {
                           type="button"
                           onClick={requestReview}
                           disabled={
-                            reviewMutation.isPending || reviewNote.trim().length < 20
+                            reviewMutation.isPending ||
+                            reviewNote.trim().length < 20
                           }
                           className="rounded-lg bg-gradient-to-r from-cyan-600 to-blue-600 px-5 py-3 font-semibold text-white disabled:opacity-60"
                         >
@@ -724,8 +968,8 @@ export function ProblemBank() {
                     </div>
                   ) : (
                     <div className="text-sm text-slate-400">
-                      No approved team submissions yet. Be the first team on this
-                      leaderboard.
+                      No approved team submissions yet. Be the first team on
+                      this leaderboard.
                     </div>
                   )}
                 </div>
@@ -767,7 +1011,9 @@ export function ProblemBank() {
                     disabled={claimMutation.isPending}
                     className="rounded-lg bg-gradient-to-r from-blue-600 to-purple-600 px-5 py-3 font-semibold text-white"
                   >
-                    {startingProblemId === selectedProblem._id ? "Starting..." : "Start Problem"}
+                    {startingProblemId === selectedProblem._id
+                      ? "Starting..."
+                      : "Start Problem"}
                   </button>
                 ) : null}
               </div>

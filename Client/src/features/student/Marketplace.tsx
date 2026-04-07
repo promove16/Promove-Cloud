@@ -70,7 +70,9 @@ const tabs: Array<{
 ];
 
 const roleCopy: Record<MarketplaceRole, string> = {
-  student: 'Find other student builders with visible skills, project work, and execution signals you can collaborate with.',
+  student: 'Discover student builders through public proof, project work, and active startup participation.',
+  school: 'Discover schools coordinating student innovation, mentorship programs, and institutional support.',
+  college: 'Discover colleges coordinating student innovation, hiring events, and institutional support.',
   mentor: 'Discover mentors with real public context across skills, experience highlights, and project work.',
   investor: 'Review investors with clearer sector fit, public links, and richer readiness signals before you connect.',
   recruiter: 'Browse recruiters with live jobs, fuller public profiles, and one-click applications from the same workspace.',

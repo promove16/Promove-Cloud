@@ -17,10 +17,8 @@ import {
   Users,
   type LucideIcon,
 } from 'lucide-react';
-import {
-  STARTUP_LAUNCH_BASE_PATH,
-  STARTUP_LAUNCH_NEW_PATH,
-} from '../../features/startup/navigation';
+import { getMarketplaceBasePath } from '../../features/marketplace/navigation';
+import { STARTUP_LAUNCH_BASE_PATH } from '../../features/startup/navigation';
 import { UserRole } from '../../types/roles.types';
 
 export interface DashboardNavLinkItem {
@@ -53,18 +51,9 @@ export const SIDEBAR_CONFIG: Record<UserRole, DashboardNavItem[]> = {
     { kind: 'link', label: 'Problem Bank', icon: Sparkles, path: '/problem-bank' },
     { kind: 'link', label: 'Product Workspace', icon: Trophy, path: '/product-workspace' },
     { kind: 'link', label: 'Patent Support', icon: FileText, path: '/patent-support' },
-    {
-      kind: 'group',
-      label: 'Startup',
-      icon: Rocket,
-      path: STARTUP_LAUNCH_BASE_PATH,
-      children: [
-        { label: 'My Startups', path: STARTUP_LAUNCH_BASE_PATH },
-        { label: 'New Startup', path: STARTUP_LAUNCH_NEW_PATH },
-      ],
-    },
+    { kind: 'link', label: 'Startup', icon: Rocket, path: STARTUP_LAUNCH_BASE_PATH },
     { kind: 'link', label: 'Portfolio', icon: Trophy, path: '/portfolio' },
-    { kind: 'link', label: 'Marketplace', icon: Globe, path: '/marketplace' },
+    { kind: 'link', label: 'Marketplace', icon: Globe, path: getMarketplaceBasePath(UserRole.STUDENT) },
     { kind: 'link', label: 'Messages', icon: MessageCircle, path: '/dashboard/messages' },
     { kind: 'link', label: 'My Profile', icon: User, path: '/dashboard/profile' },
     { kind: 'link', label: 'Settings', icon: Settings, path: '/dashboard/settings' },
@@ -82,7 +71,7 @@ export const SIDEBAR_CONFIG: Record<UserRole, DashboardNavItem[]> = {
       ],
     },
     { kind: 'link', label: 'Problem Bank', icon: Sparkles, path: '/problem-bank' },
-    { kind: 'link', label: 'Marketplace', icon: Globe, path: '/marketplace' },
+    { kind: 'link', label: 'Marketplace', icon: Globe, path: getMarketplaceBasePath(UserRole.SCHOOL) },
     { kind: 'link', label: 'Student Innovators', icon: Users, path: '/dashboard/school/students' },
     { kind: 'link', label: 'Investors', icon: Globe, path: '/dashboard/school/investors' },
     { kind: 'link', label: 'Mentorship', icon: GraduationCap, path: '/dashboard/school/mentors' },
@@ -103,7 +92,7 @@ export const SIDEBAR_CONFIG: Record<UserRole, DashboardNavItem[]> = {
       ],
     },
     { kind: 'link', label: 'Problem Bank', icon: Sparkles, path: '/problem-bank' },
-    { kind: 'link', label: 'Marketplace', icon: Globe, path: '/marketplace' },
+    { kind: 'link', label: 'Marketplace', icon: Globe, path: getMarketplaceBasePath(UserRole.COLLEGE) },
     { kind: 'link', label: 'Student Innovators', icon: Users, path: '/dashboard/college/students' },
     { kind: 'link', label: 'Recruiters', icon: BriefcaseBusiness, path: '/dashboard/college/recruiters' },
     { kind: 'link', label: 'Investors', icon: Globe, path: '/dashboard/college/investors' },
@@ -118,7 +107,7 @@ export const SIDEBAR_CONFIG: Record<UserRole, DashboardNavItem[]> = {
   [UserRole.MENTOR]: [
     { kind: 'link', label: 'Dashboard', icon: Home, path: '/dashboard/mentor' },
     { kind: 'link', label: 'Problem Bank', icon: Sparkles, path: '/problem-bank' },
-    { kind: 'link', label: 'Marketplace', icon: Globe, path: '/marketplace' },
+    { kind: 'link', label: 'Marketplace', icon: Globe, path: getMarketplaceBasePath(UserRole.MENTOR) },
     { kind: 'link', label: 'Student Feed', icon: Users, path: '/dashboard/mentor/students' },
     { kind: 'link', label: 'Sessions', icon: GraduationCap, path: '/dashboard/mentor/sessions' },
     { kind: 'link', label: 'Messages', icon: MessageCircle, path: '/dashboard/messages' },
@@ -129,7 +118,7 @@ export const SIDEBAR_CONFIG: Record<UserRole, DashboardNavItem[]> = {
   [UserRole.INVESTOR]: [
     { kind: 'link', label: 'Deal Flow', icon: ArrowRight, path: '/dashboard/investor' },
     { kind: 'link', label: 'Problem Bank', icon: Sparkles, path: '/problem-bank' },
-    { kind: 'link', label: 'Marketplace', icon: Globe, path: '/marketplace' },
+    { kind: 'link', label: 'Marketplace', icon: Globe, path: getMarketplaceBasePath(UserRole.INVESTOR) },
     { kind: 'link', label: 'Startups', icon: Rocket, path: '/dashboard/investor/startups' },
     { kind: 'link', label: 'Institutions', icon: Building2, path: '/dashboard/investor/institutions' },
     { kind: 'link', label: 'My Portfolio', icon: BriefcaseBusiness, path: '/dashboard/investor/portfolio' },
@@ -139,17 +128,12 @@ export const SIDEBAR_CONFIG: Record<UserRole, DashboardNavItem[]> = {
     { kind: 'action', label: 'Logout', icon: LogOut, action: 'logout' },
   ],
   [UserRole.RECRUITER]: [
-    { kind: 'link', label: 'Dashboard', icon: BriefcaseBusiness, path: '/dashboard/recruiter' },
-    { kind: 'link', label: 'Problem Bank', icon: Sparkles, path: '/problem-bank' },
-    { kind: 'link', label: 'Marketplace', icon: Globe, path: '/marketplace' },
+    { kind: 'link', label: 'Home', icon: Home, path: '/dashboard/recruiter' },
+    { kind: 'link', label: 'Marketplace', icon: Globe, path: getMarketplaceBasePath(UserRole.RECRUITER) },
     { kind: 'link', label: 'Talent Search', icon: Users, path: '/dashboard/recruiter/talent' },
-    { kind: 'link', label: 'College Connect', icon: Globe, path: '/dashboard/recruiter/colleges' },
+    { kind: 'link', label: 'College Connect', icon: Building2, path: '/dashboard/recruiter/colleges' },
     { kind: 'link', label: 'Active Drives', icon: BarChart3, path: '/dashboard/recruiter/drives' },
     { kind: 'link', label: 'Onboarding Tracker', icon: Trophy, path: '/dashboard/recruiter/onboarding' },
-    { kind: 'link', label: 'Messages', icon: MessageCircle, path: '/dashboard/recruiter/messages' },
-    { kind: 'link', label: 'Profile', icon: User, path: '/dashboard/profile' },
-    { kind: 'link', label: 'Settings', icon: Settings, path: '/dashboard/settings' },
-    { kind: 'action', label: 'Logout', icon: LogOut, action: 'logout' },
   ],
   [UserRole.ADMIN]: [
     { kind: 'link', label: 'Dashboard', icon: Home, path: '/dashboard/admin' },

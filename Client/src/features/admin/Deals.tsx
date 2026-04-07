@@ -45,7 +45,9 @@ export default function Deals() {
       deals.filter(
         (deal) =>
           deal.stage === 3 &&
+          deal.adminApprovalRequired &&
           deal.stockTransfer.status !== 'approved' &&
+          deal.stockTransfer.status !== 'rejected' &&
           !deal.adminApprovedAt,
       ),
     [deals],

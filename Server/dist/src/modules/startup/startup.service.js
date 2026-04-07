@@ -12,7 +12,9 @@ const ApiError_1 = require("../../utils/ApiError");
 const placementRecord_model_1 = require("../college/placementRecord.model");
 const roles_types_1 = require("../../types/roles.types");
 const score_utils_1 = require("../innovationScore/score.utils");
+const patent_model_1 = require("../patent/patent.model");
 const workspace_model_1 = require("../workspace/workspace.model");
+const adminAuditLog_model_1 = require("../admin/adminAuditLog.model");
 const pdfFileNamePattern = /\.pdf$/i;
 const STARTUP_DOCUMENT_CATEGORIES = [
     'business_plan',
@@ -312,6 +314,40 @@ const getRequiredStartupDocumentCategories = (startup) => {
         ? ['design_plan_sketch']
         : ['technical_documentation'];
 };
+const isWorkspaceLaunchComplete = (workspace) => workspace.stage === 'Launch' ||
+    (workspace.progressPercent ?? 0) >= 100 ||
+    Boolean(workspace.milestones?.length && workspace.milestones.every((milestone) => milestone.isCompleted));
+const ensureInvestorLaunchWorkflowReady = async (startup) => {
+    if (!startup.projectId) {
+        throw new ApiError_1.ApiError(400, 'STARTUP_WORKSPACE_REQUIRED', 'Link a completed project workspace before listing the startup for investor pitch.');
+    }
+    const workspace = await workspace_model_1.Workspace.findOne({ _id: startup.projectId, isActive: true })
+        .select('_id stage progressPercent milestones.isCompleted')
+        .lean();
+    if (!workspace) {
+        throw new ApiError_1.ApiError(404, 'WORKSPACE_NOT_FOUND', 'The linked project workspace is no longer available.');
+    }
+    if (!isWorkspaceLaunchComplete(workspace)) {
+        throw new ApiError_1.ApiError(400, 'PROJECT_NOT_COMPLETE', 'Complete the linked project workspace before listing the startup for investor pitch.');
+    }
+    const founderIds = startup.founderIds.map((founderId) => new mongoose_1.Types.ObjectId(String(founderId)));
+    const latestPatent = await patent_model_1.Patent.findOne({
+        workspaceId: startup.projectId,
+        $or: [{ studentId: { $in: founderIds } }, { coInventorIds: { $in: founderIds } }],
+    })
+        .sort({ submittedAt: -1, createdAt: -1 })
+        .select('_id status')
+        .lean();
+    if (!latestPatent) {
+        throw new ApiError_1.ApiError(400, 'PATENT_APPROVAL_REQUIRED', 'An approved patent submission for the linked project is required before investor pitch listing.');
+    }
+    if (latestPatent.status === 'rejected') {
+        throw new ApiError_1.ApiError(400, 'PATENT_REJECTED', 'The latest patent submission was rejected. Correct and resubmit it for approval before investor pitch listing.');
+    }
+    if (latestPatent.status !== 'approved') {
+        throw new ApiError_1.ApiError(400, 'PATENT_APPROVAL_REQUIRED', 'An approved patent submission for the linked project is required before investor pitch listing.');
+    }
+};
 const buildStartupReadiness = (startup) => {
     const missingItems = [];
     const documents = startup.documents ?? [];
@@ -546,13 +582,16 @@ const launchStartup = async (startupId, userId, payload) => {
     if (!readiness.isReviewReady) {
         throw new ApiError_1.ApiError(400, 'STARTUP_INCOMPLETE', formatReadinessErrorMessage(readiness));
     }
-    if (payload.launchTo !== 'recruiters' && startup.reviewStatus !== 'approved') {
+    if (startup.reviewStatus !== 'approved') {
         throw new ApiError_1.ApiError(403, 'STARTUP_REVIEW_REQUIRED', 'Startup must be approved by admin before it can be launched to the marketplace.');
     }
+    if (payload.launchTo === 'investors' || payload.launchTo === 'both') {
+        await ensureInvestorLaunchWorkflowReady(startup);
+    }
     const score = calculateStartupInnovationScore(startup.toObject());
-    startup.launchedToInvestors = payload.launchTo === 'investors' || payload.launchTo === 'both';
-    startup.launchedToMentors = payload.launchTo === 'mentors' || payload.launchTo === 'both';
-    startup.launchedToRecruiters = payload.launchTo === 'recruiters';
+    startup.launchedToInvestors = startup.launchedToInvestors || payload.launchTo === 'investors' || payload.launchTo === 'both';
+    startup.launchedToMentors = startup.launchedToMentors || payload.launchTo === 'mentors' || payload.launchTo === 'both';
+    startup.launchedToRecruiters = startup.launchedToRecruiters || payload.launchTo === 'recruiters';
     startup.launchedAt = new Date();
     startup.innovationScoreAtLaunch = score;
     if (payload.launchTo !== 'recruiters') {
@@ -806,6 +845,16 @@ const reviewStartupSubmission = async (adminId, startupId, payload) => {
         startup.reviewRequestedAt = startup.reviewRequestedAt ?? new Date();
     }
     await startup.save();
+    await adminAuditLog_model_1.AdminAuditLog.create({
+        adminId: new mongoose_1.Types.ObjectId(adminId),
+        action: payload.decision === 'approved' ? 'STARTUP_APPROVED' : 'STARTUP_CHANGES_REQUESTED',
+        targetId: startup._id,
+        targetModel: 'Startup',
+        metadata: {
+            reviewStatus: startup.reviewStatus,
+            ...(startup.adminNotes ? { adminNotes: startup.adminNotes } : {}),
+        },
+    });
     return serializeStartup(startup);
 };
 exports.reviewStartupSubmission = reviewStartupSubmission;

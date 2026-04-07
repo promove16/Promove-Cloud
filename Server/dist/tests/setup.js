@@ -218,7 +218,9 @@ const dropDatabaseWithRetry = async (attempts = 5) => {
     }
 };
 beforeAll(async () => {
-    mongoServer = await mongodb_memory_server_1.MongoMemoryServer.create();
+    mongoServer = await mongodb_memory_server_1.MongoMemoryReplSet.create({
+        replSet: { count: 1 },
+    });
     await mongoose_1.default.connect(mongoServer.getUri());
 });
 beforeEach(async () => {

@@ -9,7 +9,9 @@ import { ApiError } from '../../utils/ApiError';
 import { PlacementRecord } from '../college/placementRecord.model';
 import { UserRole } from '../../types/roles.types';
 import { normalizeInnovationScore } from '../innovationScore/score.utils';
+import { Patent } from '../patent/patent.model';
 import { Workspace } from '../workspace/workspace.model';
+import { AdminAuditLog } from '../admin/adminAuditLog.model';
 import type { StartupDocumentCategory, StartupReadiness } from './startup.types';
 
 const pdfFileNamePattern = /\.pdf$/i;
@@ -184,6 +186,15 @@ type StartupLinkedWorkspace = {
   ownerId: Types.ObjectId;
   teamMemberIds: Types.ObjectId[];
   isActive?: boolean;
+};
+
+type StartupLaunchWorkspace = {
+  _id: Types.ObjectId;
+  stage: string;
+  progressPercent?: number;
+  milestones?: Array<{
+    isCompleted?: boolean;
+  }>;
 };
 
 const clearReviewMetadata = (startup: InstanceType<typeof Startup>) => {
@@ -372,6 +383,74 @@ const getRequiredStartupDocumentCategories = (startup: {
   return startup.registrationProfile?.developmentStage === 'idea'
     ? ['design_plan_sketch']
     : ['technical_documentation'];
+};
+
+const isWorkspaceLaunchComplete = (workspace: StartupLaunchWorkspace) =>
+  workspace.stage === 'Launch' ||
+  (workspace.progressPercent ?? 0) >= 100 ||
+  Boolean(workspace.milestones?.length && workspace.milestones.every((milestone) => milestone.isCompleted));
+
+const ensureInvestorLaunchWorkflowReady = async (startup: InstanceType<typeof Startup>) => {
+  if (!startup.projectId) {
+    throw new ApiError(
+      400,
+      'STARTUP_WORKSPACE_REQUIRED',
+      'Link a completed project workspace before listing the startup for investor pitch.',
+    );
+  }
+
+  const workspace = await Workspace.findOne({ _id: startup.projectId, isActive: true })
+    .select('_id stage progressPercent milestones.isCompleted')
+    .lean<StartupLaunchWorkspace | null>();
+
+  if (!workspace) {
+    throw new ApiError(
+      404,
+      'WORKSPACE_NOT_FOUND',
+      'The linked project workspace is no longer available.',
+    );
+  }
+
+  if (!isWorkspaceLaunchComplete(workspace)) {
+    throw new ApiError(
+      400,
+      'PROJECT_NOT_COMPLETE',
+      'Complete the linked project workspace before listing the startup for investor pitch.',
+    );
+  }
+
+  const founderIds = startup.founderIds.map((founderId) => new Types.ObjectId(String(founderId)));
+  const latestPatent = await Patent.findOne({
+    workspaceId: startup.projectId,
+    $or: [{ studentId: { $in: founderIds } }, { coInventorIds: { $in: founderIds } }],
+  })
+    .sort({ submittedAt: -1, createdAt: -1 })
+    .select('_id status')
+    .lean<{ _id: Types.ObjectId; status: 'submitted' | 'under_review' | 'approved' | 'rejected' } | null>();
+
+  if (!latestPatent) {
+    throw new ApiError(
+      400,
+      'PATENT_APPROVAL_REQUIRED',
+      'An approved patent submission for the linked project is required before investor pitch listing.',
+    );
+  }
+
+  if (latestPatent.status === 'rejected') {
+    throw new ApiError(
+      400,
+      'PATENT_REJECTED',
+      'The latest patent submission was rejected. Correct and resubmit it for approval before investor pitch listing.',
+    );
+  }
+
+  if (latestPatent.status !== 'approved') {
+    throw new ApiError(
+      400,
+      'PATENT_APPROVAL_REQUIRED',
+      'An approved patent submission for the linked project is required before investor pitch listing.',
+    );
+  }
 };
 
 const buildStartupReadiness = (startup: {
@@ -705,7 +784,7 @@ export const launchStartup = async (
     throw new ApiError(400, 'STARTUP_INCOMPLETE', formatReadinessErrorMessage(readiness));
   }
 
-  if (payload.launchTo !== 'recruiters' && startup.reviewStatus !== 'approved') {
+  if (startup.reviewStatus !== 'approved') {
     throw new ApiError(
       403,
       'STARTUP_REVIEW_REQUIRED',
@@ -713,11 +792,15 @@ export const launchStartup = async (
     );
   }
 
+  if (payload.launchTo === 'investors' || payload.launchTo === 'both') {
+    await ensureInvestorLaunchWorkflowReady(startup);
+  }
+
   const score = calculateStartupInnovationScore(startup.toObject());
 
-  startup.launchedToInvestors = payload.launchTo === 'investors' || payload.launchTo === 'both';
-  startup.launchedToMentors = payload.launchTo === 'mentors' || payload.launchTo === 'both';
-  startup.launchedToRecruiters = payload.launchTo === 'recruiters';
+  startup.launchedToInvestors = startup.launchedToInvestors || payload.launchTo === 'investors' || payload.launchTo === 'both';
+  startup.launchedToMentors = startup.launchedToMentors || payload.launchTo === 'mentors' || payload.launchTo === 'both';
+  startup.launchedToRecruiters = startup.launchedToRecruiters || payload.launchTo === 'recruiters';
   startup.launchedAt = new Date();
   startup.innovationScoreAtLaunch = score;
   if (payload.launchTo !== 'recruiters') {
@@ -1103,5 +1186,15 @@ export const reviewStartupSubmission = async (
   }
 
   await startup.save();
+  await AdminAuditLog.create({
+    adminId: new Types.ObjectId(adminId),
+    action: payload.decision === 'approved' ? 'STARTUP_APPROVED' : 'STARTUP_CHANGES_REQUESTED',
+    targetId: startup._id,
+    targetModel: 'Startup',
+    metadata: {
+      reviewStatus: startup.reviewStatus,
+      ...(startup.adminNotes ? { adminNotes: startup.adminNotes } : {}),
+    },
+  });
   return serializeStartup(startup);
 };

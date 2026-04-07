@@ -3,9 +3,10 @@ export type DealStatus = 'active' | 'closed' | 'cancelled';
 export type InvestorType = 'penny' | 'sole';
 export type InvestorRole = 'shareholder' | 'director' | 'observer';
 export type DealRequestOrigin = 'investor' | 'student';
-export type DealMediationStatus = 'intake' | 'under_review' | 'approved';
-export type StockTransferStatus = 'not_started' | 'pending_review' | 'under_review' | 'approved';
+export type DealMediationStatus = 'intake' | 'under_review' | 'approved' | 'rejected';
+export type StockTransferStatus = 'not_started' | 'pending_review' | 'under_review' | 'approved' | 'rejected';
 export type RoyaltyStatus = 'pending' | 'invoiced' | 'received';
+export type FounderDecisionStatus = 'pending' | 'accepted' | 'rejected';
 
 export interface DealStockDetails {
   shareClassLabel: string;
@@ -29,6 +30,13 @@ export interface DealRoyalty {
   promoveAmountINR: number;
   status: RoyaltyStatus;
   settledAt?: string;
+}
+
+export interface DealFounderDecision {
+  status: FounderDecisionStatus;
+  respondedAt?: string;
+  respondedBy?: string;
+  note?: string;
 }
 
 export interface DealSummaryView {
@@ -59,6 +67,7 @@ export interface DealSummaryView {
   stockDetails: DealStockDetails;
   stockTransfer: DealStockTransfer;
   royalty: DealRoyalty;
+  founderDecision: DealFounderDecision;
   innovationScoreSnapshot: number;
   nextActionLabel: string;
   createdAt: string;
@@ -115,6 +124,11 @@ export interface DealUpdateStagePayload {
     equityPercent?: number;
     investorRole?: InvestorRole;
   };
+}
+
+export interface DealFounderDecisionPayload {
+  decision: 'accepted' | 'rejected';
+  note?: string;
 }
 
 export interface InvestorAuthorityItem {

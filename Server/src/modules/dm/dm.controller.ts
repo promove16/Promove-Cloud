@@ -4,9 +4,18 @@ import { DirectMessage } from './dm.model';
 import { User } from '../user/user.model';
 import { ApiError } from '../../utils/ApiError';
 import { uploadToCloudinary } from '../../services/cloudinaryService';
+import { ensureDmAccess, ensureDmThreadAccess } from './dm.permissions';
 const allowedMimeTypes = new Set(['image/jpeg', 'image/png', 'image/gif', 'image/webp', 'application/pdf']);
 const pdfFileNamePattern = /\.pdf$/i;
-const allowedQueryTypes = new Set(['project_mentor', 'project_join', 'investor', 'recruiter', 'general'] as const);
+const allowedQueryTypes = new Set([
+  'project_mentor',
+  'project_join',
+  'investor',
+  'recruiter',
+  'hiring_event',
+  'mentorship_program',
+  'general',
+] as const);
 
 /** Shared online-users set — populated by dmSocket */
 export const onlineUsers = new Set<string>();
@@ -122,11 +131,14 @@ export const listConversations = async (req: Request, res: Response) => {
 
 /** GET /api/dm/partner/:userId — get partner profile for chat header */
 export const getPartnerProfile = async (req: Request, res: Response) => {
-  const { userId } = req.params;
+  const rawUserId = req.params.userId;
+  const userId = Array.isArray(rawUserId) ? rawUserId[0] : rawUserId;
 
   if (!Types.ObjectId.isValid(userId as string)) {
     throw new ApiError(400, 'INVALID_ID', 'Invalid user ID');
   }
+
+  await ensureDmThreadAccess(req.user!._id, userId);
 
   const user = await User.findById(userId)
     .select('_id displayName avatar role')
@@ -148,11 +160,14 @@ export const getPartnerProfile = async (req: Request, res: Response) => {
 /** GET /api/dm/:userId — get message thread with a user */
 export const getThread = async (req: Request, res: Response) => {
   const myId = new Types.ObjectId(req.user!._id);
-  const { userId } = req.params;
+  const rawUserId = req.params.userId;
+  const userId = Array.isArray(rawUserId) ? rawUserId[0] : rawUserId;
 
   if (!Types.ObjectId.isValid(userId as string)) {
     throw new ApiError(400, 'INVALID_ID', 'Invalid user ID');
   }
+
+  await ensureDmThreadAccess(req.user!._id, userId);
 
   const partnerId = new Types.ObjectId(userId as string);
 
@@ -178,11 +193,14 @@ export const getThread = async (req: Request, res: Response) => {
 /** PATCH /api/dm/:userId/read — mark all messages from a partner as read */
 export const markAsRead = async (req: Request, res: Response) => {
   const myId = new Types.ObjectId(req.user!._id);
-  const { userId } = req.params;
+  const rawUserId = req.params.userId;
+  const userId = Array.isArray(rawUserId) ? rawUserId[0] : rawUserId;
 
   if (!Types.ObjectId.isValid(userId as string)) {
     throw new ApiError(400, 'INVALID_ID', 'Invalid user ID');
   }
+
+  await ensureDmThreadAccess(req.user!._id, userId);
 
   const partnerId = new Types.ObjectId(userId as string);
 
@@ -197,7 +215,8 @@ export const markAsRead = async (req: Request, res: Response) => {
 /** POST /api/dm/:userId — send a message */
 export const sendMessage = async (req: Request, res: Response) => {
   const myId = new Types.ObjectId(req.user!._id);
-  const { userId } = req.params;
+  const rawUserId = req.params.userId;
+  const userId = Array.isArray(rawUserId) ? rawUserId[0] : rawUserId;
 
   if (!Types.ObjectId.isValid(userId as string)) {
     throw new ApiError(400, 'INVALID_ID', 'Invalid user ID');
@@ -212,7 +231,14 @@ export const sendMessage = async (req: Request, res: Response) => {
     attachmentUrl?: string;
     attachmentType?: 'image' | 'pdf';
     attachmentName?: string;
-    queryType?: 'project_mentor' | 'project_join' | 'investor' | 'recruiter' | 'general';
+    queryType?:
+      | 'project_mentor'
+      | 'project_join'
+      | 'investor'
+      | 'recruiter'
+      | 'hiring_event'
+      | 'mentorship_program'
+      | 'general';
   };
 
   const normalizedMessage = typeof message === 'string' ? message.trim() : '';
@@ -230,14 +256,7 @@ export const sendMessage = async (req: Request, res: Response) => {
     throw new ApiError(400, 'INVALID_QUERY_TYPE', 'Invalid message query type');
   }
 
-  if (myId.toString() === userId) {
-    throw new ApiError(400, 'SELF_MESSAGE', 'You cannot send a message to yourself');
-  }
-
-  const recipientExists = await User.exists({ _id: recipientId });
-  if (!recipientExists) {
-    throw new ApiError(404, 'USER_NOT_FOUND', 'Recipient not found');
-  }
+  await ensureDmAccess(req.user!._id, userId, queryType || 'general');
 
   const msg = await DirectMessage.create({
     senderId: myId,

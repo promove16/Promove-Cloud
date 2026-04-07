@@ -223,7 +223,7 @@ export interface AdminDealItem {
     totalSharesConsidered: number;
   };
   stockTransfer: Omit<DealStockTransfer, 'requestedAt' | 'reviewedAt' | 'reviewedBy'> & {
-    status: 'not_started' | 'pending_review' | 'under_review' | 'approved';
+    status: 'not_started' | 'pending_review' | 'under_review' | 'approved' | 'rejected';
     requestedAt?: string;
     reviewedAt?: string;
     reviewedBy?: string;
@@ -403,7 +403,7 @@ export interface AdminUserActivitySearchResponse {
 export type AdminUserActivityDetail = UserActivityDetail;
 
 export interface AdminDealReviewPayload {
-  stockTransferStatus?: 'pending_review' | 'under_review';
+  stockTransferStatus?: 'pending_review' | 'under_review' | 'rejected';
   reviewNotes?: string;
   royaltyPercentage?: number;
   royaltyStatus?: 'pending' | 'invoiced' | 'received';

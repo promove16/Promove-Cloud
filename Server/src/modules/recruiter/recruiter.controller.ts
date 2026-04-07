@@ -4,6 +4,7 @@ import { ApiResponse } from '../../utils/ApiResponse';
 import {
   applyToRecruiterJob,
   closeRecruiterDrive,
+  collegeIdSchema,
   createRecruiterDrive,
   createRecruiterJob,
   deleteRecruiterJob,
@@ -27,9 +28,13 @@ import {
   jobUpdateSchema,
   markStudentHired,
   messageSchema,
+  partnershipRequestSchema,
   publicJobsQuerySchema,
   registerForDrive,
+  reminderSchema,
   removeShortlist,
+  requestCollegePartnership,
+  sendOnboardingReminder,
   sendRecruiterMessage,
   shortlistStudent,
   studentIdSchema,
@@ -174,5 +179,19 @@ export const sendMessageController = async (req: Request, res: Response) => {
   const { studentId } = studentIdSchema.parse(req.params);
   const payload = messageSchema.parse(req.body);
   const data = await sendRecruiterMessage(req.user!._id, studentId, payload.body);
+  res.status(200).json(new ApiResponse(data));
+};
+
+export const sendOnboardingReminderController = async (req: Request, res: Response) => {
+  const { studentId } = studentIdSchema.parse(req.params);
+  const payload = reminderSchema.parse(req.body ?? {});
+  const data = await sendOnboardingReminder(req.user!._id, studentId, payload.message);
+  res.status(200).json(new ApiResponse(data));
+};
+
+export const requestPartnershipController = async (req: Request, res: Response) => {
+  const { collegeId } = collegeIdSchema.parse(req.params);
+  const payload = partnershipRequestSchema.parse(req.body ?? {});
+  const data = await requestCollegePartnership(req.user!._id, collegeId, payload.message);
   res.status(200).json(new ApiResponse(data));
 };

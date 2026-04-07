@@ -25,9 +25,12 @@ export {
   getRecruiterOnboarding,
   markStudentHired,
   registerForDrive,
+  requestCollegePartnership,
+  sendOnboardingReminder,
   submitDriveScore,
 } from './recruiter.drive.service';
 export {
+  collegeIdSchema,
   driveCreateSchema,
   driveIdSchema,
   driveScoreSchema,
@@ -36,7 +39,9 @@ export {
   jobIdSchema,
   jobUpdateSchema,
   messageSchema,
+  partnershipRequestSchema,
   publicJobsQuerySchema,
+  reminderSchema,
   studentIdSchema,
   talentQuerySchema,
 } from './recruiter.schemas';

@@ -6,9 +6,10 @@ export type DealStatus = 'active' | 'closed' | 'cancelled';
 export type InvestorType = 'penny' | 'sole';
 export type InvestorRole = 'shareholder' | 'director' | 'observer';
 export type DealRequestOrigin = 'investor' | 'student';
-export type DealMediationStatus = 'intake' | 'under_review' | 'approved';
-export type StockTransferStatus = 'not_started' | 'pending_review' | 'under_review' | 'approved';
+export type DealMediationStatus = 'intake' | 'under_review' | 'approved' | 'rejected';
+export type StockTransferStatus = 'not_started' | 'pending_review' | 'under_review' | 'approved' | 'rejected';
 export type RoyaltyStatus = 'pending' | 'invoiced' | 'received';
+export type FounderDecisionStatus = 'pending' | 'accepted' | 'rejected';
 
 export interface DealStockDetails {
   shareClassLabel: string;
@@ -32,6 +33,13 @@ export interface DealRoyalty {
   promoveAmountINR: number;
   status: RoyaltyStatus;
   settledAt?: Date;
+}
+
+export interface DealFounderDecision {
+  status: FounderDecisionStatus;
+  respondedAt?: Date;
+  respondedBy?: Types.ObjectId;
+  note?: string;
 }
 
 export interface InvestmentAuthority {
@@ -60,6 +68,7 @@ export interface IInvestment extends InvestmentAuthority {
   stockDetails: DealStockDetails;
   stockTransfer: DealStockTransfer;
   royalty: DealRoyalty;
+  founderDecision: DealFounderDecision;
   fundTransferInitiatedAt?: Date;
   adminApprovalRequired: boolean;
   adminApprovedAt?: Date;
@@ -128,6 +137,12 @@ export interface DealSummaryView extends InvestmentAuthority {
     promoveAmountINR: number;
     status: RoyaltyStatus;
     settledAt?: string;
+  };
+  founderDecision: {
+    status: FounderDecisionStatus;
+    respondedAt?: string;
+    respondedBy?: string;
+    note?: string;
   };
   innovationScoreSnapshot: number;
   nextActionLabel: string;

@@ -1,7 +1,7 @@
 import { useMemo } from "react";
-import { useQuery } from "@tanstack/react-query";
+import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useParams } from "react-router-dom";
-import { Briefcase, TrendingUp, CheckCircle2, Clock } from "lucide-react";
+import { Briefcase, TrendingUp, CheckCircle2, Clock, XCircle, Handshake } from "lucide-react";
 import { dealApi } from "../../../api/deal.api";
 import { normalizeStartupRouteId } from "../../../features/startup/navigation";
 import { DealSummaryView } from "../../../types/deal.types";
@@ -29,9 +29,20 @@ const stageLabels: Record<number, { label: string; description: string; color: s
   },
 };
 
-function DealCard({ deal, index }: { deal: DealSummaryView; index: number }) {
+function DealCard({
+  deal,
+  index,
+  onRespond,
+  responding,
+}: {
+  deal: DealSummaryView;
+  index: number;
+  onRespond: (decision: "accepted" | "rejected") => void;
+  responding: boolean;
+}) {
   const stage = stageLabels[deal.currentStage] ?? stageLabels[1];
-  const investorName = deal.currentStage < 2 ? `Investor #${index + 1}` : deal.investorDisplayName;
+  const investorName = deal.investorDisplayName || `Investor #${index + 1}`;
+  const canRespond = deal.currentStage === 1 && deal.founderDecision.status === "pending" && deal.status === "active";
 
   return (
     <div className="rounded-2xl border border-slate-800 bg-slate-900 p-6 transition-all hover:border-blue-500/30">
@@ -55,6 +66,38 @@ function DealCard({ deal, index }: { deal: DealSummaryView; index: number }) {
           {deal.nextActionLabel}
         </div>
         <p className="mt-2 text-xs text-slate-500">{stage.description}</p>
+        <div className="mt-3 inline-flex items-center gap-2 rounded-full border border-slate-800 bg-slate-900 px-3 py-1 text-xs text-slate-300">
+          <Handshake className="h-3.5 w-3.5 text-cyan-400" />
+          Founder response: {deal.founderDecision.status}
+        </div>
+        {deal.founderDecision.note ? (
+          <p className="mt-3 text-xs leading-5 text-slate-400">{deal.founderDecision.note}</p>
+        ) : null}
+        {deal.stockTransfer.reviewNotes ? (
+          <p className="mt-3 text-xs leading-5 text-amber-300">Admin note: {deal.stockTransfer.reviewNotes}</p>
+        ) : null}
+        {canRespond ? (
+          <div className="mt-4 flex flex-wrap gap-2">
+            <button
+              type="button"
+              disabled={responding}
+              onClick={() => onRespond("accepted")}
+              className="inline-flex items-center gap-2 rounded-lg bg-emerald-500/10 px-3 py-2 text-xs font-semibold text-emerald-300 transition hover:bg-emerald-500/20 disabled:opacity-50"
+            >
+              <CheckCircle2 className="h-4 w-4" />
+              Accept proposal
+            </button>
+            <button
+              type="button"
+              disabled={responding}
+              onClick={() => onRespond("rejected")}
+              className="inline-flex items-center gap-2 rounded-lg bg-rose-500/10 px-3 py-2 text-xs font-semibold text-rose-300 transition hover:bg-rose-500/20 disabled:opacity-50"
+            >
+              <XCircle className="h-4 w-4" />
+              Decline proposal
+            </button>
+          </div>
+        ) : null}
       </div>
 
       <div className="grid grid-cols-2 gap-3 text-xs">
@@ -86,10 +129,18 @@ function DealCard({ deal, index }: { deal: DealSummaryView; index: number }) {
 export function StudentInvestorDeals() {
   const { startupId } = useParams<{ startupId?: string }>();
   const normalizedStartupId = normalizeStartupRouteId(startupId);
+  const queryClient = useQueryClient();
   const { data, isLoading } = useQuery({
     queryKey: ["student", "active-deals"],
     queryFn: dealApi.getMyDeals,
     refetchInterval: 60_000,
+  });
+  const respondMutation = useMutation({
+    mutationFn: ({ dealId, decision }: { dealId: string; decision: "accepted" | "rejected" }) =>
+      dealApi.respondToFounderDecision(dealId, { decision }),
+    onSuccess: async () => {
+      await queryClient.invalidateQueries({ queryKey: ["student", "active-deals"] });
+    },
   });
 
   const deals = data?.items ?? [];
@@ -149,7 +200,13 @@ export function StudentInvestorDeals() {
               </div>
               <div className="grid gap-4 lg:grid-cols-2">
                 {activeDeals.map((deal, i) => (
-                  <DealCard key={deal._id} deal={deal} index={i} />
+                  <DealCard
+                    key={deal._id}
+                    deal={deal}
+                    index={i}
+                    responding={respondMutation.isPending && respondMutation.variables?.dealId === deal._id}
+                    onRespond={(decision) => respondMutation.mutate({ dealId: deal._id, decision })}
+                  />
                 ))}
               </div>
             </section>
@@ -163,7 +220,13 @@ export function StudentInvestorDeals() {
               </div>
               <div className="grid gap-4 lg:grid-cols-2">
                 {closedDeals.map((deal, i) => (
-                  <DealCard key={deal._id} deal={deal} index={i} />
+                  <DealCard
+                    key={deal._id}
+                    deal={deal}
+                    index={i}
+                    responding={false}
+                    onRespond={() => undefined}
+                  />
                 ))}
               </div>
             </section>

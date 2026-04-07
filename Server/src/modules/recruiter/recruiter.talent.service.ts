@@ -35,6 +35,13 @@ import { MAX_INNOVATION_SCORE } from '../innovationScore/score.utils';
 
 type TalentQuery = ReturnType<typeof talentQuerySchema.parse>;
 
+const escapeRegex = (value: string) => value.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+
+const canRecruiterViewStudent = (student: { discoverableToRecruiters?: boolean }, bridgeType?: RelevanceBridgeType | null) =>
+  Boolean(student.discoverableToRecruiters || bridgeType);
+
+const canRecruiterContactStudent = canRecruiterViewStudent;
+
 const listTalent = async (
   recruiterId: string,
   query: TalentQuery,
@@ -62,6 +69,7 @@ const listTalent = async (
     role: UserRole.STUDENT,
     isActive: true,
   };
+  const baseClauses: Array<Record<string, unknown>> = [];
 
   if (typeof query.minScore === 'number' || typeof query.maxScore === 'number') {
     const normalizedMinScore =
@@ -78,11 +86,22 @@ const listTalent = async (
   }
 
   if (query.domain) {
-    studentFilter.domain = new RegExp(query.domain, 'i');
+    studentFilter.domain = new RegExp(escapeRegex(query.domain), 'i');
   }
 
   if (query.search) {
-    studentFilter.displayName = new RegExp(query.search, 'i');
+    const searchRegex = new RegExp(escapeRegex(query.search), 'i');
+    const matchingWorkspaces = await Workspace.find({
+      $or: [{ title: searchRegex }, { category: searchRegex }, { stage: searchRegex }],
+    })
+      .select('ownerId')
+      .lean();
+    studentFilter.$or = [
+      { displayName: searchRegex },
+      { domain: searchRegex },
+      { headline: searchRegex },
+      { _id: { $in: matchingWorkspaces.map((workspace) => workspace.ownerId) } },
+    ];
   }
 
   const matchedInstitutionIds = await resolveInstitutionIds(query.institution);
@@ -92,11 +111,20 @@ const listTalent = async (
 
   if (mode === 'pipeline') {
     studentFilter._id = { $in: bridgeDocs.map((bridge) => bridge.studentId) };
+  } else {
+    baseClauses.push({
+      $or: [{ discoverableToRecruiters: true }, { _id: { $in: bridgeDocs.map((bridge) => bridge.studentId) } }],
+    });
+  }
+
+  if (baseClauses.length > 0) {
+    const existingClauses = (studentFilter.$and as Array<Record<string, unknown>> | undefined) ?? [];
+    studentFilter.$and = [...existingClauses, ...baseClauses];
   }
 
   const total = await User.countDocuments(studentFilter);
   const students = await User.find(studentFilter)
-    .select('_id displayName avatar email domain innovationScore scoreBreakdown institutionId institutionProfile createdAt')
+    .select('_id displayName avatar email domain innovationScore scoreBreakdown institutionId institutionProfile createdAt discoverableToRecruiters')
     .sort({ innovationScore: -1, createdAt: 1 })
     .skip(skip)
     .limit(limit)
@@ -121,7 +149,7 @@ const listTalent = async (
       const bridgeType = bridgeMap.get(studentId);
       const activeProject = workspaceMap.get(studentId);
       return mapTalent(student, {
-        canContact: mode === 'pipeline' ? true : Boolean(bridgeType),
+        canContact: canRecruiterContactStudent(student, bridgeType),
         ...(bridgeType ? { bridgeType } : {}),
         ...(activeProject ? { activeProject } : {}),
         extraSkills: startupCategories.get(studentId) ?? [],
@@ -172,8 +200,9 @@ export const getRecruiterDashboard = async (recruiterId: string): Promise<Recrui
         _id: { $in: matchIds },
         role: UserRole.STUDENT,
         isActive: true,
+        $or: [{ discoverableToRecruiters: true }, { _id: { $in: matchIds } }],
       })
-        .select('_id displayName avatar email domain innovationScore scoreBreakdown institutionId institutionProfile createdAt')
+        .select('_id displayName avatar email domain innovationScore scoreBreakdown institutionId institutionProfile createdAt discoverableToRecruiters')
         .sort({ innovationScore: -1, createdAt: 1 })
         .limit(6)
         .lean()
@@ -181,6 +210,15 @@ export const getRecruiterDashboard = async (recruiterId: string): Promise<Recrui
 
   const workspaceMap = await getWorkspaceMap(students.map((student) => String(student._id)));
   const startupCategories = await getStartupCategories(students.map((student) => String(student._id)));
+  const institutionObjectIds = Array.from(
+    new Set(students.map((student) => student.institutionId).filter((id): id is Types.ObjectId => Boolean(id))),
+  );
+  const institutions = institutionObjectIds.length
+    ? await User.find({ _id: { $in: institutionObjectIds }, role: { $in: [UserRole.SCHOOL, UserRole.COLLEGE] } })
+        .select('_id displayName institutionProfile')
+        .lean()
+    : [];
+  const institutionMap = new Map(institutions.map((institution) => [String(institution._id), mapInstitution(institution)]));
 
   return {
     openPositions,
@@ -193,10 +231,13 @@ export const getRecruiterDashboard = async (recruiterId: string): Promise<Recrui
       const bridgeType = bridgeMap.get(studentId);
       return {
         ...mapTalent(student, {
-          canContact: Boolean(bridgeType),
+          canContact: canRecruiterContactStudent(student, bridgeType),
           ...(bridgeType ? { bridgeType } : {}),
           ...(activeProject ? { activeProject } : {}),
           extraSkills: startupCategories.get(studentId) ?? [],
+          ...(student.institutionId && institutionMap.get(String(student.institutionId))
+            ? { institution: institutionMap.get(String(student.institutionId)) }
+            : {}),
         }),
         headline: activeProject ? `${activeProject.title} in ${activeProject.category}` : 'Top score-match candidate',
       } satisfies RecruiterDashboardMatch;
@@ -219,7 +260,9 @@ export const getRecruiterTalentProfile = async (
     role: UserRole.STUDENT,
     isActive: true,
   })
-    .select('_id displayName avatar email bio domain innovationScore scoreBreakdown institutionId institutionProfile createdAt')
+    .select(
+      '_id displayName avatar email bio headline domain innovationScore scoreBreakdown institutionId institutionProfile education experience portfolioProjects createdAt discoverableToRecruiters',
+    )
     .lean();
 
   if (!student) {
@@ -227,13 +270,16 @@ export const getRecruiterTalentProfile = async (
   }
 
   const bridgeType = await getBridgeType(recruiterId, studentId);
+  if (!canRecruiterViewStudent(student, bridgeType)) {
+    throw new ApiError(403, 'RECRUITER_PROFILE_FORBIDDEN', 'This student profile is not visible to recruiters');
+  }
   const [scoreTimeline, workspaces, patents, startups] = await Promise.all([
     ScoreEvent.find({ userId: studentId }).sort({ createdAt: -1 }).limit(20).lean(),
     Workspace.find({ ownerId: studentId })
       .select('title category stage progressPercent updatedAt')
       .sort({ updatedAt: -1 })
       .lean(),
-    Patent.find({ studentId }).select('projectTitle status submittedAt').sort({ updatedAt: -1 }).lean(),
+    Patent.find({ studentId }).select('projectTitle status submittedAt questionnaire.problemStatement').sort({ updatedAt: -1 }).lean(),
     Startup.find({ founderIds: studentId }).select('name category stage launchedAt').sort({ updatedAt: -1 }).lean(),
   ]);
 
@@ -255,35 +301,46 @@ export const getRecruiterTalentProfile = async (
         .lean()
     : null;
   const talent = mapTalent(student, {
-    canContact: Boolean(bridgeType),
+    canContact: canRecruiterContactStudent(student, bridgeType),
     ...(bridgeType ? { bridgeType } : {}),
     ...(activeProject ? { activeProject } : {}),
     extraSkills: startupCategories.get(studentId) ?? [],
     ...(institution ? { institution: mapInstitution(institution) } : {}),
   });
 
+  const canSeeExpandedWorkspaceData = Boolean(bridgeType);
+  const canSeeSensitivePatentDetails = Boolean(bridgeType);
+
   return {
     ...talent,
     bio: student.bio,
-    scoreTimeline: scoreTimeline.map((event) => ({
-      _id: String(event._id),
-      trigger: event.trigger,
-      delta: event.delta,
-      scoreAfter: event.scoreAfter,
-      createdAt: event.createdAt.toISOString(),
-    })),
-    workspaces: workspaces.map((workspace) => ({
-      _id: String(workspace._id),
-      title: workspace.title,
-      category: workspace.category,
-      stage: workspace.stage,
-      progressPercent: workspace.progressPercent ?? 0,
-      updatedAt: workspace.updatedAt.toISOString(),
-    })),
+    headline: student.headline,
+    scoreTimeline: canSeeExpandedWorkspaceData
+      ? scoreTimeline.map((event) => ({
+          _id: String(event._id),
+          trigger: event.trigger,
+          delta: event.delta,
+          scoreAfter: event.scoreAfter,
+          createdAt: event.createdAt.toISOString(),
+        }))
+      : [],
+    workspaces: canSeeExpandedWorkspaceData
+      ? workspaces.map((workspace) => ({
+          _id: String(workspace._id),
+          title: workspace.title,
+          category: workspace.category,
+          stage: workspace.stage,
+          progressPercent: workspace.progressPercent ?? 0,
+          updatedAt: workspace.updatedAt.toISOString(),
+        }))
+      : [],
     patents: patents.map((patent) => ({
       _id: String(patent._id),
       projectTitle: patent.projectTitle,
       status: patent.status,
+      ...(canSeeSensitivePatentDetails && patent.questionnaire?.problemStatement
+        ? { problemStatement: patent.questionnaire.problemStatement }
+        : {}),
       submittedAt: patent.submittedAt.toISOString(),
     })),
     startups: startups.map((startup) => ({
@@ -293,6 +350,34 @@ export const getRecruiterTalentProfile = async (
       stage: startup.stage,
       ...(startup.launchedAt ? { launchedAt: startup.launchedAt.toISOString() } : {}),
     })),
+    education: (student.education ?? []).map((education) => ({
+      _id: String(education._id),
+      institution: education.institution,
+      degree: education.degree,
+      fieldOfStudy: education.fieldOfStudy,
+      endYear: education.endYear,
+      grade: education.grade,
+    })),
+    experience: (student.experience ?? []).map((experience) => ({
+      _id: String(experience._id),
+      title: experience.title,
+      company: experience.company,
+      type: experience.type,
+      startDate: experience.startDate.toISOString(),
+      ...(experience.endDate ? { endDate: experience.endDate.toISOString() } : { endDate: null }),
+      isCurrent: experience.isCurrent,
+      description: experience.description,
+      skills: experience.skills,
+    })),
+    portfolioProjects: (student.portfolioProjects ?? []).map((project) => ({
+      _id: String(project._id),
+      title: project.title,
+      description: project.description,
+      techStack: project.techStack,
+      ...(project.startDate ? { startDate: project.startDate.toISOString() } : { startDate: null }),
+      ...(project.endDate ? { endDate: project.endDate.toISOString() } : { endDate: null }),
+      isCurrent: project.isCurrent,
+    })),
   };
 };
 
@@ -301,8 +386,16 @@ export const getRecruiterMessageCheck = async (
   studentId: string,
 ): Promise<RecruiterMessageCheck> => {
   const bridgeType = await getBridgeType(recruiterId, studentId);
+  const student = await User.findOne({
+    _id: studentId,
+    role: UserRole.STUDENT,
+    isActive: true,
+  })
+    .select('_id discoverableToRecruiters')
+    .lean<{ _id: Types.ObjectId; discoverableToRecruiters?: boolean } | null>();
+
   return {
-    canContact: Boolean(bridgeType),
+    canContact: Boolean(student && canRecruiterContactStudent(student, bridgeType)),
     ...(bridgeType ? { bridgeType } : {}),
   };
 };
@@ -320,6 +413,7 @@ export const shortlistStudent = async (recruiterId: string, studentId: string) =
     throw new ApiError(404, 'STUDENT_NOT_FOUND', 'Student not found');
   }
 
+  const existingBridgeType = await getBridgeType(recruiterId, studentId);
   await createBridge(recruiterId, studentId, 'HR_SHORTLIST');
 
   const collegeId = await getStudentCollegeId(studentId);
@@ -337,16 +431,26 @@ export const shortlistStudent = async (recruiterId: string, studentId: string) =
     );
   }
 
-  await notifyUser(studentId, 'A recruiter shortlisted your profile', 'A recruiter shortlisted your profile.', '/dashboard/student');
+  if (existingBridgeType !== 'HR_SHORTLIST') {
+    await notifyUser(studentId, 'A recruiter shortlisted your profile', 'A recruiter shortlisted your profile.', '/dashboard/student');
+  }
+
   return { bridgeCreated: true };
 };
 
 export const removeShortlist = async (recruiterId: string, studentId: string) => {
-  await RelevanceBridge.updateOne({ recruiterId, studentId }, { isActive: false });
+  const updateResult = await RelevanceBridge.updateOne(
+    { recruiterId, studentId, bridgeType: 'HR_SHORTLIST' },
+    { $set: { isActive: false } },
+  );
+  if (updateResult.matchedCount === 0) {
+    return { bridgeCreated: false };
+  }
+
   const collegeId = await getStudentCollegeId(studentId);
   if (collegeId) {
     await PlacementRecord.updateOne(
-      { recruiterId, studentId, collegeId },
+      { recruiterId, studentId, collegeId, status: 'Shortlisted' },
       { status: 'Discovered' },
     );
   }
@@ -355,30 +459,33 @@ export const removeShortlist = async (recruiterId: string, studentId: string) =>
 
 export const sendRecruiterMessage = async (recruiterId: string, studentId: string, body?: string) => {
   const bridgeType = await getBridgeType(recruiterId, studentId);
-  if (!bridgeType) {
-    throw new ApiError(
-      403,
-      'RELEVANCE_REQUIRED',
-      'You can reach out once you are shortlisted or apply to an active drive.',
-    );
-  }
-
   const student = await User.findOne({
     _id: studentId,
     role: UserRole.STUDENT,
     isActive: true,
   })
-    .select('_id displayName')
-    .lean();
+    .select('_id displayName discoverableToRecruiters')
+    .lean<{ _id: Types.ObjectId; displayName: string; discoverableToRecruiters?: boolean } | null>();
 
   if (!student) {
     throw new ApiError(404, 'STUDENT_NOT_FOUND', 'Student not found');
   }
 
+  if (!canRecruiterContactStudent(student, bridgeType)) {
+    throw new ApiError(
+      403,
+      'RELEVANCE_REQUIRED',
+      'You can reach out only after the student is publicly discoverable or a recruiter bridge exists.',
+    );
+  }
+
   await notifyUser(
     studentId,
     'New message from recruiter',
-    body ?? `A recruiter reached out after your ${bridgeType.replace('_', ' ').toLowerCase()} bridge was created.`,
+    body ??
+      (bridgeType
+        ? `A recruiter reached out after your ${bridgeType.replace('_', ' ').toLowerCase()} bridge was created.`
+        : 'A recruiter reached out after viewing your public recruiter profile.'),
   );
 
   return { sent: true };

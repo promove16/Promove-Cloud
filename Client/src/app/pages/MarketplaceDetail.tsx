@@ -29,6 +29,7 @@ import {
 } from "../../api/marketplace.api";
 import { useAuthStore } from "../../store/authStore";
 import { UserRole } from "../../types/roles.types";
+import { getMarketplaceBasePath, getMarketplaceDetailPath } from "../../features/marketplace/navigation";
 
 const money = new Intl.NumberFormat("en-IN", {
   style: "currency",
@@ -42,15 +43,15 @@ const dateFormatter = new Intl.DateTimeFormat("en-IN", {
   year: "numeric",
 });
 
-const validEntityTypes = new Set<MarketplaceEntityType>(["student", "mentor", "investor", "recruiter", "startup"]);
-
-const getMarketplaceQueryType = (role?: string | null) => {
-  if (role === UserRole.MENTOR) return "project_mentor" as const;
-  if (role === UserRole.INVESTOR) return "investor" as const;
-  if (role === UserRole.RECRUITER) return "recruiter" as const;
-  if (role === UserRole.STUDENT) return "project_join" as const;
-  return "general" as const;
-};
+const validEntityTypes = new Set<MarketplaceEntityType>([
+  "student",
+  "school",
+  "college",
+  "mentor",
+  "investor",
+  "recruiter",
+  "startup",
+]);
 
 const getDashboardRole = (role?: UserRole) => role ?? UserRole.STUDENT;
 
@@ -100,17 +101,19 @@ export function MarketplaceDetail() {
   });
 
   const entity = detailQuery.data;
+  const dashboardRole = getDashboardRole(authUser?.role);
 
-  const handleMessage = (targetId: string, queryType?: string) => {
-    const nextPath = queryType
-      ? `/dashboard/messages/${targetId}?queryType=${encodeURIComponent(queryType)}`
-      : `/dashboard/messages/${targetId}`;
-    navigate(nextPath);
+  const handleMessage = (targetId: string) => {
+    const storageKey = `dm_first_contact_${targetId}`;
+    if (!localStorage.getItem(storageKey)) {
+      localStorage.setItem(storageKey, "true");
+    }
+    navigate(`/dashboard/messages/${targetId}`);
   };
 
   if (!entityType || !entityId) {
     return (
-      <DashboardLayout role={getDashboardRole(authUser?.role)}>
+      <DashboardLayout role={dashboardRole}>
         <div className="rounded-[28px] border border-rose-500/20 bg-rose-500/10 px-6 py-6 text-sm text-rose-100">
           Invalid marketplace detail route.
         </div>
@@ -119,11 +122,11 @@ export function MarketplaceDetail() {
   }
 
   return (
-    <DashboardLayout role={getDashboardRole(authUser?.role)}>
+    <DashboardLayout role={dashboardRole}>
       <div className="space-y-6">
         <div className="flex flex-wrap items-center justify-between gap-3">
           <Link
-            to={`/marketplace?role=${entityType}`}
+            to={`${getMarketplaceBasePath(dashboardRole)}?role=${entityType}`}
             className="inline-flex items-center gap-2 rounded-full border border-white/10 bg-white/5 px-4 py-2 text-sm font-medium text-slate-200 transition hover:border-white/20 hover:bg-white/10"
           >
             <ArrowLeft className="h-4 w-4" />
@@ -145,19 +148,9 @@ export function MarketplaceDetail() {
 
         {entity ? (
           isStartupDetail(entity) ? (
-            <StartupDetailView
-              entity={entity}
-              onMessage={handleMessage}
-              isStudentViewer={authUser?.role === UserRole.STUDENT}
-              currentUserId={authUser?._id}
-            />
+            <StartupDetailView entity={entity} onMessage={handleMessage} />
           ) : (
-            <ProfileDetailView
-              entity={entity}
-              onMessage={handleMessage}
-              isStudentViewer={authUser?.role === UserRole.STUDENT}
-              currentUserId={authUser?._id}
-            />
+            <ProfileDetailView entity={entity} onMessage={handleMessage} dashboardRole={dashboardRole} />
           )
         ) : null}
       </div>
@@ -168,16 +161,10 @@ export function MarketplaceDetail() {
 function StartupDetailView({
   entity,
   onMessage,
-  isStudentViewer,
-  currentUserId,
 }: {
   entity: MarketplaceStartupDetail;
-  onMessage: (targetId: string, queryType?: string) => void;
-  isStudentViewer: boolean;
-  currentUserId?: string;
+  onMessage: (targetId: string) => void;
 }) {
-  const canRequestJoin = Boolean(isStudentViewer && entity.primaryFounderId && entity.primaryFounderId !== currentUserId);
-
   return (
     <div className="space-y-6">
       <section className="relative overflow-hidden rounded-[32px] border border-white/10 bg-[#070816] px-6 py-7 shadow-[0_30px_120px_rgba(15,23,42,0.45)] sm:px-8">
@@ -201,18 +188,9 @@ function StartupDetailView({
           </div>
 
           <div className="flex flex-wrap items-center gap-3">
-            {canRequestJoin ? (
-              <button
-                onClick={() => onMessage(entity.primaryFounderId!, "project_join")}
-                className="inline-flex items-center gap-2 rounded-full border border-fuchsia-400/30 bg-fuchsia-400/10 px-4 py-2 text-sm font-semibold text-fuchsia-100 transition hover:bg-fuchsia-400/20"
-              >
-                <Users className="h-4 w-4" />
-                Request to Join
-              </button>
-            ) : null}
             {entity.primaryFounderId ? (
               <button
-                onClick={() => onMessage(entity.primaryFounderId!, "general")}
+                onClick={() => onMessage(entity.primaryFounderId!)}
                 className="inline-flex items-center gap-2 rounded-full border border-white/10 bg-white/5 px-4 py-2 text-sm font-medium text-white transition hover:border-white/20 hover:bg-white/10"
               >
                 <MessageCircle className="h-4 w-4" />
@@ -323,20 +301,22 @@ function StartupDetailView({
             </div>
           </div>
 
-          <div className="rounded-[28px] border border-white/10 bg-[#090d1b] p-6">
-            <div className="text-xs uppercase tracking-[0.28em] text-slate-500">Equity window</div>
-            <div className="mt-4 space-y-3 text-sm text-slate-300">
-              <SidebarRow label="Total Shares" value={String(entity.sharePool.totalShares)} />
-              <SidebarRow label="Available Shares" value={String(entity.sharePool.availableShares)} />
-              <SidebarRow label="Reserved For Sole" value={String(entity.sharePool.reservedForSole)} />
-              <SidebarRow
-                label="Penny Investors"
-                value={`${entity.sharePool.currentPennyCount}/${entity.sharePool.maxPennyInvestors}`}
-              />
-              <SidebarRow label="Sole Investor" value={entity.sharePool.hasSoleInvestor ? "Assigned" : "Open"} />
-              <SidebarRow label="Launched" value={formatDate(entity.launchedAt)} />
+          {entity.sharePool ? (
+            <div className="rounded-[28px] border border-white/10 bg-[#090d1b] p-6">
+              <div className="text-xs uppercase tracking-[0.28em] text-slate-500">Equity window</div>
+              <div className="mt-4 space-y-3 text-sm text-slate-300">
+                <SidebarRow label="Total Shares" value={String(entity.sharePool.totalShares)} />
+                <SidebarRow label="Available Shares" value={String(entity.sharePool.availableShares)} />
+                <SidebarRow label="Reserved For Sole" value={String(entity.sharePool.reservedForSole)} />
+                <SidebarRow
+                  label="Penny Investors"
+                  value={`${entity.sharePool.currentPennyCount}/${entity.sharePool.maxPennyInvestors}`}
+                />
+                <SidebarRow label="Sole Investor" value={entity.sharePool.hasSoleInvestor ? "Assigned" : "Open"} />
+                <SidebarRow label="Launched" value={formatDate(entity.launchedAt)} />
+              </div>
             </div>
-          </div>
+          ) : null}
         </aside>
       </section>
     </div>
@@ -346,18 +326,13 @@ function StartupDetailView({
 function ProfileDetailView({
   entity,
   onMessage,
-  isStudentViewer,
-  currentUserId,
+  dashboardRole,
 }: {
   entity: MarketplaceUserDetail;
-  onMessage: (targetId: string, queryType?: string) => void;
-  isStudentViewer: boolean;
-  currentUserId?: string;
+  onMessage: (targetId: string) => void;
+  dashboardRole: UserRole;
 }) {
   const links = linkList(entity);
-  const isSelfProfile = entity._id === currentUserId;
-  const canRequestJoin = isStudentViewer && entity.entityType === "student" && !isSelfProfile;
-  const canMessage = !isSelfProfile;
 
   return (
     <div className="space-y-6">
@@ -395,24 +370,13 @@ function ProfileDetailView({
           </div>
 
           <div className="flex flex-wrap items-center gap-3">
-            {canRequestJoin ? (
-              <button
-                onClick={() => onMessage(entity._id, "project_join")}
-                className="inline-flex items-center gap-2 rounded-full border border-fuchsia-400/30 bg-fuchsia-400/10 px-4 py-2 text-sm font-semibold text-fuchsia-100 transition hover:bg-fuchsia-400/20"
-              >
-                <Users className="h-4 w-4" />
-                Request to Join
-              </button>
-            ) : null}
-            {canMessage ? (
-              <button
-                onClick={() => onMessage(entity._id, getMarketplaceQueryType(entity.role))}
-                className="inline-flex items-center gap-2 rounded-full border border-white/10 bg-white/5 px-4 py-2 text-sm font-medium text-white transition hover:border-white/20 hover:bg-white/10"
-              >
-                <MessageCircle className="h-4 w-4" />
-                Message
-              </button>
-            ) : null}
+            <button
+              onClick={() => onMessage(entity._id)}
+              className="inline-flex items-center gap-2 rounded-full border border-white/10 bg-white/5 px-4 py-2 text-sm font-medium text-white transition hover:border-white/20 hover:bg-white/10"
+            >
+              <MessageCircle className="h-4 w-4" />
+              Message
+            </button>
             {links.map((link) => {
               const Icon = link.icon;
               return (
@@ -644,7 +608,7 @@ function ProfileDetailView({
                     </div>
                     <p className="mt-2 text-sm leading-6 text-slate-300">{startup.tagline}</p>
                     <Link
-                      to={`/marketplace/view/startup/${startup._id}`}
+                      to={getMarketplaceDetailPath(dashboardRole, "startup", startup._id)}
                       className="mt-4 inline-flex items-center gap-2 text-sm font-medium text-cyan-200 hover:text-cyan-100"
                     >
                       View startup

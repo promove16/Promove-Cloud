@@ -25,7 +25,9 @@ import {
   messageCheckController,
   registerForDriveController,
   removeShortlistController,
+  requestPartnershipController,
   sendMessageController,
+  sendOnboardingReminderController,
   shortlistStudentController,
   submitDriveScoreController,
   updateJobController,
@@ -84,6 +86,18 @@ router.post('/drives/:driveId/submit-score', authenticate, authorize(UserRole.RE
 router.patch('/drives/:driveId/close', authenticate, authorize(UserRole.RECRUITER), asyncHandler(closeDriveController));
 router.get('/colleges', authenticate, authorize(UserRole.RECRUITER), connectionGuard(UserRole.COLLEGE), asyncHandler(getCollegesController));
 router.get('/onboarding', authenticate, authorize(UserRole.RECRUITER), asyncHandler(getOnboardingController));
+router.post(
+  '/onboarding/:studentId/reminder',
+  authenticate,
+  authorize(UserRole.RECRUITER),
+  asyncHandler(sendOnboardingReminderController),
+);
 router.post('/hired/:studentId', authenticate, authorize(UserRole.RECRUITER), connectionGuard(UserRole.STUDENT), asyncHandler(hiredStudentController));
+router.post(
+  '/colleges/:collegeId/partnership-request',
+  authenticate,
+  authorize(UserRole.RECRUITER),
+  asyncHandler(requestPartnershipController),
+);
 
 export default router;

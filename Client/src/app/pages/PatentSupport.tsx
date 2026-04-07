@@ -317,15 +317,15 @@ const formatQuestionValue = (key: string, value: string) => {
 const formatBoolean = (value: boolean) => (value ? 'Yes' : 'No');
 
 const STATUS_STYLES: Record<string, string> = {
-  approved: 'bg-green-500/10 text-green-400',
-  rejected: 'bg-red-500/10 text-red-400',
-  under_review: 'bg-blue-500/10 text-blue-400',
-  submitted: 'bg-yellow-500/10 text-yellow-400',
+  approved: 'bg-green-500/10 text-green-300',
+  rejected: 'bg-red-500/10 text-red-300',
+  under_review: 'bg-cyan-500/10 text-cyan-300',
+  submitted: 'bg-yellow-500/10 text-yellow-300',
 };
 
 const fieldCls =
-  'w-full rounded-2xl border border-slate-800 bg-slate-950/90 px-4 py-3 text-white outline-none transition focus:border-cyan-400/60';
-const textAreaCls = `${fieldCls} min-h-28`;
+  'w-full rounded-lg border border-slate-800 bg-slate-950/90 px-3 py-2.5 text-white outline-none transition focus:border-cyan-400/60';
+const textAreaCls = `${fieldCls} min-h-20`;
 
 // ─── Upload slot state ────────────────────────────────────────────────────────
 
@@ -684,10 +684,10 @@ export function PatentSupport() {
     [],
   );
 
+  // ── File upload per category ────────────────────────────────────────────────
+
   const updateFiling = <K extends keyof PatentFilingDocuments>(key: K, value: PatentFilingDocuments[K]) =>
     setFiling((prev) => ({ ...prev, [key]: value }));
-
-  // ── File upload per category ────────────────────────────────────────────────
 
   const handleFileSelect = async (category: PatentDocumentCategory, file: File) => {
     const targetWorkspaceId = selectedWorkspaceIdRef.current;
@@ -866,31 +866,34 @@ export function PatentSupport() {
 
   return (
     <DashboardLayout role="student">
-      <div className="space-y-6">
+      <div className="space-y-5">
         {/* Page header */}
-        <div className="flex flex-col gap-4 md:flex-row md:items-start md:justify-between">
-          <div>
-            <h1 className="mb-2 text-3xl font-bold text-white">IPR / Patent Intake Request</h1>
-            <p className="text-slate-400">
-              Choose your own product workspace, answer the admin intake questions, and attach light supporting files for IPR review. ProMove problem-bank workspaces are for leaderboard points and are not eligible for patent filing.
-            </p>
-          </div>
-          <div className="rounded-2xl border border-cyan-500/20 bg-cyan-500/10 px-4 py-3 text-sm text-cyan-200">
-            This request is only for self-created student products, brands, and startup workspaces. Complete the intake questions and upload sketches, plans, diagrams, or drafts up to {formatFileSize(PATENT_SUPPORT_UPLOAD_MAX_BYTES)} each when available.
+        <div className="border-b border-slate-800 pb-4">
+          <div className="flex flex-col gap-3 md:flex-row md:items-end md:justify-between">
+            <div className="max-w-4xl">
+              <div className="mb-2 text-xs uppercase tracking-[0.28em] text-cyan-300">Student Patent Support</div>
+              <h1 className="text-2xl font-semibold text-white">IPR / Patent Intake Request</h1>
+              <p className="mt-2 text-sm leading-6 text-slate-400">
+                Choose your own product workspace, answer the admin intake questions, and attach light supporting files for IPR review. ProMove problem-bank workspaces are for leaderboard points and are not eligible for patent filing.
+              </p>
+            </div>
+            <div className="text-sm text-slate-400 md:max-w-sm md:text-right">
+              Self-created products only. Optional uploads can be up to {formatFileSize(PATENT_SUPPORT_UPLOAD_MAX_BYTES)} each.
+            </div>
           </div>
         </div>
 
         {!hasPatentEligibleWorkspaces && !workspacesQuery.isLoading ? (
-          <div className="rounded-3xl border border-dashed border-slate-800 bg-slate-900/90 p-10 text-center">
+          <div className="rounded-lg border border-dashed border-slate-800 bg-slate-900/60 p-8 text-center">
             <FileText className="mx-auto mb-4 h-10 w-10 text-slate-500" />
-            <h2 className="mb-3 text-2xl font-bold text-white">Create your own product workspace first</h2>
-            <p className="mx-auto mb-5 max-w-2xl text-slate-400">
+            <h2 className="mb-3 text-xl font-semibold text-white">Create your own product workspace first</h2>
+            <p className="mx-auto mb-5 max-w-2xl text-sm leading-6 text-slate-400">
               Patent support is tied to your own product workspace so your filing documents, evidence, and review history stay attached to one innovation. Problem-bank workspaces remain available for leaderboard points only.
             </p>
             <div className="flex flex-wrap justify-center gap-3">
               <button
                 onClick={() => navigate('/product-workspace')}
-                className="rounded-2xl bg-slate-800 px-5 py-3 font-semibold text-white"
+                className="rounded-lg bg-slate-800 px-4 py-2.5 text-sm font-semibold text-white transition hover:bg-slate-700"
               >
                 Open Product Workspace
               </button>
@@ -899,20 +902,20 @@ export function PatentSupport() {
         ) : null}
 
         {hasPatentEligibleWorkspaces ? submitted ? (
-          <div className="rounded-3xl border border-slate-800 bg-slate-900 p-10 text-center">
+          <div className="rounded-lg border border-slate-800 bg-slate-900/60 p-8 text-center">
             <div className="mx-auto mb-4 flex h-16 w-16 items-center justify-center rounded-full bg-green-500/10">
               <CheckCircle className="h-8 w-8 text-green-500" />
             </div>
-            <h2 className="mb-3 text-2xl font-bold text-white">Patent intake request submitted</h2>
-            <p className="mx-auto max-w-2xl text-slate-300">
+            <h2 className="mb-3 text-xl font-semibold text-white">Patent intake request submitted</h2>
+            <p className="mx-auto max-w-2xl text-sm leading-6 text-slate-300">
               Your student patent request now includes the intake questionnaire and any supporting files attached from the selected workspace. The admin and IPR review team can start from this package without asking for the same basics again.
             </p>
           </div>
         ) : (
-          <div className="space-y-6">
+          <div className="space-y-5">
             {/* ── Project Setup ──────────────────────────────────────── */}
-            <div className="rounded-3xl border border-slate-800 bg-slate-900/90 p-5">
-              <div className="mb-4 text-xs uppercase tracking-[0.3em] text-cyan-300">Project Setup</div>
+            <section className="border-b border-slate-800 pb-5">
+              <div className="mb-3 text-xs uppercase tracking-[0.28em] text-cyan-300">Project Setup</div>
               <div className="grid gap-4 md:grid-cols-2">
                 <div>
                   <label className="mb-2 block text-sm font-semibold text-white">Workspace</label>
@@ -946,27 +949,24 @@ export function PatentSupport() {
                   />
                 </div>
               </div>
-            </div>
+            </section>
 
             {/* ── Government Filing Documents ───────────────────────── */}
-            <div className="rounded-3xl border border-cyan-800/40 bg-slate-900/90 p-5">
-              <div className="mb-1 text-xs uppercase tracking-[0.3em] text-cyan-300">Supporting Files</div>
-
-              {/* Security notice */}
-              <div className="mb-5 flex items-start gap-3 rounded-2xl border border-cyan-500/20 bg-cyan-500/8 px-4 py-3">
-                <ShieldCheck className="mt-0.5 h-5 w-5 shrink-0 text-cyan-400" />
+            <div className="grid gap-5 xl:grid-cols-[minmax(0,1fr),minmax(360px,0.8fr)]">
+            <section className="order-2 border-t border-slate-800 pt-5 xl:border-l xl:border-t-0 xl:pl-5 xl:pt-0">
+              <div className="flex flex-col gap-2 md:flex-row md:items-end md:justify-between">
                 <div>
-                  <div className="text-sm font-semibold text-cyan-200">Attach lightweight supporting evidence</div>
-                  <p className="mt-0.5 text-xs text-slate-400">
-                    Upload sketches, design plans, process diagrams, prior-art notes, or early patent drafts that help the admin understand your innovation. Keep each file within <span className="font-medium text-white">{formatFileSize(PATENT_SUPPORT_UPLOAD_MAX_BYTES)}</span>.
+                  <div className="text-xs uppercase tracking-[0.28em] text-cyan-300">Supporting Files</div>
+                  <p className="mt-2 text-sm text-slate-400">
+                    Optional PDF or image evidence for faster review.
                   </p>
+                </div>
+                <div className="text-sm text-slate-400">
+                  {uploadedSupportCount} / {GOVT_DOCS.length} added - {formatFileSize(PATENT_SUPPORT_UPLOAD_MAX_BYTES)} max each
                 </div>
               </div>
 
-              <p className="mb-5 text-sm text-slate-400">
-                Upload PDF or image evidence when available. The design, plan, or pen-paper sketch slot is intended for light concept files, and none of these uploads are mandatory for submitting the request.
-              </p>
-              <div className="grid gap-4 md:grid-cols-2">
+              <div className="mt-4 divide-y divide-slate-800 border-y border-slate-800">
                 {GOVT_DOCS.map(({ category, label, required, hint }) => {
                   const slot = categorySlots[category];
                   const hasUpload = Boolean(slot?.uploadId);
@@ -976,99 +976,95 @@ export function PatentSupport() {
                   const isSketchUpload = category === 'design_plan_sketch';
 
                   return (
-                    <div key={category} className="rounded-2xl border border-slate-800 bg-slate-950/60 p-4">
-                      <div className="mb-1 flex items-center gap-1 text-sm font-semibold text-white">
-                        {label}
-                        {isSketchUpload ? (
-                          <span className="rounded-full border border-cyan-500/30 bg-cyan-500/10 px-2 py-0.5 text-[10px] uppercase tracking-[0.2em] text-cyan-200">
-                            Recommended
-                          </span>
-                        ) : null}
-                        {required && <span className="text-red-400">*</span>}
-                      </div>
-                      <p className="mb-3 text-xs text-slate-500">{hint}</p>
-
-                      {hasUpload ? (
-                        <div className="flex items-center justify-between gap-3 rounded-xl border border-cyan-500/30 bg-cyan-500/10 px-3 py-2">
-                          <div className="flex min-w-0 items-center gap-2">
-                            <FileText className="h-4 w-4 shrink-0 text-cyan-400" />
-                            <span className="truncate text-sm text-white">{slot!.fileName}</span>
-                          </div>
-                          <button
-                            onClick={() => {
-                              void clearSlot(category);
-                            }}
-                            className="shrink-0 rounded-lg p-1 text-slate-400 hover:text-red-400 transition-colors"
-                            title="Remove and re-upload"
-                          >
-                            <X className="h-3.5 w-3.5" />
-                          </button>
+                    <div key={category} className="grid gap-3 py-2.5 md:grid-cols-[minmax(0,1fr),220px] md:items-center">
+                      <div className="min-w-0">
+                        <div className="flex flex-wrap items-center gap-2 text-sm font-semibold text-white">
+                          {label}
+                          {isSketchUpload ? (
+                            <span className="rounded-full bg-cyan-500/10 px-2 py-0.5 text-[10px] uppercase tracking-[0.2em] text-cyan-200">
+                              Recommended
+                            </span>
+                          ) : null}
+                          {required && <span className="text-red-400">*</span>}
                         </div>
-                      ) : (
-                        <label
-                          className={`flex cursor-pointer flex-col items-center justify-center gap-2 rounded-xl border-2 border-dashed px-4 py-5 text-center transition ${
-                            isDisabled
-                              ? 'cursor-not-allowed border-slate-800 opacity-50'
-                              : 'border-slate-700 hover:border-cyan-500/50 hover:bg-slate-950/40'
-                          }`}
-                        >
-                          {isUploading ? (
-                            <>
-                              <Loader2 className="h-5 w-5 animate-spin text-cyan-400" />
-                              <span className="text-xs text-slate-400">Uploading…</span>
-                            </>
-                          ) : (
-                            <>
-                              <Upload className="h-5 w-5 text-slate-500" />
-                              <span className="text-xs text-slate-400">
-                                {!selectedWorkspaceId ? 'Select a workspace first' : `Click to upload PDF or image up to ${formatFileSize(PATENT_SUPPORT_UPLOAD_MAX_BYTES)}`}
-                              </span>
-                            </>
-                          )}
-                          <input
-                            ref={(el) => { fileInputRefs.current[category] = el; }}
-                            type="file"
-                            accept=".pdf,image/*"
-                            className="sr-only"
-                            disabled={isDisabled}
-                            onChange={(e) => {
-                              const file = e.target.files?.[0];
-                              if (file) handleFileSelect(category, file);
-                            }}
-                          />
-                        </label>
-                      )}
+                        <p className="mt-1 truncate text-xs text-slate-500">{hint}</p>
+                        {slotError && (
+                          <p className="mt-1 text-xs text-red-400">{slotError}</p>
+                        )}
+                      </div>
 
-                      {slotError && (
-                        <p className="mt-2 text-xs text-red-400">{slotError}</p>
-                      )}
+                      <div className="flex justify-start md:justify-end">
+                        {hasUpload ? (
+                          <div className="flex w-full items-center justify-between gap-2 rounded-lg bg-cyan-500/10 px-3 py-2 md:w-[220px]">
+                            <div className="flex min-w-0 items-center gap-2">
+                              <FileText className="h-4 w-4 shrink-0 text-cyan-400" />
+                              <span className="truncate text-sm text-white">{slot!.fileName}</span>
+                            </div>
+                            <button
+                              onClick={() => {
+                                void clearSlot(category);
+                              }}
+                              className="shrink-0 rounded-lg p-1 text-slate-400 transition-colors hover:text-red-400"
+                              title="Remove and re-upload"
+                            >
+                              <X className="h-3.5 w-3.5" />
+                            </button>
+                          </div>
+                        ) : (
+                          <label
+                            className={`flex w-full cursor-pointer items-center justify-center gap-2 rounded-lg border border-dashed px-3 py-2 text-center transition md:w-[220px] ${
+                              isDisabled
+                                ? 'cursor-not-allowed border-slate-800 opacity-50'
+                                : 'border-slate-700 hover:border-cyan-500/50 hover:bg-slate-950/40'
+                            }`}
+                          >
+                            {isUploading ? (
+                              <>
+                                <Loader2 className="h-4 w-4 animate-spin text-cyan-400" />
+                                <span className="text-xs text-slate-400">Uploading</span>
+                              </>
+                            ) : (
+                              <>
+                                <Upload className="h-4 w-4 text-slate-500" />
+                                <span className="text-xs text-slate-400">
+                                  {!selectedWorkspaceId ? 'Select workspace' : 'Upload file'}
+                                </span>
+                              </>
+                            )}
+                            <input
+                              ref={(el) => { fileInputRefs.current[category] = el; }}
+                              type="file"
+                              accept=".pdf,image/*"
+                              className="sr-only"
+                              disabled={isDisabled}
+                              onChange={(e) => {
+                                const file = e.target.files?.[0];
+                                if (file) handleFileSelect(category, file);
+                              }}
+                            />
+                          </label>
+                        )}
+                      </div>
                     </div>
                   );
                 })}
               </div>
 
-              {/* Upload progress summary */}
-              <div className="mt-4 flex items-center gap-3 rounded-2xl border border-slate-800 bg-slate-950/50 px-4 py-3 text-sm">
-                <div className={`flex h-2 w-2 rounded-full ${uploadedSupportCount > 0 ? 'bg-green-400' : 'bg-cyan-400'}`} />
-                <span className="text-slate-300">
-                  {uploadedSupportCount} of {GOVT_DOCS.length} support slots used
-                  {uploadedSupportCount > 0
-                    ? ` — every upload respects the ${formatFileSize(PATENT_SUPPORT_UPLOAD_MAX_BYTES)} page limit`
-                    : ''}
-                </span>
-              </div>
-            </div>
+            </section>
 
             {/* ── Two-column: Questionnaire + Filing Readiness ──────── */}
-            <div className="grid gap-6 xl:grid-cols-[1.15fr,0.85fr]">
+            <div className="order-1 min-w-0 xl:order-1">
               {/* Patent Questionnaire */}
-              <div className="rounded-3xl border border-slate-800 bg-slate-900/90 p-5">
-                <div className="mb-4 text-xs uppercase tracking-[0.3em] text-cyan-300">Patent Intake Questions</div>
-                <div className="space-y-6">
+              <section className="min-w-0">
+                <div className="mb-3 flex flex-col gap-1 sm:flex-row sm:items-end sm:justify-between">
+                  <div className="text-xs uppercase tracking-[0.28em] text-cyan-300">Patent Intake Questions</div>
+                  <div className="text-xs text-slate-500">Complete each field to submit.</div>
+                </div>
+                <div className="space-y-4">
                   {QUESTION_SECTIONS.map((section) => (
-                    <div key={section.title} className="rounded-2xl border border-slate-800 bg-slate-950/40 p-4">
-                      <div className="mb-4 text-sm font-semibold text-cyan-200">{section.title}</div>
-                      <div className="space-y-5">
+                    <div key={section.title} className="border-t border-slate-800 pt-3 first:border-t-0 first:pt-0">
+                      <div className="mb-2 text-xs font-semibold uppercase tracking-[0.18em] text-cyan-200">{section.title}</div>
+                      <div className="grid gap-3 md:grid-cols-2">
                         {section.questions.map((question) => {
                           const value = answers[question.key];
                           const valueLength = value.trim().length;
@@ -1077,7 +1073,7 @@ export function PatentSupport() {
 
                           return (
                             <div key={question.key}>
-                              <label className="mb-2 block text-sm font-semibold text-white">
+                              <label className="mb-1.5 block text-xs font-semibold leading-5 text-white">
                                 {QUESTION_LABELS[question.key]}
                               </label>
                               {question.type === 'select' ? (
@@ -1098,8 +1094,8 @@ export function PatentSupport() {
                                   className={textAreaCls}
                                 />
                               )}
-                              <div className={`mt-1.5 text-xs ${isValid ? 'text-green-400' : 'text-slate-500'}`}>
-                                {question.type === 'select' ? (isValid ? 'Selected' : 'Selection required') : `${valueLength} / ${question.minLength} minimum`}
+                              <div className={`mt-1 text-xs ${isValid ? 'text-green-400' : 'text-slate-500'}`}>
+                                {question.type === 'select' ? (isValid ? 'Selected' : 'Required') : `${valueLength}/${question.minLength}`}
                               </div>
                             </div>
                           );
@@ -1108,39 +1104,7 @@ export function PatentSupport() {
                     </div>
                   ))}
                 </div>
-              </div>
-
-              <div className="rounded-3xl border border-slate-800 bg-slate-900/90 p-5">
-                <div className="mb-4 text-xs uppercase tracking-[0.3em] text-cyan-300">Intake Guidance</div>
-                <div className="space-y-4">
-                  <div className="rounded-2xl border border-cyan-500/20 bg-cyan-500/10 p-4">
-                    <div className="text-sm font-semibold text-cyan-200">What to attach</div>
-                    <p className="mt-2 text-sm leading-6 text-slate-300">
-                      Add sketches, design plans, diagrams, prior-art notes, or draft descriptions only if they help explain the invention faster. The design, plan, or pen-paper sketch slot is the best place for early rough material.
-                    </p>
-                  </div>
-                  <div className="rounded-2xl border border-slate-800 bg-slate-950/60 p-4">
-                    <div className="text-sm font-semibold text-white">What happens after submission</div>
-                    <div className="mt-3 space-y-3 text-sm text-slate-300">
-                      <div className="flex items-start gap-3">
-                        <CheckCircle className="mt-0.5 h-4 w-4 shrink-0 text-green-400" />
-                        <span>Admins review the problem clarity, novelty, ownership, and disclosure status from this questionnaire.</span>
-                      </div>
-                      <div className="flex items-start gap-3">
-                        <Upload className="mt-0.5 h-4 w-4 shrink-0 text-cyan-400" />
-                        <span>Supporting files stay linked to the selected workspace so the review team can inspect the same evidence package later.</span>
-                      </div>
-                      <div className="flex items-start gap-3">
-                        <Clock className="mt-0.5 h-4 w-4 shrink-0 text-yellow-400" />
-                        <span>Status updates appear in the submissions list once the request moves into review.</span>
-                      </div>
-                    </div>
-                  </div>
-                  <div className="rounded-2xl border border-dashed border-slate-700 p-4 text-sm text-slate-400">
-                    Keep answers concrete. Mention the user group, the differentiator, and whether you have already shown the idea publicly.
-                  </div>
-                </div>
-              </div>
+              </section>
 
               <div className="hidden rounded-3xl border border-slate-800 bg-slate-900/90 p-5">
                 <div className="mb-4 text-xs uppercase tracking-[0.3em] text-cyan-300">Filing Readiness</div>
@@ -1329,13 +1293,15 @@ export function PatentSupport() {
             </div>
 
             {/* ── Submit bar ─────────────────────────────────────────── */}
+            </div>
+
             {formError && (
-              <div className="rounded-2xl border border-red-500/20 bg-red-500/10 p-4 text-sm text-red-300">
+              <div className="rounded-lg border border-red-500/20 bg-red-500/10 p-3 text-sm text-red-300">
                 {formError}
               </div>
             )}
 
-            <div className="flex flex-col gap-4 border-t border-slate-800 pt-5 md:flex-row md:items-center md:justify-between">
+            <div className="flex flex-col gap-4 border-t border-slate-800 pt-4 md:flex-row md:items-center md:justify-between">
               <div className="flex items-start gap-3 text-sm text-slate-400">
                 <AlertCircle className="mt-0.5 h-4 w-4 shrink-0 text-cyan-300" />
                 <div>
@@ -1345,7 +1311,7 @@ export function PatentSupport() {
               <button
                 onClick={() => submitMutation.mutate()}
                 disabled={!canSubmit || submitMutation.isPending}
-                className="inline-flex items-center justify-center gap-2 rounded-2xl bg-gradient-to-r from-blue-600 to-purple-600 px-6 py-3 font-semibold text-white transition disabled:cursor-not-allowed disabled:opacity-50"
+                className="inline-flex items-center justify-center gap-2 rounded-lg bg-cyan-500 px-5 py-2.5 text-sm font-semibold text-slate-950 transition hover:bg-cyan-400 disabled:cursor-not-allowed disabled:opacity-50"
               >
                 {submitMutation.isPending ? (
                   <Loader2 className="h-4 w-4 animate-spin" />
@@ -1359,25 +1325,25 @@ export function PatentSupport() {
         ) : null}
 
         {/* ── Existing submissions ───────────────────────────────────── */}
-        <div className="grid gap-6 lg:grid-cols-3">
-          <div className="rounded-3xl border border-slate-800 bg-slate-900/90 p-6 lg:col-span-2">
-            <h2 className="mb-4 text-xl font-bold text-white">Existing submissions</h2>
+        <section className="grid gap-5 border-t border-slate-800 pt-5 lg:grid-cols-[1fr,280px]">
+          <div className="min-w-0">
+            <h2 className="mb-3 text-lg font-semibold text-white">Existing submissions</h2>
             {(patentsQuery.data ?? []).length === 0 ? (
-              <div className="flex flex-col items-center justify-center rounded-2xl border border-dashed border-slate-800 py-10 text-slate-500">
+              <div className="flex flex-col items-center justify-center rounded-lg border border-dashed border-slate-800 py-8 text-slate-500">
                 <FileText className="mb-3 h-8 w-8 opacity-40" />
                 <div className="text-sm">No submissions yet.</div>
               </div>
             ) : (
               <div className="space-y-3">
                 {showcaseError && (
-                  <div className="rounded-2xl border border-red-500/20 bg-red-500/10 px-4 py-3 text-sm text-red-300">
+                  <div className="rounded-lg border border-red-500/20 bg-red-500/10 px-3 py-2 text-sm text-red-300">
                     {showcaseError}
                   </div>
                 )}
                 {(patentsQuery.data ?? []).map((patent) => (
                   <div
                     key={patent._id}
-                    className="flex items-center justify-between gap-4 rounded-2xl border border-slate-800 bg-slate-950/80 p-4"
+                    className="flex flex-col justify-between gap-3 border-b border-slate-800 py-3 md:flex-row md:items-center"
                   >
                     <div>
                       <div className="flex items-center gap-2">
@@ -1408,10 +1374,10 @@ export function PatentSupport() {
                         <button
                           onClick={() => showcaseMutation.mutate(patent._id)}
                           disabled={showcaseMutation.isPending}
-                          className={`flex items-center gap-1.5 rounded-xl border px-3 py-1.5 text-xs font-medium transition-colors disabled:opacity-50 ${
+                          className={`flex items-center gap-1.5 rounded-lg border px-3 py-1.5 text-xs font-medium transition-colors disabled:opacity-50 ${
                             patent.showcasedInMarketplace
                               ? 'border-cyan-500/50 bg-cyan-500/10 text-cyan-300 hover:bg-cyan-500/20'
-                              : 'border-slate-700 bg-slate-800/60 text-slate-300 hover:border-cyan-500/50 hover:text-cyan-300'
+                              : 'border-slate-700 text-slate-300 hover:border-cyan-500/50 hover:text-cyan-300'
                           }`}
                           title={patent.showcasedInMarketplace ? 'Remove from marketplace showcase' : 'Showcase in marketplace'}
                         >
@@ -1425,7 +1391,7 @@ export function PatentSupport() {
                       )}
                       <button
                         onClick={() => setViewPatent(patent)}
-                        className="flex items-center gap-1.5 rounded-xl border border-slate-700 bg-slate-800/60 px-3 py-1.5 text-xs font-medium text-slate-300 hover:border-cyan-500/50 hover:text-cyan-300 transition-colors"
+                        className="flex items-center gap-1.5 rounded-lg border border-slate-700 px-3 py-1.5 text-xs font-medium text-slate-300 transition-colors hover:border-cyan-500/50 hover:text-cyan-300"
                       >
                         <Eye className="h-3.5 w-3.5" />
                         View
@@ -1437,13 +1403,13 @@ export function PatentSupport() {
             )}
           </div>
 
-          <div className="space-y-6">
-            <div className="rounded-2xl border border-yellow-800/30 bg-gradient-to-br from-yellow-900/20 to-orange-900/20 p-6">
-              <div className="mb-4 flex h-12 w-12 items-center justify-center rounded-lg bg-gradient-to-br from-yellow-500 to-orange-500">
-                <Award className="h-6 w-6 text-white" />
+          <aside className="space-y-5 border-t border-slate-800 pt-4 lg:border-l lg:border-t-0 lg:pl-5 lg:pt-0">
+            <div>
+              <div className="mb-2 flex items-center gap-2 text-sm font-semibold text-white">
+                <Award className="h-4 w-4 text-cyan-300" />
+                ProMove IPR Services
               </div>
-              <h3 className="mb-2 font-bold text-white">ProMove IPR Services</h3>
-              <p className="mb-4 text-sm text-slate-400">Professional patent filing support included</p>
+              <p className="mb-3 text-sm text-slate-400">Professional patent filing support included</p>
               <ul className="space-y-2 text-sm text-slate-300">
                 <li>Novelty and filing readiness review</li>
                 <li>Prior-art positioning support</li>
@@ -1451,8 +1417,8 @@ export function PatentSupport() {
               </ul>
             </div>
 
-            <div className="rounded-2xl border border-slate-800 bg-slate-900/90 p-6">
-              <h3 className="mb-4 font-bold text-white">Submission Flow</h3>
+            <div className="border-t border-slate-800 pt-4">
+              <h3 className="mb-3 text-sm font-semibold text-white">Submission Flow</h3>
               <div className="space-y-3 text-sm text-slate-300">
                 <div className="flex items-center gap-3">
                   <Upload className="h-4 w-4 text-blue-400" />
@@ -1463,7 +1429,7 @@ export function PatentSupport() {
                   Intake questionnaire completed with innovation, novelty, rights, and market context
                 </div>
                 <div className="flex items-center gap-3">
-                  <ShieldCheck className="h-4 w-4 text-purple-400" />
+                  <ShieldCheck className="h-4 w-4 text-cyan-400" />
                   Disclosure and legal-agreement status captured for IPR review
                 </div>
                 <div className="flex items-center gap-3">
@@ -1476,8 +1442,8 @@ export function PatentSupport() {
                 </div>
               </div>
             </div>
-          </div>
-        </div>
+          </aside>
+        </section>
       </div>
 
       {/* Patent detail view modal */}

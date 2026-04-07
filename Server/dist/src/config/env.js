@@ -34,6 +34,7 @@ const envSchema = zod_1.z.object({
     UPSTASH_REDIS_PASSWORD: zod_1.z.string().min(1).optional(),
     REDIS_REQUEST_TIMEOUT_MS: zod_1.z.coerce.number().int().positive().default(1500),
     REDIS_REQUEST_RETRIES: zod_1.z.coerce.number().int().min(0).default(0),
+    AUTH_ALLOW_REDIS_AUTH_FALLBACK: booleanFromEnv.optional(),
     BULLMQ_CONNECT_TIMEOUT_MS: zod_1.z.coerce.number().int().positive().default(5000),
     BULLMQ_COMMAND_TIMEOUT_MS: zod_1.z.coerce.number().int().positive().default(5000),
     JWT_ACCESS_SECRET: zod_1.z.string().min(1),
@@ -71,4 +72,5 @@ exports.env = {
     ...parsed.data,
     JWT_ACCESS_SECRET: normalizeMultiline(parsed.data.JWT_ACCESS_SECRET),
     JWT_REFRESH_SECRET: normalizeMultiline(parsed.data.JWT_REFRESH_SECRET),
+    AUTH_ALLOW_REDIS_AUTH_FALLBACK: parsed.data.AUTH_ALLOW_REDIS_AUTH_FALLBACK ?? parsed.data.NODE_ENV !== "production",
 };

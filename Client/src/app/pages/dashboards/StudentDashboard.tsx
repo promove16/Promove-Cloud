@@ -32,8 +32,17 @@ const formatDate = (value?: string) =>
       })
     : "Not scheduled";
 
-const getStageStatus = (stage: Workspace["stage"] | undefined, current: Workspace["stage"]) => {
-  const order: Workspace["stage"][] = ["Ideation", "Problem", "Build", "Patent", "Launch"];
+const getStageStatus = (
+  stage: Workspace["stage"] | undefined,
+  current: Workspace["stage"],
+) => {
+  const order: Workspace["stage"][] = [
+    "Ideation",
+    "Problem",
+    "Build",
+    "Patent",
+    "Launch",
+  ];
   const currentIndex = stage ? order.indexOf(stage) : -1;
   const stageIndex = order.indexOf(current);
 
@@ -70,8 +79,15 @@ export function StudentDashboard() {
   const weeklyDelta = scoreQuery.data?.weeklyDelta ?? 0;
   const weeklyDeltaLabel = `${weeklyDelta > 0 ? "+" : ""}${weeklyDelta} this week`;
   const weeklyDeltaClass =
-    weeklyDelta > 0 ? "text-green-400" : weeklyDelta < 0 ? "text-amber-300" : "text-blue-200";
-  const rankPercentile = Math.min(Math.max(scoreQuery.data?.rankPercentile ?? 100, 1), 100);
+    weeklyDelta > 0
+      ? "text-green-400"
+      : weeklyDelta < 0
+        ? "text-amber-300"
+        : "text-blue-200";
+  const rankPercentile = Math.min(
+    Math.max(scoreQuery.data?.rankPercentile ?? 100, 1),
+    100,
+  );
 
   const stages = [
     { id: "Ideation", name: "Idea", icon: Lightbulb },
@@ -122,7 +138,9 @@ export function StudentDashboard() {
       <OnboardingChecklist />
 
       <div className="rounded-2xl border border-blue-800/30 bg-gradient-to-r from-blue-900/20 to-purple-900/20 p-8">
-        <h2 className="mb-6 text-center text-xl font-bold text-white">Your Innovation Journey</h2>
+        <h2 className="mb-6 text-center text-xl font-bold text-white">
+          Your Innovation Journey
+        </h2>
         <div className="mx-auto flex max-w-4xl items-center justify-between">
           {stages.map((stage, index) => {
             const status = getStageStatus(activeWorkspace?.stage, stage.id);
@@ -141,10 +159,14 @@ export function StudentDashboard() {
                     {status === "completed" ? (
                       <CheckCircle2 className="h-8 w-8 text-white" />
                     ) : (
-                      <stage.icon className={`h-8 w-8 ${status === "active" ? "text-white" : "text-slate-500"}`} />
+                      <stage.icon
+                        className={`h-8 w-8 ${status === "active" ? "text-white" : "text-slate-500"}`}
+                      />
                     )}
                   </div>
-                  <span className={`text-sm font-semibold ${status === "upcoming" ? "text-slate-500" : "text-white"}`}>
+                  <span
+                    className={`text-sm font-semibold ${status === "upcoming" ? "text-slate-500" : "text-white"}`}
+                  >
                     {stage.name}
                   </span>
                 </div>
@@ -152,7 +174,9 @@ export function StudentDashboard() {
                 {index < stages.length - 1 ? (
                   <div
                     className={`mx-2 h-1 w-24 ${
-                      status === "completed" ? "bg-gradient-to-r from-green-500 to-emerald-500" : "bg-slate-800"
+                      status === "completed"
+                        ? "bg-gradient-to-r from-green-500 to-emerald-500"
+                        : "bg-slate-800"
                     }`}
                   />
                 ) : null}
@@ -164,21 +188,28 @@ export function StudentDashboard() {
 
       <div className="grid gap-6 md:grid-cols-4">
         {stats.map((stat) => (
-          <div key={stat.label} className="rounded-xl border border-slate-800 bg-slate-900 p-6">
-            <div className="mb-1 text-3xl font-bold text-white">{stat.value}</div>
+          <div
+            key={stat.label}
+            className="rounded-xl border border-slate-800 bg-slate-900 p-6"
+          >
+            <div className="mb-1 text-3xl font-bold text-white">
+              {stat.value}
+            </div>
             <div className="mb-2 text-sm text-slate-400">{stat.label}</div>
             <div className="text-xs text-blue-300">{stat.helper}</div>
           </div>
         ))}
       </div>
 
-        <div className="grid gap-6 lg:grid-cols-3">
-          <Link
-            to="/dashboard/student/score"
-            className="block rounded-2xl border border-blue-700 bg-gradient-to-br from-blue-900 to-purple-900 p-8 text-center transition hover:border-cyan-400/60 hover:shadow-2xl hover:shadow-cyan-950/40"
-          >
-            <h3 className="mb-4 text-lg font-semibold text-blue-200">Innovation Score</h3>
-            <div className="relative mx-auto mb-4 h-40 w-40">
+      <div className="grid gap-6 lg:grid-cols-3">
+        <Link
+          to="/dashboard/student/score"
+          className="block rounded-2xl border border-blue-700 bg-gradient-to-br from-blue-900 to-purple-900 p-8 text-center transition hover:border-cyan-400/60 hover:shadow-2xl hover:shadow-cyan-950/40"
+        >
+          <h3 className="mb-4 text-lg font-semibold text-blue-200">
+            Innovation Score
+          </h3>
+          <div className="relative mx-auto mb-4 h-40 w-40">
             <svg className="h-40 w-40 -rotate-90 transform">
               <circle
                 cx="80"
@@ -210,24 +241,38 @@ export function StudentDashboard() {
             </svg>
             <div className="absolute inset-0 flex items-center justify-center">
               <div>
-                <div className="text-5xl font-bold text-white">{innovationScore}</div>
-                <div className="text-sm text-blue-200">of {MAX_INNOVATION_SCORE}</div>
+                <div className="text-5xl font-bold text-white">
+                  {innovationScore}
+                </div>
+                <div className="text-sm text-blue-200">
+                  of {MAX_INNOVATION_SCORE}
+                </div>
               </div>
             </div>
           </div>
-            <div className={`flex items-center justify-center gap-2 ${weeklyDeltaClass}`}>
-              <TrendingUp className="h-4 w-4" />
-              <span className="text-sm font-semibold">{weeklyDeltaLabel}</span>
-            </div>
-            <p className="mt-3 text-xs text-blue-200">Top {rankPercentile}% of innovators</p>
-            <div className="mt-5 text-sm font-semibold text-cyan-200">Open score details</div>
-          </Link>
+          <div
+            className={`flex items-center justify-center gap-2 ${weeklyDeltaClass}`}
+          >
+            <TrendingUp className="h-4 w-4" />
+            <span className="text-sm font-semibold">{weeklyDeltaLabel}</span>
+          </div>
+          <p className="mt-3 text-xs text-blue-200">
+            Top {rankPercentile}% of innovators
+          </p>
+          <div className="mt-5 text-sm font-semibold text-cyan-200">
+            Open score details
+          </div>
+        </Link>
 
         <div className="lg:col-span-2 rounded-2xl border border-slate-800 bg-slate-900 p-6">
           <div className="mb-6 flex items-center justify-between">
             <h3 className="text-xl font-bold text-white">Active Project</h3>
             <Link
-              to={activeWorkspace ? `/product-workspace/${activeWorkspace._id}` : "/problem-bank"}
+              to={
+                activeWorkspace
+                  ? `/product-workspace/${activeWorkspace._id}`
+                  : "/problem-bank"
+              }
               className="text-sm font-semibold text-blue-400 hover:text-blue-300"
             >
               {activeWorkspace ? "View Details" : "Browse Problems"}
@@ -237,9 +282,12 @@ export function StudentDashboard() {
             <div className="rounded-xl border border-slate-800 bg-slate-950 p-6">
               <div className="mb-4 flex items-start justify-between gap-4">
                 <div>
-                  <h4 className="mb-2 text-2xl font-bold text-white">{activeWorkspace.title}</h4>
+                  <h4 className="mb-2 text-2xl font-bold text-white">
+                    {activeWorkspace.title}
+                  </h4>
                   <p className="mb-3 text-slate-400">
-                    {activeWorkspace.category} workspace in the {activeWorkspace.stage} stage
+                    {activeWorkspace.category} workspace in the{" "}
+                    {activeWorkspace.stage} stage
                   </p>
                   <div className="flex items-center gap-4">
                     <span className="rounded-full bg-blue-500/10 px-3 py-1 text-sm font-semibold text-blue-400">
@@ -252,7 +300,9 @@ export function StudentDashboard() {
                   </div>
                 </div>
                 <div className="text-right">
-                  <div className="mb-1 text-4xl font-bold text-white">{activeWorkspace.progressPercent}%</div>
+                  <div className="mb-1 text-4xl font-bold text-white">
+                    {activeWorkspace.progressPercent}%
+                  </div>
                   <div className="text-sm text-slate-400">Complete</div>
                 </div>
               </div>
@@ -269,9 +319,13 @@ export function StudentDashboard() {
               <div className="flex items-center gap-3 rounded-lg border border-slate-800 bg-slate-900 p-4">
                 <Target className="h-5 w-5 flex-shrink-0 text-blue-500" />
                 <div>
-                  <div className="mb-1 text-xs text-slate-500">Next Milestone</div>
+                  <div className="mb-1 text-xs text-slate-500">
+                    Next Milestone
+                  </div>
                   <div className="text-sm font-semibold text-white">
-                    {activeWorkspace.milestones.find((milestone) => !milestone.isCompleted)?.name ?? "Ready to launch"}
+                    {activeWorkspace.milestones.find(
+                      (milestone) => !milestone.isCompleted,
+                    )?.name ?? "Ready to launch"}
                   </div>
                 </div>
               </div>
@@ -279,8 +333,12 @@ export function StudentDashboard() {
           ) : (
             <div className="rounded-xl border border-dashed border-slate-700 bg-slate-950 p-8 text-center">
               <Briefcase className="mx-auto mb-4 h-10 w-10 text-slate-500" />
-              <h4 className="mb-2 text-xl font-bold text-white">No active workspace yet</h4>
-              <p className="mb-4 text-slate-400">Claim a problem to create your first student workspace.</p>
+              <h4 className="mb-2 text-xl font-bold text-white">
+                No active workspace yet
+              </h4>
+              <p className="mb-4 text-slate-400">
+                Claim a problem to create your first student workspace.
+              </p>
               <Link
                 to="/problem-bank"
                 className="inline-flex rounded-lg bg-gradient-to-r from-blue-600 to-purple-600 px-5 py-3 font-semibold text-white"
@@ -295,19 +353,29 @@ export function StudentDashboard() {
       <div className="rounded-2xl border border-slate-800 bg-slate-900 p-6">
         <div className="mb-6 flex items-center justify-between">
           <h3 className="text-xl font-bold text-white">Your Portfolio</h3>
-          <Link to="/portfolio" className="text-sm font-semibold text-blue-400 hover:text-blue-300">
+          <Link
+            to="/portfolio"
+            className="text-sm font-semibold text-blue-400 hover:text-blue-300"
+          >
             View Portfolio
           </Link>
         </div>
         <div className="grid gap-4 md:grid-cols-2">
           {workspaces.length > 0 ? (
             workspaces.map((project) => (
-              <div key={project._id} className="group rounded-xl border border-slate-800 bg-slate-950 p-5 transition-all hover:border-blue-500/50">
+              <div
+                key={project._id}
+                className="group rounded-xl border border-slate-800 bg-slate-950 p-5 transition-all hover:border-blue-500/50"
+              >
                 <div className="mb-3 flex items-start justify-between">
                   <div className="flex-1">
-                    <h4 className="mb-2 font-bold text-white transition-colors group-hover:text-blue-400">{project.title}</h4>
+                    <h4 className="mb-2 font-bold text-white transition-colors group-hover:text-blue-400">
+                      {project.title}
+                    </h4>
                     <div className="flex items-center gap-2">
-                      <span className="rounded bg-slate-800 px-2 py-1 text-xs text-slate-300">{project.category}</span>
+                      <span className="rounded bg-slate-800 px-2 py-1 text-xs text-slate-300">
+                        {project.category}
+                      </span>
                       <span className="rounded bg-blue-500/10 px-2 py-1 text-xs font-semibold text-blue-400">
                         {project.stage}
                       </span>
@@ -330,7 +398,8 @@ export function StudentDashboard() {
             ))
           ) : (
             <div className="md:col-span-2 py-8 text-center text-slate-400">
-              Your workspace portfolio will appear here once you claim a problem.
+              Your workspace portfolio will appear here once you claim a
+              problem.
             </div>
           )}
         </div>
@@ -359,7 +428,10 @@ export function StudentDashboard() {
         ) : workspaces.length === 0 ? (
           <div className="rounded-xl border border-dashed border-slate-700 bg-slate-950 p-6 text-center">
             <BookOpen className="mx-auto mb-3 h-8 w-8 text-slate-600" />
-            <p className="text-sm text-slate-400">Claim a problem from the Problem Bank to start tracking course progress.</p>
+            <p className="text-sm text-slate-400">
+              Claim a problem from the Problem Bank to start tracking course
+              progress.
+            </p>
             <Link
               to="/problem-bank"
               className="mt-3 inline-flex rounded-lg bg-gradient-to-r from-blue-600 to-purple-600 px-4 py-2 text-sm font-semibold text-white"
@@ -370,17 +442,26 @@ export function StudentDashboard() {
         ) : (
           <div className="space-y-4">
             {workspaces.slice(0, 3).map((ws) => {
-              const completedMilestones = ws.milestones.filter((m) => m.isCompleted).length;
+              const completedMilestones = ws.milestones.filter(
+                (m) => m.isCompleted,
+              ).length;
               const totalMilestones = ws.milestones.length;
               const nextMilestone = ws.milestones.find((m) => !m.isCompleted);
               return (
-                <div key={ws._id} className="rounded-xl border border-slate-800 bg-slate-950 p-4">
+                <div
+                  key={ws._id}
+                  className="rounded-xl border border-slate-800 bg-slate-950 p-4"
+                >
                   <div className="mb-3 flex items-start justify-between gap-3">
                     <div>
                       <div className="font-semibold text-white">{ws.title}</div>
-                      <div className="mt-0.5 text-xs text-slate-400">{ws.category} · {ws.stage}</div>
+                      <div className="mt-0.5 text-xs text-slate-400">
+                        {ws.category} · {ws.stage}
+                      </div>
                     </div>
-                    <span className="flex-shrink-0 text-sm font-bold text-white">{ws.progressPercent}%</span>
+                    <span className="flex-shrink-0 text-sm font-bold text-white">
+                      {ws.progressPercent}%
+                    </span>
                   </div>
                   <div className="mb-3 h-2 w-full overflow-hidden rounded-full bg-slate-800">
                     <div
@@ -399,7 +480,9 @@ export function StudentDashboard() {
                         Next: {nextMilestone.name}
                       </span>
                     ) : (
-                      <span className="text-emerald-400">All milestones complete</span>
+                      <span className="text-emerald-400">
+                        All milestones complete
+                      </span>
                     )}
                   </div>
                 </div>
@@ -408,7 +491,12 @@ export function StudentDashboard() {
             {workspaces.length > 3 ? (
               <div className="text-center text-sm text-slate-500">
                 +{workspaces.length - 3} more workspaces —{" "}
-                <Link to="/product-workspace" className="text-blue-400 hover:text-blue-300">View all</Link>
+                <Link
+                  to="/product-workspace"
+                  className="text-blue-400 hover:text-blue-300"
+                >
+                  View all
+                </Link>
               </div>
             ) : null}
           </div>
@@ -417,8 +505,12 @@ export function StudentDashboard() {
 
       <div className="rounded-2xl border border-slate-800 bg-slate-900 p-6">
         <div className="mb-6 flex items-center justify-between">
-          <h3 className="text-xl font-bold text-white">Active Investor Deals</h3>
-          <span className="text-sm text-slate-400">{activeDeals.length} active deals</span>
+          <h3 className="text-xl font-bold text-white">
+            Active Investor Deals
+          </h3>
+          <span className="text-sm text-slate-400">
+            {activeDeals.length} active deals
+          </span>
         </div>
         {activeDealsQuery.isLoading ? (
           <div className="rounded-xl border border-dashed border-slate-700 bg-slate-950 p-8 text-center text-slate-400">
@@ -426,24 +518,34 @@ export function StudentDashboard() {
           </div>
         ) : activeDeals.length === 0 ? (
           <div className="rounded-xl border border-dashed border-slate-700 bg-slate-950 p-8 text-center text-slate-400">
-            No investor deals yet. Launch your startup to investors from the Startup Launch engine.
+            No investor deals yet. Launch your startup to investors from the
+            Startup Launch engine.
           </div>
         ) : (
           <div className="grid gap-4 md:grid-cols-2">
             {activeDeals.map((deal, index) => (
-              <div key={deal._id} className="rounded-xl border border-slate-800 bg-slate-950 p-5">
+              <div
+                key={deal._id}
+                className="rounded-xl border border-slate-800 bg-slate-950 p-5"
+              >
                 <div className="flex items-start justify-between gap-3">
                   <div>
                     <h4 className="mb-1 font-bold text-white">
-                      {deal.currentStage < 2 ? `Investor #${index + 1}` : deal.investorDisplayName}
+                      {deal.currentStage < 2
+                        ? `Investor #${index + 1}`
+                        : deal.investorDisplayName}
                     </h4>
-                    <p className="text-sm text-slate-400">Startup: {deal.startupName}</p>
+                    <p className="text-sm text-slate-400">
+                      Startup: {deal.startupName}
+                    </p>
                   </div>
                   <span className="rounded bg-blue-500/10 px-2 py-1 text-xs font-semibold text-blue-400">
                     Stage {deal.currentStage}
                   </span>
                 </div>
-                <p className="mt-4 text-sm text-slate-300">{deal.nextActionLabel}</p>
+                <p className="mt-4 text-sm text-slate-300">
+                  {deal.nextActionLabel}
+                </p>
                 <p className="mt-2 text-xs text-slate-500">
                   {deal.currentStage === 1
                     ? "Due diligence in progress"

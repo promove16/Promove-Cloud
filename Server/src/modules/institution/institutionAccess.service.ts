@@ -422,7 +422,7 @@ export const bulkCreateManagedStudentCredentials = async (
 ): Promise<BulkCredentialResult> => {
   await assertInstitutionRole(institutionId, institutionRole);
 
-  const rows = workbookRowsToPayloads(file.buffer);
+  const rows = await workbookRowsToPayloads(file.buffer, file.originalname);
 
   if (rows.length === 0) {
     throw new ApiError(400, 'EMPTY_STUDENT_ROSTER_FILE', 'The uploaded file has no student rows.');

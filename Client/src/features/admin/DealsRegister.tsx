@@ -16,6 +16,7 @@ const transferTone: Record<string, string> = {
   pending_review: 'border-amber-500/30 bg-amber-500/10 text-amber-300',
   under_review: 'border-cyan-500/30 bg-cyan-500/10 text-cyan-300',
   approved: 'border-emerald-500/30 bg-emerald-500/10 text-emerald-300',
+  rejected: 'border-rose-500/30 bg-rose-500/10 text-rose-300',
 };
 
 export default function DealsRegister() {
@@ -41,7 +42,9 @@ export default function DealsRegister() {
           {deals.map((deal) => {
             const canApprove =
               deal.stage === 3 &&
+              deal.adminApprovalRequired &&
               deal.stockTransfer.status !== 'approved' &&
+              deal.stockTransfer.status !== 'rejected' &&
               !deal.adminApprovedAt;
 
             return (

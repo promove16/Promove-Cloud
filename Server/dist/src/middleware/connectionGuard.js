@@ -12,7 +12,7 @@ exports.ALLOWED_CONNECTIONS = {
         roles_types_1.UserRole.RECRUITER,
         roles_types_1.UserRole.STUDENT,
     ],
-    [roles_types_1.UserRole.MENTOR]: [roles_types_1.UserRole.STUDENT],
+    [roles_types_1.UserRole.MENTOR]: [roles_types_1.UserRole.STUDENT, roles_types_1.UserRole.SCHOOL, roles_types_1.UserRole.COLLEGE],
     [roles_types_1.UserRole.INVESTOR]: [roles_types_1.UserRole.STUDENT, roles_types_1.UserRole.SCHOOL, roles_types_1.UserRole.COLLEGE],
     [roles_types_1.UserRole.RECRUITER]: [roles_types_1.UserRole.STUDENT, roles_types_1.UserRole.COLLEGE],
     [roles_types_1.UserRole.ADMIN]: [

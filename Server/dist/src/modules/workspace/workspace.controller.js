@@ -1,6 +1,6 @@
 "use strict";
 Object.defineProperty(exports, "__esModule", { value: true });
-exports.removeWorkspaceChatParticipant = exports.addWorkspaceChatParticipant = exports.getWorkspaceChat = exports.removeWorkspaceMember = exports.inviteWorkspaceMember = exports.removeWorkspaceTask = exports.patchWorkspaceTask = exports.addWorkspaceTask = exports.removeWorkspaceCodeSubmission = exports.addWorkspaceCodeSubmission = exports.removeWorkspaceRepoSubmission = exports.addWorkspaceRepoSubmission = exports.removeWorkspaceAsset = exports.uploadWorkspaceAsset = exports.addWorkspaceProgress = exports.removeWorkspace = exports.patchWorkspace = exports.getWorkspace = exports.createWorkspaceController = exports.listWorkspaces = void 0;
+exports.removeWorkspaceChatParticipant = exports.addWorkspaceChatParticipant = exports.getWorkspaceChat = exports.removeWorkspaceMember = exports.declineWorkspaceInvite = exports.acceptWorkspaceInvite = exports.inviteWorkspaceMember = exports.removeWorkspaceTask = exports.patchWorkspaceTask = exports.addWorkspaceTask = exports.removeWorkspaceCodeSubmission = exports.addWorkspaceCodeSubmission = exports.removeWorkspaceRepoSubmission = exports.addWorkspaceRepoSubmission = exports.removeWorkspaceAsset = exports.uploadWorkspaceAsset = exports.addWorkspaceProgress = exports.removeWorkspace = exports.patchWorkspace = exports.getWorkspace = exports.createWorkspaceController = exports.listWorkspaces = void 0;
 const ApiError_1 = require("../../utils/ApiError");
 const ApiResponse_1 = require("../../utils/ApiResponse");
 const workspace_service_1 = require("./workspace.service");
@@ -135,6 +135,22 @@ const inviteWorkspaceMember = async (req, res) => {
     res.json(new ApiResponse_1.ApiResponse(workspace));
 };
 exports.inviteWorkspaceMember = inviteWorkspaceMember;
+const acceptWorkspaceInvite = async (req, res) => {
+    const userId = ensureUserId(req);
+    const workspaceId = getParam(req.params.id, 'WORKSPACE_REQUIRED', 'Workspace id is required');
+    const requestId = getParam(req.params.requestId, 'TEAM_INVITE_REQUIRED', 'Team invite id is required');
+    const workspace = await (0, workspace_service_1.acceptMemberInvite)(workspaceId, requestId, userId);
+    res.json(new ApiResponse_1.ApiResponse(workspace));
+};
+exports.acceptWorkspaceInvite = acceptWorkspaceInvite;
+const declineWorkspaceInvite = async (req, res) => {
+    const userId = ensureUserId(req);
+    const workspaceId = getParam(req.params.id, 'WORKSPACE_REQUIRED', 'Workspace id is required');
+    const requestId = getParam(req.params.requestId, 'TEAM_INVITE_REQUIRED', 'Team invite id is required');
+    const workspace = await (0, workspace_service_1.declineMemberInvite)(workspaceId, requestId, userId);
+    res.json(new ApiResponse_1.ApiResponse(workspace));
+};
+exports.declineWorkspaceInvite = declineWorkspaceInvite;
 const removeWorkspaceMember = async (req, res) => {
     const userId = ensureUserId(req);
     const workspaceId = getParam(req.params.id, 'WORKSPACE_REQUIRED', 'Workspace id is required');

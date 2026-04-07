@@ -1,7 +1,14 @@
 import api from './axiosInstance';
 import { ApiSuccessResponse } from '../types/auth.types';
 
-export type QueryType = 'project_mentor' | 'project_join' | 'investor' | 'recruiter' | 'general';
+export type QueryType =
+  | 'project_mentor'
+  | 'project_join'
+  | 'investor'
+  | 'recruiter'
+  | 'hiring_event'
+  | 'mentorship_program'
+  | 'general';
 
 export interface DMMessage {
   _id: string;

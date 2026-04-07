@@ -5,19 +5,28 @@ import { ApiRequestActivityPayload } from '../modules/analytics/activity.types';
 
 export const hasBullMqRedisConnection = Boolean(env.UPSTASH_REDIS_PASSWORD);
 
-const connection = {
+const baseConnection = {
   host: env.UPSTASH_REDIS_HOST,
   port: 6379,
   password: env.UPSTASH_REDIS_PASSWORD ?? env.UPSTASH_REDIS_REST_TOKEN,
   tls: {},
   lazyConnect: true,
   enableOfflineQueue: false,
-  maxRetriesPerRequest: 1,
   connectTimeout: env.BULLMQ_CONNECT_TIMEOUT_MS,
+};
+
+const connection = {
+  ...baseConnection,
+  maxRetriesPerRequest: 1,
   commandTimeout: env.BULLMQ_COMMAND_TIMEOUT_MS,
 };
 
 export const bullmqConnection = connection;
+
+const workerConnection = {
+  ...baseConnection,
+  maxRetriesPerRequest: null,
+};
 
 export type QueueJob<T> = {
   id?: string;
@@ -180,8 +189,8 @@ export const createQueueWorker = <T>(
     queueName,
     async (job: Job<T>) => processor({ id: job.id, name: job.name, data: job.data }),
     {
-      connection: bullmqConnection,
       ...options,
+      connection: workerConnection,
     },
   );
 

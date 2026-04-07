@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { X, MessageSquare, GraduationCap, TrendingUp, Building2, ChevronRight, Users } from 'lucide-react';
 import { QueryType } from '../../api/dm.api';
 import { getVisibleAssociationQueryTypes, isAssociationQueryType } from './queryTypeVisibility';
@@ -9,6 +9,7 @@ interface QueryTypeModalProps {
   onSelect: (queryType: QueryType, customMessage?: string) => void;
   recipientName: string;
   recipientRole?: string;
+  currentUserRole?: string;
   initialQueryType?: QueryType | null;
 }
 
@@ -71,6 +72,30 @@ const queryTemplates: QueryTemplate[] = [
     ],
   },
   {
+    type: 'hiring_event',
+    label: 'Hiring Event',
+    description: 'Organize a hiring event with a college',
+    icon: <Building2 className="h-5 w-5" />,
+    color: 'from-amber-500 to-orange-500',
+    autoMessages: [
+      'Hi! I would like to organize a hiring event with your college and explore student talent for open roles.',
+      'Hello! I am planning a campus hiring event and would like to coordinate with your college placement team.',
+      'Hi! I would like to discuss a hiring event for your college students. Could we connect on the event format and timeline?',
+    ],
+  },
+  {
+    type: 'mentorship_program',
+    label: 'Mentorship Program',
+    description: 'Request a school or college mentorship program',
+    icon: <GraduationCap className="h-5 w-5" />,
+    color: 'from-cyan-500 to-blue-500',
+    autoMessages: [
+      'Hi! I would like to support your students through a mentorship program. Could we discuss the format and schedule?',
+      'Hello! I am available for a mentorship program with your institution and would like to understand your preferred topics.',
+      'Hi! I would like to propose a mentorship session for your students. Could we coordinate the program request?',
+    ],
+  },
+  {
     type: 'general',
     label: 'General Query',
     description: 'Start a general conversation',
@@ -90,19 +115,27 @@ export function QueryTypeModal({
   onSelect,
   recipientName,
   recipientRole,
+  currentUserRole,
   initialQueryType,
 }: QueryTypeModalProps) {
   const [selectedType, setSelectedType] = useState<QueryTemplate | null>(null);
   const [customMessage, setCustomMessage] = useState('');
   const [showCustomInput, setShowCustomInput] = useState(false);
-  const visibleAssociationTypes = new Set(getVisibleAssociationQueryTypes(recipientRole));
-  const visibleTemplates = queryTemplates.filter((template) => {
-    if (!isAssociationQueryType(template.type)) {
-      return true;
-    }
+  const visibleAssociationTypes = useMemo(
+    () => new Set(getVisibleAssociationQueryTypes(recipientRole, currentUserRole)),
+    [currentUserRole, recipientRole],
+  );
+  const visibleTemplates = useMemo(
+    () =>
+      queryTemplates.filter((template) => {
+        if (!isAssociationQueryType(template.type)) {
+          return true;
+        }
 
-    return visibleAssociationTypes.has(template.type);
-  });
+        return visibleAssociationTypes.has(template.type);
+      }),
+    [visibleAssociationTypes],
+  );
 
   useEffect(() => {
     if (!isOpen) {
@@ -126,7 +159,7 @@ export function QueryTypeModal({
       setShowCustomInput(false);
       setCustomMessage('');
     }
-  }, [initialQueryType, isOpen, recipientRole, selectedType?.type]);
+  }, [currentUserRole, initialQueryType, isOpen, recipientRole, selectedType?.type, visibleTemplates]);
 
   if (!isOpen) return null;
 

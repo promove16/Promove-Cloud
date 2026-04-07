@@ -8,6 +8,7 @@ import {
   getInvestorAuthorityController,
   getMyDealController,
   getMyDealsController,
+  respondToDealController,
   getStartupCapTableController,
   getStartupInvestorsController,
   updateDealStageController,
@@ -23,6 +24,7 @@ startupsInvestmentRouter.use(authenticate);
 
 dealsRouter.get('/', asyncHandler(getMyDealsController));
 dealsRouter.get('/:id', asyncHandler(getMyDealController));
+dealsRouter.patch('/:id/founder-decision', authorize(UserRole.STUDENT), asyncHandler(respondToDealController));
 dealsRouter.post('/:id/fund-transfer', authorize(UserRole.INVESTOR), asyncHandler(fundTransferController));
 dealsRouter.patch('/:id/stage', authorize(UserRole.INVESTOR), asyncHandler(updateDealStageController));
 dealsRouter.patch('/:id/investor-role', authorize(UserRole.ADMIN), asyncHandler(updateInvestorRoleController));

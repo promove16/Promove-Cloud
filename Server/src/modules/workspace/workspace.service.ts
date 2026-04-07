@@ -6,10 +6,12 @@ import { notificationQueue } from '../../config/bullmq';
 import { applyScoreAsync } from '../../services/scoreEngine';
 import { User } from '../user/user.model';
 import { ChatMessage } from '../chat/chat.model';
+import { TeamRequest } from '../social/teamRequest.model';
 import { Workspace } from './workspace.model';
 import { ApiError } from '../../utils/ApiError';
 
 const objectId = (value: string) => new Types.ObjectId(value);
+const TEAM_REQUEST_TTL_MS = 7 * 24 * 60 * 60 * 1000;
 
 export const createWorkspaceSchema = z.object({
   title: z.string().trim().min(2).max(120),
@@ -135,6 +137,7 @@ const recalcProgressPercent = (workspace: { milestones: Array<{ completionPercen
 
 type WorkspaceSnapshot = {
   toObject?: () => any;
+  _id?: unknown;
   ownerId: unknown;
   teamMemberIds: unknown[];
   [key: string]: any;
@@ -165,6 +168,20 @@ export const serializeWorkspace = async (workspace: WorkspaceSnapshot) => {
   const chatParticipantUserMap = new Map(
     chatParticipantUsers.map((u) => [String(u._id), u]),
   );
+  const pendingInvites =
+    baseWorkspace._id
+      ? await TeamRequest.find({ workspaceId: baseWorkspace._id, status: 'pending' })
+          .select('_id toUserId proposedRole status expiresAt createdAt')
+          .lean()
+      : [];
+  const pendingInviteUserIds = pendingInvites.map((invite) => String(invite.toUserId));
+  const pendingInviteUsers =
+    pendingInviteUserIds.length > 0
+      ? await User.find({ _id: { $in: pendingInviteUserIds } }).select('_id displayName email').lean()
+      : [];
+  const pendingInviteUserMap = new Map(
+    pendingInviteUsers.map((user) => [String(user._id), user]),
+  );
 
   return {
     ...baseWorkspace,
@@ -190,6 +207,19 @@ export const serializeWorkspace = async (workspace: WorkspaceSnapshot) => {
         addedAt: p.addedAt,
         displayName: user?.displayName ?? null,
         avatar: user?.avatar ?? null,
+      };
+    }),
+    pendingInvites: pendingInvites.map((invite) => {
+      const user = pendingInviteUserMap.get(String(invite.toUserId));
+      return {
+        _id: String(invite._id),
+        toUserId: String(invite.toUserId),
+        displayName: user?.displayName ?? 'Pending member',
+        email: user?.email ?? null,
+        proposedRole: invite.proposedRole,
+        status: invite.status,
+        expiresAt: invite.expiresAt,
+        createdAt: invite.createdAt,
       };
     }),
   };
@@ -524,9 +554,6 @@ export const inviteMember = async (
   payload: z.infer<typeof inviteMemberSchema>,
 ) => {
   const workspace = await getWorkspaceForOwner(workspaceId, ownerId);
-  if (workspace.teamMemberIds.length >= 5) {
-    throw new ApiError(400, 'TEAM_LIMIT_REACHED', 'A workspace can have at most 5 team members.');
-  }
 
   let user = payload.userId ? await User.findById(payload.userId) : null;
   if (!user && payload.email) {
@@ -537,14 +564,46 @@ export const inviteMember = async (
     if (workspace.teamMemberIds.some((memberId) => String(memberId) === String(user?._id))) {
       throw new ApiError(400, 'MEMBER_ALREADY_EXISTS', 'That member is already on the team.');
     }
+    const pendingInviteCount = await TeamRequest.countDocuments({ workspaceId, status: 'pending' });
+    if (workspace.teamMemberIds.length + pendingInviteCount >= 5) {
+      throw new ApiError(400, 'TEAM_LIMIT_REACHED', 'A workspace can have at most 5 team members.');
+    }
 
-    workspace.teamMemberIds.push(user._id);
-    await workspace.save();
+    const existingInvite = await TeamRequest.findOne({
+      fromUserId: ownerId,
+      toUserId: user._id,
+      workspaceId,
+    });
+
+    if (existingInvite?.status === 'pending') {
+      throw new ApiError(409, 'INVITE_ALREADY_PENDING', 'That invite is already pending.');
+    }
+
+    const invite =
+      existingInvite ??
+      new TeamRequest({
+        fromUserId: objectId(ownerId),
+        toUserId: user._id,
+        workspaceId: objectId(workspaceId),
+      });
+
+    invite.message = '';
+    invite.proposedRole = 'other';
+    invite.status = 'pending';
+    invite.respondedAt = null;
+    invite.expiresAt = new Date(Date.now() + TEAM_REQUEST_TTL_MS);
+    await invite.save();
+
+    await Promise.all([
+      User.findByIdAndUpdate(ownerId, { $addToSet: { teamRequestsSent: invite._id } }),
+      User.findByIdAndUpdate(user._id, { $addToSet: { teamRequestsReceived: invite._id } }),
+    ]);
+
     await notificationQueue.add('team-invite', {
       userId: String(user._id),
       type: 'team_invite',
       title: 'New workspace invite',
-      body: `You were added to ${workspace.title}.`,
+      body: `You were invited to join ${workspace.title}.`,
       link: `/product-workspace/${workspaceId}`,
     });
 
@@ -570,6 +629,70 @@ export const removeMember = async (workspaceId: string, memberId: string, ownerI
   const workspace = await getWorkspaceForOwner(workspaceId, ownerId);
   workspace.teamMemberIds = workspace.teamMemberIds.filter((id) => String(id) !== memberId);
   await workspace.save();
+  return serializeWorkspace(workspace);
+};
+
+const getInviteForRecipient = async (workspaceId: string, requestId: string, userId: string) => {
+  const invite = await TeamRequest.findOne({
+    _id: requestId,
+    workspaceId,
+    toUserId: userId,
+  });
+
+  if (!invite) {
+    throw new ApiError(404, 'TEAM_INVITE_NOT_FOUND', 'Team invite not found');
+  }
+
+  if (invite.status !== 'pending') {
+    throw new ApiError(400, 'TEAM_INVITE_NOT_ACTIONABLE', 'This invite is no longer pending.');
+  }
+
+  if (invite.expiresAt.getTime() <= Date.now()) {
+    invite.status = 'expired';
+    invite.respondedAt = new Date();
+    await invite.save();
+    throw new ApiError(400, 'TEAM_INVITE_EXPIRED', 'This invite has expired.');
+  }
+
+  return invite;
+};
+
+export const acceptMemberInvite = async (workspaceId: string, requestId: string, userId: string) => {
+  const invite = await getInviteForRecipient(workspaceId, requestId, userId);
+  const workspace = await Workspace.findById(workspaceId);
+
+  if (!workspace || !workspace.isActive) {
+    throw new ApiError(404, 'WORKSPACE_NOT_FOUND', 'Workspace not found');
+  }
+
+  const isMember = workspace.teamMemberIds.some((memberId) => String(memberId) === String(userId));
+  if (!isMember) {
+    if (workspace.teamMemberIds.length >= 5) {
+      throw new ApiError(400, 'TEAM_LIMIT_REACHED', 'A workspace can have at most 5 team members.');
+    }
+
+    workspace.teamMemberIds.push(objectId(userId));
+    await workspace.save();
+  }
+
+  invite.status = 'accepted';
+  invite.respondedAt = new Date();
+  await invite.save();
+
+  return serializeWorkspace(workspace);
+};
+
+export const declineMemberInvite = async (workspaceId: string, requestId: string, userId: string) => {
+  const invite = await getInviteForRecipient(workspaceId, requestId, userId);
+  invite.status = 'declined';
+  invite.respondedAt = new Date();
+  await invite.save();
+
+  const workspace = await Workspace.findById(workspaceId);
+  if (!workspace) {
+    throw new ApiError(404, 'WORKSPACE_NOT_FOUND', 'Workspace not found');
+  }
+
   return serializeWorkspace(workspace);
 };
 

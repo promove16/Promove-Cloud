@@ -131,6 +131,18 @@ export const workspaceApi = {
     const response = await api.post<ApiSuccessResponse<Workspace>>(`/api/workspace/${workspaceId}/invite`, payload);
     return response.data.data;
   },
+  async acceptInvite(workspaceId: string, requestId: string) {
+    const response = await api.post<ApiSuccessResponse<Workspace>>(
+      `/api/workspace/${workspaceId}/invites/${requestId}/accept`,
+    );
+    return response.data.data;
+  },
+  async declineInvite(workspaceId: string, requestId: string) {
+    const response = await api.post<ApiSuccessResponse<Workspace>>(
+      `/api/workspace/${workspaceId}/invites/${requestId}/decline`,
+    );
+    return response.data.data;
+  },
   async removeMember(workspaceId: string, userId: string) {
     const response = await api.delete<ApiSuccessResponse<Workspace>>(
       `/api/workspace/${workspaceId}/members/${userId}`,

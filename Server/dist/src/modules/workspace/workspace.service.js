@@ -1,6 +1,6 @@
 "use strict";
 Object.defineProperty(exports, "__esModule", { value: true });
-exports.removeChatParticipant = exports.addChatParticipant = exports.getWorkspaceChatHistory = exports.removeMember = exports.inviteMember = exports.deleteTask = exports.updateTask = exports.addTask = exports.deleteCodeSubmission = exports.addCodeSubmission = exports.deleteRepoSubmission = exports.addRepoSubmission = exports.deleteWorkspaceUpload = exports.uploadWorkspaceFile = exports.addProgress = exports.deleteWorkspace = exports.updateWorkspace = exports.createWorkspace = exports.getWorkspaceForChatAccess = exports.getWorkspaceForOwner = exports.getWorkspaceForMember = exports.getAccessibleWorkspaces = exports.serializeWorkspace = exports.addChatParticipantSchema = exports.inviteMemberSchema = exports.addCodeSubmissionSchema = exports.addRepoSubmissionSchema = exports.addTaskSchema = exports.addProgressSchema = exports.updateWorkspaceSchema = exports.createWorkspaceSchema = void 0;
+exports.removeChatParticipant = exports.addChatParticipant = exports.getWorkspaceChatHistory = exports.declineMemberInvite = exports.acceptMemberInvite = exports.removeMember = exports.inviteMember = exports.deleteTask = exports.updateTask = exports.addTask = exports.deleteCodeSubmission = exports.addCodeSubmission = exports.deleteRepoSubmission = exports.addRepoSubmission = exports.deleteWorkspaceUpload = exports.uploadWorkspaceFile = exports.addProgress = exports.deleteWorkspace = exports.updateWorkspace = exports.createWorkspace = exports.getWorkspaceForChatAccess = exports.getWorkspaceForOwner = exports.getWorkspaceForMember = exports.getAccessibleWorkspaces = exports.serializeWorkspace = exports.addChatParticipantSchema = exports.inviteMemberSchema = exports.addCodeSubmissionSchema = exports.addRepoSubmissionSchema = exports.addTaskSchema = exports.addProgressSchema = exports.updateWorkspaceSchema = exports.createWorkspaceSchema = void 0;
 const mongoose_1 = require("mongoose");
 const zod_1 = require("zod");
 const cloudinaryService_1 = require("../../services/cloudinaryService");
@@ -9,9 +9,11 @@ const bullmq_1 = require("../../config/bullmq");
 const scoreEngine_1 = require("../../services/scoreEngine");
 const user_model_1 = require("../user/user.model");
 const chat_model_1 = require("../chat/chat.model");
+const teamRequest_model_1 = require("../social/teamRequest.model");
 const workspace_model_1 = require("./workspace.model");
 const ApiError_1 = require("../../utils/ApiError");
 const objectId = (value) => new mongoose_1.Types.ObjectId(value);
+const TEAM_REQUEST_TTL_MS = 7 * 24 * 60 * 60 * 1000;
 exports.createWorkspaceSchema = zod_1.z.object({
     title: zod_1.z.string().trim().min(2).max(120),
     category: zod_1.z.string().trim().min(2).max(100),
@@ -133,6 +135,16 @@ const serializeWorkspace = async (workspace) => {
             .lean()
         : [];
     const chatParticipantUserMap = new Map(chatParticipantUsers.map((u) => [String(u._id), u]));
+    const pendingInvites = baseWorkspace._id
+        ? await teamRequest_model_1.TeamRequest.find({ workspaceId: baseWorkspace._id, status: 'pending' })
+            .select('_id toUserId proposedRole status expiresAt createdAt')
+            .lean()
+        : [];
+    const pendingInviteUserIds = pendingInvites.map((invite) => String(invite.toUserId));
+    const pendingInviteUsers = pendingInviteUserIds.length > 0
+        ? await user_model_1.User.find({ _id: { $in: pendingInviteUserIds } }).select('_id displayName email').lean()
+        : [];
+    const pendingInviteUserMap = new Map(pendingInviteUsers.map((user) => [String(user._id), user]));
     return {
         ...baseWorkspace,
         tasks: baseWorkspace.tasks || [],
@@ -157,6 +169,19 @@ const serializeWorkspace = async (workspace) => {
                 addedAt: p.addedAt,
                 displayName: user?.displayName ?? null,
                 avatar: user?.avatar ?? null,
+            };
+        }),
+        pendingInvites: pendingInvites.map((invite) => {
+            const user = pendingInviteUserMap.get(String(invite.toUserId));
+            return {
+                _id: String(invite._id),
+                toUserId: String(invite.toUserId),
+                displayName: user?.displayName ?? 'Pending member',
+                email: user?.email ?? null,
+                proposedRole: invite.proposedRole,
+                status: invite.status,
+                expiresAt: invite.expiresAt,
+                createdAt: invite.createdAt,
             };
         }),
     };
@@ -416,9 +441,6 @@ const deleteTask = async (workspaceId, taskId, userId) => {
 exports.deleteTask = deleteTask;
 const inviteMember = async (workspaceId, ownerId, payload) => {
     const workspace = await (0, exports.getWorkspaceForOwner)(workspaceId, ownerId);
-    if (workspace.teamMemberIds.length >= 5) {
-        throw new ApiError_1.ApiError(400, 'TEAM_LIMIT_REACHED', 'A workspace can have at most 5 team members.');
-    }
     let user = payload.userId ? await user_model_1.User.findById(payload.userId) : null;
     if (!user && payload.email) {
         user = await user_model_1.User.findOne({ email: payload.email.toLowerCase() });
@@ -427,13 +449,39 @@ const inviteMember = async (workspaceId, ownerId, payload) => {
         if (workspace.teamMemberIds.some((memberId) => String(memberId) === String(user?._id))) {
             throw new ApiError_1.ApiError(400, 'MEMBER_ALREADY_EXISTS', 'That member is already on the team.');
         }
-        workspace.teamMemberIds.push(user._id);
-        await workspace.save();
+        const pendingInviteCount = await teamRequest_model_1.TeamRequest.countDocuments({ workspaceId, status: 'pending' });
+        if (workspace.teamMemberIds.length + pendingInviteCount >= 5) {
+            throw new ApiError_1.ApiError(400, 'TEAM_LIMIT_REACHED', 'A workspace can have at most 5 team members.');
+        }
+        const existingInvite = await teamRequest_model_1.TeamRequest.findOne({
+            fromUserId: ownerId,
+            toUserId: user._id,
+            workspaceId,
+        });
+        if (existingInvite?.status === 'pending') {
+            throw new ApiError_1.ApiError(409, 'INVITE_ALREADY_PENDING', 'That invite is already pending.');
+        }
+        const invite = existingInvite ??
+            new teamRequest_model_1.TeamRequest({
+                fromUserId: objectId(ownerId),
+                toUserId: user._id,
+                workspaceId: objectId(workspaceId),
+            });
+        invite.message = '';
+        invite.proposedRole = 'other';
+        invite.status = 'pending';
+        invite.respondedAt = null;
+        invite.expiresAt = new Date(Date.now() + TEAM_REQUEST_TTL_MS);
+        await invite.save();
+        await Promise.all([
+            user_model_1.User.findByIdAndUpdate(ownerId, { $addToSet: { teamRequestsSent: invite._id } }),
+            user_model_1.User.findByIdAndUpdate(user._id, { $addToSet: { teamRequestsReceived: invite._id } }),
+        ]);
         await bullmq_1.notificationQueue.add('team-invite', {
             userId: String(user._id),
             type: 'team_invite',
             title: 'New workspace invite',
-            body: `You were added to ${workspace.title}.`,
+            body: `You were invited to join ${workspace.title}.`,
             link: `/product-workspace/${workspaceId}`,
         });
         return (0, exports.serializeWorkspace)(workspace);
@@ -458,6 +506,58 @@ const removeMember = async (workspaceId, memberId, ownerId) => {
     return (0, exports.serializeWorkspace)(workspace);
 };
 exports.removeMember = removeMember;
+const getInviteForRecipient = async (workspaceId, requestId, userId) => {
+    const invite = await teamRequest_model_1.TeamRequest.findOne({
+        _id: requestId,
+        workspaceId,
+        toUserId: userId,
+    });
+    if (!invite) {
+        throw new ApiError_1.ApiError(404, 'TEAM_INVITE_NOT_FOUND', 'Team invite not found');
+    }
+    if (invite.status !== 'pending') {
+        throw new ApiError_1.ApiError(400, 'TEAM_INVITE_NOT_ACTIONABLE', 'This invite is no longer pending.');
+    }
+    if (invite.expiresAt.getTime() <= Date.now()) {
+        invite.status = 'expired';
+        invite.respondedAt = new Date();
+        await invite.save();
+        throw new ApiError_1.ApiError(400, 'TEAM_INVITE_EXPIRED', 'This invite has expired.');
+    }
+    return invite;
+};
+const acceptMemberInvite = async (workspaceId, requestId, userId) => {
+    const invite = await getInviteForRecipient(workspaceId, requestId, userId);
+    const workspace = await workspace_model_1.Workspace.findById(workspaceId);
+    if (!workspace || !workspace.isActive) {
+        throw new ApiError_1.ApiError(404, 'WORKSPACE_NOT_FOUND', 'Workspace not found');
+    }
+    const isMember = workspace.teamMemberIds.some((memberId) => String(memberId) === String(userId));
+    if (!isMember) {
+        if (workspace.teamMemberIds.length >= 5) {
+            throw new ApiError_1.ApiError(400, 'TEAM_LIMIT_REACHED', 'A workspace can have at most 5 team members.');
+        }
+        workspace.teamMemberIds.push(objectId(userId));
+        await workspace.save();
+    }
+    invite.status = 'accepted';
+    invite.respondedAt = new Date();
+    await invite.save();
+    return (0, exports.serializeWorkspace)(workspace);
+};
+exports.acceptMemberInvite = acceptMemberInvite;
+const declineMemberInvite = async (workspaceId, requestId, userId) => {
+    const invite = await getInviteForRecipient(workspaceId, requestId, userId);
+    invite.status = 'declined';
+    invite.respondedAt = new Date();
+    await invite.save();
+    const workspace = await workspace_model_1.Workspace.findById(workspaceId);
+    if (!workspace) {
+        throw new ApiError_1.ApiError(404, 'WORKSPACE_NOT_FOUND', 'Workspace not found');
+    }
+    return (0, exports.serializeWorkspace)(workspace);
+};
+exports.declineMemberInvite = declineMemberInvite;
 const getWorkspaceChatHistory = async (workspaceId, userId, before, limit = 50) => {
     await (0, exports.getWorkspaceForChatAccess)(workspaceId, userId);
     const filter = { workspaceId };

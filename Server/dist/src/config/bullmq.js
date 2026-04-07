@@ -5,18 +5,25 @@ const bullmq_1 = require("bullmq");
 const env_1 = require("./env");
 const logger_1 = require("./logger");
 exports.hasBullMqRedisConnection = Boolean(env_1.env.UPSTASH_REDIS_PASSWORD);
-const connection = {
+const baseConnection = {
     host: env_1.env.UPSTASH_REDIS_HOST,
     port: 6379,
     password: env_1.env.UPSTASH_REDIS_PASSWORD ?? env_1.env.UPSTASH_REDIS_REST_TOKEN,
     tls: {},
     lazyConnect: true,
     enableOfflineQueue: false,
-    maxRetriesPerRequest: 1,
     connectTimeout: env_1.env.BULLMQ_CONNECT_TIMEOUT_MS,
+};
+const connection = {
+    ...baseConnection,
+    maxRetriesPerRequest: 1,
     commandTimeout: env_1.env.BULLMQ_COMMAND_TIMEOUT_MS,
 };
 exports.bullmqConnection = connection;
+const workerConnection = {
+    ...baseConnection,
+    maxRetriesPerRequest: null,
+};
 const createMockQueue = () => ({
     add: async () => ({ id: 'mock-job' }),
 });
@@ -125,8 +132,8 @@ const createQueueWorker = (queueName, processor, options) => {
         return createLocalWorker(queueName, processor);
     }
     const worker = new bullmq_1.Worker(queueName, async (job) => processor({ id: job.id, name: job.name, data: job.data }), {
-        connection: exports.bullmqConnection,
         ...options,
+        connection: workerConnection,
     });
     worker.on('error', (error) => {
         (0, logger_1.logError)(`BullMQ worker "${queueName}" error`, error);

@@ -3,11 +3,13 @@ import { ApiError } from '../../utils/ApiError';
 import { ApiResponse } from '../../utils/ApiResponse';
 import {
   advanceDealStage,
+  founderDecisionSchema,
   getDealForParticipant,
   getInvestorAuthorityPortfolio,
   getStartupCapTable,
   getStartupInvestors,
   listDealsForParticipant,
+  recordFounderDecision,
   recordFundTransfer,
   updateInvestorRoleSchema,
   updateInvestmentRole,
@@ -57,6 +59,19 @@ export const updateDealStageController = async (req: Request, res: Response) => 
 
   const data = await advanceDealStage(req.user._id, assertObjectId(String(req.params.id), 'Deal id'), req.body);
   res.status(200).json(new ApiResponse(data));
+};
+
+export const respondToDealController = async (req: Request, res: Response) => {
+  if (!req.user) {
+    throw new ApiError(401, 'UNAUTHORIZED', 'Invalid or expired token');
+  }
+
+  const deal = await recordFounderDecision(
+    req.user._id,
+    assertObjectId(String(req.params.id), 'Deal id'),
+    founderDecisionSchema.parse(req.body),
+  );
+  res.status(200).json(new ApiResponse(deal));
 };
 
 export const getStartupInvestorsController = async (req: Request, res: Response) => {

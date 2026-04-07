@@ -63,7 +63,39 @@ export interface RecruiterTalentPatent {
   _id: string;
   projectTitle: string;
   status: string;
+  problemStatement?: string;
   submittedAt: string;
+}
+
+export interface RecruiterTalentEducation {
+  _id: string;
+  institution: string;
+  degree: string;
+  fieldOfStudy: string;
+  endYear?: number | null;
+  grade: string;
+}
+
+export interface RecruiterTalentExperience {
+  _id: string;
+  title: string;
+  company: string;
+  type: string;
+  startDate: string;
+  endDate?: string | null;
+  isCurrent: boolean;
+  description: string;
+  skills: string[];
+}
+
+export interface RecruiterTalentPortfolioProject {
+  _id: string;
+  title: string;
+  description: string;
+  techStack: string[];
+  startDate?: string | null;
+  endDate?: string | null;
+  isCurrent: boolean;
 }
 
 export interface RecruiterTalentStartup {
@@ -76,10 +108,14 @@ export interface RecruiterTalentStartup {
 
 export interface RecruiterTalentProfile extends RecruiterTalentSummary {
   bio?: string;
+  headline?: string;
   scoreTimeline: RecruiterTalentTimelineItem[];
   workspaces: RecruiterTalentProject[];
   patents: RecruiterTalentPatent[];
   startups: RecruiterTalentStartup[];
+  education: RecruiterTalentEducation[];
+  experience: RecruiterTalentExperience[];
+  portfolioProjects: RecruiterTalentPortfolioProject[];
 }
 
 export interface RecruiterDashboardMatch extends RecruiterTalentSummary {

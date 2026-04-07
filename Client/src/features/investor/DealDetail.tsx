@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { isAxiosError } from 'axios';
+import { useNavigate } from 'react-router-dom';
 import { Badge } from '../../components/ui/Badge';
 import { Button } from '../../components/ui/Button';
 import { Card } from '../../components/ui/Card';
@@ -26,6 +27,7 @@ const getDealWorkflowErrorMessage = (error: unknown) => {
 };
 
 export function DealDetail({ dealId, open, onOpenChange }: Props) {
+  const navigate = useNavigate();
   const queryClient = useQueryClient();
   const [amountINR, setAmountINR] = useState('20000');
   const [equityPercent, setEquityPercent] = useState('10');
@@ -98,49 +100,55 @@ export function DealDetail({ dealId, open, onOpenChange }: Props) {
 
     setError('');
     if (deal.currentStage === 1) {
-      const parsedAmount = Number(amountINR);
-      if (!Number.isFinite(parsedAmount) || parsedAmount < 20000) {
-        setError('Minimum investment is INR 20,000.');
+      if (deal.founderDecision.status !== 'accepted') {
+        setError('Founder acceptance is required before payment can begin.');
         return;
       }
 
-      advanceMutation.mutate({
-        newStage: 2,
-        stageData: { amountINR: parsedAmount },
-      });
+      onOpenChange(false);
+      navigate(`/dashboard/investor/deals/${deal._id}/payment`);
       return;
     }
 
     if (deal.currentStage === 2) {
-      const parsedEquity = Number(equityPercent);
-      if (!Number.isFinite(parsedEquity) || parsedEquity <= 0 || parsedEquity > 100) {
-        setError('Enter a valid equity percentage between 0.01 and 100.');
-        return;
-      }
+      submitStageThreeTransfer(deal);
+      return;
+    }
 
-      if (deal.investorType === 'penny' && parsedEquity > 5) {
-        setError('A penny investor cannot request more than 5% equity.');
-        return;
-      }
-
-      if (deal.investorType === 'sole' && investorRole === 'director' && parsedEquity < 51) {
-        setError('A sole investor needs at least 51% equity to take the director role.');
-        return;
-      }
-
-      advanceMutation.mutate({
-        newStage: 3,
-        stageData: {
-          equityPercent: parsedEquity,
-          investorRole,
-        },
-      });
+    if (deal.currentStage === 3 && deal.stockTransfer.status === 'rejected') {
+      submitStageThreeTransfer(deal);
       return;
     }
 
     if (deal.currentStage === 3 && deal.adminApprovedAt) {
       advanceMutation.mutate({ newStage: 4 });
     }
+  };
+
+  const submitStageThreeTransfer = (deal: DealDetailView) => {
+    const parsedEquity = Number(equityPercent);
+    if (!Number.isFinite(parsedEquity) || parsedEquity <= 0 || parsedEquity > 100) {
+      setError('Enter a valid equity percentage between 0.01 and 100.');
+      return;
+    }
+
+    if (deal.investorType === 'penny' && parsedEquity > 5) {
+      setError('A penny investor cannot request more than 5% equity.');
+      return;
+    }
+
+    if (deal.investorType === 'sole' && investorRole === 'director' && parsedEquity < 51) {
+      setError('A sole investor needs at least 51% equity to take the director role.');
+      return;
+    }
+
+    advanceMutation.mutate({
+      newStage: 3,
+      stageData: {
+        equityPercent: parsedEquity,
+        investorRole,
+      },
+    });
   };
 
   if (!open) {
@@ -203,6 +211,24 @@ export function DealDetail({ dealId, open, onOpenChange }: Props) {
                   Stage 1 to Stage 2
                 </div>
                 <div className="text-sm text-slate-300">Minimum investment: INR 20,000</div>
+                <div
+                  className={`rounded-2xl px-4 py-3 text-sm ${
+                    deal.founderDecision.status === 'accepted'
+                      ? 'border border-emerald-500/30 bg-emerald-500/10 text-emerald-200'
+                      : deal.founderDecision.status === 'rejected'
+                        ? 'border border-red-500/30 bg-red-500/10 text-red-200'
+                        : 'border border-amber-500/30 bg-amber-500/10 text-amber-200'
+                  }`}
+                >
+                  {deal.founderDecision.status === 'accepted'
+                    ? 'Founder accepted this proposal. You can begin fund transfer.'
+                    : deal.founderDecision.status === 'rejected'
+                      ? 'Founder rejected this proposal. This deal cannot advance.'
+                      : 'Waiting for founder acceptance before fund transfer can begin.'}
+                </div>
+                {deal.founderDecision.note ? (
+                  <div className="text-sm text-slate-400">Founder note: {deal.founderDecision.note}</div>
+                ) : null}
                 <Input
                   type="number"
                   min={20000}
@@ -272,7 +298,53 @@ export function DealDetail({ dealId, open, onOpenChange }: Props) {
                 <div className="text-sm font-semibold uppercase tracking-[0.2em] text-slate-400">
                   Stage 3 to Stage 4
                 </div>
-                {deal.adminApprovedAt ? (
+                {deal.stockTransfer.status === 'rejected' ? (
+                  <>
+                    <div className="rounded-2xl border border-red-500/30 bg-red-500/10 px-4 py-3 text-sm text-red-200">
+                      Transfer rejected by admin. Update the equity terms or role and resubmit.
+                    </div>
+                    <div className="grid gap-4 sm:grid-cols-2">
+                      <div>
+                        <div className="mb-2 text-xs uppercase tracking-[0.2em] text-slate-400">
+                          Equity percent
+                        </div>
+                        <Input
+                          type="number"
+                          min={0}
+                          max={100}
+                          value={equityPercent}
+                          onChange={(event) => setEquityPercent(event.target.value)}
+                        />
+                      </div>
+                      <div>
+                        <div className="mb-2 text-xs uppercase tracking-[0.2em] text-slate-400">
+                          Investor role
+                        </div>
+                        <select
+                          value={investorRole}
+                          onChange={(event) =>
+                            setInvestorRole(event.target.value as (typeof investorRoles)[number])
+                          }
+                          className="w-full rounded-lg border border-slate-800 bg-slate-950 px-4 py-3 text-white"
+                        >
+                          {(deal.investorType === 'penny'
+                            ? investorRoles.filter((role) => role !== 'director')
+                            : investorRoles.filter((role) => role !== 'observer')
+                          ).map((role) => (
+                            <option key={role} value={role}>
+                              {formatRoleLabel(role)}
+                            </option>
+                          ))}
+                        </select>
+                      </div>
+                    </div>
+                    {deal.stockTransfer.reviewNotes ? (
+                      <div className="rounded-2xl border border-slate-800 bg-slate-900/80 px-4 py-3 text-sm text-slate-300">
+                        Admin notes: {deal.stockTransfer.reviewNotes}
+                      </div>
+                    ) : null}
+                  </>
+                ) : deal.adminApprovedAt ? (
                   <div className="rounded-2xl border border-emerald-500/30 bg-emerald-500/10 px-4 py-3 text-sm text-emerald-200">
                     Equity transfer has been verified. You may now move the deal to your portfolio.
                   </div>
@@ -289,19 +361,24 @@ export function DealDetail({ dealId, open, onOpenChange }: Props) {
                 onClick={handleAdvance}
                 disabled={
                   advanceMutation.isPending ||
-                  awaitingAdminApproval ||
-                  (deal.currentStage === 3 && !deal.adminApprovedAt)
+                  (deal.currentStage === 1 && deal.founderDecision.status !== 'accepted') ||
+                  (awaitingAdminApproval && deal.stockTransfer.status !== 'rejected') ||
+                  (deal.currentStage === 3 && deal.stockTransfer.status !== 'rejected' && !deal.adminApprovedAt)
                 }
               >
                 {advanceMutation.isPending
                   ? 'Updating...'
                   : deal.currentStage === 1
-                    ? 'Advance to Stage 2'
+                    ? deal.founderDecision.status === 'accepted'
+                      ? 'Advance to Stage 2'
+                      : 'Awaiting Founder Acceptance'
                     : deal.currentStage === 2
                       ? awaitingAdminApproval
                         ? 'Awaiting Admin Verification'
                         : 'Submit for Admin Approval'
-                      : 'Move to Portfolio'}
+                      : deal.stockTransfer.status === 'rejected'
+                        ? 'Resubmit for Admin Approval'
+                        : 'Move to Portfolio'}
               </Button>
             </div>
           </div>

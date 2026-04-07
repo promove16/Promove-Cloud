@@ -97,6 +97,31 @@ const signToken = (
   );
 };
 
+const createAuthSessionStoreError = () =>
+  new ApiError(
+    503,
+    'AUTH_SESSION_STORE_UNAVAILABLE',
+    'Authentication session store is temporarily unavailable. Please try again.',
+  );
+
+const persistRefreshSession = async (
+  refreshTokenId: string,
+  user: SanitizedUser,
+) => {
+  await Promise.all([
+    redis.set(`refresh:${refreshTokenId}`, user._id, { ex: REFRESH_TTL_SECONDS }),
+    redis.set(
+      `session:${user._id}:${refreshTokenId}`,
+      JSON.stringify({
+        userId: user._id,
+        role: user.role,
+        issuedAt: new Date().toISOString(),
+      }),
+      { ex: REFRESH_TTL_SECONDS },
+    ),
+  ]);
+};
+
 const createTokenPair = async (user: SanitizedUser) => {
   const tokenBase = {
     _id: user._id,
@@ -114,16 +139,15 @@ const createTokenPair = async (user: SanitizedUser) => {
     refreshTokenId,
   );
 
-  await redis.set(`refresh:${refreshTokenId}`, user._id, { ex: REFRESH_TTL_SECONDS });
-  await redis.set(
-    `session:${user._id}:${refreshTokenId}`,
-    JSON.stringify({
-      userId: user._id,
-      role: user.role,
-      issuedAt: new Date().toISOString(),
-    }),
-    { ex: REFRESH_TTL_SECONDS },
-  );
+  try {
+    await persistRefreshSession(refreshTokenId, user);
+  } catch (error) {
+    logError('Failed to persist refresh session in Redis', error);
+
+    if (!env.AUTH_ALLOW_REDIS_AUTH_FALLBACK) {
+      throw createAuthSessionStoreError();
+    }
+  }
 
   return {
     accessToken,
@@ -678,14 +702,28 @@ export const refreshUserToken = async (refreshToken: string | undefined): Promis
   }
 
   const key = `refresh:${decoded.tokenId}`;
-  const storedUserId = await redis.get<string>(key);
+  let storedUserId: string | null;
+
+  try {
+    storedUserId = await redis.get<string>(key);
+  } catch (error) {
+    logError('Failed to read refresh session from Redis', error);
+    throw createAuthSessionStoreError();
+  }
 
   if (!storedUserId || storedUserId !== decoded._id) {
     throw new ApiError(401, 'UNAUTHORIZED', 'Invalid or expired token');
   }
 
-  await redis.del(key);
-  await redis.del(`session:${decoded._id}:${decoded.tokenId}`);
+  try {
+    await Promise.all([
+      redis.del(key),
+      redis.del(`session:${decoded._id}:${decoded.tokenId}`),
+    ]);
+  } catch (error) {
+    logError('Failed to rotate refresh session in Redis', error);
+    throw createAuthSessionStoreError();
+  }
 
   const user = await User.findById(decoded._id);
 

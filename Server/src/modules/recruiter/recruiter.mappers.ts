@@ -10,11 +10,14 @@ import { normalizeInnovationScore, normalizeScoreBreakdown } from '../innovation
 import {
   RecruiterCollegeCard,
   RecruiterDriveView,
+  RecruiterInstitutionSummary,
   RecruiterJobView,
   RecruiterPlacementRow,
   RecruiterTalentProject,
   RecruiterTalentSummary,
 } from './recruiter.types';
+
+const escapeRegex = (value: string) => value.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
 
 export const mapInstitution = (institution?: {
   _id: Types.ObjectId;
@@ -82,6 +85,7 @@ export const mapTalent = (
     bridgeType?: RelevanceBridgeType;
     activeProject?: RecruiterTalentProject;
     extraSkills?: string[];
+    institution?: RecruiterInstitutionSummary;
   },
 ): RecruiterTalentSummary => ({
   _id: String(student._id),
@@ -90,7 +94,11 @@ export const mapTalent = (
   innovationScore: normalizeInnovationScore(student.innovationScore),
   scoreBreakdown: normalizeScoreBreakdown(student.scoreBreakdown),
   skills: getSkills(student.domain, params.activeProject?.category, params.extraSkills ?? []),
-  ...(student.institutionId
+  ...(params.institution
+    ? {
+        institution: params.institution,
+      }
+    : student.institutionId
     ? {
         institution: mapInstitution({
           _id: student.institutionId,
@@ -246,6 +254,9 @@ export const mapCollege = (college: {
     totalStudentsEnrolled: number;
     studentsPlaced?: number;
     iicStarRating: number;
+    stats?: {
+      topHiringSector?: string;
+    };
   };
 }): RecruiterCollegeCard => {
   const total = college.institutionProfile?.totalStudentsEnrolled ?? 0;
@@ -257,7 +268,7 @@ export const mapCollege = (college: {
     studentCount: total,
     placementVelocity: total > 0 ? Number(((placed / total) * 100).toFixed(2)) : 0,
     iicStarRating: college.institutionProfile?.iicStarRating ?? 0,
-    focusLabel: 'Equity - Incubation - Patent Licensing',
+    focusLabel: college.institutionProfile?.stats?.topHiringSector ?? 'Not added',
   };
 };
 
@@ -285,13 +296,27 @@ export const createBridge = async (
   studentId: string,
   bridgeType: RelevanceBridgeType,
 ) => {
+  const existingBridge = await RelevanceBridge.findOne({ recruiterId, studentId })
+    .select('bridgeType isActive')
+    .lean<{ bridgeType?: RelevanceBridgeType; isActive?: boolean }>();
+
+  if (
+    existingBridge?.isActive &&
+    existingBridge.bridgeType &&
+    bridgePriority(existingBridge.bridgeType) <= bridgePriority(bridgeType)
+  ) {
+    return;
+  }
+
   await RelevanceBridge.updateOne(
     { recruiterId, studentId },
     {
-      recruiterId,
-      studentId,
-      bridgeType,
-      isActive: true,
+      $set: {
+        recruiterId,
+        studentId,
+        bridgeType,
+        isActive: true,
+      },
     },
     { upsert: true },
   );
@@ -369,7 +394,7 @@ export const resolveInstitutionIds = async (institution?: string) => {
 
   const matches = await User.find({
     role: { $in: [UserRole.SCHOOL, UserRole.COLLEGE] },
-    'institutionProfile.institutionName': new RegExp(institution, 'i'),
+    'institutionProfile.institutionName': new RegExp(escapeRegex(institution), 'i'),
   })
     .select('_id')
     .lean();

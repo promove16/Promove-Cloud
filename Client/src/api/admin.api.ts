@@ -304,7 +304,7 @@ export interface AdminStartupReviewItem {
 }
 
 export interface AdminDealReviewPayload {
-  stockTransferStatus?: 'pending_review' | 'under_review';
+  stockTransferStatus?: 'pending_review' | 'under_review' | 'rejected';
   reviewNotes?: string;
   royaltyPercentage?: number;
   royaltyStatus?: 'pending' | 'invoiced' | 'received';

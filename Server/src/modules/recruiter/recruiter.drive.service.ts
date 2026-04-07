@@ -144,6 +144,55 @@ export const getRecruiterOnboarding = async (recruiterId: string): Promise<Recru
   );
 };
 
+export const sendOnboardingReminder = async (
+  recruiterId: string,
+  studentId: string,
+  message?: string,
+) => {
+  const placement = await PlacementRecord.findOne({ recruiterId, studentId }).lean();
+  if (!placement) {
+    throw new ApiError(404, 'PLACEMENT_NOT_FOUND', 'No onboarding record exists for this student');
+  }
+
+  const recruiter = await User.findById(recruiterId).select('displayName').lean();
+  const recruiterName = recruiter?.displayName ?? 'Your recruiter';
+  const body =
+    message?.trim() ||
+    `${recruiterName} sent a reminder about your onboarding. Please review your pending steps.`;
+
+  await notifyUser(studentId, 'Onboarding reminder', body, '/dashboard/student');
+
+  return { sent: true };
+};
+
+export const requestCollegePartnership = async (
+  recruiterId: string,
+  collegeId: string,
+  message?: string,
+) => {
+  const college = await User.findOne({ _id: collegeId, role: UserRole.COLLEGE, isActive: true })
+    .select('_id displayName')
+    .lean();
+  if (!college) {
+    throw new ApiError(404, 'COLLEGE_NOT_FOUND', 'College not found');
+  }
+
+  const recruiter = await User.findById(recruiterId).select('displayName').lean();
+  const recruiterName = recruiter?.displayName ?? 'A recruiter';
+  const body =
+    message?.trim() ||
+    `${recruiterName} is interested in partnering with ${college.displayName} for placements and drives.`;
+
+  await notifyUser(
+    String(college._id),
+    'New partnership request',
+    body,
+    '/dashboard/college',
+  );
+
+  return { sent: true };
+};
+
 export const markStudentHired = async (recruiterId: string, studentId: string, companyName: string) => {
   const student = await User.findOne({
     _id: studentId,

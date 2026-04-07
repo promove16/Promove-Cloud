@@ -79,10 +79,12 @@ const isValidQueryType = (value: string | null): value is QueryType =>
   value === 'project_join' ||
   value === 'investor' ||
   value === 'recruiter' ||
+  value === 'hiring_event' ||
+  value === 'mentorship_program' ||
   value === 'general';
 
-const getAutoQueryTypeForRole = (role?: string | null): QueryType | null => {
-  const visibleTypes = getVisibleAssociationQueryTypes(role);
+const getAutoQueryTypeForRole = (role?: string | null, senderRole?: string | null): QueryType | null => {
+  const visibleTypes = getVisibleAssociationQueryTypes(role, senderRole);
   return visibleTypes[0] ?? null;
 };
 
@@ -412,14 +414,15 @@ function ConversationItem({
 interface FirstContactPanelProps {
   partnerName: string;
   partnerRole?: string;
+  currentUserRole?: string;
   onSend: (message: string, queryType: QueryType) => void;
   initialQueryType?: QueryType | null;
 }
 
-function FirstContactPanel({ partnerName, partnerRole, onSend, initialQueryType }: FirstContactPanelProps) {
+function FirstContactPanel({ partnerName, partnerRole, currentUserRole, onSend, initialQueryType }: FirstContactPanelProps) {
   const [selectedType, setSelectedType] = useState<QueryType | null>(initialQueryType ?? null);
   const [customMessage, setCustomMessage] = useState('');
-  const visibleAssociationTypes = new Set(getVisibleAssociationQueryTypes(partnerRole));
+  const visibleAssociationTypes = new Set(getVisibleAssociationQueryTypes(partnerRole, currentUserRole));
 
   const queryTypes: { type: QueryType; label: string; icon: React.ReactNode; color: string; autoMessages: string[] }[] = [
     {
@@ -460,6 +463,26 @@ function FirstContactPanel({ partnerName, partnerRole, onSend, initialQueryType 
       autoMessages: [
         'Hi! I am interested in career opportunities at your organization.',
         'I would love to discuss potential opportunities with your team.',
+      ],
+    },
+    {
+      type: 'hiring_event',
+      label: 'Hiring Event',
+      icon: <Calendar className="h-5 w-5" />,
+      color: 'from-amber-500 to-orange-500',
+      autoMessages: [
+        'Hi! I would like to organize a hiring event with your college and explore student talent for open roles.',
+        'Hello! I am planning a campus hiring event and would like to coordinate with your college placement team.',
+      ],
+    },
+    {
+      type: 'mentorship_program',
+      label: 'Mentorship Program',
+      icon: <GraduationCap className="h-5 w-5" />,
+      color: 'from-cyan-500 to-blue-500',
+      autoMessages: [
+        'Hi! I would like to support your students through a mentorship program. Could we discuss the format and schedule?',
+        'Hello! I am available for a mentorship program with your institution and would like to understand your preferred topics.',
       ],
     },
     {
@@ -923,6 +946,7 @@ function ChatPanel({
               <FirstContactPanel
                 partnerName={partnerName}
                 partnerRole={partnerRole}
+                currentUserRole={currentUser?.role}
                 onSend={onSendWithQuery}
                 initialQueryType={initialQueryType}
               />
@@ -1111,7 +1135,7 @@ export function MessagesPage() {
   const partnerRole = activeConvo?.partner?.role ?? partnerProfile?.role ?? 'user';
   const partnerAvatar = activeConvo?.partner?.avatar ?? partnerProfile?.avatar;
   const partnerOnline = activeConvo?.isOnline || isPartnerOnline;
-  const visibleAssociationTypes = new Set(getVisibleAssociationQueryTypes(partnerRole));
+  const visibleAssociationTypes = new Set(getVisibleAssociationQueryTypes(partnerRole, currentUser?.role));
   const requestedQueryType = (() => {
     const rawType = searchParams.get('queryType');
     return isValidQueryType(rawType) ? rawType : null;
@@ -1119,7 +1143,7 @@ export function MessagesPage() {
   const contextualQueryType =
     requestedQueryType && (requestedQueryType === 'general' || visibleAssociationTypes.has(requestedQueryType))
       ? requestedQueryType
-      : getAutoQueryTypeForRole(partnerRole);
+      : getAutoQueryTypeForRole(partnerRole, currentUser?.role);
 
   const getFirstContactKey = (userId: string) => `dm_first_contact_${userId}_${currentUser?._id}`;
 
@@ -1134,7 +1158,7 @@ export function MessagesPage() {
       setPendingPartnerId(pid);
       setPendingPartnerName(pname);
       setPendingPartnerRole(prole ?? '');
-      setPendingQueryType(getAutoQueryTypeForRole(prole));
+      setPendingQueryType(getAutoQueryTypeForRole(prole, currentUser?.role));
       setShowQueryModal(true);
     } else {
       navigate(`/dashboard/messages/${pid}`);
@@ -1435,6 +1459,38 @@ export function MessagesPage() {
                                 Recruiter
                               </button>
                             ) : null}
+                            {visibleAssociationTypes.has('hiring_event') ? (
+                              <button
+                                type="button"
+                                disabled={!partnerId}
+                                onClick={() => {
+                                  if (partnerId) {
+                                    sendMessage({ message: 'Hi! I would like to organize a hiring event with your college and discuss student talent for open roles.', messageType: 'text', queryType: 'hiring_event' });
+                                    setShowMenu(false);
+                                  }
+                                }}
+                                className="flex w-full items-center gap-2 rounded-lg px-2 py-1.5 text-left text-sm text-amber-400 transition hover:bg-slate-800 disabled:cursor-not-allowed disabled:opacity-50"
+                              >
+                                <Calendar className="h-4 w-4" />
+                                Hiring Event
+                              </button>
+                            ) : null}
+                            {visibleAssociationTypes.has('mentorship_program') ? (
+                              <button
+                                type="button"
+                                disabled={!partnerId}
+                                onClick={() => {
+                                  if (partnerId) {
+                                    sendMessage({ message: 'Hi! I would like to support your students through a mentorship program and discuss the request details.', messageType: 'text', queryType: 'mentorship_program' });
+                                    setShowMenu(false);
+                                  }
+                                }}
+                                className="flex w-full items-center gap-2 rounded-lg px-2 py-1.5 text-left text-sm text-cyan-300 transition hover:bg-slate-800 disabled:cursor-not-allowed disabled:opacity-50"
+                              >
+                                <GraduationCap className="h-4 w-4" />
+                                Mentorship Program
+                              </button>
+                            ) : null}
                           </div>
                         </div>
                       ) : null}
@@ -1484,6 +1540,7 @@ export function MessagesPage() {
         onSelect={handleQuerySelect}
         recipientName={pendingPartnerName}
         recipientRole={pendingPartnerRole}
+        currentUserRole={currentUser?.role}
         initialQueryType={pendingQueryType}
       />
 

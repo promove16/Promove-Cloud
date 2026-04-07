@@ -47,6 +47,7 @@ const createStartup = async (
     category: 'Software',
     stage: 'Launched',
     launchedToInvestors: true,
+    reviewStatus: 'approved',
     innovationScoreAtLaunch: 88,
     traction: {
       patentFiled: false,
@@ -75,10 +76,12 @@ describe('investment workflow integration', () => {
     expect(response.status).toBe(201);
     expect(response.body.data.investorType).toBe('penny');
     expect(response.body.data.sharesAllocated).toBe(20);
+    expect(response.body.data.founderDecision.status).toBe('pending');
 
     const updatedStartup = await Startup.findById(startup._id).lean();
     expect(updatedStartup?.currentPennyCount).toBe(1);
     expect(updatedStartup?.availableShares).toBe(980);
+
   });
 
   it('creates a sole investment and blocks a second sole investor', async () => {
@@ -214,9 +217,10 @@ describe('investment workflow integration', () => {
     const founder = await createUser(UserRole.STUDENT, { displayName: 'Cap Table Founder' });
     const soleInvestor = await createUser(UserRole.INVESTOR, { displayName: 'Sole Lead' });
     const pennyInvestor = await createUser(UserRole.INVESTOR, { displayName: 'Penny Backer' });
+    const admin = await createUser(UserRole.ADMIN, { displayName: 'Cap Table Admin' });
     const startup = await createStartup(founder._id.toString());
 
-    await request(app)
+    const soleResponse = await request(app)
       .post(`/api/startups/${startup._id}/sole-investor`)
       .set(authHeader(soleInvestor))
       .send({
@@ -226,7 +230,9 @@ describe('investment workflow integration', () => {
         chosenRole: 'director',
       });
 
-    await request(app)
+    expect(soleResponse.status).toBe(201);
+
+    const pennyResponse = await request(app)
       .post(`/api/investor/express-interest/${startup._id}`)
       .set(authHeader(pennyInvestor))
       .send({
@@ -235,6 +241,46 @@ describe('investment workflow integration', () => {
         proposedEquityPercent: 2,
         chosenRole: 'shareholder',
       });
+
+    expect(pennyResponse.status).toBe(201);
+
+    for (const [dealId, investor, amount, equityPercent, investorRole] of [
+      [soleResponse.body.data._id, soleInvestor, 300000, 60, 'director'],
+      [pennyResponse.body.data._id, pennyInvestor, 20000, 2, 'shareholder'],
+    ] as const) {
+      const founderAcceptResponse = await request(app)
+        .patch(`/api/deals/${dealId}/founder-decision`)
+        .set(authHeader(founder))
+        .send({ decision: 'accepted' });
+
+      expect(founderAcceptResponse.status).toBe(200);
+
+      const stageTwoResponse = await request(app)
+        .patch(`/api/investor/deals/${dealId}/stage`)
+        .set(authHeader(investor))
+        .send({
+          newStage: 2,
+          stageData: { amountINR: amount },
+        });
+
+      expect(stageTwoResponse.status).toBe(200);
+
+      const stageThreeResponse = await request(app)
+        .patch(`/api/investor/deals/${dealId}/stage`)
+        .set(authHeader(investor))
+        .send({
+          newStage: 3,
+          stageData: { equityPercent, investorRole },
+        });
+
+      expect(stageThreeResponse.status).toBe(200);
+
+      const approveResponse = await request(app)
+        .patch(`/api/admin/deals/${dealId}/approve-stage`)
+        .set(authHeader(admin));
+
+      expect(approveResponse.status).toBe(200);
+    }
 
     const founderView = await request(app)
       .get(`/api/startups/${startup._id}/cap-table`)
@@ -350,5 +396,271 @@ describe('investment workflow integration', () => {
     expect(soleAuthority.body.data.items[0].canVeto).toBe(true);
     expect(pennyAuthority.status).toBe(200);
     expect(pennyAuthority.body.data.items[0].canVeto).toBe(false);
+  });
+
+  it('blocks finalization after admin rejects a transfer and allows resubmission', async () => {
+    const founder = await createUser(UserRole.STUDENT, { displayName: 'Review Founder' });
+    const investor = await createUser(UserRole.INVESTOR, { displayName: 'Review Investor' });
+    const admin = await createUser(UserRole.ADMIN, { displayName: 'Admin Reviewer' });
+    const startup = await createStartup(founder._id.toString());
+
+    const expressResponse = await request(app)
+      .post(`/api/investor/express-interest/${startup._id}`)
+      .set(authHeader(investor))
+      .send({
+        investorType: 'penny',
+        proposedAmountINR: 25000,
+        proposedEquityPercent: 2,
+        chosenRole: 'shareholder',
+      });
+
+    expect(expressResponse.status).toBe(201);
+    const dealId = expressResponse.body.data._id;
+
+    const founderAcceptResponse = await request(app)
+      .patch(`/api/deals/${dealId}/founder-decision`)
+      .set(authHeader(founder))
+      .send({
+        decision: 'accepted',
+      });
+
+    expect(founderAcceptResponse.status).toBe(200);
+
+    const fundTransferResponse = await request(app)
+      .patch(`/api/investor/deals/${dealId}/stage`)
+      .set(authHeader(investor))
+      .send({
+        newStage: 2,
+        stageData: { amountINR: 25000 },
+      });
+
+    expect(fundTransferResponse.status).toBe(200);
+
+    const transferReviewResponse = await request(app)
+      .patch(`/api/investor/deals/${dealId}/stage`)
+      .set(authHeader(investor))
+      .send({
+        newStage: 3,
+        stageData: {
+          equityPercent: 2,
+          investorRole: 'shareholder',
+        },
+      });
+
+    expect(transferReviewResponse.status).toBe(200);
+    expect(transferReviewResponse.body.data.requiresAdminApproval).toBe(true);
+
+    const rejectResponse = await request(app)
+      .patch(`/api/admin/deals/${dealId}/review`)
+      .set(authHeader(admin))
+      .send({
+        stockTransferStatus: 'rejected',
+        reviewNotes: 'Cap table documents do not match the submitted transfer terms.',
+      });
+
+    expect(rejectResponse.status).toBe(200);
+    expect(rejectResponse.body.data).toEqual(
+      expect.objectContaining({
+        mediationStatus: 'rejected',
+        adminApprovalRequired: false,
+      }),
+    );
+    expect(rejectResponse.body.data.stockTransfer.status).toBe('rejected');
+
+    const blockedCloseResponse = await request(app)
+      .patch(`/api/investor/deals/${dealId}/stage`)
+      .set(authHeader(investor))
+      .send({ newStage: 4 });
+
+    expect(blockedCloseResponse.status).toBe(400);
+    expect(blockedCloseResponse.body.error.code).toBe('ADMIN_APPROVAL_REQUIRED');
+
+    const resubmissionResponse = await request(app)
+      .patch(`/api/investor/deals/${dealId}/stage`)
+      .set(authHeader(investor))
+      .send({
+        newStage: 3,
+        stageData: {
+          equityPercent: 2,
+          investorRole: 'shareholder',
+        },
+      });
+
+    expect(resubmissionResponse.status).toBe(200);
+    expect(resubmissionResponse.body.data.requiresAdminApproval).toBe(true);
+
+    const approveResponse = await request(app)
+      .patch(`/api/admin/deals/${dealId}/approve-stage`)
+      .set(authHeader(admin));
+
+    expect(approveResponse.status).toBe(200);
+
+    const closeResponse = await request(app)
+      .patch(`/api/investor/deals/${dealId}/stage`)
+      .set(authHeader(investor))
+      .send({ newStage: 4 });
+
+    expect(closeResponse.status).toBe(200);
+    expect(closeResponse.body.data.deal).toEqual(
+      expect.objectContaining({
+        currentStage: 4,
+        status: 'closed',
+      }),
+    );
+
+  });
+
+  it('blocks fund transfer until a founder accepts the proposal', async () => {
+    const founder = await createUser(UserRole.STUDENT, { displayName: 'Gate Founder' });
+    const investor = await createUser(UserRole.INVESTOR, { displayName: 'Gate Investor' });
+    const startup = await createStartup(founder._id.toString());
+
+    const expressResponse = await request(app)
+      .post(`/api/investor/express-interest/${startup._id}`)
+      .set(authHeader(investor))
+      .send({
+        investorType: 'penny',
+        proposedAmountINR: 22000,
+        proposedEquityPercent: 2,
+        chosenRole: 'shareholder',
+      });
+
+    expect(expressResponse.status).toBe(201);
+
+    const blockedResponse = await request(app)
+      .patch(`/api/investor/deals/${expressResponse.body.data._id}/stage`)
+      .set(authHeader(investor))
+      .send({
+        newStage: 2,
+        stageData: { amountINR: 22000 },
+      });
+
+    expect(blockedResponse.status).toBe(400);
+    expect(blockedResponse.body.error.code).toBe('FOUNDER_ACCEPTANCE_REQUIRED');
+  });
+
+  it('restores reserved shares and penny slots when the founder rejects a proposal', async () => {
+    const founder = await createUser(UserRole.STUDENT, { displayName: 'Reject Founder' });
+    const investor = await createUser(UserRole.INVESTOR, { displayName: 'Reject Investor' });
+    const startup = await createStartup(founder._id.toString());
+
+    const expressResponse = await request(app)
+      .post(`/api/investor/express-interest/${startup._id}`)
+      .set(authHeader(investor))
+      .send({
+        investorType: 'penny',
+        proposedAmountINR: 24000,
+        proposedEquityPercent: 2,
+        chosenRole: 'shareholder',
+      });
+
+    expect(expressResponse.status).toBe(201);
+
+    const rejectResponse = await request(app)
+      .patch(`/api/deals/${expressResponse.body.data._id}/founder-decision`)
+      .set(authHeader(founder))
+      .send({
+        decision: 'rejected',
+        note: 'We are not taking external capital on this project yet.',
+      });
+
+    expect(rejectResponse.status).toBe(200);
+    expect(rejectResponse.body.data.status).toBe('cancelled');
+    expect(rejectResponse.body.data.founderDecision.status).toBe('rejected');
+
+    const updatedStartup = await Startup.findById(startup._id).lean();
+    expect(updatedStartup?.currentPennyCount).toBe(0);
+    expect(updatedStartup?.availableShares).toBe(1000);
+
+  });
+
+  it('requires founder acceptance before an investor can advance and restores shares when the founder rejects', async () => {
+    const founder = await createUser(UserRole.STUDENT, { displayName: 'Founder Gatekeeper' });
+    const investor = await createUser(UserRole.INVESTOR, { displayName: 'Waiting Investor' });
+    const startup = await createStartup(founder._id.toString());
+
+    const expressResponse = await request(app)
+      .post(`/api/investor/express-interest/${startup._id}`)
+      .set(authHeader(investor))
+      .send({
+        investorType: 'penny',
+        proposedAmountINR: 25000,
+        proposedEquityPercent: 2,
+        chosenRole: 'shareholder',
+      });
+
+    expect(expressResponse.status).toBe(201);
+    expect(expressResponse.body.data.founderDecision.status).toBe('pending');
+
+    const blockedAdvanceResponse = await request(app)
+      .patch(`/api/investor/deals/${expressResponse.body.data._id}/stage`)
+      .set(authHeader(investor))
+      .send({
+        newStage: 2,
+        stageData: { amountINR: 25000 },
+      });
+
+    expect(blockedAdvanceResponse.status).toBe(400);
+    expect(blockedAdvanceResponse.body.error.code).toBe('FOUNDER_ACCEPTANCE_REQUIRED');
+
+    const rejectionResponse = await request(app)
+      .patch(`/api/deals/${expressResponse.body.data._id}/founder-decision`)
+      .set(authHeader(founder))
+      .send({
+        decision: 'rejected',
+        note: 'The current proposal terms do not fit our round.',
+      });
+
+    expect(rejectionResponse.status).toBe(200);
+    expect(rejectionResponse.body.data).toEqual(
+      expect.objectContaining({
+        status: 'cancelled',
+        founderDecision: expect.objectContaining({
+          status: 'rejected',
+        }),
+      }),
+    );
+
+    const restoredStartup = await Startup.findById(startup._id).lean();
+    expect(restoredStartup?.availableShares).toBe(1000);
+    expect(restoredStartup?.currentPennyCount).toBe(0);
+
+    const resubmittedResponse = await request(app)
+      .post(`/api/investor/express-interest/${startup._id}`)
+      .set(authHeader(investor))
+      .send({
+        investorType: 'penny',
+        proposedAmountINR: 30000,
+        proposedEquityPercent: 3,
+        chosenRole: 'shareholder',
+      });
+
+    expect(resubmittedResponse.status).toBe(201);
+
+    const acceptanceResponse = await request(app)
+      .patch(`/api/deals/${resubmittedResponse.body.data._id}/founder-decision`)
+      .set(authHeader(founder))
+      .send({
+        decision: 'accepted',
+        note: 'Proceed with diligence.',
+      });
+
+    expect(acceptanceResponse.status).toBe(200);
+    expect(acceptanceResponse.body.data.founderDecision).toEqual(
+      expect.objectContaining({
+        status: 'accepted',
+      }),
+    );
+
+    const advanceResponse = await request(app)
+      .patch(`/api/investor/deals/${resubmittedResponse.body.data._id}/stage`)
+      .set(authHeader(investor))
+      .send({
+        newStage: 2,
+        stageData: { amountINR: 30000 },
+      });
+
+    expect(advanceResponse.status).toBe(200);
+    expect(advanceResponse.body.data.deal.currentStage).toBe(2);
   });
 });

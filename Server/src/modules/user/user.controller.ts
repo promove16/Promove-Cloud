@@ -22,6 +22,8 @@ import {
 } from './user.service';
 import { getOnboardingStatus, claimOnboardingStep } from './onboarding.service';
 import { User } from './user.model';
+import { ALLOWED_CONNECTIONS } from '../../middleware/connectionGuard';
+import { canSearchUserForDm } from '../dm/dm.permissions';
 
 export const getMe = async (req: Request, res: Response) => {
   if (!req.user) {
@@ -197,10 +199,12 @@ export const searchUsers = async (req: Request, res: Response) => {
   // Escape regex special characters to prevent ReDoS
   const escaped = q.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
 
-  const users = await User.find(
+  const candidateRoles = ALLOWED_CONNECTIONS[req.user.role] ?? [];
+  const candidates = await User.find(
     {
       displayName: { $regex: escaped, $options: 'i' },
       isActive: true,
+      role: { $in: candidateRoles },
       _id: { $ne: req.user._id },
     },
     { _id: 1, displayName: 1, avatar: 1, role: 1 },
@@ -208,5 +212,9 @@ export const searchUsers = async (req: Request, res: Response) => {
     .limit(10)
     .lean();
 
-  res.status(200).json(new ApiResponse(users));
+  const allowedFlags = await Promise.all(
+    candidates.map((candidate) => canSearchUserForDm(req.user!._id, String(candidate._id))),
+  );
+
+  res.status(200).json(new ApiResponse(candidates.filter((_candidate, index) => allowedFlags[index])));
 };

@@ -2,6 +2,7 @@ import { Request, Response } from 'express';
 import { ApiError } from '../../utils/ApiError';
 import { ApiResponse } from '../../utils/ApiResponse';
 import {
+  acceptMemberInvite,
   addChatParticipant,
   addChatParticipantSchema,
   addCodeSubmission,
@@ -25,6 +26,7 @@ import {
   serializeWorkspace,
   inviteMember,
   inviteMemberSchema,
+  declineMemberInvite,
   removeChatParticipant,
   removeMember,
   updateTask,
@@ -163,6 +165,22 @@ export const inviteWorkspaceMember = async (req: Request, res: Response) => {
   const userId = ensureUserId(req);
   const workspaceId = getParam(req.params.id, 'WORKSPACE_REQUIRED', 'Workspace id is required');
   const workspace = await inviteMember(workspaceId, userId, inviteMemberSchema.parse(req.body));
+  res.json(new ApiResponse(workspace));
+};
+
+export const acceptWorkspaceInvite = async (req: Request, res: Response) => {
+  const userId = ensureUserId(req);
+  const workspaceId = getParam(req.params.id, 'WORKSPACE_REQUIRED', 'Workspace id is required');
+  const requestId = getParam(req.params.requestId, 'TEAM_INVITE_REQUIRED', 'Team invite id is required');
+  const workspace = await acceptMemberInvite(workspaceId, requestId, userId);
+  res.json(new ApiResponse(workspace));
+};
+
+export const declineWorkspaceInvite = async (req: Request, res: Response) => {
+  const userId = ensureUserId(req);
+  const workspaceId = getParam(req.params.id, 'WORKSPACE_REQUIRED', 'Workspace id is required');
+  const requestId = getParam(req.params.requestId, 'TEAM_INVITE_REQUIRED', 'Team invite id is required');
+  const workspace = await declineMemberInvite(workspaceId, requestId, userId);
   res.json(new ApiResponse(workspace));
 };
 

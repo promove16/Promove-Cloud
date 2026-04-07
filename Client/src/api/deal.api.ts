@@ -4,6 +4,7 @@ import {
   CapTableResponse,
   DealCollectionResponse,
   DealDetailView,
+  DealFounderDecisionPayload,
   DealGroupView,
   DealTransitionResponse,
   DealUpdateStagePayload,
@@ -38,6 +39,13 @@ export const dealApi = {
     const response = await api.post<ApiSuccessResponse<DealTransitionResponse>>(`/api/deals/${dealId}/fund-transfer`, {
       amountINR,
     });
+    return response.data.data;
+  },
+  async respondToFounderDecision(dealId: string, payload: DealFounderDecisionPayload) {
+    const response = await api.patch<ApiSuccessResponse<DealDetailView>>(
+      `/api/deals/${dealId}/founder-decision`,
+      payload,
+    );
     return response.data.data;
   },
   async getStartupInvestors(startupId: string) {

@@ -47,6 +47,8 @@ router.post('/:id/tasks', (0, asyncHandler_1.asyncHandler)(workspace_controller_
 router.patch('/:id/tasks/:taskId', (0, asyncHandler_1.asyncHandler)(workspace_controller_1.patchWorkspaceTask));
 router.delete('/:id/tasks/:taskId', (0, asyncHandler_1.asyncHandler)(workspace_controller_1.removeWorkspaceTask));
 router.post('/:id/invite', (0, asyncHandler_1.asyncHandler)(workspace_controller_1.inviteWorkspaceMember));
+router.post('/:id/invites/:requestId/accept', (0, asyncHandler_1.asyncHandler)(workspace_controller_1.acceptWorkspaceInvite));
+router.post('/:id/invites/:requestId/decline', (0, asyncHandler_1.asyncHandler)(workspace_controller_1.declineWorkspaceInvite));
 router.delete('/:id/members/:userId', (0, asyncHandler_1.asyncHandler)(workspace_controller_1.removeWorkspaceMember));
 router.post('/:id/chat-participants', (0, asyncHandler_1.asyncHandler)(workspace_controller_1.addWorkspaceChatParticipant));
 router.delete('/:id/chat-participants/:userId', (0, asyncHandler_1.asyncHandler)(workspace_controller_1.removeWorkspaceChatParticipant));

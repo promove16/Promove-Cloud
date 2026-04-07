@@ -47,6 +47,17 @@ const signToken = (payload, secret, expiresIn, tokenType, tokenId) => {
     }
     return jsonwebtoken_1.default.sign(tokenId ? { ...payload, tokenId, type: tokenType } : { ...payload, type: tokenType }, secret, options);
 };
+const createAuthSessionStoreError = () => new ApiError_1.ApiError(503, 'AUTH_SESSION_STORE_UNAVAILABLE', 'Authentication session store is temporarily unavailable. Please try again.');
+const persistRefreshSession = async (refreshTokenId, user) => {
+    await Promise.all([
+        redis_1.redis.set(`refresh:${refreshTokenId}`, user._id, { ex: REFRESH_TTL_SECONDS }),
+        redis_1.redis.set(`session:${user._id}:${refreshTokenId}`, JSON.stringify({
+            userId: user._id,
+            role: user.role,
+            issuedAt: new Date().toISOString(),
+        }), { ex: REFRESH_TTL_SECONDS }),
+    ]);
+};
 const createTokenPair = async (user) => {
     const tokenBase = {
         _id: user._id,
@@ -56,12 +67,15 @@ const createTokenPair = async (user) => {
     const refreshTokenId = (0, crypto_1.randomUUID)();
     const accessToken = signToken(tokenBase, env_1.env.JWT_ACCESS_SECRET, env_1.env.JWT_ACCESS_EXPIRES, 'access');
     const refreshToken = signToken(tokenBase, env_1.env.JWT_REFRESH_SECRET, env_1.env.JWT_REFRESH_EXPIRES, 'refresh', refreshTokenId);
-    await redis_1.redis.set(`refresh:${refreshTokenId}`, user._id, { ex: REFRESH_TTL_SECONDS });
-    await redis_1.redis.set(`session:${user._id}:${refreshTokenId}`, JSON.stringify({
-        userId: user._id,
-        role: user.role,
-        issuedAt: new Date().toISOString(),
-    }), { ex: REFRESH_TTL_SECONDS });
+    try {
+        await persistRefreshSession(refreshTokenId, user);
+    }
+    catch (error) {
+        (0, logger_1.logError)('Failed to persist refresh session in Redis', error);
+        if (!env_1.env.AUTH_ALLOW_REDIS_AUTH_FALLBACK) {
+            throw createAuthSessionStoreError();
+        }
+    }
     return {
         accessToken,
         refreshToken,
@@ -441,12 +455,27 @@ const refreshUserToken = async (refreshToken) => {
         throw new ApiError_1.ApiError(401, 'UNAUTHORIZED', 'Invalid or expired token');
     }
     const key = `refresh:${decoded.tokenId}`;
-    const storedUserId = await redis_1.redis.get(key);
+    let storedUserId;
+    try {
+        storedUserId = await redis_1.redis.get(key);
+    }
+    catch (error) {
+        (0, logger_1.logError)('Failed to read refresh session from Redis', error);
+        throw createAuthSessionStoreError();
+    }
     if (!storedUserId || storedUserId !== decoded._id) {
         throw new ApiError_1.ApiError(401, 'UNAUTHORIZED', 'Invalid or expired token');
     }
-    await redis_1.redis.del(key);
-    await redis_1.redis.del(`session:${decoded._id}:${decoded.tokenId}`);
+    try {
+        await Promise.all([
+            redis_1.redis.del(key),
+            redis_1.redis.del(`session:${decoded._id}:${decoded.tokenId}`),
+        ]);
+    }
+    catch (error) {
+        (0, logger_1.logError)('Failed to rotate refresh session in Redis', error);
+        throw createAuthSessionStoreError();
+    }
     const user = await user_model_1.User.findById(decoded._id);
     if (!user) {
         throw new ApiError_1.ApiError(401, 'UNAUTHORIZED', 'Invalid or expired token');

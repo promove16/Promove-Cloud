@@ -1,4 +1,11 @@
-import { BarChart3, BriefcaseBusiness, Rocket, Send, type LucideIcon } from 'lucide-react';
+import {
+  BarChart3,
+  BriefcaseBusiness,
+  FileText,
+  Rocket,
+  Send,
+  type LucideIcon,
+} from "lucide-react";
 
 export interface StartupLaunchSectionLink {
   label: string;
@@ -6,42 +13,56 @@ export interface StartupLaunchSectionLink {
   description: string;
   segment: string;
   icon: LucideIcon;
+  path?: string;
 }
 
-export const STARTUP_LAUNCH_BASE_PATH = '/startup-launch';
+export const STARTUP_LAUNCH_BASE_PATH = "/startup-launch";
 export const STARTUP_LAUNCH_LIST_PATH = STARTUP_LAUNCH_BASE_PATH;
-export const STARTUP_LAUNCH_DRAFT_ID = 'new';
+export const STARTUP_LAUNCH_DRAFT_ID = "new";
 export const STARTUP_LAUNCH_NEW_PATH = `${STARTUP_LAUNCH_BASE_PATH}/new`;
 export const STARTUP_LAUNCH_LEGACY_NEW_OVERVIEW_PATH = `${STARTUP_LAUNCH_BASE_PATH}/new/overview`;
 
 export const STARTUP_LAUNCH_SECTION_LINKS: StartupLaunchSectionLink[] = [
   {
-    label: 'Launch',
-    shortLabel: 'Launch',
-    description: 'Build the startup profile, upload the pitch deck, and launch to investors or mentors.',
-    segment: 'overview',
+    label: "Launch",
+    shortLabel: "Launch",
+    description:
+      "Build the startup profile, complete project gates, and launch to investors or mentors.",
+    segment: "overview",
     icon: Rocket,
   },
   {
-    label: 'Investor Outreach',
-    shortLabel: 'Outreach',
-    description: 'Shortlist investors, send pitch requests, and continue investor conversations.',
-    segment: 'investor-outreach',
+    label: "Investor Outreach",
+    shortLabel: "Outreach",
+    description:
+      "Shortlist investors, send pitch requests, and track investor approval conversations.",
+    segment: "investor-outreach",
     icon: Send,
   },
   {
-    label: 'Cap Table',
-    shortLabel: 'Cap Table',
-    description: 'Track founder retention, sole investor allocation, and penny investor equity.',
-    segment: 'cap-table',
+    label: "Cap Table",
+    shortLabel: "Cap Table",
+    description:
+      "Track founder retention, sole investor allocation, and penny investor equity.",
+    segment: "cap-table",
     icon: BarChart3,
   },
   {
-    label: 'Investors Deals',
-    shortLabel: 'Investors Deals',
-    description: 'Monitor live investor deal flow, stages, and closed outcomes in one place.',
-    segment: 'investor-deals',
+    label: "Investors Deals",
+    shortLabel: "Investors Deals",
+    description:
+      "Monitor live investor deal flow, stages, and closed outcomes in one place.",
+    segment: "investor-deals",
     icon: BriefcaseBusiness,
+  },
+  {
+    label: "Patent Support",
+    shortLabel: "Patent Support",
+    description:
+      "Request admin patent review before investor pitch listing.",
+    segment: "patent-support",
+    icon: FileText,
+    path: "/patent-support",
   },
 ];
 
@@ -49,7 +70,7 @@ export const getStartupSectionPath = (startupId: string, segment: string) =>
   `${STARTUP_LAUNCH_BASE_PATH}/${startupId}/${segment}`;
 
 export const getStartupOverviewPath = (startupId: string) =>
-  getStartupSectionPath(startupId, 'overview');
+  getStartupSectionPath(startupId, "overview");
 
 export const normalizeStartupRouteId = (startupId?: string) =>
   startupId && startupId !== STARTUP_LAUNCH_DRAFT_ID ? startupId : undefined;

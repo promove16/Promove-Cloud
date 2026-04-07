@@ -5,7 +5,6 @@ import { Button } from '../../components/ui/Button';
 import { Card } from '../../components/ui/Card';
 import { Input } from '../../components/ui/Input';
 import { Spinner } from '../../components/ui/Spinner';
-import { MAX_INNOVATION_SCORE } from '../../constants/score';
 import { investorApi } from '../../api/investor.api';
 import { InvestorStartupDetailResponse } from '../../types/investor.types';
 
@@ -175,7 +174,7 @@ export function StartupDetailDrawer({
                   <div className="flex flex-wrap gap-2">
                     <Badge>{detail.startup.stage}</Badge>
                     <Badge className="border-emerald-500/30 bg-emerald-500/10 text-emerald-300">
-                      Score {detail.startup.innovationScoreAtLaunch}/{MAX_INNOVATION_SCORE}
+                      Score {detail.startup.innovationScoreAtLaunch}/200
                     </Badge>
                   </div>
                 </div>
@@ -188,7 +187,7 @@ export function StartupDetailDrawer({
                     >
                       <div className="text-xs uppercase tracking-[0.2em] text-slate-500">Founder</div>
                       <div className="mt-2 font-semibold text-white">{founder.displayName}</div>
-                      <div className="mt-2 text-sm text-cyan-300">{founder.innovationScore}/{MAX_INNOVATION_SCORE}</div>
+                      <div className="mt-2 text-sm text-cyan-300">{founder.innovationScore}/200</div>
                     </div>
                   ))}
                 </div>
@@ -232,7 +231,7 @@ export function StartupDetailDrawer({
                     <div className="flex items-center justify-between gap-3">
                       <div>
                         <div className="font-semibold text-white">{founder.displayName}</div>
-                        <div className="text-sm text-slate-400">Live score {founder.innovationScore}/{MAX_INNOVATION_SCORE}</div>
+                        <div className="text-sm text-slate-400">Live score {founder.innovationScore}/200</div>
                       </div>
                       <Badge>{founder.domain ?? 'Founder'}</Badge>
                     </div>

@@ -11,7 +11,7 @@ export const ALLOWED_CONNECTIONS: Record<UserRole, UserRole[]> = {
     UserRole.RECRUITER,
     UserRole.STUDENT,
   ],
-  [UserRole.MENTOR]: [UserRole.STUDENT],
+  [UserRole.MENTOR]: [UserRole.STUDENT, UserRole.SCHOOL, UserRole.COLLEGE],
   [UserRole.INVESTOR]: [UserRole.STUDENT, UserRole.SCHOOL, UserRole.COLLEGE],
   [UserRole.RECRUITER]: [UserRole.STUDENT, UserRole.COLLEGE],
   [UserRole.ADMIN]: [

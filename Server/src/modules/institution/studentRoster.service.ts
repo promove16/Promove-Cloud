@@ -1,5 +1,6 @@
 import { z } from 'zod';
-import * as XLSX from 'xlsx';
+import { Readable } from 'stream';
+import ExcelJS from 'exceljs';
 import { UserRole } from '../../types/roles.types';
 import { ApiError } from '../../utils/ApiError';
 import { sanitizePlainText } from '../../utils/sanitizeText';
@@ -277,21 +278,26 @@ const normalizeHeader = (value: unknown) =>
     .toLowerCase()
     .replace(/[^a-z0-9]+/g, '');
 
-const pickColumn = (row: Record<string, unknown>, candidates: string[]) => {
-  const entries = Object.entries(row);
-  const match = entries.find(([key]) => candidates.includes(normalizeHeader(key)));
-  return match?.[1];
+type StudentRosterWorkbookRow = Partial<StudentRosterInput> & { __rowNumber: number };
+
+const findColumnNumber = (headerColumns: Map<string, number>, candidates: string[]) => {
+  const normalizedCandidates = candidates.map(normalizeHeader);
+  const match = normalizedCandidates.find((candidate) => headerColumns.has(candidate));
+  return match ? headerColumns.get(match) : undefined;
 };
 
-export const workbookRowsToPayloads = (buffer: Buffer): Array<Partial<StudentRosterInput> & { __rowNumber: number }> => {
-  let workbook: XLSX.WorkBook;
+export const workbookRowsToPayloads = async (
+  buffer: Buffer,
+  fileName: string,
+): Promise<StudentRosterWorkbookRow[]> => {
+  const workbook = new ExcelJS.Workbook();
 
   try {
-    workbook = XLSX.read(buffer, {
-      type: 'buffer',
-      raw: false,
-      cellDates: true,
-    });
+    if (/\.csv$/i.test(fileName)) {
+      await workbook.csv.read(Readable.from([buffer]));
+    } else {
+      await workbook.xlsx.load(buffer as unknown as Parameters<typeof workbook.xlsx.load>[0]);
+    }
   } catch (_error) {
     throw new ApiError(
       400,
@@ -300,22 +306,47 @@ export const workbookRowsToPayloads = (buffer: Buffer): Array<Partial<StudentRos
     );
   }
 
-  const firstSheetName = workbook.SheetNames[0];
-  if (!firstSheetName) {
+  const sheet = workbook.worksheets[0];
+  if (!sheet) {
     throw new ApiError(400, 'EMPTY_STUDENT_ROSTER_FILE', 'The uploaded file does not contain any sheets.');
   }
 
-  const sheet = workbook.Sheets[firstSheetName];
-  const rows = XLSX.utils.sheet_to_json<Record<string, unknown>>(sheet, { defval: '' });
+  const headerColumns = new Map<string, number>();
+  sheet.getRow(1).eachCell({ includeEmpty: true }, (cell, columnNumber) => {
+    const normalized = normalizeHeader(cell.text);
+    if (normalized) {
+      headerColumns.set(normalized, columnNumber);
+    }
+  });
 
-  return rows.map((row, index) => ({
-    displayName: String(pickColumn(row, worksheetHeaders.displayName) ?? ''),
-    email: String(pickColumn(row, worksheetHeaders.email) ?? ''),
-    gradeOrProgram: String(pickColumn(row, worksheetHeaders.gradeOrProgram) ?? ''),
-    rollNumber: String(pickColumn(row, worksheetHeaders.rollNumber) ?? ''),
-    notes: String(pickColumn(row, worksheetHeaders.notes) ?? ''),
-    __rowNumber: index + 2,
-  }));
+  const displayNameColumn = findColumnNumber(headerColumns, worksheetHeaders.displayName);
+  const emailColumn = findColumnNumber(headerColumns, worksheetHeaders.email);
+  const gradeOrProgramColumn = findColumnNumber(headerColumns, worksheetHeaders.gradeOrProgram);
+  const rollNumberColumn = findColumnNumber(headerColumns, worksheetHeaders.rollNumber);
+  const notesColumn = findColumnNumber(headerColumns, worksheetHeaders.notes);
+  const rows: StudentRosterWorkbookRow[] = [];
+
+  sheet.eachRow({ includeEmpty: false }, (row, rowNumber) => {
+    if (rowNumber === 1) {
+      return;
+    }
+
+    const payload = {
+      displayName: displayNameColumn ? row.getCell(displayNameColumn).text : '',
+      email: emailColumn ? row.getCell(emailColumn).text : '',
+      gradeOrProgram: gradeOrProgramColumn ? row.getCell(gradeOrProgramColumn).text : '',
+      rollNumber: rollNumberColumn ? row.getCell(rollNumberColumn).text : '',
+      notes: notesColumn ? row.getCell(notesColumn).text : '',
+      __rowNumber: rowNumber,
+    };
+
+    const hasContent = Object.values(payload).some((value) => typeof value === 'string' && value.trim().length > 0);
+    if (hasContent) {
+      rows.push(payload);
+    }
+  });
+
+  return rows;
 };
 
 export const createStudentRosterEntry = async (
@@ -394,7 +425,7 @@ export const importStudentRosterEntries = async (
   await assertInstitutionRole(institutionId, institutionRole);
 
   const source: StudentRosterSource = /\.xlsx?$/i.test(file.originalname) ? 'xlsx' : 'csv';
-  const rows = workbookRowsToPayloads(file.buffer);
+  const rows = await workbookRowsToPayloads(file.buffer, file.originalname);
 
   if (rows.length === 0) {
     throw new ApiError(400, 'EMPTY_STUDENT_ROSTER_FILE', 'The uploaded roster file has no student rows.');

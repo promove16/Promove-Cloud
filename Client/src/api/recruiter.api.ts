@@ -207,4 +207,18 @@ export const recruiterApi = {
     );
     return response.data.data;
   },
+  async sendOnboardingReminder(studentId: string, message?: string) {
+    const response = await api.post<ApiSuccessResponse<{ sent: boolean }>>(
+      `/api/recruiter/onboarding/${studentId}/reminder`,
+      message ? { message } : {},
+    );
+    return response.data.data;
+  },
+  async requestPartnership(collegeId: string, message?: string) {
+    const response = await api.post<ApiSuccessResponse<{ sent: boolean }>>(
+      `/api/recruiter/colleges/${collegeId}/partnership-request`,
+      message ? { message } : {},
+    );
+    return response.data.data;
+  },
 };

@@ -4,11 +4,19 @@ import { Types } from 'mongoose';
 import { env } from '../config/env';
 import { DirectMessage } from '../modules/dm/dm.model';
 import { onlineUsers } from '../modules/dm/dm.controller';
-import { User } from '../modules/user/user.model';
+import { ensureDmAccess, ensureDmThreadAccess } from '../modules/dm/dm.permissions';
 
 // Map to store userId -> socket mapping for secure message routing
 const userSockets = new Map<string, Set<Socket>>();
-const allowedQueryTypes = new Set<string>(['project_mentor', 'project_join', 'investor', 'recruiter', 'general']);
+const allowedQueryTypes = new Set<string>([
+  'project_mentor',
+  'project_join',
+  'investor',
+  'recruiter',
+  'hiring_event',
+  'mentorship_program',
+  'general',
+]);
 
 export const initDmSocket = (io: Server) => {
   const dm = io.of('/dm');
@@ -63,12 +71,6 @@ export const initDmSocket = (io: Server) => {
           return;
         }
 
-        // Prevent sending to self
-        if (recipientId === senderId) {
-          socket.emit('dm:error', { message: 'Cannot send message to yourself' });
-          return;
-        }
-
         const normalizedMessage = typeof message === 'string' ? message.trim() : '';
         const type = messageType === 'interview_request' ? 'interview_request' : 'text';
 
@@ -87,11 +89,7 @@ export const initDmSocket = (io: Server) => {
           return;
         }
 
-        const recipientExists = await User.exists({ _id: recipientId });
-        if (!recipientExists) {
-          socket.emit('dm:error', { message: 'Recipient not found' });
-          return;
-        }
+        await ensureDmAccess(senderId, recipientId, (queryType as any) || 'general');
 
         // Create message with verified senderId from socket auth
         const msg = await DirectMessage.create({
@@ -128,6 +126,7 @@ export const initDmSocket = (io: Server) => {
       
       // Use socket's authenticated userId
       const userId = socket.data.userId;
+      await ensureDmThreadAccess(userId, partnerId);
 
       const now = new Date();
       await DirectMessage.updateMany(
@@ -147,12 +146,17 @@ export const initDmSocket = (io: Server) => {
     });
 
     // Typing indicator - SECURE VERSION
-    socket.on('dm:typing', (data: { recipientId?: string; isTyping?: boolean }) => {
+    socket.on('dm:typing', async (data: { recipientId?: string; isTyping?: boolean }) => {
       const { recipientId, isTyping } = data;
       if (!recipientId) return;
       
       // Use socket's authenticated userId
       const senderId = socket.data.userId;
+      try {
+        await ensureDmThreadAccess(senderId, recipientId);
+      } catch {
+        return;
+      }
       dm.to(`user:${recipientId}`).emit('dm:typing', { senderId, isTyping });
     });
 

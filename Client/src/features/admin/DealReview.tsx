@@ -1,4 +1,4 @@
-import { useMemo, type ReactNode } from 'react';
+import { useMemo, useState, type ReactNode } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { ArrowRight, ExternalLink, FileText, GitBranch, TrendingUp } from 'lucide-react';
 import { useParams } from 'react-router-dom';
@@ -21,6 +21,7 @@ const transferTone: Record<string, string> = {
   pending_review: 'border-amber-500/30 bg-amber-500/10 text-amber-300',
   under_review: 'border-cyan-500/30 bg-cyan-500/10 text-cyan-300',
   approved: 'border-emerald-500/30 bg-emerald-500/10 text-emerald-300',
+  rejected: 'border-rose-500/30 bg-rose-500/10 text-rose-300',
 };
 
 const breakdownLabels: Record<string, string> = {
@@ -86,6 +87,7 @@ function Section({
 export default function DealReview() {
   const { dealId } = useParams<{ dealId: string }>();
   const queryClient = useQueryClient();
+  const [reviewNotes, setReviewNotes] = useState('');
 
   const dealQuery = useQuery({
     queryKey: ['admin-deal-review', dealId],
@@ -111,6 +113,20 @@ export default function DealReview() {
     },
   });
 
+  const rejectMutation = useMutation({
+    mutationFn: () =>
+      adminApi.updateDealReview(dealId!, {
+        stockTransferStatus: 'rejected',
+        reviewNotes,
+      }),
+    onSuccess: async () => {
+      setReviewNotes('');
+      await queryClient.invalidateQueries({ queryKey: ['admin-deal-review', dealId] });
+      await queryClient.invalidateQueries({ queryKey: ['admin-deals'] });
+      await queryClient.invalidateQueries({ queryKey: ['admin-analytics'] });
+    },
+  });
+
   const metrics = useMemo(() => {
     if (!deal) return null;
     const amount = deal.amountINR ?? deal.stockDetails.transferValueInr ?? 0;
@@ -127,7 +143,19 @@ export default function DealReview() {
   }, [deal]);
 
   const canApprove = deal
-    ? deal.stage === 3 && deal.stockTransfer.status !== 'approved' && !deal.adminApprovedAt
+    ? deal.stage === 3 &&
+      deal.adminApprovalRequired &&
+      deal.stockTransfer.status !== 'approved' &&
+      deal.stockTransfer.status !== 'rejected' &&
+      !deal.adminApprovedAt
+    : false;
+  const canReject = deal
+    ? deal.stage === 3 &&
+      deal.adminApprovalRequired &&
+      deal.stockTransfer.status !== 'approved' &&
+      deal.stockTransfer.status !== 'rejected' &&
+      !deal.adminApprovedAt &&
+      reviewNotes.trim().length >= 10
     : false;
 
   if (dealQuery.isLoading) {
@@ -175,11 +203,19 @@ export default function DealReview() {
               ) : null}
               <Button
                 onClick={() => approveMutation.mutate(deal._id)}
-                disabled={!canApprove || approveMutation.isPending}
+                disabled={!canApprove || approveMutation.isPending || rejectMutation.isPending}
                 className="w-full justify-center"
               >
                 {canApprove ? 'Approve Transfer' : 'Transfer Already Reviewed'}
                 <ArrowRight className="ml-2 h-4 w-4" />
+              </Button>
+              <Button
+                variant="secondary"
+                onClick={() => rejectMutation.mutate()}
+                disabled={!canReject || approveMutation.isPending || rejectMutation.isPending}
+                className="w-full justify-center"
+              >
+                {deal.stockTransfer.status === 'rejected' ? 'Transfer Rejected' : 'Reject Transfer'}
               </Button>
             </div>
           </div>
@@ -228,6 +264,13 @@ export default function DealReview() {
             <div className="border border-slate-800 bg-slate-950/80 px-4 py-4 text-sm text-slate-300">
               Review notes: {deal.stockTransfer.reviewNotes?.trim() || 'No admin notes added yet.'}
             </div>
+            <textarea
+              value={reviewNotes}
+              onChange={(event) => setReviewNotes(event.target.value)}
+              rows={4}
+              className="w-full border border-slate-800 bg-slate-950 px-4 py-3 text-sm text-white outline-none"
+              placeholder="Required when rejecting a transfer"
+            />
           </div>
         </Section>
       </div>
