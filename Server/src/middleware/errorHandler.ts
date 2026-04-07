@@ -57,6 +57,10 @@ export const errorHandler: ErrorRequestHandler = (error, req, res, _next) => {
     return res.status(400).json(buildFailure('UPLOAD_ERROR', message));
   }
 
+  if (typeof error === 'object' && error !== null && 'type' in error && error.type === 'entity.too.large') {
+    return res.status(413).json(buildFailure('PAYLOAD_TOO_LARGE', 'Request body is too large'));
+  }
+
   if (
     typeof error === 'object' &&
     error !== null &&

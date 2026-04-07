@@ -2,11 +2,17 @@ import { Types } from 'mongoose';
 import { z } from 'zod';
 import { deleteFromCloudinary, uploadToCloudinary } from '../../services/cloudinaryService';
 import { sendTeamInviteEmail } from '../../services/emailService';
-import { notificationQueue } from '../../config/bullmq';
 import { applyScoreAsync } from '../../services/scoreEngine';
 import { User } from '../user/user.model';
 import { ChatMessage } from '../chat/chat.model';
 import { TeamRequest } from '../social/teamRequest.model';
+import { RequestRecord } from '../request/request.model';
+import {
+  acceptRequest,
+  createRequest,
+  declineRequest,
+  registerRequestHandler,
+} from '../request/request.service';
 import { Workspace } from './workspace.model';
 import { ApiError } from '../../utils/ApiError';
 
@@ -60,6 +66,11 @@ export const inviteMemberSchema = z
   .object({
     email: z.string().email().optional(),
     userId: z.string().optional(),
+    message: z.string().trim().max(500).optional(),
+    proposedRole: z
+      .enum(['developer', 'designer', 'researcher', 'marketer', 'lead', 'other'])
+      .default('other'),
+    targetRole: z.string().trim().max(80).optional(),
   })
   .refine((value) => value.email || value.userId, {
     message: 'Email or userId is required',
@@ -561,6 +572,14 @@ export const inviteMember = async (
   }
 
   if (user) {
+    if (user.role !== 'student') {
+      throw new ApiError(
+        400,
+        'ROLE_NOT_SUPPORTED',
+        'Team invites are limited to student collaborators. Use admin mentorship assignment for mentors and chat access for investors.',
+      );
+    }
+
     if (workspace.teamMemberIds.some((memberId) => String(memberId) === String(user?._id))) {
       throw new ApiError(400, 'MEMBER_ALREADY_EXISTS', 'That member is already on the team.');
     }
@@ -587,8 +606,8 @@ export const inviteMember = async (
         workspaceId: objectId(workspaceId),
       });
 
-    invite.message = '';
-    invite.proposedRole = 'other';
+    invite.message = payload.message ?? '';
+    invite.proposedRole = payload.proposedRole;
     invite.status = 'pending';
     invite.respondedAt = null;
     invite.expiresAt = new Date(Date.now() + TEAM_REQUEST_TTL_MS);
@@ -599,12 +618,26 @@ export const inviteMember = async (
       User.findByIdAndUpdate(user._id, { $addToSet: { teamRequestsReceived: invite._id } }),
     ]);
 
-    await notificationQueue.add('team-invite', {
-      userId: String(user._id),
-      type: 'team_invite',
-      title: 'New workspace invite',
-      body: `You were invited to join ${workspace.title}.`,
-      link: `/product-workspace/${workspaceId}`,
+    await createRequest({
+      type: 'workspace_member',
+      actionType: 'join',
+      fromUserId: ownerId,
+      toUserId: String(user._id),
+      targetEntityType: 'workspace',
+      targetEntityId: workspaceId,
+      targetEntityTitle: workspace.title,
+      targetRole: payload.targetRole ?? payload.proposedRole,
+      requestedRole: payload.targetRole ?? payload.proposedRole,
+      message: payload.message,
+      deepLink: `/product-workspace/${workspaceId}`,
+      acceptRedirect: `/product-workspace/${workspaceId}`,
+      expiresAt: invite.expiresAt,
+      metadata: {
+        workspaceId,
+        teamRequestId: String(invite._id),
+        targetName: workspace.title,
+        workspaceTitle: workspace.title,
+      },
     });
 
     return serializeWorkspace(workspace);
@@ -615,11 +648,31 @@ export const inviteMember = async (
   }
 
   const inviter = await User.findById(ownerId).select('displayName').lean();
+  const request = await createRequest({
+    type: 'workspace_member',
+    actionType: 'join',
+    fromUserId: ownerId,
+    recipientEmail: payload.email,
+    targetEntityType: 'workspace',
+    targetEntityId: workspaceId,
+    targetEntityTitle: workspace.title,
+    targetRole: payload.targetRole ?? payload.proposedRole,
+    requestedRole: payload.targetRole ?? payload.proposedRole,
+    message: payload.message,
+    deepLink: `/product-workspace/${workspaceId}`,
+    acceptRedirect: `/product-workspace/${workspaceId}`,
+    metadata: {
+      workspaceId,
+      targetName: workspace.title,
+      workspaceTitle: workspace.title,
+    },
+  });
+
   await sendTeamInviteEmail({
     toEmail: payload.email,
     inviterName: inviter?.displayName ?? 'A ProMove collaborator',
     workspaceTitle: workspace.title,
-    inviteLink: `${process.env.CLIENT_URL ?? 'http://localhost:5173'}/signup`,
+    inviteLink: `${process.env.CLIENT_URL ?? 'http://localhost:5173'}/signup?requestId=${String(request._id)}`,
   });
 
   return serializeWorkspace(workspace);
@@ -658,6 +711,23 @@ const getInviteForRecipient = async (workspaceId: string, requestId: string, use
 };
 
 export const acceptMemberInvite = async (workspaceId: string, requestId: string, userId: string) => {
+  const requestRecord = await RequestRecord.findOne({
+    _id: requestId,
+    type: 'workspace_member',
+    targetEntityType: 'workspace',
+    targetEntityId: workspaceId,
+  }).lean();
+
+  if (requestRecord) {
+    const actor = await User.findById(userId).select('email').lean();
+    await acceptRequest(requestId, userId, actor?.email ?? '');
+    const workspace = await Workspace.findById(workspaceId);
+    if (!workspace) {
+      throw new ApiError(404, 'WORKSPACE_NOT_FOUND', 'Workspace not found');
+    }
+    return serializeWorkspace(workspace);
+  }
+
   const invite = await getInviteForRecipient(workspaceId, requestId, userId);
   const workspace = await Workspace.findById(workspaceId);
 
@@ -683,6 +753,23 @@ export const acceptMemberInvite = async (workspaceId: string, requestId: string,
 };
 
 export const declineMemberInvite = async (workspaceId: string, requestId: string, userId: string) => {
+  const requestRecord = await RequestRecord.findOne({
+    _id: requestId,
+    type: 'workspace_member',
+    targetEntityType: 'workspace',
+    targetEntityId: workspaceId,
+  }).lean();
+
+  if (requestRecord) {
+    const actor = await User.findById(userId).select('email').lean();
+    await declineRequest(requestId, userId, actor?.email ?? '');
+    const workspace = await Workspace.findById(workspaceId);
+    if (!workspace) {
+      throw new ApiError(404, 'WORKSPACE_NOT_FOUND', 'Workspace not found');
+    }
+    return serializeWorkspace(workspace);
+  }
+
   const invite = await getInviteForRecipient(workspaceId, requestId, userId);
   invite.status = 'declined';
   invite.respondedAt = new Date();
@@ -747,21 +834,26 @@ export const addChatParticipant = async (
     throw new ApiError(400, 'MEMBER_ALREADY_EXISTS', 'That user is already a team member.');
   }
 
-  workspace.chatParticipants.push({
-    _id: new Types.ObjectId(),
-    userId: user._id,
-    role: payload.role,
-    addedBy: objectId(ownerId),
-    addedAt: new Date(),
-  });
-  await workspace.save();
-
-  await notificationQueue.add('chat-participant-invite', {
-    userId: String(user._id),
-    type: 'chat_invite',
-    title: 'You have been invited to a workspace chat',
-    body: `You were granted chat access to ${workspace.title}.`,
-    link: `/product-workspace/${workspaceId}`,
+  await createRequest({
+    type: 'workspace_chat_access',
+    actionType: 'access_chat',
+    fromUserId: ownerId,
+    toUserId: String(user._id),
+    targetEntityType: 'workspace',
+    targetEntityId: workspaceId,
+    targetEntityTitle: workspace.title,
+    targetRole: payload.role,
+    requestedRole: payload.role,
+    requestedPermission: 'workspace_chat_access',
+    message: `Chat-only access to ${workspace.title}`,
+    deepLink: `/product-workspace/${workspaceId}`,
+    acceptRedirect: `/product-workspace/${workspaceId}`,
+    metadata: {
+      workspaceId,
+      targetName: workspace.title,
+      workspaceTitle: workspace.title,
+      accessScope: 'chat',
+    },
   });
 
   return serializeWorkspace(workspace);
@@ -792,3 +884,132 @@ export const removeChatParticipant = async (
   await workspace.save();
   return serializeWorkspace(workspace);
 };
+
+const grantWorkspaceMemberRequest = async (requestId: string, workspaceId: string, userId: string) => {
+  const workspace = await Workspace.findById(workspaceId);
+  if (!workspace || !workspace.isActive) {
+    throw new ApiError(404, 'WORKSPACE_NOT_FOUND', 'Workspace not found');
+  }
+
+  const isMember = workspace.teamMemberIds.some((memberId) => String(memberId) === String(userId));
+  if (!isMember) {
+    if (workspace.teamMemberIds.length >= 5) {
+      throw new ApiError(400, 'TEAM_LIMIT_REACHED', 'A workspace can have at most 5 team members.');
+    }
+
+    workspace.teamMemberIds.push(objectId(userId));
+    await workspace.save();
+  }
+
+  const request = await RequestRecord.findById(requestId).select('metadata').lean();
+  const teamRequestId =
+    typeof request?.metadata?.teamRequestId === 'string' ? request.metadata.teamRequestId : undefined;
+  if (teamRequestId) {
+    await TeamRequest.updateOne(
+      { _id: teamRequestId },
+      {
+        $set: {
+          status: 'accepted',
+          respondedAt: new Date(),
+        },
+      },
+    );
+  }
+};
+
+const validateWorkspaceMemberRequest = async (workspaceId: string, userId: string) => {
+  const workspace = await Workspace.findById(workspaceId).select('teamMemberIds isActive');
+  if (!workspace || !workspace.isActive) {
+    throw new ApiError(404, 'WORKSPACE_NOT_FOUND', 'Workspace not found');
+  }
+
+  const isMember = workspace.teamMemberIds.some((memberId) => String(memberId) === String(userId));
+  if (!isMember && workspace.teamMemberIds.length >= 5) {
+    throw new ApiError(400, 'TEAM_LIMIT_REACHED', 'A workspace can have at most 5 team members.');
+  }
+};
+
+const grantWorkspaceChatRequest = async (workspaceId: string, userId: string) => {
+  const workspace = await Workspace.findById(workspaceId);
+  if (!workspace || !workspace.isActive) {
+    throw new ApiError(404, 'WORKSPACE_NOT_FOUND', 'Workspace not found');
+  }
+
+  const user = await User.findById(userId).select('_id role').lean();
+  if (!user || !['mentor', 'investor'].includes(user.role)) {
+    throw new ApiError(400, 'ROLE_MISMATCH', 'Only mentors or investors can accept chat access.');
+  }
+
+  const alreadyParticipant = workspace.chatParticipants.some((p) => String(p.userId) === userId);
+  const alreadyMember = workspace.teamMemberIds.some((id) => String(id) === userId);
+  if (!alreadyParticipant && !alreadyMember) {
+    workspace.chatParticipants.push({
+      _id: new Types.ObjectId(),
+      userId: user._id,
+      role: user.role as 'mentor' | 'investor',
+      addedBy: objectId(String(workspace.ownerId)),
+      addedAt: new Date(),
+    });
+    await workspace.save();
+  }
+};
+
+const validateWorkspaceChatRequest = async (workspaceId: string, userId: string) => {
+  const [workspace, user] = await Promise.all([
+    Workspace.findById(workspaceId).select('isActive').lean(),
+    User.findById(userId).select('_id role').lean(),
+  ]);
+
+  if (!workspace || !workspace.isActive) {
+    throw new ApiError(404, 'WORKSPACE_NOT_FOUND', 'Workspace not found');
+  }
+
+  if (!user || !['mentor', 'investor'].includes(user.role)) {
+    throw new ApiError(400, 'ROLE_MISMATCH', 'Only mentors or investors can accept chat access.');
+  }
+};
+
+registerRequestHandler('workspace_member', {
+  validateAccept: async (request, actorUserId) => {
+    if (request.targetEntityType !== 'workspace') {
+      return;
+    }
+    await validateWorkspaceMemberRequest(request.targetEntityId, actorUserId);
+  },
+  onAccept: async (request, actorUserId) => {
+    if (request.targetEntityType !== 'workspace') {
+      return;
+    }
+    await grantWorkspaceMemberRequest(String(request._id), request.targetEntityId, actorUserId);
+  },
+  onDecline: async (request) => {
+    const teamRequestId =
+      typeof request.metadata?.teamRequestId === 'string' ? request.metadata.teamRequestId : undefined;
+    if (teamRequestId) {
+      await TeamRequest.updateOne(
+        { _id: teamRequestId },
+        {
+          $set: {
+            status: 'declined',
+            respondedAt: new Date(),
+          },
+        },
+      );
+    }
+  },
+});
+
+registerRequestHandler('workspace_chat_access', {
+  validateAccept: async (request, actorUserId) => {
+    if (request.targetEntityType !== 'workspace') {
+      return;
+    }
+    await validateWorkspaceChatRequest(request.targetEntityId, actorUserId);
+  },
+  onAccept: async (request, actorUserId) => {
+    if (request.targetEntityType !== 'workspace') {
+      return;
+    }
+    await grantWorkspaceChatRequest(request.targetEntityId, actorUserId);
+  },
+});

@@ -31,14 +31,14 @@ export default function AnalyticsTemporary() {
             <div className="text-[11px] uppercase tracking-[0.35em] text-cyan-300">Admin Analytics</div>
             <h1 className="text-3xl font-semibold tracking-tight text-white">Temporary page for now</h1>
             <p className="text-sm leading-6 text-slate-400">
-              The analytics workspace is not linked yet. This placeholder keeps the navigation stable while the full
-              analytics experience is being updated.
+              This is a temporary placeholder for the admin analytics route while the full analytics workspace is
+              wired later.
             </p>
           </div>
 
           <div className="inline-flex items-center gap-2 rounded-full border border-amber-500/20 bg-amber-500/10 px-4 py-2 text-sm text-amber-100">
             <Clock3 className="h-4 w-4" />
-            Analytics routes will be connected here in a future update.
+            The temporary analytics workspace stays in place until the real reporting pages are ready.
           </div>
         </div>
       </section>

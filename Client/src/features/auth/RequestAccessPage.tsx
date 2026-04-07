@@ -1,6 +1,6 @@
-import { ChangeEvent, FormEvent, useMemo, useState } from "react";
+import { ChangeEvent, FormEvent, useEffect, useMemo, useState } from "react";
 import { isAxiosError } from "axios";
-import { Link, useNavigate } from "react-router-dom";
+import { Link, useNavigate, useSearchParams } from "react-router-dom";
 import { BusinessLogo } from "../../components/branding/BusinessLogo";
 import { AuthPasswordField } from "./AuthPasswordField";
 import { useRegisterRequestMutation } from "./useAuth";
@@ -9,6 +9,10 @@ import {
   InstitutionVerificationDocumentCategory,
 } from "../../types/auth.types";
 import { UserRole } from "../../types/roles.types";
+import {
+  getInvitationRoleLabel,
+  normalizeInvitationRole,
+} from "../invitations/invitationConfig";
 
 const NON_STUDENT_ROLES = [
   UserRole.MENTOR,
@@ -126,6 +130,7 @@ const initialFormState: FormState = {
 
 export function RequestAccessPage() {
   const navigate = useNavigate();
+  const [searchParams] = useSearchParams();
   const registerRequestMutation = useRegisterRequestMutation();
   const [formData, setFormData] = useState<FormState>(initialFormState);
   const [regulatoryBodies, setRegulatoryBodies] = useState<
@@ -136,6 +141,14 @@ export function RequestAccessPage() {
   >({});
   const [error, setError] = useState("");
   const [notice, setNotice] = useState("");
+  const invitedRole = normalizeInvitationRole(searchParams.get("inviteRole"));
+  const invitedEmail = searchParams.get("inviteeEmail")?.trim() ?? "";
+  const inviterName = searchParams.get("inviterName")?.trim() ?? "";
+  const invitePurpose = searchParams.get("purpose")?.trim() ?? "";
+  const signupLink = useMemo(() => {
+    const next = new URLSearchParams(searchParams);
+    return `/signup${next.toString() ? `?${next.toString()}` : ""}`;
+  }, [searchParams]);
 
   const selectedRole = formData.role as UserRole;
   const isInstitutionRole = isInstitutionRoleValue(selectedRole);
@@ -150,6 +163,24 @@ export function RequestAccessPage() {
 
     return getRequiredInstitutionDocuments(selectedRole, regulatoryBodies);
   }, [isInstitutionRole, regulatoryBodies, selectedRole]);
+
+  useEffect(() => {
+    if (invitedRole && invitedRole !== UserRole.STUDENT) {
+      setFormData((current) =>
+        current.role === invitedRole ? current : { ...current, role: invitedRole },
+      );
+    }
+  }, [invitedRole]);
+
+  useEffect(() => {
+    if (!invitedEmail) {
+      return;
+    }
+
+    setFormData((current) =>
+      current.email === invitedEmail ? current : { ...current, email: invitedEmail },
+    );
+  }, [invitedEmail]);
 
   const updateField = (key: keyof FormState, value: string) => {
     setFormData((current) => ({ ...current, [key]: value }));
@@ -324,6 +355,34 @@ export function RequestAccessPage() {
           titleClassName="text-2xl text-slate-950"
           subtitleClassName="text-slate-500"
         />
+        {invitedRole && invitedRole !== UserRole.STUDENT ? (
+          <div className="mb-6 rounded-2xl border border-cyan-200 bg-cyan-50 p-5 text-sm text-cyan-950">
+            <div className="text-xs font-semibold uppercase tracking-[0.24em] text-cyan-700">
+              Invitation received
+            </div>
+            <div className="mt-2 text-base font-semibold text-slate-950">
+              {inviterName || "A ProMove member"} invited you to request{" "}
+              {getInvitationRoleLabel(invitedRole)} access.
+            </div>
+            {invitePurpose ? (
+              <p className="mt-2 leading-6 text-slate-700">{invitePurpose}</p>
+            ) : null}
+          </div>
+        ) : null}
+        {invitedRole === UserRole.STUDENT ? (
+          <div className="mb-6 rounded-2xl border border-amber-200 bg-amber-50 p-5 text-sm text-amber-950">
+            <div className="text-xs font-semibold uppercase tracking-[0.24em] text-amber-700">
+              Student invite detected
+            </div>
+            <div className="mt-2 text-base font-semibold text-slate-950">
+              Student invitations use the direct signup flow instead of request
+              access.
+            </div>
+            <Link to={signupLink} className="mt-3 inline-flex font-semibold text-amber-700 underline">
+              Continue to student signup
+            </Link>
+          </div>
+        ) : null}
         <h2 className="mb-2 text-2xl font-bold text-slate-950">
           Request Access (Non-Student)
         </h2>

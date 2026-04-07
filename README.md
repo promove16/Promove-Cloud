@@ -332,6 +332,7 @@ Current test focus in the active backend:
 - [docs/SRS.md](docs/SRS.md)
 - [docs/ARCHITECTURE_DIAGRAMS.md](docs/ARCHITECTURE_DIAGRAMS.md)
 - [docs/CODE_STRUCTURE.md](docs/CODE_STRUCTURE.md)
+- [docs/RBAC_ROADMAP.md](docs/RBAC_ROADMAP.md)
 - `docs/prd_extracted.txt`
 - `docs/student-prd-extract.txt`
 - `docs/docs/implementation-blueprint.md`

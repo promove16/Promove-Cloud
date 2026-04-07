@@ -5,6 +5,7 @@ import { User } from '../user/user.model';
 import { ApiError } from '../../utils/ApiError';
 import { uploadToCloudinary } from '../../services/cloudinaryService';
 import { ensureDmAccess, ensureDmThreadAccess } from './dm.permissions';
+import { createRequest } from '../request/request.service';
 const allowedMimeTypes = new Set(['image/jpeg', 'image/png', 'image/gif', 'image/webp', 'application/pdf']);
 const pdfFileNamePattern = /\.pdf$/i;
 const allowedQueryTypes = new Set([
@@ -16,6 +17,15 @@ const allowedQueryTypes = new Set([
   'mentorship_program',
   'general',
 ] as const);
+
+const workflowQueryActions = {
+  project_mentor: 'mentor',
+  project_join: 'join',
+  investor: 'invest',
+  recruiter: 'hire',
+  hiring_event: 'register',
+  mentorship_program: 'mentor',
+} as const;
 
 /** Shared online-users set — populated by dmSocket */
 export const onlineUsers = new Set<string>();
@@ -270,6 +280,28 @@ export const sendMessage = async (req: Request, res: Response) => {
     ...(attachmentType ? { attachmentType } : {}),
     ...(attachmentName ? { attachmentName } : {}),
   });
+
+  if (queryType && queryType !== 'general') {
+    const recipient = await User.findById(recipientId).select('displayName role').lean();
+    await createRequest({
+      type: 'generic',
+      actionType: workflowQueryActions[queryType],
+      fromUserId: req.user!._id,
+      toUserId: String(recipientId),
+      targetEntityType: 'user_profile',
+      targetEntityId: `${String(recipientId)}:${queryType}`,
+      targetEntityTitle: recipient?.displayName ?? 'User profile',
+      requestedPermission: `dm_${queryType}`,
+      message: normalizedMessage,
+      deepLink: `/dashboard/messages/${String(recipientId)}`,
+      acceptRedirect: `/dashboard/messages/${String(recipientId)}`,
+      metadata: {
+        queryType,
+        recipientRole: recipient?.role,
+        messageId: String(msg._id),
+      },
+    });
+  }
 
   res.status(201).json({ success: true, data: msg });
 };

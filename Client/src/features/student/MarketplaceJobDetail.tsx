@@ -157,6 +157,8 @@ export function MarketplaceJobDetail() {
   );
 
   const applied = hasApplied || Boolean(job?.hasApplied);
+  const applicationLabel =
+    job?.applicationSource === 'recruiter_invite' ? 'Invited' : 'Applied';
 
   const responsibilityList = buildDetailList(job?.keyResponsibilities ?? [], job?.description);
   const requirementList = buildDetailList(job?.requirements ?? [], recruiter?.skills?.map((skill) => skill.name).join('. '));
@@ -371,7 +373,7 @@ export function MarketplaceJobDetail() {
                         onClick={handleApply}
                         disabled={applied || isApplying || !job.isActive}
                       >
-                        {isApplying ? 'Applying...' : applied ? 'Applied' : 'Apply now'}
+                        {isApplying ? 'Applying...' : applied ? applicationLabel : 'Apply now'}
                       </Button>
                       <Button
                         variant="secondary"

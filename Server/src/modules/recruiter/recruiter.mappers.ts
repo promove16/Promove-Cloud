@@ -145,6 +145,9 @@ export const mapJob = (job: {
   expiresAt?: Date;
 }, options?: {
   hasApplied?: boolean;
+  applicationStage?: RecruiterJobView['applicationStage'];
+  applicationSource?: RecruiterJobView['applicationSource'];
+  applicationUpdatedAt?: string;
 }): RecruiterJobView => ({
   _id: String(job._id),
   recruiterId: String(job.recruiterId),
@@ -169,6 +172,9 @@ export const mapJob = (job: {
   applicantCount: job.applicantIds.length,
   shortlistedCount: job.shortlistedIds.length,
   ...(typeof options?.hasApplied === 'boolean' ? { hasApplied: options.hasApplied } : {}),
+  ...(options?.applicationStage ? { applicationStage: options.applicationStage } : {}),
+  ...(options?.applicationSource ? { applicationSource: options.applicationSource } : {}),
+  ...(options?.applicationUpdatedAt ? { applicationUpdatedAt: options.applicationUpdatedAt } : {}),
   createdAt: job.createdAt.toISOString(),
   ...(job.expiresAt ? { expiresAt: job.expiresAt.toISOString() } : {}),
 });

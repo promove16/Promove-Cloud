@@ -8,6 +8,7 @@ export class NotificationService {
     title: string;
     body: string;
     link?: string;
+    metadata?: Record<string, unknown>;
   }) {
     return Notification.create(params);
   }

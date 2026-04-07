@@ -2,6 +2,27 @@ import { Schema, Types, model } from 'mongoose';
 
 export type JobType = 'Full-time' | 'Internship' | 'Contract' | 'Part-time';
 export type JobWorkMode = 'On-site' | 'Hybrid' | 'Remote';
+export type JobApplicationSource = 'student_apply' | 'recruiter_invite';
+export type JobApplicationStage =
+  | 'Invited Pending'
+  | 'Invite Accepted'
+  | 'Invite Declined'
+  | 'Applied'
+  | 'Screening'
+  | 'Shortlisted'
+  | 'Interview'
+  | 'Offered'
+  | 'Hired'
+  | 'Rejected';
+
+export interface IJobApplicationRecord {
+  studentId: Types.ObjectId;
+  source: JobApplicationSource;
+  stage: JobApplicationStage;
+  appliedAt: Date;
+  updatedAt: Date;
+  note?: string;
+}
 
 export interface IJobPost {
   _id: Types.ObjectId;
@@ -26,9 +47,61 @@ export interface IJobPost {
   isActive: boolean;
   applicantIds: Types.ObjectId[];
   shortlistedIds: Types.ObjectId[];
+  applicationRecords: IJobApplicationRecord[];
   createdAt: Date;
   expiresAt?: Date;
 }
+
+const applicationRecordSchema = new Schema<IJobApplicationRecord>(
+  {
+    studentId: {
+      type: Schema.Types.ObjectId,
+      required: true,
+    },
+    source: {
+      type: String,
+      enum: ['student_apply', 'recruiter_invite'],
+      default: 'student_apply',
+      required: true,
+    },
+    stage: {
+      type: String,
+      enum: [
+        'Invited Pending',
+        'Invite Accepted',
+        'Invite Declined',
+        'Applied',
+        'Screening',
+        'Shortlisted',
+        'Interview',
+        'Offered',
+        'Hired',
+        'Rejected',
+      ],
+      default: 'Applied',
+      required: true,
+    },
+    appliedAt: {
+      type: Date,
+      required: true,
+      default: Date.now,
+    },
+    updatedAt: {
+      type: Date,
+      required: true,
+      default: Date.now,
+    },
+    note: {
+      type: String,
+      trim: true,
+      maxlength: 500,
+      default: undefined,
+    },
+  },
+  {
+    _id: false,
+  },
+);
 
 const jobPostSchema = new Schema<IJobPost>(
   {
@@ -138,6 +211,10 @@ const jobPostSchema = new Schema<IJobPost>(
     },
     shortlistedIds: {
       type: [Schema.Types.ObjectId],
+      default: [],
+    },
+    applicationRecords: {
+      type: [applicationRecordSchema],
       default: [],
     },
     expiresAt: {

@@ -14,7 +14,7 @@ const stageLabels: Record<number, { label: string; description: string; color: s
   },
   2: {
     label: "Stage 2",
-    description: "Fund transfer in progress",
+    description: "Payment placeholder pending",
     color: "bg-blue-500/10 text-blue-400 ring-1 ring-blue-500/20",
   },
   3: {

@@ -5,10 +5,14 @@ import {
   RecruiterDashboardData,
   RecruiterDriveView,
   RecruiterJobDetail,
+  RecruiterJobApplicantView,
+  RecruiterJobApplicationStage,
+  RecruiterJobPipelineView,
   RecruiterJobView,
   RecruiterListResponse,
   RecruiterMessageCheck,
   RecruiterPlacementRow,
+  RecruiterStudentApplicationView,
   RecruiterTalentProfile,
   RecruiterTalentSummary,
 } from '../types/recruiter.types';
@@ -139,6 +143,38 @@ export const recruiterApi = {
   async applyToJob(jobId: string) {
     const response = await api.post<ApiSuccessResponse<{ applied: boolean; alreadyApplied: boolean }>>(
       `/api/recruiter/jobs/${jobId}/apply`,
+    );
+    return response.data.data;
+  },
+  async inviteStudentToJob(jobId: string, studentId: string, payload?: { note?: string }) {
+    const response = await api.post<
+      ApiSuccessResponse<{ invited: boolean; alreadyApplied: boolean; alreadyInvited: boolean }>
+    >(`/api/recruiter/jobs/${jobId}/invite/${studentId}`, payload ?? {});
+    return response.data.data;
+  },
+  async getJobApplications(jobId: string) {
+    const response = await api.get<ApiSuccessResponse<RecruiterJobPipelineView>>(
+      `/api/recruiter/jobs/${jobId}/applications`,
+    );
+    return response.data.data;
+  },
+  async getMyApplications() {
+    const response = await api.get<ApiSuccessResponse<RecruiterStudentApplicationView[]>>(
+      '/api/recruiter/applications/me',
+    );
+    return response.data.data;
+  },
+  async updateJobApplication(
+    jobId: string,
+    studentId: string,
+    payload: {
+      stage: RecruiterJobApplicationStage;
+      note?: string;
+    },
+  ) {
+    const response = await api.patch<ApiSuccessResponse<RecruiterJobApplicantView>>(
+      `/api/recruiter/jobs/${jobId}/applications/${studentId}`,
+      payload,
     );
     return response.data.data;
   },

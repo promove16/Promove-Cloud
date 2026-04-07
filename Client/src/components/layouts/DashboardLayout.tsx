@@ -14,6 +14,7 @@ import { useAuthStore } from '../../store/authStore';
 import { UserRole } from '../../types/roles.types';
 import { useLogoutMutation } from '../../features/auth/useAuth';
 import { notificationApi } from '../../api/notification.api';
+import { workspaceApi } from '../../api/workspace.api';
 import { dmApi } from '../../api/dm.api';
 import { useNotifications } from '../../hooks/useNotifications';
 import { trackNavigationClick } from '../../lib/activityTracker';
@@ -41,6 +42,7 @@ function NotificationBell() {
   const navigate = useNavigate();
   const queryClient = useQueryClient();
   const { data, unreadCount } = useNotifications();
+  const [inviteFeedback, setInviteFeedback] = useState<string | null>(null);
 
   const markReadMutation = useMutation({
     mutationFn: notificationApi.markRead,
@@ -56,6 +58,41 @@ function NotificationBell() {
     onSuccess: () => {
       queryClient.setQueryData<NotificationItem[] | undefined>(['notifications'], (current) =>
         current?.map((item) => ({ ...item, isRead: true })),
+      );
+    },
+  });
+
+  const teamInviteActionMutation = useMutation({
+    mutationFn: async (params: {
+      action: 'accept' | 'decline';
+      notificationId: string;
+      workspaceId: string;
+      requestId: string;
+    }) =>
+      params.action === 'accept'
+        ? workspaceApi.acceptInvite(params.workspaceId, params.requestId)
+        : workspaceApi.declineInvite(params.workspaceId, params.requestId),
+    onSuccess: async (_workspace, variables) => {
+      setInviteFeedback(
+        variables.action === 'accept' ? 'Workspace invite accepted.' : 'Workspace invite declined.',
+      );
+      queryClient.setQueryData<NotificationItem[] | undefined>(['notifications'], (current) =>
+        current?.map((item) =>
+          item._id === variables.notificationId ? { ...item, isRead: true } : item,
+        ),
+      );
+      await Promise.all([
+        queryClient.invalidateQueries({ queryKey: ['notifications'] }),
+        queryClient.invalidateQueries({ queryKey: ['workspaces'] }),
+      ]);
+      if (variables.action === 'accept') {
+        navigate(`/product-workspace/${variables.workspaceId}`);
+      }
+    },
+    onError: (error) => {
+      setInviteFeedback(
+        (error as { response?: { data?: { error?: { message?: string } } } })?.response?.data?.error
+          ?.message ?? 'Unable to update workspace invite.',
       );
     },
   });
@@ -90,6 +127,12 @@ function NotificationBell() {
           </button>
         </div>
         <DropdownMenuSeparator className="bg-slate-800" />
+        {inviteFeedback ? (
+          <>
+            <div className="px-3 py-2 text-xs text-cyan-200">{inviteFeedback}</div>
+            <DropdownMenuSeparator className="bg-slate-800" />
+          </>
+        ) : null}
         {notifications.length === 0 ? (
           <div className="px-3 py-4 text-sm text-slate-400">You're all caught up.</div>
         ) : (
@@ -97,9 +140,13 @@ function NotificationBell() {
             <DropdownMenuItem
               key={notification._id}
               className={`cursor-pointer rounded-xl px-3 py-3 focus:bg-slate-900 ${notification.isRead ? 'opacity-70' : ''}`}
-              onSelect={() => {
+              onSelect={(event) => {
+                const isTeamInvite = notification.type === 'team_invite';
+                if (isTeamInvite) {
+                  event.preventDefault();
+                }
                 markReadMutation.mutate(notification._id);
-                if (notification.link) {
+                if (!isTeamInvite && notification.link) {
                   navigate(notification.link);
                 }
               }}
@@ -113,6 +160,48 @@ function NotificationBell() {
                 <div className="text-[11px] uppercase tracking-[0.25em] text-slate-500">
                   {new Date(notification.createdAt).toLocaleString('en-IN')}
                 </div>
+                {notification.type === 'team_invite' &&
+                notification.metadata?.workspaceId &&
+                notification.metadata?.requestId ? (
+                  <div className="flex gap-2 pt-2">
+                    <button
+                      type="button"
+                      onClick={(event) => {
+                        event.preventDefault();
+                        event.stopPropagation();
+                        setInviteFeedback(null);
+                        teamInviteActionMutation.mutate({
+                          action: 'accept',
+                          notificationId: notification._id,
+                          workspaceId: notification.metadata!.workspaceId!,
+                          requestId: notification.metadata!.requestId!,
+                        });
+                      }}
+                      disabled={teamInviteActionMutation.isPending}
+                      className="rounded-lg bg-cyan-500 px-3 py-1.5 text-xs font-semibold text-slate-950 disabled:opacity-60"
+                    >
+                      Accept
+                    </button>
+                    <button
+                      type="button"
+                      onClick={(event) => {
+                        event.preventDefault();
+                        event.stopPropagation();
+                        setInviteFeedback(null);
+                        teamInviteActionMutation.mutate({
+                          action: 'decline',
+                          notificationId: notification._id,
+                          workspaceId: notification.metadata!.workspaceId!,
+                          requestId: notification.metadata!.requestId!,
+                        });
+                      }}
+                      disabled={teamInviteActionMutation.isPending}
+                      className="rounded-lg border border-slate-700 px-3 py-1.5 text-xs font-semibold text-slate-200 disabled:opacity-60"
+                    >
+                      Decline
+                    </button>
+                  </div>
+                ) : null}
               </div>
             </DropdownMenuItem>
           ))

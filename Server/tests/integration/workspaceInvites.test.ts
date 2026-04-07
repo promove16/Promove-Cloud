@@ -105,4 +105,48 @@ describe('workspace invite acceptance flow', () => {
       expect.arrayContaining([owner._id.toString(), invitee._id.toString()]),
     );
   });
+
+  it('rejects non-student users as workspace team invitees', async () => {
+    const owner = await createStudent('Workspace Owner');
+    const mentor = await User.create({
+      email: `mentor-${Math.random().toString(36).slice(2, 10)}@example.com`,
+      passwordHash: 'hashed-password',
+      role: UserRole.MENTOR,
+      displayName: 'Mentor Invitee',
+      accessGrantedBy: 'self_registered',
+      accessExpiresAt: new Date(Date.now() + 365 * 24 * 60 * 60 * 1000),
+      isActive: true,
+      innovationScore: 42,
+      profileComplete: true,
+      registrationStage: 'profile_setup',
+      verificationStatus: 'verified',
+      adminApprovalStatus: 'approved',
+    });
+
+    const workspace = await Workspace.create({
+      ownerId: owner._id,
+      teamMemberIds: [owner._id],
+      title: 'Restricted Invite Workspace',
+      category: 'AI',
+      stage: 'Ideation',
+    });
+
+    const response = await request(app)
+      .post(`/api/workspace/${workspace._id}/invite`)
+      .set(authHeader(owner))
+      .send({ userId: mentor._id.toString() });
+
+    expect(response.status).toBe(400);
+    expect(response.body.error).toEqual(
+      expect.objectContaining({
+        code: 'ROLE_NOT_SUPPORTED',
+      }),
+    );
+
+    const invite = await TeamRequest.findOne({
+      workspaceId: workspace._id,
+      toUserId: mentor._id,
+    }).lean();
+    expect(invite).toBeNull();
+  });
 });

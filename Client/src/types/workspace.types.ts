@@ -100,6 +100,18 @@ export interface Workspace {
     role: string;
     avatar?: string;
   }>;
+  pendingInvites?: Array<{
+    _id: string;
+    toUserId: string;
+    displayName: string;
+    email: string | null;
+    proposedRole: string;
+    type?: 'workspace_member' | 'workspace_chat_access';
+    message?: string;
+    status: 'pending' | 'accepted' | 'declined' | 'withdrawn' | 'expired';
+    expiresAt: string;
+    createdAt: string;
+  }>;
   chatParticipants?: WorkspaceChatParticipant[];
   isActive: boolean;
   createdAt: string;

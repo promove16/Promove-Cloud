@@ -1,6 +1,6 @@
 import { useQuery } from '@tanstack/react-query';
 import { useNavigate } from 'react-router-dom';
-import { Mail, ShieldCheck, Sparkles, X } from 'lucide-react';
+import { BriefcaseBusiness, Mail, ShieldCheck, Sparkles, X } from 'lucide-react';
 import { recruiterApi } from '../../api/recruiter.api';
 import { Badge } from '../../components/ui/Badge';
 import { Button } from '../../components/ui/Button';
@@ -12,6 +12,8 @@ type Props = {
   open: boolean;
   onClose: () => void;
   onChanged?: () => void;
+  onInviteToJob?: (studentId: string) => void;
+  activeJobCount?: number;
 };
 
 const scoreFields = [
@@ -26,7 +28,14 @@ const scoreFields = [
   ['Awards Approved', 'awardsApproved'],
 ] as const;
 
-export function StudentProfileDrawer({ studentId, open, onClose, onChanged }: Props) {
+export function StudentProfileDrawer({
+  studentId,
+  open,
+  onClose,
+  onChanged,
+  onInviteToJob,
+  activeJobCount = 0,
+}: Props) {
   const navigate = useNavigate();
   const profileQuery = useQuery({
     queryKey: ['recruiter', 'student-profile', studentId],
@@ -49,6 +58,11 @@ export function StudentProfileDrawer({ studentId, open, onClose, onChanged }: Pr
     if (!studentId) return;
     await recruiterApi.shortlistStudent(studentId);
     onChanged?.();
+  };
+
+  const handleInvite = () => {
+    if (!studentId || !onInviteToJob) return;
+    onInviteToJob(studentId);
   };
 
   return (
@@ -209,13 +223,19 @@ export function StudentProfileDrawer({ studentId, open, onClose, onChanged }: Pr
             </div>
 
             <div className="flex flex-wrap items-center justify-end gap-3 border-t border-slate-800 pt-4">
+              {onInviteToJob ? (
+                <Button data-testid="invite-job-btn" onClick={handleInvite}>
+                  <BriefcaseBusiness className="mr-2 h-4 w-4" />
+                  {activeJobCount > 0 ? 'Invite to Job' : 'Create job to invite'}
+                </Button>
+              ) : null}
               {profile.canContact ? (
-                <Button data-testid="message-btn" onClick={handleMessage}>
+                <Button data-testid="message-btn" onClick={handleMessage} variant={onInviteToJob ? 'secondary' : 'primary'}>
                   <Mail className="mr-2 h-4 w-4" />
                   Message
                 </Button>
               ) : (
-                <Button data-testid="shortlist-btn" onClick={handleShortlist}>
+                <Button data-testid="shortlist-btn" onClick={handleShortlist} variant={onInviteToJob ? 'secondary' : 'primary'}>
                   <ShieldCheck className="mr-2 h-4 w-4" />
                   Shortlist to Connect
                 </Button>

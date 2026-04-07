@@ -2,6 +2,7 @@ import { PropsWithChildren, ReactElement, useEffect } from "react";
 import { useMutation } from "@tanstack/react-query";
 import axios, { isAxiosError } from "axios";
 import api, { refreshClient } from "../../api/axiosInstance";
+import { authApi } from "../../api/auth.api";
 import { useAuthStore } from "../../store/authStore";
 import {
   ApiErrorResponse,
@@ -100,13 +101,7 @@ export const useLogoutMutation = () => {
       }
 
       try {
-        await api.post(
-          "/api/auth/logout",
-          {},
-          {
-            headers: { Authorization: `Bearer ${accessToken}` },
-          },
-        );
+        await authApi.logout(accessToken);
       } catch (error) {
         if (isAxiosError(error) && error.response?.status === 401) {
           return;

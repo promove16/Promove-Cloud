@@ -1,4 +1,5 @@
 import { RelevanceBridgeType } from './relevanceBridge.model';
+import { JobApplicationSource, JobApplicationStage } from './jobPost.model';
 
 export interface RecruiterTalentScoreBreakdown {
   problemsClaimed: number;
@@ -154,6 +155,9 @@ export interface RecruiterJobView {
   applicantCount: number;
   shortlistedCount: number;
   hasApplied?: boolean;
+  applicationStage?: JobApplicationStage;
+  applicationSource?: JobApplicationSource;
+  applicationUpdatedAt?: string;
   createdAt: string;
   expiresAt?: string;
 }
@@ -161,6 +165,34 @@ export interface RecruiterJobView {
 export interface RecruiterJobDetail extends RecruiterJobView {
   applicantIds: string[];
   shortlistedIds: string[];
+}
+
+export interface RecruiterJobApplicantView extends RecruiterTalentSummary {
+  stage: JobApplicationStage;
+  source: JobApplicationSource;
+  appliedAt: string;
+  updatedAt: string;
+  note?: string;
+}
+
+export interface RecruiterJobPipelineView {
+  job: RecruiterJobDetail;
+  applications: RecruiterJobApplicantView[];
+}
+
+export interface RecruiterStudentApplicationView {
+  job: RecruiterJobView;
+  recruiter: {
+    _id: string;
+    displayName: string;
+    avatar?: string;
+    headline?: string;
+  };
+  stage: JobApplicationStage;
+  source: JobApplicationSource;
+  appliedAt: string;
+  updatedAt: string;
+  note?: string;
 }
 
 export interface RecruiterDriveRegisteredStudent {

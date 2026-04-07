@@ -16,7 +16,6 @@ import {
   Sparkles,
   Users,
 } from "lucide-react";
-import { DashboardLayout } from "../components/DashboardLayout";
 import {
   MarketplaceEntityDetail,
   MarketplaceEntityType,
@@ -113,48 +112,44 @@ export function MarketplaceDetail() {
 
   if (!entityType || !entityId) {
     return (
-      <DashboardLayout role={dashboardRole}>
-        <div className="rounded-[28px] border border-rose-500/20 bg-rose-500/10 px-6 py-6 text-sm text-rose-100">
-          Invalid marketplace detail route.
-        </div>
-      </DashboardLayout>
+      <div className="rounded-[28px] border border-rose-500/20 bg-rose-500/10 px-6 py-6 text-sm text-rose-100">
+        Invalid marketplace detail route.
+      </div>
     );
   }
 
   return (
-    <DashboardLayout role={dashboardRole}>
-      <div className="space-y-6">
-        <div className="flex flex-wrap items-center justify-between gap-3">
-          <Link
-            to={`${getMarketplaceBasePath(dashboardRole)}?role=${entityType}`}
-            className="inline-flex items-center gap-2 rounded-full border border-white/10 bg-white/5 px-4 py-2 text-sm font-medium text-slate-200 transition hover:border-white/20 hover:bg-white/10"
-          >
-            <ArrowLeft className="h-4 w-4" />
-            Back to marketplace
-          </Link>
-        </div>
-
-        {detailQuery.isLoading ? (
-          <div className="rounded-[32px] border border-white/10 bg-[#090d1b] px-6 py-10 text-sm text-slate-400">
-            Loading detail view...
-          </div>
-        ) : null}
-
-        {detailQuery.isError ? (
-          <div className="rounded-[32px] border border-rose-500/20 bg-rose-500/10 px-6 py-6 text-sm text-rose-100">
-            Unable to load this marketplace record right now.
-          </div>
-        ) : null}
-
-        {entity ? (
-          isStartupDetail(entity) ? (
-            <StartupDetailView entity={entity} onMessage={handleMessage} />
-          ) : (
-            <ProfileDetailView entity={entity} onMessage={handleMessage} dashboardRole={dashboardRole} />
-          )
-        ) : null}
+    <div className="space-y-6">
+      <div className="flex flex-wrap items-center justify-between gap-3">
+        <Link
+          to={`${getMarketplaceBasePath(dashboardRole)}?role=${entityType}`}
+          className="inline-flex items-center gap-2 rounded-full border border-white/10 bg-white/5 px-4 py-2 text-sm font-medium text-slate-200 transition hover:border-white/20 hover:bg-white/10"
+        >
+          <ArrowLeft className="h-4 w-4" />
+          Back to marketplace
+        </Link>
       </div>
-    </DashboardLayout>
+
+      {detailQuery.isLoading ? (
+        <div className="rounded-[32px] border border-white/10 bg-[#090d1b] px-6 py-10 text-sm text-slate-400">
+          Loading detail view...
+        </div>
+      ) : null}
+
+      {detailQuery.isError ? (
+        <div className="rounded-[32px] border border-rose-500/20 bg-rose-500/10 px-6 py-6 text-sm text-rose-100">
+          Unable to load this marketplace record right now.
+        </div>
+      ) : null}
+
+      {entity ? (
+        isStartupDetail(entity) ? (
+          <StartupDetailView entity={entity} onMessage={handleMessage} />
+        ) : (
+          <ProfileDetailView entity={entity} onMessage={handleMessage} dashboardRole={dashboardRole} />
+        )
+      ) : null}
+    </div>
   );
 }
 

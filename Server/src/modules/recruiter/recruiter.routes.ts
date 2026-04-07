@@ -14,6 +14,8 @@ import {
   getCollegesController,
   getDashboardController,
   getDrivesController,
+  getJobApplicationsController,
+  getStudentApplicationsController,
   getPublicJobController,
   getJobsController,
   getOnboardingController,
@@ -22,6 +24,7 @@ import {
   getTalentPipelineController,
   getTalentProfileController,
   hiredStudentController,
+  inviteStudentToJobController,
   messageCheckController,
   registerForDriveController,
   removeShortlistController,
@@ -31,6 +34,7 @@ import {
   shortlistStudentController,
   submitDriveScoreController,
   updateJobController,
+  updateJobApplicationController,
 } from './recruiter.controller';
 
 const router = Router();
@@ -78,6 +82,21 @@ router.get(
 router.post('/jobs', authenticate, authorize(UserRole.RECRUITER), asyncHandler(createJobController));
 router.patch('/jobs/:jobId', authenticate, authorize(UserRole.RECRUITER), asyncHandler(updateJobController));
 router.delete('/jobs/:jobId', authenticate, authorize(UserRole.RECRUITER), asyncHandler(deleteJobController));
+router.get('/applications/me', authenticate, authorize(UserRole.STUDENT), asyncHandler(getStudentApplicationsController));
+router.get('/jobs/:jobId/applications', authenticate, authorize(UserRole.RECRUITER), asyncHandler(getJobApplicationsController));
+router.patch(
+  '/jobs/:jobId/applications/:studentId',
+  authenticate,
+  authorize(UserRole.RECRUITER),
+  asyncHandler(updateJobApplicationController),
+);
+router.post(
+  '/jobs/:jobId/invite/:studentId',
+  authenticate,
+  authorize(UserRole.RECRUITER),
+  connectionGuard(UserRole.STUDENT),
+  asyncHandler(inviteStudentToJobController),
+);
 router.post('/jobs/:jobId/apply', authenticate, authorize(UserRole.STUDENT), asyncHandler(applyJobController));
 router.get('/drives', authenticate, authorize(UserRole.RECRUITER), asyncHandler(getDrivesController));
 router.post('/drives', authenticate, authorize(UserRole.RECRUITER), asyncHandler(createDriveController));

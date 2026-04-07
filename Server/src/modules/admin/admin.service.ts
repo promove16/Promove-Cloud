@@ -1510,9 +1510,42 @@ export const approveDealStage = async (adminId: string, dealId: string) => {
       equityPercent: deal.equityPercent,
       chosenRole: deal.investorRole,
       excludeId: String(deal._id),
-      currentSharesAllocated: deal.sharesAllocated,
       session,
     });
+
+    const allocationUpdate: Record<string, unknown> = {
+      $inc: {
+        availableShares: -deal.sharesAllocated,
+        ...(deal.investorType === 'penny' ? { currentPennyCount: 1 } : {}),
+      },
+    };
+
+    if (deal.investorType === 'sole') {
+      allocationUpdate.$set = {
+        hasSoleInvestor: true,
+        soleInvestorId: deal.investorId,
+      };
+    }
+
+    const allocationResult = await Startup.updateOne(
+      {
+        _id: startup._id,
+        availableShares: startup.availableShares,
+        currentPennyCount: startup.currentPennyCount,
+        hasSoleInvestor: startup.hasSoleInvestor,
+        soleInvestorId: startup.soleInvestorId ?? null,
+      },
+      allocationUpdate,
+      { session },
+    );
+
+    if (!allocationResult.modifiedCount) {
+      throw new ApiError(
+        409,
+        'STARTUP_ALLOCATION_CONFLICT',
+        'The startup allocation changed while processing this investment. Refresh and try again.',
+      );
+    }
 
     const approvedAt = new Date();
     const reviewedBy = new Types.ObjectId(adminId);

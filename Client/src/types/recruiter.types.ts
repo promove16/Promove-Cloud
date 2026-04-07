@@ -152,6 +152,9 @@ export interface RecruiterJobView {
   applicantCount: number;
   shortlistedCount: number;
   hasApplied?: boolean;
+  applicationStage?: RecruiterJobApplicationStage;
+  applicationSource?: 'student_apply' | 'recruiter_invite';
+  applicationUpdatedAt?: string;
   createdAt: string;
   expiresAt?: string;
 }
@@ -159,6 +162,46 @@ export interface RecruiterJobView {
 export interface RecruiterJobDetail extends RecruiterJobView {
   applicantIds: string[];
   shortlistedIds: string[];
+}
+
+export type RecruiterJobApplicationStage =
+  | 'Invited Pending'
+  | 'Invite Accepted'
+  | 'Invite Declined'
+  | 'Applied'
+  | 'Screening'
+  | 'Shortlisted'
+  | 'Interview'
+  | 'Offered'
+  | 'Hired'
+  | 'Rejected';
+
+export interface RecruiterJobApplicantView extends RecruiterTalentSummary {
+  stage: RecruiterJobApplicationStage;
+  source: 'student_apply' | 'recruiter_invite';
+  appliedAt: string;
+  updatedAt: string;
+  note?: string;
+}
+
+export interface RecruiterJobPipelineView {
+  job: RecruiterJobDetail;
+  applications: RecruiterJobApplicantView[];
+}
+
+export interface RecruiterStudentApplicationView {
+  job: RecruiterJobView;
+  recruiter: {
+    _id: string;
+    displayName: string;
+    avatar?: string;
+    headline?: string;
+  };
+  stage: RecruiterJobApplicationStage;
+  source: 'student_apply' | 'recruiter_invite';
+  appliedAt: string;
+  updatedAt: string;
+  note?: string;
 }
 
 export interface RecruiterDriveRegisteredStudent {

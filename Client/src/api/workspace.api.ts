@@ -13,6 +13,14 @@ export interface AddChatParticipantPayload {
   role: 'mentor' | 'investor';
 }
 
+export interface WorkspaceInvitePayload {
+  email?: string;
+  userId?: string;
+  message?: string;
+  proposedRole?: 'developer' | 'designer' | 'researcher' | 'marketer' | 'lead' | 'other';
+  targetRole?: string;
+}
+
 export interface WorkspacePayload {
   title: string;
   category: string;
@@ -127,7 +135,7 @@ export const workspaceApi = {
     );
     return response.data.data;
   },
-  async invite(workspaceId: string, payload: { email?: string; userId?: string }) {
+  async invite(workspaceId: string, payload: WorkspaceInvitePayload) {
     const response = await api.post<ApiSuccessResponse<Workspace>>(`/api/workspace/${workspaceId}/invite`, payload);
     return response.data.data;
   },

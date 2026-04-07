@@ -111,6 +111,7 @@ const RecruiterOnboardingTracker = lazy(() =>
     default: module.RecruiterOnboardingTrackerView,
   })),
 );
+const RecruiterApplications = lazy(() => import("../features/recruiter/ApplicationsPipeline"));
 
 const InvestorDashboard = lazy(() => import("../features/investor/Dashboard"));
 const InvestorStartupMarketplace = lazy(() => import("../features/investor/StartupMarketplace"));
@@ -148,6 +149,11 @@ const UserProfilePage = lazy(() =>
 const SettingsPage = lazy(() =>
   import("../features/settings/SettingsPage").then((module) => ({
     default: module.SettingsPage,
+  })),
+);
+const InvitationPage = lazy(() =>
+  import("../features/invitations/InvitationPage").then((module) => ({
+    default: module.InvitationPage,
   })),
 );
 const Homepage = lazy(() =>
@@ -194,6 +200,12 @@ const StartupLaunch = lazy(() =>
 const Portfolio = lazy(() =>
   import("../app/pages/Portfolio").then((module) => ({
     default: module.Portfolio,
+  })),
+);
+const StudentApplicationsPage = lazy(() => import("../features/student/ApplicationsPage"));
+const MarketplaceJobDetail = lazy(() =>
+  import("../features/student/MarketplaceJobDetail").then((module) => ({
+    default: module.MarketplaceJobDetail,
   })),
 );
 const InnovationScorePage = lazy(() =>
@@ -396,6 +408,16 @@ const NON_ADMIN_DASHBOARD_ROLES = [
   UserRole.RECRUITER,
 ];
 
+const INVITATION_ROLES = [
+  UserRole.COLLEGE,
+  UserRole.STUDENT,
+  UserRole.INVESTOR,
+  UserRole.RECRUITER,
+  UserRole.MENTOR,
+  UserRole.SCHOOL,
+  UserRole.ADMIN,
+];
+
 export const router = createBrowserRouter([
   {
     path: "/",
@@ -542,6 +564,14 @@ export const router = createBrowserRouter([
         ),
       },
       {
+        path: "/marketplace/jobs/:jobId",
+        element: (
+          <ProtectedRoleRoute role={UserRole.STUDENT}>
+            <LazyPage component={MarketplaceJobDetail} />
+          </ProtectedRoleRoute>
+        ),
+      },
+      {
         path: "/marketplace/view/:entityType/:entityId",
         element: (
           <ProtectedRolesRoute roles={NON_ADMIN_DASHBOARD_ROLES}>
@@ -577,6 +607,7 @@ export const router = createBrowserRouter([
               { path: "score", element: <LazyPage component={InnovationScorePage} /> },
               { path: "mentor-sessions", element: <LazyPage component={StudentMentorSessions} /> },
               { path: "investor-deals", element: <Navigate to="/startup-launch" replace /> },
+              { path: "applications", element: <LazyPage component={StudentApplicationsPage} /> },
               { path: "marketplace", element: <LazyPage component={Marketplace} /> },
               { path: "marketplace/view/:entityType/:entityId", element: <LazyPage component={MarketplaceDetail} /> },
             ],
@@ -619,6 +650,7 @@ export const router = createBrowserRouter([
               { path: "marketplace", element: <LazyPage component={Marketplace} /> },
               { path: "marketplace/view/:entityType/:entityId", element: <LazyPage component={MarketplaceDetail} /> },
               { path: "talent", element: <LazyPage component={RecruiterTalentSearch} /> },
+              { path: "applications", element: <LazyPage component={RecruiterApplications} /> },
               { path: "colleges", element: <LazyPage component={RecruiterCollegeConnect} /> },
               { path: "drives", element: <LazyPage component={RecruiterActiveDrives} /> },
               { path: "onboarding", element: <LazyPage component={RecruiterOnboardingTracker} /> },
@@ -690,6 +722,14 @@ export const router = createBrowserRouter([
             path: "settings",
             element: <ProtectedAnyRoute />,
             children: [{ index: true, element: <LazyPage component={SettingsPage} /> }],
+          },
+          {
+            path: "invitations",
+            element: (
+              <ProtectedRolesRoute roles={INVITATION_ROLES}>
+                <LazyPage component={InvitationPage} />
+              </ProtectedRolesRoute>
+            ),
           },
           {
             path: "messages",

@@ -18,6 +18,7 @@ type Props = {
 
 const investorRoles = ['shareholder', 'director', 'observer'] as const;
 const formatRoleLabel = (role: (typeof investorRoles)[number]) => role.charAt(0).toUpperCase() + role.slice(1);
+const formatInr = (amount: number) => `INR ${amount.toLocaleString()}`;
 const getDealWorkflowErrorMessage = (error: unknown) => {
   if (isAxiosError<{ error?: { message?: string } }>(error)) {
     return error.response?.data?.error?.message ?? 'Unable to update this deal right now.';
@@ -29,7 +30,6 @@ const getDealWorkflowErrorMessage = (error: unknown) => {
 export function DealDetail({ dealId, open, onOpenChange }: Props) {
   const navigate = useNavigate();
   const queryClient = useQueryClient();
-  const [amountINR, setAmountINR] = useState('20000');
   const [equityPercent, setEquityPercent] = useState('10');
   const [investorRole, setInvestorRole] = useState<(typeof investorRoles)[number]>('shareholder');
   const [error, setError] = useState('');
@@ -46,7 +46,6 @@ export function DealDetail({ dealId, open, onOpenChange }: Props) {
     if (dealQuery.data) {
       setError('');
       setNotice('');
-      setAmountINR(String(dealQuery.data.amountINR || 20000));
       setEquityPercent(String(dealQuery.data.equityPercent || 10));
       setInvestorRole(dealQuery.data.investorRole);
       setAwaitingAdminApproval(Boolean(dealQuery.data.adminApprovalRequired && !dealQuery.data.adminApprovedAt));
@@ -55,7 +54,6 @@ export function DealDetail({ dealId, open, onOpenChange }: Props) {
 
   useEffect(() => {
     if (!open) {
-      setAmountINR('20000');
       setEquityPercent('10');
       setInvestorRole('shareholder');
       setError('');
@@ -101,7 +99,7 @@ export function DealDetail({ dealId, open, onOpenChange }: Props) {
     setError('');
     if (deal.currentStage === 1) {
       if (deal.founderDecision.status !== 'accepted') {
-        setError('Founder acceptance is required before payment can begin.');
+        setError('Founder acceptance is required before opening the payment placeholder.');
         return;
       }
 
@@ -208,9 +206,11 @@ export function DealDetail({ dealId, open, onOpenChange }: Props) {
             {deal.currentStage === 1 ? (
               <Card className="space-y-4 p-5">
                 <div className="text-sm font-semibold uppercase tracking-[0.2em] text-slate-400">
-                  Stage 1 to Stage 2
+                  Stage 1 payment placeholder
                 </div>
-                <div className="text-sm text-slate-300">Minimum investment: INR 20,000</div>
+                <div className="text-sm text-slate-300">
+                  Payment gateway is not connected yet. This stage is temporarily read-only from the investor UI.
+                </div>
                 <div
                   className={`rounded-2xl px-4 py-3 text-sm ${
                     deal.founderDecision.status === 'accepted'
@@ -221,21 +221,18 @@ export function DealDetail({ dealId, open, onOpenChange }: Props) {
                   }`}
                 >
                   {deal.founderDecision.status === 'accepted'
-                    ? 'Founder accepted this proposal. You can begin fund transfer.'
+                    ? 'Founder accepted this proposal. No payment action can be initiated here yet.'
                     : deal.founderDecision.status === 'rejected'
                       ? 'Founder rejected this proposal. This deal cannot advance.'
-                      : 'Waiting for founder acceptance before fund transfer can begin.'}
+                      : 'Waiting for founder acceptance before the payment placeholder can be viewed.'}
                 </div>
                 {deal.founderDecision.note ? (
                   <div className="text-sm text-slate-400">Founder note: {deal.founderDecision.note}</div>
                 ) : null}
-                <Input
-                  type="number"
-                  min={20000}
-                  value={amountINR}
-                  onChange={(event) => setAmountINR(event.target.value)}
-                  placeholder="Enter investment amount"
-                />
+                <div className="rounded-lg border border-slate-800 bg-slate-950 px-4 py-3">
+                  <div className="text-xs uppercase tracking-[0.2em] text-slate-500">Proposed amount</div>
+                  <div className="mt-2 text-base font-semibold text-white">{formatInr(deal.amountINR)}</div>
+                </div>
                 {error ? <div className="text-sm text-red-300">{error}</div> : null}
               </Card>
             ) : null}
@@ -370,7 +367,7 @@ export function DealDetail({ dealId, open, onOpenChange }: Props) {
                   ? 'Updating...'
                   : deal.currentStage === 1
                     ? deal.founderDecision.status === 'accepted'
-                      ? 'Advance to Stage 2'
+                      ? 'View Payment Placeholder'
                       : 'Awaiting Founder Acceptance'
                     : deal.currentStage === 2
                       ? awaitingAdminApproval

@@ -10,6 +10,7 @@ export const startNotificationWorker = () => {
     title: string;
     body: string;
     link?: string;
+    metadata?: Record<string, unknown>;
   }>(
     'notifications',
     async (job: QueueJob<{
@@ -18,13 +19,15 @@ export const startNotificationWorker = () => {
       title: string;
       body: string;
       link?: string;
+      metadata?: Record<string, unknown>;
     }>) => {
-      const { userId, type, title, body, link } = job.data as {
+      const { userId, type, title, body, link, metadata } = job.data as {
         userId: string;
         type: Parameters<typeof NotificationService.create>[0]['type'];
         title: string;
         body: string;
         link?: string;
+        metadata?: Record<string, unknown>;
       };
 
       const notification = await NotificationService.create({
@@ -33,6 +36,7 @@ export const startNotificationWorker = () => {
         title,
         body,
         link,
+        metadata,
       });
 
       if (io) {

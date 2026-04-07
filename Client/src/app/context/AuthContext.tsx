@@ -1,5 +1,6 @@
 import { ReactNode, createContext, useContext } from 'react';
 import api from '../../api/axiosInstance';
+import { authApi } from '../../api/auth.api';
 import { useBootstrapAuth } from '../../features/auth/useAuth';
 import { disconnectAll } from '../../lib/socket';
 import { useAuthStore } from '../../store/authStore';
@@ -182,13 +183,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const logout = async () => {
     try {
       if (accessToken) {
-        await api.post(
-          '/api/auth/logout',
-          {},
-          {
-            headers: { Authorization: `Bearer ${accessToken}` },
-          },
-        );
+        await authApi.logout(accessToken);
       }
     } catch (_error) {
       // Clearing local state is enough for logout UX even if the token is already stale.

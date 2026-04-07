@@ -725,6 +725,13 @@ export function RecruiterDashboardExperience({ initialView = "home" }: Recruiter
       {/* Quick Actions */}
       <div className="flex justify-end gap-3">
         <button
+          onClick={() => navigate('/dashboard/recruiter/applications')}
+          className="px-6 py-3 bg-cyan-600 hover:bg-cyan-700 text-white rounded-lg font-semibold transition-all flex items-center gap-2 shadow-lg shadow-cyan-500/20"
+        >
+          <Users className="w-5 h-5" />
+          Applications
+        </button>
+        <button
           onClick={() => setShowJobModal(true)}
           className="px-6 py-3 bg-blue-600 hover:bg-blue-700 text-white rounded-lg font-semibold transition-all flex items-center gap-2 shadow-lg shadow-blue-500/20"
         >
@@ -1714,7 +1721,7 @@ export function RecruiterDashboardExperience({ initialView = "home" }: Recruiter
                   type: "Placement Drive",
                   scheduledAt: new Date(`${deadline}T09:00:00`).toISOString(),
                   description: enriched,
-                  minimumInnovationScore: Number.isFinite(minimumCgpa) ? Math.round(minimumCgpa * 20) : 0,
+                  minimumInnovationScore: Number.isFinite(minimumCgpa) ? Math.round(minimumCgpa * 100) : 0,
                 });
               }}
             >
@@ -2068,29 +2075,6 @@ export function RecruiterDashboardExperience({ initialView = "home" }: Recruiter
 
   return (
     <div className="space-y-8">
-      {/* Header */}
-      {!selectedStudent && (
-        <>
-          <div>
-            <h1 className="text-3xl font-bold text-white mb-2">
-              {currentView === "home" && "Recruiter Dashboard"}
-              {currentView === "talent-search" && "Talent Search"}
-              {currentView === "college-connect" && "College Connect"}
-              {currentView === "active-drives" && "Active Drives"}
-              {currentView === "onboarding" && "Onboarding Tracker"}
-            </h1>
-            <p className="text-slate-400">
-              {currentView === "home" && "Your hiring command center"}
-              {currentView === "talent-search" && "Find the perfect talent for your team"}
-              {currentView === "college-connect" && "Partner with top institutions"}
-              {currentView === "active-drives" && "Manage your campus recruitment drives"}
-              {currentView === "onboarding" && "Track new hire onboarding progress"}
-            </p>
-          </div>
-
-        </>
-      )}
-
       {/* Content */}
       {selectedStudent ? (
         renderStudentProfile()
@@ -2230,7 +2214,7 @@ export function RecruiterDashboardExperience({ initialView = "home" }: Recruiter
                 <input
                   type="number"
                   min={0}
-                  max={200}
+                  max={1000}
                   value={jobForm.minimumInnovationScore}
                   onChange={(event) =>
                     setJobForm({ ...jobForm, minimumInnovationScore: event.target.value })

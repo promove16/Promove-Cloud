@@ -72,6 +72,8 @@ export function ProductWorkspace() {
     dueDate: "",
   });
   const [inviteEmail, setInviteEmail] = useState("");
+  const [inviteMessage, setInviteMessage] = useState("");
+  const [inviteRole, setInviteRole] = useState<"developer" | "designer" | "researcher" | "marketer" | "lead" | "other">("other");
   const [uploadNote, setUploadNote] = useState("");
   const [uploadCategory, setUploadCategory] = useState<WorkspaceUploadCategory>("other");
   const [repoForm, setRepoForm] = useState({ repoUrl: "", branch: "", commitHash: "", note: "" });
@@ -167,11 +169,18 @@ export function ProductWorkspace() {
   });
 
   const invite = useMutation({
-    mutationFn: () => workspaceApi.invite(workspaceId!, { email: inviteEmail }),
+    mutationFn: () =>
+      workspaceApi.invite(workspaceId!, {
+        email: inviteEmail,
+        message: inviteMessage.trim() || undefined,
+        proposedRole: inviteRole,
+      }),
     onSuccess: async () => {
       setInviteEmail("");
+      setInviteMessage("");
+      setInviteRole("other");
       setShowInviteForm(false);
-      setToast("Invite sent.");
+      setToast("Student teammate invite sent.");
       await refresh();
     },
     onError: (error) =>
@@ -254,7 +263,7 @@ export function ProductWorkspace() {
       }),
     onSuccess: async () => {
       setParticipantForm({ email: "", role: "mentor" });
-      setToast(`${participantForm.role === "mentor" ? "Mentor" : "Investor"} added to chat.`);
+      setToast(`${participantForm.role === "mentor" ? "Mentor" : "Investor"} chat access request sent.`);
       await refresh();
     },
     onError: (error) =>
@@ -587,11 +596,25 @@ export function ProductWorkspace() {
                         ) : null}
                       </div>
                       {showInviteForm ? (
-                        <div className="flex gap-3 rounded-2xl border border-slate-800 bg-slate-950/70 p-4">
-                          <input value={inviteEmail} onChange={(event) => setInviteEmail(event.target.value)} placeholder="Enter teammate email" className="flex-1 rounded-xl border border-slate-800 bg-slate-950 px-4 py-3 text-white" />
-                          <button onClick={() => invite.mutate()} disabled={!inviteEmail.trim() || invite.isPending} className="rounded-xl bg-blue-600 px-4 py-3 text-sm font-semibold text-white disabled:opacity-60">
-                            Send
-                          </button>
+                        <div className="space-y-3 rounded-2xl border border-slate-800 bg-slate-950/70 p-4">
+                          <div className="text-xs leading-5 text-slate-500">
+                            Team invites are for student collaborators only. Mentor assignments are admin-managed, and investor collaboration should use chat access.
+                          </div>
+                          <div className="grid gap-3 lg:grid-cols-[minmax(0,1fr)_160px]">
+                            <input value={inviteEmail} onChange={(event) => setInviteEmail(event.target.value)} placeholder="Enter student teammate email" className="rounded-xl border border-slate-800 bg-slate-950 px-4 py-3 text-white" />
+                            <select value={inviteRole} onChange={(event) => setInviteRole(event.target.value as typeof inviteRole)} className="rounded-xl border border-slate-800 bg-slate-950 px-4 py-3 text-white">
+                              <option value="developer">Developer</option>
+                              <option value="designer">Designer</option>
+                              <option value="researcher">Researcher</option>
+                              <option value="marketer">Marketer</option>
+                              <option value="lead">Lead</option>
+                              <option value="other">Other</option>
+                            </select>
+                            <input value={inviteMessage} onChange={(event) => setInviteMessage(event.target.value)} placeholder="Message or access details" className="rounded-xl border border-slate-800 bg-slate-950 px-4 py-3 text-white lg:col-span-2" />
+                            <button onClick={() => invite.mutate()} disabled={!inviteEmail.trim() || invite.isPending} className="rounded-xl bg-blue-600 px-4 py-3 text-sm font-semibold text-white disabled:opacity-60">
+                              Send
+                            </button>
+                          </div>
                         </div>
                       ) : null}
                       <div className="grid gap-3 md:grid-cols-2">

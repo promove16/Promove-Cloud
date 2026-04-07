@@ -199,6 +199,14 @@ const getJobDescriptionHighlights = (description: string) =>
     .filter(Boolean)
     .slice(0, 3);
 
+const getApplicationButtonLabel = (job: Pick<RecruiterJobView, 'hasApplied' | 'applicationSource'>) => {
+  if (!job.hasApplied) {
+    return 'Apply';
+  }
+
+  return job.applicationSource === 'recruiter_invite' ? 'Invited' : 'Applied';
+};
+
 const getInsightCounts = (profile: MarketplaceProfile) => ({
   skills: profile.insightCounts?.skills ?? profile.skills?.length ?? 0,
   experience: profile.insightCounts?.experience ?? profile.experienceHighlights?.length ?? 0,
@@ -670,6 +678,7 @@ function RecruiterJobCard({
         (jobsQuery.data ?? []).map((job) => {
           const hasApplied = Boolean(job.hasApplied) || appliedJobIds.includes(job._id);
           const isPending = pendingJobIds.includes(job._id);
+          const actionLabel = isPending ? 'Applying...' : getApplicationButtonLabel(job);
 
           return (
             <div key={job._id} className="border-b border-slate-800/80 py-4 last:border-b-0">
@@ -692,7 +701,7 @@ function RecruiterJobCard({
                         : 'border-slate-700 bg-transparent text-slate-200 hover:border-slate-500 hover:bg-slate-900/40'
                     }
                   >
-                    {isPending ? 'Applying...' : hasApplied ? 'Applied' : 'Apply'}
+                    {actionLabel}
                   </Button>
                 </div>
               </div>
@@ -744,6 +753,12 @@ function MarketplaceRecruiterJobCard({
       setIsPending(false);
     }
   };
+
+  const actionLabel = hasApplied
+    ? job.applicationSource === 'recruiter_invite'
+      ? 'Invited'
+      : 'Applied'
+    : 'Apply now';
 
   return (
     <article className="border-b border-slate-800/80 py-6 last:border-b-0">
@@ -853,7 +868,7 @@ function MarketplaceRecruiterJobCard({
               disabled={hasApplied || isPending || !job.isActive}
               onClick={handleApply}
             >
-              {isPending ? 'Applying...' : hasApplied ? 'Applied' : 'Apply now'}
+              {isPending ? 'Applying...' : actionLabel}
             </Button>
             <Button
               variant="secondary"

@@ -13,16 +13,20 @@ import {
   driveScoreSchema,
   getPublicRecruiterJobs,
   getPublicRecruiterJob,
+  getRecruiterJobApplications,
   getRecruiterColleges,
   getRecruiterDashboard,
   getRecruiterDrives,
   getRecruiterJobs,
+  getStudentRecruiterApplications,
   getRecruiterMessageCheck,
   getRecruiterOnboarding,
   getRecruiterTalentDiscover,
   getRecruiterTalentPipeline,
   getRecruiterTalentProfile,
   hireSchema,
+  jobApplicationParamsSchema,
+  jobApplicationUpdateSchema,
   jobCreateSchema,
   jobIdSchema,
   jobUpdateSchema,
@@ -32,6 +36,7 @@ import {
   publicJobsQuerySchema,
   registerForDrive,
   reminderSchema,
+  recruiterJobInviteSchema,
   removeShortlist,
   requestCollegePartnership,
   sendOnboardingReminder,
@@ -41,6 +46,8 @@ import {
   submitDriveScore,
   talentQuerySchema,
   updateRecruiterJob,
+  updateRecruiterJobApplicationStage,
+  inviteStudentToRecruiterJob,
 } from './recruiter.service';
 
 export const getDashboardController = async (req: Request, res: Response) => {
@@ -119,6 +126,31 @@ export const deleteJobController = async (req: Request, res: Response) => {
 export const applyJobController = async (req: Request, res: Response) => {
   const { jobId } = jobIdSchema.parse(req.params);
   const data = await applyToRecruiterJob(req.user!._id, jobId);
+  res.status(200).json(new ApiResponse(data));
+};
+
+export const inviteStudentToJobController = async (req: Request, res: Response) => {
+  const { jobId, studentId } = jobApplicationParamsSchema.parse(req.params);
+  const payload = recruiterJobInviteSchema.parse(req.body ?? {});
+  const data = await inviteStudentToRecruiterJob(req.user!._id, jobId, studentId, payload);
+  res.status(200).json(new ApiResponse(data));
+};
+
+export const getJobApplicationsController = async (req: Request, res: Response) => {
+  const { jobId } = jobIdSchema.parse(req.params);
+  const data = await getRecruiterJobApplications(req.user!._id, jobId);
+  res.status(200).json(new ApiResponse(data));
+};
+
+export const getStudentApplicationsController = async (req: Request, res: Response) => {
+  const data = await getStudentRecruiterApplications(req.user!._id);
+  res.status(200).json(new ApiResponse(data));
+};
+
+export const updateJobApplicationController = async (req: Request, res: Response) => {
+  const { jobId, studentId } = jobApplicationParamsSchema.parse(req.params);
+  const payload = jobApplicationUpdateSchema.parse(req.body);
+  const data = await updateRecruiterJobApplicationStage(req.user!._id, jobId, studentId, payload);
   res.status(200).json(new ApiResponse(data));
 };
 

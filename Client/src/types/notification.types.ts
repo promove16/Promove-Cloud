@@ -1,6 +1,8 @@
 export type NotificationType =
   | 'score_update'
   | 'team_invite'
+  | 'chat_invite'
+  | 'request'
   | 'patent_status'
   | 'deal_interest'
   | 'startup_launch'
@@ -13,6 +15,28 @@ export interface NotificationItem {
   title: string;
   body: string;
   link?: string;
+  metadata?: {
+    workspaceId?: string;
+    requestId?: string;
+    requestType?: string;
+    actionType?: string;
+    targetEntityType?: string;
+    targetEntityId?: string;
+    targetEntityTitle?: string;
+    targetName?: string;
+    requestedRole?: string;
+    requestedPermission?: string;
+    deepLink?: string;
+    acceptRedirect?: string;
+    declineRedirect?: string;
+    workspaceTitle?: string;
+    sender?: {
+      _id: string;
+      name?: string;
+      displayName?: string;
+      role?: string;
+    };
+  };
   isRead: boolean;
   createdAt: string;
 }

@@ -1,4 +1,4 @@
-import { FormEvent, useState } from "react";
+import { FormEvent, useEffect, useMemo, useState } from "react";
 import { isAxiosError } from "axios";
 import {
   GraduationCap,
@@ -7,12 +7,16 @@ import {
   Ticket,
   UserCircle,
 } from "lucide-react";
-import { Link, useNavigate } from "react-router-dom";
+import { Link, useNavigate, useSearchParams } from "react-router-dom";
 import { BusinessLogo } from "../../components/branding/BusinessLogo";
 import { AuthPasswordField } from "./AuthPasswordField";
 import { useSignupMutation } from "./useAuth";
 import { UserRole } from "../../types/roles.types";
 import { roleRedirect } from "../../utils/roleRedirect";
+import {
+  getInvitationRoleLabel,
+  normalizeInvitationRole,
+} from "../invitations/invitationConfig";
 
 type SignupFormState = {
   displayName: string;
@@ -36,10 +40,29 @@ const initialFormState: SignupFormState = {
 
 export function SignupPage() {
   const navigate = useNavigate();
+  const [searchParams] = useSearchParams();
   const signupMutation = useSignupMutation();
   const [formData, setFormData] = useState<SignupFormState>(initialFormState);
   const [error, setError] = useState("");
   const [notice, setNotice] = useState("");
+  const invitedRole = normalizeInvitationRole(searchParams.get("inviteRole"));
+  const invitedEmail = searchParams.get("inviteeEmail")?.trim() ?? "";
+  const inviterName = searchParams.get("inviterName")?.trim() ?? "";
+  const invitePurpose = searchParams.get("purpose")?.trim() ?? "";
+  const requestAccessLink = useMemo(() => {
+    const next = new URLSearchParams(searchParams);
+    return `/request-access${next.toString() ? `?${next.toString()}` : ""}`;
+  }, [searchParams]);
+
+  useEffect(() => {
+    if (!invitedEmail) {
+      return;
+    }
+
+    setFormData((current) =>
+      current.email === invitedEmail ? current : { ...current, email: invitedEmail },
+    );
+  }, [invitedEmail]);
 
   const updateField = <K extends keyof SignupFormState>(
     key: K,
@@ -123,6 +146,39 @@ export function SignupPage() {
           </h1>
           <p className="text-slate-400">Student registration starts here</p>
         </div>
+
+        {invitedRole === UserRole.STUDENT ? (
+          <div className="mb-6 rounded-2xl border border-cyan-500/30 bg-cyan-500/10 p-5 text-sm text-cyan-100">
+            <div className="text-xs uppercase tracking-[0.28em] text-cyan-300">
+              Invitation received
+            </div>
+            <div className="mt-2 text-base font-semibold text-white">
+              {inviterName || "A ProMove member"} invited you to join as a{" "}
+              {getInvitationRoleLabel(UserRole.STUDENT)}.
+            </div>
+            {invitePurpose ? (
+              <p className="mt-2 leading-6 text-cyan-100/90">{invitePurpose}</p>
+            ) : null}
+          </div>
+        ) : null}
+
+        {invitedRole && invitedRole !== UserRole.STUDENT ? (
+          <div className="mb-6 rounded-2xl border border-amber-500/30 bg-amber-500/10 p-5 text-sm text-amber-100">
+            <div className="text-xs uppercase tracking-[0.28em] text-amber-300">
+              Different access flow
+            </div>
+            <div className="mt-2 text-base font-semibold text-white">
+              This invite is for {getInvitationRoleLabel(invitedRole)} access, not
+              student signup.
+            </div>
+            <Link
+              to={requestAccessLink}
+              className="mt-3 inline-flex text-sm font-semibold text-amber-200 underline"
+            >
+              Continue to request access
+            </Link>
+          </div>
+        ) : null}
 
         <form
           onSubmit={handleSubmit}

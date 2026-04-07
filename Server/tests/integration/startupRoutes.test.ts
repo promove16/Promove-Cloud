@@ -305,6 +305,64 @@ describe('startup route validation', () => {
     );
   });
 
+  it('allows startup creation with a fully filled long-form payload', async () => {
+    const founder = await createStudent('Large Payload Founder');
+    const longText = 'Detailed startup launch answer. '.repeat(22);
+
+    const response = await request(app)
+      .post('/api/startup')
+      .set(authHeader(founder))
+      .send({
+        name: 'Long Form Startup',
+        tagline: 'Launch profile with a large but valid questionnaire payload',
+        category: 'DeepTech',
+        stage: 'Pre-Launch',
+        fundingNeeded: 2500000,
+        activeProducts: 3,
+        teamSize: 1,
+        traction: {
+          patentFiled: true,
+          mvpBuilt: true,
+          revenueGenerating: false,
+          usersCount: 120,
+        },
+        businessProfile: {
+          problemStatement: longText,
+          solutionSummary: longText,
+          targetCustomers: longText,
+          marketAnalysis: longText,
+          revenueModel: longText,
+          goToMarketPlan: longText,
+        },
+        registrationProfile: {
+          problemStatement: longText,
+          solutionDifferentiation: longText,
+          coreInnovation: longText,
+          priorArtStatus: longText,
+          workingMechanism: longText,
+          keyComponents: longText,
+          developmentStage: 'prototype',
+          documentationReadiness: longText,
+          inventorOwnership: 'team',
+          developmentContext: longText,
+          targetMarkets: longText,
+          commercializationStrategy: 'build_startup',
+          publicDisclosureStatus: longText,
+          legalAgreements: longText,
+          ipProtectionType: 'patent',
+        },
+      });
+
+    expect(response.status).toBe(201);
+    expect(response.body.data).toEqual(
+      expect.objectContaining({
+        name: 'Long Form Startup',
+        category: 'DeepTech',
+        stage: 'Pre-Launch',
+      }),
+    );
+  });
+
   it('does not expose startups in marketplace listings based on stage alone', async () => {
     const founder = await createStudent('Marketplace Founder');
     const viewer = await createStudent('Marketplace Viewer');

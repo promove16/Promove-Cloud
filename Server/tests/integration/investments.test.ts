@@ -57,8 +57,55 @@ const createStartup = async (
     ...overrides,
   });
 
+const approveDealThroughAdmin = async ({
+  founder,
+  investor,
+  admin,
+  dealId,
+  amountINR,
+  equityPercent,
+  investorRole,
+}: {
+  founder: { _id: { toString(): string }; email: string; role: UserRole };
+  investor: { _id: { toString(): string }; email: string; role: UserRole };
+  admin: { _id: { toString(): string }; email: string; role: UserRole };
+  dealId: string;
+  amountINR: number;
+  equityPercent: number;
+  investorRole: 'shareholder' | 'director' | 'observer';
+}) => {
+  const founderAcceptResponse = await request(app)
+    .patch(`/api/deals/${dealId}/founder-decision`)
+    .set(authHeader(founder))
+    .send({ decision: 'accepted' });
+  expect(founderAcceptResponse.status).toBe(200);
+
+  const stageTwoResponse = await request(app)
+    .patch(`/api/investor/deals/${dealId}/stage`)
+    .set(authHeader(investor))
+    .send({
+      newStage: 2,
+      stageData: { amountINR },
+    });
+  expect(stageTwoResponse.status).toBe(200);
+
+  const stageThreeResponse = await request(app)
+    .patch(`/api/investor/deals/${dealId}/stage`)
+    .set(authHeader(investor))
+    .send({
+      newStage: 3,
+      stageData: { equityPercent, investorRole },
+    });
+  expect(stageThreeResponse.status).toBe(200);
+
+  const approveResponse = await request(app)
+    .patch(`/api/admin/deals/${dealId}/approve-stage`)
+    .set(authHeader(admin));
+  expect(approveResponse.status).toBe(200);
+};
+
 describe('investment workflow integration', () => {
-  it('creates a penny investment and increments startup counters', async () => {
+  it('creates a penny investment without changing startup allocation before admin approval', async () => {
     const founder = await createUser(UserRole.STUDENT, { displayName: 'Founder One' });
     const investor = await createUser(UserRole.INVESTOR, { displayName: 'Penny Investor' });
     const startup = await createStartup(founder._id.toString());
@@ -79,15 +126,23 @@ describe('investment workflow integration', () => {
     expect(response.body.data.founderDecision.status).toBe('pending');
 
     const updatedStartup = await Startup.findById(startup._id).lean();
-    expect(updatedStartup?.currentPennyCount).toBe(1);
-    expect(updatedStartup?.availableShares).toBe(980);
+    expect(updatedStartup?.currentPennyCount).toBe(0);
+    expect(updatedStartup?.availableShares).toBe(1000);
 
+    const capTableResponse = await request(app)
+      .get(`/api/startups/${startup._id}/cap-table`)
+      .set(authHeader(founder));
+
+    expect(capTableResponse.status).toBe(200);
+    expect(capTableResponse.body.data.pennyInvestors).toHaveLength(0);
+    expect(capTableResponse.body.data.availableShares).toBe(1000);
   });
 
-  it('creates a sole investment and blocks a second sole investor', async () => {
+  it('allows pending sole proposals, but blocks a second sole investor after admin approval', async () => {
     const founder = await createUser(UserRole.STUDENT, { displayName: 'Founder Two' });
     const firstSole = await createUser(UserRole.INVESTOR, { displayName: 'Lead Investor' });
     const secondSole = await createUser(UserRole.INVESTOR, { displayName: 'Backup Investor' });
+    const admin = await createUser(UserRole.ADMIN, { displayName: 'Deal Admin' });
     const startup = await createStartup(founder._id.toString(), { reservedForSole: 510 });
 
     const firstResponse = await request(app)
@@ -103,12 +158,34 @@ describe('investment workflow integration', () => {
     expect(firstResponse.status).toBe(201);
     expect(firstResponse.body.data.canVeto).toBe(true);
 
-    const secondResponse = await request(app)
+    const pendingSecondResponse = await request(app)
       .post(`/api/startups/${startup._id}/sole-investor`)
       .set(authHeader(secondSole))
       .send({
         investorType: 'sole',
         proposedAmountINR: 250000,
+        proposedEquityPercent: 55,
+        chosenRole: 'director',
+      });
+
+    expect(pendingSecondResponse.status).toBe(201);
+
+    await approveDealThroughAdmin({
+      founder,
+      investor: firstSole,
+      admin,
+      dealId: firstResponse.body.data._id,
+      amountINR: 200000,
+      equityPercent: 60,
+      investorRole: 'director',
+    });
+
+    const secondResponse = await request(app)
+      .post(`/api/startups/${startup._id}/sole-investor`)
+      .set(authHeader(await createUser(UserRole.INVESTOR, { displayName: 'Third Sole Investor' })))
+      .send({
+        investorType: 'sole',
+        proposedAmountINR: 275000,
         proposedEquityPercent: 55,
         chosenRole: 'director',
       });
@@ -179,6 +256,7 @@ describe('investment workflow integration', () => {
 
   it('rejects penny investments that breach the collective 49% cap', async () => {
     const founder = await createUser(UserRole.STUDENT);
+    const admin = await createUser(UserRole.ADMIN, { displayName: 'Penny Cap Admin' });
     const startup = await createStartup(founder._id.toString(), {
       maxPennyInvestors: 12,
     });
@@ -193,9 +271,19 @@ describe('investment workflow integration', () => {
           proposedAmountINR: 20000 + index,
           proposedEquityPercent: 5,
           chosenRole: 'shareholder',
-        });
+      });
 
       expect(response.status).toBe(201);
+
+      await approveDealThroughAdmin({
+        founder,
+        investor,
+        admin,
+        dealId: response.body.data._id,
+        amountINR: 20000 + index,
+        equityPercent: 5,
+        investorRole: 'shareholder',
+      });
     }
 
     const overflowInvestor = await createUser(UserRole.INVESTOR, { displayName: 'Overflow Penny' });
@@ -363,9 +451,10 @@ describe('investment workflow integration', () => {
     const founder = await createUser(UserRole.STUDENT);
     const soleInvestor = await createUser(UserRole.INVESTOR, { displayName: 'Director Lead' });
     const pennyInvestor = await createUser(UserRole.INVESTOR, { displayName: 'Observer Penny' });
+    const admin = await createUser(UserRole.ADMIN, { displayName: 'Authority Admin' });
     const startup = await createStartup(founder._id.toString());
 
-    await request(app)
+    const soleResponse = await request(app)
       .post(`/api/startups/${startup._id}/sole-investor`)
       .set(authHeader(soleInvestor))
       .send({
@@ -374,8 +463,9 @@ describe('investment workflow integration', () => {
         proposedEquityPercent: 60,
         chosenRole: 'director',
       });
+    expect(soleResponse.status).toBe(201);
 
-    await request(app)
+    const pennyResponse = await request(app)
       .post(`/api/investor/express-interest/${startup._id}`)
       .set(authHeader(pennyInvestor))
       .send({
@@ -384,6 +474,26 @@ describe('investment workflow integration', () => {
         proposedEquityPercent: 2,
         chosenRole: 'observer',
       });
+    expect(pennyResponse.status).toBe(201);
+
+    await approveDealThroughAdmin({
+      founder,
+      investor: soleInvestor,
+      admin,
+      dealId: soleResponse.body.data._id,
+      amountINR: 250000,
+      equityPercent: 60,
+      investorRole: 'director',
+    });
+    await approveDealThroughAdmin({
+      founder,
+      investor: pennyInvestor,
+      admin,
+      dealId: pennyResponse.body.data._id,
+      amountINR: 20000,
+      equityPercent: 2,
+      investorRole: 'observer',
+    });
 
     const soleAuthority = await request(app)
       .get('/api/investor/portfolio/authority')
@@ -539,7 +649,7 @@ describe('investment workflow integration', () => {
     expect(blockedResponse.body.error.code).toBe('FOUNDER_ACCEPTANCE_REQUIRED');
   });
 
-  it('restores reserved shares and penny slots when the founder rejects a proposal', async () => {
+  it('keeps startup allocation unchanged when the founder rejects a pending proposal', async () => {
     const founder = await createUser(UserRole.STUDENT, { displayName: 'Reject Founder' });
     const investor = await createUser(UserRole.INVESTOR, { displayName: 'Reject Investor' });
     const startup = await createStartup(founder._id.toString());
@@ -574,7 +684,7 @@ describe('investment workflow integration', () => {
 
   });
 
-  it('requires founder acceptance before an investor can advance and restores shares when the founder rejects', async () => {
+  it('requires founder acceptance before an investor can advance and keeps allocation unchanged after rejection', async () => {
     const founder = await createUser(UserRole.STUDENT, { displayName: 'Founder Gatekeeper' });
     const investor = await createUser(UserRole.INVESTOR, { displayName: 'Waiting Investor' });
     const startup = await createStartup(founder._id.toString());

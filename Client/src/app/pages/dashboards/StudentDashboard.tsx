@@ -550,7 +550,7 @@ export function StudentDashboard() {
                   {deal.currentStage === 1
                     ? "Due diligence in progress"
                     : deal.currentStage === 2
-                      ? "Fund transfer in progress"
+                      ? "Payment placeholder pending"
                       : deal.currentStage === 3
                         ? "Awaiting equity verification by admin"
                         : "Deal closed - check your portfolio!"}

@@ -35,7 +35,7 @@ export default function InvestorDashboard() {
   const stageGroups = useMemo(() => dealsQuery.data ?? [], [dealsQuery.data]);
   const stageLabels: Record<number, string> = {
     1: 'Due Diligence',
-    2: 'Fund Transfer',
+    2: 'Payment Placeholder',
     3: 'Equity Transfer',
     4: 'Portfolio',
   };

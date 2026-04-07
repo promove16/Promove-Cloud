@@ -1,47 +1,19 @@
-import { useEffect, useState } from 'react';
-import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
+import { useQuery } from '@tanstack/react-query';
 import { useNavigate, useParams } from 'react-router-dom';
 import { Badge } from '../../components/ui/Badge';
 import { Button } from '../../components/ui/Button';
 import { Card } from '../../components/ui/Card';
-import { Input } from '../../components/ui/Input';
 import { Spinner } from '../../components/ui/Spinner';
 import { dealApi } from '../../api/deal.api';
 
 export default function InvestorPaymentPage() {
   const { dealId } = useParams<{ dealId: string }>();
   const navigate = useNavigate();
-  const queryClient = useQueryClient();
-  const [amountINR, setAmountINR] = useState('20000');
 
   const dealQuery = useQuery({
     queryKey: ['investor-deal', dealId],
     queryFn: () => dealApi.getInvestorDeal(dealId!),
     enabled: Boolean(dealId),
-  });
-
-  const paymentMutation = useMutation({
-    mutationFn: async () => {
-      if (!dealQuery.data) {
-        throw new Error('Deal not loaded');
-      }
-
-      const parsedAmount = Number(amountINR);
-      if (!Number.isFinite(parsedAmount) || parsedAmount < 20000) {
-        throw new Error('Minimum investment is INR 20,000');
-      }
-
-      return dealApi.advanceInvestorDealStage(dealQuery.data._id, {
-        newStage: 2,
-        stageData: { amountINR: parsedAmount },
-      });
-    },
-    onSuccess: async () => {
-      await queryClient.invalidateQueries({ queryKey: ['investor-deals'] });
-      await queryClient.invalidateQueries({ queryKey: ['investor-deal', dealId] });
-      await queryClient.invalidateQueries({ queryKey: ['investor-dashboard'] });
-      navigate('/dashboard/investor');
-    },
   });
 
   if (dealQuery.isLoading) {
@@ -54,12 +26,6 @@ export default function InvestorPaymentPage() {
 
   const deal = dealQuery.data;
 
-  useEffect(() => {
-    if (deal) {
-      setAmountINR(String(deal.amountINR || 20000));
-    }
-  }, [deal]);
-
   if (!deal) {
     return (
       <Card className="p-6">
@@ -70,14 +36,16 @@ export default function InvestorPaymentPage() {
 
   const founderAccepted = deal.founderDecision.status === 'accepted';
   const paymentAlreadyMarked = deal.currentStage >= 2;
+  const amountLabel =
+    typeof deal.amountINR === 'number' ? `INR ${deal.amountINR.toLocaleString()}` : deal.amountINR;
 
   return (
     <div className="mx-auto max-w-4xl space-y-6">
       <div className="flex flex-wrap items-center justify-between gap-4">
         <div>
-          <h1 className="text-3xl font-bold text-white">Dummy Payment Page</h1>
+          <h1 className="text-3xl font-bold text-white">Payment Placeholder</h1>
           <p className="mt-2 text-slate-400">
-            This screen is a placeholder. No payment gateway or escrow service is connected yet.
+            Payment gateway is not connected yet. This is a temporary placeholder.
           </p>
         </div>
         <Button variant="secondary" onClick={() => navigate('/dashboard/investor')}>
@@ -110,14 +78,7 @@ export default function InvestorPaymentPage() {
         <div className="grid gap-4 sm:grid-cols-3">
           <div className="rounded-xl border border-slate-800 bg-slate-950 p-4">
             <div className="text-xs uppercase tracking-[0.2em] text-slate-500">Amount</div>
-            <Input
-              type="number"
-              min={20000}
-              value={amountINR}
-              onChange={(event) => setAmountINR(event.target.value)}
-              disabled={paymentAlreadyMarked}
-              className="mt-2"
-            />
+            <div className="mt-2 text-xl font-semibold text-white">{amountLabel}</div>
           </div>
           <div className="rounded-xl border border-slate-800 bg-slate-950 p-4">
             <div className="text-xs uppercase tracking-[0.2em] text-slate-500">Equity</div>
@@ -131,36 +92,17 @@ export default function InvestorPaymentPage() {
 
         {!founderAccepted ? (
           <div className="rounded-2xl border border-amber-500/30 bg-amber-500/10 px-4 py-3 text-sm text-amber-200">
-            Founder acceptance is still pending. Dummy payment cannot be initiated yet.
+            Founder acceptance is still pending. This placeholder cannot initiate payment.
           </div>
         ) : paymentAlreadyMarked ? (
           <div className="rounded-2xl border border-emerald-500/30 bg-emerald-500/10 px-4 py-3 text-sm text-emerald-200">
-            Payment is already marked as initiated for this deal. Continue the workflow from the deal board.
+            The deal is already beyond the payment placeholder stage.
           </div>
         ) : (
           <div className="rounded-2xl border border-cyan-500/30 bg-cyan-500/10 px-4 py-3 text-sm text-cyan-200">
-            Use this placeholder to simulate a successful payment until the real integration is added.
+            Review the deal details here. No payment action is available in this temporary page.
           </div>
         )}
-
-        <div className="flex flex-wrap gap-3">
-          <Button
-            onClick={() => paymentMutation.mutate()}
-            disabled={!founderAccepted || paymentAlreadyMarked || paymentMutation.isPending}
-          >
-            {paymentMutation.isPending ? 'Marking Payment...' : 'Simulate Payment Success'}
-          </Button>
-          <Button variant="secondary" onClick={() => navigate('/dashboard/investor')}>
-            Continue Later
-          </Button>
-        </div>
-        {paymentMutation.error ? (
-          <div className="text-sm text-red-300">
-            {paymentMutation.error instanceof Error
-              ? paymentMutation.error.message
-              : 'Unable to simulate payment right now.'}
-          </div>
-        ) : null}
       </Card>
     </div>
   );

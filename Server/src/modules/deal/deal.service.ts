@@ -409,54 +409,6 @@ export const invalidateInvestmentCaches = async (startupId: string, investorId?:
   await Promise.all(keys.map((key) => redis.del(key)));
 };
 
-const updateStartupAllocationState = async (input: {
-  startup: LeanStartup;
-  shareDelta: number;
-  pennyCountDelta?: number;
-  setHasSoleInvestor?: boolean;
-  setSoleInvestorId?: string | null;
-  session: ClientSession;
-}) => {
-  const filter: Record<string, unknown> = {
-    _id: input.startup._id,
-    availableShares: input.startup.availableShares,
-    currentPennyCount: input.startup.currentPennyCount,
-    hasSoleInvestor: input.startup.hasSoleInvestor,
-    soleInvestorId: input.startup.soleInvestorId ?? null,
-  };
-
-  const update: Record<string, unknown> = {
-    $inc: {
-      availableShares: input.shareDelta,
-      ...(input.pennyCountDelta ? { currentPennyCount: input.pennyCountDelta } : {}),
-    },
-  };
-
-  if (input.setHasSoleInvestor !== undefined || input.setSoleInvestorId !== undefined) {
-    update.$set = {
-      ...(input.setHasSoleInvestor !== undefined ? { hasSoleInvestor: input.setHasSoleInvestor } : {}),
-      ...(input.setSoleInvestorId !== undefined ? { soleInvestorId: input.setSoleInvestorId } : {}),
-    };
-  }
-
-  const updated = await Startup.findOneAndUpdate(filter, update, {
-    new: true,
-    session: input.session,
-  })
-    .select('_id name tagline category stage pitchDeckUrl founderIds launchedToInvestors launchedAt innovationScoreAtLaunch traction totalShares availableShares reservedForSole maxPennyInvestors currentPennyCount hasSoleInvestor soleInvestorId')
-    .lean<LeanStartup | null>();
-
-  if (!updated) {
-    throw new ApiError(
-      409,
-      'STARTUP_ALLOCATION_CONFLICT',
-      'The startup allocation changed while processing this investment. Refresh and try again.',
-    );
-  }
-
-  return updated;
-};
-
 const buildOfficialDealQuery = (excludeId?: string) => ({
   status: { $ne: 'cancelled' as const },
   adminApprovedAt: { $exists: true, $ne: null },
@@ -480,7 +432,7 @@ const getTotalPennyEquity = async (startupId: string, excludeId?: string, sessio
   const deals = await Deal.find({
     startupId,
     investorType: 'penny',
-    ...buildReservedDealQuery(excludeId),
+    ...buildOfficialDealQuery(excludeId),
   })
     .session(session ?? null)
     .select('equityPercent')
@@ -496,7 +448,7 @@ const getTotalPennyEquity = async (startupId: string, excludeId?: string, sessio
 const getTotalInvestorEquity = async (startupId: string, excludeId?: string, session?: ClientSession) => {
   const deals = await Deal.find({
     startupId,
-    ...buildReservedDealQuery(excludeId),
+    ...buildOfficialDealQuery(excludeId),
   })
     .session(session ?? null)
     .select('equityPercent')
@@ -684,15 +636,6 @@ export const createInvestorDealFromInterest = async (
       parsed.proposedEquityPercent,
       parsed.chosenRole,
     );
-
-    await updateStartupAllocationState({
-      startup,
-      shareDelta: -sharesToAllocate,
-      pennyCountDelta: parsed.investorType === 'penny' ? 1 : 0,
-      setHasSoleInvestor: parsed.investorType === 'sole' ? true : undefined,
-      setSoleInvestorId: parsed.investorType === 'sole' ? investorId : undefined,
-      session,
-    });
 
     const deal =
       existing ??
@@ -928,14 +871,6 @@ export const recordFounderDecision = async (
       deal.closedAt = undefined;
       deal.mediationStatus = 'rejected';
 
-      await updateStartupAllocationState({
-        startup,
-        shareDelta: deal.sharesAllocated,
-        pennyCountDelta: deal.investorType === 'penny' ? -1 : 0,
-        setHasSoleInvestor: deal.investorType === 'sole' ? false : undefined,
-        setSoleInvestorId: deal.investorType === 'sole' ? null : undefined,
-        session,
-      });
     }
 
     await deal.save({ session });
@@ -1079,19 +1014,9 @@ export const advanceDealStage = async (
         equityPercent: nextEquityPercent,
         chosenRole: nextRole,
         excludeId: String(deal._id),
-        currentSharesAllocated: deal.sharesAllocated,
         session,
       });
       const authority = resolveInvestorAuthority(deal.investorType, nextEquityPercent, nextRole);
-      const shareDelta = deal.sharesAllocated - sharesToAllocate;
-
-      if (shareDelta !== 0) {
-        await updateStartupAllocationState({
-          startup,
-          shareDelta,
-          session,
-        });
-      }
 
       deal.stage = 3;
       deal.adminApprovalRequired = true;

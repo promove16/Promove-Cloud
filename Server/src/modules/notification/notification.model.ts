@@ -3,6 +3,8 @@ import { Schema, Types, model } from 'mongoose';
 export type NotificationType =
   | 'score_update'
   | 'team_invite'
+  | 'chat_invite'
+  | 'request'
   | 'patent_status'
   | 'deal_interest'
   | 'startup_launch'
@@ -15,6 +17,7 @@ export interface INotification {
   title: string;
   body: string;
   link?: string;
+  metadata?: Record<string, unknown>;
   isRead: boolean;
   createdAt: Date;
   updatedAt: Date;
@@ -30,7 +33,16 @@ const notificationSchema = new Schema<INotification>(
     type: {
       type: String,
       required: true,
-      enum: ['score_update', 'team_invite', 'patent_status', 'deal_interest', 'startup_launch', 'system'],
+      enum: [
+        'score_update',
+        'team_invite',
+        'chat_invite',
+        'request',
+        'patent_status',
+        'deal_interest',
+        'startup_launch',
+        'system',
+      ],
     },
     title: {
       type: String,
@@ -46,6 +58,10 @@ const notificationSchema = new Schema<INotification>(
     },
     link: {
       type: String,
+      default: undefined,
+    },
+    metadata: {
+      type: Schema.Types.Mixed,
       default: undefined,
     },
     isRead: {

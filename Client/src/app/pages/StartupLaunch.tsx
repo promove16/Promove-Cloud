@@ -191,7 +191,7 @@ export function StartupLaunch() {
     },
     onSuccess: async (saved) => {
       queryClient.setQueryData(["startup", saved._id], saved);
-      setToast("Startup profile saved.");
+      setToast("Startup draft saved. Submit it for admin review when ready.");
       await queryClient.invalidateQueries({ queryKey: ["startup"] });
       if (isNew && saved._id) {
         navigate(`/startup-launch/${saved._id}/overview`, { replace: true });
@@ -1043,7 +1043,7 @@ export function StartupLaunch() {
                         {deal.currentStage === 1
                           ? "Due diligence in progress"
                           : deal.currentStage === 2
-                            ? "Fund transfer in progress"
+                            ? "Payment placeholder pending"
                             : deal.currentStage === 3
                               ? "Awaiting equity verification by admin"
                               : "Deal closed - check your portfolio!"}
@@ -1095,7 +1095,7 @@ export function StartupLaunch() {
               disabled={persistStartup.isPending}
               className="rounded-xl bg-white px-5 py-3 text-sm font-semibold text-slate-950 transition hover:bg-slate-100 disabled:cursor-not-allowed disabled:opacity-60"
             >
-              {persistStartup.isPending ? "Saving..." : isNew ? "Create Startup" : "Save Profile"}
+              {persistStartup.isPending ? "Saving..." : isNew ? "Create Startup Draft" : reviewStatus === "draft" ? "Save Draft" : "Save Profile"}
             </button>
           </div>
         </div>

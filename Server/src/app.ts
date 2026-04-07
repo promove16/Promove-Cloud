@@ -22,6 +22,7 @@ import notificationRoutes from './modules/notification/notification.routes';
 import patentRoutes from './modules/patent/patent.routes';
 import problemRoutes from './modules/problemBank/problem.routes';
 import recruiterRoutes from './modules/recruiter/recruiter.routes';
+import requestRoutes from './modules/request/request.routes';
 import schoolRoutes from './modules/school/school.routes';
 import scoreRoutes from './modules/innovationScore/score.routes';
 import mentorRoutes from './modules/mentor/mentor.routes';
@@ -38,6 +39,7 @@ export const createApp = () => {
   const app = express();
   const clientBuildPath = path.resolve(__dirname, '../../public');
   const hasClientBuild = existsSync(clientBuildPath);
+  const jsonBodyLimit = '256kb';
 
   app.set('trust proxy', 1);
   app.use(compression());
@@ -48,8 +50,8 @@ export const createApp = () => {
       credentials: true,
     }),
   );
-  app.use(express.json({ limit: '10kb' }));
-  app.use(express.urlencoded({ extended: true, limit: '10kb' }));
+  app.use(express.json({ limit: jsonBodyLimit }));
+  app.use(express.urlencoded({ extended: true, limit: jsonBodyLimit }));
   app.use(cookieParser());
   app.use(
     morgan(env.NODE_ENV === 'production' ? 'combined' : 'dev', {
@@ -62,6 +64,8 @@ export const createApp = () => {
   app.use('/api/users', userRoutes);
   app.use('/api/score', scoreRoutes);
   app.use('/api/problems', problemRoutes);
+  app.use('/api/requests', requestRoutes);
+  app.use('/api/workflow-requests', requestRoutes);
   app.use('/api/workspace', workspaceRoutes);
   app.use('/api/chat', chatRoutes);
   app.use('/api/patents', patentRoutes);
