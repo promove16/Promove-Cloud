@@ -93,7 +93,6 @@ export function ProductWorkspace() {
   const [showNegotiationPanel, setShowNegotiationPanel] = useState(false);
   const [participantForm, setParticipantForm] = useState({
     email: "",
-    role: "mentor" as "mentor" | "investor",
   });
   const [selectedWorkspaceId, setSelectedWorkspaceId] = useState<string>("");
 
@@ -262,11 +261,11 @@ export function ProductWorkspace() {
     mutationFn: () =>
       workspaceApi.addChatParticipant(workspaceId!, {
         email: participantForm.email,
-        role: participantForm.role,
+        role: "investor",
       }),
     onSuccess: async () => {
-      setParticipantForm({ email: "", role: "mentor" });
-      setToast(`${participantForm.role === "mentor" ? "Mentor" : "Investor"} chat access request sent.`);
+      setParticipantForm({ email: "" });
+      setToast("Investor chat access request sent.");
       await refresh();
     },
     onError: (error) =>
@@ -732,7 +731,7 @@ export function ProductWorkspace() {
                       {showNegotiationPanel ? (
                         <div className="space-y-3 rounded-2xl border border-amber-800/30 bg-amber-950/10 p-4">
                           <div className="text-xs text-amber-200">
-                            Mentor and investor participants can review this workspace dashboard and collaborate in chat. Student collaborators manage tasks, docs, and code records.
+                            Investor participants can be invited here for chat-only access. Mentor coverage is assigned and removed by admins from the mentorship workspace.
                           </div>
                           {(workspace.chatParticipants ?? []).map((participant) => (
                             <div key={participant._id} className="flex items-center justify-between rounded-xl border border-slate-800 bg-slate-950/70 px-4 py-3">
@@ -740,20 +739,20 @@ export function ProductWorkspace() {
                                 <div className="text-sm font-semibold text-white">{participant.displayName ?? participant.userId}</div>
                                 <div className="text-xs capitalize text-slate-400">{participant.role}</div>
                               </div>
-                              {canManageChatAccess ? (
+                              {canManageChatAccess && participant.role !== "mentor" ? (
                                 <button onClick={() => removeParticipant.mutate(participant.userId)} className="rounded-lg border border-slate-700 px-3 py-2 text-xs font-semibold text-slate-300">Remove</button>
+                              ) : participant.role === "mentor" ? (
+                                <span className="rounded-lg border border-sky-500/30 bg-sky-500/10 px-3 py-2 text-xs font-semibold text-sky-200">
+                                  Admin managed
+                                </span>
                               ) : null}
                             </div>
                           ))}
                           {canManageChatAccess ? (
-                            <div className="grid gap-3 md:grid-cols-[minmax(0,1fr)_180px_auto]">
-                              <input value={participantForm.email} onChange={(event) => setParticipantForm((current) => ({ ...current, email: event.target.value }))} placeholder="mentor@example.com" className="rounded-xl border border-slate-800 bg-slate-950 px-4 py-3 text-white" />
-                              <select value={participantForm.role} onChange={(event) => setParticipantForm((current) => ({ ...current, role: event.target.value as "mentor" | "investor" }))} className="rounded-xl border border-slate-800 bg-slate-950 px-4 py-3 text-white">
-                                <option value="mentor">Mentor</option>
-                                <option value="investor">Investor</option>
-                              </select>
+                            <div className="grid gap-3 md:grid-cols-[minmax(0,1fr)_auto]">
+                              <input value={participantForm.email} onChange={(event) => setParticipantForm({ email: event.target.value })} placeholder="investor@example.com" className="rounded-xl border border-slate-800 bg-slate-950 px-4 py-3 text-white" />
                               <button onClick={() => addParticipant.mutate()} disabled={!participantForm.email.trim() || addParticipant.isPending} className="rounded-xl bg-amber-600 px-4 py-3 text-sm font-semibold text-white disabled:opacity-60">
-                                Add
+                                Add Investor
                               </button>
                             </div>
                           ) : null}

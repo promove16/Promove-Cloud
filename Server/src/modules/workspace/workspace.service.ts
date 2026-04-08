@@ -282,6 +282,14 @@ export const getWorkspaceForOwner = async (workspaceId: string, userId: string) 
   return workspace;
 };
 
+const assertMentorAssignmentIsAdminManaged = () => {
+  throw new ApiError(
+    403,
+    'MENTOR_ASSIGNMENT_ADMIN_ONLY',
+    'Mentor assignments are managed by admins through project mentorship review.',
+  );
+};
+
 export const getWorkspaceForChatAccess = async (workspaceId: string, userId: string) => {
   const workspace = await Workspace.findById(workspaceId);
 
@@ -810,6 +818,10 @@ export const addChatParticipant = async (
 ) => {
   const workspace = await getWorkspaceForOwner(workspaceId, ownerId);
 
+  if (payload.role === 'mentor') {
+    assertMentorAssignmentIsAdminManaged();
+  }
+
   let user = payload.userId ? await User.findById(payload.userId) : null;
   if (!user && payload.email) {
     user = await User.findOne({ email: payload.email.toLowerCase() });
@@ -871,6 +883,10 @@ export const removeChatParticipant = async (
   const participant = workspace.chatParticipants.find((p) => String(p.userId) === participantUserId);
   if (!participant) {
     throw new ApiError(404, 'PARTICIPANT_NOT_FOUND', 'Chat participant not found');
+  }
+
+  if (participant.role === 'mentor') {
+    assertMentorAssignmentIsAdminManaged();
   }
 
   workspace.chatParticipants = workspace.chatParticipants.filter(
