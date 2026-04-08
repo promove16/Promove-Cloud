@@ -31,6 +31,7 @@ const envSchema = z.object({
   REDIS_REQUEST_TIMEOUT_MS: z.coerce.number().int().positive().default(1500),
   REDIS_REQUEST_RETRIES: z.coerce.number().int().min(0).default(0),
   AUTH_ALLOW_REDIS_AUTH_FALLBACK: booleanFromEnv.optional(),
+  BULLMQ_USE_REDIS: booleanFromEnv.optional(),
   BULLMQ_CONNECT_TIMEOUT_MS: z.coerce.number().int().positive().default(5000),
   BULLMQ_COMMAND_TIMEOUT_MS: z.coerce.number().int().positive().default(5000),
   JWT_ACCESS_SECRET: z.string().min(1),
@@ -74,4 +75,6 @@ export const env = {
   JWT_REFRESH_SECRET: normalizeMultiline(parsed.data.JWT_REFRESH_SECRET),
   AUTH_ALLOW_REDIS_AUTH_FALLBACK:
     parsed.data.AUTH_ALLOW_REDIS_AUTH_FALLBACK ?? parsed.data.NODE_ENV !== "production",
+  BULLMQ_USE_REDIS:
+    parsed.data.BULLMQ_USE_REDIS ?? parsed.data.NODE_ENV === "production",
 };

@@ -253,6 +253,7 @@ Important backend variables:
 - `UPSTASH_REDIS_REST_TOKEN`
 - `UPSTASH_REDIS_HOST`
 - `UPSTASH_REDIS_PASSWORD` optional for BullMQ TCP mode
+- `BULLMQ_USE_REDIS` optional, defaults to `false` in development and `true` in production
 - `JWT_ACCESS_SECRET`
 - `JWT_REFRESH_SECRET`
 - `CLIENT_URL`
