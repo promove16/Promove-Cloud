@@ -499,15 +499,15 @@ const fetchGithubActivity = async (accessToken: string, username: string) => {
 
 const normalizeReturnTo = (returnTo?: string) => {
   if (!returnTo) {
-    return '/dashboard/profile';
+    return '/portfolio';
   }
 
   if (!returnTo.startsWith('/')) {
-    return '/dashboard/profile';
+    return '/portfolio';
   }
 
   if (returnTo.startsWith('//') || returnTo.startsWith('/api/')) {
-    return '/dashboard/profile';
+    return '/portfolio';
   }
 
   return returnTo;

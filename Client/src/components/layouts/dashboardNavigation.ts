@@ -49,14 +49,12 @@ export const SIDEBAR_CONFIG: Record<UserRole, DashboardNavItem[]> = {
   [UserRole.STUDENT]: [
     { kind: 'link', label: 'Dashboard', icon: Home, path: '/dashboard/student' },
     { kind: 'link', label: 'Problem Bank', icon: Sparkles, path: '/problem-bank' },
-    { kind: 'link', label: 'Product Workspace', icon: Trophy, path: '/product-workspace' },
     { kind: 'link', label: 'Startup', icon: Rocket, path: STARTUP_LAUNCH_BASE_PATH },
     { kind: 'link', label: 'Portfolio', icon: Trophy, path: '/portfolio' },
     { kind: 'link', label: 'Marketplace', icon: Globe, path: getMarketplaceBasePath(UserRole.STUDENT) },
     { kind: 'link', label: 'Applications', icon: BriefcaseBusiness, path: '/dashboard/student/applications' },
     { kind: 'link', label: 'Invitations', icon: UserPlus, path: '/dashboard/invitations' },
     { kind: 'link', label: 'Messages', icon: MessageCircle, path: '/dashboard/messages' },
-    { kind: 'link', label: 'My Profile', icon: User, path: '/dashboard/profile' },
     { kind: 'link', label: 'Settings', icon: Settings, path: '/dashboard/settings' },
     { kind: 'action', label: 'Logout', icon: LogOut, action: 'logout' },
   ],
@@ -94,7 +92,6 @@ export const SIDEBAR_CONFIG: Record<UserRole, DashboardNavItem[]> = {
   [UserRole.MENTOR]: [
     { kind: 'link', label: 'Dashboard', icon: Home, path: '/dashboard/mentor' },
     { kind: 'link', label: 'Problem Bank', icon: Sparkles, path: '/problem-bank' },
-    { kind: 'link', label: 'Product Workspace', icon: Trophy, path: '/product-workspace' },
     { kind: 'link', label: 'Marketplace', icon: Globe, path: getMarketplaceBasePath(UserRole.MENTOR) },
     { kind: 'link', label: 'Student Feed', icon: Users, path: '/dashboard/mentor/students' },
     { kind: 'link', label: 'Sessions', icon: GraduationCap, path: '/dashboard/mentor/sessions' },
@@ -107,7 +104,6 @@ export const SIDEBAR_CONFIG: Record<UserRole, DashboardNavItem[]> = {
   [UserRole.INVESTOR]: [
     { kind: 'link', label: 'Dashboard', icon: Home, path: '/dashboard/investor' },
     { kind: 'link', label: 'Problem Bank', icon: Sparkles, path: '/problem-bank' },
-    { kind: 'link', label: 'Product Workspace', icon: Trophy, path: '/product-workspace' },
     { kind: 'link', label: 'Marketplace', icon: Globe, path: getMarketplaceBasePath(UserRole.INVESTOR) },
     { kind: 'link', label: 'Startups', icon: Rocket, path: '/dashboard/investor/startups' },
     { kind: 'link', label: 'Institutions', icon: Building2, path: '/dashboard/investor/institutions' },

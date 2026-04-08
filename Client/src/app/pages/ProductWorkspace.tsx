@@ -13,7 +13,6 @@ import {
   Github,
   Image,
   Paperclip,
-  Plus,
   Rocket,
   Send,
   Trash2,
@@ -97,10 +96,12 @@ export function ProductWorkspace() {
     role: "mentor" as "mentor" | "investor",
   });
   const [selectedWorkspaceId, setSelectedWorkspaceId] = useState<string>("");
-  const [showCreateWorkspaceForm, setShowCreateWorkspaceForm] = useState(false);
-  const [newWorkspaceForm, setNewWorkspaceForm] = useState({ title: "", category: "" });
 
   const listQuery = useQuery({ queryKey: ["workspaces"], queryFn: () => workspaceApi.list() });
+  const problemBankWorkspaceOptions = useMemo(
+    () => (listQuery.data ?? []).filter((item) => Boolean(item.claimedProblemId)),
+    [listQuery.data],
+  );
   const workspaceId = projectId || selectedWorkspaceId || undefined;
   const workspaceQuery = useQuery({
     queryKey: ["workspace", workspaceId],
@@ -110,8 +111,7 @@ export function ProductWorkspace() {
   const workspace = workspaceQuery.data;
   const teamMembers = workspace?.teamMembers ?? [];
   const isOwner = workspace?.ownerId === currentUser?._id;
-  const canCreateWorkspace = currentUser?.role === "student";
-  const canManageWorkspace = canCreateWorkspace && Boolean(workspace);
+  const canManageWorkspace = currentUser?.role === "student" && Boolean(workspace);
   const canManageChatAccess = Boolean(isOwner);
   const chat = useWorkspaceChat(workspaceId);
 
@@ -126,11 +126,11 @@ export function ProductWorkspace() {
       return;
     }
 
-    const hasSelectedWorkspace = listQuery.data.some((item) => item._id === selectedWorkspaceId);
+    const hasSelectedWorkspace = problemBankWorkspaceOptions.some((item) => item._id === selectedWorkspaceId);
     if (!hasSelectedWorkspace) {
-      setSelectedWorkspaceId(listQuery.data[0]?._id ?? "");
+      setSelectedWorkspaceId(problemBankWorkspaceOptions[0]?._id ?? "");
     }
-  }, [projectId, listQuery.data, selectedWorkspaceId]);
+  }, [projectId, listQuery.data, problemBankWorkspaceOptions, selectedWorkspaceId]);
 
   const refresh = async () => {
     if (!workspaceId) return;
@@ -305,27 +305,6 @@ export function ProductWorkspace() {
     },
   });
 
-  const createWorkspace = useMutation({
-    mutationFn: () =>
-      workspaceApi.create({
-        title: newWorkspaceForm.title.trim(),
-        category: newWorkspaceForm.category.trim(),
-      }),
-    onSuccess: async (createdWorkspace) => {
-      setNewWorkspaceForm({ title: "", category: "" });
-      setShowCreateWorkspaceForm(false);
-      setToast("Personal product workspace created.");
-      await queryClient.invalidateQueries({ queryKey: ["workspaces"] });
-      navigate(`/product-workspace/${createdWorkspace._id}`);
-    },
-    onError: (error) => {
-      setToast(
-        (error as { response?: { data?: { error?: { message?: string } } } })?.response?.data?.error
-          ?.message ?? "Unable to create a workspace right now.",
-      );
-    },
-  });
-
   const onFile = async (file: File | null) => {
     if (!file) return;
     if (file.size > 10 * 1024 * 1024) return setToast("File size must be 10MB or less.");
@@ -378,10 +357,10 @@ export function ProductWorkspace() {
   };
 
   const nextMilestone = useMemo(
-    () => workspace?.milestones.find((item) => !item.isCompleted)?.name ?? "Ready to launch",
+    () => workspace?.milestones.find((item) => !item.isCompleted)?.name ?? "Ready for review",
     [workspace?.milestones],
   );
-  const workspaceOptions = listQuery.data ?? [];
+  const workspaceOptions = problemBankWorkspaceOptions;
   const completedTaskCount = (workspace?.tasks ?? []).filter((task) => task.done).length;
   const openTaskCount = (workspace?.tasks ?? []).filter((task) => !task.done).length;
   const evidenceCount =
@@ -389,7 +368,7 @@ export function ProductWorkspace() {
     (workspace?.repoSubmissions ?? []).length +
     (workspace?.codeSubmissions ?? []).length;
   const recentUpdates = (workspace?.progressUpdates ?? []).slice(-4).reverse();
-  const workspaceSourceLabel = workspace?.claimedProblemId ? "Problem Bank" : "Own Product";
+  const workspaceSourceLabel = workspace?.claimedProblemId ? "Problem Bank" : "Independent Workspace";
   const chatRoster = workspace
     ? [
         ...teamMembers,
@@ -410,14 +389,14 @@ export function ProductWorkspace() {
             <div className="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
               <div className="max-w-3xl">
                 <div className="mb-3 text-xs uppercase tracking-[0.35em] text-sky-200/55">
-                  Workspace Mission Control
+                  Problem Workspace
                 </div>
                 <h1 className="text-3xl font-bold tracking-tight text-white lg:text-4xl">
-                  Product Development Workspace
+                  Problem Bank Product Workspace
                 </h1>
                 <p className="mt-3 max-w-2xl text-sm leading-7 text-slate-300 lg:text-base">
-                  One focused surface for execution, proof of work, and collaboration. Keep the team on
-                  the current milestone instead of spreading attention across too many panels.
+                  Execute claimed Problem Bank challenges, upload proof of work, and prepare the team
+                  submission for admin review.
                 </p>
                 {workspace ? (
                   <div className="mt-5 flex flex-wrap gap-3 text-sm">
@@ -430,9 +409,6 @@ export function ProductWorkspace() {
               </div>
 
               <div className="flex flex-wrap gap-3 lg:max-w-sm lg:justify-end">
-                {!projectId && canCreateWorkspace ? (
-                  <button onClick={() => setShowCreateWorkspaceForm((value) => !value)} className="inline-flex items-center gap-2 rounded-xl border border-slate-700 bg-slate-900/80 px-5 py-3 text-sm font-semibold text-white transition hover:border-slate-600 hover:bg-slate-800"><Plus className="h-4 w-4" />Create Personal Workspace</button>
-                ) : null}
                 {canManageWorkspace ? (
                   <button onClick={() => setShowProgressModal(true)} disabled={!workspace} className="inline-flex items-center gap-2 rounded-xl bg-gradient-to-r from-blue-600 to-fuchsia-600 px-5 py-3 text-sm font-semibold text-white transition hover:brightness-110 disabled:cursor-not-allowed disabled:opacity-50"><Upload className="h-4 w-4" />Upload Progress</button>
                 ) : null}
@@ -444,7 +420,7 @@ export function ProductWorkspace() {
                 <div>
                   <div className="text-xs uppercase tracking-[0.32em] text-slate-500">Current workspace</div>
                   <div className="mt-2 text-xl font-semibold text-white">{workspace?.title ?? (listQuery.isLoading ? "Loading workspaces..." : "No active workspace")}</div>
-                  <div className="mt-2 text-sm text-slate-400">Switch between problem-bank workspaces and your own product builds without leaving the page.</div>
+                  <div className="mt-2 text-sm text-slate-400">Switch between claimed Problem Bank workspaces without leaving the page.</div>
                 </div>
 
                 {!projectId ? (
@@ -454,22 +430,11 @@ export function ProductWorkspace() {
                       return (
                         <button key={item._id} onClick={() => setSelectedWorkspaceId(item._id)} className={`min-w-[220px] flex-1 rounded-2xl border px-4 py-3 text-left transition ${isActive ? "border-sky-500/40 bg-sky-500/12 text-white shadow-[0_0_0_1px_rgba(56,189,248,0.15)]" : "border-slate-800 bg-slate-900/70 text-slate-300 hover:border-slate-700 hover:bg-slate-900"}`}>
                           <div className="truncate font-semibold">{item.title}</div>
-                          <div className="mt-1 text-xs uppercase tracking-[0.24em] text-slate-500">{item.claimedProblemId ? "Problem Bank" : "Own Product"}</div>
+                          <div className="mt-1 text-xs uppercase tracking-[0.24em] text-slate-500">{item.claimedProblemId ? "Problem Bank" : "Independent Workspace"}</div>
                         </button>
                       );
                     })}
-                    {!listQuery.isLoading && workspaceOptions.length === 0 ? <div className="rounded-2xl border border-dashed border-slate-800 bg-slate-900/60 px-4 py-5 text-sm text-slate-400">No workspace exists yet. Start from the Problem Bank or create your own product workspace.</div> : null}
-                  </div>
-                ) : null}
-
-                {showCreateWorkspaceForm && canCreateWorkspace ? (
-                  <div className="grid gap-3 rounded-2xl border border-slate-800 bg-slate-900/75 p-4 md:grid-cols-2">
-                    <input value={newWorkspaceForm.title} onChange={(event) => setNewWorkspaceForm((current) => ({ ...current, title: event.target.value }))} placeholder="Product or innovation name" className="rounded-xl border border-slate-800 bg-slate-950 px-4 py-3 text-white" />
-                    <input value={newWorkspaceForm.category} onChange={(event) => setNewWorkspaceForm((current) => ({ ...current, category: event.target.value }))} placeholder="Category, domain, or track" className="rounded-xl border border-slate-800 bg-slate-950 px-4 py-3 text-white" />
-                    <div className="flex justify-end gap-2 md:col-span-2">
-                      <button onClick={() => setShowCreateWorkspaceForm(false)} className="rounded-xl border border-slate-700 bg-slate-900 px-4 py-2.5 text-sm font-semibold text-white">Cancel</button>
-                      <button onClick={() => createWorkspace.mutate()} disabled={createWorkspace.isPending || !newWorkspaceForm.title.trim() || !newWorkspaceForm.category.trim()} className="rounded-xl bg-blue-600 px-4 py-2.5 text-sm font-semibold text-white disabled:opacity-60">{createWorkspace.isPending ? "Creating..." : "Create Workspace"}</button>
-                    </div>
+                    {!listQuery.isLoading && workspaceOptions.length === 0 ? <div className="rounded-2xl border border-dashed border-slate-800 bg-slate-900/60 px-4 py-5 text-sm text-slate-400">No Problem Bank workspace exists yet. Start from the Problem Bank to create one.</div> : null}
                   </div>
                 ) : null}
               </div>
@@ -495,11 +460,8 @@ export function ProductWorkspace() {
           <section className="rounded-[28px] border border-dashed border-slate-700 bg-slate-950/90 p-10 text-center">
             <Rocket className="mx-auto mb-4 h-10 w-10 text-slate-500" />
             <h2 className="text-2xl font-bold text-white">No workspace available yet</h2>
-            <p className="mx-auto mt-3 max-w-2xl text-slate-400">Start a challenge from the Problem Bank or create your own product workspace for independent innovation and patent filing.</p>
+            <p className="mx-auto mt-3 max-w-2xl text-slate-400">Start a challenge from the Problem Bank to create the linked product workspace for that problem.</p>
             <div className="mt-6 flex flex-wrap justify-center gap-3">
-              {canCreateWorkspace ? (
-                <button onClick={() => setShowCreateWorkspaceForm(true)} className="rounded-xl border border-slate-700 bg-slate-900 px-6 py-3 font-semibold text-white">Create Personal Workspace</button>
-              ) : null}
               <button onClick={() => navigate("/problem-bank")} className="rounded-xl bg-gradient-to-r from-blue-600 to-fuchsia-600 px-6 py-3 font-semibold text-white">Open Problem Bank</button>
             </div>
           </section>
@@ -848,7 +810,7 @@ export function ProductWorkspace() {
                   <div>
                     <h3 className="font-bold text-white">Workspace Policy</h3>
                     <p className="mt-2 text-sm leading-6 text-cyan-100">
-                      Build your own product workspace for startup registration and patent filing. Problem Bank workspaces are intended for challenge delivery and leaderboard progress.
+                      Product Workspace is reserved for Problem Bank challenge delivery and leaderboard progress. Use Startup Launch for startup drafts, investor launch, and patent support.
                     </p>
                   </div>
                 </div>

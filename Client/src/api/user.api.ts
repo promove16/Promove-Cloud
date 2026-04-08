@@ -157,6 +157,7 @@ export interface UserProfile extends AuthUser {
   bio?: string;
   domain?: string;
   avatar?: string;
+  avatarWallpaper?: string;
   headline?: string;
   location?: string;
   websiteUrl?: string | null;
@@ -196,6 +197,7 @@ export interface UserProfile extends AuthUser {
 export interface UpdateUserProfilePayload {
   displayName?: string;
   avatar?: string;
+  avatarWallpaper?: string;
   bio?: string;
   domain?: string;
   githubUrl?: string;
@@ -208,6 +210,11 @@ export interface UpdateUserProfilePayload {
   instagramUrl?: string;
   researchGateUrl?: string;
   mediumUrl?: string;
+  skills?: ProfileSkill[];
+  experience?: ProfileExperience[];
+  education?: ProfileEducation[];
+  certifications?: ProfileCertification[];
+  portfolioProjects?: PortfolioProject[];
   profileComplete?: boolean;
   discoverableToRecruiters?: boolean;
 }
@@ -278,12 +285,20 @@ export interface PublicStudentProfile {
   _id: string;
   displayName: string;
   avatar?: string;
+  avatarWallpaper?: string;
   bio?: string;
   headline: string;
   location: string;
   websiteUrl: string | null;
   githubUrl: string | null;
   linkedinUrl: string | null;
+  twitterUrl: string | null;
+  youtubeUrl: string | null;
+  behanceUrl: string | null;
+  dribbbleUrl: string | null;
+  instagramUrl: string | null;
+  researchGateUrl: string | null;
+  mediumUrl: string | null;
   profileSlug: string;
   domain?: string;
   innovationScore: number;

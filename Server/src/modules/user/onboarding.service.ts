@@ -65,7 +65,7 @@ export const getOnboardingStatus = async (userId: string): Promise<OnboardingSta
       optional: false,
       completed: profileDone,
       claimed: claimedTriggers.has('ONBOARDING_PROFILE'),
-      href: '/dashboard/profile',
+      href: '/portfolio',
     },
     {
       id: 'project',
@@ -98,7 +98,7 @@ export const getOnboardingStatus = async (userId: string): Promise<OnboardingSta
       optional: true,
       completed: githubDone,
       claimed: claimedTriggers.has('ONBOARDING_GITHUB'),
-      href: '/dashboard/profile',
+      href: '/portfolio',
     });
   }
 

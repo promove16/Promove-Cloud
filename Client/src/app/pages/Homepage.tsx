@@ -20,8 +20,8 @@ const pipelineSteps = [
   },
   {
     icon: Rocket,
-    title: "Build Products",
-    desc: "Develop solutions with mentorship",
+    title: "Build Solutions",
+    desc: "Develop Problem Bank solutions with mentorship",
     color: "from-blue-500 to-cyan-500",
   },
   {
@@ -41,9 +41,9 @@ const pipelineSteps = [
 const platformModules = [
   { title: "Problem Bank", desc: "Global problem repository", icon: Globe, link: "/problem-bank" },
   { title: "Startup School", desc: "Learn and build startups", icon: GraduationCap, link: "/student" },
-  { title: "Instant Internship", desc: "Work on real projects", icon: Building2, link: "/product-workspace" },
+  { title: "Instant Internship", desc: "Work on Problem Bank challenges", icon: Building2, link: "/problem-bank" },
   { title: "Innovation Marketplace", desc: "License and sell innovations", icon: TrendingUp, link: "/marketplace" },
-  { title: "Product Workspace", desc: "Build and collaborate on your product", icon: Lightbulb, link: "/product-workspace" },
+  { title: "Product Workspace", desc: "Execute claimed Problem Bank solutions", icon: Lightbulb, link: "/product-workspace" },
   { title: "Patent Support", desc: "File patents with ease", icon: Award, link: "/startup-launch" },
   { title: "Startup Launch", desc: "Launch your startup", icon: Rocket, link: "/startup-launch" },
   { title: "Portfolio", desc: "Showcase your innovation journey", icon: Users, link: "/portfolio" },

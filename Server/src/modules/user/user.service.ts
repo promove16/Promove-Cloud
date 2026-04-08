@@ -36,21 +36,6 @@ import {
   syncGithubProofForUser,
 } from './githubProof';
 
-export const updateMeSchema = z
-  .object({
-    displayName: z.string().trim().min(2).max(100).optional(),
-    avatar: z.string().trim().url().optional().or(z.literal('')),
-    bio: z.string().trim().max(500).optional().or(z.literal('')),
-    domain: z.string().trim().max(120).optional().or(z.literal('')),
-    githubUrl: z.string().trim().url().optional().or(z.literal('')),
-    linkedinUrl: z.string().trim().url().optional().or(z.literal('')),
-    profileComplete: z.boolean().optional(),
-    discoverableToRecruiters: z.boolean().optional(),
-  })
-  .refine((value) => Object.keys(value).length > 0, {
-    message: 'At least one field is required',
-  });
-
 export const socialEnrichSchema = z.object({
   githubUrl: z.string().trim().url().optional(),
   linkedinUrl: z.string().trim().url().optional(),
@@ -73,6 +58,123 @@ type UserLike = Omit<IUser, '_id' | 'institutionId'> & {
 const GITHUB_PROFILE_ROLES = new Set<UserRole>([UserRole.STUDENT, UserRole.MENTOR]);
 
 const supportsGithubProfile = (role: UserRole) => GITHUB_PROFILE_ROLES.has(role);
+
+const optionalUrlSchema = z.string().trim().url().optional().or(z.literal(''));
+
+const nullableUrlSchema = z
+  .preprocess((value) => (value === '' || value === undefined ? null : value), z.string().trim().url().nullable())
+  .optional();
+
+const nullableDateSchema = z.preprocess(
+  (value) => (value === '' || value === undefined ? null : value),
+  z.coerce.date().nullable(),
+);
+
+const optionalYearSchema = z.preprocess(
+  (value) => (value === '' || value === null || value === undefined ? undefined : value),
+  z.coerce.number().int().min(1900).max(3000).optional(),
+);
+
+const stringListSchema = z.array(z.string().trim().min(1).max(100)).max(24).default([]);
+
+const skillEntrySchema = z.object({
+  name: z.string().trim().min(1).max(100),
+  category: z.enum(['programming', 'design', 'business', 'research', 'other']).default('other'),
+  source: z.enum(['platform', 'github', 'linkedin', 'manual']).default('manual'),
+  level: z.enum(['beginner', 'intermediate', 'advanced', 'expert']).default('beginner'),
+  endorsements: z.coerce.number().int().min(0).max(100000).default(0),
+  addedAt: z.coerce.date().optional(),
+});
+
+const experienceEntrySchema = z.object({
+  _id: z.string().trim().optional(),
+  title: z.string().trim().min(1).max(120),
+  company: z.string().trim().min(1).max(160),
+  type: z.enum(['full_time', 'part_time', 'internship', 'freelance', 'volunteer']).default('internship'),
+  location: z.string().trim().max(100).default(''),
+  startDate: z.coerce.date(),
+  endDate: nullableDateSchema.default(null),
+  isCurrent: z.boolean().default(false),
+  description: z.string().trim().max(1000).default(''),
+  skills: stringListSchema,
+  source: z.enum(['manual', 'linkedin']).default('manual'),
+  linkedinId: z.string().trim().nullable().default(null),
+});
+
+const educationEntrySchema = z.object({
+  _id: z.string().trim().optional(),
+  institution: z.string().trim().min(1).max(160),
+  degree: z.string().trim().max(160).default(''),
+  fieldOfStudy: z.string().trim().max(160).default(''),
+  startYear: optionalYearSchema,
+  endYear: z.preprocess(
+    (value) => (value === '' || value === undefined ? null : value),
+    z.coerce.number().int().min(1900).max(3000).nullable(),
+  ).default(null),
+  isCurrent: z.boolean().default(false),
+  grade: z.string().trim().max(80).default(''),
+  activities: z.string().trim().max(500).default(''),
+  description: z.string().trim().max(1000).default(''),
+  source: z.enum(['manual', 'linkedin']).default('manual'),
+});
+
+const certificationEntrySchema = z.object({
+  _id: z.string().trim().optional(),
+  name: z.string().trim().min(1).max(160),
+  issuingOrganization: z.string().trim().min(1).max(160),
+  issueDate: nullableDateSchema.default(null),
+  expiryDate: nullableDateSchema.default(null),
+  credentialId: z.string().trim().max(120).default(''),
+  credentialUrl: nullableUrlSchema.default(null),
+  source: z.enum(['manual', 'linkedin']).default('manual'),
+});
+
+const portfolioProjectEntrySchema = z.object({
+  _id: z.string().trim().optional(),
+  title: z.string().trim().min(1).max(160),
+  description: z.string().trim().max(1000).default(''),
+  techStack: stringListSchema,
+  repoUrl: nullableUrlSchema.default(null),
+  liveUrl: nullableUrlSchema.default(null),
+  coverImageUrl: nullableUrlSchema.default(null),
+  startDate: nullableDateSchema.default(null),
+  endDate: nullableDateSchema.default(null),
+  isCurrent: z.boolean().default(false),
+  source: z.enum(['manual', 'github']).default('manual'),
+  githubRepoId: z.string().trim().nullable().default(null),
+  stars: z.coerce.number().int().min(0).max(1000000).default(0),
+  forks: z.coerce.number().int().min(0).max(1000000).default(0),
+  languages: stringListSchema,
+});
+
+export const updateMeSchema = z
+  .object({
+    displayName: z.string().trim().min(2).max(100).optional(),
+    avatar: optionalUrlSchema,
+    avatarWallpaper: optionalUrlSchema,
+    bio: z.string().trim().max(500).optional().or(z.literal('')),
+    domain: z.string().trim().max(120).optional().or(z.literal('')),
+    websiteUrl: optionalUrlSchema,
+    githubUrl: optionalUrlSchema,
+    linkedinUrl: optionalUrlSchema,
+    twitterUrl: optionalUrlSchema,
+    youtubeUrl: optionalUrlSchema,
+    behanceUrl: optionalUrlSchema,
+    dribbbleUrl: optionalUrlSchema,
+    instagramUrl: optionalUrlSchema,
+    researchGateUrl: optionalUrlSchema,
+    mediumUrl: optionalUrlSchema,
+    skills: z.array(skillEntrySchema).max(80).optional(),
+    experience: z.array(experienceEntrySchema).max(25).optional(),
+    education: z.array(educationEntrySchema).max(25).optional(),
+    certifications: z.array(certificationEntrySchema).max(40).optional(),
+    portfolioProjects: z.array(portfolioProjectEntrySchema).max(40).optional(),
+    profileComplete: z.boolean().optional(),
+    discoverableToRecruiters: z.boolean().optional(),
+  })
+  .refine((value) => Object.keys(value).length > 0, {
+    message: 'At least one field is required',
+  });
 
 const slugifyDisplayName = (displayName: string) => {
   const normalized = displayName
@@ -205,12 +307,20 @@ export const toSanitizedUser = (user: UserLike): SanitizedUser => ({
   displayName: user.displayName,
   githubOAuthAvailable: isGithubOauthAvailable(),
   ...(user.avatar ? { avatar: user.avatar } : {}),
+  ...(user.avatarWallpaper ? { avatarWallpaper: user.avatarWallpaper } : {}),
   ...(user.bio ? { bio: user.bio } : {}),
   headline: user.headline ?? '',
   location: user.location ?? '',
   websiteUrl: user.websiteUrl ?? null,
   githubUrl: user.githubUrl ?? null,
   linkedinUrl: user.linkedinUrl ?? null,
+  twitterUrl: user.twitterUrl ?? null,
+  youtubeUrl: user.youtubeUrl ?? null,
+  behanceUrl: user.behanceUrl ?? null,
+  dribbbleUrl: user.dribbbleUrl ?? null,
+  instagramUrl: user.instagramUrl ?? null,
+  researchGateUrl: user.researchGateUrl ?? null,
+  mediumUrl: user.mediumUrl ?? null,
   isProfilePublic: user.isProfilePublic ?? true,
   ...(user.profileSlug !== undefined ? { profileSlug: user.profileSlug ?? null } : {}),
   ...(user.domain ? { domain: user.domain } : {}),
@@ -996,6 +1106,86 @@ export const launchCurrentUserToRecruiters = async (studentId: string): Promise<
   };
 };
 
+const getExistingObjectId = (id: string | undefined) =>
+  id && Types.ObjectId.isValid(id) ? { _id: new Types.ObjectId(id) } : {};
+
+const normalizeStringList = (items: string[]) =>
+  items.map((item) => sanitizePlainText(item)).filter(Boolean);
+
+const normalizeSkillEntries = (items: z.infer<typeof skillEntrySchema>[]): IUser['skills'] =>
+  items.map((skill) => ({
+    name: sanitizePlainText(skill.name),
+    category: skill.category,
+    source: skill.source,
+    level: skill.level,
+    endorsements: skill.endorsements,
+    addedAt: skill.addedAt ?? new Date(),
+  }));
+
+const normalizeExperienceEntries = (items: z.infer<typeof experienceEntrySchema>[]): IUser['experience'] =>
+  items.map((experience) => ({
+    ...getExistingObjectId(experience._id),
+    title: sanitizePlainText(experience.title),
+    company: sanitizePlainText(experience.company),
+    type: experience.type,
+    location: sanitizePlainText(experience.location),
+    startDate: experience.startDate,
+    endDate: experience.isCurrent ? null : experience.endDate,
+    isCurrent: experience.isCurrent,
+    description: sanitizePlainText(experience.description),
+    skills: normalizeStringList(experience.skills),
+    source: experience.source,
+    linkedinId: experience.linkedinId ? sanitizePlainText(experience.linkedinId) : null,
+  })) as IUser['experience'];
+
+const normalizeEducationEntries = (items: z.infer<typeof educationEntrySchema>[]): IUser['education'] =>
+  items.map((education) => ({
+    ...getExistingObjectId(education._id),
+    institution: sanitizePlainText(education.institution),
+    degree: sanitizePlainText(education.degree),
+    fieldOfStudy: sanitizePlainText(education.fieldOfStudy),
+    ...(education.startYear ? { startYear: education.startYear } : {}),
+    endYear: education.isCurrent ? null : education.endYear,
+    isCurrent: education.isCurrent,
+    grade: sanitizePlainText(education.grade),
+    activities: sanitizePlainText(education.activities),
+    description: sanitizePlainText(education.description),
+    source: education.source,
+  })) as IUser['education'];
+
+const normalizeCertificationEntries = (items: z.infer<typeof certificationEntrySchema>[]): IUser['certifications'] =>
+  items.map((certification) => ({
+    ...getExistingObjectId(certification._id),
+    name: sanitizePlainText(certification.name),
+    issuingOrganization: sanitizePlainText(certification.issuingOrganization),
+    issueDate: certification.issueDate,
+    expiryDate: certification.expiryDate,
+    credentialId: sanitizePlainText(certification.credentialId),
+    credentialUrl: certification.credentialUrl ?? '',
+    source: certification.source,
+  })) as IUser['certifications'];
+
+const normalizePortfolioProjectEntries = (
+  items: z.infer<typeof portfolioProjectEntrySchema>[],
+): IUser['portfolioProjects'] =>
+  items.map((project) => ({
+    ...getExistingObjectId(project._id),
+    title: sanitizePlainText(project.title),
+    description: sanitizePlainText(project.description),
+    techStack: normalizeStringList(project.techStack),
+    repoUrl: project.repoUrl ?? null,
+    liveUrl: project.liveUrl ?? null,
+    coverImageUrl: project.coverImageUrl ?? null,
+    startDate: project.startDate,
+    endDate: project.isCurrent ? null : project.endDate,
+    isCurrent: project.isCurrent,
+    source: project.source,
+    githubRepoId: project.githubRepoId ? sanitizePlainText(project.githubRepoId) : null,
+    stars: project.stars,
+    forks: project.forks,
+    languages: normalizeStringList(project.languages),
+  })) as IUser['portfolioProjects'];
+
 export const updateCurrentUser = async (
   userId: string,
   payload: z.infer<typeof updateMeSchema>,
@@ -1017,6 +1207,10 @@ export const updateCurrentUser = async (
     user.avatar = payload.avatar || undefined;
   }
 
+  if (payload.avatarWallpaper !== undefined) {
+    user.avatarWallpaper = payload.avatarWallpaper || undefined;
+  }
+
   if (payload.bio !== undefined) {
     user.bio = payload.bio ? sanitizePlainText(payload.bio) : undefined;
   }
@@ -1025,12 +1219,64 @@ export const updateCurrentUser = async (
     user.domain = payload.domain ? sanitizePlainText(payload.domain) : undefined;
   }
 
+  if (payload.websiteUrl !== undefined) {
+    user.websiteUrl = payload.websiteUrl || null;
+  }
+
   if (payload.githubUrl !== undefined) {
     user.githubUrl = payload.githubUrl || null;
   }
 
   if (payload.linkedinUrl !== undefined) {
     user.linkedinUrl = payload.linkedinUrl || null;
+  }
+
+  if (payload.twitterUrl !== undefined) {
+    user.twitterUrl = payload.twitterUrl || null;
+  }
+
+  if (payload.youtubeUrl !== undefined) {
+    user.youtubeUrl = payload.youtubeUrl || null;
+  }
+
+  if (payload.behanceUrl !== undefined) {
+    user.behanceUrl = payload.behanceUrl || null;
+  }
+
+  if (payload.dribbbleUrl !== undefined) {
+    user.dribbbleUrl = payload.dribbbleUrl || null;
+  }
+
+  if (payload.instagramUrl !== undefined) {
+    user.instagramUrl = payload.instagramUrl || null;
+  }
+
+  if (payload.researchGateUrl !== undefined) {
+    user.researchGateUrl = payload.researchGateUrl || null;
+  }
+
+  if (payload.mediumUrl !== undefined) {
+    user.mediumUrl = payload.mediumUrl || null;
+  }
+
+  if (payload.skills !== undefined) {
+    user.skills = normalizeSkillEntries(payload.skills);
+  }
+
+  if (payload.experience !== undefined) {
+    user.experience = normalizeExperienceEntries(payload.experience);
+  }
+
+  if (payload.education !== undefined) {
+    user.education = normalizeEducationEntries(payload.education);
+  }
+
+  if (payload.certifications !== undefined) {
+    user.certifications = normalizeCertificationEntries(payload.certifications);
+  }
+
+  if (payload.portfolioProjects !== undefined) {
+    user.portfolioProjects = normalizePortfolioProjectEntries(payload.portfolioProjects);
   }
 
   if (payload.discoverableToRecruiters !== undefined) {
@@ -1073,12 +1319,20 @@ export const getPublicStudentProfileBySlug = async (profileSlug: string): Promis
     _id: String(student._id),
     displayName: student.displayName,
     ...(student.avatar ? { avatar: student.avatar } : {}),
+    ...(student.avatarWallpaper ? { avatarWallpaper: student.avatarWallpaper } : {}),
     ...(student.bio ? { bio: student.bio } : {}),
     headline: student.headline ?? '',
     location: student.location ?? '',
     websiteUrl: student.websiteUrl ?? null,
     githubUrl: student.githubUrl ?? null,
     linkedinUrl: student.linkedinUrl ?? null,
+    twitterUrl: student.twitterUrl ?? null,
+    youtubeUrl: student.youtubeUrl ?? null,
+    behanceUrl: student.behanceUrl ?? null,
+    dribbbleUrl: student.dribbbleUrl ?? null,
+    instagramUrl: student.instagramUrl ?? null,
+    researchGateUrl: student.researchGateUrl ?? null,
+    mediumUrl: student.mediumUrl ?? null,
     profileSlug: student.profileSlug ?? '',
     ...(student.domain ? { domain: student.domain } : {}),
     innovationScore: normalizeInnovationScore(student.innovationScore),

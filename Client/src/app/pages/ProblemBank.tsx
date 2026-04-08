@@ -180,9 +180,16 @@ export function ProblemBank() {
   );
   const [feedback, setFeedback] = useState("");
   const [reviewNote, setReviewNote] = useState("");
+  const [startingProblemId, setStartingProblemId] = useState<string | null>(
+    null,
+  );
   const deferredSearchQuery = useDeferredValue(searchValue.trim());
   const viewerRole = authUser?.role ?? UserRole.STUDENT;
   const canClaimProblems = viewerRole === UserRole.STUDENT;
+  const canOpenProductWorkspace =
+    viewerRole === UserRole.STUDENT ||
+    viewerRole === UserRole.MENTOR ||
+    viewerRole === UserRole.INVESTOR;
   const domainOptions = useMemo(
     () => getDomainFilters(selectedCategory),
     [selectedCategory],
@@ -278,21 +285,56 @@ export function ProblemBank() {
     enabled: Boolean(selectedProblemId),
   });
 
-  const claimMutation = useMutation({
-    mutationFn: (problemId: string) => problemBankApi.claim(problemId),
-    onSuccess: (workspace) => {
+  const startProblem = async (problem: Problem) => {
+    const existingWorkspaceId = getProblemWorkspaceId(problem);
+    if (existingWorkspaceId) {
+      navigate(`/product-workspace/${existingWorkspaceId}`);
+      return;
+    }
+
+    if (startingProblemId) {
+      return;
+    }
+
+    setStartingProblemId(problem._id);
+    setFeedback("");
+
+    try {
+      const workspace = await Promise.race([
+        problemBankApi.claim(problem._id),
+        new Promise<"timeout">((resolve) => {
+          window.setTimeout(() => resolve("timeout"), 10000);
+        }),
+      ]);
+
+      if (workspace === "timeout") {
+        const workspaces = await queryClient.fetchQuery({
+          queryKey: ["workspaces"],
+          queryFn: workspaceApi.list,
+        });
+        const claimedWorkspace = workspaces.find(
+          (item) => item.claimedProblemId === problem._id,
+        );
+
+        if (claimedWorkspace) {
+          navigate(`/product-workspace/${claimedWorkspace._id}`);
+          return;
+        }
+
+        setFeedback("Starting this problem is taking longer than expected. Please try again.");
+        return;
+      }
+
       void queryClient.invalidateQueries({ queryKey: ["problems"] });
       void queryClient.invalidateQueries({ queryKey: ["workspaces"] });
       setFeedback("Problem started. Your team workspace is ready.");
       navigate(`/product-workspace/${workspace._id}`);
-    },
-    onError: (error) => {
+    } catch (error) {
       setFeedback(getApiErrorMessage(error, "Unable to start this problem right now."));
-    },
-  });
-  const startingProblemId = claimMutation.isPending
-    ? claimMutation.variables
-    : null;
+    } finally {
+      setStartingProblemId(null);
+    }
+  };
 
   const reviewMutation = useMutation({
     mutationFn: (payload: {
@@ -386,10 +428,21 @@ export function ProblemBank() {
               workspace-linked review.
             </p>
           </div>
-          <div className="rounded-xl border border-slate-800 bg-slate-900 px-5 py-3 text-sm text-slate-300">
-            {canClaimProblems
-              ? "Complete the problem, request admin review, and earn innovation points."
-              : "Browse admin-provided challenges, review requirements, and track approved leaderboard entries."}
+          <div className="flex flex-col gap-3 sm:items-end">
+            <div className="rounded-xl border border-slate-800 bg-slate-900 px-5 py-3 text-sm text-slate-300">
+              {canClaimProblems
+                ? "Complete the problem, request admin review, and earn innovation points."
+                : "Browse admin-provided challenges, review requirements, and track approved leaderboard entries."}
+            </div>
+            {canOpenProductWorkspace ? (
+              <button
+                type="button"
+                onClick={() => navigate("/product-workspace")}
+                className="rounded-xl bg-gradient-to-r from-cyan-600 to-blue-600 px-5 py-3 text-sm font-semibold text-white"
+              >
+                Open Product Workshop
+              </button>
+            ) : null}
           </div>
         </div>
 
@@ -658,12 +711,12 @@ export function ProblemBank() {
                         }
                         className="flex-1 rounded-lg bg-gradient-to-r from-cyan-600 to-blue-600 px-6 py-3 font-semibold text-white"
                       >
-                        Open Workspace
+                        Open Product Workshop
                       </button>
                     ) : canClaimProblems ? (
                       <button
-                        onClick={() => claimMutation.mutate(problem._id)}
-                        disabled={claimMutation.isPending}
+                        onClick={() => void startProblem(problem)}
+                        disabled={Boolean(startingProblemId)}
                         className="flex-1 rounded-lg bg-gradient-to-r from-blue-600 to-purple-600 px-6 py-3 font-semibold text-white transition-all disabled:opacity-60"
                       >
                         {startingProblemId === problem._id
@@ -808,7 +861,7 @@ export function ProblemBank() {
                         }
                         className="rounded-lg bg-slate-800 px-4 py-2 text-sm font-semibold text-white"
                       >
-                        Open Workspace
+                        Open Product Workshop
                       </button>
                     </div>
 
@@ -1040,13 +1093,13 @@ export function ProblemBank() {
                     }
                     className="rounded-lg bg-gradient-to-r from-cyan-600 to-blue-600 px-5 py-3 font-semibold text-white"
                   >
-                    Open Workspace
+                    Open Product Workshop
                   </button>
                 ) : canClaimProblems ? (
                   <button
                     type="button"
-                    onClick={() => claimMutation.mutate(selectedProblem._id)}
-                    disabled={claimMutation.isPending}
+                    onClick={() => void startProblem(selectedProblem)}
+                    disabled={Boolean(startingProblemId)}
                     className="rounded-lg bg-gradient-to-r from-blue-600 to-purple-600 px-5 py-3 font-semibold text-white disabled:opacity-60"
                   >
                     {startingProblemId === selectedProblem._id

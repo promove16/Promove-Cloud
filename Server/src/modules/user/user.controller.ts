@@ -92,7 +92,7 @@ export const githubOauthCallback = async (req: Request, res: Response) => {
   const clientUrl = process.env.CLIENT_URL ?? 'http://localhost:5173';
 
   if (!code || !state) {
-    res.redirect(`${clientUrl}/dashboard/profile?github=error`);
+    res.redirect(`${clientUrl}/portfolio?github=error`);
     return;
   }
 
@@ -103,7 +103,7 @@ export const githubOauthCallback = async (req: Request, res: Response) => {
   } catch (error) {
     const message =
       error instanceof ApiError ? encodeURIComponent(error.message) : encodeURIComponent('GitHub connection failed.');
-    res.redirect(`${clientUrl}/dashboard/profile?github=error&message=${message}`);
+    res.redirect(`${clientUrl}/portfolio?github=error&message=${message}`);
   }
 };
 

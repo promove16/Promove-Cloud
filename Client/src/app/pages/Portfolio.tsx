@@ -1,13 +1,11 @@
-import { useMemo, useState } from "react";
+import { type ReactNode, useEffect, useMemo, useState } from "react";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import {
   Award,
   Briefcase,
-  Calendar,
-  Code2,
+  Building2,
   Download,
   ExternalLink,
-  FileText,
   Github,
   Globe,
   GraduationCap,
@@ -15,19 +13,19 @@ import {
   Linkedin,
   Link2,
   MapPin,
+  Pencil,
   Rocket,
   Share2,
   ShieldCheck,
   Sparkles,
   Star,
-  Target,
-  TrendingUp,
   Twitter,
   Youtube,
 } from "lucide-react";
 import { jsPDF } from "jspdf";
+import { Link, useSearchParams } from "react-router-dom";
 import { DashboardLayout } from "../components/DashboardLayout";
-import { userApi } from "../../api/user.api";
+import { type ProfileSkill, userApi } from "../../api/user.api";
 import { scoreApi } from "../../api/score.api";
 import { startupApi } from "../../api/startup.api";
 import { workspaceApi } from "../../api/workspace.api";
@@ -35,6 +33,7 @@ import { studentApi } from "../../api/student.api";
 import { useAuthStore } from "../../store/authStore";
 import { useInnovationScore } from "../../hooks/useInnovationScore";
 import { DEFAULT_STARTUP_IPR_PROFILE } from "../../features/startup/iprIntake";
+import { getStartupOverviewPath } from "../../features/startup/navigation";
 import { UserRole } from "../../types/roles.types";
 
 const eventLabel: Record<string, string> = {
@@ -49,13 +48,6 @@ const eventLabel: Record<string, string> = {
   PROFILE_COMPLETE: "Completed profile",
 };
 
-const skillLevelColor: Record<string, string> = {
-  beginner: "bg-slate-800 text-slate-300",
-  intermediate: "bg-blue-500/15 text-blue-300",
-  advanced: "bg-purple-500/15 text-purple-300",
-  expert: "bg-amber-500/15 text-amber-300",
-};
-
 const experienceTypeLabel: Record<string, string> = {
   full_time: "Full-time",
   part_time: "Part-time",
@@ -64,87 +56,179 @@ const experienceTypeLabel: Record<string, string> = {
   volunteer: "Volunteer",
 };
 
+const categoryLabel: Record<string, string> = {
+  programming: "Programming",
+  design: "Design",
+  business: "Business",
+  research: "Research",
+  other: "Other",
+};
+
 function formatDate(dateStr: string | null | undefined): string {
   if (!dateStr) return "";
   return new Date(dateStr).toLocaleDateString("en-IN", { month: "short", year: "numeric" });
 }
 
+function formatDateTime(dateStr: string | null | undefined): string {
+  if (!dateStr) return "";
+  return new Date(dateStr).toLocaleString("en-IN", { day: "numeric", month: "short", year: "numeric" });
+}
+
+function Section({ title, children, canEdit }: { title: string; children: ReactNode; canEdit?: boolean }) {
+  return (
+    <section className="rounded-lg border border-slate-800 bg-slate-900/90 p-4 text-slate-100 shadow-sm">
+      <div className="flex items-center justify-between gap-3">
+        <h2 className="text-xl font-semibold">{title}</h2>
+        {canEdit ? (
+          <Link
+            to="/dashboard/profile"
+            aria-label={`Edit ${title}`}
+            className="rounded-full p-2 text-slate-400 transition hover:bg-slate-800 hover:text-cyan-200"
+          >
+            <Pencil className="h-4 w-4" />
+          </Link>
+        ) : null}
+      </div>
+      <div className="mt-4">{children}</div>
+    </section>
+  );
+}
+
+function Empty({ children }: { children: ReactNode }) {
+  return (
+    <div className="rounded-lg border border-dashed border-slate-700 bg-slate-950/70 p-4 text-sm text-slate-400">
+      {children}
+    </div>
+  );
+}
+
+function LogoTile({ children }: { children: ReactNode }) {
+  return (
+    <div className="flex h-12 w-12 flex-shrink-0 items-center justify-center rounded bg-cyan-500/10 text-cyan-200">
+      {children}
+    </div>
+  );
+}
+
+function ProfileButton({
+  children,
+  primary,
+  onClick,
+  disabled,
+}: {
+  children: ReactNode;
+  primary?: boolean;
+  onClick?: () => void;
+  disabled?: boolean;
+}) {
+  return (
+    <button
+      type="button"
+      onClick={onClick}
+      disabled={disabled}
+      className={
+        primary
+          ? "inline-flex items-center gap-2 rounded-full bg-cyan-400 px-4 py-1.5 text-sm font-semibold text-slate-950 transition hover:bg-cyan-300 disabled:cursor-not-allowed disabled:opacity-50"
+          : "inline-flex items-center gap-2 rounded-full border border-cyan-400/70 px-4 py-1.5 text-sm font-semibold text-cyan-200 transition hover:border-cyan-300 hover:bg-cyan-400/10 hover:text-cyan-100 disabled:cursor-not-allowed disabled:opacity-50"
+      }
+    >
+      {children}
+    </button>
+  );
+}
+
 export function Portfolio() {
   const queryClient = useQueryClient();
+  const [searchParams, setSearchParams] = useSearchParams();
   const authUser = useAuthStore((state) => state.user);
   const setUser = useAuthStore((state) => state.setUser);
   const [toast, setToast] = useState("");
   const [showLaunchModal, setShowLaunchModal] = useState(false);
-  const [activeTab, setActiveTab] = useState<"overview" | "projects" | "experience" | "skills" | "timeline">("overview");
-
   const isStudent = authUser?.role === UserRole.STUDENT;
 
-  const profileQuery = useQuery({
-    queryKey: ["user-profile-me"],
-    queryFn: () => userApi.getMe(),
-  });
+  const profileQuery = useQuery({ queryKey: ["profile", "me"], queryFn: () => userApi.getMe() });
   const score = useInnovationScore();
-  const workspaces = useQuery({
-    queryKey: ["workspaces"],
-    queryFn: () => workspaceApi.list(),
-    enabled: isStudent,
-  });
+  const workspaces = useQuery({ queryKey: ["workspaces"], queryFn: () => workspaceApi.list(), enabled: isStudent });
   const scoreHistory = useQuery({
     queryKey: ["score", "history", authUser?._id],
     queryFn: () => scoreApi.getScoreHistory(authUser!._id),
     enabled: isStudent && Boolean(authUser?._id),
   });
-  const startups = useQuery({
-    queryKey: ["startup", "mine"],
-    queryFn: () => startupApi.mine(),
-    enabled: isStudent,
-  });
+  const startups = useQuery({ queryKey: ["startup", "mine"], queryFn: () => startupApi.mine(), enabled: isStudent });
 
   const profile = profileQuery.data;
+  const isOwner = Boolean(authUser?._id && profile?._id && authUser._id === profile._id);
+  const canManagePortfolio = isStudent && isOwner;
+  const displayName = profile?.displayName ?? authUser?.displayName ?? "Portfolio";
+  const initials = displayName
+    .split(" ")
+    .map((part) => part[0])
+    .join("")
+    .slice(0, 2)
+    .toUpperCase();
+  const publicProfileUrl = profile?.profileSlug && typeof window !== "undefined" ? `${window.location.origin}/students/${profile.profileSlug}` : "";
+  const canShareProfile = Boolean(profile?.verificationStatus === "verified" && profile?.profileComplete && profile?.profileSlug);
+  const launchSourceWorkspace = (workspaces.data ?? []).length === 1 ? workspaces.data?.[0] : null;
+  const heroBackgroundStyle = profile?.avatarWallpaper
+    ? {
+        backgroundImage: `linear-gradient(180deg, rgba(15, 23, 42, 0.18), rgba(15, 23, 42, 0.44)), url(${profile.avatarWallpaper})`,
+      }
+    : undefined;
 
-  const publicProfileUrl =
-    authUser?.profileSlug && typeof window !== "undefined"
-      ? `${window.location.origin}/students/${authUser.profileSlug}`
-      : "";
-
-  const canShareProfile = Boolean(
-    authUser?.verificationStatus === "verified" &&
-      authUser?.profileComplete &&
-      authUser?.profileSlug,
-  );
-
-  const launchSourceWorkspace =
-    (workspaces.data ?? []).length === 1 ? workspaces.data?.[0] : null;
-
-  const innovationStats = useMemo(
-    () => [
-      { label: "Problems Solved", value: score.data?.breakdown.problemsClaimed ?? 0, icon: Target },
-      { label: "Innovations", value: workspaces.data?.length ?? 0, icon: Rocket },
-      { label: "Prototypes", value: score.data?.breakdown.progressUploads ?? 0, icon: Code2 },
-      { label: "Patents Filed", value: score.data?.breakdown.patentsSubmitted ?? 0, icon: FileText },
-      { label: "Startups", value: score.data?.breakdown.startupsLaunched ?? 0, icon: TrendingUp },
-    ],
-    [score.data, workspaces.data],
-  );
+  useEffect(() => {
+    const githubStatus = searchParams.get("github");
+    if (!githubStatus) return;
+    setToast(githubStatus === "connected" ? "GitHub connected. Your proof signals will update shortly." : searchParams.get("message") ?? "GitHub connection failed.");
+    void queryClient.invalidateQueries({ queryKey: ["profile", "me"] });
+    const next = new URLSearchParams(searchParams);
+    next.delete("github");
+    next.delete("message");
+    setSearchParams(next, { replace: true });
+  }, [queryClient, searchParams, setSearchParams]);
 
   const skillsByCategory = useMemo(() => {
-    const skills = profile?.skills ?? [];
-    const categories: Record<string, typeof skills> = {};
-    for (const skill of skills) {
-      const cat = skill.category ?? "other";
-      if (!categories[cat]) categories[cat] = [];
-      categories[cat].push(skill);
+    const grouped: Record<string, ProfileSkill[]> = {};
+    for (const skill of profile?.skills ?? []) {
+      const category = skill.category ?? "other";
+      grouped[category] = [...(grouped[category] ?? []), skill];
     }
-    return categories;
+    return grouped;
   }, [profile?.skills]);
 
-  const categoryLabel: Record<string, string> = {
-    programming: "Programming",
-    design: "Design",
-    business: "Business",
-    research: "Research",
-    other: "Other",
-  };
+  const socialLinks = [
+    { label: "LinkedIn", url: profile?.linkedinUrl, icon: Linkedin },
+    { label: "GitHub", url: profile?.githubUrl, icon: Github },
+    { label: "Website", url: profile?.websiteUrl, icon: Globe },
+    { label: "Twitter", url: profile?.twitterUrl, icon: Twitter },
+    { label: "YouTube", url: profile?.youtubeUrl, icon: Youtube },
+    { label: "Instagram", url: profile?.instagramUrl, icon: Instagram },
+    { label: "Behance", url: profile?.behanceUrl, icon: Link2 },
+    { label: "Dribbble", url: profile?.dribbbleUrl, icon: Link2 },
+    { label: "ResearchGate", url: profile?.researchGateUrl, icon: Link2 },
+    { label: "Medium", url: profile?.mediumUrl, icon: Link2 },
+  ];
+  const visibleSocialLinks = socialLinks.filter((link) => Boolean(link.url));
+  const publicRepos = (profile?.githubProof?.importedRepos ?? []).filter((repo) => !repo.isPrivate).slice(0, 3);
+  const recentActivity = (profile?.githubProof?.recentActivity ?? []).filter((activity) => !activity.isPrivate).slice(0, 4);
+  const recentWorkspaces = useMemo(
+    () => [...(workspaces.data ?? [])].sort((left, right) => new Date(right.updatedAt).getTime() - new Date(left.updatedAt).getTime()).slice(0, 3),
+    [workspaces.data],
+  );
+  const recentStartups = useMemo(
+    () => [...(startups.data ?? [])].sort((left, right) => new Date(right.updatedAt).getTime() - new Date(left.updatedAt).getTime()).slice(0, 3),
+    [startups.data],
+  );
+  const featuredItems = [
+    ...(profile?.portfolioProjects ?? []).slice(0, 3).map((item) => ({ kind: "Project", title: item.title, body: item.description, url: item.liveUrl ?? item.repoUrl, key: `project-${item._id}` })),
+    ...(profile?.certifications ?? []).slice(0, 2).map((item) => ({ kind: "Certification", title: item.name, body: item.issuingOrganization, url: item.credentialUrl, key: `cert-${item._id}` })),
+    ...(profile?.education ?? []).slice(0, 1).map((item) => ({ kind: "Education", title: item.institution, body: `${item.degree}${item.fieldOfStudy ? ` in ${item.fieldOfStudy}` : ""}`, url: null, key: `edu-${item._id}` })),
+  ];
+  const profileStats = [
+    { label: "Innovation Score", value: score.data?.score ?? profile?.innovationScore ?? 0 },
+    { label: "Projects", value: profile?.portfolioProjects?.length ?? 0 },
+    { label: "Skills", value: profile?.skills?.length ?? 0 },
+    { label: "Certifications", value: profile?.certifications?.length ?? 0 },
+  ];
 
   const launchToRecruiters = async () => {
     try {
@@ -158,14 +242,7 @@ export function Portfolio() {
           activeProducts: 1,
           teamSize: launchSourceWorkspace?.teamMembers?.length ?? 1,
           traction: { patentFiled: false, mvpBuilt: false, revenueGenerating: false },
-          businessProfile: {
-            problemStatement: "",
-            solutionSummary: "",
-            targetCustomers: "",
-            marketAnalysis: "",
-            revenueModel: "",
-            goToMarketPlan: "",
-          },
+          businessProfile: { problemStatement: "", solutionSummary: "", targetCustomers: "", marketAnalysis: "", revenueModel: "", goToMarketPlan: "" },
           registrationProfile: { ...DEFAULT_STARTUP_IPR_PROFILE },
         });
       }
@@ -175,14 +252,8 @@ export function Portfolio() {
       setShowLaunchModal(false);
       await queryClient.invalidateQueries({ queryKey: ["startup", "mine"] });
       await queryClient.invalidateQueries({ queryKey: ["marketplace"] });
-      if (authUser?._id) {
-        await queryClient.invalidateQueries({ queryKey: ["score", "history", authUser._id] });
-      }
     } catch (error) {
-      setToast(
-        (error as { response?: { data?: { error?: { message?: string } } } })?.response?.data?.error?.message ??
-          "Unable to launch your portfolio to recruiters.",
-      );
+      setToast((error as { response?: { data?: { error?: { message?: string } } } })?.response?.data?.error?.message ?? "Unable to launch your portfolio to recruiters.");
     }
   };
 
@@ -202,703 +273,411 @@ export function Portfolio() {
   const downloadPdf = () => {
     const pdf = new jsPDF();
     pdf.setFontSize(18);
-    pdf.text(authUser?.displayName ?? "Portfolio", 14, 20);
+    pdf.text(displayName, 14, 20);
     pdf.setFontSize(12);
-    pdf.text(`Innovation Score: ${score.data?.score ?? 0}`, 14, 30);
-    pdf.text(`Role: ${authUser?.role ?? "student"}`, 14, 38);
-    if (profile?.bio) {
-      const bioLines = pdf.splitTextToSize(profile.bio, 180);
-      pdf.text(bioLines, 14, 46);
-    }
-    pdf.text("Recent Timeline", 14, 58);
-    (scoreHistory.data ?? []).slice(0, 8).forEach((event, index) => {
-      pdf.text(
-        `${index + 1}. ${eventLabel[event.trigger] ?? event.trigger} (+${event.delta})`,
-        14,
-        68 + index * 8,
-      );
-    });
+    pdf.text(`Innovation Score: ${score.data?.score ?? profile?.innovationScore ?? 0}`, 14, 30);
+    if (profile?.bio) pdf.text(pdf.splitTextToSize(profile.bio, 180), 14, 42);
     pdf.save("promove-portfolio.pdf");
   };
 
-  const tabs = [
-    { id: "overview" as const, label: "Overview" },
-    { id: "projects" as const, label: "Projects" },
-    { id: "experience" as const, label: "Experience" },
-    { id: "skills" as const, label: "Skills" },
-    ...(isStudent ? [{ id: "timeline" as const, label: "Timeline" }] : []),
-  ];
-
   return (
     <DashboardLayout role={authUser?.role ?? "student"}>
-      <div className="space-y-8">
-        {toast ? (
-          <div className="p-4 bg-blue-500/10 border border-blue-500/20 rounded-lg text-blue-300 text-sm">
-            {toast}
-          </div>
-        ) : null}
+      <div className="-mx-4 -my-6 min-h-[calc(100vh-5rem)] bg-[#050816] px-4 py-5 text-slate-100 lg:-mx-8 lg:px-8">
+        <div className="w-full space-y-4">
+          {toast ? <div className="rounded-lg border border-cyan-400/30 bg-slate-950 p-3 text-sm font-medium text-cyan-100">{toast}</div> : null}
 
-        {/* Hero Card */}
-        <div className="rounded-2xl border border-slate-800 bg-slate-900 p-8">
-          <div className="flex flex-col gap-6 lg:flex-row lg:items-start lg:justify-between">
-            {/* Left: Avatar + Identity */}
-            <div className="flex items-start gap-6">
-              <div className="flex-shrink-0 w-24 h-24 rounded-2xl bg-gradient-to-br from-cyan-500 via-blue-500 to-purple-500 flex items-center justify-center text-4xl font-bold text-white overflow-hidden">
-                {profile?.avatar ? (
-                  <img src={profile.avatar} alt={authUser?.displayName} className="w-24 h-24 object-cover" />
-                ) : (
-                  authUser?.displayName?.slice(0, 1).toUpperCase() ?? "U"
-                )}
-              </div>
-              <div className="min-w-0">
-                <div className="flex flex-wrap items-center gap-3 mb-1">
-                  <h1 className="text-3xl font-bold text-white">{authUser?.displayName ?? "My Portfolio"}</h1>
-                  {authUser?.verificationStatus === "verified" ? (
-                    <span className="inline-flex items-center gap-1.5 rounded-full border border-emerald-500/30 bg-emerald-500/10 px-3 py-1 text-xs font-semibold uppercase tracking-widest text-emerald-300">
-                      <ShieldCheck className="h-3.5 w-3.5" />
-                      Verified
-                    </span>
+          <section className="w-full overflow-hidden rounded-lg border border-slate-800 bg-slate-900/90 shadow-sm">
+                <div
+                  className={
+                    profile?.avatarWallpaper
+                      ? "relative h-48 bg-cover bg-center"
+                      : "relative h-48 bg-[linear-gradient(135deg,_#243a8f_0%,_#0a66c2_46%,_#0b5cab_64%,_#f5b841_65%,_#f59e0b_78%,_#0a66c2_79%,_#0f4c81_100%)]"
+                  }
+                  style={heroBackgroundStyle}
+                >
+                  {!profile?.avatarWallpaper ? (
+                    <div className="absolute inset-0 bg-[linear-gradient(120deg,_transparent_0%,_transparent_42%,_rgba(255,255,255,0.24)_43%,_rgba(255,255,255,0.24)_50%,_transparent_51%)]" />
+                  ) : null}
+                  {canManagePortfolio ? (
+                    <Link
+                      to="/dashboard/profile"
+                      className="absolute right-4 top-4 rounded-full bg-slate-950/90 p-2 text-cyan-200 shadow transition hover:bg-slate-800"
+                      aria-label="Edit intro"
+                    >
+                      <Pencil className="h-4 w-4" />
+                    </Link>
                   ) : null}
                 </div>
-                {profile?.headline ? (
-                  <p className="text-slate-300 text-base mb-2">{profile.headline}</p>
-                ) : null}
-                {profile?.bio ? (
-                  <p className="text-slate-400 text-sm max-w-2xl mb-3 leading-relaxed">{profile.bio}</p>
-                ) : null}
-                <div className="flex flex-wrap gap-4 text-sm text-slate-400 mb-4">
-                  {profile?.domain ? (
-                    <span className="flex items-center gap-1.5">
-                      <Sparkles className="w-4 h-4 text-cyan-400" />
-                      {profile.domain}
-                    </span>
-                  ) : null}
-                  {profile?.location ? (
-                    <span className="flex items-center gap-1.5">
-                      <MapPin className="w-4 h-4 text-cyan-400" />
-                      {profile.location}
-                    </span>
-                  ) : null}
-                  {profile?.institutionProfile?.institutionName ? (
-                    <span className="flex items-center gap-1.5">
-                      <GraduationCap className="w-4 h-4 text-cyan-400" />
-                      {profile.institutionProfile.institutionName}
-                    </span>
-                  ) : null}
-                </div>
-                <div className="flex flex-wrap gap-2">
-                  {profile?.linkedinUrl ? (
-                    <a href={profile.linkedinUrl} target="_blank" rel="noreferrer" className="inline-flex items-center gap-1.5 rounded-lg border border-slate-700 px-3 py-1.5 text-xs font-medium text-slate-300 transition hover:border-cyan-500 hover:text-cyan-200">
-                      <Linkedin className="h-3.5 w-3.5" />LinkedIn
-                    </a>
-                  ) : null}
-                  {profile?.githubUrl ? (
-                    <a href={profile.githubUrl} target="_blank" rel="noreferrer" className="inline-flex items-center gap-1.5 rounded-lg border border-slate-700 px-3 py-1.5 text-xs font-medium text-slate-300 transition hover:border-cyan-500 hover:text-cyan-200">
-                      <Github className="h-3.5 w-3.5" />GitHub
-                    </a>
-                  ) : null}
-                  {profile?.websiteUrl ? (
-                    <a href={profile.websiteUrl} target="_blank" rel="noreferrer" className="inline-flex items-center gap-1.5 rounded-lg border border-slate-700 px-3 py-1.5 text-xs font-medium text-slate-300 transition hover:border-cyan-500 hover:text-cyan-200">
-                      <Globe className="h-3.5 w-3.5" />Website
-                    </a>
-                  ) : null}
-                  {profile?.twitterUrl ? (
-                    <a href={profile.twitterUrl} target="_blank" rel="noreferrer" className="inline-flex items-center gap-1.5 rounded-lg border border-slate-700 px-3 py-1.5 text-xs font-medium text-slate-300 transition hover:border-cyan-500 hover:text-cyan-200">
-                      <Twitter className="h-3.5 w-3.5" />Twitter
-                    </a>
-                  ) : null}
-                  {profile?.youtubeUrl ? (
-                    <a href={profile.youtubeUrl} target="_blank" rel="noreferrer" className="inline-flex items-center gap-1.5 rounded-lg border border-slate-700 px-3 py-1.5 text-xs font-medium text-slate-300 transition hover:border-cyan-500 hover:text-cyan-200">
-                      <Youtube className="h-3.5 w-3.5" />YouTube
-                    </a>
-                  ) : null}
-                  {profile?.instagramUrl ? (
-                    <a href={profile.instagramUrl} target="_blank" rel="noreferrer" className="inline-flex items-center gap-1.5 rounded-lg border border-slate-700 px-3 py-1.5 text-xs font-medium text-slate-300 transition hover:border-cyan-500 hover:text-cyan-200">
-                      <Instagram className="h-3.5 w-3.5" />Instagram
-                    </a>
-                  ) : null}
-                  {profile?.behanceUrl ? (
-                    <a href={profile.behanceUrl} target="_blank" rel="noreferrer" className="inline-flex items-center gap-1.5 rounded-lg border border-slate-700 px-3 py-1.5 text-xs font-medium text-slate-300 transition hover:border-cyan-500 hover:text-cyan-200">
-                      <Link2 className="h-3.5 w-3.5" />Behance
-                    </a>
-                  ) : null}
-                  {profile?.dribbbleUrl ? (
-                    <a href={profile.dribbbleUrl} target="_blank" rel="noreferrer" className="inline-flex items-center gap-1.5 rounded-lg border border-slate-700 px-3 py-1.5 text-xs font-medium text-slate-300 transition hover:border-cyan-500 hover:text-cyan-200">
-                      <Link2 className="h-3.5 w-3.5" />Dribbble
-                    </a>
-                  ) : null}
-                  {profile?.researchGateUrl ? (
-                    <a href={profile.researchGateUrl} target="_blank" rel="noreferrer" className="inline-flex items-center gap-1.5 rounded-lg border border-slate-700 px-3 py-1.5 text-xs font-medium text-slate-300 transition hover:border-cyan-500 hover:text-cyan-200">
-                      <Link2 className="h-3.5 w-3.5" />ResearchGate
-                    </a>
-                  ) : null}
-                  {profile?.mediumUrl ? (
-                    <a href={profile.mediumUrl} target="_blank" rel="noreferrer" className="inline-flex items-center gap-1.5 rounded-lg border border-slate-700 px-3 py-1.5 text-xs font-medium text-slate-300 transition hover:border-cyan-500 hover:text-cyan-200">
-                      <Link2 className="h-3.5 w-3.5" />Medium
-                    </a>
-                  ) : null}
-                </div>
-              </div>
-            </div>
 
-            {/* Right: Actions + Score */}
-            <div className="flex flex-col gap-4">
-              {isStudent && (
-                <div className="flex gap-2 flex-wrap justify-end">
-                  <button
-                    onClick={() => void copyShareLink()}
-                    disabled={!canShareProfile}
-                    className="px-4 py-2.5 bg-slate-800 hover:bg-slate-700 text-white rounded-lg text-sm font-semibold transition flex items-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed"
-                  >
-                    <Share2 className="w-4 h-4" />
-                    Share
-                  </button>
-                  <button
-                    onClick={() => setShowLaunchModal(true)}
-                    className="px-4 py-2.5 bg-slate-800 hover:bg-slate-700 text-white rounded-lg text-sm font-semibold transition flex items-center gap-2"
-                  >
-                    <Rocket className="w-4 h-4" />
-                    Launch to Recruiters
-                  </button>
-                  <button
-                    onClick={downloadPdf}
-                    className="px-4 py-2.5 bg-gradient-to-r from-blue-600 to-purple-600 text-white rounded-lg text-sm font-semibold transition flex items-center gap-2"
-                  >
-                    <Download className="w-4 h-4" />
-                    Download PDF
-                  </button>
-                </div>
-              )}
-
-              {/* Innovation Score Display */}
-              {isStudent && (
-                <div className="rounded-xl border border-slate-800 bg-slate-950 p-5 text-center min-w-[200px]">
-                  <div className="text-xs uppercase tracking-widest text-slate-500 mb-2">Innovation Score</div>
-                  <div className="flex items-center justify-center gap-2 mb-2">
-                    <Award className="w-6 h-6 text-yellow-500" />
-                    <span className="text-4xl font-bold text-white">{score.data?.score ?? 0}</span>
-                  </div>
-                  <div className="flex items-center justify-center gap-1">
-                    {[...Array(5)].map((_, i) => (
-                      <Star
-                        key={i}
-                        className={`w-4 h-4 ${i < Math.max(1, Math.round((score.data?.score ?? 0) / 50)) ? "text-yellow-500 fill-yellow-500" : "text-slate-700"}`}
-                      />
-                    ))}
-                  </div>
-                </div>
-              )}
-            </div>
-          </div>
-
-          {isStudent && !canShareProfile ? (
-            <div className="mt-5 rounded-xl border border-amber-500/20 bg-amber-500/10 p-3 text-sm text-amber-200">
-              Public sharing unlocks after your profile is complete and your institution has verified your account.
-            </div>
-          ) : null}
-        </div>
-
-        {/* Innovation Stats (student only) */}
-        {isStudent ? (
-          <div className="grid grid-cols-2 md:grid-cols-5 gap-4">
-            {innovationStats.map((stat) => (
-              <div key={stat.label} className="bg-slate-900 border border-slate-800 rounded-xl p-5 text-center">
-                <div className="w-12 h-12 bg-gradient-to-br from-blue-500 to-purple-500 rounded-lg flex items-center justify-center mx-auto mb-3">
-                  <stat.icon className="w-6 h-6 text-white" />
-                </div>
-                <div className="text-2xl font-bold text-white mb-1">{stat.value}</div>
-                <div className="text-xs text-slate-400">{stat.label}</div>
-              </div>
-            ))}
-          </div>
-        ) : null}
-
-        {/* Tabs */}
-        <div className="flex gap-1 bg-slate-900 border border-slate-800 rounded-xl p-1">
-          {tabs.map((tab) => (
-            <button
-              key={tab.id}
-              onClick={() => setActiveTab(tab.id)}
-              className={`flex-1 px-4 py-2.5 rounded-lg text-sm font-semibold transition ${
-                activeTab === tab.id
-                  ? "bg-gradient-to-r from-blue-600 to-purple-600 text-white"
-                  : "text-slate-400 hover:text-white"
-              }`}
-            >
-              {tab.label}
-            </button>
-          ))}
-        </div>
-
-        {/* Overview Tab */}
-        {activeTab === "overview" ? (
-          <div className="grid lg:grid-cols-2 gap-6">
-            {/* GitHub Stats */}
-            {profile?.githubStats ? (
-              <div className="bg-slate-900 border border-slate-800 rounded-xl p-6">
-                <div className="flex items-center gap-2 mb-5">
-                  <Github className="w-5 h-5 text-slate-300" />
-                  <h2 className="text-lg font-bold text-white">GitHub Activity</h2>
-                </div>
-                <div className="grid grid-cols-2 gap-3 mb-4">
-                  {[
-                    { label: "Repositories", value: profile.githubStats.totalRepos },
-                    { label: "Total Stars", value: profile.githubStats.totalStars },
-                    { label: "Total Forks", value: profile.githubStats.totalForks },
-                    { label: "Contributions/yr", value: profile.githubStats.contributionsLastYear },
-                  ].map((item) => (
-                    <div key={item.label} className="bg-slate-950 rounded-lg p-4">
-                      <div className="text-xs text-slate-500 mb-1">{item.label}</div>
-                      <div className="text-2xl font-bold text-white">{item.value}</div>
-                    </div>
-                  ))}
-                </div>
-                {profile.githubStats.topLanguages.length > 0 ? (
-                  <div>
-                    <div className="text-xs text-slate-500 mb-2">Top Languages</div>
-                    <div className="space-y-2">
-                      {profile.githubStats.topLanguages.slice(0, 5).map((lang) => (
-                        <div key={lang.language}>
-                          <div className="flex justify-between text-xs mb-1">
-                            <span className="text-slate-300">{lang.language}</span>
-                            <span className="text-slate-500">{lang.percentage}%</span>
-                          </div>
-                          <div className="h-1.5 bg-slate-800 rounded-full overflow-hidden">
-                            <div
-                              className="h-full bg-gradient-to-r from-blue-500 to-purple-500 rounded-full"
-                              style={{ width: `${lang.percentage}%` }}
-                            />
-                          </div>
-                        </div>
-                      ))}
+                <div className="px-6 pb-6">
+                  <div className="-mt-20 flex items-end justify-between gap-4">
+                    <div className="flex h-40 w-40 items-center justify-center overflow-hidden rounded-full border-4 border-slate-900 bg-slate-800 text-5xl font-semibold text-cyan-200 shadow-sm">
+                      {profile?.avatar ? <img src={profile.avatar} alt={displayName} className="h-full w-full object-cover" /> : initials}
                     </div>
                   </div>
-                ) : null}
-              </div>
-            ) : null}
 
-            {/* 30-Day Proof (student) */}
-            {isStudent && profile?.githubProof ? (
-              <div className="bg-slate-900 border border-slate-800 rounded-xl p-6">
-                <div className="flex items-center gap-2 mb-5">
-                  <Code2 className="w-5 h-5 text-cyan-400" />
-                  <h2 className="text-lg font-bold text-white">30-Day Activity</h2>
-                </div>
-                <div className="grid grid-cols-2 gap-3 mb-4">
-                  {[
-                    { label: "Commits", value: profile.githubProof.commitCount30Days },
-                    { label: "Active Days", value: profile.githubProof.activeDays30Days },
-                    { label: "Pull Requests", value: profile.githubProof.pullRequests30Days },
-                    { label: "Issues", value: profile.githubProof.issues30Days },
-                  ].map((item) => (
-                    <div key={item.label} className="bg-slate-950 rounded-lg p-4">
-                      <div className="text-xs text-slate-500 mb-1">{item.label}</div>
-                      <div className="text-2xl font-bold text-white">{item.value}</div>
-                    </div>
-                  ))}
-                </div>
-                <div className="space-y-3">
-                  {(profile.githubProof.recentActivity ?? []).slice(0, 3).map((activity) => (
-                    <div key={activity.id} className="bg-slate-950 rounded-lg p-3">
-                      <div className="text-sm font-semibold text-white truncate">{activity.title}</div>
-                      <div className="text-xs text-slate-400 mt-0.5">{activity.repoFullName}</div>
-                    </div>
-                  ))}
-                </div>
-              </div>
-            ) : null}
-
-            {/* Education */}
-            {(profile?.education ?? []).length > 0 ? (
-              <div className="bg-slate-900 border border-slate-800 rounded-xl p-6">
-                <div className="flex items-center gap-2 mb-5">
-                  <GraduationCap className="w-5 h-5 text-cyan-400" />
-                  <h2 className="text-lg font-bold text-white">Education</h2>
-                </div>
-                <div className="space-y-4">
-                  {(profile?.education ?? []).map((edu) => (
-                    <div key={edu._id} className="border-l-2 border-blue-500/40 pl-4">
-                      <div className="font-semibold text-white">{edu.degree} in {edu.fieldOfStudy}</div>
-                      <div className="text-sm text-slate-300">{edu.institution}</div>
-                      <div className="text-xs text-slate-500 mt-1">
-                        {edu.startYear ? `${edu.startYear} – ` : ""}
-                        {edu.isCurrent ? "Present" : edu.endYear ?? ""}
-                        {edu.grade ? ` · ${edu.grade}` : ""}
-                      </div>
-                      {edu.description ? (
-                        <div className="text-xs text-slate-400 mt-1">{edu.description}</div>
-                      ) : null}
-                    </div>
-                  ))}
-                </div>
-              </div>
-            ) : null}
-
-            {/* Certifications */}
-            {(profile?.certifications ?? []).length > 0 ? (
-              <div className="bg-slate-900 border border-slate-800 rounded-xl p-6">
-                <div className="flex items-center gap-2 mb-5">
-                  <Award className="w-5 h-5 text-yellow-500" />
-                  <h2 className="text-lg font-bold text-white">Certifications</h2>
-                </div>
-                <div className="space-y-3">
-                  {(profile?.certifications ?? []).map((cert) => (
-                    <div key={cert._id} className="bg-slate-950 rounded-lg p-4">
-                      <div className="flex items-start justify-between gap-3">
-                        <div>
-                          <div className="font-semibold text-white">{cert.name}</div>
-                          <div className="text-sm text-slate-400">{cert.issuingOrganization}</div>
-                          <div className="text-xs text-slate-500 mt-1">
-                            {cert.issueDate ? `Issued ${formatDate(cert.issueDate)}` : ""}
-                            {cert.expiryDate ? ` · Expires ${formatDate(cert.expiryDate)}` : ""}
-                          </div>
-                        </div>
-                        {cert.credentialUrl ? (
-                          <a
-                            href={cert.credentialUrl}
-                            target="_blank"
-                            rel="noreferrer"
-                            className="flex-shrink-0 text-cyan-400 hover:text-cyan-300"
-                          >
-                            <ExternalLink className="w-4 h-4" />
-                          </a>
-                        ) : null}
-                      </div>
-                    </div>
-                  ))}
-                </div>
-              </div>
-            ) : null}
-
-            {/* ProMove Workspaces (student only) */}
-            {isStudent && (workspaces.data ?? []).length > 0 ? (
-              <div className="bg-slate-900 border border-slate-800 rounded-xl p-6 lg:col-span-2">
-                <div className="flex items-center gap-2 mb-5">
-                  <Rocket className="w-5 h-5 text-purple-400" />
-                  <h2 className="text-lg font-bold text-white">Innovation Workspaces</h2>
-                </div>
-                <div className="grid md:grid-cols-2 gap-4">
-                  {(workspaces.data ?? []).map((ws) => (
-                    <div key={ws._id} className="bg-slate-950 border border-slate-800 rounded-lg p-5">
-                      <div className="font-bold text-white mb-1">{ws.title}</div>
-                      <div className="text-sm text-slate-400 mb-3">{ws.category} · {ws.stage}</div>
-                      <div className="h-1.5 bg-slate-800 rounded-full overflow-hidden mb-1">
-                        <div
-                          className="h-full bg-gradient-to-r from-blue-500 to-purple-500"
-                          style={{ width: `${ws.progressPercent}%` }}
-                        />
-                      </div>
-                      <div className="text-xs text-slate-500">{ws.progressPercent}% complete</div>
-                    </div>
-                  ))}
-                </div>
-              </div>
-            ) : null}
-          </div>
-        ) : null}
-
-        {/* Projects Tab */}
-        {activeTab === "projects" ? (
-          <div className="space-y-6">
-            {/* Portfolio Projects */}
-            {(profile?.portfolioProjects ?? []).length > 0 ? (
-              <div className="bg-slate-900 border border-slate-800 rounded-xl p-6">
-                <h2 className="text-xl font-bold text-white mb-5">Portfolio Projects</h2>
-                <div className="grid md:grid-cols-2 gap-4">
-                  {(profile?.portfolioProjects ?? []).map((project) => (
-                    <div key={project._id} className="bg-slate-950 border border-slate-800 rounded-xl p-5">
-                      <div className="flex items-start justify-between gap-3 mb-2">
-                        <div className="font-bold text-white">{project.title}</div>
-                        {project.stars > 0 ? (
-                          <span className="inline-flex items-center gap-1 rounded-full bg-amber-500/10 px-2 py-1 text-xs font-semibold text-amber-300 flex-shrink-0">
-                            <Star className="h-3.5 w-3.5 fill-current" />
-                            {project.stars}
+                  <div className="mt-4 flex flex-col gap-5 lg:flex-row lg:items-start lg:justify-between">
+                    <div className="min-w-0 flex-1">
+                      <div className="flex flex-wrap items-center gap-2">
+                        <h1 className="text-2xl font-semibold leading-tight text-white">{displayName}</h1>
+                        {profile?.verificationStatus === "verified" ? (
+                          <span className="inline-flex items-center gap-1 rounded-full bg-[#e3f9e5] px-2.5 py-1 text-xs font-semibold text-[#057642]">
+                            <ShieldCheck className="h-3.5 w-3.5" />
+                            Verified
                           </span>
                         ) : null}
                       </div>
-                      {project.description ? (
-                        <p className="text-sm text-slate-400 mb-3">{project.description}</p>
+                      <p className="mt-1 text-base text-slate-200">{profile?.headline || profile?.domain || "Innovation profile"}</p>
+                      <div className="mt-2 flex flex-wrap items-center gap-x-2 gap-y-1 text-sm text-slate-400">
+                        {profile?.domain ? <span>{profile.domain}</span> : null}
+                        {profile?.location ? (
+                          <>
+                            <span aria-hidden="true">.</span>
+                            <span className="inline-flex items-center gap-1"><MapPin className="h-3.5 w-3.5" />{profile.location}</span>
+                          </>
+                        ) : null}
+                        {profile?.institutionProfile?.institutionName ? (
+                          <>
+                            <span aria-hidden="true">.</span>
+                            <span>{profile.institutionProfile.institutionName}</span>
+                          </>
+                        ) : null}
+                      </div>
+                      {visibleSocialLinks.length > 0 ? (
+                        <div className="mt-2 flex flex-wrap gap-2 text-sm font-semibold text-cyan-200">
+                          {visibleSocialLinks.slice(0, 6).map((link) => {
+                            const Icon = link.icon;
+                            return (
+                              <a key={link.label} href={link.url ?? ""} target="_blank" rel="noreferrer" className="inline-flex items-center gap-1 hover:underline">
+                                <Icon className="h-3.5 w-3.5" />
+                                {link.label}
+                              </a>
+                            );
+                          })}
+                        </div>
                       ) : null}
-                      {project.techStack.length > 0 ? (
-                        <div className="flex flex-wrap gap-2 mb-3">
-                          {project.techStack.slice(0, 6).map((tech) => (
-                            <span key={tech} className="rounded-full bg-slate-800 px-2.5 py-1 text-xs text-slate-300">
-                              {tech}
+                      <div className="mt-4 flex flex-wrap gap-2">
+                        {canManagePortfolio ? (
+                          <>
+                            <Link
+                              to="/dashboard/profile"
+                              className="inline-flex items-center gap-2 rounded-full bg-cyan-400 px-4 py-1.5 text-sm font-semibold text-slate-950 transition hover:bg-cyan-300"
+                            >
+                              <Pencil className="h-4 w-4" />
+                              Edit profile
+                            </Link>
+                            <ProfileButton onClick={() => void copyShareLink()} disabled={!canShareProfile}>
+                              <Share2 className="h-4 w-4" />
+                              Share
+                            </ProfileButton>
+                            <ProfileButton onClick={() => setShowLaunchModal(true)}>
+                              <Rocket className="h-4 w-4" />
+                              Launch
+                            </ProfileButton>
+                            <ProfileButton onClick={downloadPdf}>
+                              <Download className="h-4 w-4" />
+                              PDF
+                            </ProfileButton>
+                          </>
+                        ) : null}
+                      </div>
+                    </div>
+
+                    <div className="min-w-[220px] space-y-3 text-sm">
+                      {profile?.institutionProfile?.institutionName ? (
+                        <div className="flex items-center gap-2 font-semibold text-slate-200">
+                          <Building2 className="h-5 w-5 text-slate-400" />
+                          {profile.institutionProfile.institutionName}
+                        </div>
+                      ) : null}
+                      <div className="flex items-center gap-2 font-semibold text-slate-200">
+                        <Sparkles className="h-5 w-5 text-slate-400" />
+                        Innovation Score {score.data?.score ?? profile?.innovationScore ?? 0}
+                      </div>
+                    </div>
+                  </div>
+
+                  {canManagePortfolio && !canShareProfile ? (
+                    <div className="mt-4 rounded-lg border border-amber-400/30 bg-amber-400/10 p-3 text-sm text-amber-100">
+                      Public sharing unlocks after your profile is complete and your institution has verified your account.
+                    </div>
+                  ) : null}
+                </div>
+          </section>
+
+          <div className="grid gap-6 xl:grid-cols-[minmax(0,1fr)_300px] 2xl:grid-cols-[minmax(0,1fr)_320px]">
+            <main className="space-y-3">
+              <Section title="About" canEdit={canManagePortfolio}>
+                {profile?.bio ? <p className="whitespace-pre-line text-sm leading-6 text-slate-200">{profile.bio}</p> : <Empty>No about summary has been added yet.</Empty>}
+              </Section>
+
+              <Section title="Featured" canEdit={canManagePortfolio}>
+                {featuredItems.length > 0 ? (
+                  <div className="grid gap-3 md:grid-cols-3">
+                    {featuredItems.map((item) => (
+                      <article key={item.key} className="overflow-hidden rounded-lg border border-slate-800 bg-slate-950/70">
+                        <div className="flex h-24 items-center justify-center bg-cyan-500/10 text-cyan-200">
+                          {item.kind === "Project" ? <Rocket className="h-8 w-8" /> : item.kind === "Certification" ? <Award className="h-8 w-8" /> : <GraduationCap className="h-8 w-8" />}
+                        </div>
+                        <div className="p-3">
+                          <div className="text-xs text-slate-400">{item.kind}</div>
+                          <h3 className="mt-1 line-clamp-2 text-sm font-semibold">{item.title}</h3>
+                          {item.body ? <p className="mt-1 line-clamp-2 text-xs text-slate-400">{item.body}</p> : null}
+                          {item.url ? (
+                            <a href={item.url} target="_blank" rel="noreferrer" className="mt-2 inline-flex items-center gap-1 text-xs font-semibold text-cyan-200 hover:underline">
+                              View
+                              <ExternalLink className="h-3 w-3" />
+                            </a>
+                          ) : null}
+                        </div>
+                      </article>
+                    ))}
+                  </div>
+                ) : (
+                  <Empty>Featured work will appear here when projects, education, or certifications are available.</Empty>
+                )}
+              </Section>
+
+              <Section title="Activity">
+                {recentActivity.length > 0 ? (
+                  <div className="divide-y divide-slate-800">
+                    {recentActivity.map((activity) => (
+                      <article key={activity.id} className="flex gap-3 py-4 first:pt-0 last:pb-0">
+                        <LogoTile><Github className="h-5 w-5" /></LogoTile>
+                        <div className="min-w-0">
+                          <h3 className="font-semibold">{activity.title}</h3>
+                          <p className="mt-1 text-sm leading-6 text-slate-300">{activity.summary}</p>
+                          <div className="mt-1 text-xs text-slate-500">{activity.repoFullName} . {formatDateTime(activity.occurredAt)}</div>
+                        </div>
+                      </article>
+                    ))}
+                  </div>
+                ) : (scoreHistory.data ?? []).length > 0 ? (
+                  <div className="divide-y divide-slate-800">
+                    {(scoreHistory.data ?? []).slice(0, 5).map((event) => (
+                      <article key={event._id} className="py-4 first:pt-0 last:pb-0">
+                        <h3 className="font-semibold">{eventLabel[event.trigger] ?? event.trigger}</h3>
+                        <p className="mt-1 text-sm text-slate-400">Innovation score updated to {event.scoreAfter} (+{event.delta}).</p>
+                      </article>
+                    ))}
+                  </div>
+                ) : (
+                  <Empty>No recent public activity is available yet.</Empty>
+                )}
+              </Section>
+
+              <Section title="Experience" canEdit={canManagePortfolio}>
+                {(profile?.experience ?? []).length > 0 ? (
+                  <div className="divide-y divide-slate-800">
+                    {(profile?.experience ?? []).map((exp) => (
+                      <article key={exp._id} className="flex gap-3 py-4 first:pt-0 last:pb-0">
+                        <LogoTile><Briefcase className="h-5 w-5" /></LogoTile>
+                        <div className="min-w-0">
+                          <h3 className="font-semibold">{exp.title}</h3>
+                          <div className="text-sm text-slate-200">{exp.company}</div>
+                          <div className="mt-0.5 text-sm text-slate-400">
+                            {formatDate(exp.startDate)} - {exp.isCurrent ? "Present" : formatDate(exp.endDate ?? undefined)}
+                            {exp.location ? ` . ${exp.location}` : ""} . {experienceTypeLabel[exp.type] ?? exp.type}
+                          </div>
+                          {exp.description ? <p className="mt-2 whitespace-pre-line text-sm leading-6 text-slate-300">{exp.description}</p> : null}
+                          {exp.skills.length > 0 ? <div className="mt-2 text-sm font-semibold text-slate-300">{exp.skills.slice(0, 6).join(" . ")}</div> : null}
+                        </div>
+                      </article>
+                    ))}
+                  </div>
+                ) : <Empty>No experience has been added yet.</Empty>}
+              </Section>
+
+              <Section title="Education" canEdit={canManagePortfolio}>
+                {(profile?.education ?? []).length > 0 ? (
+                  <div className="divide-y divide-slate-800">
+                    {(profile?.education ?? []).map((edu) => (
+                      <article key={edu._id} className="flex gap-3 py-4 first:pt-0 last:pb-0">
+                        <LogoTile><GraduationCap className="h-5 w-5" /></LogoTile>
+                        <div className="min-w-0">
+                          <h3 className="font-semibold">{edu.institution}</h3>
+                          <div className="text-sm text-slate-200">{[edu.degree, edu.fieldOfStudy].filter(Boolean).join(", ")}</div>
+                          <div className="mt-0.5 text-sm text-slate-400">{edu.startYear ? `${edu.startYear} - ` : ""}{edu.isCurrent ? "Present" : edu.endYear ?? ""}{edu.grade ? ` . Grade: ${edu.grade}` : ""}</div>
+                          {edu.description ? <p className="mt-2 text-sm leading-6 text-slate-300">{edu.description}</p> : null}
+                          {edu.activities ? <p className="mt-1 text-sm text-slate-400">{edu.activities}</p> : null}
+                        </div>
+                      </article>
+                    ))}
+                  </div>
+                ) : <Empty>No education entries have been added yet.</Empty>}
+              </Section>
+
+              <Section title="Licenses & certifications" canEdit={canManagePortfolio}>
+                {(profile?.certifications ?? []).length > 0 ? (
+                  <div className="divide-y divide-slate-800">
+                    {(profile?.certifications ?? []).map((cert) => (
+                      <article key={cert._id} className="flex gap-3 py-4 first:pt-0 last:pb-0">
+                        <LogoTile><Award className="h-5 w-5" /></LogoTile>
+                        <div className="min-w-0 flex-1">
+                          <div className="flex items-start justify-between gap-3">
+                            <div>
+                              <h3 className="font-semibold">{cert.name}</h3>
+                              <div className="text-sm text-slate-200">{cert.issuingOrganization}</div>
+                              <div className="mt-0.5 text-sm text-slate-400">
+                                {cert.issueDate ? `Issued ${formatDate(cert.issueDate)}` : ""}
+                                {cert.expiryDate ? ` . Expires ${formatDate(cert.expiryDate)}` : ""}
+                              </div>
+                              {cert.credentialId ? <div className="mt-1 text-xs text-slate-500">Credential ID {cert.credentialId}</div> : null}
+                            </div>
+                            {cert.credentialUrl ? <a href={cert.credentialUrl} target="_blank" rel="noreferrer" className="text-cyan-200 hover:underline"><ExternalLink className="h-4 w-4" /></a> : null}
+                          </div>
+                        </div>
+                      </article>
+                    ))}
+                  </div>
+                ) : <Empty>No licenses or certifications have been added yet.</Empty>}
+              </Section>
+
+              <Section title="Skills" canEdit={canManagePortfolio}>
+                {Object.keys(skillsByCategory).length > 0 ? (
+                  <div className="space-y-4">
+                    {Object.entries(skillsByCategory).map(([category, skills]) => (
+                      <div key={category}>
+                        <h3 className="font-semibold">{categoryLabel[category] ?? category}</h3>
+                        <div className="mt-2 flex flex-wrap gap-2">
+                          {skills.map((skill) => (
+                            <span key={`${skill.name}-${skill.source}`} className="rounded-full border border-cyan-400/60 bg-cyan-400/10 px-3 py-1 text-sm font-semibold text-cyan-100">
+                              {skill.name}
                             </span>
                           ))}
                         </div>
-                      ) : null}
-                      {project.languages.length > 0 ? (
-                        <div className="text-xs text-slate-500 mb-3">
-                          {project.languages.slice(0, 4).join(" · ")}
-                        </div>
-                      ) : null}
-                      <div className="flex gap-3 text-sm">
-                        {project.repoUrl ? (
-                          <a href={project.repoUrl} target="_blank" rel="noreferrer" className="flex items-center gap-1 text-cyan-400 hover:text-cyan-300">
-                            <Github className="w-3.5 h-3.5" />
-                            Repository
-                          </a>
-                        ) : null}
-                        {project.liveUrl ? (
-                          <a href={project.liveUrl} target="_blank" rel="noreferrer" className="flex items-center gap-1 text-cyan-400 hover:text-cyan-300">
-                            <ExternalLink className="w-3.5 h-3.5" />
-                            Live Demo
-                          </a>
-                        ) : null}
-                      </div>
-                    </div>
-                  ))}
-                </div>
-              </div>
-            ) : (
-              <div className="bg-slate-900 border border-dashed border-slate-700 rounded-xl p-10 text-center text-slate-400">
-                No portfolio projects yet. Connect your GitHub or add projects manually in Settings.
-              </div>
-            )}
-
-            {/* GitHub Imported Repos */}
-            {isStudent && (profile?.githubProof?.importedRepos ?? []).length > 0 ? (
-              <div className="bg-slate-900 border border-slate-800 rounded-xl p-6">
-                <h2 className="text-xl font-bold text-white mb-5">GitHub Repositories</h2>
-                <div className="grid md:grid-cols-2 gap-4">
-                  {(profile?.githubProof?.importedRepos ?? []).map((repo) => (
-                    <div key={repo.repoId} className="bg-slate-950 border border-slate-800 rounded-xl p-5">
-                      <div className="flex items-start justify-between gap-3 mb-1">
-                        <div className="font-bold text-white">{repo.name}</div>
-                        <div className="flex items-center gap-3 text-xs text-slate-500 flex-shrink-0">
-                          <span className="flex items-center gap-1">
-                            <Star className="w-3 h-3" />
-                            {repo.stars}
-                          </span>
-                        </div>
-                      </div>
-                      {repo.description ? (
-                        <p className="text-sm text-slate-400 mb-3">{repo.description}</p>
-                      ) : null}
-                      {repo.primaryLanguage ? (
-                        <span className="rounded-full bg-slate-800 px-2.5 py-1 text-xs text-slate-300">
-                          {repo.primaryLanguage}
-                        </span>
-                      ) : null}
-                      <div className="mt-3">
-                        <a href={repo.url} target="_blank" rel="noreferrer" className="text-xs text-cyan-400 hover:text-cyan-300">
-                          View on GitHub
-                        </a>
-                      </div>
-                    </div>
-                  ))}
-                </div>
-              </div>
-            ) : null}
-          </div>
-        ) : null}
-
-        {/* Experience Tab */}
-        {activeTab === "experience" ? (
-          <div className="space-y-6">
-            {(profile?.experience ?? []).length > 0 ? (
-              <div className="bg-slate-900 border border-slate-800 rounded-xl p-6">
-                <div className="flex items-center gap-2 mb-6">
-                  <Briefcase className="w-5 h-5 text-cyan-400" />
-                  <h2 className="text-xl font-bold text-white">Work Experience</h2>
-                </div>
-                <div className="space-y-6">
-                  {(profile?.experience ?? []).map((exp, idx) => (
-                    <div key={exp._id} className={`flex gap-5 ${idx < (profile?.experience?.length ?? 0) - 1 ? "pb-6 border-b border-slate-800" : ""}`}>
-                      <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-blue-500/20 to-purple-500/20 border border-slate-700 flex items-center justify-center flex-shrink-0">
-                        <Briefcase className="w-4 h-4 text-blue-400" />
-                      </div>
-                      <div className="flex-1 min-w-0">
-                        <div className="font-bold text-white">{exp.title}</div>
-                        <div className="text-sm text-slate-300 mb-1">{exp.company}</div>
-                        <div className="flex flex-wrap items-center gap-2 text-xs text-slate-500 mb-2">
-                          <span className="bg-slate-800 px-2 py-0.5 rounded-full">
-                            {experienceTypeLabel[exp.type] ?? exp.type}
-                          </span>
-                          {exp.location ? <span>{exp.location}</span> : null}
-                          <span>
-                            {formatDate(exp.startDate)} – {exp.isCurrent ? "Present" : formatDate(exp.endDate ?? undefined)}
-                          </span>
-                        </div>
-                        {exp.description ? (
-                          <p className="text-sm text-slate-400 leading-relaxed">{exp.description}</p>
-                        ) : null}
-                        {exp.skills.length > 0 ? (
-                          <div className="mt-3 flex flex-wrap gap-2">
-                            {exp.skills.map((skill) => (
-                              <span key={skill} className="rounded-full bg-slate-800 px-2.5 py-1 text-xs text-slate-300">
-                                {skill}
-                              </span>
-                            ))}
-                          </div>
-                        ) : null}
-                      </div>
-                    </div>
-                  ))}
-                </div>
-              </div>
-            ) : (
-              <div className="bg-slate-900 border border-dashed border-slate-700 rounded-xl p-10 text-center text-slate-400">
-                No work experience added yet. Add experience in your profile settings.
-              </div>
-            )}
-
-            {/* Education in experience tab */}
-            {(profile?.education ?? []).length > 0 ? (
-              <div className="bg-slate-900 border border-slate-800 rounded-xl p-6">
-                <div className="flex items-center gap-2 mb-6">
-                  <GraduationCap className="w-5 h-5 text-cyan-400" />
-                  <h2 className="text-xl font-bold text-white">Education</h2>
-                </div>
-                <div className="space-y-6">
-                  {(profile?.education ?? []).map((edu, idx) => (
-                    <div key={edu._id} className={`flex gap-5 ${idx < (profile?.education?.length ?? 0) - 1 ? "pb-6 border-b border-slate-800" : ""}`}>
-                      <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-cyan-500/20 to-blue-500/20 border border-slate-700 flex items-center justify-center flex-shrink-0">
-                        <GraduationCap className="w-4 h-4 text-cyan-400" />
-                      </div>
-                      <div className="flex-1">
-                        <div className="font-bold text-white">{edu.degree} in {edu.fieldOfStudy}</div>
-                        <div className="text-sm text-slate-300 mb-1">{edu.institution}</div>
-                        <div className="text-xs text-slate-500 mb-2">
-                          {edu.startYear ? `${edu.startYear} – ` : ""}
-                          {edu.isCurrent ? "Present" : edu.endYear ?? ""}
-                          {edu.grade ? ` · Grade: ${edu.grade}` : ""}
-                        </div>
-                        {edu.description ? <p className="text-sm text-slate-400">{edu.description}</p> : null}
-                        {edu.activities ? <p className="text-xs text-slate-500 mt-1">Activities: {edu.activities}</p> : null}
-                      </div>
-                    </div>
-                  ))}
-                </div>
-              </div>
-            ) : null}
-
-            {/* Certifications in experience tab */}
-            {(profile?.certifications ?? []).length > 0 ? (
-              <div className="bg-slate-900 border border-slate-800 rounded-xl p-6">
-                <div className="flex items-center gap-2 mb-6">
-                  <Award className="w-5 h-5 text-yellow-500" />
-                  <h2 className="text-xl font-bold text-white">Certifications</h2>
-                </div>
-                <div className="grid md:grid-cols-2 gap-4">
-                  {(profile?.certifications ?? []).map((cert) => (
-                    <div key={cert._id} className="bg-slate-950 border border-slate-800 rounded-xl p-4">
-                      <div className="flex items-start justify-between gap-2">
-                        <div>
-                          <div className="font-semibold text-white">{cert.name}</div>
-                          <div className="text-sm text-slate-400 mt-0.5">{cert.issuingOrganization}</div>
-                          <div className="text-xs text-slate-500 mt-1">
-                            {cert.issueDate ? `Issued ${formatDate(cert.issueDate)}` : ""}
-                            {cert.expiryDate ? ` · Expires ${formatDate(cert.expiryDate)}` : ""}
-                          </div>
-                          {cert.credentialId ? (
-                            <div className="text-xs text-slate-600 mt-1">ID: {cert.credentialId}</div>
-                          ) : null}
-                        </div>
-                        {cert.credentialUrl ? (
-                          <a href={cert.credentialUrl} target="_blank" rel="noreferrer" className="text-cyan-400 hover:text-cyan-300">
-                            <ExternalLink className="w-4 h-4" />
-                          </a>
-                        ) : null}
-                      </div>
-                    </div>
-                  ))}
-                </div>
-              </div>
-            ) : null}
-          </div>
-        ) : null}
-
-        {/* Skills Tab */}
-        {activeTab === "skills" ? (
-          <div className="space-y-6">
-            {Object.keys(skillsByCategory).length > 0 ? (
-              Object.entries(skillsByCategory).map(([category, skills]) => (
-                <div key={category} className="bg-slate-900 border border-slate-800 rounded-xl p-6">
-                  <h2 className="text-lg font-bold text-white mb-4">{categoryLabel[category] ?? category}</h2>
-                  <div className="flex flex-wrap gap-3">
-                    {skills.map((skill) => (
-                      <div
-                        key={`${skill.name}-${skill.source}`}
-                        className={`rounded-xl px-4 py-2 text-sm font-medium ${skillLevelColor[skill.level] ?? "bg-slate-800 text-slate-300"}`}
-                      >
-                        <span>{skill.name}</span>
-                        <span className="ml-2 text-xs opacity-60 capitalize">{skill.level}</span>
-                        {skill.endorsements > 0 ? (
-                          <span className="ml-2 text-xs opacity-60">· {skill.endorsements} ✓</span>
-                        ) : null}
                       </div>
                     ))}
                   </div>
-                </div>
-              ))
-            ) : (
-              <div className="bg-slate-900 border border-dashed border-slate-700 rounded-xl p-10 text-center text-slate-400">
-                No skills added yet. Connect GitHub or LinkedIn to auto-import skills, or add them manually in settings.
-              </div>
-            )}
-          </div>
-        ) : null}
+                ) : <Empty>No skills have been added yet.</Empty>}
+              </Section>
 
-        {/* Timeline Tab (student only) */}
-        {activeTab === "timeline" && isStudent ? (
-          <div className="bg-slate-900 border border-slate-800 rounded-xl p-6">
-            <div className="flex items-center gap-2 mb-6">
-              <Calendar className="w-5 h-5 text-blue-400" />
-              <h2 className="text-xl font-bold text-white">Innovation Timeline</h2>
-            </div>
-            {(scoreHistory.data ?? []).length > 0 ? (
-              <div className="space-y-5">
-                {(scoreHistory.data ?? []).map((event) => (
-                  <div key={event._id} className="flex gap-4">
-                    <div className="w-10 h-10 rounded-full flex items-center justify-center bg-blue-500/15 flex-shrink-0">
-                      <TrendingUp className="w-5 h-5 text-blue-400" />
-                    </div>
-                    <div className="flex-1 pb-5 border-l border-slate-800 pl-5 -ml-5 ml-0">
-                      <div className="text-xs text-slate-500 mb-1">
-                        {new Date(event.createdAt).toLocaleDateString("en-IN", { day: "numeric", month: "short", year: "numeric" })}
-                      </div>
-                      <div className="font-bold text-white mb-0.5">
-                        {eventLabel[event.trigger] ?? event.trigger}
-                      </div>
-                      <div className="text-sm text-slate-400">
-                        Score updated to {event.scoreAfter}
-                        <span className="ml-1 text-emerald-400 font-semibold">+{event.delta}</span>
-                      </div>
-                    </div>
+              <Section title="Projects" canEdit={canManagePortfolio}>
+                {(profile?.portfolioProjects ?? []).length > 0 ? (
+                  <div className="divide-y divide-slate-800">
+                    {(profile?.portfolioProjects ?? []).map((project) => (
+                      <article key={project._id} className="flex gap-3 py-4 first:pt-0 last:pb-0">
+                        <LogoTile><Rocket className="h-5 w-5" /></LogoTile>
+                        <div className="min-w-0 flex-1">
+                          <div className="flex items-start justify-between gap-3">
+                            <div>
+                              <h3 className="font-semibold">{project.title}</h3>
+                              {project.description ? <p className="mt-1 text-sm leading-6 text-slate-300">{project.description}</p> : null}
+                            </div>
+                            {project.stars > 0 ? <span className="inline-flex flex-shrink-0 items-center gap-1 text-xs font-semibold text-amber-300"><Star className="h-3.5 w-3.5 fill-current" />{project.stars}</span> : null}
+                          </div>
+                          {project.techStack.length > 0 ? <div className="mt-2 text-sm font-semibold text-slate-300">{project.techStack.slice(0, 8).join(" . ")}</div> : null}
+                          <div className="mt-2 flex flex-wrap gap-4 text-sm font-semibold text-cyan-200">
+                            {project.repoUrl ? <a href={project.repoUrl} target="_blank" rel="noreferrer" className="hover:underline">Repository</a> : null}
+                            {project.liveUrl ? <a href={project.liveUrl} target="_blank" rel="noreferrer" className="hover:underline">Live demo</a> : null}
+                          </div>
+                        </div>
+                      </article>
+                    ))}
                   </div>
-                ))}
-              </div>
-            ) : (
-              <div className="text-center text-slate-400 py-6">No timeline events yet. Start solving problems to build your timeline.</div>
-            )}
-          </div>
-        ) : null}
+                ) : <Empty>No portfolio projects are available yet.</Empty>}
+              </Section>
 
-        {/* Launch to Recruiters Modal */}
-        {showLaunchModal ? (
-          <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-950/80 p-6 backdrop-blur-sm">
-            <div className="w-full max-w-lg rounded-2xl border border-slate-800 bg-slate-900 p-6">
-              <h2 className="text-2xl font-bold text-white">Launch Portfolio to Recruiters</h2>
-              <p className="mt-3 text-sm leading-6 text-slate-400">
-                Confirm to make your portfolio visible to recruiters who match your innovation score and activity history.
-              </p>
+              <Section title="Startups">
+                {recentStartups.length > 0 ? (
+                  <div className="divide-y divide-slate-800">
+                    {recentStartups.map((startup) => (
+                      <article key={startup._id} className="flex gap-3 py-4 first:pt-0 last:pb-0">
+                        <LogoTile><Building2 className="h-5 w-5" /></LogoTile>
+                        <div className="min-w-0 flex-1">
+                          <Link to={getStartupOverviewPath(startup._id)} className="font-semibold text-white hover:text-cyan-200 hover:underline">
+                            {startup.name || "Untitled Startup"}
+                          </Link>
+                          {startup.tagline ? <p className="mt-1 text-sm leading-6 text-slate-300">{startup.tagline}</p> : null}
+                          <div className="mt-2 flex flex-wrap gap-2 text-xs text-slate-400">
+                            {startup.category ? <span>{startup.category}</span> : null}
+                            <span>{startup.stage}</span>
+                            <span>{startup.teamSize} member{startup.teamSize === 1 ? "" : "s"}</span>
+                            <span className="capitalize">{startup.reviewStatus.replace(/_/g, " ")}</span>
+                          </div>
+                        </div>
+                      </article>
+                    ))}
+                  </div>
+                ) : <Empty>No startups are linked to this profile yet.</Empty>}
+              </Section>
+            </main>
+
+            <aside className="space-y-3">
+              <section className="rounded-lg border border-slate-800 bg-slate-900/90 p-4 text-slate-100 shadow-sm">
+                <h2 className="font-semibold">Profile strength</h2>
+                <div className="mt-4 space-y-3">
+                  {profileStats.map((stat) => (
+                    <div key={stat.label} className="flex items-center justify-between text-sm">
+                      <span className="text-slate-400">{stat.label}</span>
+                      <span className="font-semibold text-white">{stat.value}</span>
+                    </div>
+                  ))}
+                </div>
+              </section>
+
+              <section className="rounded-lg border border-slate-800 bg-slate-900/90 p-4 text-slate-100 shadow-sm">
+                <h2 className="font-semibold">Public profile & URL</h2>
+                <p className="mt-2 break-all text-sm text-slate-400">{publicProfileUrl || "Public portfolio link is not available yet."}</p>
+                <button type="button" onClick={() => void copyShareLink()} disabled={!publicProfileUrl} className="mt-3 text-sm font-semibold text-cyan-200 disabled:text-slate-600">
+                  Copy public link
+                </button>
+              </section>
+
+              <section className="rounded-lg border border-slate-800 bg-slate-900/90 p-4 text-slate-100 shadow-sm">
+                <h2 className="font-semibold">GitHub signal</h2>
+                {profile?.githubStats ? (
+                  <div className="mt-4 space-y-3 text-sm">
+                    <div className="flex justify-between"><span className="text-slate-400">Repositories</span><span className="font-semibold text-white">{profile.githubStats.totalRepos}</span></div>
+                    <div className="flex justify-between"><span className="text-slate-400">Stars</span><span className="font-semibold text-white">{profile.githubStats.totalStars}</span></div>
+                    <div className="flex justify-between"><span className="text-slate-400">Forks</span><span className="font-semibold text-white">{profile.githubStats.totalForks}</span></div>
+                    <div className="flex justify-between"><span className="text-slate-400">Contributions/yr</span><span className="font-semibold text-white">{profile.githubStats.contributionsLastYear}</span></div>
+                    {profile.githubStats.topLanguages.length > 0 ? <p className="pt-2 text-xs text-slate-500">{profile.githubStats.topLanguages.slice(0, 5).map((lang) => `${lang.language} ${lang.percentage}%`).join(" . ")}</p> : null}
+                  </div>
+                ) : <div className="mt-3 text-sm text-slate-400">No GitHub signal is available yet.</div>}
+              </section>
+
+              {publicRepos.length > 0 ? (
+                <section className="rounded-lg border border-slate-800 bg-slate-900/90 p-4 text-slate-100 shadow-sm">
+                  <h2 className="font-semibold">Repositories</h2>
+                  <div className="mt-3 space-y-3">
+                    {publicRepos.map((repo) => (
+                      <a key={repo.repoId} href={repo.url} target="_blank" rel="noreferrer" className="block rounded-lg p-2 transition hover:bg-slate-800">
+                        <div className="text-sm font-semibold text-cyan-200">{repo.fullName}</div>
+                        <div className="mt-1 line-clamp-2 text-xs text-slate-400">{repo.description || "No description added."}</div>
+                        <div className="mt-2 text-xs text-slate-500">{[repo.primaryLanguage, `${repo.stars} stars`].filter(Boolean).join(" . ")}</div>
+                      </a>
+                    ))}
+                  </div>
+                </section>
+              ) : null}
+
+              {canManagePortfolio && recentWorkspaces.length > 0 ? (
+                <section className="rounded-lg border border-slate-800 bg-slate-900/90 p-4 text-slate-100 shadow-sm">
+                  <h2 className="font-semibold">Innovation workspaces</h2>
+                  <div className="mt-3 space-y-3">
+                    {recentWorkspaces.map((ws) => (
+                      <div key={ws._id}>
+                        <div className="text-sm font-semibold">{ws.title}</div>
+                        <div className="mt-1 text-xs text-slate-400">{ws.category} . {ws.stage}</div>
+                        <div className="mt-2 h-1.5 overflow-hidden rounded-full bg-slate-800"><div className="h-full rounded-full bg-cyan-400" style={{ width: `${ws.progressPercent}%` }} /></div>
+                      </div>
+                    ))}
+                  </div>
+                </section>
+              ) : null}
+            </aside>
+          </div>
+        </div>
+
+        {showLaunchModal && canManagePortfolio ? (
+          <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-6">
+            <div className="w-full max-w-lg rounded-lg border border-slate-800 bg-slate-900 p-6 text-slate-100 shadow-2xl">
+              <h2 className="text-2xl font-semibold text-white">Launch Portfolio to Recruiters</h2>
+              <p className="mt-3 text-sm leading-6 text-slate-400">Confirm to make your portfolio visible to recruiters who match your innovation score and activity history.</p>
               <div className="mt-6 flex justify-end gap-3">
-                <button
-                  type="button"
-                  onClick={() => setShowLaunchModal(false)}
-                  className="rounded-lg bg-slate-800 px-5 py-3 font-semibold text-white hover:bg-slate-700"
-                >
-                  Cancel
-                </button>
-                <button
-                  type="button"
-                  onClick={() => void launchToRecruiters()}
-                  className="rounded-lg bg-gradient-to-r from-blue-600 to-purple-600 px-5 py-3 font-semibold text-white"
-                >
-                  Confirm Launch
-                </button>
+                <ProfileButton onClick={() => setShowLaunchModal(false)}>Cancel</ProfileButton>
+                <ProfileButton primary onClick={() => void launchToRecruiters()}>Confirm Launch</ProfileButton>
               </div>
             </div>
           </div>

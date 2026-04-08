@@ -78,17 +78,6 @@ const workflowStatusLabel: Record<WorkflowStepStatus, string> = {
   optional: "Optional",
 };
 
-const hasIprIntakeDraft = (registrationProfile: StartupRegistrationProfile) =>
-  STARTUP_IPR_QUESTION_SECTIONS.some((section) =>
-    section.questions.some((question) => {
-      if (question.type === "select") {
-        return false;
-      }
-
-      return String(registrationProfile[question.key] ?? "").trim().length > 0;
-    }),
-  );
-
 export function StartupLaunch() {
   const maxPitchDeckSizeBytes = 10 * 1024 * 1024;
   const maxIprUploadSizeBytes = STARTUP_IPR_UPLOAD_MAX_BYTES;
@@ -158,7 +147,6 @@ export function StartupLaunch() {
         ...(startup.registrationProfile ?? {}),
       },
     });
-    setIsIprIntakeOpen(!hasIprIntakeDraft(startup.registrationProfile ?? defaultPayload.registrationProfile));
   }, [startup]);
 
   const persistStartup = useMutation({
@@ -176,7 +164,6 @@ export function StartupLaunch() {
     },
     onSuccess: async (saved) => {
       queryClient.setQueryData(["startup", saved._id], saved);
-      setIsIprIntakeOpen(!hasIprIntakeDraft(saved.registrationProfile));
       setToast("Startup draft saved. Submit it for admin review when ready.");
       await queryClient.invalidateQueries({ queryKey: ["startup"] });
       if (isNew && saved._id) {

@@ -846,6 +846,10 @@ const userSchema = new Schema<IUser>(
       type: String,
       default: undefined,
     },
+    avatarWallpaper: {
+      type: String,
+      default: undefined,
+    },
     bio: {
       type: String,
       default: '',
@@ -870,6 +874,34 @@ const userSchema = new Schema<IUser>(
       default: null,
     },
     linkedinUrl: {
+      type: String,
+      default: null,
+    },
+    twitterUrl: {
+      type: String,
+      default: null,
+    },
+    youtubeUrl: {
+      type: String,
+      default: null,
+    },
+    behanceUrl: {
+      type: String,
+      default: null,
+    },
+    dribbbleUrl: {
+      type: String,
+      default: null,
+    },
+    instagramUrl: {
+      type: String,
+      default: null,
+    },
+    researchGateUrl: {
+      type: String,
+      default: null,
+    },
+    mediumUrl: {
       type: String,
       default: null,
     },

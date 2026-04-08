@@ -3,7 +3,6 @@ import { Types } from 'mongoose';
 import request from 'supertest';
 import app from '../../src/app';
 import { env } from '../../src/config/env';
-import { Patent } from '../../src/modules/patent/patent.model';
 import { Startup } from '../../src/modules/startup/startup.model';
 import { User } from '../../src/modules/user/user.model';
 import { Workspace } from '../../src/modules/workspace/workspace.model';
@@ -60,14 +59,14 @@ const createRoleUser = async (role: UserRole, displayName: string) =>
 const completeRegistrationProfile = {
   problemStatement: 'This innovation solves a persistent logistics visibility problem for city teams.',
   solutionDifferentiation: 'The solution differs by combining workflow state, team context, and live launch signals.',
-  coreInnovation: 'A governed launch workflow that ties workspace progress to investor readiness.',
-  priorArtStatus: 'The team reviewed adjacent workflow products and found no identical launch gate.',
-  workingMechanism: 'The workflow validates project completion, patent approval, pitch readiness, and marketplace launch.',
-  keyComponents: 'Workspace progress, patent approval, startup profile, pitch deck, and investor marketplace.',
+  coreInnovation: 'A governed launch workflow that keeps startup readiness independent from learning modules.',
+  priorArtStatus: 'The team reviewed adjacent workflow products and found no identical launch model.',
+  workingMechanism: 'The workflow validates startup profile, pitch readiness, admin review, and marketplace launch.',
+  keyComponents: 'Startup profile, founder context, pitch deck, admin review, and investor marketplace.',
   developmentStage: 'idea',
   documentationReadiness: 'Required launch documentation is available for admin review.',
   inventorOwnership: 'team',
-  developmentContext: 'The innovation was developed in a ProMove student project workspace.',
+  developmentContext: 'The innovation was developed in a student-led startup preparation flow.',
   targetMarkets: 'Student startups, campus incubators, and early-stage investor discovery workflows.',
   commercializationStrategy: 'build_startup',
   publicDisclosureStatus: 'No harmful public disclosure has been made before review.',
@@ -80,12 +79,12 @@ type WorkspaceWithId = { _id: Types.ObjectId };
 
 const createApprovedLaunchStartup = async (
   founder: CreatedStudent,
-  workspace: WorkspaceWithId,
+  workspace?: WorkspaceWithId,
   overrides: Partial<Record<string, unknown>> = {},
 ) =>
   Startup.create({
     founderIds: [founder._id],
-    projectId: workspace._id,
+    ...(workspace ? { projectId: workspace._id } : {}),
     name: 'Workflow Launch Startup',
     tagline: 'A governed launch profile for investor pitch listing',
     category: 'AI',
@@ -113,24 +112,6 @@ const createApprovedLaunchStartup = async (
     reviewStatus: 'approved',
     isActive: true,
     ...overrides,
-  });
-
-const createApprovedPatent = async (
-  founder: CreatedStudent,
-  workspace: WorkspaceWithId,
-) =>
-  Patent.create({
-    studentId: founder._id,
-    workspaceId: workspace._id,
-    projectTitle: 'Workflow Launch Patent',
-    questionnaire: completeRegistrationProfile,
-    supportingDocuments: [],
-    status: 'approved',
-    submittedAt: new Date(),
-    adminReviewedAt: new Date(),
-    adminReviewedBy: founder._id,
-    scoreAwarded: true,
-    showcasedInMarketplace: false,
   });
 
 describe('startup route validation', () => {
@@ -530,69 +511,9 @@ describe('startup route validation', () => {
     );
   });
 
-  it('blocks investor launch until the linked workspace has an approved patent', async () => {
-    const founder = await createStudent('Patent Gate Founder');
-    const workspace = await Workspace.create({
-      ownerId: founder._id,
-      teamMemberIds: [founder._id],
-      title: 'Patent Gate Workspace',
-      category: 'AI',
-      stage: 'Launch',
-      progressPercent: 100,
-      milestones: [
-        { name: 'Research & Planning', isCompleted: true, completionPercent: 100 },
-        { name: 'Design & Prototyping', isCompleted: true, completionPercent: 100 },
-        { name: 'Development', isCompleted: true, completionPercent: 100 },
-        { name: 'Testing & Validation', isCompleted: true, completionPercent: 100 },
-        { name: 'Final Delivery', isCompleted: true, completionPercent: 100 },
-      ],
-    });
-    const startup = await createApprovedLaunchStartup(founder, workspace);
-
-    await Patent.create({
-      studentId: founder._id,
-      workspaceId: workspace._id,
-      projectTitle: 'Pending Patent',
-      questionnaire: completeRegistrationProfile,
-      supportingDocuments: [],
-      status: 'submitted',
-      submittedAt: new Date(),
-      scoreAwarded: false,
-      showcasedInMarketplace: false,
-    });
-
-    const response = await request(app)
-      .post(`/api/startup/${startup._id}/launch`)
-      .set(authHeader(founder))
-      .send({ launchTo: 'investors' });
-
-    expect(response.status).toBe(400);
-    expect(response.body.error).toEqual(
-      expect.objectContaining({
-        code: 'PATENT_APPROVAL_REQUIRED',
-      }),
-    );
-  });
-
-  it('allows investor launch after project completion and patent approval', async () => {
+  it('allows investor launch for an approved startup without workspace or patent coupling', async () => {
     const founder = await createStudent('Investor Launch Founder');
-    const workspace = await Workspace.create({
-      ownerId: founder._id,
-      teamMemberIds: [founder._id],
-      title: 'Approved Launch Workspace',
-      category: 'AI',
-      stage: 'Launch',
-      progressPercent: 100,
-      milestones: [
-        { name: 'Research & Planning', isCompleted: true, completionPercent: 100 },
-        { name: 'Design & Prototyping', isCompleted: true, completionPercent: 100 },
-        { name: 'Development', isCompleted: true, completionPercent: 100 },
-        { name: 'Testing & Validation', isCompleted: true, completionPercent: 100 },
-        { name: 'Final Delivery', isCompleted: true, completionPercent: 100 },
-      ],
-    });
-    const startup = await createApprovedLaunchStartup(founder, workspace);
-    await createApprovedPatent(founder, workspace);
+    const startup = await createApprovedLaunchStartup(founder);
 
     const response = await request(app)
       .post(`/api/startup/${startup._id}/launch`)
@@ -627,7 +548,6 @@ describe('startup route validation', () => {
       ],
     });
     const startup = await createApprovedLaunchStartup(founder, workspace);
-    await createApprovedPatent(founder, workspace);
 
     const investorLaunchResponse = await request(app)
       .post(`/api/startup/${startup._id}/launch`)
@@ -733,68 +653,4 @@ describe('startup route validation', () => {
     expect(startupNames).not.toContain('Recruiter Draft Startup');
   });
 
-  it('blocks investor launch when the latest patent submission was rejected until a corrected patent is approved', async () => {
-    const founder = await createStudent('Rejected Patent Founder');
-    const workspace = await Workspace.create({
-      ownerId: founder._id,
-      teamMemberIds: [founder._id],
-      title: 'Rejected Patent Workspace',
-      category: 'AI',
-      stage: 'Launch',
-      progressPercent: 100,
-      milestones: [
-        { name: 'Research & Planning', isCompleted: true, completionPercent: 100 },
-        { name: 'Design & Prototyping', isCompleted: true, completionPercent: 100 },
-        { name: 'Development', isCompleted: true, completionPercent: 100 },
-        { name: 'Testing & Validation', isCompleted: true, completionPercent: 100 },
-        { name: 'Final Delivery', isCompleted: true, completionPercent: 100 },
-      ],
-    });
-    const startup = await createApprovedLaunchStartup(founder, workspace);
-
-    await Patent.create({
-      studentId: founder._id,
-      workspaceId: workspace._id,
-      projectTitle: 'Rejected Patent',
-      questionnaire: completeRegistrationProfile,
-      supportingDocuments: [],
-      status: 'rejected',
-      submittedAt: new Date(),
-      adminReviewedAt: new Date(),
-      adminReviewedBy: founder._id,
-      adminNotes: 'Needs correction',
-      scoreAwarded: false,
-      showcasedInMarketplace: false,
-    });
-
-    const blockedResponse = await request(app)
-      .post(`/api/startup/${startup._id}/launch`)
-      .set(authHeader(founder))
-      .send({ launchTo: 'investors' });
-
-    expect(blockedResponse.status).toBe(400);
-    expect(blockedResponse.body.error.code).toBe('PATENT_REJECTED');
-
-    await Patent.create({
-      studentId: founder._id,
-      workspaceId: workspace._id,
-      projectTitle: 'Corrected Patent',
-      questionnaire: completeRegistrationProfile,
-      supportingDocuments: [],
-      status: 'approved',
-      submittedAt: new Date(Date.now() + 1000),
-      adminReviewedAt: new Date(),
-      adminReviewedBy: founder._id,
-      scoreAwarded: true,
-      showcasedInMarketplace: false,
-    });
-
-    const approvedResponse = await request(app)
-      .post(`/api/startup/${startup._id}/launch`)
-      .set(authHeader(founder))
-      .send({ launchTo: 'investors' });
-
-    expect(approvedResponse.status).toBe(200);
-    expect(approvedResponse.body.data.launchedToInvestors).toBe(true);
-  });
 });

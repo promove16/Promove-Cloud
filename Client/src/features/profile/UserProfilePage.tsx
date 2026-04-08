@@ -1,65 +1,37 @@
-import { FormEvent, useEffect, useMemo, useState } from 'react';
+import { FormEvent, type ReactNode, useEffect, useMemo, useState } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
-import { useSearchParams } from 'react-router-dom';
+import { Link, useSearchParams } from 'react-router-dom';
 import {
-  BadgeCheck,
-  CalendarDays,
+  Award,
+  Briefcase,
   Copy,
   ExternalLink,
-  GitCommitHorizontal,
   Github,
   Globe,
+  GraduationCap,
   Instagram,
   Linkedin,
   Link2,
-  Mail,
-  RefreshCw,
-  ShieldCheck,
-  Sparkles,
+  Rocket,
+  Save,
+  Trash2,
   Twitter,
   Youtube,
 } from 'lucide-react';
-import { authApi } from '../../api/auth.api';
-import { GithubRepositoryChoice, SocialEnrichSummary, UserProfile, userApi } from '../../api/user.api';
-import { Button } from '../../components/ui/Button';
-import { Card } from '../../components/ui/Card';
+import {
+  GithubRepositoryChoice,
+  PortfolioProject,
+  ProfileCertification,
+  ProfileEducation,
+  ProfileExperience,
+  ProfileSkill,
+  SocialEnrichSummary,
+  UserProfile,
+  userApi,
+} from '../../api/user.api';
+import { startupApi } from '../../api/startup.api';
 import { useAuthStore } from '../../store/authStore';
 import { UserRole } from '../../types/roles.types';
-
-const GITHUB_PROFILE_ROLES = new Set<UserRole>([UserRole.STUDENT, UserRole.MENTOR]);
-
-const roleCopy: Record<UserRole, { title: string; description: string }> = {
-  [UserRole.STUDENT]: {
-    title: 'Build your maker identity',
-    description: 'Shift your profile from claims to proof with GitHub-backed repositories and activity.',
-  },
-  [UserRole.SCHOOL]: {
-    title: 'Represent your institution clearly',
-    description: 'Keep your institution profile clear and current across platform workflows.',
-  },
-  [UserRole.COLLEGE]: {
-    title: 'Showcase your college innovation desk',
-    description: 'Make your college presence credible, current, and easy to trust.',
-  },
-  [UserRole.MENTOR]: {
-    title: 'Make your guidance discoverable',
-    description: 'Connect real work proof so students can trust your technical credibility.',
-  },
-  [UserRole.INVESTOR]: {
-    title: 'Present your investor profile',
-    description: 'Keep your public context sharp for founders and institutions.',
-  },
-  [UserRole.RECRUITER]: {
-    title: 'Clarify your hiring identity',
-    description: 'A clear profile helps students and institutions understand what you represent.',
-  },
-  [UserRole.ADMIN]: {
-    title: 'Keep your admin identity current',
-    description: 'This profile appears across platform-level workflows where trust matters.',
-  },
-};
-
-const supportsGithubProfile = (role: UserRole) => GITHUB_PROFILE_ROLES.has(role);
 
 const readError = (error: unknown, fallback: string) =>
   (error as { response?: { data?: { error?: { message?: string } } } })?.response?.data?.error?.message ?? fallback;
@@ -101,6 +73,7 @@ const buildSocialToast = (summary: SocialEnrichSummary) => {
 type ProfileForm = {
   displayName: string;
   avatar: string;
+  avatarWallpaper: string;
   bio: string;
   domain: string;
   linkedinUrl: string;
@@ -113,43 +86,220 @@ type ProfileForm = {
   researchGateUrl: string;
   mediumUrl: string;
   discoverableToRecruiters: boolean;
+  skills: ProfileSkill[];
+  experience: ProfileExperience[];
+  education: ProfileEducation[];
+  certifications: ProfileCertification[];
+  portfolioProjects: PortfolioProject[];
 };
 
-function RepoRow({
-  repo,
-  checked,
-  onToggle,
+const newId = () => `manual-${Date.now()}-${Math.random().toString(36).slice(2)}`;
+
+const toDateInput = (value: string | null | undefined) => {
+  if (!value) return '';
+  const date = new Date(value);
+  return Number.isNaN(date.getTime()) ? '' : date.toISOString().slice(0, 10);
+};
+
+const fromListInput = (value: string) =>
+  value
+    .split(',')
+    .map((item) => item.trim())
+    .filter(Boolean);
+
+const parseYear = (value: string) => {
+  const year = Number(value);
+  return Number.isFinite(year) && year > 0 ? year : null;
+};
+
+const emptySkill = (): ProfileSkill => ({
+  name: '',
+  category: 'other',
+  source: 'manual',
+  level: 'beginner',
+  endorsements: 0,
+  addedAt: new Date().toISOString(),
+});
+
+const emptyExperience = (): ProfileExperience => ({
+  _id: newId(),
+  title: '',
+  company: '',
+  type: 'internship',
+  location: '',
+  startDate: new Date().toISOString(),
+  endDate: null,
+  isCurrent: false,
+  description: '',
+  skills: [],
+  source: 'manual',
+  linkedinId: null,
+});
+
+const emptyEducation = (): ProfileEducation => ({
+  _id: newId(),
+  institution: '',
+  degree: '',
+  fieldOfStudy: '',
+  startYear: undefined,
+  endYear: null,
+  isCurrent: false,
+  grade: '',
+  activities: '',
+  description: '',
+  source: 'manual',
+});
+
+const emptyCertification = (): ProfileCertification => ({
+  _id: newId(),
+  name: '',
+  issuingOrganization: '',
+  issueDate: null,
+  expiryDate: null,
+  credentialId: '',
+  credentialUrl: '',
+  source: 'manual',
+});
+
+const emptyProject = (): PortfolioProject => ({
+  _id: newId(),
+  title: '',
+  description: '',
+  techStack: [],
+  repoUrl: null,
+  liveUrl: null,
+  coverImageUrl: null,
+  startDate: null,
+  endDate: null,
+  isCurrent: false,
+  source: 'manual',
+  githubRepoId: null,
+  stars: 0,
+  forks: 0,
+  languages: [],
+});
+
+function Field({
+  label,
+  value,
+  onChange,
+  placeholder,
+  type = 'text',
 }: {
-  repo: GithubRepositoryChoice;
-  checked: boolean;
-  onToggle: () => void;
+  label: string;
+  value: string;
+  onChange: (value: string) => void;
+  placeholder?: string;
+  type?: string;
 }) {
   return (
-    <label className="flex cursor-pointer gap-3 rounded-2xl border border-slate-800 bg-slate-950/80 p-3">
+    <label className="block space-y-1.5">
+      <span className="text-xs font-semibold uppercase tracking-[0.16em] text-slate-500">{label}</span>
+      <input
+        type={type}
+        value={value}
+        onChange={(event) => onChange(event.target.value)}
+        placeholder={placeholder}
+        className="w-full rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm text-slate-950 outline-none transition focus:border-[#0a66c2] focus:ring-2 focus:ring-[#0a66c2]/15 dark:border-slate-700 dark:bg-slate-950 dark:text-white"
+      />
+    </label>
+  );
+}
+
+function TextArea({
+  label,
+  value,
+  onChange,
+  placeholder,
+  rows = 4,
+}: {
+  label: string;
+  value: string;
+  onChange: (value: string) => void;
+  placeholder?: string;
+  rows?: number;
+}) {
+  return (
+    <label className="block space-y-1.5">
+      <span className="text-xs font-semibold uppercase tracking-[0.16em] text-slate-500">{label}</span>
+      <textarea
+        value={value}
+        onChange={(event) => onChange(event.target.value)}
+        placeholder={placeholder}
+        rows={rows}
+        className="w-full rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm text-slate-950 outline-none transition focus:border-[#0a66c2] focus:ring-2 focus:ring-[#0a66c2]/15 dark:border-slate-700 dark:bg-slate-950 dark:text-white"
+      />
+    </label>
+  );
+}
+
+function EditorSection({
+  title,
+  icon,
+  action,
+  children,
+}: {
+  title: string;
+  icon: ReactNode;
+  action?: ReactNode;
+  children: ReactNode;
+}) {
+  return (
+    <section className="rounded-lg border border-slate-200 bg-white p-5 shadow-sm dark:border-slate-800 dark:bg-slate-900">
+      <div className="mb-5 flex items-center justify-between gap-3">
+        <div className="flex items-center gap-3">
+          <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-[#eef3f8] text-[#0a66c2]">{icon}</div>
+          <h2 className="text-lg font-semibold text-slate-950 dark:text-white">{title}</h2>
+        </div>
+        {action}
+      </div>
+      {children}
+    </section>
+  );
+}
+
+function SmallButton({
+  children,
+  onClick,
+  type = 'button',
+  disabled,
+}: {
+  children: ReactNode;
+  onClick?: () => void;
+  type?: 'button' | 'submit';
+  disabled?: boolean;
+}) {
+  return (
+    <button
+      type={type}
+      onClick={onClick}
+      disabled={disabled}
+      className="inline-flex items-center justify-center gap-2 rounded-full bg-[#0a66c2] px-4 py-2 text-sm font-semibold text-white transition hover:bg-[#004182] disabled:cursor-not-allowed disabled:opacity-60"
+    >
+      {children}
+    </button>
+  );
+}
+
+function RepoRow({ repo, checked, onToggle }: { repo: GithubRepositoryChoice; checked: boolean; onToggle: () => void }) {
+  return (
+    <label className="flex cursor-pointer gap-3 rounded-lg border border-slate-200 bg-slate-50 p-3 dark:border-slate-800 dark:bg-slate-950">
       <input
         type="checkbox"
         checked={checked}
         onChange={onToggle}
-        className="mt-1 h-4 w-4 rounded border-slate-600 bg-slate-900 text-cyan-500 focus:ring-cyan-500"
+        className="mt-1 h-4 w-4 rounded border-slate-400 text-[#0a66c2] focus:ring-[#0a66c2]"
       />
       <div className="min-w-0 flex-1">
         <div className="flex flex-wrap items-center gap-2">
-          <span className="truncate font-semibold text-white">{repo.fullName}</span>
-          <span className={`rounded-full px-2 py-0.5 text-[11px] font-semibold ${repo.isPrivate ? 'bg-amber-500/10 text-amber-300' : 'bg-emerald-500/10 text-emerald-300'}`}>
+          <span className="truncate font-semibold text-slate-950 dark:text-white">{repo.fullName}</span>
+          <span className="rounded-full bg-slate-200 px-2 py-0.5 text-[11px] text-slate-700 dark:bg-slate-800 dark:text-slate-300">
             {repo.isPrivate ? 'Private' : 'Public'}
           </span>
-          {repo.imported ? (
-            <span className="rounded-full bg-cyan-500/10 px-2 py-0.5 text-[11px] font-semibold text-cyan-300">
-              Imported
-            </span>
-          ) : null}
+          {repo.imported ? <span className="rounded-full bg-[#e3f9e5] px-2 py-0.5 text-[11px] font-semibold text-[#057642]">Imported</span> : null}
         </div>
-        <div className="mt-1 text-sm text-slate-400">{repo.description || 'No description added.'}</div>
-        <div className="mt-2 flex flex-wrap gap-3 text-xs text-slate-500">
-          {repo.primaryLanguage ? <span>{repo.primaryLanguage}</span> : null}
-          <span>Stars {repo.stars}</span>
-          <span>Forks {repo.forks}</span>
-        </div>
+        <div className="mt-1 text-sm text-slate-600 dark:text-slate-400">{repo.description || 'No description added.'}</div>
+        <div className="mt-2 text-xs text-slate-500">{[repo.primaryLanguage, `${repo.stars} stars`, `${repo.forks} forks`].filter(Boolean).join(' . ')}</div>
       </div>
     </label>
   );
@@ -163,10 +313,10 @@ export function UserProfilePage() {
   const [toast, setToast] = useState('');
   const [confirmLinkedinFetch, setConfirmLinkedinFetch] = useState(false);
   const [selectedRepoIds, setSelectedRepoIds] = useState<string[]>([]);
-  const [institutionToken, setInstitutionToken] = useState('');
   const [form, setForm] = useState<ProfileForm>({
     displayName: '',
     avatar: '',
+    avatarWallpaper: '',
     bio: '',
     domain: '',
     linkedinUrl: '',
@@ -179,16 +329,27 @@ export function UserProfilePage() {
     researchGateUrl: '',
     mediumUrl: '',
     discoverableToRecruiters: false,
+    skills: [],
+    experience: [],
+    education: [],
+    certifications: [],
+    portfolioProjects: [],
   });
 
   const profileQuery = useQuery({ queryKey: ['profile', 'me'], queryFn: userApi.getMe });
   const profile = (profileQuery.data ?? currentUser ?? null) as UserProfile | null;
+  const startupsQuery = useQuery({
+    queryKey: ['startup', 'mine'],
+    queryFn: startupApi.mine,
+    enabled: currentUser?.role === UserRole.STUDENT,
+  });
 
   useEffect(() => {
     if (!profileQuery.data) return;
     setForm({
       displayName: profileQuery.data.displayName ?? '',
       avatar: profileQuery.data.avatar ?? '',
+      avatarWallpaper: profileQuery.data.avatarWallpaper ?? '',
       bio: profileQuery.data.bio ?? '',
       domain: profileQuery.data.domain ?? '',
       linkedinUrl: profileQuery.data.linkedinUrl ?? '',
@@ -201,6 +362,11 @@ export function UserProfilePage() {
       researchGateUrl: profileQuery.data.researchGateUrl ?? '',
       mediumUrl: profileQuery.data.mediumUrl ?? '',
       discoverableToRecruiters: profileQuery.data.discoverableToRecruiters ?? false,
+      skills: profileQuery.data.skills ?? [],
+      experience: profileQuery.data.experience ?? [],
+      education: profileQuery.data.education ?? [],
+      certifications: profileQuery.data.certifications ?? [],
+      portfolioProjects: profileQuery.data.portfolioProjects ?? [],
     });
   }, [profileQuery.data]);
 
@@ -210,14 +376,9 @@ export function UserProfilePage() {
     return () => window.clearTimeout(timeout);
   }, [toast]);
 
-  const githubRoleSupported = currentUser ? supportsGithubProfile(currentUser.role) : false;
   const githubOauthAvailable = profile?.githubOAuthAvailable ?? currentUser?.githubOAuthAvailable ?? false;
-  const githubConnected = githubRoleSupported && Boolean(profile?.connectedAccounts?.github?.userId);
-  const hasGithubProof =
-    githubConnected ||
-    (profile?.githubProof?.importedRepos?.length ?? 0) > 0 ||
-    Boolean(profile?.githubProof?.lastSyncedAt);
-  const githubEnabled = githubRoleSupported && (githubOauthAvailable || hasGithubProof);
+  const githubConnected = Boolean(profile?.connectedAccounts?.github?.userId);
+  const githubEnabled = Boolean((currentUser?.role === UserRole.STUDENT || currentUser?.role === UserRole.MENTOR) && (githubOauthAvailable || githubConnected));
 
   const githubRepositoriesQuery = useQuery({
     queryKey: ['profile', 'github-repositories'],
@@ -235,7 +396,7 @@ export function UserProfilePage() {
     if (!githubStatus) return;
 
     if (githubStatus === 'connected') {
-      setToast('GitHub connected. Your profile has been enriched with GitHub activity, tech, and skills.');
+      setToast('GitHub connected. Your portfolio data has been refreshed.');
       void queryClient.invalidateQueries({ queryKey: ['profile', 'me'] });
       void queryClient.invalidateQueries({ queryKey: ['profile', 'github-repositories'] });
     } else if (githubStatus === 'error') {
@@ -253,9 +414,9 @@ export function UserProfilePage() {
     onSuccess: (user) => {
       queryClient.setQueryData(['profile', 'me'], user);
       setUser(user);
-      setToast('Profile updated.');
+      setToast('Portfolio profile saved.');
     },
-    onError: (error) => setToast(readError(error, 'Unable to update your profile right now.')),
+    onError: (error) => setToast(readError(error, 'Unable to update your portfolio right now.')),
   });
 
   const socialMutation = useMutation({
@@ -270,20 +431,9 @@ export function UserProfilePage() {
   });
 
   const startGithubMutation = useMutation({
-    mutationFn: userApi.startGithubOauth,
+    mutationFn: () => userApi.startGithubOauth('/dashboard/profile'),
     onSuccess: ({ authorizationUrl }) => window.location.assign(authorizationUrl),
     onError: (error) => setToast(readError(error, 'Unable to start GitHub sign-in.')),
-  });
-
-  const syncGithubMutation = useMutation({
-    mutationFn: userApi.syncGithubProof,
-    onSuccess: ({ user, repositoryCount }) => {
-      queryClient.setQueryData(['profile', 'me'], user);
-      setUser(user);
-      void queryClient.invalidateQueries({ queryKey: ['profile', 'github-repositories'] });
-      setToast(`GitHub proof refreshed from ${repositoryCount} repositories.`);
-    },
-    onError: (error) => setToast(readError(error, 'Unable to refresh GitHub proof.')),
   });
 
   const importGithubMutation = useMutation({
@@ -292,521 +442,401 @@ export function UserProfilePage() {
       queryClient.setQueryData(['profile', 'me'], user);
       setUser(user);
       void queryClient.invalidateQueries({ queryKey: ['profile', 'github-repositories'] });
-      setToast(`Imported ${importedCount} repositories into your proof layer.`);
+      setToast(`Imported ${importedCount} repositories into your portfolio.`);
     },
     onError: (error) => setToast(readError(error, 'Unable to import repositories.')),
   });
-  const submitInstitutionTokenMutation = useMutation({
-    mutationFn: authApi.submitInstitutionToken,
-    onSuccess: ({ message, user }) => {
-      queryClient.setQueryData(['profile', 'me'], user);
-      setUser(user);
-      setInstitutionToken('');
-      setToast(message);
-    },
-    onError: (error) => setToast(readError(error, 'Unable to submit the institution token.')),
-  });
 
-  const initials = useMemo(
-    () =>
-      (profile?.displayName ?? 'User')
-        .split(' ')
-        .map((part) => part[0])
-        .join('')
-        .slice(0, 2)
-        .toUpperCase(),
-    [profile?.displayName],
+  const isBusy = updateMutation.isPending || socialMutation.isPending || startGithubMutation.isPending || importGithubMutation.isPending;
+  const repoChoices = githubRepositoriesQuery.data ?? [];
+  const publicProfileUrl = profile?.profileSlug && typeof window !== 'undefined' ? `${window.location.origin}/students/${profile.profileSlug}` : '';
+  const completionStats = useMemo(
+    () => [
+      { label: 'Skills', value: form.skills.filter((skill) => skill.name.trim()).length },
+      { label: 'Experience', value: form.experience.filter((item) => item.title.trim()).length },
+      { label: 'Education', value: form.education.filter((item) => item.institution.trim()).length },
+      { label: 'Projects', value: form.portfolioProjects.filter((item) => item.title.trim()).length },
+      { label: 'Startups', value: startupsQuery.data?.length ?? 0 },
+    ],
+    [form.education, form.experience, form.portfolioProjects, form.skills, startupsQuery.data?.length],
   );
 
   if (!currentUser) return null;
-
-  const roleMeta = roleCopy[currentUser.role];
-  const importedRepos = profile?.githubProof?.importedRepos ?? [];
-  const repoChoices = githubRepositoriesQuery.data ?? [];
-  const githubTopLanguages = profile?.githubStats?.topLanguages ?? [];
-  const githubSkills = (profile?.skills ?? []).filter((skill) => skill.source === 'github');
-  const githubProjects = (profile?.portfolioProjects ?? []).filter((project) => project.source === 'github');
-  const allSocialLinks = [
-    form.linkedinUrl, form.websiteUrl, form.twitterUrl, form.youtubeUrl,
-    form.behanceUrl, form.dribbbleUrl, form.instagramUrl, form.researchGateUrl, form.mediumUrl,
-    profile?.githubUrl,
-  ];
-  const hasAnySocialLink = allSocialLinks.some((url) => Boolean((url ?? '').trim()));
-  const completionItems = [
-    Boolean(form.displayName.trim()),
-    Boolean(form.bio.trim()),
-    Boolean(form.domain.trim()),
-    Boolean(form.avatar.trim() || profile?.avatar),
-    hasAnySocialLink,
-  ];
-  const completionPct = Math.round((completionItems.filter(Boolean).length / completionItems.length) * 100);
-  const publicProfileUrl =
-    profile?.profileSlug && typeof window !== 'undefined'
-      ? `${window.location.origin}/students/${profile.profileSlug}`
-      : '';
-  const isBusy =
-    updateMutation.isPending ||
-    socialMutation.isPending ||
-    startGithubMutation.isPending ||
-    syncGithubMutation.isPending ||
-    importGithubMutation.isPending ||
-    submitInstitutionTokenMutation.isPending;
 
   const saveProfile = async (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault();
     await updateMutation.mutateAsync({
       displayName: form.displayName.trim(),
-      avatar: form.avatar.trim() || '',
-      bio: form.bio.trim() || '',
-      domain: form.domain.trim() || '',
-      linkedinUrl: form.linkedinUrl.trim() || '',
-      websiteUrl: form.websiteUrl.trim() || '',
-      twitterUrl: form.twitterUrl.trim() || '',
-      youtubeUrl: form.youtubeUrl.trim() || '',
-      behanceUrl: form.behanceUrl.trim() || '',
-      dribbbleUrl: form.dribbbleUrl.trim() || '',
-      instagramUrl: form.instagramUrl.trim() || '',
-      researchGateUrl: form.researchGateUrl.trim() || '',
-      mediumUrl: form.mediumUrl.trim() || '',
+      avatar: form.avatar.trim(),
+      avatarWallpaper: form.avatarWallpaper.trim(),
+      bio: form.bio.trim(),
+      domain: form.domain.trim(),
+      linkedinUrl: form.linkedinUrl.trim(),
+      websiteUrl: form.websiteUrl.trim(),
+      twitterUrl: form.twitterUrl.trim(),
+      youtubeUrl: form.youtubeUrl.trim(),
+      behanceUrl: form.behanceUrl.trim(),
+      dribbbleUrl: form.dribbbleUrl.trim(),
+      instagramUrl: form.instagramUrl.trim(),
+      researchGateUrl: form.researchGateUrl.trim(),
+      mediumUrl: form.mediumUrl.trim(),
       discoverableToRecruiters: currentUser.role === UserRole.STUDENT ? form.discoverableToRecruiters : undefined,
+      skills: form.skills.filter((skill) => skill.name.trim()),
+      experience: form.experience.filter((item) => item.title.trim() && item.company.trim()),
+      education: form.education.filter((item) => item.institution.trim()),
+      certifications: form.certifications.filter((item) => item.name.trim() && item.issuingOrganization.trim()),
+      portfolioProjects: form.portfolioProjects.filter((item) => item.title.trim()),
     });
   };
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-5">
       {toast ? (
-        <div className="fixed bottom-6 right-6 z-50 rounded-2xl border border-cyan-500/30 bg-slate-950/95 px-4 py-3 text-sm text-cyan-200 shadow-2xl">
+        <div className="fixed bottom-6 right-6 z-50 rounded-lg border border-[#0a66c2]/30 bg-white px-4 py-3 text-sm font-semibold text-[#0a66c2] shadow-2xl dark:bg-slate-950">
           {toast}
         </div>
       ) : null}
 
-      <Card className="overflow-hidden">
-        <div className="bg-[radial-gradient(circle_at_top_left,_rgba(34,211,238,0.18),_transparent_35%),linear-gradient(135deg,_rgba(15,23,42,0.95),_rgba(2,6,23,0.98))] p-8">
-          <div className="flex flex-col gap-6 lg:flex-row lg:items-start lg:justify-between">
-            <div className="flex items-center gap-5">
-              <div className="flex h-24 w-24 items-center justify-center rounded-3xl bg-gradient-to-br from-cyan-500 via-sky-500 to-emerald-500 text-2xl font-bold text-white">
-                {profile?.avatar ? <img src={profile.avatar} alt={profile.displayName} className="h-24 w-24 rounded-3xl object-cover" /> : initials}
-              </div>
-              <div>
-                <div className="flex flex-wrap items-center gap-2">
-                  <h1 className="text-3xl font-bold text-white">{profile?.displayName ?? 'Your Profile'}</h1>
-                  <span className="rounded-full border border-cyan-500/30 bg-cyan-500/10 px-3 py-1 text-xs font-semibold uppercase tracking-[0.25em] text-cyan-200">
-                    {currentUser.role}
-                  </span>
-                  {profile?.profileComplete ? (
-                    <span className="flex items-center gap-1 rounded-full bg-emerald-500/10 px-3 py-1 text-xs font-semibold text-emerald-300">
-                      <BadgeCheck className="h-3.5 w-3.5" /> Complete
-                    </span>
-                  ) : (
-                    <span className="rounded-full bg-amber-500/10 px-3 py-1 text-xs font-semibold text-amber-300">
-                      {completionPct}% complete
-                    </span>
-                  )}
-                </div>
-                <p className="mt-2 max-w-2xl text-slate-300">{roleMeta.description}</p>
-                <div className="mt-4 flex flex-wrap gap-4 text-sm text-slate-400">
-                  <span className="inline-flex items-center gap-2"><Mail className="h-4 w-4 text-cyan-300" />{profile?.email}</span>
-                  <span className="inline-flex items-center gap-2"><Sparkles className="h-4 w-4 text-cyan-300" />Score: {profile?.innovationScore ?? 0}</span>
-                  <span className="inline-flex items-center gap-2"><CalendarDays className="h-4 w-4 text-cyan-300" />Joined {profile?.createdAt ? new Date(profile.createdAt).toLocaleDateString('en-IN') : 'recently'}</span>
-                  <span className="inline-flex items-center gap-2"><ShieldCheck className="h-4 w-4 text-cyan-300" />{profile?.accessGrantedBy ?? 'self_registered'}</span>
-                  {profile?.githubUrl ? <a href={profile.githubUrl} target="_blank" rel="noreferrer" className="inline-flex items-center gap-2 text-cyan-300 hover:text-cyan-200"><Github className="h-4 w-4" />GitHub<ExternalLink className="h-3 w-3" /></a> : null}
-                  {profile?.linkedinUrl ? <a href={profile.linkedinUrl} target="_blank" rel="noreferrer" className="inline-flex items-center gap-2 text-cyan-300 hover:text-cyan-200"><Linkedin className="h-4 w-4" />LinkedIn<ExternalLink className="h-3 w-3" /></a> : null}
-                </div>
-              </div>
-            </div>
-            <div className="rounded-2xl border border-slate-800 bg-slate-950/70 px-5 py-4 text-center">
-              <div className="text-2xl font-bold text-white">{completionPct}%</div>
-              <div className="text-xs text-slate-500">Profile filled</div>
-            </div>
+      <div className="rounded-lg border border-slate-200 bg-white p-5 shadow-sm dark:border-slate-800 dark:bg-slate-900">
+        <div className="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
+          <div>
+            <div className="text-xs font-semibold uppercase tracking-[0.24em] text-[#0a66c2]">Portfolio editor</div>
+            <h1 className="mt-2 text-3xl font-semibold text-slate-950 dark:text-white">LinkedIn-style profile contents</h1>
+            <p className="mt-2 max-w-3xl text-sm leading-6 text-slate-600 dark:text-slate-400">
+              Fill the same sections that render on the portfolio page. LinkedIn and GitHub can still be used as fast-fill sources.
+            </p>
+          </div>
+          <div className="flex flex-wrap gap-2">
+            <Link to="/portfolio" className="inline-flex items-center justify-center rounded-full border border-[#0a66c2] px-4 py-2 text-sm font-semibold text-[#0a66c2] transition hover:bg-[#eef3f8]">
+              View portfolio
+            </Link>
+            {publicProfileUrl ? (
+              <button
+                type="button"
+                onClick={() => {
+                  void navigator.clipboard.writeText(publicProfileUrl);
+                  setToast('Public link copied.');
+                }}
+                className="inline-flex items-center justify-center gap-2 rounded-full border border-[#0a66c2] px-4 py-2 text-sm font-semibold text-[#0a66c2] transition hover:bg-[#eef3f8]"
+              >
+                <Copy className="h-4 w-4" />
+                Copy link
+              </button>
+            ) : null}
           </div>
         </div>
-      </Card>
-
-      {currentUser.role === UserRole.STUDENT ? (
-        <Card className="p-6">
-          <div className="flex flex-col gap-5 lg:flex-row lg:items-start lg:justify-between">
-            <div>
-              <div className="text-xs uppercase tracking-[0.3em] text-cyan-300">Institution Verification</div>
-              <h2 className="mt-2 text-xl font-semibold text-white">
-                {profile?.verificationStatus === 'verified'
-                  ? 'Verified and share-ready'
-                  : profile?.verificationStatus === 'pending'
-                    ? 'Waiting for institution review'
-                    : profile?.verificationStatus === 'rejected'
-                      ? 'Verification was rejected'
-                      : 'Submit your institution token'}
-              </h2>
-              <p className="mt-2 max-w-2xl text-sm leading-6 text-slate-400">
-                {profile?.verificationStatus === 'verified'
-                  ? 'Your school or college has verified this account. Once your profile is complete, the public link is live.'
-                  : profile?.verificationStatus === 'pending'
-                    ? 'Your institution token is on file. A school or college reviewer must approve the account before the public profile can be shared.'
-                    : profile?.verificationStatus === 'rejected'
-                      ? profile?.verificationRejectedReason ?? 'This account was rejected by the institution reviewer. Contact your institution for support.'
-                      : 'Complete your profile first, then submit the token shared by your school or college to move into the verification queue.'}
-              </p>
-              {profile?.verificationStatus === 'pending' && profile?.verificationRequestedAt ? (
-                <div className="mt-3 text-sm text-slate-500">
-                  Submitted {new Date(profile.verificationRequestedAt).toLocaleString('en-IN')}
-                </div>
-              ) : null}
-              {profile?.verificationStatus === 'verified' && publicProfileUrl ? (
-                <div className="mt-4 flex flex-wrap gap-3">
-                  <a
-                    href={publicProfileUrl}
-                    target="_blank"
-                    rel="noreferrer"
-                    className="inline-flex items-center gap-2 rounded-xl border border-cyan-500/30 bg-cyan-500/10 px-4 py-3 text-sm font-semibold text-cyan-200 transition hover:border-cyan-400 hover:text-cyan-100"
-                  >
-                    Open Public Profile
-                    <ExternalLink className="h-4 w-4" />
-                  </a>
-                  <Button
-                    variant="secondary"
-                    onClick={() =>
-                      navigator.clipboard
-                        .writeText(publicProfileUrl)
-                        .then(() => setToast('Public profile link copied.'))
-                        .catch(() => setToast('Unable to copy the public profile link.'))
-                    }
-                  >
-                    <Copy className="mr-2 h-4 w-4" />
-                    Copy Share Link
-                  </Button>
-                </div>
-              ) : null}
-            </div>
-
-            {profile?.verificationStatus === 'not_required' ? (
-              <form
-                className="w-full max-w-md space-y-3"
-                onSubmit={(event) => {
-                  event.preventDefault();
-                  if (!institutionToken.trim()) {
-                    setToast('Enter the institution token provided by your school or college.');
-                    return;
-                  }
-
-                  submitInstitutionTokenMutation.mutate(institutionToken.trim());
-                }}
-              >
-                <input
-                  type="text"
-                  value={institutionToken}
-                  onChange={(event) => setInstitutionToken(event.target.value)}
-                  className="w-full rounded-2xl border border-slate-800 bg-slate-950 px-4 py-3 text-white outline-none focus:border-cyan-500"
-                  placeholder="COL-AB12CD34"
-                />
-                <Button type="submit" disabled={submitInstitutionTokenMutation.isPending || !profile?.profileComplete}>
-                  {submitInstitutionTokenMutation.isPending ? 'Submitting...' : 'Submit Institution Token'}
-                </Button>
-                {!profile?.profileComplete ? (
-                  <div className="text-xs text-amber-300">
-                    Finish your profile before requesting institution verification.
-                  </div>
-                ) : null}
-              </form>
-            ) : null}
-          </div>
-        </Card>
-      ) : null}
-
-      <div className="grid gap-6 xl:grid-cols-2">
-        <Card className="p-6">
-          <div className="mb-5 flex items-center justify-between">
-            <div>
-              <h2 className="text-xl font-semibold text-white">{roleMeta.title}</h2>
-              <p className="mt-1 text-sm text-slate-400">Update the identity shown across ProMove.</p>
-            </div>
-            <Button variant="ghost" onClick={() => profileQuery.refetch()} disabled={profileQuery.isFetching || isBusy}>
-              <RefreshCw className={`mr-2 h-4 w-4 ${profileQuery.isFetching ? 'animate-spin' : ''}`} />
-              Refresh
-            </Button>
-          </div>
-
-          <form className="space-y-4" onSubmit={saveProfile}>
-            <div className="grid gap-4 sm:grid-cols-2">
-              <input value={form.displayName} onChange={(event) => setForm((current) => ({ ...current, displayName: event.target.value }))} className="rounded-2xl border border-slate-800 bg-slate-950 px-4 py-3 text-white outline-none focus:border-cyan-500" placeholder="Display name" />
-              <input value={form.domain} onChange={(event) => setForm((current) => ({ ...current, domain: event.target.value }))} className="rounded-2xl border border-slate-800 bg-slate-950 px-4 py-3 text-white outline-none focus:border-cyan-500" placeholder="Domain / focus area" />
-            </div>
-            <input value={form.avatar} onChange={(event) => setForm((current) => ({ ...current, avatar: event.target.value }))} className="w-full rounded-2xl border border-slate-800 bg-slate-950 px-4 py-3 text-white outline-none focus:border-cyan-500" placeholder="Avatar URL" />
-            <textarea value={form.bio} onChange={(event) => setForm((current) => ({ ...current, bio: event.target.value }))} className="min-h-32 w-full rounded-2xl border border-slate-800 bg-slate-950 px-4 py-3 text-white outline-none focus:border-cyan-500" placeholder="Bio" />
-            {currentUser.role === UserRole.STUDENT ? (
-              <label className="flex items-start gap-3 rounded-2xl border border-slate-800 bg-slate-950 p-4">
-                <input type="checkbox" checked={form.discoverableToRecruiters} onChange={(event) => setForm((current) => ({ ...current, discoverableToRecruiters: event.target.checked }))} className="mt-1 h-4 w-4 rounded border-slate-600 bg-slate-900 text-cyan-500 focus:ring-cyan-500" />
-                <div>
-                  <div className="font-semibold text-white">Visible to recruiters</div>
-                  <div className="mt-1 text-sm text-slate-400">Let recruiter workflows surface your profile when your score and proof signal fit.</div>
-                </div>
-              </label>
-            ) : null}
-            <div className="flex justify-end">
-              <Button type="submit" disabled={isBusy}>{updateMutation.isPending ? 'Saving...' : 'Save Profile'}</Button>
-            </div>
-          </form>
-        </Card>
-
-        <Card className="p-6">
-          <div className="mb-4">
-            <h3 className="text-lg font-semibold text-white">Profile Links</h3>
-            <p className="mt-1 text-sm text-slate-400">Add links relevant to your background — fill in what applies to you.</p>
-          </div>
-
-          <form className="space-y-3" onSubmit={saveProfile}>
-            {/* LinkedIn + fetch */}
-            <div className="rounded-2xl border border-slate-800 bg-slate-950 p-4 space-y-3">
-              <div className="flex items-center gap-2 text-sm font-semibold text-white"><Linkedin className="h-4 w-4 text-cyan-300" />LinkedIn</div>
-              <input type="url" value={form.linkedinUrl} onChange={(event) => setForm((current) => ({ ...current, linkedinUrl: event.target.value }))} className="w-full rounded-xl border border-slate-800 bg-slate-900 px-3 py-2 text-sm text-white outline-none focus:border-cyan-500" placeholder="https://linkedin.com/in/your-profile" />
-              <div className="flex flex-wrap items-center justify-between gap-2">
-                <label className="flex items-center gap-2 text-sm text-slate-400 cursor-pointer">
-                  <input type="checkbox" checked={confirmLinkedinFetch} onChange={(event) => setConfirmLinkedinFetch(event.target.checked)} className="h-4 w-4 rounded border-slate-600 bg-slate-900 text-cyan-500 focus:ring-cyan-500" />
-                  Import public LinkedIn data
-                </label>
-                <Button variant="secondary" className="px-3 py-2 text-xs" onClick={() => socialMutation.mutate({ ...(form.linkedinUrl.trim() ? { linkedinUrl: form.linkedinUrl.trim(), confirmLinkedinFetch } : {}) })} disabled={isBusy || !form.linkedinUrl.trim()}>
-                  {socialMutation.isPending ? 'Fetching...' : 'Fetch'}
-                </Button>
-              </div>
-            </div>
-
-            {/* Website */}
-            <label className="block rounded-2xl border border-slate-800 bg-slate-950 p-4 space-y-2">
-              <div className="flex items-center gap-2 text-sm font-semibold text-white"><Globe className="h-4 w-4 text-cyan-300" />Personal Website / Portfolio</div>
-              <input type="url" value={form.websiteUrl} onChange={(event) => setForm((current) => ({ ...current, websiteUrl: event.target.value }))} className="w-full rounded-xl border border-slate-800 bg-slate-900 px-3 py-2 text-sm text-white outline-none focus:border-cyan-500" placeholder="https://yourportfolio.com" />
-            </label>
-
-            {/* Twitter/X */}
-            <label className="block rounded-2xl border border-slate-800 bg-slate-950 p-4 space-y-2">
-              <div className="flex items-center gap-2 text-sm font-semibold text-white"><Twitter className="h-4 w-4 text-cyan-300" />Twitter / X</div>
-              <input type="url" value={form.twitterUrl} onChange={(event) => setForm((current) => ({ ...current, twitterUrl: event.target.value }))} className="w-full rounded-xl border border-slate-800 bg-slate-900 px-3 py-2 text-sm text-white outline-none focus:border-cyan-500" placeholder="https://twitter.com/yourhandle" />
-            </label>
-
-            {/* Creative platforms row */}
-            <div className="grid gap-3 sm:grid-cols-2">
-              <label className="block rounded-2xl border border-slate-800 bg-slate-950 p-4 space-y-2">
-                <div className="flex items-center gap-2 text-sm font-semibold text-white">
-                  <Link2 className="h-4 w-4 text-cyan-300" />Behance
-                </div>
-                <input type="url" value={form.behanceUrl} onChange={(event) => setForm((current) => ({ ...current, behanceUrl: event.target.value }))} className="w-full rounded-xl border border-slate-800 bg-slate-900 px-3 py-2 text-sm text-white outline-none focus:border-cyan-500" placeholder="https://behance.net/you" />
-              </label>
-              <label className="block rounded-2xl border border-slate-800 bg-slate-950 p-4 space-y-2">
-                <div className="flex items-center gap-2 text-sm font-semibold text-white">
-                  <Link2 className="h-4 w-4 text-cyan-300" />Dribbble
-                </div>
-                <input type="url" value={form.dribbbleUrl} onChange={(event) => setForm((current) => ({ ...current, dribbbleUrl: event.target.value }))} className="w-full rounded-xl border border-slate-800 bg-slate-900 px-3 py-2 text-sm text-white outline-none focus:border-cyan-500" placeholder="https://dribbble.com/you" />
-              </label>
-              <label className="block rounded-2xl border border-slate-800 bg-slate-950 p-4 space-y-2">
-                <div className="flex items-center gap-2 text-sm font-semibold text-white">
-                  <Youtube className="h-4 w-4 text-cyan-300" />YouTube
-                </div>
-                <input type="url" value={form.youtubeUrl} onChange={(event) => setForm((current) => ({ ...current, youtubeUrl: event.target.value }))} className="w-full rounded-xl border border-slate-800 bg-slate-900 px-3 py-2 text-sm text-white outline-none focus:border-cyan-500" placeholder="https://youtube.com/@yourchannel" />
-              </label>
-              <label className="block rounded-2xl border border-slate-800 bg-slate-950 p-4 space-y-2">
-                <div className="flex items-center gap-2 text-sm font-semibold text-white">
-                  <Instagram className="h-4 w-4 text-cyan-300" />Instagram
-                </div>
-                <input type="url" value={form.instagramUrl} onChange={(event) => setForm((current) => ({ ...current, instagramUrl: event.target.value }))} className="w-full rounded-xl border border-slate-800 bg-slate-900 px-3 py-2 text-sm text-white outline-none focus:border-cyan-500" placeholder="https://instagram.com/yourhandle" />
-              </label>
-              <label className="block rounded-2xl border border-slate-800 bg-slate-950 p-4 space-y-2">
-                <div className="flex items-center gap-2 text-sm font-semibold text-white">
-                  <Link2 className="h-4 w-4 text-cyan-300" />ResearchGate
-                </div>
-                <input type="url" value={form.researchGateUrl} onChange={(event) => setForm((current) => ({ ...current, researchGateUrl: event.target.value }))} className="w-full rounded-xl border border-slate-800 bg-slate-900 px-3 py-2 text-sm text-white outline-none focus:border-cyan-500" placeholder="https://researchgate.net/profile/you" />
-              </label>
-              <label className="block rounded-2xl border border-slate-800 bg-slate-950 p-4 space-y-2">
-                <div className="flex items-center gap-2 text-sm font-semibold text-white">
-                  <Link2 className="h-4 w-4 text-cyan-300" />Medium / Blog
-                </div>
-                <input type="url" value={form.mediumUrl} onChange={(event) => setForm((current) => ({ ...current, mediumUrl: event.target.value }))} className="w-full rounded-xl border border-slate-800 bg-slate-900 px-3 py-2 text-sm text-white outline-none focus:border-cyan-500" placeholder="https://medium.com/@you" />
-              </label>
-            </div>
-
-            {/* GitHub — optional, only shown when OAuth is available for this role */}
-            {githubEnabled ? (
-              <div className="rounded-2xl border border-slate-800 bg-slate-950 p-4 space-y-3">
-                <div className="flex items-center justify-between gap-3">
-                  <div className="flex items-center gap-2 text-sm font-semibold text-white">
-                    <Github className="h-4 w-4 text-cyan-300" />GitHub
-                    {githubConnected ? (
-                      <span className="rounded-full bg-emerald-500/10 px-2 py-0.5 text-xs font-semibold text-emerald-300">Connected</span>
-                    ) : (
-                      <span className="rounded-full bg-slate-800 px-2 py-0.5 text-xs text-slate-400">Optional</span>
-                    )}
-                  </div>
-                  <div className="flex gap-2">
-                    {githubOauthAvailable ? (
-                      <Button variant="secondary" className="px-3 py-2 text-xs" onClick={() => startGithubMutation.mutate(undefined)} disabled={startGithubMutation.isPending}>
-                        {startGithubMutation.isPending ? 'Redirecting...' : githubConnected ? 'Reconnect' : 'Connect GitHub'}
-                      </Button>
-                    ) : null}
-                    {githubConnected ? (
-                      <Button className="px-3 py-2 text-xs" onClick={() => syncGithubMutation.mutate(undefined)} disabled={syncGithubMutation.isPending}>
-                        {syncGithubMutation.isPending ? 'Refreshing...' : 'Sync Repos'}
-                      </Button>
-                    ) : null}
-                  </div>
-                </div>
-                {githubConnected ? (
-                  <div className="text-xs text-slate-500">
-                    @{profile?.connectedAccounts?.github.username} · {importedRepos.length} repos imported · Last sync {profile?.githubProof?.lastSyncedAt ? new Date(profile.githubProof.lastSyncedAt).toLocaleString('en-IN') : 'never'}
-                  </div>
-                ) : !githubOauthAvailable ? (
-                  <div className="text-xs text-slate-500">GitHub OAuth is unavailable in this environment.</div>
-                ) : (
-                  <div className="text-xs text-slate-500">Connect to import repositories and auto-populate skills from your code activity.</div>
-                )}
-                {githubConnected && repoChoices.length > 0 ? (
-                  <div className="space-y-2">
-                    <div className="flex items-center justify-between">
-                      <span className="text-xs text-slate-400">Select repos to import as proof</span>
-                      <Button className="px-3 py-2 text-xs" onClick={() => importGithubMutation.mutate(selectedRepoIds)} disabled={importGithubMutation.isPending || selectedRepoIds.length === 0}>
-                        {importGithubMutation.isPending ? 'Importing...' : 'Save'}
-                      </Button>
-                    </div>
-                    <div className="max-h-56 space-y-2 overflow-y-auto pr-1">
-                      {repoChoices.map((repo) => (
-                        <RepoRow key={repo.repoId} repo={repo} checked={selectedRepoIds.includes(repo.repoId)} onToggle={() => setSelectedRepoIds((current) => current.includes(repo.repoId) ? current.filter((value) => value !== repo.repoId) : [...current, repo.repoId])} />
-                      ))}
-                    </div>
-                  </div>
-                ) : null}
-              </div>
-            ) : null}
-
-            <div className="flex justify-end">
-              <Button type="submit" disabled={isBusy}>{updateMutation.isPending ? 'Saving...' : 'Save Links'}</Button>
-            </div>
-          </form>
-        </Card>
       </div>
 
-      {githubEnabled && githubConnected ? (
-        <div className="grid gap-6 xl:grid-cols-[1.1fr,0.9fr]">
-          <Card className="p-6">
-            <div className="mb-4 flex items-center justify-between">
-              <div>
-                <h3 className="text-lg font-semibold text-white">Imported Repositories</h3>
-                <p className="mt-1 text-sm text-slate-400">These repos now act as proof artifacts on your profile.</p>
-              </div>
-              <span className="rounded-full bg-cyan-500/10 px-3 py-1 text-xs font-semibold text-cyan-300">{importedRepos.length} imported</span>
+      <form className="grid gap-5 xl:grid-cols-[minmax(0,1fr)_320px]" onSubmit={saveProfile}>
+        <div className="space-y-5">
+          <EditorSection title="Intro" icon={<Linkedin className="h-5 w-5" />}>
+            <div className="grid gap-4 md:grid-cols-2">
+              <Field label="Name" value={form.displayName} onChange={(value) => setForm((current) => ({ ...current, displayName: value }))} />
+              <Field label="Avatar URL" type="url" value={form.avatar} onChange={(value) => setForm((current) => ({ ...current, avatar: value }))} />
+              <Field label="Avatar wallpaper URL" type="url" value={form.avatarWallpaper} onChange={(value) => setForm((current) => ({ ...current, avatarWallpaper: value }))} />
+              <Field label="Headline / domain" value={form.domain} onChange={(value) => setForm((current) => ({ ...current, domain: value }))} placeholder="AI, robotics, full-stack engineering" />
+              <Field label="LinkedIn URL" type="url" value={form.linkedinUrl} onChange={(value) => setForm((current) => ({ ...current, linkedinUrl: value }))} placeholder="https://linkedin.com/in/..." />
             </div>
-            {importedRepos.length === 0 ? (
-              <div className="rounded-2xl border border-dashed border-slate-800 bg-slate-950 p-6 text-sm text-slate-400">
-                Import the repositories that best prove what you actually build.
-              </div>
-            ) : (
-              <div className="space-y-4">
-                {importedRepos.map((repo) => (
-                  <div key={repo.repoId} className="rounded-2xl border border-slate-800 bg-slate-950 p-4">
-                    <div className="flex flex-wrap items-center gap-2">
-                      <a href={repo.url} target="_blank" rel="noreferrer" className="font-semibold text-white hover:text-cyan-300">{repo.fullName}</a>
-                      <span className={`rounded-full px-2 py-0.5 text-[11px] font-semibold ${repo.isPrivate ? 'bg-amber-500/10 text-amber-300' : 'bg-emerald-500/10 text-emerald-300'}`}>
-                        {repo.isPrivate ? 'Private proof' : 'Public'}
-                      </span>
-                    </div>
-                    <div className="mt-2 text-sm text-slate-400">{repo.description || 'No description added.'}</div>
-                    <div className="mt-2 flex flex-wrap gap-3 text-xs text-slate-500">
-                      {repo.primaryLanguage ? <span>{repo.primaryLanguage}</span> : null}
-                      <span>Stars {repo.stars}</span>
-                      <span>Forks {repo.forks}</span>
-                      <span>Open issues {repo.openIssues}</span>
-                    </div>
-                    <div className="mt-4 space-y-2">
-                      {repo.recentCommits.slice(0, 3).map((commit) => (
-                        <div key={commit.sha} className="flex items-start gap-3 rounded-xl bg-slate-900/70 px-3 py-3">
-                          <GitCommitHorizontal className="mt-0.5 h-4 w-4 flex-shrink-0 text-cyan-300" />
-                          <div className="min-w-0 flex-1">
-                            <div className="truncate text-sm text-white">{commit.message}</div>
-                            <div className="mt-1 text-xs text-slate-500">{commit.sha.slice(0, 7)} • {new Date(commit.committedAt).toLocaleString('en-IN')}</div>
-                          </div>
-                        </div>
-                      ))}
-                      {repo.recentCommits.length === 0 ? <div className="text-sm text-slate-500">No recent commits available.</div> : null}
-                    </div>
+            <div className="mt-4">
+              <TextArea label="About" value={form.bio} onChange={(value) => setForm((current) => ({ ...current, bio: value }))} rows={5} />
+            </div>
+            {currentUser.role === UserRole.STUDENT ? (
+              <label className="mt-4 flex items-center gap-2 text-sm text-slate-600 dark:text-slate-400">
+                <input
+                  type="checkbox"
+                  checked={form.discoverableToRecruiters}
+                  onChange={(event) => setForm((current) => ({ ...current, discoverableToRecruiters: event.target.checked }))}
+                  className="h-4 w-4 rounded border-slate-400 text-[#0a66c2] focus:ring-[#0a66c2]"
+                />
+                Visible to recruiters after launch
+              </label>
+            ) : null}
+          </EditorSection>
+
+          <EditorSection title="Links" icon={<Globe className="h-5 w-5" />}>
+            <div className="grid gap-4 md:grid-cols-2">
+              <Field label="Website" type="url" value={form.websiteUrl} onChange={(value) => setForm((current) => ({ ...current, websiteUrl: value }))} />
+              <Field label="Twitter / X" type="url" value={form.twitterUrl} onChange={(value) => setForm((current) => ({ ...current, twitterUrl: value }))} />
+              <Field label="YouTube" type="url" value={form.youtubeUrl} onChange={(value) => setForm((current) => ({ ...current, youtubeUrl: value }))} />
+              <Field label="Instagram" type="url" value={form.instagramUrl} onChange={(value) => setForm((current) => ({ ...current, instagramUrl: value }))} />
+              <Field label="Behance" type="url" value={form.behanceUrl} onChange={(value) => setForm((current) => ({ ...current, behanceUrl: value }))} />
+              <Field label="Dribbble" type="url" value={form.dribbbleUrl} onChange={(value) => setForm((current) => ({ ...current, dribbbleUrl: value }))} />
+              <Field label="ResearchGate" type="url" value={form.researchGateUrl} onChange={(value) => setForm((current) => ({ ...current, researchGateUrl: value }))} />
+              <Field label="Medium / Blog" type="url" value={form.mediumUrl} onChange={(value) => setForm((current) => ({ ...current, mediumUrl: value }))} />
+            </div>
+          </EditorSection>
+
+          <EditorSection
+            title="Skills"
+            icon={<Award className="h-5 w-5" />}
+            action={<SmallButton onClick={() => setForm((current) => ({ ...current, skills: [...current.skills, emptySkill()] }))}>Add skill</SmallButton>}
+          >
+            <div className="space-y-3">
+              {form.skills.map((skill, index) => (
+                <div key={`${skill.name}-${skill.addedAt}-${index}`} className="grid gap-3 rounded-lg border border-slate-200 p-3 dark:border-slate-800 md:grid-cols-[1fr,160px,160px,auto]">
+                  <Field label="Skill" value={skill.name} onChange={(value) => setForm((current) => ({ ...current, skills: current.skills.map((item, itemIndex) => itemIndex === index ? { ...item, name: value, source: item.source ?? 'manual' } : item) }))} />
+                  <label className="block space-y-1.5">
+                    <span className="text-xs font-semibold uppercase tracking-[0.16em] text-slate-500">Category</span>
+                    <select value={skill.category} onChange={(event) => setForm((current) => ({ ...current, skills: current.skills.map((item, itemIndex) => itemIndex === index ? { ...item, category: event.target.value as ProfileSkill['category'] } : item) }))} className="w-full rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm dark:border-slate-700 dark:bg-slate-950 dark:text-white">
+                      <option value="programming">Programming</option>
+                      <option value="design">Design</option>
+                      <option value="business">Business</option>
+                      <option value="research">Research</option>
+                      <option value="other">Other</option>
+                    </select>
+                  </label>
+                  <label className="block space-y-1.5">
+                    <span className="text-xs font-semibold uppercase tracking-[0.16em] text-slate-500">Level</span>
+                    <select value={skill.level} onChange={(event) => setForm((current) => ({ ...current, skills: current.skills.map((item, itemIndex) => itemIndex === index ? { ...item, level: event.target.value as ProfileSkill['level'] } : item) }))} className="w-full rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm dark:border-slate-700 dark:bg-slate-950 dark:text-white">
+                      <option value="beginner">Beginner</option>
+                      <option value="intermediate">Intermediate</option>
+                      <option value="advanced">Advanced</option>
+                      <option value="expert">Expert</option>
+                    </select>
+                  </label>
+                  <button type="button" onClick={() => setForm((current) => ({ ...current, skills: current.skills.filter((_, itemIndex) => itemIndex !== index) }))} className="self-end rounded-full p-2 text-slate-500 transition hover:bg-red-50 hover:text-red-600">
+                    <Trash2 className="h-4 w-4" />
+                  </button>
+                </div>
+              ))}
+              {form.skills.length === 0 ? <div className="rounded-lg border border-dashed border-slate-300 p-4 text-sm text-slate-500 dark:border-slate-700">No skills yet.</div> : null}
+            </div>
+          </EditorSection>
+
+          <EditorSection
+            title="Experience"
+            icon={<Briefcase className="h-5 w-5" />}
+            action={<SmallButton onClick={() => setForm((current) => ({ ...current, experience: [...current.experience, emptyExperience()] }))}>Add experience</SmallButton>}
+          >
+            <div className="space-y-4">
+              {form.experience.map((item, index) => (
+                <div key={item._id} className="space-y-3 rounded-lg border border-slate-200 p-4 dark:border-slate-800">
+                  <div className="grid gap-3 md:grid-cols-2">
+                    <Field label="Title" value={item.title} onChange={(value) => setForm((current) => ({ ...current, experience: current.experience.map((entry, itemIndex) => itemIndex === index ? { ...entry, title: value } : entry) }))} />
+                    <Field label="Company" value={item.company} onChange={(value) => setForm((current) => ({ ...current, experience: current.experience.map((entry, itemIndex) => itemIndex === index ? { ...entry, company: value } : entry) }))} />
+                    <Field label="Location" value={item.location} onChange={(value) => setForm((current) => ({ ...current, experience: current.experience.map((entry, itemIndex) => itemIndex === index ? { ...entry, location: value } : entry) }))} />
+                    <Field label="Skills, comma separated" value={item.skills.join(', ')} onChange={(value) => setForm((current) => ({ ...current, experience: current.experience.map((entry, itemIndex) => itemIndex === index ? { ...entry, skills: fromListInput(value) } : entry) }))} />
+                    <Field label="Start date" type="date" value={toDateInput(item.startDate)} onChange={(value) => setForm((current) => ({ ...current, experience: current.experience.map((entry, itemIndex) => itemIndex === index ? { ...entry, startDate: value ? new Date(value).toISOString() : entry.startDate } : entry) }))} />
+                    <Field label="End date" type="date" value={toDateInput(item.endDate)} onChange={(value) => setForm((current) => ({ ...current, experience: current.experience.map((entry, itemIndex) => itemIndex === index ? { ...entry, endDate: value ? new Date(value).toISOString() : null } : entry) }))} />
                   </div>
-                ))}
-              </div>
-            )}
-          </Card>
-
-          <div className="space-y-6">
-            <Card className="p-6">
-              <h3 className="text-lg font-semibold text-white">GitHub Profile Enrichment</h3>
-              <p className="mt-1 text-sm text-slate-400">
-                These skills and technologies are extracted from your connected GitHub account and shown on your student profile.
-              </p>
-              <div className="mt-4 grid grid-cols-3 gap-3">
-                <div className="rounded-2xl bg-slate-950 p-4">
-                  <div className="text-xs uppercase tracking-[0.2em] text-slate-500">Tech Signals</div>
-                  <div className="mt-2 text-2xl font-bold text-white">{githubTopLanguages.length}</div>
-                </div>
-                <div className="rounded-2xl bg-slate-950 p-4">
-                  <div className="text-xs uppercase tracking-[0.2em] text-slate-500">GitHub Skills</div>
-                  <div className="mt-2 text-2xl font-bold text-white">{githubSkills.length}</div>
-                </div>
-                <div className="rounded-2xl bg-slate-950 p-4">
-                  <div className="text-xs uppercase tracking-[0.2em] text-slate-500">Profile Projects</div>
-                  <div className="mt-2 text-2xl font-bold text-white">{githubProjects.length}</div>
-                </div>
-              </div>
-              <div className="mt-5">
-                <div className="text-xs uppercase tracking-[0.2em] text-slate-500">Extracted Tech Stack</div>
-                <div className="mt-3 flex flex-wrap gap-2">
-                  {githubTopLanguages.map((entry) => (
-                    <span key={entry.language} className="rounded-full bg-cyan-500/10 px-3 py-1 text-sm text-cyan-200">
-                      {entry.language} {entry.percentage > 0 ? `${entry.percentage}%` : ''}
-                    </span>
-                  ))}
-                  {githubTopLanguages.length === 0 ? (
-                    <div className="text-sm text-slate-400">No language signal extracted yet.</div>
-                  ) : null}
-                </div>
-              </div>
-              <div className="mt-5">
-                <div className="text-xs uppercase tracking-[0.2em] text-slate-500">GitHub-Derived Skills</div>
-                <div className="mt-3 flex flex-wrap gap-2">
-                  {githubSkills.slice(0, 12).map((skill) => (
-                    <span key={`${skill.name}-${skill.source}`} className="rounded-full bg-slate-900 px-3 py-1 text-sm text-slate-200">
-                      {skill.name}
-                    </span>
-                  ))}
-                  {githubSkills.length === 0 ? (
-                    <div className="text-sm text-slate-400">Connect and sync GitHub to populate profile skills automatically.</div>
-                  ) : null}
-                </div>
-              </div>
-            </Card>
-
-            <Card className="p-6">
-              <h3 className="text-lg font-semibold text-white">GitHub Activity</h3>
-              <p className="mt-1 text-sm text-slate-400">A 30-day proof snapshot from the connected account.</p>
-              <div className="mt-4 grid grid-cols-2 gap-3">
-                <div className="rounded-2xl bg-slate-950 p-4"><div className="text-xs uppercase tracking-[0.2em] text-slate-500">Commits</div><div className="mt-2 text-2xl font-bold text-white">{profile?.githubProof?.commitCount30Days ?? 0}</div></div>
-                <div className="rounded-2xl bg-slate-950 p-4"><div className="text-xs uppercase tracking-[0.2em] text-slate-500">Active Days</div><div className="mt-2 text-2xl font-bold text-white">{profile?.githubProof?.activeDays30Days ?? 0}</div></div>
-                <div className="rounded-2xl bg-slate-950 p-4"><div className="text-xs uppercase tracking-[0.2em] text-slate-500">Push Events</div><div className="mt-2 text-2xl font-bold text-white">{profile?.githubProof?.pushEvents30Days ?? 0}</div></div>
-                <div className="rounded-2xl bg-slate-950 p-4"><div className="text-xs uppercase tracking-[0.2em] text-slate-500">Pull Requests</div><div className="mt-2 text-2xl font-bold text-white">{profile?.githubProof?.pullRequests30Days ?? 0}</div></div>
-              </div>
-            </Card>
-
-            <Card className="p-6">
-              <h3 className="text-lg font-semibold text-white">Recent GitHub Activity</h3>
-              <div className="mt-4 space-y-3">
-                {(profile?.githubProof?.recentActivity ?? []).slice(0, 6).map((activity) => (
-                  <div key={activity.id} className="rounded-2xl border border-slate-800 bg-slate-950 p-4">
-                    <div className="font-semibold text-white">{activity.title}</div>
-                    <div className="mt-1 text-sm text-slate-400">{activity.summary}</div>
-                    <div className="mt-2 flex flex-wrap gap-3 text-xs text-slate-500">
-                      <span>{activity.repoFullName}</span>
-                      <span>{activity.isPrivate ? 'Private activity' : 'Public activity'}</span>
-                      <span>{new Date(activity.occurredAt).toLocaleString('en-IN')}</span>
-                    </div>
+                  <TextArea label="Description" value={item.description} onChange={(value) => setForm((current) => ({ ...current, experience: current.experience.map((entry, itemIndex) => itemIndex === index ? { ...entry, description: value } : entry) }))} rows={3} />
+                  <div className="flex items-center justify-between gap-3">
+                    <label className="flex items-center gap-2 text-sm text-slate-600 dark:text-slate-400">
+                      <input type="checkbox" checked={item.isCurrent} onChange={(event) => setForm((current) => ({ ...current, experience: current.experience.map((entry, itemIndex) => itemIndex === index ? { ...entry, isCurrent: event.target.checked, endDate: event.target.checked ? null : entry.endDate } : entry) }))} className="h-4 w-4 rounded border-slate-400 text-[#0a66c2] focus:ring-[#0a66c2]" />
+                      Current role
+                    </label>
+                    <button type="button" onClick={() => setForm((current) => ({ ...current, experience: current.experience.filter((_, itemIndex) => itemIndex !== index) }))} className="inline-flex items-center gap-2 rounded-full px-3 py-2 text-sm font-semibold text-red-600 hover:bg-red-50">
+                      <Trash2 className="h-4 w-4" />
+                      Remove
+                    </button>
                   </div>
-                ))}
-                {(profile?.githubProof?.recentActivity ?? []).length === 0 ? <div className="text-sm text-slate-400">No recent GitHub activity captured yet.</div> : null}
-              </div>
-            </Card>
+                </div>
+              ))}
+              {form.experience.length === 0 ? <div className="rounded-lg border border-dashed border-slate-300 p-4 text-sm text-slate-500 dark:border-slate-700">No experience yet.</div> : null}
+            </div>
+          </EditorSection>
+
+          <EditorSection
+            title="Education"
+            icon={<GraduationCap className="h-5 w-5" />}
+            action={<SmallButton onClick={() => setForm((current) => ({ ...current, education: [...current.education, emptyEducation()] }))}>Add education</SmallButton>}
+          >
+            <div className="space-y-4">
+              {form.education.map((item, index) => (
+                <div key={item._id} className="space-y-3 rounded-lg border border-slate-200 p-4 dark:border-slate-800">
+                  <div className="grid gap-3 md:grid-cols-2">
+                    <Field label="Institution" value={item.institution} onChange={(value) => setForm((current) => ({ ...current, education: current.education.map((entry, itemIndex) => itemIndex === index ? { ...entry, institution: value } : entry) }))} />
+                    <Field label="Degree" value={item.degree} onChange={(value) => setForm((current) => ({ ...current, education: current.education.map((entry, itemIndex) => itemIndex === index ? { ...entry, degree: value } : entry) }))} />
+                    <Field label="Field of study" value={item.fieldOfStudy} onChange={(value) => setForm((current) => ({ ...current, education: current.education.map((entry, itemIndex) => itemIndex === index ? { ...entry, fieldOfStudy: value } : entry) }))} />
+                    <Field label="Grade" value={item.grade} onChange={(value) => setForm((current) => ({ ...current, education: current.education.map((entry, itemIndex) => itemIndex === index ? { ...entry, grade: value } : entry) }))} />
+                    <Field label="Start year" type="number" value={item.startYear?.toString() ?? ''} onChange={(value) => setForm((current) => ({ ...current, education: current.education.map((entry, itemIndex) => itemIndex === index ? { ...entry, startYear: parseYear(value) ?? undefined } : entry) }))} />
+                    <Field label="End year" type="number" value={item.endYear?.toString() ?? ''} onChange={(value) => setForm((current) => ({ ...current, education: current.education.map((entry, itemIndex) => itemIndex === index ? { ...entry, endYear: parseYear(value) } : entry) }))} />
+                  </div>
+                  <TextArea label="Activities" value={item.activities} onChange={(value) => setForm((current) => ({ ...current, education: current.education.map((entry, itemIndex) => itemIndex === index ? { ...entry, activities: value } : entry) }))} rows={2} />
+                  <TextArea label="Description" value={item.description} onChange={(value) => setForm((current) => ({ ...current, education: current.education.map((entry, itemIndex) => itemIndex === index ? { ...entry, description: value } : entry) }))} rows={3} />
+                  <div className="flex justify-end">
+                    <button type="button" onClick={() => setForm((current) => ({ ...current, education: current.education.filter((_, itemIndex) => itemIndex !== index) }))} className="inline-flex items-center gap-2 rounded-full px-3 py-2 text-sm font-semibold text-red-600 hover:bg-red-50">
+                      <Trash2 className="h-4 w-4" />
+                      Remove
+                    </button>
+                  </div>
+                </div>
+              ))}
+              {form.education.length === 0 ? <div className="rounded-lg border border-dashed border-slate-300 p-4 text-sm text-slate-500 dark:border-slate-700">No education yet.</div> : null}
+            </div>
+          </EditorSection>
+
+          <EditorSection
+            title="Licenses & certifications"
+            icon={<Award className="h-5 w-5" />}
+            action={<SmallButton onClick={() => setForm((current) => ({ ...current, certifications: [...current.certifications, emptyCertification()] }))}>Add certification</SmallButton>}
+          >
+            <div className="space-y-4">
+              {form.certifications.map((item, index) => (
+                <div key={item._id} className="space-y-3 rounded-lg border border-slate-200 p-4 dark:border-slate-800">
+                  <div className="grid gap-3 md:grid-cols-2">
+                    <Field label="Name" value={item.name} onChange={(value) => setForm((current) => ({ ...current, certifications: current.certifications.map((entry, itemIndex) => itemIndex === index ? { ...entry, name: value } : entry) }))} />
+                    <Field label="Issuing organization" value={item.issuingOrganization} onChange={(value) => setForm((current) => ({ ...current, certifications: current.certifications.map((entry, itemIndex) => itemIndex === index ? { ...entry, issuingOrganization: value } : entry) }))} />
+                    <Field label="Issue date" type="date" value={toDateInput(item.issueDate)} onChange={(value) => setForm((current) => ({ ...current, certifications: current.certifications.map((entry, itemIndex) => itemIndex === index ? { ...entry, issueDate: value ? new Date(value).toISOString() : null } : entry) }))} />
+                    <Field label="Expiry date" type="date" value={toDateInput(item.expiryDate)} onChange={(value) => setForm((current) => ({ ...current, certifications: current.certifications.map((entry, itemIndex) => itemIndex === index ? { ...entry, expiryDate: value ? new Date(value).toISOString() : null } : entry) }))} />
+                    <Field label="Credential ID" value={item.credentialId} onChange={(value) => setForm((current) => ({ ...current, certifications: current.certifications.map((entry, itemIndex) => itemIndex === index ? { ...entry, credentialId: value } : entry) }))} />
+                    <Field label="Credential URL" type="url" value={item.credentialUrl} onChange={(value) => setForm((current) => ({ ...current, certifications: current.certifications.map((entry, itemIndex) => itemIndex === index ? { ...entry, credentialUrl: value } : entry) }))} />
+                  </div>
+                  <div className="flex justify-end">
+                    <button type="button" onClick={() => setForm((current) => ({ ...current, certifications: current.certifications.filter((_, itemIndex) => itemIndex !== index) }))} className="inline-flex items-center gap-2 rounded-full px-3 py-2 text-sm font-semibold text-red-600 hover:bg-red-50">
+                      <Trash2 className="h-4 w-4" />
+                      Remove
+                    </button>
+                  </div>
+                </div>
+              ))}
+              {form.certifications.length === 0 ? <div className="rounded-lg border border-dashed border-slate-300 p-4 text-sm text-slate-500 dark:border-slate-700">No certifications yet.</div> : null}
+            </div>
+          </EditorSection>
+
+          <EditorSection
+            title="Projects"
+            icon={<Rocket className="h-5 w-5" />}
+            action={<SmallButton onClick={() => setForm((current) => ({ ...current, portfolioProjects: [...current.portfolioProjects, emptyProject()] }))}>Add project</SmallButton>}
+          >
+            <div className="space-y-4">
+              {form.portfolioProjects.map((item, index) => (
+                <div key={item._id} className="space-y-3 rounded-lg border border-slate-200 p-4 dark:border-slate-800">
+                  <div className="grid gap-3 md:grid-cols-2">
+                    <Field label="Title" value={item.title} onChange={(value) => setForm((current) => ({ ...current, portfolioProjects: current.portfolioProjects.map((entry, itemIndex) => itemIndex === index ? { ...entry, title: value } : entry) }))} />
+                    <Field label="Tech stack, comma separated" value={item.techStack.join(', ')} onChange={(value) => setForm((current) => ({ ...current, portfolioProjects: current.portfolioProjects.map((entry, itemIndex) => itemIndex === index ? { ...entry, techStack: fromListInput(value), languages: fromListInput(value) } : entry) }))} />
+                    <Field label="Repository URL" type="url" value={item.repoUrl ?? ''} onChange={(value) => setForm((current) => ({ ...current, portfolioProjects: current.portfolioProjects.map((entry, itemIndex) => itemIndex === index ? { ...entry, repoUrl: value || null } : entry) }))} />
+                    <Field label="Live URL" type="url" value={item.liveUrl ?? ''} onChange={(value) => setForm((current) => ({ ...current, portfolioProjects: current.portfolioProjects.map((entry, itemIndex) => itemIndex === index ? { ...entry, liveUrl: value || null } : entry) }))} />
+                  </div>
+                  <TextArea label="Description" value={item.description} onChange={(value) => setForm((current) => ({ ...current, portfolioProjects: current.portfolioProjects.map((entry, itemIndex) => itemIndex === index ? { ...entry, description: value } : entry) }))} rows={3} />
+                  <div className="flex justify-end">
+                    <button type="button" onClick={() => setForm((current) => ({ ...current, portfolioProjects: current.portfolioProjects.filter((_, itemIndex) => itemIndex !== index) }))} className="inline-flex items-center gap-2 rounded-full px-3 py-2 text-sm font-semibold text-red-600 hover:bg-red-50">
+                      <Trash2 className="h-4 w-4" />
+                      Remove
+                    </button>
+                  </div>
+                </div>
+              ))}
+              {form.portfolioProjects.length === 0 ? <div className="rounded-lg border border-dashed border-slate-300 p-4 text-sm text-slate-500 dark:border-slate-700">No projects yet.</div> : null}
+            </div>
+          </EditorSection>
+
+          <div className="sticky bottom-4 z-10 flex justify-end">
+            <SmallButton type="submit" disabled={isBusy}>
+              <Save className="h-4 w-4" />
+              {updateMutation.isPending ? 'Saving...' : 'Save portfolio'}
+            </SmallButton>
           </div>
         </div>
-      ) : null}
+
+        <aside className="space-y-5">
+          <EditorSection title="Section status" icon={<Linkedin className="h-5 w-5" />}>
+            <div className="space-y-3">
+              {completionStats.map((stat) => (
+                <div key={stat.label} className="flex items-center justify-between text-sm">
+                  <span className="text-slate-600 dark:text-slate-400">{stat.label}</span>
+                  <span className="font-semibold text-slate-950 dark:text-white">{stat.value}</span>
+                </div>
+              ))}
+            </div>
+          </EditorSection>
+
+          <EditorSection title="LinkedIn fast fill" icon={<Linkedin className="h-5 w-5" />}>
+            <div className="space-y-3">
+              <p className="text-sm leading-6 text-slate-600 dark:text-slate-400">
+                Add your public LinkedIn URL, confirm import, then fetch public profile data into these same portfolio fields.
+              </p>
+              <label className="flex items-center gap-2 text-sm text-slate-600 dark:text-slate-400">
+                <input
+                  type="checkbox"
+                  checked={confirmLinkedinFetch}
+                  onChange={(event) => setConfirmLinkedinFetch(event.target.checked)}
+                  className="h-4 w-4 rounded border-slate-400 text-[#0a66c2] focus:ring-[#0a66c2]"
+                />
+                Import public LinkedIn data
+              </label>
+              <SmallButton
+                onClick={() => socialMutation.mutate({ ...(form.linkedinUrl.trim() ? { linkedinUrl: form.linkedinUrl.trim(), confirmLinkedinFetch } : {}) })}
+                disabled={isBusy || !form.linkedinUrl.trim()}
+              >
+                {socialMutation.isPending ? 'Fetching...' : 'Fetch LinkedIn'}
+              </SmallButton>
+            </div>
+          </EditorSection>
+
+          <EditorSection title="GitHub projects" icon={<Github className="h-5 w-5" />}>
+            <div className="space-y-3">
+              {githubEnabled ? (
+                <>
+                  <div className="text-sm text-slate-600 dark:text-slate-400">
+                    {githubConnected
+                      ? `Connected as @${profile?.connectedAccounts?.github.username ?? 'github'}`
+                      : githubOauthAvailable
+                        ? 'Connect GitHub to import repositories as projects.'
+                        : 'GitHub OAuth is unavailable in this environment.'}
+                  </div>
+                  {githubOauthAvailable ? (
+                    <SmallButton onClick={() => startGithubMutation.mutate(undefined)} disabled={startGithubMutation.isPending}>
+                      {startGithubMutation.isPending ? 'Redirecting...' : githubConnected ? 'Reconnect GitHub' : 'Connect GitHub'}
+                    </SmallButton>
+                  ) : null}
+                  {githubConnected && repoChoices.length > 0 ? (
+                    <div className="space-y-3">
+                      <div className="max-h-80 space-y-2 overflow-y-auto pr-1">
+                        {repoChoices.map((repo) => (
+                          <RepoRow
+                            key={repo.repoId}
+                            repo={repo}
+                            checked={selectedRepoIds.includes(repo.repoId)}
+                            onToggle={() =>
+                              setSelectedRepoIds((current) =>
+                                current.includes(repo.repoId)
+                                  ? current.filter((value) => value !== repo.repoId)
+                                  : [...current, repo.repoId],
+                              )
+                            }
+                          />
+                        ))}
+                      </div>
+                      <SmallButton onClick={() => importGithubMutation.mutate(selectedRepoIds)} disabled={importGithubMutation.isPending || selectedRepoIds.length === 0}>
+                        {importGithubMutation.isPending ? 'Importing...' : 'Import selected'}
+                      </SmallButton>
+                    </div>
+                  ) : null}
+                </>
+              ) : (
+                <div className="text-sm text-slate-600 dark:text-slate-400">GitHub import is available for student and mentor profiles.</div>
+              )}
+            </div>
+          </EditorSection>
+
+          <EditorSection title="Saved links" icon={<Link2 className="h-5 w-5" />}>
+            <div className="space-y-2 text-sm">
+              {[
+                ['Website', form.websiteUrl, Globe],
+                ['LinkedIn', form.linkedinUrl, Linkedin],
+                ['Twitter', form.twitterUrl, Twitter],
+                ['YouTube', form.youtubeUrl, Youtube],
+                ['Instagram', form.instagramUrl, Instagram],
+                ['Behance', form.behanceUrl, Link2],
+              ].map(([label, url, Icon]) => {
+                if (!url) return null;
+                const LinkIcon = Icon as typeof Globe;
+                return (
+                  <a key={label as string} href={url as string} target="_blank" rel="noreferrer" className="flex items-center gap-2 font-semibold text-[#0a66c2] hover:underline">
+                    <LinkIcon className="h-4 w-4" />
+                    {label as string}
+                    <ExternalLink className="h-3 w-3" />
+                  </a>
+                );
+              })}
+              {!form.websiteUrl && !form.linkedinUrl && !form.twitterUrl && !form.youtubeUrl && !form.instagramUrl && !form.behanceUrl ? (
+                <div className="text-sm text-slate-500">No profile links added yet.</div>
+              ) : null}
+            </div>
+          </EditorSection>
+        </aside>
+      </form>
     </div>
   );
 }

@@ -150,6 +150,7 @@ export interface AuthUser {
   displayName: string;
   githubOAuthAvailable: boolean;
   avatar?: string;
+  avatarWallpaper?: string;
   bio?: string;
   isProfilePublic?: boolean;
   profileSlug?: string | null;
@@ -159,6 +160,13 @@ export interface AuthUser {
   websiteUrl?: string | null;
   githubUrl?: string | null;
   linkedinUrl?: string | null;
+  twitterUrl?: string | null;
+  youtubeUrl?: string | null;
+  behanceUrl?: string | null;
+  dribbbleUrl?: string | null;
+  instagramUrl?: string | null;
+  researchGateUrl?: string | null;
+  mediumUrl?: string | null;
   profileComplete: boolean;
   innovationScore: number;
   accessGrantedBy?:

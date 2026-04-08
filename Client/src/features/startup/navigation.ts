@@ -27,7 +27,7 @@ export const STARTUP_LAUNCH_SECTION_LINKS: StartupLaunchSectionLink[] = [
     label: "Launch",
     shortLabel: "Launch",
     description:
-      "Build the startup profile, complete project gates, and launch to investors or mentors.",
+      "Build the startup profile, pass admin review, and launch to investors or mentors.",
     segment: "overview",
     icon: Rocket,
   },
@@ -58,7 +58,7 @@ export const STARTUP_LAUNCH_SECTION_LINKS: StartupLaunchSectionLink[] = [
   {
     label: "Patent Support",
     shortLabel: "Patent Support",
-    description: "Request admin patent review before investor pitch listing.",
+    description: "Request patent support for startups that need IP protection.",
     segment: "patent-support",
     icon: FileText,
   },

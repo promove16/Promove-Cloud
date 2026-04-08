@@ -58,7 +58,7 @@ export function StudentGithubProofPrompt() {
   }, [refreshUserMutation, searchParams, setSearchParams]);
 
   const startGithubMutation = useMutation({
-    mutationFn: () => userApi.startGithubOauth('/dashboard/profile'),
+    mutationFn: () => userApi.startGithubOauth('/portfolio'),
     onSuccess: ({ authorizationUrl }) => {
       window.location.assign(authorizationUrl);
     },

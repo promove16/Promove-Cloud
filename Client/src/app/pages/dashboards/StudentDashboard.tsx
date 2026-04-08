@@ -263,7 +263,7 @@ export function StudentDashboard() {
 
         <div className="lg:col-span-2 rounded-2xl border border-slate-800 bg-slate-900 p-6">
           <div className="mb-6 flex items-center justify-between">
-            <h3 className="text-xl font-bold text-white">Active Project</h3>
+            <h3 className="text-xl font-bold text-white">Active Problem Workspace</h3>
             <Link
               to={
                 activeWorkspace
@@ -283,7 +283,7 @@ export function StudentDashboard() {
                     {activeWorkspace.title}
                   </h4>
                   <p className="mb-3 text-slate-400">
-                    {activeWorkspace.category} workspace in the{" "}
+                    {activeWorkspace.category} Problem Bank workspace in the{" "}
                     {activeWorkspace.stage} stage
                   </p>
                   <div className="flex items-center gap-4">
@@ -334,7 +334,7 @@ export function StudentDashboard() {
                 No active workspace yet
               </h4>
               <p className="mb-4 text-slate-400">
-                Claim a problem to create your first student workspace.
+                Claim a problem to create your first Problem Bank workspace.
               </p>
               <Link
                 to="/problem-bank"
@@ -395,7 +395,7 @@ export function StudentDashboard() {
             ))
           ) : (
             <div className="md:col-span-2 py-8 text-center text-slate-400">
-              Your workspace portfolio will appear here once you claim a
+              Your Problem Bank workspace portfolio will appear here once you claim a
               problem.
             </div>
           )}
