@@ -25,7 +25,9 @@ export const initChatSocket = (io: Server) => {
     const token = socket.handshake.auth.token;
     if (!token) return next(new Error('Unauthorized'));
     try {
-      const decoded = jwt.verify(token, env.JWT_ACCESS_SECRET) as any;
+      const decoded = jwt.verify(token, env.JWT_ACCESS_SECRET, {
+        algorithms: ['RS256'],
+      }) as any;
       socket.data.userId = decoded._id;
       socket.data.role = decoded.role;
       next();
@@ -104,9 +106,13 @@ export const initChatSocket = (io: Server) => {
       }
     });
 
-    // Typing indicator: broadcast to room excluding sender
-    socket.on('chat:typing', ({ workspaceId, isTyping }: { workspaceId: string; isTyping: boolean }) => {
+    // Typing indicator: broadcast to room excluding sender. Verify access
+    // first so non-members cannot inject fake typing indicators into a
+    // workspace they do not belong to.
+    socket.on('chat:typing', async ({ workspaceId, isTyping }: { workspaceId: string; isTyping: boolean }) => {
       if (!workspaceId || !Types.ObjectId.isValid(workspaceId)) return;
+      const hasAccess = await canAccessWorkspace(workspaceId, socket.data.userId);
+      if (!hasAccess) return;
       socket.to(`ws:${workspaceId}`).emit('chat:typing', { userId, isTyping });
     });
 

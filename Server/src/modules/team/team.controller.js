@@ -1,19 +1,19 @@
 const teamService = require('./team.service');
 
 async function createTeam(req, res) {
-  const team = await teamService.createTeam(req.user.userId, req.body);
+  const team = await teamService.createTeam(req.user._id, req.body);
   res.status(201).json({ success: true, team });
 }
 
 async function getTeam(req, res) {
-  const team = await teamService.getTeam(req.params.id, req.user.userId);
+  const team = await teamService.getTeam(req.params.id, req.user._id);
   res.json({ success: true, team });
 }
 
 async function inviteByEmail(req, res) {
   const result = await teamService.inviteByEmail(
     req.params.id,
-    req.user.userId,
+    req.user._id,
     req.body.email,
     req.body.role
   );
@@ -34,7 +34,7 @@ async function declineInvitation(req, res) {
 async function updateMemberRole(req, res) {
   const team = await teamService.updateMemberRole(
     req.params.id,
-    req.user.userId,
+    req.user._id,
     req.params.uid,
     req.body.role
   );
@@ -43,7 +43,7 @@ async function updateMemberRole(req, res) {
 }
 
 async function removeMember(req, res) {
-  const team = await teamService.removeMember(req.params.id, req.user.userId, req.params.uid);
+  const team = await teamService.removeMember(req.params.id, req.user._id, req.params.uid);
   res.json({ success: true, team });
 }
 

@@ -7,6 +7,45 @@
     color-scheme: dark;
     scrollbar-color: rgba(71, 85, 105, 0.9) transparent;
     scrollbar-width: thin;
+    --dashboard-bg: #020617;
+    --dashboard-sidebar-bg: rgba(2, 6, 23, 0.95);
+    --dashboard-header-bg: rgba(2, 6, 23, 0.85);
+    --dashboard-surface: rgba(15, 23, 42, 0.7);
+    --dashboard-surface-solid: #0f172a;
+    --dashboard-surface-hover: #0f172a;
+    --dashboard-popover: #020617;
+    --dashboard-border: #1e293b;
+    --dashboard-border-strong: #334155;
+    --dashboard-text: #ffffff;
+    --dashboard-text-muted: #cbd5e1;
+    --dashboard-text-subtle: #94a3b8;
+    --dashboard-text-faint: #64748b;
+    --dashboard-active-bg: rgba(34, 211, 238, 0.1);
+    --dashboard-active-text: #a5f3fc;
+    --dashboard-active-ring: rgba(34, 211, 238, 0.3);
+    --dashboard-overlay: rgba(2, 6, 23, 0.6);
+  }
+
+  html.light {
+    color-scheme: light;
+    scrollbar-color: rgba(148, 163, 184, 0.9) transparent;
+    --dashboard-bg: #f8fafc;
+    --dashboard-sidebar-bg: rgba(255, 255, 255, 0.95);
+    --dashboard-header-bg: rgba(255, 255, 255, 0.86);
+    --dashboard-surface: rgba(255, 255, 255, 0.88);
+    --dashboard-surface-solid: #ffffff;
+    --dashboard-surface-hover: #f1f5f9;
+    --dashboard-popover: #ffffff;
+    --dashboard-border: #e2e8f0;
+    --dashboard-border-strong: #cbd5e1;
+    --dashboard-text: #0f172a;
+    --dashboard-text-muted: #334155;
+    --dashboard-text-subtle: #64748b;
+    --dashboard-text-faint: #94a3b8;
+    --dashboard-active-bg: rgba(8, 145, 178, 0.12);
+    --dashboard-active-text: #0e7490;
+    --dashboard-active-ring: rgba(8, 145, 178, 0.35);
+    --dashboard-overlay: rgba(15, 23, 42, 0.36);
   }
 
   * {
@@ -41,5 +80,81 @@
 
   *::-webkit-scrollbar-corner {
     background: transparent;
+  }
+}
+
+@layer components {
+  .dashboard-theme-bg {
+    background-color: var(--dashboard-bg);
+    color: var(--dashboard-text);
+  }
+
+  .dashboard-theme-sidebar {
+    background-color: var(--dashboard-sidebar-bg);
+  }
+
+  .dashboard-theme-header {
+    background-color: var(--dashboard-header-bg);
+  }
+
+  .dashboard-theme-surface {
+    background-color: var(--dashboard-surface);
+  }
+
+  .dashboard-theme-popover {
+    background-color: var(--dashboard-popover);
+  }
+
+  .dashboard-theme-border {
+    border-color: var(--dashboard-border);
+  }
+
+  .dashboard-theme-border-strong {
+    border-color: var(--dashboard-border-strong);
+  }
+
+  .dashboard-theme-separator {
+    background-color: var(--dashboard-border);
+  }
+
+  .dashboard-theme-text {
+    color: var(--dashboard-text);
+  }
+
+  .dashboard-theme-muted {
+    color: var(--dashboard-text-muted);
+  }
+
+  .dashboard-theme-subtle {
+    color: var(--dashboard-text-subtle);
+  }
+
+  .dashboard-theme-faint {
+    color: var(--dashboard-text-faint);
+  }
+
+  .dashboard-theme-hover:hover {
+    background-color: var(--dashboard-surface-hover);
+    color: var(--dashboard-text);
+  }
+
+  .dashboard-theme-menu-item:focus {
+    background-color: var(--dashboard-surface-hover);
+    color: var(--dashboard-text);
+  }
+
+  .dashboard-theme-nav-active {
+    background-color: var(--dashboard-active-bg);
+    color: var(--dashboard-active-text);
+    box-shadow: inset 0 0 0 1px var(--dashboard-active-ring);
+  }
+
+  .dashboard-theme-child-active {
+    background-color: var(--dashboard-surface-hover);
+    color: var(--dashboard-active-text);
+  }
+
+  .dashboard-theme-overlay {
+    background-color: var(--dashboard-overlay);
   }
 }

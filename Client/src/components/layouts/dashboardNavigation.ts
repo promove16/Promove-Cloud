@@ -1,5 +1,4 @@
 import {
-  ArrowRight,
   BarChart3,
   BriefcaseBusiness,
   Building2,
@@ -51,7 +50,6 @@ export const SIDEBAR_CONFIG: Record<UserRole, DashboardNavItem[]> = {
     { kind: 'link', label: 'Dashboard', icon: Home, path: '/dashboard/student' },
     { kind: 'link', label: 'Problem Bank', icon: Sparkles, path: '/problem-bank' },
     { kind: 'link', label: 'Product Workspace', icon: Trophy, path: '/product-workspace' },
-    { kind: 'link', label: 'Patent Support', icon: FileText, path: '/patent-support' },
     { kind: 'link', label: 'Startup', icon: Rocket, path: STARTUP_LAUNCH_BASE_PATH },
     { kind: 'link', label: 'Portfolio', icon: Trophy, path: '/portfolio' },
     { kind: 'link', label: 'Marketplace', icon: Globe, path: getMarketplaceBasePath(UserRole.STUDENT) },
@@ -63,16 +61,8 @@ export const SIDEBAR_CONFIG: Record<UserRole, DashboardNavItem[]> = {
     { kind: 'action', label: 'Logout', icon: LogOut, action: 'logout' },
   ],
   [UserRole.SCHOOL]: [
-    {
-      kind: 'group',
-      label: 'Dashboard',
-      icon: Home,
-      path: '/dashboard/school',
-      children: [
-        { label: 'Overview', path: '/dashboard/school' },
-        { label: 'Operations', path: '/dashboard/school/operations' },
-      ],
-    },
+    { kind: 'link', label: 'Dashboard', icon: Home, path: '/dashboard/school' },
+    { kind: 'link', label: 'Operations', icon: Home, path: '/dashboard/school/operations' },
     { kind: 'link', label: 'Problem Bank', icon: Sparkles, path: '/problem-bank' },
     { kind: 'link', label: 'Marketplace', icon: Globe, path: getMarketplaceBasePath(UserRole.SCHOOL) },
     { kind: 'link', label: 'Student Innovators', icon: Users, path: '/dashboard/school/students' },
@@ -85,16 +75,8 @@ export const SIDEBAR_CONFIG: Record<UserRole, DashboardNavItem[]> = {
     { kind: 'action', label: 'Logout', icon: LogOut, action: 'logout' },
   ],
   [UserRole.COLLEGE]: [
-    {
-      kind: 'group',
-      label: 'Dashboard',
-      icon: Home,
-      path: '/dashboard/college',
-      children: [
-        { label: 'Overview', path: '/dashboard/college' },
-        { label: 'Operations', path: '/dashboard/college/operations' },
-      ],
-    },
+    { kind: 'link', label: 'Dashboard', icon: Home, path: '/dashboard/college' },
+    { kind: 'link', label: 'Operations', icon: Home, path: '/dashboard/college/operations' },
     { kind: 'link', label: 'Problem Bank', icon: Sparkles, path: '/problem-bank' },
     { kind: 'link', label: 'Marketplace', icon: Globe, path: getMarketplaceBasePath(UserRole.COLLEGE) },
     { kind: 'link', label: 'Student Innovators', icon: Users, path: '/dashboard/college/students' },
@@ -112,6 +94,7 @@ export const SIDEBAR_CONFIG: Record<UserRole, DashboardNavItem[]> = {
   [UserRole.MENTOR]: [
     { kind: 'link', label: 'Dashboard', icon: Home, path: '/dashboard/mentor' },
     { kind: 'link', label: 'Problem Bank', icon: Sparkles, path: '/problem-bank' },
+    { kind: 'link', label: 'Product Workspace', icon: Trophy, path: '/product-workspace' },
     { kind: 'link', label: 'Marketplace', icon: Globe, path: getMarketplaceBasePath(UserRole.MENTOR) },
     { kind: 'link', label: 'Student Feed', icon: Users, path: '/dashboard/mentor/students' },
     { kind: 'link', label: 'Sessions', icon: GraduationCap, path: '/dashboard/mentor/sessions' },
@@ -122,8 +105,9 @@ export const SIDEBAR_CONFIG: Record<UserRole, DashboardNavItem[]> = {
     { kind: 'action', label: 'Logout', icon: LogOut, action: 'logout' },
   ],
   [UserRole.INVESTOR]: [
-    { kind: 'link', label: 'Deal Flow', icon: ArrowRight, path: '/dashboard/investor' },
+    { kind: 'link', label: 'Dashboard', icon: Home, path: '/dashboard/investor' },
     { kind: 'link', label: 'Problem Bank', icon: Sparkles, path: '/problem-bank' },
+    { kind: 'link', label: 'Product Workspace', icon: Trophy, path: '/product-workspace' },
     { kind: 'link', label: 'Marketplace', icon: Globe, path: getMarketplaceBasePath(UserRole.INVESTOR) },
     { kind: 'link', label: 'Startups', icon: Rocket, path: '/dashboard/investor/startups' },
     { kind: 'link', label: 'Institutions', icon: Building2, path: '/dashboard/investor/institutions' },
@@ -135,7 +119,7 @@ export const SIDEBAR_CONFIG: Record<UserRole, DashboardNavItem[]> = {
     { kind: 'action', label: 'Logout', icon: LogOut, action: 'logout' },
   ],
   [UserRole.RECRUITER]: [
-    { kind: 'link', label: 'Home', icon: Home, path: '/dashboard/recruiter' },
+    { kind: 'link', label: 'Dashboard', icon: Home, path: '/dashboard/recruiter' },
     { kind: 'link', label: 'Marketplace', icon: Globe, path: getMarketplaceBasePath(UserRole.RECRUITER) },
     { kind: 'link', label: 'Applications', icon: BriefcaseBusiness, path: '/dashboard/recruiter/applications' },
     { kind: 'link', label: 'Talent Search', icon: Users, path: '/dashboard/recruiter/talent' },

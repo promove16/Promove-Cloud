@@ -36,7 +36,9 @@ interface DashboardLayoutProps {
 }
 
 const ACTIVE_NAV_ITEM_CLASS =
-  'bg-cyan-500/10 text-cyan-200 shadow-[inset_0_0_0_1px_rgba(34,211,238,0.3)]';
+  'dashboard-theme-nav-active';
+const INACTIVE_NAV_ITEM_CLASS = 'dashboard-theme-muted dashboard-theme-hover';
+const INACTIVE_CHILD_NAV_ITEM_CLASS = 'dashboard-theme-subtle dashboard-theme-hover';
 
 function NotificationBell() {
   const navigate = useNavigate();
@@ -104,42 +106,42 @@ function NotificationBell() {
       <DropdownMenuTrigger asChild>
         <button
           type="button"
-          className="relative rounded-lg p-2 transition-colors hover:bg-slate-800"
+          className="dashboard-theme-hover relative rounded-lg p-2 transition-colors"
           aria-label="Notifications"
         >
-          <Bell className="h-5 w-5 text-slate-400" />
+          <Bell className="dashboard-theme-subtle h-5 w-5" />
           {unreadCount > 0 ? (
-            <div className="absolute -right-1 -top-1 flex h-5 min-w-5 items-center justify-center rounded-full bg-blue-500 px-1 text-[10px] font-bold text-white">
+            <div className="absolute -right-1 -top-1 flex h-5 min-w-5 items-center justify-center rounded-full bg-blue-500 px-1 text-[10px] font-bold text-slate-50">
               {Math.min(unreadCount, 99)}
             </div>
           ) : null}
         </button>
       </DropdownMenuTrigger>
-      <DropdownMenuContent align="end" className="w-[22rem] border-slate-800 bg-slate-950 text-white">
+      <DropdownMenuContent align="end" className="dashboard-theme-border dashboard-theme-popover dashboard-theme-text w-[22rem]">
         <div className="flex items-center justify-between px-2 py-1">
-          <DropdownMenuLabel className="px-0 text-sm font-semibold text-white">Notifications</DropdownMenuLabel>
+          <DropdownMenuLabel className="dashboard-theme-text px-0 text-sm font-semibold">Notifications</DropdownMenuLabel>
           <button
             type="button"
             onClick={() => markAllReadMutation.mutate()}
-            className="text-xs font-semibold text-cyan-300 hover:text-cyan-200"
+            className="text-xs font-semibold text-cyan-700 hover:text-cyan-600 dark:text-cyan-300 dark:hover:text-cyan-200"
           >
             Mark all read
           </button>
         </div>
-        <DropdownMenuSeparator className="bg-slate-800" />
+        <DropdownMenuSeparator className="dashboard-theme-separator" />
         {inviteFeedback ? (
           <>
-            <div className="px-3 py-2 text-xs text-cyan-200">{inviteFeedback}</div>
-            <DropdownMenuSeparator className="bg-slate-800" />
+            <div className="px-3 py-2 text-xs text-cyan-700 dark:text-cyan-200">{inviteFeedback}</div>
+            <DropdownMenuSeparator className="dashboard-theme-separator" />
           </>
         ) : null}
         {notifications.length === 0 ? (
-          <div className="px-3 py-4 text-sm text-slate-400">You're all caught up.</div>
+          <div className="dashboard-theme-subtle px-3 py-4 text-sm">You're all caught up.</div>
         ) : (
           notifications.slice(0, 6).map((notification) => (
             <DropdownMenuItem
               key={notification._id}
-              className={`cursor-pointer rounded-xl px-3 py-3 focus:bg-slate-900 ${notification.isRead ? 'opacity-70' : ''}`}
+              className={`dashboard-theme-menu-item cursor-pointer rounded-xl px-3 py-3 ${notification.isRead ? 'opacity-70' : ''}`}
               onSelect={(event) => {
                 const isTeamInvite = notification.type === 'team_invite';
                 if (isTeamInvite) {
@@ -153,11 +155,11 @@ function NotificationBell() {
             >
               <div className="w-full space-y-1">
                 <div className="flex items-start justify-between gap-3">
-                  <div className="text-sm font-semibold text-white">{notification.title}</div>
+                  <div className="dashboard-theme-text text-sm font-semibold">{notification.title}</div>
                   {!notification.isRead ? <span className="mt-1 h-2.5 w-2.5 rounded-full bg-cyan-400" /> : null}
                 </div>
-                <div className="text-xs leading-5 text-slate-400">{notification.body}</div>
-                <div className="text-[11px] uppercase tracking-[0.25em] text-slate-500">
+                <div className="dashboard-theme-subtle text-xs leading-5">{notification.body}</div>
+                <div className="dashboard-theme-faint text-[11px] uppercase tracking-[0.25em]">
                   {new Date(notification.createdAt).toLocaleString('en-IN')}
                 </div>
                 {notification.type === 'team_invite' &&
@@ -196,7 +198,7 @@ function NotificationBell() {
                         });
                       }}
                       disabled={teamInviteActionMutation.isPending}
-                      className="rounded-lg border border-slate-700 px-3 py-1.5 text-xs font-semibold text-slate-200 disabled:opacity-60"
+                      className="dashboard-theme-border-strong dashboard-theme-muted dashboard-theme-hover rounded-lg border px-3 py-1.5 text-xs font-semibold disabled:opacity-60"
                     >
                       Decline
                     </button>
@@ -304,7 +306,7 @@ export function DashboardLayout({ children, role }: PropsWithChildren<DashboardL
         `flex items-center gap-3 rounded-2xl px-4 py-3 transition ${
           isActive || isPathActive(path, shouldMatchExactly(path))
             ? ACTIVE_NAV_ITEM_CLASS
-            : 'text-slate-300 hover:bg-slate-900 hover:text-white'
+            : INACTIVE_NAV_ITEM_CLASS
         }`
       }
     >
@@ -326,7 +328,7 @@ export function DashboardLayout({ children, role }: PropsWithChildren<DashboardL
           key={item.label}
           type="button"
           onClick={handleLogout}
-          className="flex w-full items-center gap-3 rounded-2xl px-4 py-3 text-left text-slate-300 transition hover:bg-slate-900 hover:text-white"
+          className={`flex w-full items-center gap-3 rounded-2xl px-4 py-3 text-left transition ${INACTIVE_NAV_ITEM_CLASS}`}
         >
           <item.icon className="h-5 w-5" />
           <span>{item.label}</span>
@@ -352,7 +354,7 @@ export function DashboardLayout({ children, role }: PropsWithChildren<DashboardL
             `flex items-center gap-3 rounded-2xl px-4 py-3 transition ${
               groupExpanded
                 ? ACTIVE_NAV_ITEM_CLASS
-                : 'text-slate-300 hover:bg-slate-900 hover:text-white'
+                : INACTIVE_NAV_ITEM_CLASS
             }`
           }
         >
@@ -362,7 +364,7 @@ export function DashboardLayout({ children, role }: PropsWithChildren<DashboardL
         </NavLink>
 
         {groupExpanded ? (
-          <div className="ml-6 mt-2 space-y-1 border-l border-slate-800 pl-4">
+          <div className="dashboard-theme-border ml-6 mt-2 space-y-1 border-l pl-4">
             {item.children.map((child) => (
               <NavLink
                 key={child.path}
@@ -375,8 +377,8 @@ export function DashboardLayout({ children, role }: PropsWithChildren<DashboardL
                 className={({ isActive }) =>
                   `flex rounded-xl px-3 py-2 text-sm transition ${
                     isActive || isPathActive(child.path, shouldMatchExactly(child.path))
-                      ? 'bg-slate-900 text-cyan-200'
-                      : 'text-slate-400 hover:bg-slate-900 hover:text-white'
+                      ? 'dashboard-theme-child-active'
+                      : INACTIVE_CHILD_NAV_ITEM_CLASS
                   }`
                 }
               >
@@ -390,10 +392,10 @@ export function DashboardLayout({ children, role }: PropsWithChildren<DashboardL
   };
 
   return (
-    <div className="h-screen overflow-hidden bg-slate-950 text-white">
+    <div className="dashboard-theme-bg h-screen overflow-hidden">
       <div className="flex h-full">
         <aside
-          className={`fixed inset-y-0 left-0 z-40 flex w-80 min-h-0 flex-col overflow-hidden transform border-r border-slate-800 bg-slate-950/95 px-6 py-6 backdrop-blur-xl transition lg:static lg:translate-x-0 ${
+          className={`dashboard-theme-border dashboard-theme-sidebar fixed inset-y-0 left-0 z-40 flex min-h-0 w-80 transform flex-col overflow-hidden border-r px-6 py-6 backdrop-blur-xl transition lg:static lg:translate-x-0 ${
             sidebarOpen ? 'translate-x-0' : '-translate-x-full'
           }`}
         >
@@ -401,8 +403,8 @@ export function DashboardLayout({ children, role }: PropsWithChildren<DashboardL
             <BusinessLogo
               to={dashboardHomePath}
               imageWrapperClassName="h-12 w-12"
-              titleClassName="text-lg text-white"
-              subtitleClassName="text-slate-500"
+              titleClassName="dashboard-theme-text text-lg"
+              subtitleClassName="dashboard-theme-faint"
             />
             <Button variant="ghost" className="lg:hidden" onClick={() => setSidebarOpen(false)}>
               <X className="h-5 w-5" />
@@ -412,10 +414,10 @@ export function DashboardLayout({ children, role }: PropsWithChildren<DashboardL
           <div className="min-h-0 flex-1 overflow-y-auto pr-1">
             <div className="space-y-2">{navItems.map(renderItem)}</div>
 
-            <div className="mt-8 rounded-3xl border border-slate-800 bg-slate-900/70 p-5">
-              <div className="text-xs uppercase tracking-[0.3em] text-cyan-300">Active Role</div>
-              <div className="mt-3 text-xl font-semibold text-white capitalize">{user.role}</div>
-              <p className="mt-2 text-sm leading-6 text-slate-400">
+            <div className="dashboard-theme-border dashboard-theme-surface mt-8 rounded-3xl border p-5">
+              <div className="text-xs uppercase tracking-[0.3em] text-cyan-700 dark:text-cyan-300">Active Role</div>
+              <div className="dashboard-theme-text mt-3 text-xl font-semibold capitalize">{user.role}</div>
+              <p className="dashboard-theme-subtle mt-2 text-sm leading-6">
                 Role-aware access is controlled from a single sidebar config so navigation stays auditable.
               </p>
             </div>
@@ -423,15 +425,15 @@ export function DashboardLayout({ children, role }: PropsWithChildren<DashboardL
         </aside>
 
         <div className="flex min-h-0 flex-1 flex-col">
-          <header className="sticky top-0 z-30 border-b border-slate-800 bg-slate-950/85 backdrop-blur-xl">
+          <header className="dashboard-theme-border dashboard-theme-header sticky top-0 z-30 border-b backdrop-blur-xl">
             <div className="flex items-center justify-between px-4 py-4 lg:px-8">
               <div className="flex items-center gap-3">
                 <Button variant="ghost" className="lg:hidden" onClick={() => setSidebarOpen(true)}>
                   <Menu className="h-5 w-5" />
                 </Button>
                 <div>
-                  <div className="text-xs uppercase tracking-[0.3em] text-slate-500">Workspace</div>
-                  <div className="mt-1 text-xl font-semibold text-white">{currentLabel}</div>
+                  <div className="dashboard-theme-faint text-xs uppercase tracking-[0.3em]">Workspace</div>
+                  <div className="dashboard-theme-text mt-1 text-xl font-semibold">{currentLabel}</div>
                 </div>
               </div>
 
@@ -439,13 +441,13 @@ export function DashboardLayout({ children, role }: PropsWithChildren<DashboardL
                 <NotificationBell />
                 <NavLink
                   to="/dashboard/profile"
-                  className="flex items-center gap-3 rounded-2xl border border-slate-800 bg-slate-900/70 px-4 py-2 transition hover:border-cyan-500/40 hover:bg-slate-900"
+                  className="dashboard-theme-border dashboard-theme-surface dashboard-theme-hover flex items-center gap-3 rounded-2xl border px-4 py-2 transition hover:border-cyan-500/40"
                 >
-                  <div className="flex h-11 w-11 items-center justify-center rounded-full bg-gradient-to-br from-cyan-500 to-emerald-500 text-sm font-bold text-white">
+                  <div className="flex h-11 w-11 items-center justify-center rounded-full bg-gradient-to-br from-cyan-500 to-emerald-500 text-sm font-bold text-slate-50">
                     {initials}
                   </div>
                   <div>
-                    <div className="text-sm font-semibold text-white">{user.displayName}</div>
+                    <div className="dashboard-theme-text text-sm font-semibold">{user.displayName}</div>
                     <Badge>{user.role}</Badge>
                   </div>
                 </NavLink>
@@ -463,7 +465,7 @@ export function DashboardLayout({ children, role }: PropsWithChildren<DashboardL
         <button
           type="button"
           aria-label="Close sidebar overlay"
-          className="fixed inset-0 z-30 bg-slate-950/60 lg:hidden"
+          className="dashboard-theme-overlay fixed inset-0 z-30 lg:hidden"
           onClick={() => setSidebarOpen(false)}
         />
       ) : null}

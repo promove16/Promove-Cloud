@@ -499,16 +499,16 @@ export const router = createBrowserRouter([
       {
         path: "/product-workspace/:projectId?",
         element: (
-          <ProtectedRoleRoute role={UserRole.STUDENT}>
+          <ProtectedRolesRoute roles={[UserRole.STUDENT, UserRole.MENTOR, UserRole.INVESTOR]}>
             <LazyPage component={ProductWorkspace} />
-          </ProtectedRoleRoute>
+          </ProtectedRolesRoute>
         ),
       },
       {
         path: "/patent-support/:innovationId?",
         element: (
           <ProtectedRoleRoute role={UserRole.STUDENT}>
-            <LazyPage component={PatentSupport} />
+            <Navigate to="/startup-launch" replace />
           </ProtectedRoleRoute>
         ),
       },
@@ -545,6 +545,7 @@ export const router = createBrowserRouter([
           { path: "investor-outreach", element: <LazyPage component={InvestorOutreach} /> },
           { path: "cap-table", element: <LazyPage component={StartupCapTable} /> },
           { path: "investor-deals", element: <LazyPage component={StudentInvestorDeals} /> },
+          { path: "patent-support", element: <LazyPage component={PatentSupport} /> },
         ],
       },
       {

@@ -50,7 +50,7 @@ async function test() {
     method: 'POST',
     headers: { 'Authorization': `Bearer ${token}` }
   });
-  console.log("Claim Same Again Status (Expect 400):", res.status);
+  console.log("Claim Same Again Status (Expect 200 idempotent):", res.status);
   
   // Create 3 workspaces then try 4th
   for (let i = 1; i < problemsToClaim.length; i++) {

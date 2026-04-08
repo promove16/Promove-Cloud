@@ -8,5 +8,6 @@ Structure:
 Common commands:
 - `npm run mock`
 - `npm run seed:users`
+- `npm run problem-bank:replace`
 - `npm run sync:indexes`
 - `npm run test:local`

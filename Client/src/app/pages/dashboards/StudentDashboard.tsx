@@ -17,7 +17,6 @@ import { OnboardingChecklist } from "../../../components/onboarding/OnboardingCh
 import { StudentGithubProofPrompt } from "../../../components/onboarding/StudentGithubProofPrompt";
 import { dealApi } from "../../../api/deal.api";
 import { workspaceApi } from "../../../api/workspace.api";
-import { StudentWorkspaceTabs } from "../../../features/student/StudentWorkspaceTabs";
 import { useInnovationScore } from "../../../hooks/useInnovationScore";
 import { useAuthStore } from "../../../store/authStore";
 import { Workspace } from "../../../types/workspace.types";
@@ -105,9 +104,9 @@ export function StudentDashboard() {
         helper: `Top ${rankPercentile}%`,
       },
       {
-        label: "Problems Claimed",
-        value: String(scoreQuery.data?.breakdown.problemsClaimed ?? 0),
-        helper: "Validated from score breakdown",
+        label: "Active Workspaces",
+        value: String(workspaces.length),
+        helper: "Claims start workspaces immediately",
       },
       {
         label: "Progress Uploads",
@@ -120,7 +119,7 @@ export function StudentDashboard() {
         helper: "Launch engine connected",
       },
     ],
-    [innovationScore, rankPercentile, scoreQuery.data, weeklyDeltaLabel],
+    [innovationScore, rankPercentile, scoreQuery.data, weeklyDeltaLabel, workspaces.length],
   );
 
   return (
@@ -131,8 +130,6 @@ export function StudentDashboard() {
         </h1>
         <p className="text-lg text-slate-400">Keep building amazing things</p>
       </div>
-
-      <StudentWorkspaceTabs />
 
       <StudentGithubProofPrompt />
       <OnboardingChecklist />

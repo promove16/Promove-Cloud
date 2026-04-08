@@ -48,7 +48,7 @@ export function StudentAccessWorkspace({
     <DashboardSection
       eyebrow="Student Access"
       title="Student access"
-      description="Generate onboarding tokens and review student verification requests without wasting vertical space."
+      description="Generate required onboarding tokens and review student verification requests without wasting vertical space."
     >
       <div className="grid gap-8 xl:grid-cols-[minmax(0,1.2fr),minmax(320px,0.8fr)]">
         <div className="space-y-6 xl:border-r xl:border-slate-800/70 xl:pr-8">
@@ -57,7 +57,7 @@ export function StudentAccessWorkspace({
               <div className="text-[11px] uppercase tracking-[0.26em] text-slate-500">Token Desk</div>
               <h3 className="mt-2 text-xl font-semibold text-white">Generate and track access tokens</h3>
               <p className="mt-2 max-w-2xl text-sm leading-6 text-slate-400">
-                Create cohort-specific signup tokens and monitor how many registrations each token has handled.
+                Create cohort-specific signup tokens students must use before they enter your approval queue.
               </p>
             </div>
             <div className="rounded-full border border-cyan-500/20 bg-cyan-500/10 px-3 py-1 text-xs font-medium text-cyan-200">

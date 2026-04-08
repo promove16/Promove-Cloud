@@ -22,7 +22,7 @@ import {
   deleteWorkspaceUpload,
   getAccessibleWorkspaces,
   getWorkspaceChatHistory,
-  getWorkspaceForMember,
+  getWorkspaceForChatAccess,
   serializeWorkspace,
   inviteMember,
   inviteMemberSchema,
@@ -65,7 +65,7 @@ export const createWorkspaceController = async (req: Request, res: Response) => 
 export const getWorkspace = async (req: Request, res: Response) => {
   const userId = ensureUserId(req);
   const workspaceId = getParam(req.params.id, 'WORKSPACE_REQUIRED', 'Workspace id is required');
-  const workspace = await getWorkspaceForMember(workspaceId, userId);
+  const workspace = await getWorkspaceForChatAccess(workspaceId, userId);
   res.json(new ApiResponse(await serializeWorkspace(workspace)));
 };
 

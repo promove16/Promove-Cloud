@@ -15,13 +15,13 @@ export const Button = forwardRef<HTMLButtonElement, ButtonProps>(
         clsx(
           'inline-flex items-center justify-center rounded-xl px-4 py-3 text-sm font-semibold transition-all focus:outline-none focus:ring-2 focus:ring-blue-500 disabled:cursor-not-allowed disabled:opacity-60',
           {
-            'bg-gradient-to-r from-blue-600 to-purple-600 text-white hover:from-blue-700 hover:to-purple-700':
+            'bg-gradient-to-r from-blue-600 to-purple-600 text-slate-50 hover:from-blue-700 hover:to-purple-700':
               variant === 'primary',
-            'border border-slate-700 bg-slate-900 text-white hover:border-slate-600':
+            'border border-slate-300 bg-white text-slate-900 hover:border-slate-400 dark:border-slate-700 dark:bg-slate-900 dark:text-white dark:hover:border-slate-600':
               variant === 'secondary',
-            'bg-transparent text-slate-300 hover:bg-slate-800 hover:text-white':
+            'bg-transparent text-slate-600 hover:bg-slate-100 hover:text-slate-950 dark:text-slate-300 dark:hover:bg-slate-800 dark:hover:text-white':
               variant === 'ghost',
-            'bg-red-600 text-white hover:bg-red-700': variant === 'danger',
+            'bg-red-600 text-slate-50 hover:bg-red-700': variant === 'danger',
           },
         ),
         className,

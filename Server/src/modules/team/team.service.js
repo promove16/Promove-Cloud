@@ -3,7 +3,7 @@ const Team = require('../../models/Team');
 const User = require('../../models/User');
 const Project = require('../../models/Project');
 const StudentProfile = require('../../models/StudentProfile');
-const ApiError = require('../../utils/ApiError');
+const { ApiError } = require('../../utils/ApiError');
 const emailService = require('../../utils/emailService');
 
 async function createTeam(userId, body) {

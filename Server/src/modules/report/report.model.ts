@@ -12,6 +12,7 @@ export const REPORT_REASONS = [
 export type ReportReason = (typeof REPORT_REASONS)[number];
 
 export interface IUserReport extends Document {
+  institutionId?: Types.ObjectId | null;
   reporterId: Types.ObjectId;
   reportedUserId: Types.ObjectId;
   reason: ReportReason;
@@ -23,6 +24,12 @@ export interface IUserReport extends Document {
 
 const userReportSchema = new Schema<IUserReport>(
   {
+    institutionId: {
+      type: Schema.Types.ObjectId,
+      ref: 'User',
+      default: null,
+      index: true,
+    },
     reporterId: { type: Schema.Types.ObjectId, required: true, index: true },
     reportedUserId: { type: Schema.Types.ObjectId, required: true, index: true },
     reason: {
@@ -41,5 +48,6 @@ const userReportSchema = new Schema<IUserReport>(
 );
 
 userReportSchema.index({ reportedUserId: 1, status: 1 });
+userReportSchema.index({ institutionId: 1, status: 1, createdAt: -1 });
 
 export const UserReport = model<IUserReport>('UserReport', userReportSchema);

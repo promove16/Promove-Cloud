@@ -260,7 +260,7 @@ export default function OperationsPage() {
         >
           <StudentIntakePanel
             heading="Feed student data manually or from Excel"
-            description="Create a school-managed roster, generate temporary credentials for managed student accounts, or issue tokens for self-service student signup."
+            description="Create a school-managed roster, email temporary credentials for managed student accounts, or issue tokens for approved self-service signup."
             secondaryFieldLabel="Class / Section"
             secondaryFieldPlaceholder="Grade 12 - A"
             roster={rosterQuery.data ?? []}

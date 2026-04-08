@@ -1325,7 +1325,7 @@
             "url": "{{baseUrl}}/api/workspace",
             "body": {
               "mode": "raw",
-              "raw": "{\n  \"title\": \"Postman Workspace\",\n  \"category\": \"Innovation Project\",\n  \"claimedProblemId\": \"{{problemId}}\"\n}",
+              "raw": "{\n  \"title\": \"Postman Workspace\",\n  \"category\": \"Innovation Project\"\n}",
               "options": {
                 "raw": {
                   "language": "json"

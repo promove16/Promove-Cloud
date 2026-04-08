@@ -62,6 +62,7 @@ export interface IRequestAuditEntry {
 
 export interface IRequest {
   _id: Types.ObjectId;
+  institutionId?: Types.ObjectId | null;
   type: RequestType;
   actionType?: RequestActionType;
   fromUserId: Types.ObjectId;
@@ -119,6 +120,12 @@ const requestAuditEntrySchema = new Schema<IRequestAuditEntry>(
 
 const requestSchema = new Schema<IRequest>(
   {
+    institutionId: {
+      type: Schema.Types.ObjectId,
+      ref: 'User',
+      default: null,
+      index: true,
+    },
     type: {
       type: String,
       enum: REQUEST_TYPES,
@@ -245,6 +252,7 @@ const requestSchema = new Schema<IRequest>(
 requestSchema.index({ toUserId: 1, status: 1, createdAt: -1 });
 requestSchema.index({ recipientEmail: 1, status: 1, createdAt: -1 });
 requestSchema.index({ fromUserId: 1, status: 1, createdAt: -1 });
+requestSchema.index({ institutionId: 1, status: 1, createdAt: -1 });
 requestSchema.index({ type: 1, targetEntityType: 1, targetEntityId: 1, status: 1 });
 requestSchema.index({
   fromUserId: 1,

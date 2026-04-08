@@ -438,7 +438,7 @@ export function StudentIntakePanel({
                       <div className="text-sm font-medium text-white">Create temporary logins</div>
                       <div className="mt-0.5 text-xs text-slate-400">
                         Automatically generate a password for each student. They must change it on first login.
-                        Email must match your institution domain.
+                        The temporary credentials are emailed to each student.
                       </div>
                     </div>
                   </label>
@@ -480,7 +480,7 @@ export function StudentIntakePanel({
                       </div>
 
                       <div className="rounded-lg border border-amber-500/20 bg-amber-500/10 px-4 py-3 text-xs text-amber-200">
-                        Save these passwords now — they cannot be retrieved again. Students must change their password on first login.
+                        These passwords were emailed to students. Save them only if your institution needs a backup handoff.
                       </div>
 
                       <div className="max-h-64 space-y-2 overflow-y-auto">
@@ -544,7 +544,7 @@ export function StudentIntakePanel({
               {activeTab === 'credentials' && (
                 <form onSubmit={handleTemporarySubmit} className="space-y-3">
                   <p className="text-xs text-slate-500">
-                    Create a one-time password using a verified institutional email. The student should change it after first sign-in.
+                    Create a one-time password using a verified institutional email. The temporary credentials will be emailed to the student.
                   </p>
                   <input
                     type="text"
@@ -597,8 +597,8 @@ export function StudentIntakePanel({
                   />
                   <div className="text-xs text-slate-500">
                     {institutionDomainHint
-                      ? `Use @${institutionDomainHint} domain. Generated password is shown once.`
-                      : 'Use a school or college email domain you control. Password is shown once.'}
+                      ? `Use @${institutionDomainHint} domain. Generated credentials are emailed to the student.`
+                      : 'Use a school or college email domain you control. Credentials are emailed to the student.'}
                   </div>
                   <Button type="submit" disabled={isTemporaryCredentialSubmitting} className="w-full">
                     {isTemporaryCredentialSubmitting ? 'Creating...' : 'Create Temporary Login'}
@@ -613,7 +613,7 @@ export function StudentIntakePanel({
                         <div className="mt-2 break-all rounded-lg border border-cyan-500/20 bg-slate-950 px-3 py-2 font-mono text-sm font-semibold text-white">
                           {temporaryCredential.temporaryPassword}
                         </div>
-                        <div className="text-xs text-cyan-50/60">Share once — student must change on first login.</div>
+                        <div className="text-xs text-cyan-50/60">Credentials emailed. Student must change the password on first login.</div>
                       </div>
                     </div>
                   )}

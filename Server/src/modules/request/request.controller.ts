@@ -69,12 +69,12 @@ const getRequestId = (req: Request) => {
 
 export const listIncomingRequestsController = async (req: Request, res: Response) => {
   const user = requireUser(req);
-  res.json(new ApiResponse(await listIncomingRequests(user._id, user.email)));
+  res.json(new ApiResponse(await listIncomingRequests(user._id, user.email, user.institutionId)));
 };
 
 export const listOutgoingRequestsController = async (req: Request, res: Response) => {
   const user = requireUser(req);
-  res.json(new ApiResponse(await listOutgoingRequests(user._id)));
+  res.json(new ApiResponse(await listOutgoingRequests(user._id, user.institutionId)));
 };
 
 export const createRequestController = async (req: Request, res: Response) => {
@@ -83,6 +83,7 @@ export const createRequestController = async (req: Request, res: Response) => {
   const request = await createRequest({
     type: (payload.requestType ?? payload.type)!,
     actionType: payload.actionType,
+    institutionId: user.institutionId,
     fromUserId: user._id,
     toUserId: payload.toUserId,
     recipientEmail: payload.recipientEmail,
@@ -104,20 +105,20 @@ export const createRequestController = async (req: Request, res: Response) => {
 
 export const getRequestController = async (req: Request, res: Response) => {
   const user = requireUser(req);
-  res.json(new ApiResponse(await getRequestForUser(getRequestId(req), user._id, user.email)));
+  res.json(new ApiResponse(await getRequestForUser(getRequestId(req), user._id, user.email, user.institutionId)));
 };
 
 export const acceptRequestController = async (req: Request, res: Response) => {
   const user = requireUser(req);
-  res.json(new ApiResponse(await acceptRequest(getRequestId(req), user._id, user.email)));
+  res.json(new ApiResponse(await acceptRequest(getRequestId(req), user._id, user.email, user.institutionId)));
 };
 
 export const declineRequestController = async (req: Request, res: Response) => {
   const user = requireUser(req);
-  res.json(new ApiResponse(await declineRequest(getRequestId(req), user._id, user.email)));
+  res.json(new ApiResponse(await declineRequest(getRequestId(req), user._id, user.email, user.institutionId)));
 };
 
 export const withdrawRequestController = async (req: Request, res: Response) => {
   const user = requireUser(req);
-  res.json(new ApiResponse(await withdrawRequest(getRequestId(req), user._id)));
+  res.json(new ApiResponse(await withdrawRequest(getRequestId(req), user._id, user.institutionId)));
 };

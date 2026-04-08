@@ -11,6 +11,7 @@
     "lint": "tsc --noEmit",
     "test": "jest --runInBand",
     "db:seed": "ts-node ./src/scripts/seed.ts",
+    "problem-bank:replace": "ts-node --transpile-only ./src/modules/problemBank/replaceProblemBank.ts --force",
     "seed:users": "node ./scripts/seed-users.js",
     "sync:indexes": "node -e \"process.env.TS_NODE_PREFER_TS_EXTS='true'; require('ts-node/register/transpile-only'); require('./scripts/sync-indexes.ts');\"",
     "test:local": "node -e \"process.env.TS_NODE_PREFER_TS_EXTS='true'; require('ts-node/register/transpile-only'); require('./scripts/manual/test-local.ts');\""

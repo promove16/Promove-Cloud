@@ -4,7 +4,6 @@ import { isAxiosError } from "axios";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { CheckCircle, Download, FileText, Rocket, Send, ShieldCheck, Target, TrendingUp, Upload, Users, X } from "lucide-react";
 import { dealApi } from "../../api/deal.api";
-import { patentApi } from "../../api/patent.api";
 import { startupApi, StartupPayload } from "../../api/startup.api";
 import { workspaceApi } from "../../api/workspace.api";
 import {
@@ -12,6 +11,8 @@ import {
   STARTUP_IPR_QUESTION_SECTIONS,
   STARTUP_IPR_UPLOAD_MAX_BYTES,
   STARTUP_IPR_DOCUMENT_SPECS,
+  buildStartupReviewReadiness,
+  formatStartupIprValue,
   getRequiredStartupDocumentCategories,
 } from "../../features/startup/iprIntake";
 import { getStartupSectionPath, normalizeStartupRouteId } from "../../features/startup/navigation";
@@ -50,6 +51,17 @@ const getStartupActionErrorMessage = (error: unknown, fallback: string) => {
   return error instanceof Error ? error.message : fallback;
 };
 
+const formatReadinessActionMessage = (missingItems: string[]) => {
+  if (missingItems.length === 0) {
+    return "Startup profile is incomplete for review.";
+  }
+
+  const topItems = missingItems.slice(0, 5).join(", ");
+  return missingItems.length > 5
+    ? `Complete before review: ${topItems}, and ${missingItems.length - 5} more.`
+    : `Complete before review: ${topItems}.`;
+};
+
 type WorkflowStepStatus = "complete" | "current" | "blocked" | "optional";
 
 const workflowStatusClassName: Record<WorkflowStepStatus, string> = {
@@ -66,6 +78,17 @@ const workflowStatusLabel: Record<WorkflowStepStatus, string> = {
   optional: "Optional",
 };
 
+const hasIprIntakeDraft = (registrationProfile: StartupRegistrationProfile) =>
+  STARTUP_IPR_QUESTION_SECTIONS.some((section) =>
+    section.questions.some((question) => {
+      if (question.type === "select") {
+        return false;
+      }
+
+      return String(registrationProfile[question.key] ?? "").trim().length > 0;
+    }),
+  );
+
 export function StartupLaunch() {
   const maxPitchDeckSizeBytes = 10 * 1024 * 1024;
   const maxIprUploadSizeBytes = STARTUP_IPR_UPLOAD_MAX_BYTES;
@@ -78,11 +101,12 @@ export function StartupLaunch() {
   const isNew = !startupId;
 
   const [showLaunchModal, setShowLaunchModal] = useState(false);
-  const [launchTarget, setLaunchTarget] = useState<"investors" | "mentors" | "both">("both");
+  const [launchTarget, setLaunchTarget] = useState<"investors" | "mentors" | "both" | "recruiters">("both");
   const [toast, setToast] = useState("");
   const [pendingPitchDeckName, setPendingPitchDeckName] = useState("");
   const [pendingDocumentCategory, setPendingDocumentCategory] = useState<StartupDocumentCategory | null>(null);
   const [form, setForm] = useState<StartupPayload>(() => createEmptyPayload());
+  const [isIprIntakeOpen, setIsIprIntakeOpen] = useState(true);
 
   const workspaceQuery = useQuery({ queryKey: ["workspaces"], queryFn: () => workspaceApi.list() });
   const startupQuery = useQuery({
@@ -95,33 +119,14 @@ export function StartupLaunch() {
     queryFn: dealApi.getMyDeals,
     refetchInterval: 60_000,
   });
-  const patentsQuery = useQuery({
-    queryKey: ["patents", "mine"],
-    queryFn: patentApi.mine,
-    enabled: !isNew,
-  });
-
   const startup = startupQuery.data;
   const workspaces = workspaceQuery.data ?? [];
-  const selectedWorkspaceId = startup?.projectId ?? form.projectId ?? workspaces[0]?._id ?? "";
+  const selectedWorkspaceId = startup?.projectId ?? form.projectId ?? "";
   const activeWorkspace = workspaces.find((workspace) => workspace._id === selectedWorkspaceId) ?? null;
   const workspaceTeamSize =
     activeWorkspace?.teamMembers?.length ??
     activeWorkspace?.teamMemberIds?.length ??
     0;
-  const linkedWorkspaceId = startup?.projectId ?? form.projectId ?? selectedWorkspaceId;
-  const linkedPatents = useMemo(
-    () => (patentsQuery.data ?? []).filter((patent) => patent.workspaceId === linkedWorkspaceId),
-    [linkedWorkspaceId, patentsQuery.data],
-  );
-  const approvedPatent = linkedPatents.find((patent) => patent.status === "approved");
-  const latestPatent = linkedPatents[0];
-  const projectComplete = Boolean(
-    activeWorkspace &&
-      (activeWorkspace.stage === "Launch" ||
-        activeWorkspace.progressPercent >= 100 ||
-        (activeWorkspace.milestones.length > 0 && activeWorkspace.milestones.every((milestone) => milestone.isCompleted))),
-  );
 
   useEffect(() => {
     if (!startup) {
@@ -153,28 +158,8 @@ export function StartupLaunch() {
         ...(startup.registrationProfile ?? {}),
       },
     });
+    setIsIprIntakeOpen(!hasIprIntakeDraft(startup.registrationProfile ?? defaultPayload.registrationProfile));
   }, [startup]);
-
-  useEffect(() => {
-    if (startup) {
-      return;
-    }
-
-    if (!isNew) {
-      return;
-    }
-
-    setForm((current) => {
-      if (current.projectId || !workspaces[0]?._id) {
-        return current;
-      }
-
-      return {
-        ...current,
-        projectId: workspaces[0]._id,
-      };
-    });
-  }, [isNew, startup, workspaces]);
 
   const persistStartup = useMutation({
     mutationFn: async () => {
@@ -191,6 +176,7 @@ export function StartupLaunch() {
     },
     onSuccess: async (saved) => {
       queryClient.setQueryData(["startup", saved._id], saved);
+      setIsIprIntakeOpen(!hasIprIntakeDraft(saved.registrationProfile));
       setToast("Startup draft saved. Submit it for admin review when ready.");
       await queryClient.invalidateQueries({ queryKey: ["startup"] });
       if (isNew && saved._id) {
@@ -234,7 +220,7 @@ export function StartupLaunch() {
 
   const requestReview = useMutation({
     mutationFn: async () => {
-      const savedStartup = startup?._id ? startup : await persistStartup.mutateAsync();
+      const savedStartup = await persistStartup.mutateAsync();
       return startupApi.requestReview(savedStartup._id);
     },
     onSuccess: async (saved) => {
@@ -375,7 +361,55 @@ export function StartupLaunch() {
   const formTeamSize = workspaceTeamSize || form.teamSize || startup?.teamSize || 1;
   const requiredDocumentCategories = getRequiredStartupDocumentCategories(form.registrationProfile);
   const currentDocuments = startup?.documents ?? [];
+  const currentReadiness = useMemo(
+    () =>
+      startup
+        ? buildStartupReviewReadiness({
+            name: form.name,
+            tagline: form.tagline,
+            category: form.category,
+            founderIds: startup.founderIds,
+            pitchDeckUrl: startup.pitchDeckUrl,
+            documents: currentDocuments,
+            registrationProfile: form.registrationProfile,
+          })
+        : undefined,
+    [
+      currentDocuments,
+      form.category,
+      form.name,
+      form.registrationProfile,
+      form.tagline,
+      startup,
+    ],
+  );
   const documentsByCategory = new Map(currentDocuments.map((document) => [document.category, document]));
+  const iprQuestionCount = STARTUP_IPR_QUESTION_SECTIONS.reduce(
+    (total, section) => total + section.questions.length,
+    0,
+  );
+  const iprAnsweredQuestionCount = STARTUP_IPR_QUESTION_SECTIONS.reduce(
+    (total, section) =>
+      total +
+      section.questions.filter((question) =>
+        String(form.registrationProfile[question.key] ?? "").trim().length > 0,
+      ).length,
+    0,
+  );
+  const iprSectionSummaries = STARTUP_IPR_QUESTION_SECTIONS.map((section) => ({
+    title: section.title,
+    answered: section.questions.filter((question) =>
+      String(form.registrationProfile[question.key] ?? "").trim().length > 0,
+    ).length,
+    total: section.questions.length,
+  }));
+  const iprPreviewAnswers = STARTUP_IPR_QUESTION_SECTIONS.flatMap((section) =>
+    section.questions.map((question) => ({
+      key: question.key,
+      label: question.label,
+      value: String(form.registrationProfile[question.key] ?? "").trim(),
+    })),
+  ).filter((item) => item.value.length > 0);
   const requiredDocumentSpecs = STARTUP_IPR_DOCUMENT_SPECS.filter((spec) =>
     requiredDocumentCategories.includes(spec.category),
   );
@@ -388,7 +422,7 @@ export function StartupLaunch() {
   const isApproved = reviewStatus === "approved";
   const isUnderReview = reviewStatus === "review_requested";
   const hasChangesRequested = reviewStatus === "changes_requested";
-  const readiness = startup?.readiness;
+  const readiness = currentReadiness ?? startup?.readiness;
   const reviewTone =
     reviewStatus === "approved"
       ? "bg-emerald-500/10 border-emerald-500/20 text-emerald-200"
@@ -426,7 +460,7 @@ export function StartupLaunch() {
   const summaryStats = [
     { label: "Team members", value: String(formTeamSize), icon: Users, tone: "text-cyan-300" },
     { label: "Launch score", value: String(startup?.innovationScoreAtLaunch ?? 0), icon: TrendingUp, tone: "text-emerald-300" },
-    { label: "Active products", value: String(startup?.activeProducts ?? form.activeProducts), icon: Target, tone: "text-violet-300" },
+    { label: "Active offerings", value: String(startup?.activeProducts ?? form.activeProducts), icon: Target, tone: "text-violet-300" },
     { label: "Status", value: profileStatusLabel, icon: CheckCircle, tone: "text-amber-300" },
   ] as const;
   const investorPitchListed = Boolean(startup?.launchedToInvestors);
@@ -436,68 +470,50 @@ export function StartupLaunch() {
     ? "Complete the startup name, tagline, category, and founder team before launch."
     : !isApproved
       ? "Admin startup review must be approved before marketplace launch."
-      : !activeWorkspace
-        ? "Link a project workspace before investor pitch listing."
-        : !projectComplete
-          ? "Complete the linked project workspace before investor pitch listing."
-          : !approvedPatent
-            ? "An approved patent for the linked project is required before investor pitch listing."
-            : "";
+      : "";
   const canOpenLaunchModal = !launchBlockedReason;
-  const patentStatusLabel = approvedPatent
-    ? "Patent approved"
-    : latestPatent
-      ? latestPatent.status.replace(/_/g, " ")
-      : "No patent request";
   const workflowSteps: Array<{
     label: string;
     detail: string;
     status: WorkflowStepStatus;
   }> = [
     {
-      label: "Create startup project",
-      detail: activeWorkspace ? activeWorkspace.title : "Link a workspace for project evidence and team context.",
-      status: activeWorkspace ? "complete" : "blocked",
-    },
-    {
-      label: "Create launch profile",
+      label: "Create startup profile",
       detail: canLaunch ? "Core startup identity is ready." : "Name, tagline, category, and team are required.",
       status: canLaunch ? "complete" : "current",
     },
     {
-      label: "Add members from marketplace",
+      label: "Build founder team",
       detail:
         formTeamSize > 1
-          ? `${formTeamSize} members are synced from the linked workspace.`
-          : "Optional: add collaborators to the workspace before launch.",
+          ? `${formTeamSize} members are attached to this startup.`
+          : "A solo founder can continue; add collaborators when the startup needs them.",
       status: formTeamSize > 1 ? "complete" : "optional",
     },
     {
-      label: "Complete the project",
-      detail: activeWorkspace
-        ? `${activeWorkspace.progressPercent}% complete in ${activeWorkspace.stage}.`
-        : "No project workspace is linked yet.",
-      status: projectComplete ? "complete" : activeWorkspace ? "current" : "blocked",
+      label: "Complete startup review",
+      detail: readiness?.isReviewReady ? "Startup review requirements are complete." : `Still missing: ${readiness?.missingItems.slice(0, 3).join(", ") || "startup details"}`,
+      status: readiness?.isReviewReady ? "complete" : "current",
     },
     {
-      label: "Request admin for patent",
-      detail: patentStatusLabel,
-      status: approvedPatent ? "complete" : latestPatent?.status === "rejected" ? "blocked" : latestPatent ? "current" : "blocked",
+      label: "Admin approval",
+      detail: isApproved ? "Admin review is approved." : isUnderReview ? "Admin review is in progress." : "Submit the startup profile for admin review.",
+      status: isApproved ? "complete" : isUnderReview ? "current" : "blocked",
     },
     {
-      label: "List for investor pitch",
-      detail: investorPitchListed ? "Investors can discover and pitch from the marketplace." : "Launch to investors after the prior gates are complete.",
+      label: "Launch to marketplace",
+      detail: marketplaceLive ? "Marketplace visibility is live." : "Choose investor, mentor, or recruiter visibility after approval.",
+      status: marketplaceLive ? "complete" : canOpenLaunchModal ? "current" : "blocked",
+    },
+    {
+      label: "Investor interest",
+      detail: investorPitchListed ? "Investors can discover this startup." : "Investor discovery starts after you launch to investors.",
       status: investorPitchListed ? "complete" : canOpenLaunchModal ? "current" : "blocked",
     },
     {
       label: "Investor approval",
       detail: investorApprovalReceived ? "Investor interest is active for this startup." : "Investor approval appears after a pitch receives interest.",
       status: investorApprovalReceived ? "complete" : investorPitchListed ? "current" : "blocked",
-    },
-    {
-      label: "Launch to marketplace",
-      detail: marketplaceLive ? "Marketplace visibility is live." : "Final launch is blocked until review and approval gates are complete.",
-      status: marketplaceLive ? "complete" : canOpenLaunchModal ? "current" : "blocked",
     },
   ];
   const checklistItems = [
@@ -514,12 +530,9 @@ export function StartupLaunch() {
     readiness?.isReviewReady
       ? "Required IPR intake answers and document uploads are complete."
       : `Still missing: ${readiness?.missingItems.slice(0, 3).join(", ") || "IPR details"}`,
-    projectComplete
-      ? "The linked project is complete for investor pitch listing."
-      : "Complete the linked workspace before investor pitch listing.",
-    approvedPatent
-      ? "An approved patent is attached to the linked workspace."
-      : "Request admin patent approval before investor pitch listing.",
+    activeWorkspace
+      ? `Optional workspace link: ${activeWorkspace.title}.`
+      : "No workspace is linked; this startup remains independent.",
     requiredDocumentCategories.length > 0
       ? `${requiredDocumentCategories.length} IPR supporting upload ${requiredDocumentCategories.length === 1 ? "is" : "are"} required at the current stage.`
       : "No mandatory IPR uploads are required at the current stage yet.",
@@ -530,6 +543,33 @@ export function StartupLaunch() {
   const fieldClassName =
     "w-full rounded-xl border border-slate-800 bg-slate-950 px-4 py-3 text-sm text-white placeholder:text-slate-500 outline-none transition focus:border-blue-500";
   const textareaClassName = `${fieldClassName} min-h-28 resize-y`;
+  const isRequestReviewBusy = requestReview.isPending || persistStartup.isPending;
+  const isRequestReviewBlocked = Boolean(!readiness?.isReviewReady || isApproved || isUnderReview);
+  const requestReviewBlockedReason = isApproved
+    ? "Startup is already approved."
+    : isUnderReview
+      ? "Startup review is already pending."
+      : formatReadinessActionMessage(readiness?.missingItems ?? []);
+  const handleRequestReviewClick = () => {
+    if (isRequestReviewBusy) {
+      return;
+    }
+
+    if (isRequestReviewBlocked) {
+      setToast(requestReviewBlockedReason);
+      return;
+    }
+
+    requestReview.mutate();
+  };
+  const handleLaunchClick = () => {
+    if (launchBlockedReason) {
+      setToast(launchBlockedReason);
+      return;
+    }
+
+    setShowLaunchModal(true);
+  };
   const renderDocumentCard = (spec: (typeof STARTUP_IPR_DOCUMENT_SPECS)[number], isRequired: boolean) => {
     const uploadedDocument = documentsByCategory.get(spec.category);
     const isUploading = pendingDocumentCategory === spec.category && uploadDocument.isPending;
@@ -606,7 +646,7 @@ export function StartupLaunch() {
           </h1>
           <p className="max-w-2xl text-sm text-slate-400">
             {isNew
-              ? "Fill in the required startup details, answer the IPR questions, and upload the required document."
+              ? "Fill in the startup details, answer the IPR questions, and upload the required startup documents."
               : "Edit the profile, keep the IPR review requirements visible, and submit only when the profile is ready."}
           </p>
         </div>
@@ -723,7 +763,7 @@ export function StartupLaunch() {
                 Startup Workflow
               </div>
               <h2 className="mt-2 text-xl font-semibold text-white">
-                Project to marketplace path
+                Startup to marketplace path
               </h2>
             </div>
             {launchBlockedReason ? (
@@ -763,16 +803,14 @@ export function StartupLaunch() {
         <div className="space-y-8">
           <div className={`${sectionClassName} grid gap-4 md:grid-cols-2`}>
               <div>
-                <label className="block text-sm font-semibold text-white mb-2">Linked workspace</label>
+                <label className="block text-sm font-semibold text-white mb-2">Optional workspace link</label>
                 <select
                   value={selectedWorkspaceId}
                   onChange={(event) => handleWorkspaceChange(event.target.value)}
                   className={fieldClassName}
-                  disabled={workspaceQuery.isLoading || workspaces.length === 0}
+                  disabled={workspaceQuery.isLoading}
                 >
-                  {workspaces.length === 0 ? (
-                    <option value="">No linked workspace</option>
-                  ) : null}
+                  <option value="">No linked workspace</option>
                   {workspaces.map((workspace) => (
                     <option key={workspace._id} value={workspace._id}>
                       {workspace.title}
@@ -781,8 +819,8 @@ export function StartupLaunch() {
                 </select>
                 <div className="mt-2 text-xs text-slate-500">
                   {activeWorkspace
-                    ? `Startup access and team context will follow ${activeWorkspace.title}.`
-                    : "You can still save a startup without linking it to a workspace."}
+                    ? `Team context will follow ${activeWorkspace.title}.`
+                    : "Keep this empty when the startup is not based on an existing workspace."}
                 </div>
               </div>
               <div>
@@ -798,7 +836,7 @@ export function StartupLaunch() {
                 <input value={form.category} onChange={(event) => setForm((current) => ({ ...current, category: event.target.value }))} placeholder="e.g. FinTech, Healthcare, EdTech, Climate..." className={fieldClassName} />
               </div>
               <div>
-                <label className="block text-sm font-semibold text-white mb-2">Product stage</label>
+                <label className="block text-sm font-semibold text-white mb-2">Startup stage</label>
                 <select value={form.stage} onChange={(event) => setForm((current) => ({ ...current, stage: event.target.value as StartupPayload["stage"] }))} className={fieldClassName}>
                   <option>Pre-Idea</option>
                   <option>Ideation</option>
@@ -812,57 +850,131 @@ export function StartupLaunch() {
                 <input type="number" value={form.fundingNeeded ?? ""} onChange={(event) => setForm((current) => ({ ...current, fundingNeeded: event.target.value ? Number(event.target.value) : undefined }))} className={fieldClassName} />
               </div>
               <div>
-                <label className="block text-sm font-semibold text-white mb-2">Active products</label>
+                <label className="block text-sm font-semibold text-white mb-2">Active offerings</label>
                 <input type="number" value={form.activeProducts} onChange={(event) => setForm((current) => ({ ...current, activeProducts: Number(event.target.value) || 1 }))} className={fieldClassName} />
               </div>
           </div>
 
           <div className={`${sectionClassName} space-y-5`}>
-              <div>
-                <div className="text-xs uppercase tracking-[0.24em] text-cyan-300">IPR Intake</div>
-                <h2 className="mt-2 text-xl font-semibold text-white">Patent and innovation disclosure questionnaire</h2>
-                <p className="mt-2 max-w-3xl text-sm text-slate-400">
-                  Answer the required questions only. Keep the responses clear and specific enough for IPR review.
-                </p>
+              <div className="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
+                <div>
+                  <div className="text-xs uppercase tracking-[0.24em] text-cyan-300">IPR Intake</div>
+                  <h2 className="mt-2 text-xl font-semibold text-white">Startup innovation disclosure questionnaire</h2>
+                  <p className="mt-2 max-w-3xl text-sm text-slate-400">
+                    Answer the required questions only. Keep the responses clear and specific enough for startup IPR review.
+                  </p>
+                </div>
+                <div className="flex flex-wrap items-center gap-2">
+                  <div className="rounded-full border border-cyan-500/20 bg-cyan-500/10 px-3 py-1.5 text-xs font-semibold text-cyan-100">
+                    {iprAnsweredQuestionCount}/{iprQuestionCount} answered
+                  </div>
+                  {isIprIntakeOpen ? (
+                    <button
+                      type="button"
+                      onClick={() => setIsIprIntakeOpen(false)}
+                      className="rounded-xl border border-slate-700 px-4 py-2 text-sm font-semibold text-slate-200 transition hover:border-slate-500 hover:text-white"
+                    >
+                      Close
+                    </button>
+                  ) : (
+                    <button
+                      type="button"
+                      onClick={() => setIsIprIntakeOpen(true)}
+                      className="rounded-xl bg-cyan-500 px-4 py-2 text-sm font-semibold text-slate-950 transition hover:bg-cyan-400"
+                    >
+                      Edit
+                    </button>
+                  )}
+                </div>
               </div>
 
-              {STARTUP_IPR_QUESTION_SECTIONS.map((section) => (
-                <div key={section.title} className={isNew ? "space-y-4 border-t border-slate-800/70 pt-5 first:border-t-0 first:pt-0" : "rounded-2xl border border-slate-800 bg-slate-950/60 p-5"}>
-                  <div className="mb-4">
-                    <div className="text-xs uppercase tracking-[0.22em] text-slate-500">{section.title}</div>
+              {isIprIntakeOpen ? (
+                <>
+                  {STARTUP_IPR_QUESTION_SECTIONS.map((section) => (
+                    <div key={section.title} className={isNew ? "space-y-4 border-t border-slate-800/70 pt-5 first:border-t-0 first:pt-0" : "rounded-2xl border border-slate-800 bg-slate-950/60 p-5"}>
+                      <div className="mb-4">
+                        <div className="text-xs uppercase tracking-[0.22em] text-slate-500">{section.title}</div>
+                      </div>
+                      <div className="grid gap-4 xl:grid-cols-2">
+                        {section.questions.map((question) => (
+                          <div key={question.key} className={question.type === "select" ? "" : section.questions.length === 1 ? "xl:col-span-2" : ""}>
+                            <label className="mb-2 block text-sm font-semibold text-white">{question.label}</label>
+                            {question.type === "select" ? (
+                              <select
+                                value={String(form.registrationProfile[question.key])}
+                                onChange={(event) => updateRegistrationField(question.key, event.target.value as StartupRegistrationProfile[typeof question.key])}
+                                className={fieldClassName}
+                              >
+                                {question.options.map((option) => (
+                                  <option key={option.value} value={option.value}>
+                                    {option.label}
+                                  </option>
+                                ))}
+                              </select>
+                            ) : (
+                              <textarea
+                                value={String(form.registrationProfile[question.key] ?? "")}
+                                onChange={(event) => updateRegistrationField(question.key, event.target.value as StartupRegistrationProfile[typeof question.key])}
+                                className={textareaClassName}
+                                placeholder="Add a concrete answer with enough technical detail for review."
+                              />
+                            )}
+                            {"minLength" in question ? (
+                              <div className="mt-2 text-xs text-slate-500">Recommended minimum: {question.minLength} characters</div>
+                            ) : null}
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+                  ))}
+
+                  <div className="flex flex-col gap-3 rounded-2xl border border-cyan-500/20 bg-cyan-500/5 px-4 py-4 sm:flex-row sm:items-center sm:justify-between">
+                    <div>
+                      <div className="text-sm font-semibold text-white">Save IPR intake</div>
+                      <div className="mt-1 text-xs text-cyan-100/80">
+                        Saved answers are stored with this startup profile and will load again after relogin.
+                      </div>
+                    </div>
+                    <button
+                      type="button"
+                      onClick={() => persistStartup.mutate()}
+                      disabled={persistStartup.isPending}
+                      className="rounded-xl bg-white px-5 py-3 text-sm font-semibold text-slate-950 transition hover:bg-slate-100 disabled:cursor-not-allowed disabled:opacity-60"
+                    >
+                      {persistStartup.isPending ? "Saving..." : isNew ? "Create & Save Intake" : "Save IPR Intake"}
+                    </button>
                   </div>
-                  <div className="grid gap-4 xl:grid-cols-2">
-                    {section.questions.map((question) => (
-                      <div key={question.key} className={question.type === "select" ? "" : section.questions.length === 1 ? "xl:col-span-2" : ""}>
-                        <label className="mb-2 block text-sm font-semibold text-white">{question.label}</label>
-                        {question.type === "select" ? (
-                          <select
-                            value={String(form.registrationProfile[question.key])}
-                            onChange={(event) => updateRegistrationField(question.key, event.target.value as StartupRegistrationProfile[typeof question.key])}
-                            className={fieldClassName}
-                          >
-                            {question.options.map((option) => (
-                              <option key={option.value} value={option.value}>
-                                {option.label}
-                              </option>
-                            ))}
-                          </select>
-                        ) : (
-                          <textarea
-                            value={String(form.registrationProfile[question.key] ?? "")}
-                            onChange={(event) => updateRegistrationField(question.key, event.target.value as StartupRegistrationProfile[typeof question.key])}
-                            className={textareaClassName}
-                            placeholder="Add a concrete answer with enough technical detail for review."
-                          />
-                        )}
-                        {"minLength" in question ? (
-                          <div className="mt-2 text-xs text-slate-500">Recommended minimum: {question.minLength} characters</div>
-                        ) : null}
+                </>
+              ) : (
+                <div className="rounded-2xl border border-slate-800 bg-slate-950/60 p-5">
+                  <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-4">
+                    {iprSectionSummaries.map((section) => (
+                      <div key={section.title} className="rounded-xl border border-slate-800 bg-slate-900/70 px-4 py-3">
+                        <div className="text-xs uppercase tracking-[0.2em] text-slate-500">{section.title}</div>
+                        <div className="mt-2 text-sm font-semibold text-white">
+                          {section.answered}/{section.total} answered
+                        </div>
                       </div>
                     ))}
                   </div>
+                  <div className="mt-4 space-y-3">
+                    {iprPreviewAnswers.length > 0 ? (
+                      iprPreviewAnswers.slice(0, 4).map((item) => (
+                        <div key={item.key} className="rounded-xl border border-slate-800 bg-slate-950 px-4 py-3">
+                          <div className="text-xs font-semibold uppercase tracking-[0.18em] text-slate-500">{item.label}</div>
+                          <div className="mt-2 line-clamp-2 text-sm leading-6 text-slate-200">
+                            {formatStartupIprValue(item.key, item.value)}
+                          </div>
+                        </div>
+                      ))
+                    ) : (
+                      <div className="rounded-xl border border-dashed border-slate-800 bg-slate-950 px-4 py-5 text-sm text-slate-400">
+                        No written intake answers have been saved yet. Use Edit to complete the questionnaire.
+                      </div>
+                    )}
+                  </div>
                 </div>
-              ))}
+              )}
           </div>
 
           {!isNew ? (
@@ -1063,7 +1175,7 @@ export function StartupLaunch() {
             <p className="mt-1 text-sm text-slate-400">
               {isNew
                 ? "Create the startup first, then return here to submit it for review."
-                : launchBlockedReason || "Save changes after reviewing the full profile, then launch to investor marketplace from here."}
+                : launchBlockedReason || "Save changes after reviewing the full profile, then launch to the marketplace from here."}
             </p>
           </div>
           <div className="flex flex-wrap items-center gap-3 sm:justify-end">
@@ -1071,18 +1183,26 @@ export function StartupLaunch() {
               <>
                 <button
                   type="button"
-                  onClick={() => requestReview.mutate()}
-                  disabled={!startup?.readiness?.isReviewReady || isUnderReview || requestReview.isPending || launchStartup.isPending}
-                  className="rounded-xl border border-slate-700 bg-slate-900 px-4 py-3 text-sm font-semibold text-white transition hover:border-slate-600 disabled:cursor-not-allowed disabled:opacity-50"
+                  onClick={handleRequestReviewClick}
+                  disabled={isRequestReviewBusy}
+                  aria-disabled={isRequestReviewBlocked || isRequestReviewBusy}
+                  title={isRequestReviewBlocked ? requestReviewBlockedReason : "Save the latest profile and submit for admin review"}
+                  className={`rounded-xl border px-4 py-3 text-sm font-semibold transition disabled:cursor-wait disabled:opacity-60 ${
+                    isRequestReviewBlocked
+                      ? "cursor-help border-slate-800 bg-slate-900/70 text-slate-400"
+                      : "border-slate-700 bg-slate-900 text-white hover:border-slate-600"
+                  }`}
                 >
-                  {requestReview.isPending ? "Submitting..." : isApproved ? "Approved" : isUnderReview ? "Under Review" : "Submit for Review"}
+                  {isRequestReviewBusy ? "Submitting..." : isApproved ? "Approved" : isUnderReview ? "Under Review" : "Submit for Review"}
                 </button>
                 <button
                   type="button"
-                  onClick={() => setShowLaunchModal(true)}
-                  disabled={!canOpenLaunchModal}
-                  title={launchBlockedReason || "Launch to investor marketplace"}
-                  className="inline-flex items-center gap-2 rounded-xl bg-gradient-to-r from-blue-600 to-purple-600 px-5 py-3 text-sm font-semibold text-white disabled:cursor-not-allowed disabled:opacity-50"
+                  onClick={handleLaunchClick}
+                  aria-disabled={!canOpenLaunchModal}
+                  title={launchBlockedReason || "Launch to marketplace"}
+                  className={`inline-flex items-center gap-2 rounded-xl bg-gradient-to-r from-blue-600 to-purple-600 px-5 py-3 text-sm font-semibold text-white ${
+                    canOpenLaunchModal ? "hover:from-blue-500 hover:to-purple-500" : "cursor-help opacity-50"
+                  }`}
                 >
                   <Rocket className="h-4 w-4" />
                   Launch
@@ -1108,18 +1228,19 @@ export function StartupLaunch() {
                 <button type="button" onClick={() => setShowLaunchModal(false)} className="text-slate-400 hover:text-white"><X className="w-5 h-5" /></button>
               </div>
               <div className="mb-5 rounded-lg border border-cyan-500/20 bg-cyan-500/10 px-4 py-3 text-sm text-cyan-100">
-                Startups with completed projects and approved patents can be listed for investor pitch. You can then continue outreach and track investor approval from this workspace.
+                Approved student-created startups can be launched to investors, mentors, or recruiters. Workspace links are optional and do not come from the Problem Bank unless you choose one.
               </div>
               <div className="space-y-3 mb-6">
                 {[
                   ["investors", "Launch to Investors"],
                   ["mentors", "Launch to Mentors"],
                   ["both", "Launch to Both (Recommended)"],
+                  ["recruiters", "Launch to Recruiters"],
                 ].map(([value, label]) => (
                   <button
                     key={value}
                     type="button"
-                    onClick={() => setLaunchTarget(value as "investors" | "mentors" | "both")}
+                    onClick={() => setLaunchTarget(value as "investors" | "mentors" | "both" | "recruiters")}
                     className={`w-full text-left px-5 py-4 rounded-xl text-white transition ${
                       launchTarget === value
                         ? "border border-blue-500/50 bg-blue-500/10"

@@ -46,7 +46,7 @@ export const INVITATION_ROLE_META: Record<InvitationRole, InvitationRoleMeta> = 
     shortLabel: 'Student',
     summary: 'Invite builders, founders, or innovation teammates into the student journey.',
     invitePath: '/signup',
-    accessModel: 'Direct signup with optional institution token review later.',
+    accessModel: 'School or college token signup with institution approval.',
     icon: GraduationCap,
   },
   [UserRole.MENTOR]: {

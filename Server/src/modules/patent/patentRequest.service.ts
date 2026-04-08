@@ -192,7 +192,7 @@ export const submitPatentRequest = async (userId: string, payload: z.infer<typeo
     type: 'patent_status',
     title: 'Patent filing request received',
     body: `Your assisted patent filing request for "${payload.inventionTitle}" is now under review.`,
-    link: '/patent-support',
+    link: '/startup-launch',
   });
 
   const admins = await User.find({ role: UserRole.ADMIN }).select('_id').lean();

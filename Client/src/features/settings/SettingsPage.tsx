@@ -1,8 +1,9 @@
-import { useEffect, useState } from 'react';
+import { type FormEvent, useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useForm } from 'react-hook-form';
 import { useQueryClient } from '@tanstack/react-query';
 import { User, Bell, Shield, Palette, Settings2, Save, Loader2, Check, Lock, Globe, Monitor, Moon, Sun } from 'lucide-react';
+import { authApi } from '../../api/auth.api';
 import { userApi } from '../../api/user.api';
 import type { UserSettings } from '../../types/settings.types';
 import { useSettings } from '../../hooks/useSettings';
@@ -10,6 +11,7 @@ import { useAuthStore } from '../../store/authStore';
 import { applyTheme } from '../../hooks/useTheme';
 import { UserRole } from '../../types/roles.types';
 import { OptionTabs } from '../../components/ui/OptionTabs';
+import { AuthPasswordField } from '../auth/AuthPasswordField';
 
 // ─── Layout helper ────────────────────────────────────────────────────────────
 
@@ -86,6 +88,7 @@ type RoleState = {
   publicProfile: boolean; allowStudentApplications: boolean;
 };
 type AccountValues = { displayName: string; bio: string; timezone: string; language: string };
+type PasswordValues = { currentPassword: string; newPassword: string; confirmPassword: string };
 
 const splitCsv = (value: string) =>
   value
@@ -108,6 +111,11 @@ const defaultRole: RoleState = {
 };
 
 const TEMPORARY_MEMORY_PREFIXES = ['promove-', 'dm_first_contact_'];
+const defaultPasswordValues: PasswordValues = {
+  currentPassword: '',
+  newPassword: '',
+  confirmPassword: '',
+};
 
 const clearBrowserTemporaryMemory = () => {
   const clearStorage = (storage: Storage) => {
@@ -199,6 +207,10 @@ export function SettingsPage() {
   const [privacy, setPrivacy] = useState<PrivacyState>(defaultPrivacy);
   const [appearance, setAppearance] = useState<AppearanceState>(defaultAppearance);
   const [roleState, setRoleState] = useState<RoleState>(defaultRole);
+  const [passwordValues, setPasswordValues] = useState<PasswordValues>(defaultPasswordValues);
+  const [passwordError, setPasswordError] = useState('');
+  const [passwordNotice, setPasswordNotice] = useState('');
+  const [isChangingPassword, setIsChangingPassword] = useState(false);
   const role = authUser?.role ?? UserRole.STUDENT;
 
   const { register, handleSubmit, watch, reset, formState: { errors } } = useForm<AccountValues>({
@@ -380,6 +392,54 @@ export function SettingsPage() {
         setAuthUser({ ...authUser, isProfilePublic: roleState.publicProfile });
       }
     });
+  };
+
+  const onChangePassword = async (event: FormEvent<HTMLFormElement>) => {
+    event.preventDefault();
+    setPasswordError('');
+    setPasswordNotice('');
+
+    const currentPassword = passwordValues.currentPassword;
+    const newPassword = passwordValues.newPassword;
+    const confirmPassword = passwordValues.confirmPassword;
+
+    if (!currentPassword || !newPassword || !confirmPassword) {
+      setPasswordError('Enter your current password, new password, and confirmation.');
+      return;
+    }
+
+    if (newPassword.length < 8) {
+      setPasswordError('New password must be at least 8 characters.');
+      return;
+    }
+
+    if (newPassword !== confirmPassword) {
+      setPasswordError('New passwords do not match.');
+      return;
+    }
+
+    if (newPassword === currentPassword) {
+      setPasswordError('New password must be different from your current password.');
+      return;
+    }
+
+    setIsChangingPassword(true);
+
+    try {
+      const result = await authApi.changePassword({ currentPassword, newPassword });
+      setPasswordValues(defaultPasswordValues);
+      setPasswordNotice(result.message || 'Password changed successfully.');
+
+      if (authUser?.mustChangePasswordOnNextLogin) {
+        setAuthUser({ ...authUser, mustChangePasswordOnNextLogin: false });
+      }
+    } catch (error) {
+      const apiError = (error as { response?: { data?: { error?: { message?: string } } } })
+        ?.response?.data?.error;
+      setPasswordError(apiError?.message ?? 'Unable to change password right now.');
+    } finally {
+      setIsChangingPassword(false);
+    }
   };
 
   const onClearTemporaryCache = async () => {
@@ -571,12 +631,63 @@ export function SettingsPage() {
             <div className={`${card} border-slate-700`}>
               <p className={sectionHdr}>Password &amp; Security</p>
               <p className="text-sm text-slate-400 mb-4">Keep your account secure by updating your password regularly. We recommend using a unique, strong password.</p>
-              <div className="flex flex-wrap items-center gap-3">
-                <button type="button" disabled title="Coming soon"
-                  className="flex items-center gap-2 bg-slate-800 text-slate-400 border border-slate-700 font-semibold rounded-xl px-5 py-2.5 text-sm cursor-not-allowed opacity-70">
-                  <Lock className="w-4 h-4" />Change Password
-                  <span className="ml-2 text-xs bg-slate-700 text-slate-400 rounded-md px-1.5 py-0.5">Coming soon</span>
-                </button>
+              <form onSubmit={onChangePassword} className="space-y-4">
+                <div className="grid gap-4 md:grid-cols-3">
+                  <AuthPasswordField
+                    label="Current password"
+                    value={passwordValues.currentPassword}
+                    onChange={(event) => setPasswordValues((current) => ({ ...current, currentPassword: event.target.value }))}
+                    placeholder="Current password"
+                    labelClassName={labelCls}
+                    inputClassName={`${inputCls} pr-12`}
+                    required
+                    autoComplete="current-password"
+                  />
+                  <AuthPasswordField
+                    label="New password"
+                    value={passwordValues.newPassword}
+                    onChange={(event) => setPasswordValues((current) => ({ ...current, newPassword: event.target.value }))}
+                    placeholder="Min. 8 characters"
+                    labelClassName={labelCls}
+                    inputClassName={`${inputCls} pr-12`}
+                    required
+                    minLength={8}
+                    autoComplete="new-password"
+                  />
+                  <AuthPasswordField
+                    label="Confirm password"
+                    value={passwordValues.confirmPassword}
+                    onChange={(event) => setPasswordValues((current) => ({ ...current, confirmPassword: event.target.value }))}
+                    placeholder="Repeat new password"
+                    labelClassName={labelCls}
+                    inputClassName={`${inputCls} pr-12`}
+                    required
+                    minLength={8}
+                    autoComplete="new-password"
+                  />
+                </div>
+                {passwordError ? (
+                  <div className="rounded-xl border border-rose-500/20 bg-rose-500/10 px-4 py-3 text-sm text-rose-300">
+                    {passwordError}
+                  </div>
+                ) : null}
+                {passwordNotice ? (
+                  <div className="rounded-xl border border-emerald-500/20 bg-emerald-500/10 px-4 py-3 text-sm text-emerald-300">
+                    {passwordNotice}
+                  </div>
+                ) : null}
+                <div className="flex flex-wrap items-center gap-3">
+                  <button
+                    type="submit"
+                    disabled={isChangingPassword}
+                    className="flex items-center gap-2 rounded-xl bg-cyan-500 px-5 py-2.5 text-sm font-semibold text-slate-950 transition-colors hover:bg-cyan-400 disabled:cursor-not-allowed disabled:opacity-60"
+                  >
+                    {isChangingPassword ? <Loader2 className="h-4 w-4 animate-spin" /> : <Lock className="h-4 w-4" />}
+                    {isChangingPassword ? 'Changing Password...' : 'Change Password'}
+                  </button>
+                </div>
+              </form>
+              <div className="mt-4 flex flex-wrap items-center gap-3">
                 <button
                   type="button"
                   onClick={onClearTemporaryCache}

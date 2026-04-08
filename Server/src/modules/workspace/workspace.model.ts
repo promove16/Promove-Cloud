@@ -147,5 +147,15 @@ const workspaceSchema = new Schema(
 );
 
 workspaceSchema.index({ teamMemberIds: 1 });
+workspaceSchema.index(
+  { ownerId: 1, claimedProblemId: 1 },
+  {
+    unique: true,
+    partialFilterExpression: {
+      isActive: true,
+      claimedProblemId: { $type: 'objectId' },
+    },
+  },
+);
 
 export const Workspace = model<IWorkspace>('Workspace', workspaceSchema);

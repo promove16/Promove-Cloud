@@ -63,9 +63,8 @@ const problemSchema = new Schema<IProblem>(
     },
     maxClaims: {
       type: Number,
-      default: 1,
+      default: Number.MAX_SAFE_INTEGER,
       min: 1,
-      max: 1,
     },
     submissionConfig: {
       type: submissionConfigSchema,

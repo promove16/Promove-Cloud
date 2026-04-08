@@ -217,7 +217,7 @@ export default function OperationsPage({ onBackToOverview }: OperationsPageProps
               <div className="space-y-4">
                 <StudentIntakePanel
                   heading="Feed student intake data for your college"
-                  description="Build a managed roster, create temporary student credentials, or issue tokens for self-service signup."
+                  description="Build a managed roster, email temporary student credentials, or issue tokens for approved self-service signup."
                   secondaryFieldLabel="Program / Year"
                   secondaryFieldPlaceholder="B.Tech CSE - 3rd Year"
                   roster={rosterQuery.data ?? []}

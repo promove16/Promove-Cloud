@@ -3,7 +3,7 @@ const StudentProfile = require('../../models/StudentProfile');
 const Project = require('../../models/Project');
 const Ticket = require('../../models/Ticket');
 const Board = require('../../models/Board');
-const ApiError = require('../../utils/ApiError');
+const { ApiError } = require('../../utils/ApiError');
 
 async function getDashboardStats(userId) {
   const [activeProjects, totalProjects, openTickets, profile, recentProjects] = await Promise.all([

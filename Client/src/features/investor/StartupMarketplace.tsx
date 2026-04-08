@@ -7,12 +7,13 @@ import { Card } from '../../components/ui/Card';
 import { Input } from '../../components/ui/Input';
 import { Spinner } from '../../components/ui/Spinner';
 import { investorApi } from '../../api/investor.api';
+import { MAX_INNOVATION_SCORE } from '../../constants/score';
 import { StartupDetailDrawer } from './StartupDetailDrawer';
 
 const categories = ['Agriculture', 'Health', 'Education', 'Energy', 'Software', 'Other'];
 const stages = ['Pre-Idea', 'Ideation', 'MVP', 'Pre-Launch', 'Launched'];
 const scoreRangeMin = 0;
-const scoreRangeMax = 200;
+const scoreRangeMax = MAX_INNOVATION_SCORE;
 
 const getInvestorWorkflowErrorMessage = (error: unknown) => {
   if (isAxiosError<{ error?: { message?: string } }>(error)) {
@@ -235,16 +236,16 @@ export default function StartupMarketplace() {
                     <div className="mt-1 text-sm text-cyan-300">{startup.category}</div>
                     <div className="mt-2 text-sm leading-6 text-slate-400">{startup.tagline}</div>
                     <p className="mt-3 line-clamp-2 text-sm leading-6 text-slate-400">
-                      {startup.founder?.displayName ?? 'Founding team'} is currently at {liveScore}/200.
+                      {startup.founder?.displayName ?? 'Founding team'} is currently at {liveScore}/{MAX_INNOVATION_SCORE}.
                       <span className="ml-2 text-slate-500">
-                        Launch snapshot: {startup.innovationScoreAtLaunch}/200.
+                        Launch snapshot: {startup.innovationScoreAtLaunch}/{MAX_INNOVATION_SCORE}.
                       </span>
                     </p>
                   </div>
                   <div className="flex flex-col items-end gap-2">
                     <Badge>{startup.stage}</Badge>
                     <div className="rounded-full border border-emerald-500/30 bg-emerald-500/10 px-3 py-1 text-xs font-semibold text-emerald-300">
-                      Live score {liveScore}/200
+                      Live score {liveScore}/{MAX_INNOVATION_SCORE}
                     </div>
                   </div>
                 </div>

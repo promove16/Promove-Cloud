@@ -28,4 +28,13 @@ export const authApi = {
 
     return response.data.data;
   },
+
+  async changePassword(payload: { currentPassword: string; newPassword: string }) {
+    const response = await api.put<ApiSuccessResponse<{ message: string }>>(
+      '/api/auth/change-password',
+      payload,
+    );
+
+    return response.data.data;
+  },
 };

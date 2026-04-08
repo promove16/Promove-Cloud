@@ -35,7 +35,7 @@ export const STARTUP_LAUNCH_SECTION_LINKS: StartupLaunchSectionLink[] = [
     label: "Investor Outreach",
     shortLabel: "Outreach",
     description:
-      "Shortlist investors, send pitch requests, and track investor approval conversations.",
+      "Founder-managed investor shortlisting, pitch requests, and fundraising conversations.",
     segment: "investor-outreach",
     icon: Send,
   },
@@ -43,7 +43,7 @@ export const STARTUP_LAUNCH_SECTION_LINKS: StartupLaunchSectionLink[] = [
     label: "Cap Table",
     shortLabel: "Cap Table",
     description:
-      "Track founder retention, sole investor allocation, and penny investor equity.",
+      "Founder-managed retained equity, sole investor allocation, and penny investor shares.",
     segment: "cap-table",
     icon: BarChart3,
   },
@@ -58,11 +58,9 @@ export const STARTUP_LAUNCH_SECTION_LINKS: StartupLaunchSectionLink[] = [
   {
     label: "Patent Support",
     shortLabel: "Patent Support",
-    description:
-      "Request admin patent review before investor pitch listing.",
+    description: "Request admin patent review before investor pitch listing.",
     segment: "patent-support",
     icon: FileText,
-    path: "/patent-support",
   },
 ];
 

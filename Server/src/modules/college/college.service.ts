@@ -390,7 +390,7 @@ export const listCollegeEvents = async (collegeId: string): Promise<EventListIte
   const rankings = await Promise.all(
     events.map(async (event) => ({
       eventId: event._id,
-      rankings: await getEventRankings(event._id),
+      rankings: await getEventRankings(event._id, collegeId),
     })),
   );
   const rankingMap = new Map(rankings.map((entry) => [entry.eventId, entry.rankings]));

@@ -47,6 +47,10 @@ export function SignupPage() {
   const [notice, setNotice] = useState("");
   const invitedRole = normalizeInvitationRole(searchParams.get("inviteRole"));
   const invitedEmail = searchParams.get("inviteeEmail")?.trim() ?? "";
+  const invitedInstitutionToken =
+    searchParams.get("institutionToken")?.trim() ??
+    searchParams.get("token")?.trim() ??
+    "";
   const inviterName = searchParams.get("inviterName")?.trim() ?? "";
   const invitePurpose = searchParams.get("purpose")?.trim() ?? "";
   const requestAccessLink = useMemo(() => {
@@ -55,14 +59,18 @@ export function SignupPage() {
   }, [searchParams]);
 
   useEffect(() => {
-    if (!invitedEmail) {
+    if (!invitedEmail && !invitedInstitutionToken) {
       return;
     }
 
-    setFormData((current) =>
-      current.email === invitedEmail ? current : { ...current, email: invitedEmail },
-    );
-  }, [invitedEmail]);
+    setFormData((current) => ({
+      ...current,
+      ...(invitedEmail && current.email !== invitedEmail ? { email: invitedEmail } : {}),
+      ...(invitedInstitutionToken && current.institutionToken !== invitedInstitutionToken
+        ? { institutionToken: invitedInstitutionToken }
+        : {}),
+    }));
+  }, [invitedEmail, invitedInstitutionToken]);
 
   const updateField = <K extends keyof SignupFormState>(
     key: K,
@@ -81,15 +89,18 @@ export function SignupPage() {
       return;
     }
 
+    if (!formData.institutionToken.trim()) {
+      setError("Enter the invitation token shared by your school or college.");
+      return;
+    }
+
     try {
       const payload = await signupMutation.mutateAsync({
         displayName: formData.displayName.trim(),
         email: formData.email.trim(),
         password: formData.password,
         role: UserRole.STUDENT,
-        ...(formData.institutionToken.trim()
-          ? { institutionToken: formData.institutionToken.trim() }
-          : {}),
+        institutionToken: formData.institutionToken.trim(),
         ...(formData.domain.trim() ? { domain: formData.domain.trim() } : {}),
         ...(formData.bio.trim() ? { bio: formData.bio.trim() } : {}),
       });
@@ -116,6 +127,8 @@ export function SignupPage() {
               ? "That institution token has expired. Please ask your school or college for a fresh one."
               : apiError?.code === "INSTITUTION_APPROVAL_PENDING"
                   ? "Your institution has not approved your account yet. Please contact your school or college."
+                  : apiError?.code === "VALIDATION_ERROR" && detailMessage?.includes("institutionToken")
+                    ? "Enter the invitation token shared by your school or college."
                   : apiError?.code === "INSTITUTION_TOKEN_MISMATCH"
                     ? "This email is already linked to a different institution. Use the correct token or contact your institution."
                     : apiError?.code === "INVALID_INSTITUTION_TOKEN"
@@ -189,8 +202,8 @@ export function SignupPage() {
               Student Registration
             </div>
             <p className="mt-3 text-sm text-slate-400">
-              Students can start with direct signup, then submit an institution
-              token later for school or college verification.
+              Students can register only with a school or college invitation
+              token. Your account stays pending until that institution approves it.
             </p>
           </div>
 
@@ -312,7 +325,7 @@ export function SignupPage() {
 
           <div className="mb-6">
             <label className="mb-2 block text-sm font-semibold text-white">
-              Institution Token
+              Institution Token <span className="text-red-400">*</span>
             </label>
             <div className="relative">
               <Ticket className="absolute left-4 top-1/2 h-5 w-5 -translate-y-1/2 text-slate-400" />
@@ -324,16 +337,14 @@ export function SignupPage() {
                 }
                 placeholder="SCH-AB12CD34"
                 className="w-full rounded-lg border border-slate-800 bg-slate-950 py-3 pl-12 pr-4 text-white placeholder-slate-500 focus:border-blue-500 focus:outline-none"
+                required
               />
             </div>
             <p className="mt-2 text-xs text-slate-500">
-              Add the token now to go straight into institution review, or leave
-              it blank and submit it from your profile later.
+              Use the token issued from your school or college dashboard.
             </p>
             <div className="mt-3 rounded-2xl border border-slate-800 bg-slate-950/70 p-4 text-sm text-slate-400">
-              Token-based signups stay pending until the institution approves
-              them. Direct signups can finish profile setup first, then request
-              verification when ready.
+              Token-verified signups stay inactive until the matching institution approves them.
             </div>
           </div>
 

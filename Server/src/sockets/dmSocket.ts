@@ -25,7 +25,9 @@ export const initDmSocket = (io: Server) => {
     const token = socket.handshake.auth.token;
     if (!token) return next(new Error('Unauthorized'));
     try {
-      const decoded = jwt.verify(token, env.JWT_ACCESS_SECRET) as any;
+      const decoded = jwt.verify(token, env.JWT_ACCESS_SECRET, {
+        algorithms: ['RS256'],
+      }) as any;
       socket.data.userId = decoded._id;
       next();
     } catch {

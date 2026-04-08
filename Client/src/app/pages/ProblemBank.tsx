@@ -21,9 +21,11 @@ import {
 } from "lucide-react";
 import { DashboardLayout } from "../components/DashboardLayout";
 import { problemBankApi } from "../../api/problemBank.api";
+import { workspaceApi } from "../../api/workspace.api";
 import { Problem, ProblemLeaderboardEntry } from "../../types/problem.types";
 import { useAuthStore } from "../../store/authStore";
 import { UserRole } from "../../types/roles.types";
+import { getApiErrorMessage } from "../../utils/apiError";
 
 const categoryOptions = [
   "All Problems",
@@ -50,6 +52,13 @@ const domainFiltersByCategory: Record<
   string[]
 > = {
   "All Problems": [
+    "Agriculture & AgriTech",
+    "Renewable Energy & Sustainability",
+    "Healthcare & MedTech",
+    "Education & Skill Development (EdTech)",
+    "Smart Cities & Infrastructure",
+    "Finance & Financial Inclusion (FinTech)",
+    "Manufacturing & Industry 4.0",
     "Agritech",
     "Supply Chain",
     "FinTech",
@@ -65,11 +74,20 @@ const domainFiltersByCategory: Record<
     "Commerce",
     "Mobility",
   ],
-  Agriculture: ["Agritech", "Supply Chain", "FinTech", "Climate", "IoT"],
-  Environment: ["Sustainability", "Climate", "Hardware", "Water", "IoT"],
-  Healthcare: ["HealthTech", "Diagnostics", "Accessibility", "IoT"],
-  Technology: ["IoT", "Software", "Hardware", "AI", "Automation"],
-  Education: ["EdTech", "Accessibility", "Learning", "Software"],
+  Agriculture: ["Agriculture & AgriTech", "Agritech", "Supply Chain", "FinTech", "Climate", "IoT"],
+  Environment: ["Renewable Energy & Sustainability", "Sustainability", "Climate", "Hardware", "Water", "IoT"],
+  Healthcare: ["Healthcare & MedTech", "HealthTech", "Diagnostics", "Accessibility", "IoT"],
+  Technology: [
+    "Smart Cities & Infrastructure",
+    "Finance & Financial Inclusion (FinTech)",
+    "Manufacturing & Industry 4.0",
+    "IoT",
+    "Software",
+    "Hardware",
+    "AI",
+    "Automation",
+  ],
+  Education: ["Education & Skill Development (EdTech)", "EdTech", "Accessibility", "Learning", "Software"],
   "Rural Development": [
     "Employment",
     "Commerce",
@@ -214,6 +232,33 @@ export function ProblemBank() {
   const selectedProblem =
     problems.find((problem) => problem._id === selectedProblemId) ?? null;
 
+  const workspacesQuery = useQuery({
+    queryKey: ["workspaces"],
+    queryFn: workspaceApi.list,
+    enabled: Boolean(authUser) && canClaimProblems,
+  });
+
+  const workspaceIdByClaimedProblemId = useMemo(() => {
+    if (!canClaimProblems) {
+      return new Map<string, string>();
+    }
+
+    return new Map(
+      (workspacesQuery.data ?? [])
+        .filter((workspace) => Boolean(workspace.claimedProblemId))
+        .map((workspace) => [workspace.claimedProblemId!, workspace._id]),
+    );
+  }, [canClaimProblems, workspacesQuery.data]);
+
+  const getProblemWorkspaceId = (problem: Problem) =>
+    problem.viewerState?.workspaceId ??
+    workspaceIdByClaimedProblemId.get(problem._id) ??
+    null;
+
+  const selectedProblemWorkspaceId = selectedProblem
+    ? getProblemWorkspaceId(selectedProblem)
+    : null;
+
   useEffect(() => {
     if (
       selectedDomain !== allDomainFilter &&
@@ -237,15 +282,12 @@ export function ProblemBank() {
     mutationFn: (problemId: string) => problemBankApi.claim(problemId),
     onSuccess: (workspace) => {
       void queryClient.invalidateQueries({ queryKey: ["problems"] });
+      void queryClient.invalidateQueries({ queryKey: ["workspaces"] });
       setFeedback("Problem started. Your team workspace is ready.");
       navigate(`/product-workspace/${workspace._id}`);
     },
     onError: (error) => {
-      const message =
-        (error as { response?: { data?: { error?: { message?: string } } } })
-          ?.response?.data?.error?.message ??
-        "Unable to start this problem right now.";
-      setFeedback(message);
+      setFeedback(getApiErrorMessage(error, "Unable to start this problem right now."));
     },
   });
   const startingProblemId = claimMutation.isPending
@@ -512,7 +554,7 @@ export function ProblemBank() {
           <div className="space-y-4">
             {problems.map((problem) => {
               const viewerStatus = getViewerStatusStyles(problem.viewerState);
-              const isStarted = Boolean(problem.viewerState?.workspaceId);
+              const workspaceId = getProblemWorkspaceId(problem);
 
               return (
                 <div
@@ -609,12 +651,10 @@ export function ProblemBank() {
                       View Details
                     </button>
 
-                    {isStarted ? (
+                    {workspaceId ? (
                       <button
                         onClick={() =>
-                          navigate(
-                            `/product-workspace/${problem.viewerState?.workspaceId}`,
-                          )
+                          navigate(`/product-workspace/${workspaceId}`)
                         }
                         className="flex-1 rounded-lg bg-gradient-to-r from-cyan-600 to-blue-600 px-6 py-3 font-semibold text-white"
                       >
@@ -992,13 +1032,11 @@ export function ProblemBank() {
                 >
                   Close
                 </button>
-                {selectedProblem.viewerState?.workspaceId ? (
+                {selectedProblemWorkspaceId ? (
                   <button
                     type="button"
                     onClick={() =>
-                      navigate(
-                        `/product-workspace/${selectedProblem.viewerState?.workspaceId}`,
-                      )
+                      navigate(`/product-workspace/${selectedProblemWorkspaceId}`)
                     }
                     className="rounded-lg bg-gradient-to-r from-cyan-600 to-blue-600 px-5 py-3 font-semibold text-white"
                   >
@@ -1009,7 +1047,7 @@ export function ProblemBank() {
                     type="button"
                     onClick={() => claimMutation.mutate(selectedProblem._id)}
                     disabled={claimMutation.isPending}
-                    className="rounded-lg bg-gradient-to-r from-blue-600 to-purple-600 px-5 py-3 font-semibold text-white"
+                    className="rounded-lg bg-gradient-to-r from-blue-600 to-purple-600 px-5 py-3 font-semibold text-white disabled:opacity-60"
                   >
                     {startingProblemId === selectedProblem._id
                       ? "Starting..."

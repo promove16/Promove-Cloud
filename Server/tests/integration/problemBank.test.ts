@@ -2,7 +2,10 @@ import bcrypt from 'bcrypt';
 import { randomUUID } from 'crypto';
 import request from 'supertest';
 import app from '../../src/app';
+import { ScoreEvent } from '../../src/modules/innovationScore/score.model';
+import { Problem } from '../../src/modules/problemBank/problem.model';
 import { User } from '../../src/modules/user/user.model';
+import { Workspace } from '../../src/modules/workspace/workspace.model';
 import { UserRole } from '../../src/types/roles.types';
 
 const PASSWORD = 'Password123!';
@@ -46,6 +49,129 @@ const loginAs = async (email: string) => {
 };
 
 describe('problem bank integration', () => {
+  it('creates isolated problem workspaces per student and keeps repeat claims idempotent', async () => {
+    const { user: firstStudent, email: firstEmail } = await createApprovedUser({
+      role: UserRole.STUDENT,
+      displayName: 'First Claimant',
+    });
+    const { user: secondStudent, email: secondEmail } = await createApprovedUser({
+      role: UserRole.STUDENT,
+      displayName: 'Second Claimant',
+    });
+
+    const firstToken = await loginAs(firstEmail);
+    const secondToken = await loginAs(secondEmail);
+
+    const listResponse = await request(app)
+      .get('/api/problems')
+      .set('Authorization', `Bearer ${firstToken}`);
+    const problemId = listResponse.body.data[0]._id as string;
+
+    const responses = await Promise.all([
+      request(app)
+        .post(`/api/problems/${problemId}/claim`)
+        .set('Authorization', `Bearer ${firstToken}`),
+      request(app)
+        .post(`/api/problems/${problemId}/claim`)
+        .set('Authorization', `Bearer ${secondToken}`),
+    ]);
+
+    expect(responses.map((response) => response.status).sort()).toEqual([200, 200]);
+
+    const firstWorkspaceId = responses[0].body.data._id as string;
+    const secondWorkspaceId = responses[1].body.data._id as string;
+    expect(firstWorkspaceId).not.toBe(secondWorkspaceId);
+    expect(responses[0].body.data.ownerId).toBe(String(firstStudent._id));
+    expect(responses[1].body.data.ownerId).toBe(String(secondStudent._id));
+
+    const retryResponse = await request(app)
+      .post(`/api/problems/${problemId}/claim`)
+      .set('Authorization', `Bearer ${firstToken}`);
+
+    expect(retryResponse.status).toBe(200);
+    expect(retryResponse.body.data._id).toBe(firstWorkspaceId);
+    expect(await Workspace.countDocuments({ claimedProblemId: problemId })).toBe(2);
+
+    const claimedProblem = await Problem.findById(problemId).lean();
+    expect(claimedProblem?.claimStatus).toBe('open');
+    expect(claimedProblem?.claimedBy).toBeUndefined();
+    expect(claimedProblem?.claimedAt).toBeUndefined();
+
+    const firstProgressResponse = await request(app)
+      .post(`/api/workspace/${firstWorkspaceId}/progress`)
+      .set('Authorization', `Bearer ${firstToken}`)
+      .send({
+        note: 'First student evidence is isolated to their own problem workspace.',
+        milestoneRef: 'Research & Planning',
+        completionPercent: 100,
+      });
+    expect(firstProgressResponse.status).toBe(200);
+
+    const forbiddenWorkspaceResponse = await request(app)
+      .get(`/api/workspace/${firstWorkspaceId}`)
+      .set('Authorization', `Bearer ${secondToken}`);
+    expect(forbiddenWorkspaceResponse.status).toBe(404);
+
+    const [firstDetailResponse, secondDetailResponse] = await Promise.all([
+      request(app)
+        .get(`/api/problems/${problemId}`)
+        .set('Authorization', `Bearer ${firstToken}`),
+      request(app)
+        .get(`/api/problems/${problemId}`)
+        .set('Authorization', `Bearer ${secondToken}`),
+    ]);
+
+    expect(firstDetailResponse.status).toBe(200);
+    expect(secondDetailResponse.status).toBe(200);
+    expect(firstDetailResponse.body.data.viewerState.workspaceId).toBe(firstWorkspaceId);
+    expect(firstDetailResponse.body.data.viewerState.progressPercent).toBeGreaterThan(0);
+    expect(secondDetailResponse.body.data.viewerState.workspaceId).toBe(secondWorkspaceId);
+    expect(secondDetailResponse.body.data.viewerState.progressPercent).toBe(0);
+
+    const firstStudentAfterClaim = await User.findById(firstStudent._id).lean();
+    const secondStudentAfterClaim = await User.findById(secondStudent._id).lean();
+    expect(firstStudentAfterClaim?.innovationScore).toBe(0);
+    expect(secondStudentAfterClaim?.innovationScore).toBe(0);
+    expect(
+      await ScoreEvent.exists({
+        trigger: 'PROBLEM_CLAIMED',
+        userId: { $in: [firstStudent._id, secondStudent._id] },
+      }),
+    ).toBeNull();
+
+    expect(
+      await ScoreEvent.exists({
+        trigger: 'PROBLEM_CLAIMED',
+      }),
+    ).toBeNull();
+  });
+
+  it('requires the problem claim endpoint for problem-backed workspaces', async () => {
+    const { email } = await createApprovedUser({
+      role: UserRole.STUDENT,
+      displayName: 'Workspace Bypass Student',
+    });
+    const token = await loginAs(email);
+
+    const listResponse = await request(app)
+      .get('/api/problems')
+      .set('Authorization', `Bearer ${token}`);
+    const problemId = listResponse.body.data[0]._id as string;
+
+    const bypassResponse = await request(app)
+      .post('/api/workspace')
+      .set('Authorization', `Bearer ${token}`)
+      .send({
+        title: 'Bypass attempt',
+        category: 'Technology',
+        claimedProblemId: problemId,
+      });
+
+    expect(bypassResponse.status).toBe(400);
+    expect(bypassResponse.body.error.code).toBe('PROBLEM_CLAIM_ENDPOINT_REQUIRED');
+    expect(await Workspace.countDocuments({ claimedProblemId: problemId })).toBe(0);
+  });
+
   it('supports review requests, admin approval, and problem leaderboard ranking', async () => {
     const { user: studentUser, email: studentEmail } = await createApprovedUser({
       role: UserRole.STUDENT,

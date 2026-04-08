@@ -5,6 +5,7 @@ import type {
   StartupIpProtectionType,
   StartupInventorOwnership,
   StartupRegistrationProfile,
+  StartupReadiness,
 } from '../../types/startup.types';
 
 export const STARTUP_IPR_UPLOAD_MAX_BYTES = 3 * 1024 * 1024;
@@ -254,10 +255,75 @@ export const STARTUP_IPR_DOCUMENT_SPECS: Array<{
   },
 ] as const;
 
+const startupDocumentLabels = Object.fromEntries(
+  STARTUP_IPR_DOCUMENT_SPECS.map((spec) => [spec.category, spec.label]),
+) as Partial<Record<StartupDocumentCategory, string>>;
+
 export const getRequiredStartupDocumentCategories = (
   registrationProfile: StartupRegistrationProfile,
 ): StartupDocumentCategory[] =>
   registrationProfile.developmentStage === 'idea' ? ['design_plan_sketch'] : ['technical_documentation'];
+
+export const buildStartupReviewReadiness = (startup: {
+  name?: string;
+  tagline?: string;
+  category?: string;
+  founderIds?: readonly unknown[];
+  pitchDeckUrl?: string;
+  documents?: readonly { category?: StartupDocumentCategory }[];
+  registrationProfile?: StartupRegistrationProfile;
+}): StartupReadiness => {
+  const missingItems: string[] = [];
+  const documents = startup.documents ?? [];
+  const uploadedDocumentCategories = Array.from(
+    new Set(
+      documents
+        .map((document) => document.category)
+        .filter((category): category is StartupDocumentCategory => Boolean(category)),
+    ),
+  );
+  const uploadedCategorySet = new Set(uploadedDocumentCategories);
+  const registrationProfile = startup.registrationProfile ?? DEFAULT_STARTUP_IPR_PROFILE;
+  const requiredDocumentCategories = getRequiredStartupDocumentCategories(registrationProfile);
+
+  const addMissing = (condition: boolean, label: string) => {
+    if (condition) {
+      missingItems.push(label);
+    }
+  };
+
+  addMissing(!startup.name?.trim(), 'startup name');
+  addMissing(!startup.tagline?.trim(), 'startup tagline');
+  addMissing(!startup.category?.trim(), 'startup category');
+  addMissing((startup.founderIds?.length ?? 0) === 0, 'at least one founder');
+  addMissing(registrationProfile.problemStatement.trim().length < 40, 'IPR problem statement');
+  addMissing(registrationProfile.solutionDifferentiation.trim().length < 40, 'solution differentiation');
+  addMissing(registrationProfile.coreInnovation.trim().length < 30, 'core innovation');
+  addMissing(registrationProfile.priorArtStatus.trim().length < 20, 'prior art status');
+  addMissing(registrationProfile.workingMechanism.trim().length < 40, 'working mechanism');
+  addMissing(registrationProfile.keyComponents.trim().length < 20, 'key components');
+  addMissing(!registrationProfile.developmentStage.trim(), 'innovation stage');
+  addMissing(registrationProfile.documentationReadiness.trim().length < 10, 'documentation readiness');
+  addMissing(!registrationProfile.inventorOwnership.trim(), 'inventor ownership');
+  addMissing(registrationProfile.developmentContext.trim().length < 20, 'development context');
+  addMissing(registrationProfile.targetMarkets.trim().length < 20, 'target markets');
+  addMissing(!registrationProfile.commercializationStrategy.trim(), 'commercialization strategy');
+  addMissing(registrationProfile.publicDisclosureStatus.trim().length < 10, 'public disclosure status');
+  addMissing(registrationProfile.legalAgreements.trim().length < 10, 'legal agreements');
+  addMissing(!registrationProfile.ipProtectionType.trim(), 'IP protection type');
+  addMissing(!startup.pitchDeckUrl && !uploadedCategorySet.has('business_plan'), 'business plan or pitch deck upload');
+
+  for (const category of requiredDocumentCategories) {
+    addMissing(!uploadedCategorySet.has(category), startupDocumentLabels[category] ?? category.replace(/_/g, ' '));
+  }
+
+  return {
+    isReviewReady: missingItems.length === 0,
+    missingItems,
+    requiredDocumentCategories,
+    uploadedDocumentCategories,
+  };
+};
 
 export const formatStartupIprValue = (
   key: keyof StartupRegistrationProfile,

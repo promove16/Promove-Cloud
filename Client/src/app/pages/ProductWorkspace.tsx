@@ -110,6 +110,9 @@ export function ProductWorkspace() {
   const workspace = workspaceQuery.data;
   const teamMembers = workspace?.teamMembers ?? [];
   const isOwner = workspace?.ownerId === currentUser?._id;
+  const canCreateWorkspace = currentUser?.role === "student";
+  const canManageWorkspace = canCreateWorkspace && Boolean(workspace);
+  const canManageChatAccess = Boolean(isOwner);
   const chat = useWorkspaceChat(workspaceId);
 
   useEffect(() => {
@@ -427,10 +430,12 @@ export function ProductWorkspace() {
               </div>
 
               <div className="flex flex-wrap gap-3 lg:max-w-sm lg:justify-end">
-                {!projectId ? (
+                {!projectId && canCreateWorkspace ? (
                   <button onClick={() => setShowCreateWorkspaceForm((value) => !value)} className="inline-flex items-center gap-2 rounded-xl border border-slate-700 bg-slate-900/80 px-5 py-3 text-sm font-semibold text-white transition hover:border-slate-600 hover:bg-slate-800"><Plus className="h-4 w-4" />Create Personal Workspace</button>
                 ) : null}
-                <button onClick={() => setShowProgressModal(true)} disabled={!workspace} className="inline-flex items-center gap-2 rounded-xl bg-gradient-to-r from-blue-600 to-fuchsia-600 px-5 py-3 text-sm font-semibold text-white transition hover:brightness-110 disabled:cursor-not-allowed disabled:opacity-50"><Upload className="h-4 w-4" />Upload Progress</button>
+                {canManageWorkspace ? (
+                  <button onClick={() => setShowProgressModal(true)} disabled={!workspace} className="inline-flex items-center gap-2 rounded-xl bg-gradient-to-r from-blue-600 to-fuchsia-600 px-5 py-3 text-sm font-semibold text-white transition hover:brightness-110 disabled:cursor-not-allowed disabled:opacity-50"><Upload className="h-4 w-4" />Upload Progress</button>
+                ) : null}
               </div>
             </div>
 
@@ -457,7 +462,7 @@ export function ProductWorkspace() {
                   </div>
                 ) : null}
 
-                {showCreateWorkspaceForm ? (
+                {showCreateWorkspaceForm && canCreateWorkspace ? (
                   <div className="grid gap-3 rounded-2xl border border-slate-800 bg-slate-900/75 p-4 md:grid-cols-2">
                     <input value={newWorkspaceForm.title} onChange={(event) => setNewWorkspaceForm((current) => ({ ...current, title: event.target.value }))} placeholder="Product or innovation name" className="rounded-xl border border-slate-800 bg-slate-950 px-4 py-3 text-white" />
                     <input value={newWorkspaceForm.category} onChange={(event) => setNewWorkspaceForm((current) => ({ ...current, category: event.target.value }))} placeholder="Category, domain, or track" className="rounded-xl border border-slate-800 bg-slate-950 px-4 py-3 text-white" />
@@ -492,7 +497,9 @@ export function ProductWorkspace() {
             <h2 className="text-2xl font-bold text-white">No workspace available yet</h2>
             <p className="mx-auto mt-3 max-w-2xl text-slate-400">Start a challenge from the Problem Bank or create your own product workspace for independent innovation and patent filing.</p>
             <div className="mt-6 flex flex-wrap justify-center gap-3">
-              <button onClick={() => setShowCreateWorkspaceForm(true)} className="rounded-xl border border-slate-700 bg-slate-900 px-6 py-3 font-semibold text-white">Create Personal Workspace</button>
+              {canCreateWorkspace ? (
+                <button onClick={() => setShowCreateWorkspaceForm(true)} className="rounded-xl border border-slate-700 bg-slate-900 px-6 py-3 font-semibold text-white">Create Personal Workspace</button>
+              ) : null}
               <button onClick={() => navigate("/problem-bank")} className="rounded-xl bg-gradient-to-r from-blue-600 to-fuchsia-600 px-6 py-3 font-semibold text-white">Open Problem Bank</button>
             </div>
           </section>
@@ -531,10 +538,10 @@ export function ProductWorkspace() {
                 <div className="flex flex-col gap-4 border-b border-slate-800 pb-5 lg:flex-row lg:items-end lg:justify-between">
                   <div>
                     <div className="text-xs uppercase tracking-[0.28em] text-slate-500">Workbench</div>
-                    <h2 className="mt-2 text-2xl font-semibold text-white">{activeTab === "tasks" ? "Tasks" : activeTab === "team" ? "Team" : activeTab === "uploads" ? "Evidence" : "Chat"}</h2>
+                    <h2 className="mt-2 text-2xl font-semibold text-white">{activeTab === "tasks" ? "Tasks" : activeTab === "team" ? "Team" : activeTab === "uploads" ? "Docs" : "Chat"}</h2>
                     <p className="mt-2 text-sm text-slate-400">Work on one stream at a time and keep the rest of the page quiet.</p>
                   </div>
-                  <div className="inline-flex rounded-2xl border border-slate-800 bg-slate-950/80 p-1.5">{["tasks", "team", "uploads", "chat"].map((tab) => <button key={tab} onClick={() => setActiveTab(tab)} className={`rounded-xl px-4 py-2.5 text-sm font-semibold transition ${activeTab === tab ? "bg-gradient-to-r from-blue-600 to-fuchsia-600 text-white" : "text-slate-400 hover:text-white"}`}>{tab === "uploads" ? "Evidence" : tab.charAt(0).toUpperCase() + tab.slice(1)}</button>)}</div>
+                  <div className="inline-flex rounded-2xl border border-slate-800 bg-slate-950/80 p-1.5">{["tasks", "team", "uploads", "chat"].map((tab) => <button key={tab} onClick={() => setActiveTab(tab)} className={`rounded-xl px-4 py-2.5 text-sm font-semibold transition ${activeTab === tab ? "bg-gradient-to-r from-blue-600 to-fuchsia-600 text-white" : "text-slate-400 hover:text-white"}`}>{tab === "uploads" ? "Docs" : tab.charAt(0).toUpperCase() + tab.slice(1)}</button>)}</div>
                 </div>
 
                 <div className="pt-6">
@@ -544,11 +551,13 @@ export function ProductWorkspace() {
                         <div className="text-sm text-slate-400">
                           {completedTaskCount} completed, {openTaskCount} open
                         </div>
-                        <button onClick={() => setShowTaskForm((value) => !value)} className="rounded-xl bg-blue-600 px-4 py-2 text-sm font-semibold text-white">
-                          Add Task
-                        </button>
+                        {canManageWorkspace ? (
+                          <button onClick={() => setShowTaskForm((value) => !value)} className="rounded-xl bg-blue-600 px-4 py-2 text-sm font-semibold text-white">
+                            Add Task
+                          </button>
+                        ) : null}
                       </div>
-                      {showTaskForm ? (
+                      {showTaskForm && canManageWorkspace ? (
                         <div className="grid gap-3 rounded-2xl border border-slate-800 bg-slate-950/70 p-4 md:grid-cols-2">
                           <input value={taskForm.title} onChange={(event) => setTaskForm((current) => ({ ...current, title: event.target.value }))} placeholder="Task title" className="rounded-xl border border-slate-800 bg-slate-950 px-4 py-3 text-white md:col-span-2" />
                           <select value={taskForm.priority} onChange={(event) => setTaskForm((current) => ({ ...current, priority: event.target.value as WorkspaceTask["priority"] }))} className="rounded-xl border border-slate-800 bg-slate-950 px-4 py-3 text-white">
@@ -567,7 +576,7 @@ export function ProductWorkspace() {
                       ) : null}
                       {(workspace.tasks ?? []).map((task) => (
                         <div key={task._id} className="flex items-start gap-3 rounded-2xl border border-slate-800 bg-slate-950/70 p-4">
-                          <button onClick={() => toggleTask.mutate({ taskId: task._id, done: !task.done })} className={task.done ? "text-emerald-400" : "text-slate-500 hover:text-sky-400"}>
+                          <button onClick={() => toggleTask.mutate({ taskId: task._id, done: !task.done })} disabled={!canManageWorkspace} className={task.done ? "text-emerald-400 disabled:cursor-default" : "text-slate-500 hover:text-sky-400 disabled:cursor-default disabled:hover:text-slate-500"}>
                             {task.done ? <CheckCircle className="h-5 w-5" /> : <Circle className="h-5 w-5" />}
                           </button>
                           <div className="min-w-0 flex-1">
@@ -576,9 +585,11 @@ export function ProductWorkspace() {
                               {task.priority} priority • Due {d(task.dueDate)}
                             </div>
                           </div>
-                          <button onClick={() => deleteTask.mutate(task._id)} className="text-slate-500 hover:text-rose-400">
-                            <Trash2 className="h-4 w-4" />
-                          </button>
+                          {canManageWorkspace ? (
+                            <button onClick={() => deleteTask.mutate(task._id)} className="text-slate-500 hover:text-rose-400">
+                              <Trash2 className="h-4 w-4" />
+                            </button>
+                          ) : null}
                         </div>
                       ))}
                     </div>
@@ -598,7 +609,7 @@ export function ProductWorkspace() {
                       {showInviteForm ? (
                         <div className="space-y-3 rounded-2xl border border-slate-800 bg-slate-950/70 p-4">
                           <div className="text-xs leading-5 text-slate-500">
-                            Team invites are for student collaborators only. Mentor assignments are admin-managed, and investor collaboration should use chat access.
+                            Team invites are for student collaborators only. Use chat access for mentor and investor collaboration.
                           </div>
                           <div className="grid gap-3 lg:grid-cols-[minmax(0,1fr)_160px]">
                             <input value={inviteEmail} onChange={(event) => setInviteEmail(event.target.value)} placeholder="Enter student teammate email" className="rounded-xl border border-slate-800 bg-slate-950 px-4 py-3 text-white" />
@@ -640,35 +651,41 @@ export function ProductWorkspace() {
 
                   {activeTab === "uploads" ? (
                     <div className="space-y-4">
-                      <div className="grid gap-3 rounded-2xl border border-slate-800 bg-slate-950/70 p-4 md:grid-cols-2">
-                        <div className="space-y-3">
-                          <select value={uploadCategory} onChange={(event) => setUploadCategory(event.target.value as WorkspaceUploadCategory)} className="w-full rounded-xl border border-slate-800 bg-slate-950 px-4 py-3 text-white">
-                            <option value="other">Other</option>
-                            <option value="bug_report">Bug report</option>
-                            <option value="error_log">Error log</option>
-                            <option value="screenshot">Screenshot</option>
-                            <option value="test_result">Test result</option>
-                            <option value="design_mockup">Design mockup</option>
-                          </select>
-                          <input value={uploadNote} onChange={(event) => setUploadNote(event.target.value)} placeholder="Upload note" className="w-full rounded-xl border border-slate-800 bg-slate-950 px-4 py-3 text-white" />
-                          <label className="flex cursor-pointer items-center gap-2 rounded-xl border border-dashed border-slate-700 px-4 py-4 text-sm text-slate-300">
-                            <Upload className="h-4 w-4" />
-                            Upload PDF or image
-                            <input type="file" accept="application/pdf,.pdf,image/*" className="hidden" onChange={(event) => void onFile(event.target.files?.[0] ?? null)} />
-                          </label>
+                      {canManageWorkspace ? (
+                        <div className="grid gap-3 rounded-2xl border border-slate-800 bg-slate-950/70 p-4 md:grid-cols-2">
+                          <div className="space-y-3">
+                            <select value={uploadCategory} onChange={(event) => setUploadCategory(event.target.value as WorkspaceUploadCategory)} className="w-full rounded-xl border border-slate-800 bg-slate-950 px-4 py-3 text-white">
+                              <option value="other">Other</option>
+                              <option value="bug_report">Bug report</option>
+                              <option value="error_log">Error log</option>
+                              <option value="screenshot">Screenshot</option>
+                              <option value="test_result">Test result</option>
+                              <option value="design_mockup">Design mockup</option>
+                            </select>
+                            <input value={uploadNote} onChange={(event) => setUploadNote(event.target.value)} placeholder="Upload note" className="w-full rounded-xl border border-slate-800 bg-slate-950 px-4 py-3 text-white" />
+                            <label className="flex cursor-pointer items-center gap-2 rounded-xl border border-dashed border-slate-700 px-4 py-4 text-sm text-slate-300">
+                              <Upload className="h-4 w-4" />
+                              Upload PDF or image
+                              <input type="file" accept="application/pdf,.pdf,image/*" className="hidden" onChange={(event) => void onFile(event.target.files?.[0] ?? null)} />
+                            </label>
+                          </div>
+                          <div className="space-y-3">
+                            <input value={repoForm.repoUrl} onChange={(event) => setRepoForm((current) => ({ ...current, repoUrl: event.target.value }))} placeholder="GitHub repository URL" className="w-full rounded-xl border border-slate-800 bg-slate-950 px-4 py-3 text-white" />
+                            <button onClick={() => addRepo.mutate()} disabled={!repoForm.repoUrl.trim() || addRepo.isPending} className="rounded-xl bg-slate-800 px-4 py-2 text-sm font-semibold text-white disabled:opacity-60">
+                              Attach Repository
+                            </button>
+                            <input value={codeForm.title} onChange={(event) => setCodeForm((current) => ({ ...current, title: event.target.value }))} placeholder="Snippet title" className="w-full rounded-xl border border-slate-800 bg-slate-950 px-4 py-3 text-white" />
+                            <textarea value={codeForm.codeSnippet} onChange={(event) => setCodeForm((current) => ({ ...current, codeSnippet: event.target.value }))} placeholder="Paste a code snippet" className="min-h-28 w-full rounded-xl border border-slate-800 bg-slate-950 px-4 py-3 text-white" />
+                            <button onClick={() => addCode.mutate()} disabled={!codeForm.title.trim() || !codeForm.codeSnippet.trim() || addCode.isPending} className="rounded-xl bg-slate-800 px-4 py-2 text-sm font-semibold text-white disabled:opacity-60">
+                              Save Code Snippet
+                            </button>
+                          </div>
                         </div>
-                        <div className="space-y-3">
-                          <input value={repoForm.repoUrl} onChange={(event) => setRepoForm((current) => ({ ...current, repoUrl: event.target.value }))} placeholder="GitHub repository URL" className="w-full rounded-xl border border-slate-800 bg-slate-950 px-4 py-3 text-white" />
-                          <button onClick={() => addRepo.mutate()} disabled={!repoForm.repoUrl.trim() || addRepo.isPending} className="rounded-xl bg-slate-800 px-4 py-2 text-sm font-semibold text-white disabled:opacity-60">
-                            Attach Repository
-                          </button>
-                          <input value={codeForm.title} onChange={(event) => setCodeForm((current) => ({ ...current, title: event.target.value }))} placeholder="Snippet title" className="w-full rounded-xl border border-slate-800 bg-slate-950 px-4 py-3 text-white" />
-                          <textarea value={codeForm.codeSnippet} onChange={(event) => setCodeForm((current) => ({ ...current, codeSnippet: event.target.value }))} placeholder="Paste a code snippet" className="min-h-28 w-full rounded-xl border border-slate-800 bg-slate-950 px-4 py-3 text-white" />
-                          <button onClick={() => addCode.mutate()} disabled={!codeForm.title.trim() || !codeForm.codeSnippet.trim() || addCode.isPending} className="rounded-xl bg-slate-800 px-4 py-2 text-sm font-semibold text-white disabled:opacity-60">
-                            Save Code Snippet
-                          </button>
+                      ) : (
+                        <div className="rounded-2xl border border-slate-800 bg-slate-950/70 p-4 text-sm text-slate-400">
+                          Student collaborators manage docs and code records. Mentor and investor access is read-only here.
                         </div>
-                      </div>
+                      )}
                       <div className="space-y-3">
                         {(workspace.uploads ?? []).map((upload) => (
                           <div key={upload._id} className="flex items-center justify-between rounded-2xl border border-slate-800 bg-slate-950/70 p-4">
@@ -678,7 +695,9 @@ export function ProductWorkspace() {
                             </div>
                             <div className="flex gap-2">
                               <a href={upload.fileUrl} target="_blank" rel="noreferrer" className="rounded-lg bg-slate-800 px-3 py-2 text-xs font-semibold text-white">Open</a>
-                              <button onClick={() => deleteUpload.mutate(upload._id)} className="rounded-lg border border-slate-700 px-3 py-2 text-xs font-semibold text-slate-300">Delete</button>
+                              {canManageWorkspace ? (
+                                <button onClick={() => deleteUpload.mutate(upload._id)} className="rounded-lg border border-slate-700 px-3 py-2 text-xs font-semibold text-slate-300">Delete</button>
+                              ) : null}
                             </div>
                           </div>
                         ))}
@@ -690,7 +709,9 @@ export function ProductWorkspace() {
                             </div>
                             <div className="flex gap-2">
                               <a href={repo.repoUrl} target="_blank" rel="noreferrer" className="rounded-lg bg-slate-800 px-3 py-2 text-xs font-semibold text-white">Open</a>
-                              <button onClick={() => deleteRepo.mutate(repo._id)} className="rounded-lg border border-slate-700 px-3 py-2 text-xs font-semibold text-slate-300">Delete</button>
+                              {canManageWorkspace ? (
+                                <button onClick={() => deleteRepo.mutate(repo._id)} className="rounded-lg border border-slate-700 px-3 py-2 text-xs font-semibold text-slate-300">Delete</button>
+                              ) : null}
                             </div>
                           </div>
                         ))}
@@ -698,7 +719,9 @@ export function ProductWorkspace() {
                           <div key={snippet._id} className="rounded-2xl border border-slate-800 bg-slate-950/70 p-4">
                             <div className="mb-2 flex items-center justify-between gap-3">
                               <div className="font-semibold text-white">{snippet.title}</div>
-                              <button onClick={() => deleteCode.mutate(snippet._id)} className="rounded-lg border border-slate-700 px-3 py-2 text-xs font-semibold text-slate-300">Delete</button>
+                              {canManageWorkspace ? (
+                                <button onClick={() => deleteCode.mutate(snippet._id)} className="rounded-lg border border-slate-700 px-3 py-2 text-xs font-semibold text-slate-300">Delete</button>
+                              ) : null}
                             </div>
                             <pre className="overflow-x-auto rounded-xl bg-slate-950 p-3 text-xs text-slate-200"><code>{snippet.codeSnippet}</code></pre>
                           </div>
@@ -731,11 +754,13 @@ export function ProductWorkspace() {
                       </div>
                       <textarea value={chatDraft} onChange={(event) => { setChatDraft(event.target.value); chat.sendTyping(); }} placeholder="Share an update with your team..." className="min-h-24 w-full rounded-2xl border border-slate-800 bg-slate-950 px-4 py-3 text-white" />
                       <div className="flex flex-wrap items-center gap-3">
-                        <label className="inline-flex cursor-pointer items-center gap-2 rounded-xl border border-slate-700 bg-slate-900 px-4 py-3 text-sm font-semibold text-white">
-                          <Paperclip className="h-4 w-4" />
-                          Attach Image/PDF
-                          <input type="file" accept="image/*,.pdf" className="hidden" onChange={(event) => setChatAttachment(event.target.files?.[0] ?? null)} />
-                        </label>
+                        {canManageWorkspace ? (
+                          <label className="inline-flex cursor-pointer items-center gap-2 rounded-xl border border-slate-700 bg-slate-900 px-4 py-3 text-sm font-semibold text-white">
+                            <Paperclip className="h-4 w-4" />
+                            Attach Image/PDF
+                            <input type="file" accept="image/*,.pdf" className="hidden" onChange={(event) => setChatAttachment(event.target.files?.[0] ?? null)} />
+                          </label>
+                        ) : null}
                         {chatAttachment ? <span className="text-sm text-slate-400">{chatAttachment.name}</span> : null}
                         <button onClick={() => void sendMessage()} className="ml-auto inline-flex items-center gap-2 rounded-xl bg-blue-600 px-5 py-3 text-sm font-semibold text-white">
                           <Send className="h-4 w-4" />
@@ -745,7 +770,7 @@ export function ProductWorkspace() {
                       {showNegotiationPanel ? (
                         <div className="space-y-3 rounded-2xl border border-amber-800/30 bg-amber-950/10 p-4">
                           <div className="text-xs text-amber-200">
-                            Chat-only access: invited mentors and investors can collaborate in chat but cannot open tasks, evidence, or code vault records.
+                            Mentor and investor participants can review this workspace dashboard and collaborate in chat. Student collaborators manage tasks, docs, and code records.
                           </div>
                           {(workspace.chatParticipants ?? []).map((participant) => (
                             <div key={participant._id} className="flex items-center justify-between rounded-xl border border-slate-800 bg-slate-950/70 px-4 py-3">
@@ -753,19 +778,23 @@ export function ProductWorkspace() {
                                 <div className="text-sm font-semibold text-white">{participant.displayName ?? participant.userId}</div>
                                 <div className="text-xs capitalize text-slate-400">{participant.role}</div>
                               </div>
-                              <button onClick={() => removeParticipant.mutate(participant.userId)} className="rounded-lg border border-slate-700 px-3 py-2 text-xs font-semibold text-slate-300">Remove</button>
+                              {canManageChatAccess ? (
+                                <button onClick={() => removeParticipant.mutate(participant.userId)} className="rounded-lg border border-slate-700 px-3 py-2 text-xs font-semibold text-slate-300">Remove</button>
+                              ) : null}
                             </div>
                           ))}
-                          <div className="grid gap-3 md:grid-cols-[minmax(0,1fr)_180px_auto]">
-                            <input value={participantForm.email} onChange={(event) => setParticipantForm((current) => ({ ...current, email: event.target.value }))} placeholder="mentor@example.com" className="rounded-xl border border-slate-800 bg-slate-950 px-4 py-3 text-white" />
-                            <select value={participantForm.role} onChange={(event) => setParticipantForm((current) => ({ ...current, role: event.target.value as "mentor" | "investor" }))} className="rounded-xl border border-slate-800 bg-slate-950 px-4 py-3 text-white">
-                              <option value="mentor">Mentor</option>
-                              <option value="investor">Investor</option>
-                            </select>
-                            <button onClick={() => addParticipant.mutate()} disabled={!participantForm.email.trim() || addParticipant.isPending} className="rounded-xl bg-amber-600 px-4 py-3 text-sm font-semibold text-white disabled:opacity-60">
-                              Add
-                            </button>
-                          </div>
+                          {canManageChatAccess ? (
+                            <div className="grid gap-3 md:grid-cols-[minmax(0,1fr)_180px_auto]">
+                              <input value={participantForm.email} onChange={(event) => setParticipantForm((current) => ({ ...current, email: event.target.value }))} placeholder="mentor@example.com" className="rounded-xl border border-slate-800 bg-slate-950 px-4 py-3 text-white" />
+                              <select value={participantForm.role} onChange={(event) => setParticipantForm((current) => ({ ...current, role: event.target.value as "mentor" | "investor" }))} className="rounded-xl border border-slate-800 bg-slate-950 px-4 py-3 text-white">
+                                <option value="mentor">Mentor</option>
+                                <option value="investor">Investor</option>
+                              </select>
+                              <button onClick={() => addParticipant.mutate()} disabled={!participantForm.email.trim() || addParticipant.isPending} className="rounded-xl bg-amber-600 px-4 py-3 text-sm font-semibold text-white disabled:opacity-60">
+                                Add
+                              </button>
+                            </div>
+                          ) : null}
                         </div>
                       ) : null}
                     </div>
@@ -792,7 +821,7 @@ export function ProductWorkspace() {
                   </div>
                   <div className="rounded-2xl bg-slate-950 p-4 text-center">
                     <div className="text-2xl font-bold text-white">{evidenceCount}</div>
-                    <div className="text-xs text-slate-400">Evidence Items</div>
+                    <div className="text-xs text-slate-400">Docs</div>
                   </div>
                 </div>
               </div>
@@ -828,7 +857,7 @@ export function ProductWorkspace() {
           </div>
         ) : null}
 
-        {showProgressModal && workspace ? (
+        {showProgressModal && workspace && canManageWorkspace ? (
           <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-950/80 p-6 backdrop-blur-sm">
             <div className="w-full max-w-2xl rounded-2xl border border-slate-800 bg-slate-900 p-6">
               <div className="mb-6 flex items-center justify-between">

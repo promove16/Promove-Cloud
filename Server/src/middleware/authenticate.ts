@@ -8,6 +8,9 @@ interface AccessTokenPayload extends jwt.JwtPayload {
   _id: string;
   email: string;
   role: UserRole;
+  // Tenant context. Optional in the type so that legacy access tokens issued
+  // before this field was added still verify; we coalesce to null below.
+  institutionId?: string | null;
   type: 'access';
 }
 
@@ -29,6 +32,7 @@ export const authenticate = (req: Request, _res: Response, next: NextFunction) =
       _id: decoded._id,
       email: decoded.email,
       role: decoded.role,
+      institutionId: decoded.institutionId ?? null,
     };
 
     return next();

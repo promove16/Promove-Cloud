@@ -7,6 +7,11 @@ declare global {
         _id: string;
         email: string;
         role: UserRole;
+        // Tenant context propagated from the JWT. For students this is the
+        // institution they were enrolled under; for institution accounts
+        // (school/college) this is their own _id; null for global roles
+        // (admin/recruiter/investor/mentor that operate cross-tenant).
+        institutionId: string | null;
       };
     }
   }

@@ -112,7 +112,7 @@ export const listCollegeEventsController = async (req: Request, res: Response) =
 };
 
 export const getCollegeEventRankingsController = async (req: Request, res: Response) => {
-  const rankings = await getCollegeEventRankings(String(req.params.eventId));
+  const rankings = await getCollegeEventRankings(String(req.params.eventId), req.user!.institutionId);
   res.status(200).json(
     new ApiResponse({
       formula: '(submissionScore * 0.6) + (innovationScore * 0.4)',

@@ -27,7 +27,7 @@ export const getOptionTabsListClassName = ({
 } = {}) =>
   twMerge(
     clsx(
-      'flex min-w-max items-stretch gap-2 border-b border-slate-800/90',
+      'flex min-w-max items-stretch gap-2 border-b border-slate-200 dark:border-slate-800/90',
       stretch && 'min-w-0 w-full gap-0',
     ),
     className,
@@ -45,8 +45,8 @@ export const getOptionTabClassName = ({
       'group relative inline-flex min-h-[3rem] items-center gap-2.5 border-b-2 px-4 py-3 text-sm font-medium whitespace-nowrap transition-colors',
       stretch ? 'min-w-0 flex-1 justify-center px-3 text-center' : 'shrink-0',
       active
-        ? 'border-cyan-400 text-cyan-300'
-        : 'border-transparent text-slate-500 hover:border-slate-700 hover:text-slate-200',
+        ? 'border-cyan-500 text-cyan-700 dark:border-cyan-400 dark:text-cyan-300'
+        : 'border-transparent text-slate-500 hover:border-slate-300 hover:text-slate-900 dark:hover:border-slate-700 dark:hover:text-slate-200',
     ),
   );
 
@@ -75,7 +75,7 @@ export function OptionTabs<T extends string>({
               className={getOptionTabClassName({ active: isActive, stretch })}
             >
               {Icon ? (
-                <span className={clsx('transition-colors', isActive ? 'text-cyan-300' : 'text-slate-500 group-hover:text-slate-300')}>
+                <span className={clsx('transition-colors', isActive ? 'text-cyan-700 dark:text-cyan-300' : 'text-slate-500 group-hover:text-slate-900 dark:group-hover:text-slate-300')}>
                   <Icon className="h-4 w-4" />
                 </span>
               ) : null}

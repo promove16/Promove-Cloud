@@ -1,4 +1,4 @@
-const ApiError = require('./ApiError');
+const { ApiError } = require('./ApiError');
 const Project = require('../models/Project');
 const Team = require('../models/Team');
 const Board = require('../models/Board');

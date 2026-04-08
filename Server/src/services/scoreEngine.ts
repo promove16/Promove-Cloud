@@ -8,7 +8,7 @@ import { ScoreEvent } from '../modules/innovationScore/score.model';
 import { normalizeInnovationScore } from '../modules/innovationScore/score.utils';
 
 export const SCORE_DELTAS = {
-  PROBLEM_CLAIMED:         25,
+  PROBLEM_CLAIMED:         0,
   PROBLEM_COMPLETED:       100,
   SKILL_COMPLETED:         40,
   PROGRESS_UPLOADED:       15,
@@ -32,7 +32,7 @@ export const SCORE_DELTAS = {
 export type ScoreTrigger = keyof typeof SCORE_DELTAS;
 
 const BREAKDOWN_FIELD_MAP: Record<ScoreTrigger, keyof IUser['scoreBreakdown'] | null> = {
-  PROBLEM_CLAIMED:        'problemsClaimed',
+  PROBLEM_CLAIMED:        null,
   PROBLEM_COMPLETED:      null,
   SKILL_COMPLETED:        'skillsCompleted',
   PROGRESS_UPLOADED:      'progressUploads',

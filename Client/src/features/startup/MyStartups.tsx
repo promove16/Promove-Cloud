@@ -112,7 +112,7 @@ export function MyStartups() {
           <div>
             <h1 className="text-3xl font-bold text-white">Startup</h1>
             <p className="mt-2 text-slate-400">
-              Create and manage startup workflows from project completion to patent approval and investor pitch listing.
+              Create and manage student-owned startups independently from the Problem Bank learning module.
             </p>
           </div>
           <button
@@ -137,7 +137,7 @@ export function MyStartups() {
             <Rocket className="mx-auto h-12 w-12 text-slate-600" />
             <h2 className="mt-4 text-xl font-bold text-white">No startups yet</h2>
             <p className="mt-2 text-sm text-slate-400">
-              Create your first startup, link the project workspace, and move it toward investor pitch listing.
+              Create your first startup, add its business and IPR details, then submit it for admin review.
             </p>
             <button
               onClick={() => navigate(STARTUP_LAUNCH_NEW_PATH)}

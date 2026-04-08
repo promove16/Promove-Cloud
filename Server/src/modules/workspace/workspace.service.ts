@@ -238,7 +238,11 @@ export const serializeWorkspace = async (workspace: WorkspaceSnapshot) => {
 
 export const getAccessibleWorkspaces = async (userId: string) => {
   const workspaces = await Workspace.find({
-    $or: [{ ownerId: userId }, { teamMemberIds: userId }],
+    $or: [
+      { ownerId: userId },
+      { teamMemberIds: userId },
+      { 'chatParticipants.userId': userId },
+    ],
   })
     .sort({ updatedAt: -1 })
     .lean();
@@ -301,6 +305,14 @@ export const createWorkspace = async (
   userId: string,
   payload: z.infer<typeof createWorkspaceSchema>,
 ) => {
+  if (payload.claimedProblemId) {
+    throw new ApiError(
+      400,
+      'PROBLEM_CLAIM_ENDPOINT_REQUIRED',
+      'Start problems from the Problem Bank claim action.',
+    );
+  }
+
   const activeCount = await Workspace.countDocuments({ ownerId: userId, isActive: true });
   if (activeCount >= 3) {
     throw new ApiError(400, 'WORKSPACE_LIMIT_REACHED', 'You can only have 3 active workspaces.');
@@ -311,8 +323,7 @@ export const createWorkspace = async (
     teamMemberIds: [userId],
     title: payload.title,
     category: payload.category,
-    claimedProblemId: payload.claimedProblemId ? objectId(payload.claimedProblemId) : undefined,
-    stage: payload.claimedProblemId ? 'Problem' : 'Ideation',
+    stage: 'Ideation',
   });
 
   return serializeWorkspace(workspace);
@@ -576,7 +587,7 @@ export const inviteMember = async (
       throw new ApiError(
         400,
         'ROLE_NOT_SUPPORTED',
-        'Team invites are limited to student collaborators. Use admin mentorship assignment for mentors and chat access for investors.',
+        'Team invites are limited to student collaborators. Use chat access for mentor and investor collaboration.',
       );
     }
 
@@ -797,14 +808,6 @@ export const addChatParticipant = async (
   ownerId: string,
   payload: z.infer<typeof addChatParticipantSchema>,
 ) => {
-  if (payload.role === 'mentor') {
-    throw new ApiError(
-      403,
-      'MENTOR_ASSIGNMENT_ADMIN_ONLY',
-      'Mentor assignments are managed by admin. Students can only add investor participants.',
-    );
-  }
-
   const workspace = await getWorkspaceForOwner(workspaceId, ownerId);
 
   let user = payload.userId ? await User.findById(payload.userId) : null;
@@ -868,14 +871,6 @@ export const removeChatParticipant = async (
   const participant = workspace.chatParticipants.find((p) => String(p.userId) === participantUserId);
   if (!participant) {
     throw new ApiError(404, 'PARTICIPANT_NOT_FOUND', 'Chat participant not found');
-  }
-
-  if (participant.role === 'mentor') {
-    throw new ApiError(
-      403,
-      'MENTOR_ASSIGNMENT_ADMIN_ONLY',
-      'Mentor assignments are managed by admin and cannot be removed from the student workspace.',
-    );
   }
 
   workspace.chatParticipants = workspace.chatParticipants.filter(

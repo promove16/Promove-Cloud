@@ -24,6 +24,11 @@ export const eventSubmissionSchema = z.object({
   score: z.number().min(0).max(100),
 });
 
+const eventTenantFilter = (eventId: string, institutionId?: string | null) => ({
+  _id: eventId,
+  ...(institutionId ? { institutionId } : {}),
+});
+
 export const createEvent = async (
   institutionId: string,
   createdBy: string,
@@ -113,9 +118,13 @@ export const listInstitutionEvents = async (institutionId: string) => {
   }));
 };
 
-export const joinEvent = async (eventId: string, studentId: string): Promise<void> => {
+export const joinEvent = async (
+  eventId: string,
+  studentId: string,
+  institutionId?: string | null,
+): Promise<void> => {
   const [event, student] = await Promise.all([
-    Event.findById(eventId),
+    Event.findOne(eventTenantFilter(eventId, institutionId)),
     User.findById(studentId).select('_id institutionId role').lean(),
   ]);
 
@@ -148,8 +157,9 @@ export const addSubmissionScore = async (
   eventId: string,
   studentId: string,
   score: number,
+  institutionId?: string | null,
 ): Promise<void> => {
-  const event = await Event.findById(eventId);
+  const event = await Event.findOne(eventTenantFilter(eventId, institutionId));
 
   if (!event) {
     throw new ApiError(404, 'EVENT_NOT_FOUND', 'Event not found');
@@ -167,8 +177,11 @@ export const addSubmissionScore = async (
   await event.save();
 };
 
-export const computeEventRankings = async (eventId: string): Promise<void> => {
-  const event = await Event.findById(eventId);
+export const computeEventRankings = async (
+  eventId: string,
+  institutionId?: string | null,
+): Promise<void> => {
+  const event = await Event.findOne(eventTenantFilter(eventId, institutionId));
 
   if (!event) {
     throw new ApiError(404, 'EVENT_NOT_FOUND', 'Event not found');
@@ -177,7 +190,11 @@ export const computeEventRankings = async (eventId: string): Promise<void> => {
   const participantIds = event.participants.map((participant) => participant.studentId);
   const users =
     participantIds.length > 0
-      ? await User.find({ _id: { $in: participantIds } })
+      ? await User.find({
+          _id: { $in: participantIds },
+          institutionId: event.institutionId,
+          role: UserRole.STUDENT,
+        })
           .select('_id innovationScore')
           .lean()
       : [];
@@ -237,8 +254,11 @@ export const computeEventRankings = async (eventId: string): Promise<void> => {
   }
 };
 
-export const getEventRankings = async (eventId: string): Promise<EventRankingView[]> => {
-  const event = await Event.findById(eventId).lean();
+export const getEventRankings = async (
+  eventId: string,
+  institutionId?: string | null,
+): Promise<EventRankingView[]> => {
+  const event = await Event.findOne(eventTenantFilter(eventId, institutionId)).lean();
 
   if (!event) {
     throw new ApiError(404, 'EVENT_NOT_FOUND', 'Event not found');
@@ -250,6 +270,8 @@ export const getEventRankings = async (eventId: string): Promise<EventRankingVie
 
   const students = await User.find({
     _id: { $in: event.rankings.map((ranking) => ranking.studentId) },
+    institutionId: event.institutionId,
+    role: UserRole.STUDENT,
   })
     .select('_id displayName avatar')
     .lean();

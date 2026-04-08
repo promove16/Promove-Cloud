@@ -1,6 +1,6 @@
 const Board = require('../../models/Board');
 const Project = require('../../models/Project');
-const ApiError = require('../../utils/ApiError');
+const { ApiError } = require('../../utils/ApiError');
 const { assertProjectAccess, assertProjectLead } = require('../../utils/projectAccess');
 
 async function getBoardByProject(projectId, userId) {

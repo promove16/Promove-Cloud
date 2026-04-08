@@ -375,8 +375,8 @@ export function RequestAccessPage() {
               Student invite detected
             </div>
             <div className="mt-2 text-base font-semibold text-slate-950">
-              Student invitations use the direct signup flow instead of request
-              access.
+              Student invitations use school or college token signup instead of
+              request access.
             </div>
             <Link to={signupLink} className="mt-3 inline-flex font-semibold text-amber-700 underline">
               Continue to student signup

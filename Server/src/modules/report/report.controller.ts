@@ -6,8 +6,23 @@ import { REPORT_REASONS, ReportReason, UserReport } from './report.model';
 
 const allowedReportReasons = new Set<ReportReason>(REPORT_REASONS);
 
+const toOptionalObjectId = (value?: string | null) =>
+  value && Types.ObjectId.isValid(value) ? new Types.ObjectId(value) : null;
+
+const reportTenantFilter = (institutionId: Types.ObjectId | null) =>
+  institutionId
+    ? {
+        $or: [
+          { institutionId },
+          { institutionId: { $exists: false } },
+          { institutionId: null },
+        ],
+      }
+    : {};
+
 export const createReport = async (req: Request, res: Response) => {
   const reporterId = new Types.ObjectId(req.user!._id);
+  const institutionId = toOptionalObjectId(req.user!.institutionId);
   const { reportedUserId, reason, description } = req.body as {
     reportedUserId: string;
     reason: ReportReason;
@@ -35,6 +50,7 @@ export const createReport = async (req: Request, res: Response) => {
     reporterId,
     reportedUserId: new Types.ObjectId(reportedUserId as string),
     status: 'pending',
+    ...reportTenantFilter(institutionId),
   });
 
   if (existingReport) {
@@ -42,6 +58,7 @@ export const createReport = async (req: Request, res: Response) => {
   }
 
   const report = await UserReport.create({
+    institutionId,
     reporterId,
     reportedUserId: new Types.ObjectId(reportedUserId as string),
     reason,
@@ -53,8 +70,12 @@ export const createReport = async (req: Request, res: Response) => {
 
 export const getMyReports = async (req: Request, res: Response) => {
   const reporterId = new Types.ObjectId(req.user!._id);
+  const institutionId = toOptionalObjectId(req.user!.institutionId);
 
-  const reports = await UserReport.find({ reporterId })
+  const reports = await UserReport.find({
+    reporterId,
+    ...reportTenantFilter(institutionId),
+  })
     .sort({ createdAt: -1 })
     .lean();
 

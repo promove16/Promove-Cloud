@@ -1,6 +1,6 @@
 const Ticket = require('../../models/Ticket');
 const Sprint = require('../../models/Sprint');
-const ApiError = require('../../utils/ApiError');
+const { ApiError } = require('../../utils/ApiError');
 const ENUMS = require('../../constants/enums');
 const { assertProjectAccess, getProjectByBoardId } = require('../../utils/projectAccess');
 const { deleteFile } = require('../upload/upload.service');

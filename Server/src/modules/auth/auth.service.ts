@@ -73,8 +73,16 @@ const buildDefaultInstitutionProfile = (displayName: string) => ({
   iicStarRating: 0,
 });
 
+type TokenBasePayload = {
+  _id: string;
+  email: string;
+  role: string;
+  // Tenant context — null for users that don't belong to a single institution.
+  institutionId: string | null;
+};
+
 const signToken = (
-  payload: Record<string, string>,
+  payload: TokenBasePayload,
   secret: string,
   expiresIn: string,
   tokenType: 'access' | 'refresh',
@@ -115,6 +123,7 @@ const persistRefreshSession = async (
       JSON.stringify({
         userId: user._id,
         role: user.role,
+        institutionId: user.institutionId ?? null,
         issuedAt: new Date().toISOString(),
       }),
       { ex: REFRESH_TTL_SECONDS },
@@ -122,11 +131,27 @@ const persistRefreshSession = async (
   ]);
 };
 
+// Resolve the tenant boundary for a user. Schools/colleges are themselves
+// the institution, so they own their own tenant. Students belong to the
+// institution that issued their token. Other roles operate cross-tenant.
+const resolveTenantInstitutionId = (user: SanitizedUser): string | null => {
+  if (user.role === UserRole.SCHOOL || user.role === UserRole.COLLEGE) {
+    return user._id;
+  }
+
+  if (user.role === UserRole.STUDENT) {
+    return user.institutionId ?? null;
+  }
+
+  return null;
+};
+
 const createTokenPair = async (user: SanitizedUser) => {
-  const tokenBase = {
+  const tokenBase: TokenBasePayload = {
     _id: user._id,
     email: user.email,
     role: user.role,
+    institutionId: resolveTenantInstitutionId(user),
   };
   const refreshTokenId = randomUUID();
 
@@ -271,7 +296,7 @@ export const registerUser = async (payload: {
   password: string;
   displayName: string;
   role: UserRole.STUDENT;
-  institutionToken?: string;
+  institutionToken: string;
   domain?: string;
   bio?: string;
 }): Promise<RegisterResult | PendingRegisterResult> => {
@@ -281,62 +306,22 @@ export const registerUser = async (payload: {
     throw new ApiError(409, 'DUPLICATE_KEY', 'Email already registered');
   }
 
+  const institutionTokenInput = (payload.institutionToken ?? '').trim();
+
+  if (!institutionTokenInput) {
+    throw new ApiError(
+      400,
+      'INSTITUTION_TOKEN_REQUIRED',
+      'Student registration requires a school or college invitation token.',
+    );
+  }
+
   const passwordHash = await bcrypt.hash(payload.password, 12);
   const sanitizedDisplayName = sanitizePlainText(payload.displayName);
   const sanitizedBio = payload.bio ? sanitizePlainText(payload.bio) : undefined;
   const profileSlug = await generateProfileSlug(sanitizedDisplayName);
   const profileComplete = Boolean(payload.domain || payload.bio);
-
-  // ── No institution token → basic self-registration ────────────────
-  if (!payload.institutionToken) {
-    const createdUser = await User.create({
-      email: payload.email.toLowerCase(),
-      passwordHash,
-      role: UserRole.STUDENT,
-      displayName: sanitizedDisplayName,
-      ...(profileSlug ? { profileSlug } : {}),
-      ...(payload.domain ? { domain: sanitizePlainText(payload.domain) } : {}),
-      ...(sanitizedBio ? { bio: sanitizedBio } : {}),
-      institutionToken: null,
-      institutionId: null,
-      profileComplete,
-      registrationStage: 'basic',
-      accessGrantedBy: 'self_registered',
-      accessExpiresAt: new Date(Date.now() + MS_IN_YEAR),
-      isActive: true,
-      institutionVerificationStatus: 'none',
-      verificationStatus: 'not_required',
-      adminApprovalStatus: 'not_required',
-    });
-
-    if (profileComplete) {
-      const newScore = await applyScore({
-        userId: String(createdUser._id),
-        trigger: 'PROFILE_COMPLETE',
-        metadata: { source: 'register' },
-      });
-      createdUser.innovationScore = newScore;
-    }
-
-    const user = toSanitizedUser(createdUser.toObject());
-    const tokens = await createTokenPair(user);
-    await queueWelcomeEmail(String(createdUser._id));
-    await queueProfileCompletionMilestoneEmail(
-      String(createdUser._id),
-      0,
-      getProfileCompletionProgress(createdUser.toObject()).percent,
-    );
-
-    return {
-      ...tokens,
-      user,
-      nextStep: 'profile_setup',
-      message: 'Registration successful. Complete your profile to get started.',
-    };
-  }
-
-  // ── With institution token → existing flow ────────────────────────
-  const institutionTokenValue = payload.institutionToken.trim().toUpperCase();
+  const institutionTokenValue = institutionTokenInput.toUpperCase();
   const studentInstitutionContext = await resolveStudentInstitutionContext(institutionTokenValue);
   const matchedRoster = await findInstitutionRosterMatchByEmail(payload.email);
 

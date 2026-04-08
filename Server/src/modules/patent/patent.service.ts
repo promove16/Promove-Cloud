@@ -163,7 +163,7 @@ export const submitPatent = async (userId: string, payload: z.infer<typeof paten
     type: 'patent_status',
     title: 'Patent submission received',
     body: `Your patent submission for ${payload.projectTitle} is now in review.`,
-    link: '/patent-support',
+    link: '/startup-launch',
   });
 
   const admins = await User.find({ role: UserRole.ADMIN }).select('_id').lean();

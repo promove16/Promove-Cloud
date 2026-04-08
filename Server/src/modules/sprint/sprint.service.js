@@ -1,6 +1,6 @@
 const Sprint = require('../../models/Sprint');
 const Ticket = require('../../models/Ticket');
-const ApiError = require('../../utils/ApiError');
+const { ApiError } = require('../../utils/ApiError');
 const { assertProjectAccess, assertProjectLead, getProjectByBoardId } = require('../../utils/projectAccess');
 
 async function createSprint(boardId, userId, body) {

@@ -24,7 +24,6 @@ export interface WorkspaceInvitePayload {
 export interface WorkspacePayload {
   title: string;
   category: string;
-  claimedProblemId?: string;
 }
 
 export interface WorkspaceProgressPayload {

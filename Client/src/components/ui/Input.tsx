@@ -9,16 +9,11 @@ export const Input = forwardRef<HTMLInputElement, InputHTMLAttributes<HTMLInputE
       type={type}
       className={twMerge(
         clsx(
-          'w-full rounded-lg border border-slate-800 bg-slate-950 px-4 py-3 text-white placeholder:text-slate-500 focus:border-blue-500 focus:outline-none focus:ring-0',
+          'w-full rounded-lg border border-slate-300 bg-white px-4 py-3 text-slate-950 placeholder:text-slate-400 focus:border-blue-500 focus:outline-none focus:ring-0 dark:border-slate-800 dark:bg-slate-950 dark:text-white dark:placeholder:text-slate-500',
         ),
         className,
       )}
-      style={{
-        ...(type === 'date' || type === 'time' || type === 'datetime-local'
-          ? { colorScheme: 'dark' }
-          : {}),
-        ...style,
-      }}
+      style={style}
       {...props}
     />
   ),

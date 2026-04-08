@@ -8,7 +8,6 @@ import {
   Gauge,
   Rocket,
   Sparkles,
-  Target,
   TrendingUp,
   Trophy,
   Upload,
@@ -46,7 +45,6 @@ const breakdownCards: Array<{
   key: keyof ScoreBreakdown;
   label: string;
 }> = [
-  { key: "problemsClaimed", label: "Problems Claimed" },
   { key: "skillsCompleted", label: "Skills Completed" },
   { key: "progressUploads", label: "Progress Uploads" },
   { key: "patentsSubmitted", label: "Patents Submitted" },
@@ -67,18 +65,9 @@ const earningRules: Array<{
   completedText: (count: number) => string;
 }> = [
   {
-    id: "claim-problem",
-    label: "Claim a problem",
-    points: "+5 each",
-    icon: Target,
-    href: "/problem-bank",
-    count: (breakdown, triggerCounts) => breakdown?.problemsClaimed ?? triggerCounts.PROBLEM_CLAIMED ?? 0,
-    completedText: (count) => `${count} claimed`,
-  },
-  {
     id: "complete-problem",
     label: "Complete a problem",
-    points: "+20 each",
+    points: "+100 after admin approval",
     icon: Trophy,
     href: "/problem-bank",
     count: (_breakdown, triggerCounts) => triggerCounts.PROBLEM_COMPLETED ?? 0,
@@ -107,7 +96,7 @@ const earningRules: Array<{
     label: "Submit a patent",
     points: "+15 each",
     icon: FileText,
-    href: "/patent-support",
+    href: "/startup-launch",
     count: (breakdown) => breakdown?.patentsSubmitted ?? 0,
     completedText: (count) => `${count} submitted`,
   },
@@ -116,7 +105,7 @@ const earningRules: Array<{
     label: "Get a patent approved",
     points: "+25 each",
     icon: Trophy,
-    href: "/patent-support",
+    href: "/startup-launch",
     count: (breakdown) => breakdown?.patentsApproved ?? 0,
     completedText: (count) => `${count} approved`,
   },

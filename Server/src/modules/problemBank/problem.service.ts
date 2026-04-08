@@ -4,33 +4,45 @@ import { z } from 'zod';
 import { logError } from '../../config/logger';
 import { redis } from '../../config/redis';
 import { ApiError } from '../../utils/ApiError';
-import { applyScore, applyScoreAsync } from '../../services/scoreEngine';
+import { applyScore } from '../../services/scoreEngine';
 import { NotificationService } from '../notification/notification.service';
 import { User } from '../user/user.model';
 import { Workspace } from '../workspace/workspace.model';
+import problemBankSeedData from './problemBank.seed.json';
 import { Problem } from './problem.model';
 import { ProblemSubmission } from './problemSubmission.model';
+import { ProblemCategory, ProblemDifficulty } from './problem.types';
 
 const defaultSecurityNotice =
   'Upload only project-safe evidence. Do not share secrets, credentials, private keys, personal data, or production database exports.';
 
-const sampleProblems = [
-  ['Smart irrigation for small farms', 'Agriculture', 'Medium', 'Agritech'],
-  ['Village cold-chain logistics', 'Agriculture', 'Hard', 'Supply Chain'],
-  ['Low-cost assistive reading tool', 'Education', 'Easy', 'Accessibility'],
-  ['AI attendance insights for schools', 'Education', 'Medium', 'EdTech'],
-  ['Rural telemedicine diagnostics', 'Healthcare', 'Hard', 'HealthTech'],
-  ['Smart medicine adherence alerts', 'Healthcare', 'Medium', 'HealthTech'],
-  ['E-waste collection incentives', 'Environment', 'Medium', 'Sustainability'],
-  ['Flood prediction for local bodies', 'Environment', 'Hard', 'Climate'],
-  ['Affordable solar uptime monitor', 'Technology', 'Medium', 'IoT'],
-  ['Offline-first learning hub', 'Technology', 'Easy', 'Software'],
-  ['Women safety commute assist', 'Other', 'Medium', 'Mobility'],
-  ['Accessible skill training portal', 'Rural Development', 'Easy', 'Employment'],
-  ['Artisan market discovery engine', 'Rural Development', 'Medium', 'Commerce'],
-  ['Water quality community scanner', 'Environment', 'Hard', 'Hardware'],
-  ['Farmer credit readiness tracker', 'Agriculture', 'Medium', 'FinTech'],
-] as const;
+type ProblemBankSeedRecord = {
+  sourceCategorySequence: number;
+  sourceCategoryNumber: number;
+  sourceCategory: string;
+  sourcePage: number;
+  number: number;
+  title: string;
+  problem: string;
+  solution: string;
+  aiTools: string;
+  market: string;
+  reference: string;
+};
+
+const seedProblemRecords = problemBankSeedData as ProblemBankSeedRecord[];
+
+const sourceCategoryMap: Record<string, ProblemCategory> = {
+  'Agriculture & AgriTech': 'Agriculture',
+  'Renewable Energy & Sustainability': 'Environment',
+  'Healthcare & MedTech': 'Healthcare',
+  'Education & Skill Development (EdTech)': 'Education',
+  'Smart Cities & Infrastructure': 'Technology',
+  'Finance & Financial Inclusion (FinTech)': 'Technology',
+  'Manufacturing & Industry 4.0': 'Technology',
+};
+
+const defaultSeedDifficulty: ProblemDifficulty = 'Medium';
 
 const arrayField = (maxItems: number, itemMax = 160) =>
   z.array(z.string().trim().min(1).max(itemMax)).max(maxItems).default([]);
@@ -121,9 +133,16 @@ type ProblemViewWorkspace = {
   updatedAt: Date;
 };
 
-const clearProblemCaches = async () => {
+export const clearProblemCaches = async () => {
+  if (process.env.PROMOVE_SKIP_PROBLEM_CACHE_CLEAR === 'true') {
+    return;
+  }
+
   const redisClient = redis as unknown as {
-    scan?: (cursor: string) => Promise<[string, string[]]>;
+    scan?: (
+      cursor: string,
+      options?: { match?: string; count?: number },
+    ) => Promise<[string, string[]]>;
   };
   const scan = typeof redisClient.scan === 'function' ? redisClient.scan.bind(redisClient) : null;
 
@@ -132,21 +151,23 @@ const clearProblemCaches = async () => {
   }
 
   try {
-    let cursor = '0';
     const keys: string[] = [];
+    const patterns = ['problems:*', 'problem:*'];
 
-    do {
-      const [nextCursor, batch] = await scan(cursor);
-      cursor = nextCursor;
-      batch.forEach((key) => {
-        if (key.startsWith('problems:') || key.startsWith('problem:')) {
-          keys.push(key);
-        }
-      });
-    } while (cursor !== '0');
+    for (const pattern of patterns) {
+      let cursor = '0';
+      let iterations = 0;
+
+      do {
+        const [nextCursor, batch] = await scan(cursor, { match: pattern, count: 100 });
+        cursor = nextCursor;
+        keys.push(...batch);
+        iterations += 1;
+      } while (cursor !== '0' && iterations < 50);
+    }
 
     if (keys.length > 0) {
-      await Promise.all(keys.map((key) => redis.del(key)));
+      await Promise.all(Array.from(new Set(keys)).map((key) => redis.del(key)));
     }
   } catch (error) {
     logError('Failed to clear problem caches', error);
@@ -163,8 +184,83 @@ const normalizeProblemInput = (payload: z.infer<typeof createProblemSchema>) => 
   resourceLinks: payload.resourceLinks ?? [],
   submissionConfig: payload.submissionConfig,
   claimStatus: 'open' as const,
-  maxClaims: 1,
+  maxClaims: Number.MAX_SAFE_INTEGER,
 });
+
+const trimField = (value: string, maxLength: number) =>
+  value.length > maxLength ? value.slice(0, maxLength - 1).trimEnd() : value;
+
+const getSeedTags = (record: ProblemBankSeedRecord) => {
+  const rawTags = [
+    record.sourceCategory,
+    ...record.aiTools.split(','),
+    ...record.title.split(/\s+/).filter((part) => part.length > 4),
+  ];
+
+  return Array.from(
+    new Set(
+      rawTags
+        .map((tag) => trimField(tag.trim(), 40))
+        .filter((tag) => tag.length > 0),
+    ),
+  ).slice(0, 12);
+};
+
+const buildSeedProblemDocuments = () =>
+  seedProblemRecords.map((record) => {
+    const category = sourceCategoryMap[record.sourceCategory] ?? 'Other';
+    const sourceRef = `Problem Bank version 01, category ${record.sourceCategoryNumber}, item ${record.number}, page ${record.sourcePage}`;
+
+    return {
+      title: record.title,
+      description: trimField(
+        `Problem: ${record.problem} Solution hint: ${record.solution} AI tools: ${record.aiTools} Market scope: ${record.market} Reference: ${record.reference}.`,
+        1200,
+      ),
+      category,
+      difficulty: defaultSeedDifficulty,
+      domain: record.sourceCategory,
+      tags: getSeedTags(record),
+      isVerified: true,
+      postedBy: 'ProMove IP Bank',
+      sponsorName: 'ProMove IP Bank',
+      geography: 'Global',
+      targetBeneficiaries: ['Student innovators', trimField(record.market, 80)],
+      impactGoal: trimField(`Build a practical solution for: ${record.problem}.`, 500),
+      expectedOutcome: trimField(`Prototype or validated concept for: ${record.solution}.`, 500),
+      deliverables: [
+        'Problem analysis',
+        'Prototype or proof of concept',
+        'AI tools and implementation plan',
+        'Market validation summary',
+      ],
+      acceptanceCriteria: [
+        trimField(`Addresses the source problem: ${record.problem}.`, 200),
+        trimField(`Demonstrates the solution hint: ${record.solution}.`, 200),
+        trimField(`Documents an AI tools plan: ${record.aiTools}.`, 200),
+      ],
+      constraints: [
+        'Use only project-safe datasets and anonymized evidence.',
+        trimField(`Validate feasibility for market scope: ${record.market}.`, 200),
+        sourceRef,
+      ],
+      resourceLinks: [],
+      securityNotice: defaultSecurityNotice,
+      publicationStatus: 'published' as const,
+      claimStatus: 'open' as const,
+      maxClaims: Number.MAX_SAFE_INTEGER,
+      submissionConfig: {
+        allowDocuments: true,
+        allowImages: true,
+        allowGithubRepos: true,
+        allowCodeSnippets: true,
+        maxFileSizeMb: 10,
+        maxRepoLinks: 3,
+        maxCodeSnippets: 5,
+        codeExecutionAllowed: false,
+      },
+    };
+  });
 
 const ensurePublishedProblem = async (problemId: string) => {
   const problem = await Problem.findOne({ _id: problemId, publicationStatus: 'published' }).lean();
@@ -194,6 +290,14 @@ const getUniqueTeamMemberIds = (workspace: {
   Array.from(
     new Set([String(workspace.ownerId), ...workspace.teamMemberIds.map((memberId) => String(memberId))]),
   );
+
+const withTenantScopedClaimState = <T extends Record<string, any>>(problem: T) => ({
+  ...problem,
+  claimStatus: 'open' as const,
+  maxClaims: Number.MAX_SAFE_INTEGER,
+  claimedBy: undefined,
+  claimedAt: undefined,
+});
 
 const buildProblemViews = async (
   problems: Array<Record<string, any>>,
@@ -293,7 +397,7 @@ const buildProblemViews = async (
     const approvedStats = approvedSubmissionStatsByProblemId.get(String(problem._id));
 
     return {
-      ...problem,
+      ...withTenantScopedClaimState(problem),
       stats: {
         activeTeamsCount: activeWorkspaceCountByProblemId.get(String(problem._id)) ?? 0,
         approvedTeamsCount: approvedStats?.approvedTeamsCount ?? 0,
@@ -329,41 +433,8 @@ export const seedProblemsIfEmpty = async () => {
     return false;
   }
 
-  await Problem.insertMany(
-    sampleProblems.map(([title, category, difficulty, domain], index) => ({
-      title,
-      description: `${title} is a verified ProMove challenge designed to help student innovators ship high-impact solutions for real communities.`,
-      category,
-      difficulty,
-      domain,
-      tags: domain.split(' ').map((part) => part.toLowerCase()),
-      isVerified: true,
-      postedBy: 'ProMove Admin',
-      sponsorName: index % 2 === 0 ? 'ProMove Innovation Desk' : 'Partner Challenge Office',
-      geography: 'India',
-      targetBeneficiaries: ['Students', 'Communities'],
-      impactGoal: 'Create a real-world, implementation-ready student innovation.',
-      expectedOutcome: 'A validated prototype and a documented implementation path.',
-      deliverables: ['Problem analysis', 'Prototype evidence', 'Validation summary'],
-      acceptanceCriteria: ['Clear user problem fit', 'Functional evidence uploaded', 'Safe submission hygiene'],
-      constraints: ['No sharing of secrets', 'No production data uploads', 'Teams are ranked after admin review'],
-      resourceLinks: [],
-      securityNotice: defaultSecurityNotice,
-      publicationStatus: 'published',
-      claimStatus: 'open',
-      maxClaims: 1,
-      submissionConfig: {
-        allowDocuments: true,
-        allowImages: true,
-        allowGithubRepos: true,
-        allowCodeSnippets: true,
-        maxFileSizeMb: 10,
-        maxRepoLinks: 3,
-        maxCodeSnippets: 5,
-        codeExecutionAllowed: false,
-      },
-    })),
-  );
+  await Problem.insertMany(buildSeedProblemDocuments());
+  await clearProblemCaches();
 
   return true;
 };
@@ -478,7 +549,7 @@ export const listAdminProblems = async () => {
   );
 
   return problems.map((problem) => ({
-    ...problem,
+    ...withTenantScopedClaimState(problem),
     stats: {
       activeTeamsCount: workspaceCountByProblemId.get(String(problem._id)) ?? 0,
       reviewRequestedCount:
@@ -548,9 +619,8 @@ export const deleteAdminProblem = async (problemId: string) => {
 };
 
 export const claimProblem = async (problemId: string, userId: string) => {
-  const [activeCount, problem, existingWorkspace] = await Promise.all([
-    Workspace.countDocuments({ ownerId: userId, isActive: true }),
-    Problem.findOne({ _id: problemId, publicationStatus: 'published' }).lean(),
+  const [problem, existingWorkspace] = await Promise.all([
+    ensurePublishedProblem(problemId),
     Workspace.findOne({
       ownerId: userId,
       claimedProblemId: problemId,
@@ -558,29 +628,41 @@ export const claimProblem = async (problemId: string, userId: string) => {
     }).lean(),
   ]);
 
-  if (!problem) {
-    throw new ApiError(404, 'PROBLEM_NOT_FOUND', 'Problem not found');
-  }
-
   if (existingWorkspace) {
     return existingWorkspace;
   }
 
-  if (activeCount >= 3) {
-    throw new ApiError(400, 'WORKSPACE_LIMIT_REACHED', 'You can only have 3 active workspaces.');
+  let workspace;
+
+  try {
+    workspace = await Workspace.create({
+      ownerId: userId,
+      teamMemberIds: [userId],
+      claimedProblemId: problem._id,
+      title: problem.title,
+      category: problem.category,
+      stage: 'Problem',
+      progressPercent: 0,
+    });
+  } catch (error) {
+    if (
+      typeof error === 'object' &&
+      error !== null &&
+      'code' in error &&
+      error.code === 11000
+    ) {
+      const duplicateWorkspace = await Workspace.findOne({
+        ownerId: userId,
+        claimedProblemId: problemId,
+        isActive: true,
+      }).lean();
+      if (duplicateWorkspace) {
+        return duplicateWorkspace;
+      }
+    }
+    throw error;
   }
 
-  const workspace = await Workspace.create({
-    ownerId: userId,
-    teamMemberIds: [userId],
-    claimedProblemId: problem._id,
-    title: problem.title,
-    category: problem.category,
-    stage: 'Problem',
-    progressPercent: 0,
-  });
-
-  await applyScoreAsync({ userId, trigger: 'PROBLEM_CLAIMED', metadata: { problemId } });
   await clearProblemCaches();
 
   return workspace.toObject();

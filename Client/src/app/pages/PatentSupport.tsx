@@ -18,13 +18,17 @@ import {
   X,
 } from 'lucide-react';
 import { patentApi } from '../../api/patent.api';
+import { patentRequestApi } from '../../api/patentRequest.api';
+import { startupApi } from '../../api/startup.api';
 import { workspaceApi } from '../../api/workspace.api';
+import { getStartupSectionPath, normalizeStartupRouteId } from '../../features/startup/navigation';
 import type {
   PatentDocumentCategory,
   PatentFilingDocuments,
   PatentQuestionnaire,
   PatentSubmission,
 } from '../../types/patent.types';
+import type { PatentRequestSubmission } from '../../types/patentRequest.types';
 import { DashboardLayout } from '../components/DashboardLayout';
 
 // ─── Constants ───────────────────────────────────────────────────────────────
@@ -272,6 +276,14 @@ const DEFAULT_ANSWERS: PatentQuestionnaire = {
   ipProtectionType: '',
 };
 
+const getPatentAnswersFromStartupProfile = (profile?: Partial<PatentQuestionnaire>): PatentQuestionnaire => ({
+  ...DEFAULT_ANSWERS,
+  ...(profile ?? {}),
+});
+
+const hasAnyPatentAnswer = (answers: Record<QuestionKey, string>) =>
+  Object.values(answers).some((value) => value.trim().length > 0);
+
 const DEFAULT_FILING: PatentFilingDocuments = {
   inventionCategory: 'software_hardware_integration',
   specificationType: 'provisional',
@@ -302,6 +314,9 @@ const formatFileSize = (bytes: number) => {
   return `${(bytes / (1024 * 1024)).toFixed(1)} MB`;
 };
 
+const formatDate = (value?: string) =>
+  value ? new Date(value).toLocaleDateString('en-IN') : 'Not recorded';
+
 const formatKey = (value: string) =>
   value.replace(/([A-Z])/g, ' $1').replace(/_/g, ' ').trim();
 
@@ -321,6 +336,26 @@ const STATUS_STYLES: Record<string, string> = {
   rejected: 'bg-red-500/10 text-red-300',
   under_review: 'bg-cyan-500/10 text-cyan-300',
   submitted: 'bg-yellow-500/10 text-yellow-300',
+  documents_review: 'bg-cyan-500/10 text-cyan-300',
+  filing_in_progress: 'bg-blue-500/10 text-blue-300',
+  filed_with_ipo: 'bg-indigo-500/10 text-indigo-300',
+  examination_requested: 'bg-purple-500/10 text-purple-300',
+  granted: 'bg-green-500/10 text-green-300',
+  draft: 'bg-slate-700/60 text-slate-300',
+};
+
+const DOCUMENT_CATEGORY_LABELS: Record<string, string> = {
+  form1_application: 'Form 1 application',
+  form2_specification: 'Form 2 specification',
+  form3_foreign_filing: 'Form 3 foreign filing',
+  form5_inventorship: 'Form 5 inventorship',
+  form26_power_of_attorney: 'Form 26 power of attorney',
+  form28_startup_status: 'Form 28 startup status',
+  drawings: 'Drawings',
+  prior_art_report: 'Prior art report',
+  assignment_deed: 'Assignment deed',
+  priority_document: 'Priority document',
+  other: 'Other',
 };
 
 const fieldCls =
@@ -560,10 +595,142 @@ function PatentDetailModal({
 
 // ─── Main page ────────────────────────────────────────────────────────────────
 
+function StartupPatentRequestOverview({
+  requests,
+  latestSubmission,
+  isLoading,
+}: {
+  requests: PatentRequestSubmission[];
+  latestSubmission?: PatentSubmission;
+  isLoading: boolean;
+}) {
+  const latestRequest = requests[0];
+  const status = latestRequest?.status ?? latestSubmission?.status;
+  const documents = latestRequest?.documents ?? latestSubmission?.supportingDocuments ?? [];
+  const title = latestRequest?.inventionTitle ?? latestSubmission?.projectTitle;
+  const submittedAt = latestRequest?.submittedAt ?? latestSubmission?.submittedAt;
+  const adminNotes = latestRequest?.adminNotes ?? latestSubmission?.adminNotes;
+  const scoreAwarded = latestRequest?.scoreAwarded ?? latestSubmission?.scoreAwarded ?? false;
+  const requestType = latestRequest ? 'Assisted filing request' : latestSubmission ? 'Patent intake submission' : 'Patent request';
+
+  if (isLoading) {
+    return (
+      <section className="grid gap-4 border-b border-slate-800 pb-5 lg:grid-cols-3">
+        {['Patent Request', 'Review', 'Uploaded Data'].map((label) => (
+          <div key={label} className="rounded-2xl border border-slate-800 bg-slate-900/60 p-5">
+            <div className="text-xs uppercase tracking-[0.24em] text-slate-500">{label}</div>
+            <div className="mt-4 h-5 w-2/3 rounded bg-slate-800" />
+            <div className="mt-3 h-4 w-full rounded bg-slate-800/70" />
+          </div>
+        ))}
+      </section>
+    );
+  }
+
+  return (
+    <section className="grid gap-4 border-b border-slate-800 pb-5 lg:grid-cols-3">
+      <div className="rounded-2xl border border-slate-800 bg-slate-900/60 p-5">
+        <div className="text-xs uppercase tracking-[0.24em] text-cyan-300">Patent Request</div>
+        <h2 className="mt-3 text-lg font-semibold text-white">{title ?? 'No patent request submitted'}</h2>
+        <div className="mt-3 flex flex-wrap items-center gap-2">
+          {status ? (
+            <span className={`rounded-full px-3 py-1 text-xs font-semibold ${STATUS_STYLES[status] ?? STATUS_STYLES.submitted}`}>
+              {status.replace(/_/g, ' ')}
+            </span>
+          ) : (
+            <span className="rounded-full bg-slate-800 px-3 py-1 text-xs font-semibold text-slate-300">
+              Not started
+            </span>
+          )}
+          <span className="text-xs text-slate-500">{requestType}</span>
+        </div>
+        <div className="mt-4 text-sm text-slate-400">
+          Submitted {formatDate(submittedAt)}
+        </div>
+        {latestRequest ? (
+          <div className="mt-2 text-sm text-slate-400">
+            {formatKey(latestRequest.inventionCategory)} / {latestRequest.specificationType}
+          </div>
+        ) : null}
+      </div>
+
+      <div className="rounded-2xl border border-slate-800 bg-slate-900/60 p-5">
+        <div className="text-xs uppercase tracking-[0.24em] text-cyan-300">Review</div>
+        <h2 className="mt-3 text-lg font-semibold text-white">
+          {adminNotes ? 'Reviewer notes available' : status ? 'Review in progress' : 'Awaiting request'}
+        </h2>
+        <p className="mt-3 text-sm leading-6 text-slate-400">
+          {adminNotes ?? 'Admin and IPR review details will appear here after the filing team updates the request.'}
+        </p>
+        <div className="mt-4 grid gap-2 text-sm text-slate-400">
+          <div className="flex items-center justify-between gap-3">
+            <span>Score award</span>
+            <span className="font-semibold text-white">{scoreAwarded ? 'Awarded' : 'Pending'}</span>
+          </div>
+          {latestRequest?.ipoApplicationNumber ? (
+            <div className="flex items-center justify-between gap-3">
+              <span>IPO application</span>
+              <span className="font-semibold text-white">{latestRequest.ipoApplicationNumber}</span>
+            </div>
+          ) : null}
+          {latestRequest?.ipoFilingDate ? (
+            <div className="flex items-center justify-between gap-3">
+              <span>IPO filing date</span>
+              <span className="font-semibold text-white">{formatDate(latestRequest.ipoFilingDate)}</span>
+            </div>
+          ) : null}
+        </div>
+      </div>
+
+      <div className="rounded-2xl border border-slate-800 bg-slate-900/60 p-5">
+        <div className="text-xs uppercase tracking-[0.24em] text-cyan-300">Uploaded Data</div>
+        <h2 className="mt-3 text-lg font-semibold text-white">
+          {documents.length} file{documents.length === 1 ? '' : 's'} attached
+        </h2>
+        {documents.length > 0 ? (
+          <div className="mt-4 space-y-2">
+            {documents.slice(0, 4).map((document, index) => (
+              <a
+                key={`${document.fileUrl}-${index}`}
+                href={document.fileUrl}
+                target="_blank"
+                rel="noreferrer"
+                className="flex items-start justify-between gap-3 rounded-xl border border-slate-800 bg-slate-950/60 px-3 py-2 transition hover:border-cyan-500/40"
+              >
+                <span className="min-w-0">
+                  <span className="block truncate text-sm font-semibold text-white">{document.fileName}</span>
+                  <span className="mt-1 block truncate text-xs text-slate-500">
+                    {DOCUMENT_CATEGORY_LABELS[document.documentCategory ?? ''] ??
+                      formatKey(document.documentCategory ?? 'Supporting document')}{' '}
+                    / {formatFileSize(document.fileSizeBytes)}
+                  </span>
+                </span>
+                <span className="shrink-0 text-xs font-semibold text-cyan-300">Open</span>
+              </a>
+            ))}
+            {documents.length > 4 ? (
+              <div className="text-xs text-slate-500">+{documents.length - 4} more files in the submission detail.</div>
+            ) : null}
+          </div>
+        ) : (
+          <p className="mt-3 text-sm leading-6 text-slate-400">
+            Uploaded sketches, drafts, prior-art notes, and specification files will appear here after submission.
+          </p>
+        )}
+      </div>
+    </section>
+  );
+}
+
 export function PatentSupport() {
-  const { innovationId } = useParams();
+  const { innovationId, startupId: routeStartupId } = useParams<{
+    innovationId?: string;
+    startupId?: string;
+  }>();
   const navigate = useNavigate();
   const queryClient = useQueryClient();
+  const startupId = normalizeStartupRouteId(routeStartupId);
+  const isStartupScoped = Boolean(startupId);
   const [workspaceId, setWorkspaceId] = useState('');
   const [projectTitle, setProjectTitle] = useState('');
   const [submitted, setSubmitted] = useState(false);
@@ -581,11 +748,22 @@ export function PatentSupport() {
 
   const workspacesQuery = useQuery({ queryKey: ['workspaces'], queryFn: () => workspaceApi.list() });
   const patentsQuery = useQuery({ queryKey: ['patents', 'mine'], queryFn: () => patentApi.mine() });
+  const patentRequestsQuery = useQuery({
+    queryKey: ['patent-requests', 'mine'],
+    queryFn: () => patentRequestApi.mine(),
+    enabled: isStartupScoped,
+  });
+  const startupQuery = useQuery({
+    queryKey: ['startup', startupId],
+    queryFn: () => startupApi.getById(startupId!),
+    enabled: isStartupScoped,
+  });
+  const startup = startupQuery.data;
+  const startupWorkspaceId = startup?.projectId ?? '';
   const patentEligibleWorkspaces = useMemo(
     () => (workspacesQuery.data ?? []).filter((workspace) => !workspace.claimedProblemId),
     [workspacesQuery.data],
   );
-  const hasPatentEligibleWorkspaces = patentEligibleWorkspaces.length > 0;
 
   const showcaseMutation = useMutation({
     mutationFn: (patentId: string) => patentApi.toggleShowcase(patentId),
@@ -600,17 +778,47 @@ export function PatentSupport() {
     },
   });
 
-  const preferredWorkspaceId = workspaceId || innovationId || '';
-  const selectedWorkspaceId =
-    patentEligibleWorkspaces.find((workspace) => workspace._id === preferredWorkspaceId)?._id ??
-    patentEligibleWorkspaces[0]?._id ??
-    '';
+  const preferredWorkspaceId = isStartupScoped ? startupWorkspaceId : workspaceId || innovationId || '';
+  const selectedWorkspaceId = isStartupScoped
+    ? patentEligibleWorkspaces.find((workspace) => workspace._id === startupWorkspaceId)?._id ?? ''
+    : patentEligibleWorkspaces.find((workspace) => workspace._id === preferredWorkspaceId)?._id ??
+      patentEligibleWorkspaces[0]?._id ??
+      '';
   const activeWorkspace = useMemo(
     () => patentEligibleWorkspaces.find((workspace) => workspace._id === selectedWorkspaceId),
     [patentEligibleWorkspaces, selectedWorkspaceId],
   );
+  const hasPatentEligibleWorkspaces = isStartupScoped ? Boolean(activeWorkspace) : patentEligibleWorkspaces.length > 0;
+  const scopedStartupTitle = startup?.name?.trim() || activeWorkspace?.title || 'this startup';
+  const visiblePatents = useMemo(() => {
+    const patents = patentsQuery.data ?? [];
+    if (!isStartupScoped) {
+      return patents;
+    }
+    if (!selectedWorkspaceId) {
+      return [];
+    }
+    return patents.filter((patent) => patent.workspaceId === selectedWorkspaceId);
+  }, [isStartupScoped, patentsQuery.data, selectedWorkspaceId]);
+  const visiblePatentRequests = useMemo(() => {
+    const requests = patentRequestsQuery.data ?? [];
+    if (!isStartupScoped) {
+      return requests;
+    }
+    if (!selectedWorkspaceId) {
+      return [];
+    }
+    return requests.filter((request) => request.workspaceId === selectedWorkspaceId);
+  }, [isStartupScoped, patentRequestsQuery.data, selectedWorkspaceId]);
 
   useEffect(() => {
+    if (isStartupScoped) {
+      if (workspaceId) {
+        setWorkspaceId('');
+      }
+      return;
+    }
+
     if (!patentEligibleWorkspaces.length) {
       if (workspaceId) {
         setWorkspaceId('');
@@ -627,7 +835,21 @@ export function PatentSupport() {
     if (!match) {
       setWorkspaceId(patentEligibleWorkspaces[0]._id);
     }
-  }, [patentEligibleWorkspaces, preferredWorkspaceId, workspaceId]);
+  }, [isStartupScoped, patentEligibleWorkspaces, preferredWorkspaceId, workspaceId]);
+
+  useEffect(() => {
+    if (!isStartupScoped || !startup) {
+      return;
+    }
+
+    setProjectTitle((current) => current || startup.name || '');
+    setAnswers((current) => {
+      if (hasAnyPatentAnswer(current)) {
+        return current;
+      }
+      return getPatentAnswersFromStartupProfile(startup.registrationProfile);
+    });
+  }, [isStartupScoped, startup]);
 
   useEffect(() => {
     categorySlotsRef.current = categorySlots;
@@ -829,7 +1051,7 @@ export function PatentSupport() {
   const submitMutation = useMutation({
     mutationFn: () =>
       patentApi.submit({
-        projectTitle: projectTitle || activeWorkspace?.title || 'Untitled innovation',
+        projectTitle: projectTitle || startup?.name || activeWorkspace?.title || 'Untitled innovation',
         workspaceId: selectedWorkspaceId,
         documentUploads,
         questionnaire: answers,
@@ -840,6 +1062,7 @@ export function PatentSupport() {
       setAnswers(DEFAULT_ANSWERS);
       setCategorySlots({});
       await queryClient.invalidateQueries({ queryKey: ['patents', 'mine'] });
+      await queryClient.invalidateQueries({ queryKey: ['patent-requests', 'mine'] });
       await queryClient.invalidateQueries({ queryKey: ['score', 'me'] });
     },
     onError: (err) => {
@@ -864,17 +1087,21 @@ export function PatentSupport() {
 
   // ── Render ──────────────────────────────────────────────────────────────────
 
-  return (
-    <DashboardLayout role="student">
+  const pageContent = (
+    <>
       <div className="space-y-5">
         {/* Page header */}
         <div className="border-b border-slate-800 pb-4">
           <div className="flex flex-col gap-3 md:flex-row md:items-end md:justify-between">
             <div className="max-w-4xl">
-              <div className="mb-2 text-xs uppercase tracking-[0.28em] text-cyan-300">Student Patent Support</div>
+              <div className="mb-2 text-xs uppercase tracking-[0.28em] text-cyan-300">
+                {isStartupScoped ? 'Startup Patent Support' : 'Student Patent Support'}
+              </div>
               <h1 className="text-2xl font-semibold text-white">IPR / Patent Intake Request</h1>
               <p className="mt-2 text-sm leading-6 text-slate-400">
-                Choose your own product workspace, answer the admin intake questions, and attach light supporting files for IPR review. ProMove problem-bank workspaces are for leaderboard points and are not eligible for patent filing.
+                {isStartupScoped
+                  ? `This patent request is attached to ${scopedStartupTitle}. Answer the admin intake questions and attach supporting files from the startup's linked workspace for IPR review.`
+                  : 'Choose your own product workspace, answer the admin intake questions, and attach light supporting files for IPR review. ProMove problem-bank workspaces are for leaderboard points and are not eligible for patent filing.'}
               </p>
             </div>
             <div className="text-sm text-slate-400 md:max-w-sm md:text-right">
@@ -883,22 +1110,34 @@ export function PatentSupport() {
           </div>
         </div>
 
-        {!hasPatentEligibleWorkspaces && !workspacesQuery.isLoading ? (
+        {!hasPatentEligibleWorkspaces && !workspacesQuery.isLoading && !startupQuery.isLoading ? (
           <div className="rounded-lg border border-dashed border-slate-800 bg-slate-900/60 p-8 text-center">
             <FileText className="mx-auto mb-4 h-10 w-10 text-slate-500" />
-            <h2 className="mb-3 text-xl font-semibold text-white">Create your own product workspace first</h2>
+            <h2 className="mb-3 text-xl font-semibold text-white">
+              {isStartupScoped ? 'Link a product workspace to this startup first' : 'Create your own product workspace first'}
+            </h2>
             <p className="mx-auto mb-5 max-w-2xl text-sm leading-6 text-slate-400">
-              Patent support is tied to your own product workspace so your filing documents, evidence, and review history stay attached to one innovation. Problem-bank workspaces remain available for leaderboard points only.
+              {isStartupScoped
+                ? `Patent support for ${scopedStartupTitle} is locked to the startup's own linked product workspace. Open the Launch section and link a self-created workspace before requesting review.`
+                : 'Patent support is tied to your own product workspace so your filing documents, evidence, and review history stay attached to one innovation. Problem-bank workspaces remain available for leaderboard points only.'}
             </p>
             <div className="flex flex-wrap justify-center gap-3">
               <button
-                onClick={() => navigate('/product-workspace')}
+                onClick={() => navigate(isStartupScoped && startupId ? getStartupSectionPath(startupId, 'overview') : '/product-workspace')}
                 className="rounded-lg bg-slate-800 px-4 py-2.5 text-sm font-semibold text-white transition hover:bg-slate-700"
               >
-                Open Product Workspace
+                {isStartupScoped ? 'Open Startup Launch' : 'Open Product Workspace'}
               </button>
             </div>
           </div>
+        ) : null}
+
+        {isStartupScoped && hasPatentEligibleWorkspaces ? (
+          <StartupPatentRequestOverview
+            requests={visiblePatentRequests}
+            latestSubmission={visiblePatents[0]}
+            isLoading={patentRequestsQuery.isLoading || patentsQuery.isLoading}
+          />
         ) : null}
 
         {hasPatentEligibleWorkspaces ? submitted ? (
@@ -919,30 +1158,38 @@ export function PatentSupport() {
               <div className="grid gap-4 md:grid-cols-2">
                 <div>
                   <label className="mb-2 block text-sm font-semibold text-white">Workspace</label>
-                  <select
-                    value={selectedWorkspaceId}
-                    onChange={(e) => {
-                      setWorkspaceId(e.target.value);
-                      setProjectTitle(
-                        patentEligibleWorkspaces.find((w) => w._id === e.target.value)?.title ?? '',
-                      );
-                    }}
-                    className={fieldCls}
-                  >
-                    {patentEligibleWorkspaces.map((w) => (
-                      <option key={w._id} value={w._id}>
-                        {w.title} · {w.claimedProblemId ? 'Problem Bank' : 'Own Product'}
-                      </option>
-                    ))}
-                  </select>
+                  {isStartupScoped ? (
+                    <div className={fieldCls}>
+                      {activeWorkspace?.title ?? 'Linked startup workspace'}
+                    </div>
+                  ) : (
+                    <select
+                      value={selectedWorkspaceId}
+                      onChange={(e) => {
+                        setWorkspaceId(e.target.value);
+                        setProjectTitle(
+                          patentEligibleWorkspaces.find((w) => w._id === e.target.value)?.title ?? '',
+                        );
+                      }}
+                      className={fieldCls}
+                    >
+                      {patentEligibleWorkspaces.map((w) => (
+                        <option key={w._id} value={w._id}>
+                          {w.title} - {w.claimedProblemId ? 'Problem Bank' : 'Own Product'}
+                        </option>
+                      ))}
+                    </select>
+                  )}
                   <p className="mt-2 text-xs text-slate-500">
-                    Pick the self-created workspace that represents the invention you want to file. Problem-bank workspaces are excluded from patent support.
+                    {isStartupScoped
+                      ? 'Patent support is locked to the product workspace linked from this startup.'
+                      : 'Pick the self-created workspace that represents the invention you want to file. Problem-bank workspaces are excluded from patent support.'}
                   </p>
                 </div>
                 <div>
                   <label className="mb-2 block text-sm font-semibold text-white">Project title for filing</label>
                   <input
-                    value={projectTitle || activeWorkspace?.title || ''}
+                    value={projectTitle || startup?.name || activeWorkspace?.title || ''}
                     onChange={(e) => setProjectTitle(e.target.value)}
                     className={fieldCls}
                     placeholder="Patent-facing title"
@@ -1328,10 +1575,10 @@ export function PatentSupport() {
         <section className="grid gap-5 border-t border-slate-800 pt-5 lg:grid-cols-[1fr,280px]">
           <div className="min-w-0">
             <h2 className="mb-3 text-lg font-semibold text-white">Existing submissions</h2>
-            {(patentsQuery.data ?? []).length === 0 ? (
+            {visiblePatents.length === 0 ? (
               <div className="flex flex-col items-center justify-center rounded-lg border border-dashed border-slate-800 py-8 text-slate-500">
                 <FileText className="mb-3 h-8 w-8 opacity-40" />
-                <div className="text-sm">No submissions yet.</div>
+                <div className="text-sm">{isStartupScoped ? 'No submissions for this startup yet.' : 'No submissions yet.'}</div>
               </div>
             ) : (
               <div className="space-y-3">
@@ -1340,7 +1587,7 @@ export function PatentSupport() {
                     {showcaseError}
                   </div>
                 )}
-                {(patentsQuery.data ?? []).map((patent) => (
+                {visiblePatents.map((patent) => (
                   <div
                     key={patent._id}
                     className="flex flex-col justify-between gap-3 border-b border-slate-800 py-3 md:flex-row md:items-center"
@@ -1450,6 +1697,8 @@ export function PatentSupport() {
       {viewPatent && (
         <PatentDetailModal patent={viewPatent} onClose={() => setViewPatent(null)} />
       )}
-    </DashboardLayout>
+    </>
   );
+
+  return isStartupScoped ? pageContent : <DashboardLayout role="student">{pageContent}</DashboardLayout>;
 }
