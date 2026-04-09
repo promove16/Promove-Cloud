@@ -35,6 +35,7 @@ import {
   resolveGithubOauthCallback,
   syncGithubProofForUser,
 } from './githubProof';
+import { InstitutionStudentRosterEntry } from '../institution/studentRoster.model';
 
 export const socialEnrichSchema = z.object({
   githubUrl: z.string().trim().url().optional(),
@@ -240,6 +241,149 @@ const computeProfileComplete = (user: Pick<IUser, 'role' | 'displayName' | 'bio'
         (supportsGithubProfile(user.role) && user.githubUrl && user.githubUrl.trim())),
   );
 
+type EducationResolverUser = Pick<IUser, 'role' | 'institutionId' | 'email' | 'education'>;
+
+type InstitutionEducationContext = {
+  institutionName: string;
+  academicYear?: string;
+  gradeOrProgram?: string;
+  notes?: string;
+};
+
+const normalizeInstitutionName = (value: string) => sanitizePlainText(value).toLowerCase();
+
+const parseAcademicYearStart = (academicYear?: string) => {
+  const match = academicYear?.match(/\b(19|20)\d{2}\b/);
+  return match ? Number(match[0]) : undefined;
+};
+
+const isCurrentInstitutionEducationMatch = (
+  education: IUser['education'][number],
+  institutionName: string,
+) => education.isCurrent && normalizeInstitutionName(education.institution) === normalizeInstitutionName(institutionName);
+
+const sortEducationEntries = (entries: IUser['education']) =>
+  [...entries].sort((left, right) => {
+    const sourceRank = (entry: IUser['education'][number]) => {
+      if (entry.source === 'institution') return 0;
+      if (entry.isCurrent) return 1;
+      return 2;
+    };
+
+    const leftRank = sourceRank(left);
+    const rightRank = sourceRank(right);
+    if (leftRank !== rightRank) {
+      return leftRank - rightRank;
+    }
+
+    const leftYear = left.endYear ?? left.startYear ?? 0;
+    const rightYear = right.endYear ?? right.startYear ?? 0;
+    if (leftYear !== rightYear) {
+      return rightYear - leftYear;
+    }
+
+    return left.institution.localeCompare(right.institution);
+  }) as IUser['education'];
+
+const resolveInstitutionEducationContext = async (
+  user: EducationResolverUser,
+): Promise<InstitutionEducationContext | null> => {
+  if (user.role !== UserRole.STUDENT || !user.institutionId) {
+    return null;
+  }
+
+  const [institution, rosterEntry] = await Promise.all([
+    User.findById(user.institutionId).select('displayName institutionProfile').lean(),
+    InstitutionStudentRosterEntry.findOne({
+      institutionId: user.institutionId,
+      email: user.email.trim().toLowerCase(),
+      isActive: true,
+    })
+      .sort({ updatedAt: -1 })
+      .select('gradeOrProgram notes')
+      .lean(),
+  ]);
+
+  if (!institution) {
+    return null;
+  }
+
+  return {
+    institutionName: institution.institutionProfile?.institutionName ?? institution.displayName,
+    ...(institution.institutionProfile?.academicYear
+      ? { academicYear: institution.institutionProfile.academicYear }
+      : {}),
+    ...(rosterEntry?.gradeOrProgram ? { gradeOrProgram: rosterEntry.gradeOrProgram } : {}),
+    ...(rosterEntry?.notes ? { notes: rosterEntry.notes } : {}),
+  };
+};
+
+const buildInstitutionEducationEntry = (
+  context: InstitutionEducationContext,
+  existing?: IUser['education'][number],
+): IUser['education'][number] => {
+  const startYear = existing?.startYear ?? parseAcademicYearStart(context.academicYear);
+  const description = existing?.description
+    ? sanitizePlainText(existing.description)
+    : [context.academicYear ? `Current session ${context.academicYear}` : null, context.notes ? sanitizePlainText(context.notes) : null]
+        .filter(Boolean)
+        .join('. ');
+
+  return {
+    ...(existing?._id ? { _id: existing._id } : {}),
+    institution: sanitizePlainText(context.institutionName),
+    degree: sanitizePlainText(existing?.degree || context.gradeOrProgram || ''),
+    fieldOfStudy: sanitizePlainText(existing?.fieldOfStudy || ''),
+    ...(startYear ? { startYear } : {}),
+    endYear: null,
+    isCurrent: true,
+    grade: sanitizePlainText(existing?.grade || ''),
+    activities: sanitizePlainText(existing?.activities || (context.academicYear ? `Academic year ${context.academicYear}` : '')),
+    description,
+    source: 'institution',
+  };
+};
+
+export const resolveEducationEntriesForUser = async (
+  user: EducationResolverUser,
+): Promise<IUser['education']> => {
+  const baseEducation = (user.education ?? []) as IUser['education'];
+  const context = await resolveInstitutionEducationContext(user);
+
+  if (!context) {
+    return sortEducationEntries(
+      baseEducation.filter((entry) => entry.source !== 'institution') as IUser['education'],
+    );
+  }
+
+  const existingInstitutionEntry =
+    baseEducation.find((entry) => entry.source === 'institution') ??
+    baseEducation.find((entry) => isCurrentInstitutionEducationMatch(entry, context.institutionName));
+
+  const remainingEntries = baseEducation.filter(
+    (entry) =>
+      entry !== existingInstitutionEntry &&
+      entry.source !== 'institution' &&
+      !isCurrentInstitutionEducationMatch(entry, context.institutionName),
+  ) as IUser['education'];
+
+  return sortEducationEntries([
+    buildInstitutionEducationEntry(context, existingInstitutionEntry),
+    ...remainingEntries,
+  ] as IUser['education']);
+};
+
+export const syncInstitutionEducationForUser = async (user: UserDocument) => {
+  user.education = await resolveEducationEntriesForUser({
+    role: user.role,
+    institutionId: user.institutionId,
+    email: user.email,
+    education: user.education,
+  });
+
+  return user.education;
+};
+
 const toSanitizedConnectedAccounts = (connectedAccounts: IUser['connectedAccounts']): SanitizedUser['connectedAccounts'] => ({
   github: {
     userId: connectedAccounts.github.userId ?? null,
@@ -413,7 +557,15 @@ export const getCurrentUser = async (userId: string) => {
     await user.save();
   }
 
-  return toSanitizedUser(user.toObject() as UserLike);
+  return {
+    ...toSanitizedUser(user.toObject() as UserLike),
+    education: await resolveEducationEntriesForUser({
+      role: user.role,
+      institutionId: user.institutionId,
+      email: user.email,
+      education: user.education,
+    }),
+  };
 };
 
 export const acceptCurrentTerms = async (
@@ -1283,6 +1435,7 @@ export const updateCurrentUser = async (
     user.discoverableToRecruiters = payload.discoverableToRecruiters;
   }
 
+  await syncInstitutionEducationForUser(user);
   await ensureProfileSlug(user);
   user.profileComplete = computeProfileComplete(user);
 
@@ -1294,7 +1447,10 @@ export const updateCurrentUser = async (
     getProfileCompletionProgress(user).percent,
   );
 
-  return toSanitizedUser(user.toObject() as UserLike);
+  return {
+    ...toSanitizedUser(user.toObject() as UserLike),
+    education: user.education ?? [],
+  };
 };
 
 export const getPublicStudentProfileBySlug = async (profileSlug: string): Promise<PublicStudentProfile> => {
@@ -1314,6 +1470,12 @@ export const getPublicStudentProfileBySlug = async (profileSlug: string): Promis
   const institution = student.institutionId
     ? await User.findById(student.institutionId).select('_id displayName').lean()
     : null;
+  const education = await resolveEducationEntriesForUser({
+    role: student.role,
+    institutionId: student.institutionId,
+    email: student.email,
+    education: student.education,
+  });
 
   return {
     _id: String(student._id),
@@ -1342,7 +1504,7 @@ export const getPublicStudentProfileBySlug = async (profileSlug: string): Promis
     updatedAt: student.updatedAt,
     skills: student.skills ?? [],
     experience: student.experience ?? [],
-    education: student.education ?? [],
+    education,
     certifications: student.certifications ?? [],
     portfolioProjects: student.portfolioProjects ?? [],
     githubStats: student.githubStats ?? {
