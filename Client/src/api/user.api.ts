@@ -43,7 +43,7 @@ export interface ProfileEducation {
   grade: string;
   activities: string;
   description: string;
-  source: 'manual' | 'linkedin';
+  source: 'manual' | 'linkedin' | 'institution';
 }
 
 export interface ProfileCertification {

@@ -150,6 +150,8 @@ const emptyEducation = (): ProfileEducation => ({
   source: 'manual',
 });
 
+const isInstitutionEducation = (item: ProfileEducation) => item.source === 'institution';
+
 const emptyCertification = (): ProfileCertification => ({
   _id: newId(),
   name: '',
@@ -450,6 +452,14 @@ export function UserProfilePage() {
   const isBusy = updateMutation.isPending || socialMutation.isPending || startGithubMutation.isPending || importGithubMutation.isPending;
   const repoChoices = githubRepositoriesQuery.data ?? [];
   const publicProfileUrl = profile?.profileSlug && typeof window !== 'undefined' ? `${window.location.origin}/students/${profile.profileSlug}` : '';
+  const currentSessionEducation = useMemo(
+    () => form.education.find((item) => isInstitutionEducation(item)) ?? null,
+    [form.education],
+  );
+  const editableEducation = useMemo(
+    () => form.education.filter((item) => !isInstitutionEducation(item)),
+    [form.education],
+  );
   const completionStats = useMemo(
     () => [
       { label: 'Skills', value: form.skills.filter((skill) => skill.name.trim()).length },
@@ -483,7 +493,7 @@ export function UserProfilePage() {
       discoverableToRecruiters: currentUser.role === UserRole.STUDENT ? form.discoverableToRecruiters : undefined,
       skills: form.skills.filter((skill) => skill.name.trim()),
       experience: form.experience.filter((item) => item.title.trim() && item.company.trim()),
-      education: form.education.filter((item) => item.institution.trim()),
+      education: form.education.filter((item) => !isInstitutionEducation(item) && item.institution.trim()),
       certifications: form.certifications.filter((item) => item.name.trim() && item.issuingOrganization.trim()),
       portfolioProjects: form.portfolioProjects.filter((item) => item.title.trim()),
     });
@@ -642,27 +652,53 @@ export function UserProfilePage() {
             action={<SmallButton onClick={() => setForm((current) => ({ ...current, education: [...current.education, emptyEducation()] }))}>Add education</SmallButton>}
           >
             <div className="space-y-4">
-              {form.education.map((item, index) => (
+              {currentSessionEducation ? (
+                <div className="rounded-lg border border-cyan-200 bg-cyan-50/70 p-4 dark:border-cyan-900/60 dark:bg-cyan-950/20">
+                  <div className="flex flex-wrap items-center gap-2">
+                    <div className="text-sm font-semibold text-slate-950 dark:text-white">Current session education</div>
+                    <span className="rounded-full bg-cyan-500/10 px-2.5 py-1 text-[11px] font-semibold uppercase tracking-[0.16em] text-cyan-700 dark:text-cyan-300">
+                      Invitation token
+                    </span>
+                  </div>
+                  <div className="mt-3 space-y-1">
+                    <div className="text-base font-semibold text-slate-950 dark:text-white">{currentSessionEducation.institution}</div>
+                    <div className="text-sm text-slate-600 dark:text-slate-300">
+                      {[currentSessionEducation.degree, currentSessionEducation.fieldOfStudy].filter(Boolean).join(' in ') || 'Current academic profile'}
+                    </div>
+                    <div className="text-sm text-slate-500 dark:text-slate-400">
+                      {profile?.institutionProfile?.academicYear ? `Academic year ${profile.institutionProfile.academicYear}` : null}
+                      {currentSessionEducation.startYear ? `${profile?.institutionProfile?.academicYear ? ' . ' : ''}Started ${currentSessionEducation.startYear}` : null}
+                    </div>
+                    {currentSessionEducation.description ? (
+                      <p className="text-sm leading-6 text-slate-600 dark:text-slate-300">{currentSessionEducation.description}</p>
+                    ) : null}
+                  </div>
+                  <p className="mt-3 text-xs leading-5 text-slate-500 dark:text-slate-400">
+                    This entry is synced from your verified institution access and stays highlighted on your portfolio. Add any previous or extra education below.
+                  </p>
+                </div>
+              ) : null}
+              {editableEducation.map((item) => (
                 <div key={item._id} className="space-y-3 rounded-lg border border-slate-200 p-4 dark:border-slate-800">
                   <div className="grid gap-3 md:grid-cols-2">
-                    <Field label="Institution" value={item.institution} onChange={(value) => setForm((current) => ({ ...current, education: current.education.map((entry, itemIndex) => itemIndex === index ? { ...entry, institution: value } : entry) }))} />
-                    <Field label="Degree" value={item.degree} onChange={(value) => setForm((current) => ({ ...current, education: current.education.map((entry, itemIndex) => itemIndex === index ? { ...entry, degree: value } : entry) }))} />
-                    <Field label="Field of study" value={item.fieldOfStudy} onChange={(value) => setForm((current) => ({ ...current, education: current.education.map((entry, itemIndex) => itemIndex === index ? { ...entry, fieldOfStudy: value } : entry) }))} />
-                    <Field label="Grade" value={item.grade} onChange={(value) => setForm((current) => ({ ...current, education: current.education.map((entry, itemIndex) => itemIndex === index ? { ...entry, grade: value } : entry) }))} />
-                    <Field label="Start year" type="number" value={item.startYear?.toString() ?? ''} onChange={(value) => setForm((current) => ({ ...current, education: current.education.map((entry, itemIndex) => itemIndex === index ? { ...entry, startYear: parseYear(value) ?? undefined } : entry) }))} />
-                    <Field label="End year" type="number" value={item.endYear?.toString() ?? ''} onChange={(value) => setForm((current) => ({ ...current, education: current.education.map((entry, itemIndex) => itemIndex === index ? { ...entry, endYear: parseYear(value) } : entry) }))} />
+                    <Field label="Institution" value={item.institution} onChange={(value) => setForm((current) => ({ ...current, education: current.education.map((entry) => entry._id === item._id ? { ...entry, institution: value } : entry) }))} />
+                    <Field label="Degree" value={item.degree} onChange={(value) => setForm((current) => ({ ...current, education: current.education.map((entry) => entry._id === item._id ? { ...entry, degree: value } : entry) }))} />
+                    <Field label="Field of study" value={item.fieldOfStudy} onChange={(value) => setForm((current) => ({ ...current, education: current.education.map((entry) => entry._id === item._id ? { ...entry, fieldOfStudy: value } : entry) }))} />
+                    <Field label="Grade" value={item.grade} onChange={(value) => setForm((current) => ({ ...current, education: current.education.map((entry) => entry._id === item._id ? { ...entry, grade: value } : entry) }))} />
+                    <Field label="Start year" type="number" value={item.startYear?.toString() ?? ''} onChange={(value) => setForm((current) => ({ ...current, education: current.education.map((entry) => entry._id === item._id ? { ...entry, startYear: parseYear(value) ?? undefined } : entry) }))} />
+                    <Field label="End year" type="number" value={item.endYear?.toString() ?? ''} onChange={(value) => setForm((current) => ({ ...current, education: current.education.map((entry) => entry._id === item._id ? { ...entry, endYear: parseYear(value) } : entry) }))} />
                   </div>
-                  <TextArea label="Activities" value={item.activities} onChange={(value) => setForm((current) => ({ ...current, education: current.education.map((entry, itemIndex) => itemIndex === index ? { ...entry, activities: value } : entry) }))} rows={2} />
-                  <TextArea label="Description" value={item.description} onChange={(value) => setForm((current) => ({ ...current, education: current.education.map((entry, itemIndex) => itemIndex === index ? { ...entry, description: value } : entry) }))} rows={3} />
+                  <TextArea label="Activities" value={item.activities} onChange={(value) => setForm((current) => ({ ...current, education: current.education.map((entry) => entry._id === item._id ? { ...entry, activities: value } : entry) }))} rows={2} />
+                  <TextArea label="Description" value={item.description} onChange={(value) => setForm((current) => ({ ...current, education: current.education.map((entry) => entry._id === item._id ? { ...entry, description: value } : entry) }))} rows={3} />
                   <div className="flex justify-end">
-                    <button type="button" onClick={() => setForm((current) => ({ ...current, education: current.education.filter((_, itemIndex) => itemIndex !== index) }))} className="inline-flex items-center gap-2 rounded-full px-3 py-2 text-sm font-semibold text-red-600 hover:bg-red-50">
+                    <button type="button" onClick={() => setForm((current) => ({ ...current, education: current.education.filter((entry) => entry._id !== item._id) }))} className="inline-flex items-center gap-2 rounded-full px-3 py-2 text-sm font-semibold text-red-600 hover:bg-red-50">
                       <Trash2 className="h-4 w-4" />
                       Remove
                     </button>
                   </div>
                 </div>
               ))}
-              {form.education.length === 0 ? <div className="rounded-lg border border-dashed border-slate-300 p-4 text-sm text-slate-500 dark:border-slate-700">No education yet.</div> : null}
+              {editableEducation.length === 0 ? <div className="rounded-lg border border-dashed border-slate-300 p-4 text-sm text-slate-500 dark:border-slate-700">No additional education yet.</div> : null}
             </div>
           </EditorSection>
 

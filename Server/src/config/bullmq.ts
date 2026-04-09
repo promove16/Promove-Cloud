@@ -34,6 +34,19 @@ const workerConnection = {
 };
 
 const UPSTASH_REQUEST_LIMIT_PATTERN = /max requests limit exceeded/i;
+const NON_RECOVERABLE_REDIS_TRANSPORT_PATTERNS = [
+  /stream isn't writeable/i,
+  /connection is closed/i,
+  /connection lost/i,
+  /socket closed unexpectedly/i,
+  /ready check failed/i,
+  /econnrefused/i,
+  /econnreset/i,
+  /etimedout/i,
+  /enotfound/i,
+  /network is unreachable/i,
+  /connection ended unexpectedly/i,
+];
 
 let remoteBullMqDisabledReason: string | null = null;
 
@@ -68,6 +81,14 @@ const isBullMqRedisRequestLimitError = (error: unknown) => {
   const message = error instanceof Error ? error.message : String(error);
   return UPSTASH_REQUEST_LIMIT_PATTERN.test(message);
 };
+
+const isBullMqRedisTransportError = (error: unknown) => {
+  const message = error instanceof Error ? error.message : String(error);
+  return NON_RECOVERABLE_REDIS_TRANSPORT_PATTERNS.some((pattern) => pattern.test(message));
+};
+
+const shouldDisableRemoteBullMq = (error: unknown) =>
+  isBullMqRedisRequestLimitError(error) || isBullMqRedisTransportError(error);
 
 const isRemoteBullMqActive = () => hasBullMqRedisConnection && !remoteBullMqDisabledReason;
 
@@ -211,12 +232,12 @@ const createSafeQueue = <T>(queueName: string): QueueLike<T> => {
     return createMockQueue<T>();
   }
 
-  const queue = hasBullMqRedisConnection ? new Queue(queueName, { connection }) : null;
+  const queue = isRemoteBullMqActive() ? new Queue(queueName, { connection }) : null;
 
   if (queue) {
     remoteQueues.add(queue);
     queue.on('error', (error) => {
-      if (isBullMqRedisRequestLimitError(error)) {
+      if (shouldDisableRemoteBullMq(error)) {
         disableRemoteBullMq(error);
         return;
       }
@@ -236,7 +257,7 @@ const createSafeQueue = <T>(queueName: string): QueueLike<T> => {
       try {
         return await queue.add(jobName, data, normalizedOpts);
       } catch (error) {
-        if (isBullMqRedisRequestLimitError(error)) {
+        if (shouldDisableRemoteBullMq(error)) {
           disableRemoteBullMq(error);
           return addLocalJob(queueName, jobName, data, normalizedOpts);
         }
@@ -283,7 +304,7 @@ export const createQueueWorker = <T>(
     return worker;
   }
 
-  if (!hasBullMqRedisConnection) {
+  if (!isRemoteBullMqActive()) {
     return createLocalWorker(queueName, processor);
   }
 
@@ -299,7 +320,7 @@ export const createQueueWorker = <T>(
   remoteWorkers.add(worker);
 
   worker.on('error', (error) => {
-    if (isBullMqRedisRequestLimitError(error)) {
+    if (shouldDisableRemoteBullMq(error)) {
       disableRemoteBullMq(error);
       return;
     }

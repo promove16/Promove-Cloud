@@ -4,7 +4,6 @@ import { startActivityWorker } from './jobs/activityWorker';
 import { startNotificationWorker } from './jobs/notificationWorker';
 import { scheduleWeeklyProgressSummaryJob, startRetentionEmailWorker } from './jobs/retentionEmailWorker';
 import { startScoreWorker } from './jobs/scoreRecalcWorker';
-import { startInstitutionVerifyWorker } from './workers/institutionVerifyWorker';
 import { seedProblemsIfEmpty } from './modules/problemBank/problem.service';
 import { initSocket } from './config/socket';
 import { connectDB } from './config/db';
@@ -23,7 +22,6 @@ const startServer = async () => {
     startScoreWorker();
     startNotificationWorker();
     startRetentionEmailWorker();
-    startInstitutionVerifyWorker();
     await scheduleWeeklyProgressSummaryJob();
   }
 

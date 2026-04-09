@@ -1,7 +1,7 @@
 import { PropsWithChildren, ReactElement, useEffect } from "react";
 import { useMutation } from "@tanstack/react-query";
 import axios, { isAxiosError } from "axios";
-import api, { refreshClient } from "../../api/axiosInstance";
+import api, { requestAccessTokenRefresh } from "../../api/axiosInstance";
 import { authApi } from "../../api/auth.api";
 import { useAuthStore } from "../../store/authStore";
 import {
@@ -136,18 +136,9 @@ export const useBootstrapAuth = () => {
 
       try {
         if (!bootstrapPromise) {
-          bootstrapPromise = refreshClient
-            .post<ApiSuccessResponse<AuthPayload>>("/api/auth/refresh")
-            .then((response) => response.data.data)
-            .catch((error) => {
-              if (axios.isAxiosError(error) && error.response?.status === 401) {
-                return null;
-              }
-              throw error;
-            })
-            .finally(() => {
-              bootstrapPromise = null;
-            });
+          bootstrapPromise = requestAccessTokenRefresh().finally(() => {
+            bootstrapPromise = null;
+          });
         }
 
         const payload = await bootstrapPromise;

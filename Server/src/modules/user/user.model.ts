@@ -420,7 +420,7 @@ const educationSchema = new Schema<IUser['education'][number]>(
     },
     source: {
       type: String,
-      enum: ['manual', 'linkedin'],
+      enum: ['manual', 'linkedin', 'institution'],
       default: 'manual',
     },
   },

@@ -30,7 +30,7 @@ export type ExperienceType =
   | 'freelance'
   | 'volunteer';
 export type ExperienceSource = 'manual' | 'linkedin';
-export type EducationSource = 'manual' | 'linkedin';
+export type EducationSource = 'manual' | 'linkedin' | 'institution';
 export type CertificationSource = 'manual' | 'linkedin';
 export type PortfolioProjectSource = 'manual' | 'github';
 

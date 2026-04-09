@@ -74,20 +74,11 @@ function formatDateTime(dateStr: string | null | undefined): string {
   return new Date(dateStr).toLocaleString("en-IN", { day: "numeric", month: "short", year: "numeric" });
 }
 
-function Section({ title, children, canEdit }: { title: string; children: ReactNode; canEdit?: boolean }) {
+function Section({ title, children }: { title: string; children: ReactNode }) {
   return (
     <section className="rounded-lg border border-slate-800 bg-slate-900/90 p-4 text-slate-100 shadow-sm">
       <div className="flex items-center justify-between gap-3">
         <h2 className="text-xl font-semibold">{title}</h2>
-        {canEdit ? (
-          <Link
-            to="/dashboard/profile"
-            aria-label={`Edit ${title}`}
-            className="rounded-full p-2 text-slate-400 transition hover:bg-slate-800 hover:text-cyan-200"
-          >
-            <Pencil className="h-4 w-4" />
-          </Link>
-        ) : null}
       </div>
       <div className="mt-4">{children}</div>
     </section>
@@ -407,11 +398,11 @@ export function Portfolio() {
 
           <div className="grid gap-6 xl:grid-cols-[minmax(0,1fr)_300px] 2xl:grid-cols-[minmax(0,1fr)_320px]">
             <main className="space-y-3">
-              <Section title="About" canEdit={canManagePortfolio}>
+              <Section title="About">
                 {profile?.bio ? <p className="whitespace-pre-line text-sm leading-6 text-slate-200">{profile.bio}</p> : <Empty>No about summary has been added yet.</Empty>}
               </Section>
 
-              <Section title="Featured" canEdit={canManagePortfolio}>
+              <Section title="Featured">
                 {featuredItems.length > 0 ? (
                   <div className="grid gap-3 md:grid-cols-3">
                     {featuredItems.map((item) => (
@@ -438,35 +429,7 @@ export function Portfolio() {
                 )}
               </Section>
 
-              <Section title="Activity">
-                {recentActivity.length > 0 ? (
-                  <div className="divide-y divide-slate-800">
-                    {recentActivity.map((activity) => (
-                      <article key={activity.id} className="flex gap-3 py-4 first:pt-0 last:pb-0">
-                        <LogoTile><Github className="h-5 w-5" /></LogoTile>
-                        <div className="min-w-0">
-                          <h3 className="font-semibold">{activity.title}</h3>
-                          <p className="mt-1 text-sm leading-6 text-slate-300">{activity.summary}</p>
-                          <div className="mt-1 text-xs text-slate-500">{activity.repoFullName} . {formatDateTime(activity.occurredAt)}</div>
-                        </div>
-                      </article>
-                    ))}
-                  </div>
-                ) : (scoreHistory.data ?? []).length > 0 ? (
-                  <div className="divide-y divide-slate-800">
-                    {(scoreHistory.data ?? []).slice(0, 5).map((event) => (
-                      <article key={event._id} className="py-4 first:pt-0 last:pb-0">
-                        <h3 className="font-semibold">{eventLabel[event.trigger] ?? event.trigger}</h3>
-                        <p className="mt-1 text-sm text-slate-400">Innovation score updated to {event.scoreAfter} (+{event.delta}).</p>
-                      </article>
-                    ))}
-                  </div>
-                ) : (
-                  <Empty>No recent public activity is available yet.</Empty>
-                )}
-              </Section>
-
-              <Section title="Experience" canEdit={canManagePortfolio}>
+              <Section title="Experience">
                 {(profile?.experience ?? []).length > 0 ? (
                   <div className="divide-y divide-slate-800">
                     {(profile?.experience ?? []).map((exp) => (
@@ -488,14 +451,21 @@ export function Portfolio() {
                 ) : <Empty>No experience has been added yet.</Empty>}
               </Section>
 
-              <Section title="Education" canEdit={canManagePortfolio}>
+              <Section title="Education">
                 {(profile?.education ?? []).length > 0 ? (
                   <div className="divide-y divide-slate-800">
                     {(profile?.education ?? []).map((edu) => (
-                      <article key={edu._id} className="flex gap-3 py-4 first:pt-0 last:pb-0">
+                      <article key={edu._id} className={`flex gap-3 py-4 first:pt-0 last:pb-0 ${edu.source === "institution" ? "rounded-lg bg-cyan-500/5 px-3" : ""}`}>
                         <LogoTile><GraduationCap className="h-5 w-5" /></LogoTile>
                         <div className="min-w-0">
-                          <h3 className="font-semibold">{edu.institution}</h3>
+                          <div className="flex flex-wrap items-center gap-2">
+                            <h3 className="font-semibold">{edu.institution}</h3>
+                            {edu.source === "institution" ? (
+                              <span className="rounded-full bg-cyan-500/10 px-2.5 py-1 text-[11px] font-semibold uppercase tracking-[0.16em] text-cyan-300">
+                                Current session
+                              </span>
+                            ) : null}
+                          </div>
                           <div className="text-sm text-slate-200">{[edu.degree, edu.fieldOfStudy].filter(Boolean).join(", ")}</div>
                           <div className="mt-0.5 text-sm text-slate-400">{edu.startYear ? `${edu.startYear} - ` : ""}{edu.isCurrent ? "Present" : edu.endYear ?? ""}{edu.grade ? ` . Grade: ${edu.grade}` : ""}</div>
                           {edu.description ? <p className="mt-2 text-sm leading-6 text-slate-300">{edu.description}</p> : null}
@@ -507,7 +477,7 @@ export function Portfolio() {
                 ) : <Empty>No education entries have been added yet.</Empty>}
               </Section>
 
-              <Section title="Licenses & certifications" canEdit={canManagePortfolio}>
+              <Section title="Licenses & certifications">
                 {(profile?.certifications ?? []).length > 0 ? (
                   <div className="divide-y divide-slate-800">
                     {(profile?.certifications ?? []).map((cert) => (
@@ -533,7 +503,7 @@ export function Portfolio() {
                 ) : <Empty>No licenses or certifications have been added yet.</Empty>}
               </Section>
 
-              <Section title="Skills" canEdit={canManagePortfolio}>
+              <Section title="Skills">
                 {Object.keys(skillsByCategory).length > 0 ? (
                   <div className="space-y-4">
                     {Object.entries(skillsByCategory).map(([category, skills]) => (
@@ -552,7 +522,7 @@ export function Portfolio() {
                 ) : <Empty>No skills have been added yet.</Empty>}
               </Section>
 
-              <Section title="Projects" canEdit={canManagePortfolio}>
+              <Section title="Projects">
                 {(profile?.portfolioProjects ?? []).length > 0 ? (
                   <div className="divide-y divide-slate-800">
                     {(profile?.portfolioProjects ?? []).map((project) => (
@@ -614,6 +584,41 @@ export function Portfolio() {
                     </div>
                   ))}
                 </div>
+              </section>
+
+              <section className="rounded-lg border border-slate-800 bg-slate-900/90 p-4 text-slate-100 shadow-sm">
+                <h2 className="font-semibold">Activity</h2>
+                {recentActivity.length > 0 ? (
+                  <div className="mt-4 divide-y divide-slate-800">
+                    {recentActivity.map((activity) => (
+                      <article key={activity.id} className="py-4 first:pt-0 last:pb-0">
+                        <div className="flex items-start gap-3">
+                          <LogoTile><Github className="h-5 w-5" /></LogoTile>
+                          <div className="min-w-0">
+                            <h3 className="font-semibold text-white">{activity.title}</h3>
+                            <p className="mt-1 text-sm leading-6 text-slate-300">{activity.summary}</p>
+                            <div className="mt-1 text-xs text-slate-500">
+                              {[activity.repoFullName, formatDateTime(activity.occurredAt)].filter(Boolean).join(" . ")}
+                            </div>
+                          </div>
+                        </div>
+                      </article>
+                    ))}
+                  </div>
+                ) : (scoreHistory.data ?? []).length > 0 ? (
+                  <div className="mt-4 divide-y divide-slate-800">
+                    {(scoreHistory.data ?? []).slice(0, 5).map((event) => (
+                      <article key={event._id} className="py-4 first:pt-0 last:pb-0">
+                        <h3 className="font-semibold text-white">{eventLabel[event.trigger] ?? event.trigger}</h3>
+                        <p className="mt-1 text-sm text-slate-400">Innovation score updated to {event.scoreAfter} (+{event.delta}).</p>
+                      </article>
+                    ))}
+                  </div>
+                ) : (
+                  <div className="mt-4">
+                    <Empty>No recent public activity is available yet.</Empty>
+                  </div>
+                )}
               </section>
 
               <section className="rounded-lg border border-slate-800 bg-slate-900/90 p-4 text-slate-100 shadow-sm">

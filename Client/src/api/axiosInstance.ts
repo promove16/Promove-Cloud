@@ -47,7 +47,8 @@ const axiosInstance = axios.create({
   withCredentials: true,
 });
 
-let refreshPromise: Promise<string | null> | null = null;
+let refreshPromise: Promise<AuthPayload | null> | null = null;
+let refreshBlocked = false;
 
 const isAuthRequest = (url?: string) =>
   Boolean(
@@ -56,6 +57,45 @@ const isAuthRequest = (url?: string) =>
       /\/(?:api\/)?auth\/register(?:\?|$)/.test(url) ||
       /\/(?:api\/)?auth\/refresh(?:\?|$)/.test(url)),
   );
+
+const isRefreshBlocked = () => refreshBlocked && !useAuthStore.getState().accessToken;
+
+export const requestAccessTokenRefresh = async (): Promise<AuthPayload | null> => {
+  if (isRefreshBlocked()) {
+    return null;
+  }
+
+  if (!refreshPromise) {
+    refreshPromise = refreshClient
+      .post<ApiSuccessResponse<AuthPayload>>("/api/auth/refresh")
+      .then((response) => {
+        const payload = response.data.data;
+        refreshBlocked = false;
+        useAuthStore.getState().setAuth(payload.user, payload.accessToken);
+        return payload;
+      })
+      .catch((refreshError: unknown) => {
+        refreshBlocked = true;
+        useAuthStore.getState().clearAuth();
+        redirectToLogin();
+
+        if (isAxiosError(refreshError) && refreshError.response?.status === 401) {
+          return null;
+        }
+
+        if (isAxiosError(refreshError)) {
+          throw refreshError;
+        }
+
+        throw refreshError;
+      })
+      .finally(() => {
+        refreshPromise = null;
+      });
+  }
+
+  return refreshPromise;
+};
 
 axiosInstance.interceptors.request.use((config) => {
   config.url = normalizeApiUrl(config.baseURL, config.url);
@@ -89,36 +129,13 @@ axiosInstance.interceptors.response.use(
 
     originalRequest._retry = true;
 
-    if (!refreshPromise) {
-      refreshPromise = refreshClient
-        .post<ApiSuccessResponse<AuthPayload>>("/api/auth/refresh")
-        .then((response) => {
-          const payload = response.data.data;
-          useAuthStore.getState().setAuth(payload.user, payload.accessToken);
-          return payload.accessToken;
-        })
-        .catch((refreshError: unknown) => {
-          useAuthStore.getState().clearAuth();
-          redirectToLogin();
+    const payload = await requestAccessTokenRefresh();
 
-          if (isAxiosError(refreshError)) {
-            throw refreshError;
-          }
-
-          throw error;
-        })
-        .finally(() => {
-          refreshPromise = null;
-        });
-    }
-
-    const refreshedToken = await refreshPromise;
-
-    if (!refreshedToken) {
+    if (!payload?.accessToken) {
       return Promise.reject(error);
     }
 
-    originalRequest.headers.set("Authorization", `Bearer ${refreshedToken}`);
+    originalRequest.headers.set("Authorization", `Bearer ${payload.accessToken}`);
     return axiosInstance(originalRequest);
   },
 );
