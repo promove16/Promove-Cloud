@@ -360,6 +360,10 @@ export const userApi = {
     const response = await api.get<ApiSuccessResponse<UserProfile>>('/api/users/me');
     return response.data.data;
   },
+  async getStudentPortfolioView(userId: string) {
+    const response = await api.get<ApiSuccessResponse<PublicStudentProfile>>(`/api/users/students/${userId}/portfolio`);
+    return response.data.data;
+  },
   async getPublicStudentProfile(profileSlug: string) {
     const response = await api.get<ApiSuccessResponse<PublicStudentProfile>>(`/api/users/public/${profileSlug}`);
     return response.data.data;

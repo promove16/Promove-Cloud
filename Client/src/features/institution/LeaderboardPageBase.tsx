@@ -11,6 +11,7 @@ import { InstitutionWorkspaceHeader } from './InstitutionWorkspaceHeader';
 import { StudentJourneyDrawerBase } from './StudentJourneyDrawerBase';
 import { getScoreSocket } from '../../lib/socket';
 import { LeaderboardPage, StudentJourney, StudentLeaderboardItem } from '../../types/school.types';
+import { getStudentPortfolioViewPath } from '../marketplace/navigation';
 
 type Props = {
   mode: 'school' | 'college';
@@ -177,7 +178,7 @@ export function LeaderboardPageBase({
                     </div>
                   </div>
                   <div>
-                    <Button onClick={() => navigate(`${basePath}/students/${student._id}`)}>
+                    <Button onClick={() => navigate(getStudentPortfolioViewPath(student._id))}>
                       View Journey
                     </Button>
                   </div>

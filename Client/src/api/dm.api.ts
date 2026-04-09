@@ -15,8 +15,17 @@ export interface DMMessage {
   senderId: string;
   recipientId: string;
   message: string;
-  messageType: 'text' | 'interview_request';
+  messageType: 'text' | 'interview_request' | 'invitation';
   queryType?: QueryType;
+  invitationType?: 'workspace_invite' | 'startup_invite';
+  invitationData?: {
+    entityId: string;
+    entityTitle: string;
+    entityType: 'workspace' | 'startup';
+    role?: string;
+    requestId?: string;
+    status?: 'pending' | 'accepted' | 'declined';
+  };
   scheduledAt?: string;
   meetLink?: string;
   attachmentUrl?: string;

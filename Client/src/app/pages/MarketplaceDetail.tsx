@@ -13,6 +13,7 @@ import {
   GraduationCap,
   MapPin,
   MessageCircle,
+  Send,
   Sparkles,
   Users,
 } from "lucide-react";
@@ -26,6 +27,14 @@ import {
   MarketplaceUserDetail,
   marketplaceApi,
 } from "../../api/marketplace.api";
+import { UserPortfolioViewContent } from "../../features/profile/UserPortfolioViewPage";
+import { StudentPortfolioViewContent } from "../../features/student/StudentPortfolioViewPage";
+import {
+  getStartupInviteActionLabel,
+  isStartupInviteTargetType,
+  StartupInviteModal,
+  StartupInviteTarget,
+} from "../../features/marketplace/StartupInviteModal";
 import { recruiterApi } from "../../api/recruiter.api";
 import { useAuthStore } from "../../store/authStore";
 import { UserRole } from "../../types/roles.types";
@@ -100,7 +109,7 @@ export function MarketplaceDetail() {
   const detailQuery = useQuery({
     queryKey: ["marketplace", "detail", entityType, entityId],
     queryFn: () => marketplaceApi.getEntityDetail(entityType!, entityId!),
-    enabled: Boolean(entityType && entityId),
+    enabled: Boolean(entityType === "startup" && entityId),
   });
 
   const entity = detailQuery.data;
@@ -120,6 +129,14 @@ export function MarketplaceDetail() {
         Invalid marketplace detail route.
       </div>
     );
+  }
+
+  if (entityType === "student") {
+    return <StudentPortfolioViewContent />;
+  }
+
+  if (entityType !== "startup") {
+    return <UserPortfolioViewContent />;
   }
 
   return (
@@ -165,32 +182,32 @@ function StartupDetailView({
   onMessage: (targetId: string) => void;
 }) {
   return (
-    <div className="space-y-6">
-      <section className="relative overflow-hidden rounded-[32px] border border-white/10 bg-[#070816] px-6 py-7 shadow-[0_30px_120px_rgba(15,23,42,0.45)] sm:px-8">
-        <div className="pointer-events-none absolute inset-0 bg-[radial-gradient(circle_at_top_left,rgba(34,211,238,0.18),transparent_42%),radial-gradient(circle_at_bottom_right,rgba(217,70,239,0.14),transparent_38%)]" />
-        <div className="relative flex flex-col gap-6 xl:flex-row xl:items-start xl:justify-between">
-          <div className="space-y-4">
-            <div className="inline-flex items-center gap-2 rounded-full border border-fuchsia-400/20 bg-fuchsia-400/10 px-3 py-1 text-xs font-semibold uppercase tracking-[0.28em] text-fuchsia-100">
+    <div className="space-y-4">
+      <section className="relative overflow-hidden border-b border-white/10 pb-5">
+        <div className="pointer-events-none absolute inset-0 bg-[radial-gradient(circle_at_top_left,rgba(34,211,238,0.12),transparent_34%),radial-gradient(circle_at_top_right,rgba(217,70,239,0.1),transparent_30%)]" />
+        <div className="relative flex flex-col gap-4 xl:flex-row xl:items-start xl:justify-between">
+          <div className="space-y-3">
+            <div className="inline-flex items-center gap-2 rounded-full border border-fuchsia-400/20 bg-fuchsia-400/10 px-2.5 py-1 text-[11px] font-semibold uppercase tracking-[0.24em] text-fuchsia-100">
               Startup View
             </div>
             <div>
-              <h1 className="text-3xl font-semibold tracking-tight text-white sm:text-5xl">{entity.name}</h1>
-              <p className="mt-2 max-w-3xl text-base leading-7 text-slate-300">{entity.tagline}</p>
+              <h1 className="max-w-4xl text-2xl font-semibold tracking-tight text-white sm:text-4xl">{entity.name}</h1>
+              <p className="mt-2 max-w-3xl text-sm leading-6 text-slate-300 sm:text-[15px]">{entity.tagline}</p>
             </div>
-            <div className="flex flex-wrap gap-2">
+            <div className="flex flex-wrap gap-1.5">
               {[entity.category, entity.stage, ...entity.launchTargets].map((chip) => (
-                <span key={chip} className="rounded-full border border-white/10 bg-white/5 px-3 py-1 text-xs font-medium text-slate-200">
+                <span key={chip} className="rounded-full border border-white/10 px-2.5 py-1 text-[11px] font-medium text-slate-200">
                   {chip}
                 </span>
               ))}
             </div>
           </div>
 
-          <div className="flex flex-wrap items-center gap-3">
+          <div className="flex flex-wrap items-center gap-2">
             {entity.primaryFounderId ? (
               <button
                 onClick={() => onMessage(entity.primaryFounderId!)}
-                className="inline-flex items-center gap-2 rounded-full border border-white/10 bg-white/5 px-4 py-2 text-sm font-medium text-white transition hover:border-white/20 hover:bg-white/10"
+                className="inline-flex items-center gap-2 rounded-full border border-white/10 px-3.5 py-2 text-sm font-medium text-white transition hover:border-white/20 hover:bg-white/5"
               >
                 <MessageCircle className="h-4 w-4" />
                 Message Founder
@@ -201,7 +218,7 @@ function StartupDetailView({
                 href={entity.pitchDeckUrl}
                 target="_blank"
                 rel="noreferrer"
-                className="inline-flex items-center gap-2 rounded-full bg-white px-4 py-2 text-sm font-semibold text-slate-950 transition hover:bg-slate-100"
+                className="inline-flex items-center gap-2 rounded-full bg-white px-3.5 py-2 text-sm font-semibold text-slate-950 transition hover:bg-slate-100"
               >
                 Open Pitch Deck
                 <ExternalLink className="h-4 w-4" />
@@ -211,32 +228,33 @@ function StartupDetailView({
         </div>
       </section>
 
-      <section className="grid gap-6 xl:grid-cols-[minmax(0,1.2fr),360px]">
-        <div className="space-y-6">
-          <div className="rounded-[28px] border border-white/10 bg-[#090d1b] p-6">
-            <div className="text-xs uppercase tracking-[0.28em] text-slate-500">Startup signals</div>
-            <div className="mt-4 grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
-              <MetricCard label="Launch Score" value={String(entity.innovationScoreAtLaunch)} />
-              <MetricCard label="Team Size" value={String(entity.teamSize)} />
-              <MetricCard label="Products" value={String(entity.activeProducts)} />
+      <section className="grid gap-4 xl:grid-cols-[minmax(0,1fr),300px]">
+        <div className="space-y-5">
+          <div className="border-t border-white/10 pt-4">
+            <div className="text-[11px] uppercase tracking-[0.28em] text-slate-500">Startup signals</div>
+            <div className="mt-3 grid gap-2 sm:grid-cols-2 xl:grid-cols-4">
+              <MetricCard compact label="Launch Score" value={String(entity.innovationScoreAtLaunch)} />
+              <MetricCard compact label="Team Size" value={String(entity.teamSize)} />
+              <MetricCard compact label="Products" value={String(entity.activeProducts)} />
               <MetricCard
+                compact
                 label="Funding Needed"
                 value={typeof entity.fundingNeeded === "number" ? money.format(entity.fundingNeeded) : "Undisclosed"}
               />
             </div>
           </div>
 
-          <div className="rounded-[28px] border border-white/10 bg-[#090d1b] p-6">
-            <div className="flex items-center gap-2 text-xs uppercase tracking-[0.28em] text-slate-500">
+          <div className="border-t border-white/10 pt-4">
+            <div className="flex items-center gap-2 text-[11px] uppercase tracking-[0.28em] text-slate-500">
               <Users className="h-4 w-4" />
               Founder Team
             </div>
-            <div className="mt-4 space-y-3">
+            <div className="mt-3 space-y-2.5">
               {entity.founders.map((founder) => (
-                <div key={founder._id} className="rounded-[22px] border border-white/10 bg-white/[0.03] p-4">
-                  <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
+                <div key={founder._id} className="rounded-2xl border border-white/10 px-4 py-3">
+                  <div className="flex flex-col gap-2.5 sm:flex-row sm:items-start sm:justify-between">
                     <div>
-                      <div className="text-lg font-semibold text-white">{founder.displayName}</div>
+                      <div className="text-base font-semibold text-white">{founder.displayName}</div>
                       <div className="mt-1 flex flex-wrap gap-2 text-sm text-slate-400">
                         {founder.headline ? <span>{founder.headline}</span> : null}
                         {founder.location ? <span>{founder.location}</span> : null}
@@ -244,8 +262,8 @@ function StartupDetailView({
                       </div>
                       {founder.bio ? <p className="mt-2 text-sm leading-6 text-slate-300">{founder.bio}</p> : null}
                     </div>
-                    <div className="rounded-full border border-cyan-400/20 bg-cyan-400/10 px-3 py-1 text-sm font-semibold text-cyan-100">
-                      Innovation Score {founder.innovationScore}
+                    <div className="rounded-full border border-cyan-400/20 bg-cyan-400/10 px-3 py-1 text-xs font-semibold text-cyan-100">
+                      Score {founder.innovationScore}
                     </div>
                   </div>
                 </div>
@@ -254,30 +272,30 @@ function StartupDetailView({
           </div>
 
           {entity.project ? (
-            <div className="rounded-[28px] border border-white/10 bg-[#090d1b] p-6">
-              <div className="flex items-center gap-2 text-xs uppercase tracking-[0.28em] text-slate-500">
+            <div className="border-t border-white/10 pt-4">
+              <div className="flex items-center gap-2 text-[11px] uppercase tracking-[0.28em] text-slate-500">
                 <FolderKanban className="h-4 w-4" />
                 Related Project
               </div>
-              <div className="mt-3 flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
+              <div className="mt-3 flex flex-col gap-2.5 sm:flex-row sm:items-start sm:justify-between">
                 <div>
-                  <h2 className="text-2xl font-semibold text-white">{entity.project.title}</h2>
+                  <h2 className="text-xl font-semibold text-white">{entity.project.title}</h2>
                   <p className="mt-1 text-sm text-cyan-200">
                     {entity.project.category} - {entity.project.stage}
                   </p>
                 </div>
-                <div className="rounded-full border border-white/10 bg-white/5 px-3 py-1 text-sm text-slate-300">
+                <div className="rounded-full border border-white/10 px-3 py-1 text-xs text-slate-300">
                   Updated {formatDate(entity.project.updatedAt)}
                 </div>
               </div>
-              <div className="mt-5 grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
+              <div className="mt-4 grid gap-2 sm:grid-cols-2 xl:grid-cols-4">
                 {projectStats(entity.project).map((stat) => (
-                  <MetricCard key={stat.label} label={stat.label} value={stat.value} />
+                  <MetricCard compact key={stat.label} label={stat.label} value={stat.value} />
                 ))}
               </div>
               {entity.project.lastUpdate ? (
-                <div className="mt-5 rounded-[22px] border border-white/10 bg-white/[0.03] p-4">
-                  <div className="text-xs uppercase tracking-[0.25em] text-slate-500">Latest update</div>
+                <div className="mt-4 rounded-2xl border border-white/10 px-4 py-3">
+                  <div className="text-[11px] uppercase tracking-[0.25em] text-slate-500">Latest update</div>
                   <p className="mt-2 text-sm leading-6 text-slate-300">{entity.project.lastUpdate.note}</p>
                   <div className="mt-2 text-xs text-slate-500">{formatDate(entity.project.lastUpdate.submittedAt)}</div>
                 </div>
@@ -286,14 +304,15 @@ function StartupDetailView({
           ) : null}
         </div>
 
-        <aside className="space-y-6">
-          <div className="rounded-[28px] border border-white/10 bg-[#090d1b] p-6">
-            <div className="text-xs uppercase tracking-[0.28em] text-slate-500">Traction</div>
-            <div className="mt-4 space-y-3">
-              <SignalPill label="Patent Filed" active={entity.traction.patentFiled} />
-              <SignalPill label="MVP Built" active={entity.traction.mvpBuilt} />
-              <SignalPill label="Revenue Generating" active={entity.traction.revenueGenerating} />
+        <aside className="space-y-5">
+          <div className="border-t border-white/10 pt-4">
+            <div className="text-[11px] uppercase tracking-[0.28em] text-slate-500">Traction</div>
+            <div className="mt-3 space-y-2">
+              <SignalPill compact label="Patent Filed" active={entity.traction.patentFiled} />
+              <SignalPill compact label="MVP Built" active={entity.traction.mvpBuilt} />
+              <SignalPill compact label="Revenue Generating" active={entity.traction.revenueGenerating} />
               <SignalPill
+                compact
                 label="Users"
                 value={typeof entity.traction.usersCount === "number" ? String(entity.traction.usersCount) : "Not shared"}
               />
@@ -301,18 +320,19 @@ function StartupDetailView({
           </div>
 
           {entity.sharePool ? (
-            <div className="rounded-[28px] border border-white/10 bg-[#090d1b] p-6">
-              <div className="text-xs uppercase tracking-[0.28em] text-slate-500">Equity window</div>
-              <div className="mt-4 space-y-3 text-sm text-slate-300">
-                <SidebarRow label="Total Shares" value={String(entity.sharePool.totalShares)} />
-                <SidebarRow label="Available Shares" value={String(entity.sharePool.availableShares)} />
-                <SidebarRow label="Reserved For Sole" value={String(entity.sharePool.reservedForSole)} />
+            <div className="border-t border-white/10 pt-4">
+              <div className="text-[11px] uppercase tracking-[0.28em] text-slate-500">Equity window</div>
+              <div className="mt-3 space-y-2 text-sm text-slate-300">
+                <SidebarRow compact label="Total Shares" value={String(entity.sharePool.totalShares)} />
+                <SidebarRow compact label="Available Shares" value={String(entity.sharePool.availableShares)} />
+                <SidebarRow compact label="Reserved For Sole" value={String(entity.sharePool.reservedForSole)} />
                 <SidebarRow
+                  compact
                   label="Penny Investors"
                   value={`${entity.sharePool.currentPennyCount}/${entity.sharePool.maxPennyInvestors}`}
                 />
-                <SidebarRow label="Sole Investor" value={entity.sharePool.hasSoleInvestor ? "Assigned" : "Open"} />
-                <SidebarRow label="Launched" value={formatDate(entity.launchedAt)} />
+                <SidebarRow compact label="Sole Investor" value={entity.sharePool.hasSoleInvestor ? "Assigned" : "Open"} />
+                <SidebarRow compact label="Launched" value={formatDate(entity.launchedAt)} />
               </div>
             </div>
           ) : null}
@@ -322,7 +342,7 @@ function StartupDetailView({
   );
 }
 
-function ProfileDetailView({
+export function ProfileDetailView({
   entity,
   onMessage,
   dashboardRole,
@@ -332,6 +352,7 @@ function ProfileDetailView({
   dashboardRole: UserRole;
 }) {
   const navigate = useNavigate();
+  const currentUserId = useAuthStore((state) => state.user?._id);
   const links = linkList(entity);
   const isInstitution = isInstitutionEntityType(entity.entityType);
   const institutionProfile = entity.institutionProfile;
@@ -341,6 +362,13 @@ function ProfileDetailView({
   const [applyingJobId, setApplyingJobId] = useState<string | null>(null);
   const [applyErrorJobId, setApplyErrorJobId] = useState<string | null>(null);
   const [applyErrorMessage, setApplyErrorMessage] = useState<string | null>(null);
+  const [inviteTarget, setInviteTarget] = useState<StartupInviteTarget | null>(
+    null,
+  );
+  const [inviteFeedback, setInviteFeedback] = useState<string | null>(null);
+  const inviteEntityType = isStartupInviteTargetType(entity.entityType)
+    ? entity.entityType
+    : null;
 
   const handleApplyToJob = async (jobId: string) => {
     if (applyingJobId || appliedJobIds[jobId]) {
@@ -361,6 +389,9 @@ function ProfileDetailView({
       setApplyingJobId(null);
     }
   };
+
+  const canInviteToStartup =
+    Boolean(inviteEntityType) && entity._id !== currentUserId;
 
   return (
     <div className="space-y-6">
@@ -405,6 +436,25 @@ function ProfileDetailView({
               <MessageCircle className="h-4 w-4" />
               Message
             </button>
+            {canInviteToStartup ? (
+              <button
+                onClick={() => {
+                  setInviteFeedback(null);
+                  setInviteTarget({
+                    _id: entity._id,
+                    entityType: inviteEntityType!,
+                    displayName: entity.displayName,
+                    headline: entity.headline,
+                    domain: entity.domain,
+                    location: entity.location,
+                  });
+                }}
+                className="inline-flex items-center gap-2 rounded-full border border-white/10 bg-white/5 px-4 py-2 text-sm font-medium text-white transition hover:border-white/20 hover:bg-white/10"
+              >
+                <Send className="h-4 w-4" />
+                {getStartupInviteActionLabel(inviteEntityType!)}
+              </button>
+            ) : null}
             {links.map((link) => {
               const Icon = link.icon;
               return (
@@ -423,6 +473,12 @@ function ProfileDetailView({
           </div>
         </div>
       </section>
+
+      {inviteFeedback ? (
+        <div className="rounded-[24px] border border-cyan-500/30 bg-cyan-500/10 px-4 py-3 text-sm text-cyan-100">
+          {inviteFeedback}
+        </div>
+      ) : null}
 
       <section className="grid gap-6 xl:grid-cols-[minmax(0,1.2fr),360px]">
         <div className="space-y-6">
@@ -792,34 +848,51 @@ function ProfileDetailView({
           ) : null}
         </aside>
       </section>
+
+      <StartupInviteModal
+        isOpen={Boolean(inviteTarget)}
+        onClose={() => setInviteTarget(null)}
+        target={inviteTarget}
+        onSent={setInviteFeedback}
+      />
     </div>
   );
 }
 
-function MetricCard({ label, value }: { label: string; value: string }) {
+function MetricCard({ label, value, compact = false }: { label: string; value: string; compact?: boolean }) {
   return (
-    <div className="rounded-[20px] border border-white/10 bg-white/[0.03] px-4 py-3">
-      <div className="text-xs uppercase tracking-[0.25em] text-slate-500">{label}</div>
-      <div className="mt-2 text-lg font-semibold text-white">{value}</div>
+    <div className={compact ? "rounded-2xl border border-white/10 px-3 py-2.5" : "rounded-[20px] border border-white/10 bg-white/[0.03] px-4 py-3"}>
+      <div className={compact ? "text-[11px] uppercase tracking-[0.24em] text-slate-500" : "text-xs uppercase tracking-[0.25em] text-slate-500"}>{label}</div>
+      <div className={compact ? "mt-1.5 text-base font-semibold text-white" : "mt-2 text-lg font-semibold text-white"}>{value}</div>
     </div>
   );
 }
 
-function SidebarRow({ label, value }: { label: string; value: string }) {
+function SidebarRow({ label, value, compact = false }: { label: string; value: string; compact?: boolean }) {
   return (
-    <div className="flex items-center justify-between gap-3 rounded-2xl border border-white/10 bg-white/[0.03] px-4 py-3">
-      <span className="text-slate-400">{label}</span>
+    <div className={compact ? "flex items-center justify-between gap-3 rounded-2xl border border-white/10 px-3 py-2.5" : "flex items-center justify-between gap-3 rounded-2xl border border-white/10 bg-white/[0.03] px-4 py-3"}>
+      <span className={compact ? "text-sm text-slate-400" : "text-slate-400"}>{label}</span>
       <span className="text-right font-medium text-white">{value}</span>
     </div>
   );
 }
 
-function SignalPill({ label, active, value }: { label: string; active?: boolean; value?: string }) {
+function SignalPill({
+  label,
+  active,
+  value,
+  compact = false,
+}: {
+  label: string;
+  active?: boolean;
+  value?: string;
+  compact?: boolean;
+}) {
   const displayValue = typeof value === "string" ? value : active ? "Yes" : "No";
 
   return (
-    <div className="flex items-center justify-between gap-3 rounded-2xl border border-white/10 bg-white/[0.03] px-4 py-3">
-      <span className="text-slate-300">{label}</span>
+    <div className={compact ? "flex items-center justify-between gap-3 rounded-2xl border border-white/10 px-3 py-2.5" : "flex items-center justify-between gap-3 rounded-2xl border border-white/10 bg-white/[0.03] px-4 py-3"}>
+      <span className={compact ? "text-sm text-slate-300" : "text-slate-300"}>{label}</span>
       <span
         className={`rounded-full px-3 py-1 text-xs font-semibold ${
           displayValue === "Yes"

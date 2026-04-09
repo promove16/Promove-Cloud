@@ -36,6 +36,8 @@ import {
   syncGithubProofForUser,
 } from './githubProof';
 import { InstitutionStudentRosterEntry } from '../institution/studentRoster.model';
+import { ALLOWED_CONNECTIONS } from '../../middleware/connectionGuard';
+import { Workspace } from '../workspace/workspace.model';
 
 export const socialEnrichSchema = z.object({
   githubUrl: z.string().trim().url().optional(),
@@ -1630,20 +1632,7 @@ export const updateCurrentUser = async (
   };
 };
 
-export const getPublicStudentProfileBySlug = async (profileSlug: string): Promise<PublicStudentProfile> => {
-  const student = await User.findOne({
-    profileSlug,
-    role: UserRole.STUDENT,
-    isActive: true,
-    isProfilePublic: true,
-    profileComplete: true,
-    verificationStatus: 'verified',
-  }).lean();
-
-  if (!student) {
-    throw new ApiError(404, 'PUBLIC_PROFILE_NOT_FOUND', 'Public student profile not found');
-  }
-
+const buildStudentPortfolioProfile = async (student: IUser): Promise<PublicStudentProfile> => {
   const institution = student.institutionId
     ? await User.findById(student.institutionId).select('_id displayName').lean()
     : null;
@@ -1709,4 +1698,85 @@ export const getPublicStudentProfileBySlug = async (profileSlug: string): Promis
         }
       : null,
   };
+};
+
+export const getPublicStudentProfileBySlug = async (profileSlug: string): Promise<PublicStudentProfile> => {
+  const student = await User.findOne({
+    profileSlug,
+    role: UserRole.STUDENT,
+    isActive: true,
+    isProfilePublic: true,
+    profileComplete: true,
+    verificationStatus: 'verified',
+  }).lean<IUser>();
+
+  if (!student) {
+    throw new ApiError(404, 'PUBLIC_PROFILE_NOT_FOUND', 'Public student profile not found');
+  }
+
+  return buildStudentPortfolioProfile(student);
+};
+
+export const getStudentPortfolioForViewer = async (
+  requesterId: string,
+  requesterRole: UserRole,
+  studentId: string,
+): Promise<PublicStudentProfile> => {
+  if (!Types.ObjectId.isValid(studentId)) {
+    throw new ApiError(404, 'USER_NOT_FOUND', 'User not found');
+  }
+
+  const student = await User.findOne({
+    _id: studentId,
+    role: UserRole.STUDENT,
+    isActive: true,
+  }).lean<IUser>();
+
+  if (!student) {
+    throw new ApiError(404, 'USER_NOT_FOUND', 'User not found');
+  }
+
+  const studentObjectId = new Types.ObjectId(studentId);
+
+  switch (requesterRole) {
+    case UserRole.ADMIN:
+      break;
+    case UserRole.STUDENT:
+      break;
+    case UserRole.SCHOOL:
+    case UserRole.COLLEGE:
+      if (!student.institutionId || String(student.institutionId) !== requesterId) {
+        throw new ApiError(404, 'USER_NOT_FOUND', 'User not found');
+      }
+      break;
+    case UserRole.MENTOR: {
+      const hasAssignment = await Workspace.exists({
+        isActive: true,
+        chatParticipants: {
+          $elemMatch: {
+            userId: new Types.ObjectId(requesterId),
+            role: 'mentor',
+          },
+        },
+        $or: [{ ownerId: studentObjectId }, { teamMemberIds: studentObjectId }],
+      });
+
+      if (!hasAssignment) {
+        throw new ApiError(403, 'MENTOR_ASSIGNMENT_REQUIRED', 'This student is not assigned to you');
+      }
+      break;
+    }
+    case UserRole.RECRUITER:
+      if (!student.discoverableToRecruiters) {
+        throw new ApiError(404, 'USER_NOT_FOUND', 'User not found');
+      }
+      break;
+    default:
+      if (!(ALLOWED_CONNECTIONS[requesterRole] ?? []).includes(UserRole.STUDENT)) {
+        throw new ApiError(403, 'CONNECTION_FORBIDDEN', 'Your role cannot connect with student');
+      }
+      break;
+  }
+
+  return buildStudentPortfolioProfile(student);
 };

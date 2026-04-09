@@ -7,6 +7,7 @@ import { Button } from '../../components/ui/Button';
 import { Card } from '../../components/ui/Card';
 import { Spinner } from '../../components/ui/Spinner';
 import type { InstitutionPatent } from '../../types/school.types';
+import { getStudentPortfolioViewPath } from '../marketplace/navigation';
 
 type Props = {
   mode: 'school' | 'college';
@@ -85,7 +86,7 @@ export function InstitutionPatentsPageBase({
                 outside the compressed dashboard metric.
               </p>
             </div>
-            <Button variant="secondary" onClick={() => navigate(`${basePath}/students/${selectedPatent.studentId}`)}>
+            <Button variant="secondary" onClick={() => navigate(getStudentPortfolioViewPath(selectedPatent.studentId))}>
               View Student Journey
             </Button>
           </div>
@@ -127,7 +128,7 @@ export function InstitutionPatentsPageBase({
               </div>
               <Button variant="secondary" onClick={(event) => {
                 event.stopPropagation();
-                navigate(`${basePath}/students/${patent.studentId}`);
+                navigate(getStudentPortfolioViewPath(patent.studentId));
               }}>
                 View Student
               </Button>

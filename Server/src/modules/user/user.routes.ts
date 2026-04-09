@@ -8,6 +8,7 @@ import {
   enrichMeFromSocialLinks,
   getMe,
   getPublicStudentProfile,
+  getStudentPortfolioView,
   githubOauthCallback,
   getMySessions,
   getMyOnboarding,
@@ -26,6 +27,7 @@ const router = Router();
 
 router.get('/github/callback', asyncHandler(githubOauthCallback));
 router.get('/public/:profileSlug', asyncHandler(getPublicStudentProfile));
+router.get('/students/:userId/portfolio', authenticate, asyncHandler(getStudentPortfolioView));
 router.get('/search', authenticate, asyncHandler(searchUsers));
 router.get('/me', authenticate, asyncHandler(getMe));
 router.patch('/me', authenticate, asyncHandler(patchMe));

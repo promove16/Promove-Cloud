@@ -7,6 +7,7 @@ import {
 } from 'lucide-react';
 import { schoolApi } from '../../api/school.api';
 import { InstitutionOverviewDashboard } from '../institution/InstitutionOverviewDashboard';
+import { getStudentPortfolioViewPath } from '../marketplace/navigation';
 
 export default function Dashboard() {
   const dashboardQuery = useQuery({
@@ -79,7 +80,7 @@ export default function Dashboard() {
       topStudents={data?.topStudents ?? []}
       upcomingEvents={data?.upcomingEvents ?? []}
       recentProjects={data?.recentProjects ?? []}
-      studentTo={(student) => `/dashboard/school/students/${student._id}`}
+      studentTo={(student) => getStudentPortfolioViewPath(student._id)}
       eventTo={(event) => `/dashboard/school/events/${event._id}`}
       projectTo={(project) => `/dashboard/school/projects/${project._id}`}
       isLoading={dashboardQuery.isLoading}

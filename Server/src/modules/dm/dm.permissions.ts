@@ -215,15 +215,15 @@ const canInitiateFirstContact = async (sender: MessagingUser, recipient: Messagi
     return true;
   }
 
+  if (queryType !== 'general') {
+    return canInitiateSpecificFirstContact(sender, recipient, queryType);
+  }
+
   if (!hasAllowedRolePair(sender.role, recipient.role)) {
     return false;
   }
 
-  if (queryType === 'general') {
-    return canOpenGeneralFirstContactChannel(sender, recipient);
-  }
-
-  return canInitiateSpecificFirstContact(sender, recipient, queryType);
+  return canOpenGeneralFirstContactChannel(sender, recipient);
 };
 
 const buildAccessContext = async (senderId: string, recipientId: string): Promise<DmAccessContext> => {

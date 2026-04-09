@@ -3,7 +3,7 @@ import { ALLOWED_CONNECTIONS } from '../../middleware/connectionGuard';
 import { ApiError } from '../../utils/ApiError';
 import { User } from '../user/user.model';
 import { UserRole } from '../../types/roles.types';
-import { JobPost } from '../recruiter/jobPost.model';
+import { JobPost, type IJobApplicationRecord, type IJobPost } from '../recruiter/jobPost.model';
 import { mapJob } from '../recruiter/recruiter.mappers';
 import { Startup } from '../startup/startup.model';
 import { Workspace } from '../workspace/workspace.model';
@@ -203,6 +203,28 @@ const MARKETPLACE_USER_ROLES = new Set<MarketplaceEntityType>([
 const compactString = (value?: string | null) => {
   const trimmed = value?.trim();
   return trimmed ? trimmed : undefined;
+};
+
+const isAppliedStage = (stage?: IJobApplicationRecord['stage']) =>
+  Boolean(stage && !['Invited Pending', 'Invite Declined'].includes(stage));
+
+const getStudentHasAppliedToJob = (
+  job: Pick<IJobPost, 'applicantIds' | 'applicationRecords'>,
+  studentId?: string,
+) => {
+  if (!studentId) {
+    return undefined;
+  }
+
+  const applicationRecord = (job.applicationRecords ?? []).find(
+    (record) => String(record.studentId) === studentId,
+  );
+
+  if (applicationRecord) {
+    return isAppliedStage(applicationRecord.stage);
+  }
+
+  return (job.applicantIds ?? []).some((applicantId) => String(applicantId) === studentId);
 };
 
 const mapLinkSet = (user: PublicUser): PublicLinkSet | undefined => {
@@ -497,6 +519,13 @@ const applyMarketplaceUserVisibility = (
   return query;
 };
 
+const canBrowseMarketplaceRole = (
+  requesterRole: UserRole,
+  targetRole: UserRole,
+) =>
+  (requesterRole === UserRole.STUDENT && targetRole === UserRole.STUDENT) ||
+  (ALLOWED_CONNECTIONS[requesterRole] ?? []).includes(targetRole);
+
 export const listMarketplaceUsers = async (
   requesterRole: UserRole,
   role: MarketplaceEntityType,
@@ -512,7 +541,7 @@ export const listMarketplaceUsers = async (
     throw new ApiError(400, 'INVALID_MARKETPLACE_ENTITY', 'Unsupported marketplace entity');
   }
 
-  if (!(ALLOWED_CONNECTIONS[requesterRole] ?? []).includes(role)) {
+  if (!canBrowseMarketplaceRole(requesterRole, role as UserRole)) {
     throw new ApiError(403, 'CONNECTION_FORBIDDEN', `Your role cannot connect with ${role}`);
   }
 
@@ -611,7 +640,11 @@ const listMarketplaceStartups = async (requesterRole: UserRole, search?: string,
   );
 };
 
-const getMarketplaceUserDetail = async (requesterRole: UserRole, userId: string) => {
+const getMarketplaceUserDetail = async (
+  requesterRole: UserRole,
+  userId: string,
+  requesterId?: string,
+) => {
   const user = await User.findById(userId)
     .select(
       'displayName avatar role domain bio headline location websiteUrl githubUrl linkedinUrl skills experience education portfolioProjects githubStats institutionProfile discoverableToRecruiters',
@@ -626,7 +659,7 @@ const getMarketplaceUserDetail = async (requesterRole: UserRole, userId: string)
     throw new ApiError(400, 'INVALID_MARKETPLACE_ENTITY', 'Unsupported marketplace entity');
   }
 
-  if (!(ALLOWED_CONNECTIONS[requesterRole] ?? []).includes(user.role)) {
+  if (!canBrowseMarketplaceRole(requesterRole, user.role)) {
     throw new ApiError(403, 'CONNECTION_FORBIDDEN', `Your role cannot connect with ${user.role}`);
   }
 
@@ -671,13 +704,17 @@ const getMarketplaceUserDetail = async (requesterRole: UserRole, userId: string)
 
   const founderMap = new Map(founders.map((founder) => [String(founder._id), founder]));
   const workspaceMap = new Map(workspaces.map((workspace) => [String(workspace._id), workspace]));
+  const viewerStudentId = requesterRole === UserRole.STUDENT ? requesterId : undefined;
 
   return {
     ...attachUserCardMetadata(user as PublicUser, {
       jobs: jobs.length,
       startups: startups.length,
     }),
-    relatedJobs: jobs.map((job) => mapJob(job)),
+    relatedJobs: jobs.map((job) => {
+      const hasApplied = getStudentHasAppliedToJob(job, viewerStudentId);
+      return mapJob(job, typeof hasApplied === 'boolean' ? { hasApplied } : undefined);
+    }),
     relatedStartups: startups.map((startup) =>
       buildStartupView(
         requesterRole,
@@ -739,6 +776,7 @@ export const getMarketplaceEntity = async (
   requesterRole: UserRole,
   entityType: MarketplaceEntityType,
   entityId: string,
+  requesterId?: string,
 ) => {
   if (entityType === 'startup') {
     return getMarketplaceStartupDetail(requesterRole, entityId);
@@ -748,8 +786,11 @@ export const getMarketplaceEntity = async (
     throw new ApiError(400, 'INVALID_MARKETPLACE_ENTITY', 'Unsupported marketplace entity');
   }
 
-  return getMarketplaceUserDetail(requesterRole, entityId);
+  return getMarketplaceUserDetail(requesterRole, entityId, requesterId);
 };
 
-export const getMarketplaceUser = async (requesterRole: UserRole, userId: string) =>
-  getMarketplaceUserDetail(requesterRole, userId);
+export const getMarketplaceUser = async (
+  requesterRole: UserRole,
+  userId: string,
+  requesterId?: string,
+) => getMarketplaceUserDetail(requesterRole, userId, requesterId);

@@ -9,6 +9,7 @@ import {
   enrichCurrentUserFromSocialLinks,
   getCurrentUser,
   getPublicStudentProfileBySlug,
+  getStudentPortfolioForViewer,
   getCurrentUserMentorSessions,
   importCurrentUserGithubRepositories,
   importGithubRepositoriesSchema,
@@ -37,6 +38,16 @@ export const getMe = async (req: Request, res: Response) => {
 export const getPublicStudentProfile = async (req: Request, res: Response) => {
   const profileSlug = String(req.params.profileSlug ?? '').trim().toLowerCase();
   const profile = await getPublicStudentProfileBySlug(profileSlug);
+  res.status(200).json(new ApiResponse(profile));
+};
+
+export const getStudentPortfolioView = async (req: Request, res: Response) => {
+  if (!req.user) {
+    throw new ApiError(401, 'UNAUTHORIZED', 'Invalid or expired token');
+  }
+
+  const userId = String(req.params.userId ?? '').trim();
+  const profile = await getStudentPortfolioForViewer(req.user._id, req.user.role, userId);
   res.status(200).json(new ApiResponse(profile));
 };
 

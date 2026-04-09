@@ -15,8 +15,16 @@ export const getMarketplaceBasePath = (role?: UserRole) => {
   return `/dashboard/${resolvedRole}/marketplace`;
 };
 
+export const getStudentPortfolioViewPath = (userId: string) => `/portfolio/student/${userId}`;
+
+export const getUserPortfolioViewPath = (
+  entityType: Exclude<MarketplaceEntityType, "startup">,
+  entityId: string,
+) => (entityType === "student" ? getStudentPortfolioViewPath(entityId) : `/portfolio/view/${entityType}/${entityId}`);
+
 export const getMarketplaceDetailPath = (
   role: UserRole | undefined,
   entityType: MarketplaceEntityType,
   entityId: string,
-) => `${getMarketplaceBasePath(role)}/view/${entityType}/${entityId}`;
+) =>
+  `${getMarketplaceBasePath(role)}/view/${entityType}/${entityId}`;

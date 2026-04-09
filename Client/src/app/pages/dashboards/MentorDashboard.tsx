@@ -2,6 +2,7 @@ import { Link } from "react-router-dom";
 import { useQuery } from "@tanstack/react-query";
 import { Users, Target, Award, Clock, MessageSquare, TrendingUp, CheckCircle2, AlertCircle, FileText, Shield, Loader2 } from "lucide-react";
 import { mentorApi, MentorDashboardData, MentorFeedStudent } from "../../../api/mentor.api";
+import { getStudentPortfolioViewPath } from "../../../features/marketplace/navigation";
 
 export function MentorDashboard() {
   const dashboardQuery = useQuery<MentorDashboardData>({
@@ -134,7 +135,7 @@ export function MentorDashboard() {
                       {/* Action Buttons */}
                       <div className="flex gap-3">
                         <Link
-                          to={`/mentor/students/${student.studentId}`}
+                          to={getStudentPortfolioViewPath(student.studentId)}
                           className="flex-1 px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-lg font-semibold text-sm transition-all text-center"
                         >
                           View Portfolio

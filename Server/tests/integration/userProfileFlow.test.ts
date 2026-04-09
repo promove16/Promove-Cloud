@@ -7,6 +7,7 @@ import { StudentAccessToken } from '../../src/modules/institution/studentAccessT
 import { InstitutionStudentRosterEntry } from '../../src/modules/institution/studentRoster.model';
 import { User } from '../../src/modules/user/user.model';
 import { UserRole } from '../../src/types/roles.types';
+import { Workspace } from '../../src/modules/workspace/workspace.model';
 
 const PASSWORD = 'Password123!';
 
@@ -590,5 +591,265 @@ describe('user profile flow integration', () => {
 
     expect(pendingResponse.status).toBe(404);
     expect(pendingResponse.body.error.code).toBe('PUBLIC_PROFILE_NOT_FOUND');
+  });
+
+  it('serves authenticated read-only student portfolio views by user id with marketplace-style access rules', async () => {
+    const schoolViewer = await User.create({
+      email: `school-viewer-${randomUUID()}@example.com`,
+      passwordHash: await bcrypt.hash(PASSWORD, 12),
+      role: UserRole.SCHOOL,
+      displayName: 'Portfolio Viewer School',
+      profileComplete: true,
+      registrationStage: 'complete',
+      accessGrantedBy: 'admin',
+      accessExpiresAt: new Date(Date.now() + 365 * 24 * 60 * 60 * 1000),
+      isActive: true,
+      institutionToken: null,
+      institutionId: null,
+      institutionVerificationStatus: 'none',
+      verificationStatus: 'not_required',
+      adminApprovalStatus: 'approved',
+    });
+
+    const collegeViewer = await User.create({
+      email: `college-viewer-${randomUUID()}@example.com`,
+      passwordHash: await bcrypt.hash(PASSWORD, 12),
+      role: UserRole.COLLEGE,
+      displayName: 'Portfolio Viewer College',
+      profileComplete: true,
+      registrationStage: 'complete',
+      accessGrantedBy: 'admin',
+      accessExpiresAt: new Date(Date.now() + 365 * 24 * 60 * 60 * 1000),
+      isActive: true,
+      institutionToken: null,
+      institutionId: null,
+      institutionVerificationStatus: 'none',
+      verificationStatus: 'not_required',
+      adminApprovalStatus: 'approved',
+    });
+
+    const mentorViewer = await User.create({
+      email: `mentor-viewer-${randomUUID()}@example.com`,
+      passwordHash: await bcrypt.hash(PASSWORD, 12),
+      role: UserRole.MENTOR,
+      displayName: 'Portfolio Viewer Mentor',
+      profileComplete: true,
+      registrationStage: 'complete',
+      accessGrantedBy: 'admin',
+      accessExpiresAt: new Date(Date.now() + 365 * 24 * 60 * 60 * 1000),
+      isActive: true,
+      institutionToken: null,
+      institutionId: null,
+      institutionVerificationStatus: 'none',
+      verificationStatus: 'not_required',
+      adminApprovalStatus: 'approved',
+    });
+
+    const recruiterViewer = await User.create({
+      email: `recruiter-viewer-${randomUUID()}@example.com`,
+      passwordHash: await bcrypt.hash(PASSWORD, 12),
+      role: UserRole.RECRUITER,
+      displayName: 'Portfolio Viewer Recruiter',
+      profileComplete: true,
+      registrationStage: 'complete',
+      accessGrantedBy: 'admin',
+      accessExpiresAt: new Date(Date.now() + 365 * 24 * 60 * 60 * 1000),
+      isActive: true,
+      institutionToken: null,
+      institutionId: null,
+      institutionVerificationStatus: 'none',
+      verificationStatus: 'not_required',
+      adminApprovalStatus: 'approved',
+    });
+
+    const studentViewer = await createStudent({
+      displayName: 'Portfolio Viewer Student',
+      profileComplete: true,
+      registrationStage: 'institution_verified',
+      verificationStatus: 'verified',
+      institutionVerificationStatus: 'verified',
+      institutionVerifiedAt: new Date(),
+      verifiedAt: new Date(),
+      isProfilePublic: false,
+      discoverableToRecruiters: false,
+    });
+
+    const schoolStudent = await createStudent({
+      displayName: 'School Portfolio Student',
+      profileComplete: true,
+      registrationStage: 'institution_verified',
+      verificationStatus: 'verified',
+      institutionVerificationStatus: 'verified',
+      institutionVerifiedAt: new Date(),
+      verifiedAt: new Date(),
+      institutionId: schoolViewer._id,
+      isProfilePublic: false,
+      discoverableToRecruiters: false,
+    });
+
+    const hiddenStudent = await createStudent({
+      displayName: 'Read Only Student',
+      profileComplete: true,
+      registrationStage: 'institution_verified',
+      verificationStatus: 'verified',
+      institutionVerificationStatus: 'verified',
+      institutionVerifiedAt: new Date(),
+      verifiedAt: new Date(),
+      institutionId: collegeViewer._id,
+      isProfilePublic: false,
+      discoverableToRecruiters: false,
+      portfolioProjects: [
+        {
+          title: 'Signals Dashboard',
+          description: 'Portfolio-only project',
+          techStack: ['React', 'TypeScript'],
+          repoUrl: 'https://github.com/example/signals-dashboard',
+          liveUrl: null,
+          coverImageUrl: null,
+          startDate: null,
+          endDate: null,
+          isCurrent: true,
+          source: 'manual',
+          githubRepoId: null,
+          stars: 0,
+          forks: 0,
+          languages: ['TypeScript'],
+        },
+      ],
+      githubProof: {
+        importedRepoIds: ['public-1', 'private-1'],
+        importedRepos: [
+          {
+            repoId: 'public-1',
+            name: 'public-repo',
+            fullName: 'public/student-repo',
+            description: 'Public repo',
+            url: 'https://github.com/public/student-repo',
+            owner: 'public',
+            isPrivate: false,
+            defaultBranch: 'main',
+            primaryLanguage: 'TypeScript',
+            languages: ['TypeScript'],
+            stars: 3,
+            forks: 1,
+            openIssues: 0,
+            pushedAt: new Date(),
+            importedAt: new Date(),
+            recentCommits: [],
+          },
+          {
+            repoId: 'private-1',
+            name: 'private-repo',
+            fullName: 'private/student-repo',
+            description: 'Private repo',
+            url: 'https://github.com/private/student-repo',
+            owner: 'private',
+            isPrivate: true,
+            defaultBranch: 'main',
+            primaryLanguage: 'TypeScript',
+            languages: ['TypeScript'],
+            stars: 0,
+            forks: 0,
+            openIssues: 0,
+            pushedAt: new Date(),
+            importedAt: new Date(),
+            recentCommits: [],
+          },
+        ],
+        recentActivity: [
+          {
+            id: 'activity-public',
+            type: 'push',
+            repoFullName: 'public/student-repo',
+            title: 'Public push',
+            summary: 'Pushed a feature branch',
+            url: 'https://github.com/public/student-repo/commit/1',
+            occurredAt: new Date(),
+            commitCount: 2,
+            isPrivate: false,
+          },
+          {
+            id: 'activity-private',
+            type: 'push',
+            repoFullName: 'private/student-repo',
+            title: 'Private push',
+            summary: 'Pushed internal work',
+            url: null,
+            occurredAt: new Date(),
+            commitCount: 1,
+            isPrivate: true,
+          },
+        ],
+        commitCount30Days: 12,
+        activeDays30Days: 6,
+        pushEvents30Days: 5,
+        pullRequests30Days: 2,
+        issues30Days: 1,
+        lastSyncedAt: new Date(),
+      },
+    });
+
+    await Workspace.create({
+      ownerId: hiddenStudent._id,
+      teamMemberIds: [hiddenStudent._id],
+      title: 'Mentor Assigned Workspace',
+      category: 'AI',
+      stage: 'Build',
+      progressPercent: 48,
+      chatParticipants: [
+        {
+          userId: mentorViewer._id,
+          role: 'mentor',
+          addedBy: mentorViewer._id,
+        },
+      ],
+    });
+
+    const schoolToken = await loginAs(schoolViewer.email);
+    const collegeToken = await loginAs(collegeViewer.email);
+    const mentorToken = await loginAs(mentorViewer.email);
+    const recruiterToken = await loginAs(recruiterViewer.email);
+
+    const schoolResponse = await request(app)
+      .get(`/api/users/students/${schoolStudent._id.toString()}/portfolio`)
+      .set('Authorization', `Bearer ${schoolToken}`);
+
+    expect(schoolResponse.status).toBe(200);
+    expect(schoolResponse.body.data.displayName).toBe('School Portfolio Student');
+
+    const collegeResponse = await request(app)
+      .get(`/api/users/students/${hiddenStudent._id.toString()}/portfolio`)
+      .set('Authorization', `Bearer ${collegeToken}`);
+
+    expect(collegeResponse.status).toBe(200);
+    expect(collegeResponse.body.data.displayName).toBe('Read Only Student');
+    expect(collegeResponse.body.data.portfolioProjects).toHaveLength(1);
+    expect(collegeResponse.body.data.githubProof.importedRepos).toHaveLength(1);
+    expect(collegeResponse.body.data.githubProof.importedRepos[0].repoId).toBe('public-1');
+    expect(collegeResponse.body.data.githubProof.recentActivity).toHaveLength(1);
+    expect(collegeResponse.body.data.githubProof.recentActivity[0].id).toBe('activity-public');
+
+    const mentorResponse = await request(app)
+      .get(`/api/users/students/${hiddenStudent._id.toString()}/portfolio`)
+      .set('Authorization', `Bearer ${mentorToken}`);
+
+    expect(mentorResponse.status).toBe(200);
+    expect(mentorResponse.body.data.displayName).toBe('Read Only Student');
+
+    const studentViewerToken = await loginAs(studentViewer.email);
+
+    const studentViewerResponse = await request(app)
+      .get(`/api/users/students/${hiddenStudent._id.toString()}/portfolio`)
+      .set('Authorization', `Bearer ${studentViewerToken}`);
+
+    expect(studentViewerResponse.status).toBe(200);
+    expect(studentViewerResponse.body.data.displayName).toBe('Read Only Student');
+
+    const recruiterResponse = await request(app)
+      .get(`/api/users/students/${hiddenStudent._id.toString()}/portfolio`)
+      .set('Authorization', `Bearer ${recruiterToken}`);
+
+    expect(recruiterResponse.status).toBe(404);
+    expect(recruiterResponse.body.error.code).toBe('USER_NOT_FOUND');
   });
 });

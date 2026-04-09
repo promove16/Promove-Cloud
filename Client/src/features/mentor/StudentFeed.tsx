@@ -10,6 +10,7 @@ import { Card } from '../../components/ui/Card';
 import { Input } from '../../components/ui/Input';
 import { MAX_INNOVATION_SCORE } from '../../constants/score';
 import { StudentProfileDrawer } from './StudentProfileDrawer';
+import { getStudentPortfolioViewPath } from '../marketplace/navigation';
 
 type SessionFormState = {
   studentId: string;
@@ -243,7 +244,7 @@ export default function StudentFeed() {
                 </div>
               </div>
               <div className="flex flex-col gap-2">
-                <Button variant="secondary" onClick={() => navigate(`/dashboard/mentor/students/${student.studentId}`)}>
+                <Button variant="secondary" onClick={() => navigate(getStudentPortfolioViewPath(student.studentId))}>
                   View Full Profile
                 </Button>
                 <Button variant="secondary" onClick={() => openSchedule(student.studentId)}>

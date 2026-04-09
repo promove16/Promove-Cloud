@@ -149,6 +149,8 @@ describe('marketplace access control', () => {
     const hiddenStudent = await createUser(UserRole.STUDENT, 'Hidden Student');
     const investor = await createUser(UserRole.INVESTOR, 'Direct Investor');
     const founder = await createUser(UserRole.STUDENT, 'Fundable Founder');
+    const teammateSeeker = await createUser(UserRole.STUDENT, 'Teammate Seeker');
+    const teammateCandidate = await createUser(UserRole.STUDENT, 'Teammate Candidate');
 
     const hiddenSearchResponse = await request(app)
       .get('/api/users/search')
@@ -190,6 +192,28 @@ describe('marketplace access control', () => {
       });
 
     expect(allowedRecruiterDm.status).toBe(201);
+
+    const generalStudentDm = await request(app)
+      .post(`/api/dm/${teammateCandidate._id}`)
+      .set(authHeader(teammateSeeker))
+      .send({
+        message: 'Plain hello should not open a teammate thread',
+        messageType: 'text',
+      });
+
+    expect(generalStudentDm.status).toBe(403);
+    expect(generalStudentDm.body.error.code).toBe('DM_PERMISSION_DENIED');
+
+    const teammateDm = await request(app)
+      .post(`/api/dm/${teammateCandidate._id}`)
+      .set(authHeader(teammateSeeker))
+      .send({
+        message: 'I am building a startup and looking for a teammate for product and research.',
+        messageType: 'text',
+        queryType: 'project_join',
+      });
+
+    expect(teammateDm.status).toBe(201);
 
     const startup = await Startup.create({
       founderIds: [founder._id],
@@ -308,5 +332,24 @@ describe('marketplace access control', () => {
       }),
     );
     expect(mentorDetailResponse.body.data.sharePool).toBeUndefined();
+  });
+
+  it('shows teammate discovery in the student marketplace', async () => {
+    const studentViewer = await createUser(UserRole.STUDENT, 'Marketplace Viewer');
+    await createUser(UserRole.STUDENT, 'Prototype Researcher', {
+      headline: 'Researcher focused on startup validation',
+      domain: 'DeepTech',
+    });
+
+    const teammateResponse = await request(app)
+      .get('/api/marketplace?role=student')
+      .set(authHeader(studentViewer));
+
+    expect(teammateResponse.status).toBe(200);
+    expect(
+      teammateResponse.body.data.some(
+        (item: { displayName: string }) => item.displayName === 'Prototype Researcher',
+      ),
+    ).toBe(true);
   });
 });

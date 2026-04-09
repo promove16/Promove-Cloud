@@ -16,12 +16,19 @@ import {
   MapPin,
   MessageCircle,
   Search,
+  Send,
   SlidersHorizontal,
   Sparkles,
   Users,
 } from "lucide-react";
 import { RecruiterMarketplace } from "../../features/recruiter/RecruiterMarketplace";
 import { getMarketplaceDetailPath } from "../../features/marketplace/navigation";
+import {
+  getStartupInviteActionLabel,
+  isStartupInviteTargetType,
+  StartupInviteModal,
+  StartupInviteTarget,
+} from "../../features/marketplace/StartupInviteModal";
 import {
   MarketplaceDirectoryItem,
   MarketplaceEntityType,
@@ -159,7 +166,7 @@ const allTabs: MarketplaceTab[] = [
 ];
 
 const roleLaneIds: Partial<Record<UserRole, MarketplaceEntityType[]>> = {
-  [UserRole.STUDENT]: ["recruiter", "mentor", "investor", "startup"],
+  [UserRole.STUDENT]: ["recruiter", "student", "mentor", "investor", "startup"],
   [UserRole.SCHOOL]: ["student", "mentor", "investor", "startup"],
   [UserRole.COLLEGE]: ["student", "recruiter", "mentor", "investor", "startup"],
   [UserRole.MENTOR]: ["student", "college", "school"],
@@ -260,14 +267,24 @@ const getTabsForRole = (role: UserRole) => {
     .map((id) => allTabs.find((tab) => tab.id === id))
     .filter((tab): tab is MarketplaceTab => Boolean(tab))
     .map((tab) =>
-      role === UserRole.STUDENT && tab.id === "recruiter"
-        ? {
-            ...tab,
-            label: "Jobs",
-            filterLabel: "Jobs",
-            description:
-              "See live job openings with recruiter context, role details, and direct apply actions.",
-          }
+      role === UserRole.STUDENT
+        ? tab.id === "recruiter"
+          ? {
+              ...tab,
+              label: "Jobs",
+              filterLabel: "Jobs",
+              description:
+                "See live job openings with recruiter context, role details, and direct apply actions.",
+            }
+          : tab.id === "student"
+            ? {
+                ...tab,
+                label: "Teammates",
+                filterLabel: "Teammates",
+                description:
+                  "Find startup teammates across research, product, founder, engineering, design, and growth roles.",
+              }
+            : tab
         : tab,
     );
 };
@@ -1171,6 +1188,7 @@ export function Marketplace() {
 
 function GeneralMarketplace({ dashboardRole }: { dashboardRole: UserRole }) {
   const navigate = useNavigate();
+  const authUser = useAuthStore((state) => state.user);
   const sortMenuRef = useRef<HTMLDivElement | null>(null);
   const [searchParams, setSearchParams] = useSearchParams();
   const [optionFilters, setOptionFilters] = useState<
@@ -1181,6 +1199,10 @@ function GeneralMarketplace({ dashboardRole }: { dashboardRole: UserRole }) {
   >(createDefaultRangeFilters);
   const [showMoreFilters, setShowMoreFilters] = useState(false);
   const [isSortMenuOpen, setIsSortMenuOpen] = useState(false);
+  const [inviteTarget, setInviteTarget] = useState<StartupInviteTarget | null>(
+    null,
+  );
+  const [inviteFeedback, setInviteFeedback] = useState<string | null>(null);
   const availableTabs = useMemo(
     () => getTabsForRole(dashboardRole),
     [dashboardRole],
@@ -1245,10 +1267,23 @@ function GeneralMarketplace({ dashboardRole }: { dashboardRole: UserRole }) {
 
   const sourceItems = useMemo(
     () =>
-      listQuery.data?.filter((item): item is MarketplaceDirectoryItem =>
-        Boolean(item),
-      ) ?? [],
-    [listQuery.data],
+      listQuery.data?.filter((item): item is MarketplaceDirectoryItem => {
+        if (!item) {
+          return false;
+        }
+
+        if (
+          dashboardRole === UserRole.STUDENT &&
+          item.entityType === "student" &&
+          authUser?._id &&
+          item._id === authUser._id
+        ) {
+          return false;
+        }
+
+        return true;
+      }) ?? [],
+    [authUser?._id, dashboardRole, listQuery.data],
   );
 
   const recruiterProfiles = useMemo(
@@ -2009,6 +2044,22 @@ function GeneralMarketplace({ dashboardRole }: { dashboardRole: UserRole }) {
     navigate(`/dashboard/messages/${targetId}`);
   };
 
+  const openStartupInvite = (item: MarketplaceUserItem) => {
+    if (!isStartupInviteTargetType(item.entityType) || item._id === authUser?._id) {
+      return;
+    }
+
+    setInviteFeedback(null);
+    setInviteTarget({
+      _id: item._id,
+      entityType: item.entityType,
+      displayName: item.displayName,
+      headline: item.headline,
+      domain: item.domain,
+      location: item.location,
+    });
+  };
+
   const renderActions = (item: MarketplaceDirectoryItem) => {
     if (isStartupItem(item)) {
       return (
@@ -2046,6 +2097,15 @@ function GeneralMarketplace({ dashboardRole }: { dashboardRole: UserRole }) {
           <MessageCircle className="h-4 w-4" />
           Message
         </button>
+        {isStartupInviteTargetType(item.entityType) && item._id !== authUser?._id ? (
+          <button
+            onClick={() => openStartupInvite(item)}
+            className={secondaryActionClassName}
+          >
+            <Send className="h-4 w-4" />
+            {getStartupInviteActionLabel(item.entityType)}
+          </button>
+        ) : null}
         <button
           onClick={() =>
             navigate(
@@ -2058,7 +2118,7 @@ function GeneralMarketplace({ dashboardRole }: { dashboardRole: UserRole }) {
           }
           className={primaryActionClassName}
         >
-          View details
+          View portfolio
           <ArrowRight className="h-4 w-4" />
         </button>
       </div>
@@ -2339,6 +2399,12 @@ function GeneralMarketplace({ dashboardRole }: { dashboardRole: UserRole }) {
                 </div>
               </div>
 
+              {inviteFeedback ? (
+                <div className="mt-4 rounded-2xl border border-cyan-500/30 bg-cyan-500/10 px-4 py-3 text-sm text-cyan-100">
+                  {inviteFeedback}
+                </div>
+              ) : null}
+
               {activeFilterChips.length ? (
                 <div className="mt-4 flex flex-wrap gap-2">
                   {activeFilterChips.map((chip) => (
@@ -2505,6 +2571,13 @@ function GeneralMarketplace({ dashboardRole }: { dashboardRole: UserRole }) {
           </main>
         </div>
       </div>
+
+      <StartupInviteModal
+        isOpen={Boolean(inviteTarget)}
+        onClose={() => setInviteTarget(null)}
+        target={inviteTarget}
+        onSent={setInviteFeedback}
+      />
     </div>
   );
 }

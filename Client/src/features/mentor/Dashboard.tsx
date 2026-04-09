@@ -9,6 +9,7 @@ import { Button } from '../../components/ui/Button';
 import { Card } from '../../components/ui/Card';
 import { Spinner } from '../../components/ui/Spinner';
 import { PatentShowcase } from '../shared/PatentShowcase';
+import { getStudentPortfolioViewPath } from '../marketplace/navigation';
 
 export default function MentorDashboard() {
   const navigate = useNavigate();
@@ -185,7 +186,7 @@ export default function MentorDashboard() {
                   </div>
                   <div className="mt-1 text-xs text-slate-500">{new Date(activity.timestamp).toLocaleString('en-IN')}</div>
                 </div>
-                <Button variant="secondary" onClick={() => navigate(`/dashboard/mentor/students/${activity.studentId}`)}>
+                <Button variant="secondary" onClick={() => navigate(getStudentPortfolioViewPath(activity.studentId))}>
                   View Student
                 </Button>
               </div>

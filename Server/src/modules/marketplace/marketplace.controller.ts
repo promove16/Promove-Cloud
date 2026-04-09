@@ -26,7 +26,12 @@ export const getMarketplaceEntityDetail = async (req: Request, res: Response) =>
     throw new Error('Marketplace entity type and id are required');
   }
 
-  const entity = await getMarketplaceEntity(req.user!.role, entityType, entityId);
+  const entity = await getMarketplaceEntity(
+    req.user!.role,
+    entityType,
+    entityId,
+    String(req.user!._id),
+  );
   res.json(new ApiResponse(entity));
 };
 
@@ -35,6 +40,6 @@ export const getMarketplaceProfile = async (req: Request, res: Response) => {
   if (!userId) {
     throw new Error('User id is required');
   }
-  const user = await getMarketplaceUser(req.user!.role, userId);
+  const user = await getMarketplaceUser(req.user!.role, userId, String(req.user!._id));
   res.json(new ApiResponse(user));
 };

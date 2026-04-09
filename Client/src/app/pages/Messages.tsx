@@ -5,15 +5,23 @@ import { isAxiosError } from 'axios';
 import { 
   MessageCircle, Search, Send, ArrowLeft, Calendar, ExternalLink, PenSquare, Users, 
   Check, CheckCheck, MoreVertical, AlertTriangle, GraduationCap, TrendingUp, Building2,
-  Image, FileText, X, Paperclip
+  Image, FileText, X, Paperclip, UserPlus, Briefcase
 } from 'lucide-react';
 import { dmApi, DMConversation, DMMessage, QueryType } from '../../api/dm.api';
+import { workspaceApi } from '../../api/workspace.api';
+import { startupApi } from '../../api/startup.api';
+import { requestApi } from '../../api/request.api';
 import { useDM } from '../../hooks/useDM';
 import { useAuthStore } from '../../store/authStore';
+import { UserRole } from '../../types/roles.types';
 import { QueryTypeModal } from '../../components/messaging/QueryTypeModal';
 import { ReportUserModal } from '../../components/messaging/ReportUserModal';
 import { InvestorProposalModal, InvestorProposalReplyActions } from '../../components/messaging/InvestorProposalModal';
+import { InviteModal } from '../../components/messaging/InviteModal';
+import { InvitationCard } from '../../components/messaging/InvitationCard';
 import { getVisibleAssociationQueryTypes, isAssociationQueryType } from '../../components/messaging/queryTypeVisibility';
+import { Workspace } from '../../types/workspace.types';
+import { Startup } from '../../types/startup.types';
 
 type PendingAttachmentState = {
   previewUrl: string;
@@ -701,7 +709,21 @@ function MessageBubble({
 
         {/* Text message */}
         {msg.message && (
-          investorPitch ? (
+          msg.messageType === 'invitation' && msg.invitationType && msg.invitationData ? (
+            <div className="order-1 w-full max-w-[320px]">
+              <InvitationCard
+                messageId={msg._id}
+                invitationType={msg.invitationType}
+                entityTitle={msg.invitationData.entityTitle}
+                entityType={msg.invitationData.entityType}
+                role={msg.invitationData.role}
+                requestId={msg.invitationData.requestId}
+                status={msg.invitationData.status}
+                senderName={isMine ? currentUserName : partnerName}
+                isMine={isMine}
+              />
+            </div>
+          ) : investorPitch ? (
             <div className="order-1 w-full">
               <InvestorPitchCard details={investorPitch} isMine={isMine} />
             </div>
@@ -1102,6 +1124,7 @@ export function MessagesPage() {
   const [showReportModal, setShowReportModal] = useState(false);
   const [showInvestorModal, setShowInvestorModal] = useState(false);
   const [showMenu, setShowMenu] = useState(false);
+  const [showInviteModal, setShowInviteModal] = useState(false);
   const searchTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const menuRef = useRef<HTMLDivElement>(null);
 
@@ -1122,6 +1145,25 @@ export function MessagesPage() {
     queryFn: dmApi.listConversations,
     refetchInterval: 30_000,
   });
+
+  const isStudentRole = currentUser?.role === UserRole.STUDENT;
+  const isRecruiterRole = currentUser?.role === UserRole.RECRUITER;
+  const canInviteToWorkspace = isStudentRole || isRecruiterRole;
+
+  const workspacesQuery = useQuery({
+    queryKey: ['workspaces', 'list'],
+    queryFn: workspaceApi.list,
+    enabled: canInviteToWorkspace,
+  });
+
+  const startupsQuery = useQuery({
+    queryKey: ['startups', 'mine'],
+    queryFn: startupApi.mine,
+    enabled: isStudentRole,
+  });
+
+  const workspaces = workspacesQuery.data ?? [];
+  const myStartups = startupsQuery.data ?? [];
 
   const conversations = (conversationsQuery.data ?? []).filter((c) => {
     if (!search) return true;
@@ -1374,6 +1416,32 @@ export function MessagesPage() {
                     <span className="capitalize text-slate-500">{partnerRole}</span>
                   </div>
                 </div>
+                {canInviteToWorkspace && partnerId && (
+                  <div className="flex items-center gap-1">
+                    {workspaces.length > 0 && (
+                      <button
+                        type="button"
+                        onClick={() => setShowInviteModal(true)}
+                        className="flex items-center gap-1.5 rounded-lg bg-cyan-500/10 px-2.5 py-1.5 text-xs font-medium text-cyan-400 transition hover:bg-cyan-500/20"
+                        title="Invite to workspace"
+                      >
+                        <UserPlus className="h-3.5 w-3.5" />
+                        <span className="hidden sm:inline">Workspace</span>
+                      </button>
+                    )}
+                    {isStudentRole && myStartups.length > 0 && (
+                      <button
+                        type="button"
+                        onClick={() => setShowInviteModal(true)}
+                        className="flex items-center gap-1.5 rounded-lg bg-emerald-500/10 px-2.5 py-1.5 text-xs font-medium text-emerald-400 transition hover:bg-emerald-500/20"
+                        title="Invite to startup"
+                      >
+                        <Briefcase className="h-3.5 w-3.5" />
+                        <span className="hidden sm:inline">Startup</span>
+                      </button>
+                    )}
+                  </div>
+                )}
                 <div className="relative" ref={menuRef}>
                   <button
                     type="button"
@@ -1494,6 +1562,41 @@ export function MessagesPage() {
                           </div>
                         </div>
                       ) : null}
+                      {canInviteToWorkspace && (
+                        <div className="border-t border-slate-700 px-4 py-2">
+                          <p className="mb-2 text-xs font-medium text-slate-400">Invite to:</p>
+                          <div className="space-y-1">
+                            {workspaces.length > 0 && (
+                              <button
+                                type="button"
+                                disabled={!partnerId}
+                                onClick={() => {
+                                  setShowMenu(false);
+                                  setShowInviteModal(true);
+                                }}
+                                className="flex w-full items-center gap-2 rounded-lg px-2 py-1.5 text-left text-sm text-cyan-400 transition hover:bg-slate-800 disabled:cursor-not-allowed disabled:opacity-50"
+                              >
+                                <UserPlus className="h-4 w-4" />
+                                Workspace
+                              </button>
+                            )}
+                            {isStudentRole && myStartups.length > 0 && (
+                              <button
+                                type="button"
+                                disabled={!partnerId}
+                                onClick={() => {
+                                  setShowMenu(false);
+                                  setShowInviteModal(true);
+                                }}
+                                className="flex w-full items-center gap-2 rounded-lg px-2 py-1.5 text-left text-sm text-emerald-400 transition hover:bg-slate-800 disabled:cursor-not-allowed disabled:opacity-50"
+                              >
+                                <Briefcase className="h-4 w-4" />
+                                Startup
+                              </button>
+                            )}
+                          </div>
+                        </div>
+                      )}
                     </div>
                   )}
                 </div>
@@ -1560,6 +1663,17 @@ export function MessagesPage() {
           onSend={(message) => sendMessage({ message, messageType: 'text', queryType: 'investor' })}
           recipientName={partnerName}
           isStudent={currentUser?.role === 'student'}
+        />
+      )}
+
+      {partnerId && (
+        <InviteModal
+          isOpen={showInviteModal}
+          onClose={() => setShowInviteModal(false)}
+          recipientId={partnerId}
+          recipientName={partnerName}
+          workspaces={workspaces}
+          startups={myStartups}
         />
       )}
     </div>

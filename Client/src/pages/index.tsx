@@ -29,6 +29,7 @@ import { useAuthStore } from "../store/authStore";
 import { UserRole } from "../types/roles.types";
 import { roleRedirect } from "../utils/roleRedirect";
 import { getMarketplaceBasePath, getMarketplaceDetailPath } from "../features/marketplace/navigation";
+import { getStudentPortfolioViewPath } from "../features/marketplace/navigation";
 
 function LazyPage({ component: Component }: { component: LazyExoticComponent<ComponentType> }) {
   return (
@@ -230,6 +231,11 @@ const PublicStudentProfilePage = lazy(() =>
     default: module.PublicStudentProfilePage,
   })),
 );
+const StudentPortfolioViewPage = lazy(() =>
+  import("../features/student/StudentPortfolioViewPage").then((module) => ({
+    default: module.StudentPortfolioViewPage,
+  })),
+);
 const MessagesPage = lazy(() =>
   import("../app/pages/Messages").then((module) => ({
     default: module.MessagesPage,
@@ -401,6 +407,16 @@ function MarketplaceDetailRedirect() {
   return <Navigate to={getMarketplaceDetailPath(user.role, entityType as "student" | "school" | "college" | "mentor" | "investor" | "recruiter" | "startup", entityId)} replace />;
 }
 
+function StudentPortfolioRedirect() {
+  const { id } = useParams<{ id?: string }>();
+
+  if (!id) {
+    return <Navigate to="/dashboard" replace />;
+  }
+
+  return <Navigate to={getStudentPortfolioViewPath(id)} replace />;
+}
+
 const NON_ADMIN_DASHBOARD_ROLES = [
   UserRole.STUDENT,
   UserRole.MENTOR,
@@ -555,6 +571,22 @@ export const router = createBrowserRouter([
         ),
       },
       {
+        path: "/portfolio/student/:userId",
+        element: (
+          <ProtectedAnyRoute>
+            <LazyPage component={StudentPortfolioViewPage} />
+          </ProtectedAnyRoute>
+        ),
+      },
+      {
+        path: "/portfolio/view/:entityType/:entityId",
+        element: (
+          <ProtectedAnyRoute>
+            <MarketplaceDetailRedirect />
+          </ProtectedAnyRoute>
+        ),
+      },
+      {
         path: "/marketplace",
         element: (
           <ProtectedRolesRoute roles={NON_ADMIN_DASHBOARD_ROLES}>
@@ -618,7 +650,7 @@ export const router = createBrowserRouter([
             children: [
               { index: true, element: <LazyPage component={MentorDashboard} /> },
               { path: "students", element: <LazyPage component={MentorStudentFeed} /> },
-              { path: "students/:id", element: <LazyPage component={MentorStudentFeed} /> },
+              { path: "students/:id", element: <StudentPortfolioRedirect /> },
               { path: "sessions", element: <LazyPage component={MentorSessions} /> },
               { path: "marketplace", element: <LazyPage component={Marketplace} /> },
               { path: "marketplace/view/:entityType/:entityId", element: <LazyPage component={MarketplaceDetail} /> },
@@ -757,7 +789,7 @@ export const router = createBrowserRouter([
               { path: "events", element: <LazyPage component={SchoolEventsPage} /> },
               { path: "events/:eventId", element: <LazyPage component={SchoolEventsPage} /> },
               { path: "students", element: <LazyPage component={SchoolStudentLeaderboard} /> },
-              { path: "students/:id", element: <LazyPage component={SchoolStudentLeaderboard} /> },
+              { path: "students/:id", element: <StudentPortfolioRedirect /> },
               { path: "investors", element: <LazyPage component={SchoolInvestorDirectory} /> },
               { path: "mentors", element: <LazyPage component={SchoolMentorshipPage} /> },
               { path: "compliance", element: <LazyPage component={SchoolComplianceReport} /> },
@@ -774,7 +806,7 @@ export const router = createBrowserRouter([
               { path: "projects", element: <LazyPage component={CollegeProjectsPage} /> },
               { path: "projects/:projectId", element: <LazyPage component={CollegeProjectsPage} /> },
               { path: "students", element: <LazyPage component={CollegeStudentLeaderboard} /> },
-              { path: "students/:id", element: <LazyPage component={CollegeStudentLeaderboard} /> },
+              { path: "students/:id", element: <StudentPortfolioRedirect /> },
               { path: "recruiters", element: <LazyPage component={RecruiterDirectory} /> },
               { path: "investors", element: <LazyPage component={CollegeInvestorDirectory} /> },
               { path: "mentors", element: <LazyPage component={CollegeMentorshipPage} /> },

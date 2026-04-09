@@ -7,6 +7,7 @@ import { Button } from '../../components/ui/Button';
 import { Card } from '../../components/ui/Card';
 import { Spinner } from '../../components/ui/Spinner';
 import type { RecentProject } from '../../types/school.types';
+import { getStudentPortfolioViewPath } from '../marketplace/navigation';
 
 type Props = {
   mode: 'school' | 'college';
@@ -96,7 +97,7 @@ export function InstitutionProjectsPageBase({
                 outside the dashboard summary card.
               </p>
             </div>
-            <Button variant="secondary" onClick={() => navigate(`${basePath}/students/${selectedProject.studentId}`)}>
+            <Button variant="secondary" onClick={() => navigate(getStudentPortfolioViewPath(selectedProject.studentId))}>
               View Student Journey
             </Button>
           </div>
