@@ -6,6 +6,7 @@ import { Card } from '../../components/ui/Card';
 import { Input } from '../../components/ui/Input';
 import { Button } from '../../components/ui/Button';
 import { marketplaceApi } from '../../api/marketplace.api';
+import { getUserPortfolioViewPath } from '../marketplace/navigation';
 
 type Props = {
   title?: string;
@@ -18,7 +19,6 @@ export function MentorDirectory({
 }: Props) {
   const navigate = useNavigate();
   const [search, setSearch] = useState('');
-  const [selectedId, setSelectedId] = useState<string | null>(null);
 
   const handleMessage = (mentorId: string) => {
     const storageKey = `dm_first_contact_${mentorId}`;
@@ -31,12 +31,6 @@ export function MentorDirectory({
   const mentorsQuery = useQuery({
     queryKey: ['marketplace-mentors'],
     queryFn: () => marketplaceApi.list('mentor'),
-  });
-
-  const profileQuery = useQuery({
-    queryKey: ['marketplace-mentor-profile', selectedId],
-    queryFn: () => marketplaceApi.getProfile(selectedId!),
-    enabled: Boolean(selectedId),
   });
 
   const mentors = useMemo(
@@ -96,7 +90,7 @@ export function MentorDirectory({
                   <MessageCircle className="mr-2 h-4 w-4" />
                   Message
                 </Button>
-                <Button variant="secondary" onClick={() => setSelectedId(mentor._id)}>
+                <Button variant="secondary" onClick={() => navigate(getUserPortfolioViewPath('mentor', mentor._id))}>
                   <Eye className="mr-2 h-4 w-4" />
                   View Profile
                 </Button>
@@ -106,35 +100,6 @@ export function MentorDirectory({
         ))}
       </div>
 
-      {selectedId && profileQuery.data ? (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-950/70 p-6 backdrop-blur-sm">
-          <Card className="w-full max-w-2xl p-6">
-            <div className="flex items-start justify-between gap-4">
-              <div>
-                <h2 className="text-2xl font-bold text-white">{profileQuery.data.displayName}</h2>
-                <p className="mt-2 text-sm text-cyan-300">
-                  {profileQuery.data.domain ?? 'Innovation mentoring'}
-                </p>
-              </div>
-              <Button variant="ghost" onClick={() => setSelectedId(null)}>
-                Close
-              </Button>
-            </div>
-            <p className="mt-4 leading-7 text-slate-300">
-              {profileQuery.data.bio ?? 'This mentor has not added a public bio yet.'}
-            </p>
-            <div className="mt-6 flex justify-end gap-3">
-              <Button variant="secondary" onClick={() => setSelectedId(null)}>
-                Close
-              </Button>
-              <Button onClick={() => { handleMessage(selectedId!); setSelectedId(null); }}>
-                <MessageCircle className="mr-2 h-4 w-4" />
-                Message Mentor
-              </Button>
-            </div>
-          </Card>
-        </div>
-      ) : null}
     </div>
   );
 }

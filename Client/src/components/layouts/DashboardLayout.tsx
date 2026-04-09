@@ -30,6 +30,7 @@ import {
 } from '../../app/components/ui/dropdown-menu';
 import { DASHBOARD_ROUTE_LABELS, DashboardNavItem, SIDEBAR_CONFIG } from './dashboardNavigation';
 import { BusinessLogo } from '../branding/BusinessLogo';
+import { GlobalWorkspaceInviteDialog } from '../workspace/GlobalWorkspaceInviteDialog';
 
 interface DashboardLayoutProps {
   role?: UserRole;
@@ -489,6 +490,7 @@ export function DashboardLayout({ children, role }: PropsWithChildren<DashboardL
               </div>
 
               <div className="flex items-center gap-3">
+                <GlobalWorkspaceInviteDialog />
                 <NotificationBell />
                 <NavLink
                   to="/portfolio"

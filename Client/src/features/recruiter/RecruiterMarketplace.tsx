@@ -13,6 +13,7 @@ import {
   X,
 } from "lucide-react";
 import { recruiterApi } from "../../api/recruiter.api";
+import { getStudentPortfolioViewPath } from "../marketplace/navigation";
 import {
   RecruiterCollegeCard,
   RecruiterJobDetail,
@@ -20,7 +21,6 @@ import {
   RecruiterTalentSummary,
 } from "../../types/recruiter.types";
 import { UserRole } from "../../types/roles.types";
-import { StudentProfileDrawer } from "./StudentProfileDrawer";
 
 type RecruiterMarketplaceLane = "students" | "colleges";
 
@@ -448,7 +448,6 @@ export function RecruiterMarketplace({ dashboardRole: _dashboardRole }: { dashbo
   const navigate = useNavigate();
   const queryClient = useQueryClient();
   const [searchParams, setSearchParams] = useSearchParams();
-  const [selectedStudentId, setSelectedStudentId] = useState<string | null>(null);
   const [shortlistingId, setShortlistingId] = useState<string | null>(null);
   const [inviteStudentId, setInviteStudentId] = useState<string | null>(null);
   const [inviteNote, setInviteNote] = useState("");
@@ -688,7 +687,7 @@ export function RecruiterMarketplace({ dashboardRole: _dashboardRole }: { dashbo
                       onInvite={openInviteModal}
                       onMessage={(studentId) => navigate(`/dashboard/recruiter/messages/${studentId}`)}
                       onShortlist={handleShortlist}
-                      onViewProfile={setSelectedStudentId}
+                      onViewProfile={(studentId) => navigate(getStudentPortfolioViewPath(studentId))}
                     />
                   ))
                 : colleges.map((college) => (
@@ -703,15 +702,6 @@ export function RecruiterMarketplace({ dashboardRole: _dashboardRole }: { dashbo
           ) : null}
         </section>
       </div>
-
-      <StudentProfileDrawer
-        studentId={selectedStudentId}
-        open={Boolean(selectedStudentId)}
-        onClose={() => setSelectedStudentId(null)}
-        onChanged={() => studentsQuery.refetch()}
-        onInviteToJob={openInviteModal}
-        activeJobCount={activeJobs.length}
-      />
 
       {inviteStudentId ? (
         <InviteStudentModal

@@ -1,10 +1,12 @@
 import { useMemo, useState } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { useQuery } from '@tanstack/react-query';
-import { Mail, Search } from 'lucide-react';
+import { Search } from 'lucide-react';
 import { Button } from '../../components/ui/Button';
 import { Card } from '../../components/ui/Card';
 import { Input } from '../../components/ui/Input';
 import { DirectoryInvestor } from '../../types/school.types';
+import { getUserPortfolioViewPath } from '../marketplace/navigation';
 
 type Props = {
   title: string;
@@ -19,8 +21,8 @@ export function InvestorDirectoryBase({
   queryKey,
   fetchInvestors,
 }: Props) {
+  const navigate = useNavigate();
   const [search, setSearch] = useState('');
-  const [selectedInvestor, setSelectedInvestor] = useState<DirectoryInvestor | null>(null);
 
   const investorsQuery = useQuery({
     queryKey: [queryKey],
@@ -81,38 +83,13 @@ export function InvestorDirectoryBase({
                   </p>
                 </div>
               </div>
-              <Button variant="secondary" onClick={() => setSelectedInvestor(investor)}>
+              <Button variant="secondary" onClick={() => navigate(getUserPortfolioViewPath('investor', investor._id))}>
                 View Profile
               </Button>
             </div>
           </Card>
         ))}
       </div>
-
-      {selectedInvestor ? (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-950/70 p-6 backdrop-blur-sm">
-          <Card className="w-full max-w-2xl p-6">
-            <div className="flex items-start justify-between gap-4">
-              <div>
-                <h2 className="text-2xl font-bold text-white">{selectedInvestor.displayName}</h2>
-                <p className="mt-2 text-sm text-amber-300">
-                  {selectedInvestor.domain ?? 'Innovation investments'}
-                </p>
-              </div>
-              <Button variant="ghost" onClick={() => setSelectedInvestor(null)}>
-                Close
-              </Button>
-            </div>
-            <p className="mt-4 leading-7 text-slate-300">
-              {selectedInvestor.bio ?? 'This investor has not added a public bio yet.'}
-            </p>
-            <div className="mt-6 flex items-center gap-3 text-sm text-slate-400">
-              <Mail className="h-4 w-4" />
-              {selectedInvestor.contactPreference}
-            </div>
-          </Card>
-        </div>
-      ) : null}
     </div>
   );
 }

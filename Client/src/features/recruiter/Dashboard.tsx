@@ -9,7 +9,7 @@ import { Card } from '../../components/ui/Card';
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from '../../app/components/ui/dialog';
 import { Input } from '../../components/ui/Input';
 import { Spinner } from '../../components/ui/Spinner';
-import { StudentProfileDrawer } from './StudentProfileDrawer';
+import { getStudentPortfolioViewPath } from '../marketplace/navigation';
 import { PatentShowcase } from '../shared/PatentShowcase';
 
 type ModalMode = 'job' | 'search' | 'drive' | null;
@@ -52,7 +52,6 @@ const parseTextareaList = (value: string) =>
 
 export default function RecruiterDashboard() {
   const navigate = useNavigate();
-  const [selectedStudentId, setSelectedStudentId] = useState<string | null>(null);
   const [modalMode, setModalMode] = useState<ModalMode>(null);
   const [jobForm, setJobForm] = useState(initialJobForm);
   const [driveForm, setDriveForm] = useState(initialDriveForm);
@@ -210,7 +209,7 @@ export default function RecruiterDashboard() {
                   </div>
                 </div>
                 <div className="mt-5 flex flex-wrap gap-3">
-                  <Button onClick={() => setSelectedStudentId(student._id)}>
+                  <Button onClick={() => navigate(getStudentPortfolioViewPath(student._id))}>
                     <Eye className="mr-2 h-4 w-4" />
                     View Profile
                   </Button>
@@ -232,13 +231,6 @@ export default function RecruiterDashboard() {
       </div>
 
       <PatentShowcase />
-
-      <StudentProfileDrawer
-        studentId={selectedStudentId}
-        open={Boolean(selectedStudentId)}
-        onClose={() => setSelectedStudentId(null)}
-        onChanged={() => dashboardQuery.refetch()}
-      />
 
       <Dialog open={modalMode !== null} onOpenChange={(open: boolean) => setModalMode(open ? modalMode : null)}>
         <DialogContent className="max-w-2xl border-slate-800 bg-slate-950 text-white">

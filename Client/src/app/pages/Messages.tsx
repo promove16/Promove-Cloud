@@ -2,26 +2,38 @@ import { useEffect, useRef, useState, useCallback } from 'react';
 import { useParams, useNavigate, useSearchParams } from 'react-router-dom';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { isAxiosError } from 'axios';
-import { 
-  MessageCircle, Search, Send, ArrowLeft, Calendar, ExternalLink, PenSquare, Users, 
+import {
+  MessageCircle, Search, Send, ArrowLeft, Calendar, ExternalLink, PenSquare, Users,
   Check, CheckCheck, MoreVertical, AlertTriangle, GraduationCap, TrendingUp, Building2,
-  Image, FileText, X, Paperclip, UserPlus, Briefcase
+  Image, FileText, X, Paperclip, UserPlus, Inbox
 } from 'lucide-react';
 import { dmApi, DMConversation, DMMessage, QueryType } from '../../api/dm.api';
-import { workspaceApi } from '../../api/workspace.api';
 import { startupApi } from '../../api/startup.api';
-import { requestApi } from '../../api/request.api';
 import { useDM } from '../../hooks/useDM';
 import { useAuthStore } from '../../store/authStore';
 import { UserRole } from '../../types/roles.types';
 import { QueryTypeModal } from '../../components/messaging/QueryTypeModal';
 import { ReportUserModal } from '../../components/messaging/ReportUserModal';
-import { InvestorProposalModal, InvestorProposalReplyActions } from '../../components/messaging/InvestorProposalModal';
-import { InviteModal } from '../../components/messaging/InviteModal';
+import { InvestorProposalReplyActions } from '../../components/messaging/InvestorProposalModal';
 import { InvitationCard } from '../../components/messaging/InvitationCard';
-import { getVisibleAssociationQueryTypes, isAssociationQueryType } from '../../components/messaging/queryTypeVisibility';
-import { Workspace } from '../../types/workspace.types';
-import { Startup } from '../../types/startup.types';
+import { getConversationPreviewText } from '../../components/messaging/conversationPreview';
+import { getVisibleAssociationQueryTypes, isAssociationQueryType, normalizeMessagingRole } from '../../components/messaging/queryTypeVisibility';
+import {
+  StartupHandshakeDmPayload,
+  StartupInviteModal,
+  StartupInviteTarget,
+  StartupInviteTargetType,
+  buildStartupHandshakeDmMessage,
+} from '../../features/marketplace/StartupInviteModal';
+import { InvitationPage } from '../../features/invitations/InvitationPage';
+import {
+  REQUEST_TYPE_LABELS,
+  formatRequestStatus,
+  getRequestActorLabel,
+  getRequestEntityName,
+} from '../../features/invitations/requestPresentation';
+import { requestApi } from '../../api/request.api';
+import { WorkflowRequest } from '../../types/request.types';
 
 type PendingAttachmentState = {
   previewUrl: string;
@@ -357,6 +369,193 @@ function InvestorPitchCard({
   );
 }
 
+type StartupHandshakeDetails = {
+  action: StartupInviteTargetType;
+  requestType?: string;
+  actionType?: string;
+  requestId?: string;
+  startupId?: string;
+  startupName: string;
+  tagline?: string;
+  category?: string;
+  stage?: string;
+  fundingNeeded?: string;
+  requestedRole?: string;
+  recipientName?: string;
+  status?: string;
+  note?: string;
+};
+
+const startupHandshakeMarker = '[PROMOVE_STARTUP_HANDSHAKE]';
+
+const getStartupHandshakeActionLabel = (targetType: StartupInviteTargetType) => {
+  if (targetType === 'investor') return 'Pitch';
+  if (targetType === 'mentor') return 'Mentorship';
+  return 'Invite';
+};
+
+const isStartupHandshakeTargetType = (value: string): value is StartupInviteTargetType =>
+  value === 'student' || value === 'mentor' || value === 'investor';
+
+const getStartupHandshakeCardConfig = (targetType: StartupInviteTargetType) => {
+  if (targetType === 'investor') {
+    return {
+      title: 'Startup Pitch',
+      icon: <TrendingUp className="h-4 w-4" />,
+      borderClassName: 'border-emerald-400/25',
+      backgroundClassName: 'bg-gradient-to-br from-emerald-500/12 via-slate-900 to-slate-950',
+      iconClassName: 'bg-emerald-500/15 text-emerald-200',
+      badgeClassName: 'border-emerald-400/20 bg-emerald-500/10 text-emerald-200',
+      eyebrowClassName: 'text-emerald-300/80',
+    };
+  }
+
+  if (targetType === 'mentor') {
+    return {
+      title: 'Startup Mentorship',
+      icon: <GraduationCap className="h-4 w-4" />,
+      borderClassName: 'border-cyan-400/25',
+      backgroundClassName: 'bg-gradient-to-br from-cyan-500/12 via-slate-900 to-slate-950',
+      iconClassName: 'bg-cyan-500/15 text-cyan-200',
+      badgeClassName: 'border-cyan-400/20 bg-cyan-500/10 text-cyan-100',
+      eyebrowClassName: 'text-cyan-300/80',
+    };
+  }
+
+  return {
+    title: 'Startup Invite',
+    icon: <UserPlus className="h-4 w-4" />,
+    borderClassName: 'border-fuchsia-400/25',
+    backgroundClassName: 'bg-gradient-to-br from-fuchsia-500/12 via-slate-900 to-slate-950',
+    iconClassName: 'bg-fuchsia-500/15 text-fuchsia-200',
+    badgeClassName: 'border-fuchsia-400/20 bg-fuchsia-500/10 text-fuchsia-100',
+    eyebrowClassName: 'text-fuchsia-200/80',
+  };
+};
+
+const parseStartupHandshake = (message: string): StartupHandshakeDetails | null => {
+  if (!message.startsWith(startupHandshakeMarker)) {
+    return null;
+  }
+
+  const fields = message
+    .split(/\r?\n/)
+    .slice(1)
+    .reduce<Record<string, string>>((accumulator, line) => {
+      const match = line.match(/^([^:]+):\s*(.*)$/);
+      if (match) {
+        accumulator[match[1].trim().toLowerCase()] = match[2].trim();
+      }
+      return accumulator;
+    }, {});
+
+  const rawAction = fields.action?.trim().toLowerCase();
+  if (!rawAction || !isStartupHandshakeTargetType(rawAction)) {
+    return null;
+  }
+
+  const startupName = fields.startup?.trim();
+  if (!startupName) {
+    return null;
+  }
+
+  return {
+    action: rawAction,
+    requestType: fields['request type'],
+    actionType: fields['action type'],
+    requestId: fields['request id'],
+    startupId: fields['startup id'],
+    startupName,
+    tagline: fields.tagline,
+    category: fields.category,
+    stage: fields.stage,
+    fundingNeeded: fields['funding needed'],
+    requestedRole: fields['requested role'],
+    recipientName: fields.recipient,
+    status: fields.status,
+    note: fields.note,
+  };
+};
+
+function StartupHandshakeCard({
+  details,
+  isMine,
+}: {
+  details: StartupHandshakeDetails;
+  isMine: boolean;
+}) {
+  const config = getStartupHandshakeCardConfig(details.action);
+  const statusLabel = details.status ? details.status.replace(/_/g, ' ') : 'pending';
+
+  return (
+    <div className={`w-full overflow-hidden rounded-[1.35rem] border ${config.borderClassName} ${config.backgroundClassName}`}>
+      <div className="border-b border-white/10 px-4 py-3">
+        <div className="flex flex-wrap items-start justify-between gap-3">
+          <div className="min-w-0 flex-1">
+            <div className={`flex items-center gap-2 text-[11px] font-semibold uppercase tracking-[0.22em] ${config.eyebrowClassName}`}>
+              {config.icon}
+              {config.title}
+            </div>
+            <h4 className="mt-2 text-base font-semibold text-white">{details.startupName}</h4>
+            {details.tagline ? (
+              <p className="mt-1 text-sm leading-relaxed text-slate-300">{details.tagline}</p>
+            ) : null}
+          </div>
+          <span className={`rounded-full border px-3 py-1 text-xs font-semibold capitalize ${config.badgeClassName}`}>
+            {statusLabel}
+          </span>
+        </div>
+      </div>
+
+      <div className="space-y-3 px-4 py-3">
+        {details.category || details.stage || details.fundingNeeded ? (
+          <div className="flex flex-wrap gap-2">
+            {details.category ? (
+              <span className="rounded-full border border-slate-700 bg-slate-900/70 px-3 py-1 text-xs font-medium text-slate-200">
+                {details.category}
+              </span>
+            ) : null}
+            {details.stage ? (
+              <span className="rounded-full border border-slate-700 bg-slate-900/70 px-3 py-1 text-xs font-medium text-slate-200">
+                {details.stage}
+              </span>
+            ) : null}
+            {details.fundingNeeded ? (
+              <span className="rounded-full border border-slate-700 bg-slate-900/70 px-3 py-1 text-xs font-medium text-slate-200">
+                {details.fundingNeeded}
+              </span>
+            ) : null}
+          </div>
+        ) : null}
+
+        {details.requestedRole ? (
+          <div className="rounded-2xl border border-white/10 bg-black/10 px-3 py-2.5">
+            <p className="text-[11px] font-semibold uppercase tracking-[0.2em] text-slate-400">
+              Requested Role
+            </p>
+            <p className="mt-1 text-sm text-slate-100">{details.requestedRole}</p>
+          </div>
+        ) : null}
+
+        {details.note ? (
+          <div>
+            <p className="mb-2 text-xs font-semibold uppercase tracking-[0.2em] text-slate-400">
+              Note
+            </p>
+            <p className="text-sm leading-relaxed text-slate-200">{details.note}</p>
+          </div>
+        ) : null}
+
+        <p className="text-xs uppercase tracking-[0.18em] text-slate-500">
+          {isMine
+            ? `${getStartupHandshakeActionLabel(details.action)} request sent`
+            : `${getStartupHandshakeActionLabel(details.action)} request received`}
+        </p>
+      </div>
+    </div>
+  );
+}
+
 function ConversationItem({
   convo,
   isActive,
@@ -404,9 +603,7 @@ function ConversationItem({
         <div className="flex items-center gap-1">
           <p className={`truncate text-xs ${convo.unreadCount > 0 ? 'font-semibold text-slate-300' : 'text-slate-500'}`}>
             {isMine ? 'You: ' : ''}
-            {convo.lastMessage.messageType === 'interview_request'
-              ? '📅 Interview request'
-              : convo.lastMessage.message || '…'}
+            {getConversationPreviewText(convo.lastMessage)}
           </p>
           {isMine && (
             <span className="flex-shrink-0">
@@ -630,6 +827,7 @@ function MessageBubble({
   const isImage = msg.attachmentType === 'image';
   const isPdf = msg.attachmentType === 'pdf';
   const investorPitch = msg.queryType === 'investor' ? parseInvestorPitch(msg.message) : null;
+  const startupHandshake = parseStartupHandshake(msg.message);
   const attachmentImage = msg.attachmentUrl ? (
     <img
       src={msg.attachmentUrl}
@@ -726,6 +924,10 @@ function MessageBubble({
           ) : investorPitch ? (
             <div className="order-1 w-full">
               <InvestorPitchCard details={investorPitch} isMine={isMine} />
+            </div>
+          ) : startupHandshake ? (
+            <div className="order-1 w-full">
+              <StartupHandshakeCard details={startupHandshake} isMine={isMine} />
             </div>
           ) : (
             <div
@@ -1107,6 +1309,56 @@ function ChatPanel({
   );
 }
 
+const STATUS_COLORS: Record<WorkflowRequest['status'], string> = {
+  pending: 'text-amber-400',
+  accepted: 'text-emerald-400',
+  declined: 'text-red-400',
+  withdrawn: 'text-slate-500',
+  expired: 'text-slate-500',
+  cancelled: 'text-slate-500',
+  completed: 'text-cyan-400',
+};
+
+function RequestSidebarItem({
+  request,
+  direction,
+  isActive,
+  onClick,
+}: {
+  request: WorkflowRequest;
+  direction: 'incoming' | 'outgoing';
+  isActive?: boolean;
+  onClick: (request: WorkflowRequest) => void;
+}) {
+  const actor = getRequestActorLabel(request, direction);
+  const avatarLetter = actor.charAt(0).toUpperCase();
+  const typeLabel = REQUEST_TYPE_LABELS[request.type] ?? 'Request';
+  const statusColor = STATUS_COLORS[request.status];
+  const entityName = getRequestEntityName(request);
+
+  return (
+    <button
+      type="button"
+      onClick={() => onClick(request)}
+      className={`flex w-full items-center gap-3 border-b border-slate-800/60 px-4 py-3 text-left transition ${
+        isActive ? 'bg-slate-800/70' : 'hover:bg-slate-800/40'
+      }`}
+    >
+      <div className="flex h-10 w-10 flex-shrink-0 items-center justify-center rounded-full bg-gradient-to-br from-slate-700 to-slate-600 text-sm font-bold text-white">
+        {avatarLetter}
+      </div>
+      <div className="min-w-0 flex-1">
+        <div className="truncate text-sm font-semibold text-white">{actor}</div>
+        <div className="truncate text-xs text-slate-500">{typeLabel}</div>
+        <div className="truncate text-[11px] text-slate-600">{entityName}</div>
+      </div>
+      <span className={`flex-shrink-0 text-[10px] font-semibold uppercase tracking-wide ${statusColor}`}>
+        {formatRequestStatus(request.status)}
+      </span>
+    </button>
+  );
+}
+
 export function MessagesPage() {
   const { partnerId } = useParams<{ partnerId?: string }>();
   const navigate = useNavigate();
@@ -1122,9 +1374,8 @@ export function MessagesPage() {
   const [pendingPartnerRole, setPendingPartnerRole] = useState<string>('');
   const [pendingQueryType, setPendingQueryType] = useState<QueryType | null>(null);
   const [showReportModal, setShowReportModal] = useState(false);
-  const [showInvestorModal, setShowInvestorModal] = useState(false);
   const [showMenu, setShowMenu] = useState(false);
-  const [showInviteModal, setShowInviteModal] = useState(false);
+  const [showStartupInviteModal, setShowStartupInviteModal] = useState(false);
   const searchTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const menuRef = useRef<HTMLDivElement>(null);
 
@@ -1147,14 +1398,6 @@ export function MessagesPage() {
   });
 
   const isStudentRole = currentUser?.role === UserRole.STUDENT;
-  const isRecruiterRole = currentUser?.role === UserRole.RECRUITER;
-  const canInviteToWorkspace = isStudentRole || isRecruiterRole;
-
-  const workspacesQuery = useQuery({
-    queryKey: ['workspaces', 'list'],
-    queryFn: workspaceApi.list,
-    enabled: canInviteToWorkspace,
-  });
 
   const startupsQuery = useQuery({
     queryKey: ['startups', 'mine'],
@@ -1162,8 +1405,31 @@ export function MessagesPage() {
     enabled: isStudentRole,
   });
 
-  const workspaces = workspacesQuery.data ?? [];
   const myStartups = startupsQuery.data ?? [];
+  const founderManagedStartups = currentUser?._id
+    ? myStartups.filter((startup) => startup.founderIds.includes(currentUser._id))
+    : [];
+
+  // Fetched only when the Requests tab is active; React Query caches and deduplicates
+  // with the same queries run inside <InvitationPage />.
+  const incomingRequestsQuery = useQuery({
+    queryKey: ['requests', 'incoming'],
+    queryFn: requestApi.incoming,
+    enabled: searchParams.get('view') === 'requests',
+  });
+  const outgoingRequestsQuery = useQuery({
+    queryKey: ['requests', 'outgoing'],
+    queryFn: requestApi.outgoing,
+    enabled: searchParams.get('view') === 'requests',
+  });
+  const sidebarIncoming = incomingRequestsQuery.data ?? [];
+  const sidebarOutgoing = outgoingRequestsQuery.data ?? [];
+  const selectedRequestId = searchParams.get('requestId');
+  const sidebarRequestEntries = [
+    ...sidebarIncoming.map((request) => ({ request, direction: 'incoming' as const })),
+    ...sidebarOutgoing.map((request) => ({ request, direction: 'outgoing' as const })),
+  ];
+  const hasSelectedRequest = sidebarRequestEntries.some((entry) => entry.request._id === selectedRequestId);
 
   const conversations = (conversationsQuery.data ?? []).filter((c) => {
     if (!search) return true;
@@ -1175,9 +1441,21 @@ export function MessagesPage() {
     ?? partnerProfile?.displayName
     ?? (partnerId ? 'Loading...' : 'Unknown');
   const partnerRole = activeConvo?.partner?.role ?? partnerProfile?.role ?? 'user';
+  const normalizedPartnerRole = normalizeMessagingRole(partnerRole);
   const partnerAvatar = activeConvo?.partner?.avatar ?? partnerProfile?.avatar;
   const partnerOnline = activeConvo?.isOnline || isPartnerOnline;
   const visibleAssociationTypes = new Set(getVisibleAssociationQueryTypes(partnerRole, currentUser?.role));
+  const startupInviteTarget: StartupInviteTarget | null =
+    partnerId && founderManagedStartups.length > 0 && isStartupHandshakeTargetType(normalizedPartnerRole)
+      ? {
+          _id: partnerId,
+          entityType: normalizedPartnerRole,
+          displayName: partnerName,
+        }
+      : null;
+  const startupActionConfig = startupInviteTarget
+    ? getStartupHandshakeCardConfig(startupInviteTarget.entityType)
+    : null;
   const requestedQueryType = (() => {
     const rawType = searchParams.get('queryType');
     return isValidQueryType(rawType) ? rawType : null;
@@ -1243,6 +1521,17 @@ export function MessagesPage() {
     setShowReportModal(true);
   };
 
+  const handleStartupRequestCreated = useCallback(
+    (payload: StartupHandshakeDmPayload) => {
+      sendMessage({
+        message: buildStartupHandshakeDmMessage(payload),
+        messageType: 'text',
+        queryType: 'general',
+      });
+    },
+    [sendMessage],
+  );
+
   // Debounced user search
   const handleSearchChange = useCallback((value: string) => {
     setSearch(value);
@@ -1271,112 +1560,282 @@ export function MessagesPage() {
   const existingPartnerIds = new Set((conversationsQuery.data ?? []).map((c) => c.partnerId));
   const newUsers = userSearchResults.filter((u) => !existingPartnerIds.has(u._id));
 
+  const view: 'chats' | 'requests' = searchParams.get('view') === 'requests' ? 'requests' : 'chats';
+
+  const switchToChats = () => {
+    const next = new URLSearchParams(searchParams);
+    next.delete('view');
+    setSearchParams(next, { replace: true });
+  };
+
+  const switchToRequests = () => {
+    const next = new URLSearchParams(searchParams);
+    next.set('view', 'requests');
+    next.delete('queryType');
+    setSearchParams(next, { replace: true });
+  };
+
+  const handleSelectRequest = (requestId: string) => {
+    const next = new URLSearchParams(searchParams);
+    next.set('view', 'requests');
+    next.set('requestId', requestId);
+    next.delete('queryType');
+    setSearchParams(next, { replace: true });
+  };
+
+  useEffect(() => {
+    if (view !== 'requests' || incomingRequestsQuery.isLoading || outgoingRequestsQuery.isLoading) {
+      return;
+    }
+
+    if (sidebarRequestEntries.length === 0) {
+      if (!selectedRequestId) {
+        return;
+      }
+
+      const next = new URLSearchParams(searchParams);
+      next.delete('requestId');
+      setSearchParams(next, { replace: true });
+      return;
+    }
+
+    if (selectedRequestId && hasSelectedRequest) {
+      return;
+    }
+
+    const next = new URLSearchParams(searchParams);
+    next.set('view', 'requests');
+    next.set('requestId', sidebarRequestEntries[0].request._id);
+    next.delete('queryType');
+    setSearchParams(next, { replace: true });
+  }, [
+    hasSelectedRequest,
+    incomingRequestsQuery.isLoading,
+    outgoingRequestsQuery.isLoading,
+    searchParams,
+    selectedRequestId,
+    setSearchParams,
+    sidebarRequestEntries,
+    view,
+  ]);
+
   return (
     <div className="-mx-4 -my-6 flex h-[calc(100%+3rem)] min-h-0 overflow-hidden bg-slate-950 lg:-mx-8">
       {/* Sidebar — conversation list */}
       <div
         className={`flex min-h-0 w-80 flex-shrink-0 flex-col border-r border-slate-800 bg-slate-900/50 ${
-          partnerId ? 'hidden lg:flex' : 'flex w-full md:w-80'
+          partnerId && view === 'chats' ? 'hidden lg:flex' : view === 'requests' ? 'hidden lg:flex' : 'flex w-full md:w-80'
         }`}
       >
         <div className="flex-none border-b border-slate-800 p-4">
           <div className="mb-3 flex items-center justify-between">
             <h2 className="text-lg font-bold text-white">Messages</h2>
+            {view === 'chats' ? (
+              <button
+                type="button"
+                onClick={() => {
+                  const input = document.querySelector<HTMLInputElement>('#msg-search-input');
+                  input?.focus();
+                }}
+                className="flex h-8 w-8 items-center justify-center rounded-lg text-slate-400 transition hover:bg-slate-800 hover:text-white"
+                title="New message"
+              >
+                <PenSquare className="h-4 w-4" />
+              </button>
+            ) : null}
+          </div>
+
+          {/* View tabs */}
+          <div className="mb-3 flex rounded-lg border border-slate-800 bg-slate-950 p-0.5">
             <button
               type="button"
-              onClick={() => {
-                const input = document.querySelector<HTMLInputElement>('#msg-search-input');
-                input?.focus();
-              }}
-              className="flex h-8 w-8 items-center justify-center rounded-lg text-slate-400 transition hover:bg-slate-800 hover:text-white"
-              title="New message"
+              onClick={switchToChats}
+              className={`flex flex-1 items-center justify-center gap-1.5 rounded-md py-1.5 text-xs font-medium transition ${
+                view === 'chats' ? 'bg-slate-800 text-white' : 'text-slate-500 hover:text-slate-300'
+              }`}
             >
-              <PenSquare className="h-4 w-4" />
+              <MessageCircle className="h-3.5 w-3.5" />
+              Chats
+            </button>
+            <button
+              type="button"
+              onClick={switchToRequests}
+              className={`flex flex-1 items-center justify-center gap-1.5 rounded-md py-1.5 text-xs font-medium transition ${
+                view === 'requests' ? 'bg-slate-800 text-white' : 'text-slate-500 hover:text-slate-300'
+              }`}
+            >
+              <Inbox className="h-3.5 w-3.5" />
+              Requests
             </button>
           </div>
-          <div className="relative">
-            <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-500" />
-            <input
-              id="msg-search-input"
-              value={search}
-              onChange={(e) => handleSearchChange(e.target.value)}
-              placeholder="Search conversations or users"
-              className="w-full rounded-xl border border-slate-700 bg-slate-950 py-2 pl-9 pr-3 text-sm text-white outline-none focus:border-cyan-500 placeholder:text-slate-500"
-            />
-          </div>
-        </div>
 
-        <div className="min-h-0 flex-1 overflow-y-auto">
-          {conversationsQuery.isLoading ? (
-            <div className="py-8 text-center text-sm text-slate-500">Loading...</div>
-          ) : conversations.length === 0 && !search ? (
-            <div className="flex flex-col items-center gap-3 py-12 text-center">
-              <MessageCircle className="h-10 w-10 text-slate-700" />
-              <p className="text-sm text-slate-500">No conversations yet.</p>
-              <p className="text-xs text-slate-600">
-                Search for a user above to start chatting, or find people in the Marketplace.
-              </p>
+          {view === 'chats' ? (
+            <div className="relative">
+              <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-500" />
+              <input
+                id="msg-search-input"
+                value={search}
+                onChange={(e) => handleSearchChange(e.target.value)}
+                placeholder="Search conversations or users"
+                className="w-full rounded-xl border border-slate-700 bg-slate-950 py-2 pl-9 pr-3 text-sm text-white outline-none focus:border-cyan-500 placeholder:text-slate-500"
+              />
             </div>
-          ) : (
-            <>
-              {conversations.map((convo) => (
-                <ConversationItem
-                  key={convo.partnerId}
-                  convo={convo}
-                  isActive={convo.partnerId === partnerId}
-                  currentUserId={currentUser?._id ?? ''}
-                  onClick={() => handleSelect(convo.partnerId, convo.partner?.displayName ?? 'Unknown', convo.partner?.role)}
-                />
-              ))}
-
-              {/* User search results — new conversations */}
-              {search.trim().length >= 2 && (newUsers.length > 0 || isSearchingUsers) ? (
-                <div className="mt-3 border-t border-slate-800 pt-3">
-                  <div className="mb-2 flex items-center gap-2 px-3 text-xs uppercase tracking-widest text-slate-500">
-                    <Users className="h-3 w-3" />
-                    All users
-                  </div>
-                  {isSearchingUsers ? (
-                    <div className="px-3 py-2 text-xs text-slate-500">Searching...</div>
-                  ) : (
-                    newUsers.map((user) => (
-                      <button
-                        key={user._id}
-                        type="button"
-                        onClick={() => handleSelect(user._id, user.displayName, user.role)}
-                        className="flex w-full items-center gap-3 rounded-2xl px-4 py-3 text-left transition-all hover:bg-slate-800/60"
-                      >
-                        <div className="flex h-11 w-11 items-center justify-center rounded-full bg-gradient-to-br from-cyan-500 to-emerald-500 text-sm font-bold text-white">
-                          {user.avatar ? (
-                            <img src={user.avatar} alt={user.displayName} className="h-11 w-11 rounded-full object-cover" />
-                          ) : (
-                            initials(user.displayName)
-                          )}
-                        </div>
-                        <div className="min-w-0 flex-1">
-                          <div className="text-sm font-semibold text-white">{user.displayName}</div>
-                          <div className="text-xs capitalize text-slate-500">{user.role}</div>
-                        </div>
-                        <span className="rounded-full border border-cyan-500/30 bg-cyan-500/10 px-2 py-0.5 text-[10px] font-semibold text-cyan-300">
-                          New
-                        </span>
-                      </button>
-                    ))
-                  )}
-                </div>
-              ) : null}
-
-              {search.trim().length >= 2 && conversations.length === 0 && newUsers.length === 0 && !isSearchingUsers ? (
-                <div className="px-3 py-6 text-center text-xs text-slate-500">No users found matching "{search}"</div>
-              ) : null}
-            </>
-          )}
+          ) : null}
         </div>
+
+        {view === 'chats' ? (
+          <div className="min-h-0 flex-1 overflow-y-auto">
+            {conversationsQuery.isLoading ? (
+              <div className="py-8 text-center text-sm text-slate-500">Loading...</div>
+            ) : conversations.length === 0 && !search ? (
+              <div className="flex flex-col items-center gap-3 py-12 text-center">
+                <MessageCircle className="h-10 w-10 text-slate-700" />
+                <p className="text-sm text-slate-500">No conversations yet.</p>
+                <p className="text-xs text-slate-600">
+                  Search for a user above to start chatting, or find people in the Marketplace.
+                </p>
+              </div>
+            ) : (
+              <>
+                {conversations.map((convo) => (
+                  <ConversationItem
+                    key={convo.partnerId}
+                    convo={convo}
+                    isActive={convo.partnerId === partnerId}
+                    currentUserId={currentUser?._id ?? ''}
+                    onClick={() => handleSelect(convo.partnerId, convo.partner?.displayName ?? 'Unknown', convo.partner?.role)}
+                  />
+                ))}
+
+                {/* User search results — new conversations */}
+                {search.trim().length >= 2 && (newUsers.length > 0 || isSearchingUsers) ? (
+                  <div className="mt-3 border-t border-slate-800 pt-3">
+                    <div className="mb-2 flex items-center gap-2 px-3 text-xs uppercase tracking-widest text-slate-500">
+                      <Users className="h-3 w-3" />
+                      All users
+                    </div>
+                    {isSearchingUsers ? (
+                      <div className="px-3 py-2 text-xs text-slate-500">Searching...</div>
+                    ) : (
+                      newUsers.map((user) => (
+                        <button
+                          key={user._id}
+                          type="button"
+                          onClick={() => handleSelect(user._id, user.displayName, user.role)}
+                          className="flex w-full items-center gap-3 rounded-2xl px-4 py-3 text-left transition-all hover:bg-slate-800/60"
+                        >
+                          <div className="flex h-11 w-11 items-center justify-center rounded-full bg-gradient-to-br from-cyan-500 to-emerald-500 text-sm font-bold text-white">
+                            {user.avatar ? (
+                              <img src={user.avatar} alt={user.displayName} className="h-11 w-11 rounded-full object-cover" />
+                            ) : (
+                              initials(user.displayName)
+                            )}
+                          </div>
+                          <div className="min-w-0 flex-1">
+                            <div className="text-sm font-semibold text-white">{user.displayName}</div>
+                            <div className="text-xs capitalize text-slate-500">{user.role}</div>
+                          </div>
+                          <span className="rounded-full border border-cyan-500/30 bg-cyan-500/10 px-2 py-0.5 text-[10px] font-semibold text-cyan-300">
+                            New
+                          </span>
+                        </button>
+                      ))
+                    )}
+                  </div>
+                ) : null}
+
+                {search.trim().length >= 2 && conversations.length === 0 && newUsers.length === 0 && !isSearchingUsers ? (
+                  <div className="px-3 py-6 text-center text-xs text-slate-500">No users found matching "{search}"</div>
+                ) : null}
+              </>
+            )}
+          </div>
+        ) : (
+          /* Requests view — list incoming then outgoing by user name */
+          <div className="min-h-0 flex-1 overflow-y-auto">
+            {incomingRequestsQuery.isLoading ? (
+              <div className="py-8 text-center text-sm text-slate-500">Loading…</div>
+            ) : sidebarIncoming.length === 0 && sidebarOutgoing.length === 0 ? (
+              <div className="flex flex-col items-center gap-3 py-12 text-center">
+                <Inbox className="h-10 w-10 text-slate-700" />
+                <p className="text-sm text-slate-500">No requests yet.</p>
+              </div>
+            ) : (
+              <>
+                {sidebarIncoming.length > 0 && (
+                  <>
+                    <div className="px-4 pb-1 pt-3 text-[10px] uppercase tracking-[0.22em] text-slate-500">
+                      Incoming
+                    </div>
+                    {sidebarIncoming.map((req) => (
+                      <RequestSidebarItem
+                        key={req._id}
+                        request={req}
+                        direction="incoming"
+                        isActive={selectedRequestId === req._id}
+                        onClick={(request) => handleSelectRequest(request._id)}
+                      />
+                    ))}
+                  </>
+                )}
+                {sidebarOutgoing.length > 0 && (
+                  <>
+                    <div className="px-4 pb-1 pt-3 text-[10px] uppercase tracking-[0.22em] text-slate-500">
+                      Outgoing
+                    </div>
+                    {sidebarOutgoing.map((req) => (
+                      <RequestSidebarItem
+                        key={req._id}
+                        request={req}
+                        direction="outgoing"
+                        isActive={selectedRequestId === req._id}
+                        onClick={(request) => handleSelectRequest(request._id)}
+                      />
+                    ))}
+                  </>
+                )}
+              </>
+            )}
+          </div>
+        )}
       </div>
 
-      {/* Chat area */}
+      {/* Main area — chat or requests */}
       <div className="flex min-h-0 flex-1 flex-col">
-        {partnerId ? (
+        {view === 'requests' ? (
+          <>
+            {/* Mobile header — tabs shown here since sidebar is hidden on small screens */}
+            <div className="flex-none border-b border-slate-800 px-4 py-3 lg:hidden">
+              <div className="flex items-center gap-3">
+                <h2 className="text-lg font-bold text-white">Messages</h2>
+                <div className="flex rounded-lg border border-slate-800 bg-slate-950 p-0.5">
+                  <button
+                    type="button"
+                    onClick={switchToChats}
+                    className="flex items-center justify-center gap-1.5 rounded-md px-4 py-1.5 text-xs font-medium text-slate-500 transition hover:text-slate-300"
+                  >
+                    <MessageCircle className="h-3.5 w-3.5" />
+                    Chats
+                  </button>
+                  <button
+                    type="button"
+                    onClick={switchToRequests}
+                    className="flex items-center justify-center gap-1.5 rounded-md bg-slate-800 px-4 py-1.5 text-xs font-medium text-white transition"
+                  >
+                    <Inbox className="h-3.5 w-3.5" />
+                    Requests
+                  </button>
+                </div>
+              </div>
+            </div>
+            <div className="min-h-0 flex-1 overflow-y-auto px-4 py-5 lg:px-6 lg:py-6">
+              <InvitationPage
+                selectedRequestId={selectedRequestId}
+                onSelectRequest={handleSelectRequest}
+              />
+            </div>
+          </>
+        ) : partnerId ? (
           <>
             {/* Header */}
             <div className="flex-none border-b border-slate-800 px-4 py-3">
@@ -1416,32 +1875,19 @@ export function MessagesPage() {
                     <span className="capitalize text-slate-500">{partnerRole}</span>
                   </div>
                 </div>
-                {canInviteToWorkspace && partnerId && (
-                  <div className="flex items-center gap-1">
-                    {workspaces.length > 0 && (
-                      <button
-                        type="button"
-                        onClick={() => setShowInviteModal(true)}
-                        className="flex items-center gap-1.5 rounded-lg bg-cyan-500/10 px-2.5 py-1.5 text-xs font-medium text-cyan-400 transition hover:bg-cyan-500/20"
-                        title="Invite to workspace"
-                      >
-                        <UserPlus className="h-3.5 w-3.5" />
-                        <span className="hidden sm:inline">Workspace</span>
-                      </button>
-                    )}
-                    {isStudentRole && myStartups.length > 0 && (
-                      <button
-                        type="button"
-                        onClick={() => setShowInviteModal(true)}
-                        className="flex items-center gap-1.5 rounded-lg bg-emerald-500/10 px-2.5 py-1.5 text-xs font-medium text-emerald-400 transition hover:bg-emerald-500/20"
-                        title="Invite to startup"
-                      >
-                        <Briefcase className="h-3.5 w-3.5" />
-                        <span className="hidden sm:inline">Startup</span>
-                      </button>
-                    )}
-                  </div>
-                )}
+                {startupInviteTarget && startupActionConfig ? (
+                  <button
+                    type="button"
+                    onClick={() => setShowStartupInviteModal(true)}
+                    className={`flex items-center gap-1.5 rounded-lg px-2.5 py-1.5 text-xs font-medium transition hover:bg-white/10 ${startupActionConfig.iconClassName}`}
+                    title={`Send a startup ${getStartupHandshakeActionLabel(startupInviteTarget.entityType).toLowerCase()} request`}
+                  >
+                    {startupActionConfig.icon}
+                    <span className="hidden sm:inline">
+                      {getStartupHandshakeActionLabel(startupInviteTarget.entityType)}
+                    </span>
+                  </button>
+                ) : null}
                 <div className="relative" ref={menuRef}>
                   <button
                     type="button"
@@ -1461,7 +1907,7 @@ export function MessagesPage() {
                         <AlertTriangle className="h-4 w-4" />
                         Report User
                       </button>
-                      {visibleAssociationTypes.size > 0 ? (
+                      {visibleAssociationTypes.size > 0 && !startupInviteTarget ? (
                         <div className="border-t border-slate-700 px-4 py-2">
                           <p className="mb-2 text-xs font-medium text-slate-400">Associate as:</p>
                           <div className="space-y-1">
@@ -1502,8 +1948,10 @@ export function MessagesPage() {
                                 type="button"
                                 disabled={!partnerId}
                                 onClick={() => {
-                                  setShowMenu(false);
-                                  setShowInvestorModal(true);
+                                  if (partnerId) {
+                                    sendMessage({ message: 'Hi! I have an exciting startup that I would like to share with you and discuss as a potential investor.', messageType: 'text', queryType: 'investor' });
+                                    setShowMenu(false);
+                                  }
                                 }}
                                 className="flex w-full items-center gap-2 rounded-lg px-2 py-1.5 text-left text-sm text-emerald-400 transition hover:bg-slate-800 disabled:cursor-not-allowed disabled:opacity-50"
                               >
@@ -1562,41 +2010,22 @@ export function MessagesPage() {
                           </div>
                         </div>
                       ) : null}
-                      {canInviteToWorkspace && (
+                      {startupInviteTarget && startupActionConfig ? (
                         <div className="border-t border-slate-700 px-4 py-2">
-                          <p className="mb-2 text-xs font-medium text-slate-400">Invite to:</p>
-                          <div className="space-y-1">
-                            {workspaces.length > 0 && (
-                              <button
-                                type="button"
-                                disabled={!partnerId}
-                                onClick={() => {
-                                  setShowMenu(false);
-                                  setShowInviteModal(true);
-                                }}
-                                className="flex w-full items-center gap-2 rounded-lg px-2 py-1.5 text-left text-sm text-cyan-400 transition hover:bg-slate-800 disabled:cursor-not-allowed disabled:opacity-50"
-                              >
-                                <UserPlus className="h-4 w-4" />
-                                Workspace
-                              </button>
-                            )}
-                            {isStudentRole && myStartups.length > 0 && (
-                              <button
-                                type="button"
-                                disabled={!partnerId}
-                                onClick={() => {
-                                  setShowMenu(false);
-                                  setShowInviteModal(true);
-                                }}
-                                className="flex w-full items-center gap-2 rounded-lg px-2 py-1.5 text-left text-sm text-emerald-400 transition hover:bg-slate-800 disabled:cursor-not-allowed disabled:opacity-50"
-                              >
-                                <Briefcase className="h-4 w-4" />
-                                Startup
-                              </button>
-                            )}
-                          </div>
+                          <button
+                            type="button"
+                            disabled={!partnerId}
+                            onClick={() => {
+                              setShowMenu(false);
+                              setShowStartupInviteModal(true);
+                            }}
+                            className="flex w-full items-center gap-2 rounded-lg px-2 py-1.5 text-left text-sm transition hover:bg-slate-800 disabled:cursor-not-allowed disabled:opacity-50"
+                          >
+                            {startupActionConfig.icon}
+                            {getStartupHandshakeActionLabel(startupInviteTarget.entityType)}
+                          </button>
                         </div>
-                      )}
+                      ) : null}
                     </div>
                   )}
                 </div>
@@ -1656,26 +2085,12 @@ export function MessagesPage() {
         />
       )}
 
-      {partnerId && (
-        <InvestorProposalModal
-          isOpen={showInvestorModal}
-          onClose={() => setShowInvestorModal(false)}
-          onSend={(message) => sendMessage({ message, messageType: 'text', queryType: 'investor' })}
-          recipientName={partnerName}
-          isStudent={currentUser?.role === 'student'}
-        />
-      )}
-
-      {partnerId && (
-        <InviteModal
-          isOpen={showInviteModal}
-          onClose={() => setShowInviteModal(false)}
-          recipientId={partnerId}
-          recipientName={partnerName}
-          workspaces={workspaces}
-          startups={myStartups}
-        />
-      )}
+      <StartupInviteModal
+        isOpen={showStartupInviteModal}
+        onClose={() => setShowStartupInviteModal(false)}
+        target={startupInviteTarget}
+        onRequestCreated={handleStartupRequestCreated}
+      />
     </div>
   );
 }

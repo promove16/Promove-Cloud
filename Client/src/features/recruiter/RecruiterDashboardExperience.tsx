@@ -2,6 +2,7 @@ import { useEffect, useMemo, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { recruiterApi } from "../../api/recruiter.api";
+import { getStudentPortfolioViewPath } from "../marketplace/navigation";
 import type {
   RecruiterCollegeCard,
   RecruiterDriveView,
@@ -832,7 +833,7 @@ export function RecruiterDashboardExperience({ initialView = "home" }: Recruiter
                 ))}
               </div>
               <button
-                onClick={() => setSelectedStudent(student.id)}
+                onClick={() => navigate(getStudentPortfolioViewPath(student.id))}
                 className="w-full px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-lg font-semibold text-sm transition-all flex items-center justify-center gap-2"
               >
                 <Eye className="w-4 h-4" />
@@ -1114,7 +1115,7 @@ export function RecruiterDashboardExperience({ initialView = "home" }: Recruiter
                     </span>
                   </div>
                   <button
-                    onClick={() => setSelectedStudent(student.id)}
+                    onClick={() => navigate(getStudentPortfolioViewPath(student.id))}
                     className="px-6 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-lg font-semibold text-sm transition-all flex items-center gap-2"
                   >
                     <Eye className="w-4 h-4" />
@@ -1220,7 +1221,7 @@ export function RecruiterDashboardExperience({ initialView = "home" }: Recruiter
                     ))}
                   </div>
                   <button
-                    onClick={() => setSelectedStudent(student.id)}
+                    onClick={() => navigate(getStudentPortfolioViewPath(student.id))}
                     className="w-full px-6 py-3 bg-gradient-to-r from-blue-600 to-purple-600 hover:from-blue-700 hover:to-purple-700 text-white rounded-lg font-semibold transition-all flex items-center justify-center gap-2 shadow-lg"
                   >
                     <Eye className="w-5 h-5" />

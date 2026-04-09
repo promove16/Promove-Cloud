@@ -16,7 +16,7 @@ import { useAuthStore } from "../../store/authStore";
 import { Startup } from "../../types/startup.types";
 import { getApiErrorMessage } from "../../utils/apiError";
 
-type StartupInviteTargetType = "student" | "mentor" | "investor";
+export type StartupInviteTargetType = "student" | "mentor" | "investor";
 
 export type StartupInviteTarget = {
   _id: string;
@@ -41,6 +41,19 @@ type StartupInviteConfig = {
   helperText: string;
   suggestions: string[];
   icon: typeof Users;
+};
+
+export type StartupHandshakeDmPayload = {
+  requestId: string;
+  target: StartupInviteTarget;
+  startup: Pick<
+    Startup,
+    "_id" | "name" | "tagline" | "category" | "stage" | "fundingNeeded"
+  >;
+  requestedRole: string;
+  note?: string;
+  requestType: StartupInviteConfig["requestType"];
+  actionType: StartupInviteConfig["actionType"];
 };
 
 const startupInviteConfigs: Record<StartupInviteTargetType, StartupInviteConfig> = {
@@ -121,6 +134,40 @@ const formatFundingNeeded = (value?: number) =>
       }).format(value)
     : "Undisclosed";
 
+const normalizeInlineText = (value: string) =>
+  value.replace(/\s+/g, " ").trim();
+
+export const buildStartupHandshakeDmMessage = ({
+  requestId,
+  target,
+  startup,
+  requestedRole,
+  note,
+  requestType,
+  actionType,
+}: StartupHandshakeDmPayload) => {
+  const roleText = normalizeInlineText(requestedRole);
+  const noteText = note ? normalizeInlineText(note) : "";
+
+  return [
+    "[PROMOVE_STARTUP_HANDSHAKE]",
+    `Action: ${target.entityType}`,
+    `Request Type: ${requestType}`,
+    `Action Type: ${actionType}`,
+    `Request Id: ${requestId}`,
+    `Startup Id: ${startup._id}`,
+    `Startup: ${startup.name}`,
+    `Tagline: ${startup.tagline || "Not shared"}`,
+    `Category: ${startup.category}`,
+    `Stage: ${startup.stage}`,
+    `Funding Needed: ${formatFundingNeeded(startup.fundingNeeded)}`,
+    `Requested Role: ${roleText}`,
+    `Recipient: ${target.displayName}`,
+    "Status: pending",
+    `Note: ${noteText || "No note added."}`,
+  ].join("\n");
+};
+
 const modalSectionClassName =
   "rounded-[22px] border border-white/10 bg-white/[0.03] p-4 sm:p-5";
 const modalEyebrowClassName =
@@ -168,11 +215,13 @@ export function StartupInviteModal({
   onClose,
   target,
   onSent,
+  onRequestCreated,
 }: {
   isOpen: boolean;
   onClose: () => void;
   target: StartupInviteTarget | null;
   onSent?: (message: string) => void;
+  onRequestCreated?: (payload: StartupHandshakeDmPayload) => void | Promise<void>;
 }) {
   const queryClient = useQueryClient();
   const currentUserId = useAuthStore((state) => state.user?._id);
@@ -253,8 +302,8 @@ export function StartupInviteModal({
         acceptRedirect: `/marketplace/view/startup/${selectedStartup._id}`,
       });
     },
-    onSuccess: async () => {
-      if (!config || !target) {
+    onSuccess: async (request) => {
+      if (!config || !target || !selectedStartup || !request) {
         return;
       }
 
@@ -262,6 +311,22 @@ export function StartupInviteModal({
         queryClient.invalidateQueries({ queryKey: ["requests"] }),
         queryClient.invalidateQueries({ queryKey: ["notifications"] }),
       ]);
+      await onRequestCreated?.({
+        requestId: request._id,
+        target,
+        startup: {
+          _id: selectedStartup._id,
+          name: selectedStartup.name,
+          tagline: selectedStartup.tagline,
+          category: selectedStartup.category,
+          stage: selectedStartup.stage,
+          fundingNeeded: selectedStartup.fundingNeeded,
+        },
+        requestedRole: requestedRole.trim(),
+        note: message.trim() || undefined,
+        requestType: config.requestType,
+        actionType: config.actionType,
+      });
       onSent?.(
         target.entityType === "investor"
           ? `Pitch request sent to ${target.displayName}.`

@@ -1,4 +1,5 @@
 import { useMemo, useState } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { useQuery } from '@tanstack/react-query';
 import { Building2, Eye, Sparkles } from 'lucide-react';
 import { recruiterApi } from '../../api/recruiter.api';
@@ -6,11 +7,11 @@ import { Badge } from '../../components/ui/Badge';
 import { Button } from '../../components/ui/Button';
 import { Card } from '../../components/ui/Card';
 import { Spinner } from '../../components/ui/Spinner';
-import { StudentProfileDrawer } from './StudentProfileDrawer';
+import { getStudentPortfolioViewPath } from '../marketplace/navigation';
 
 export default function CollegeConnect() {
+  const navigate = useNavigate();
   const [institution, setInstitution] = useState('');
-  const [selectedStudentId, setSelectedStudentId] = useState<string | null>(null);
 
   const collegesQuery = useQuery({
     queryKey: ['recruiter', 'colleges'],
@@ -135,7 +136,7 @@ export default function CollegeConnect() {
                       </div>
                     </div>
                     <div className="mt-4 flex justify-end">
-                      <Button onClick={() => setSelectedStudentId(student._id)}>
+                      <Button onClick={() => navigate(getStudentPortfolioViewPath(student._id))}>
                         <Eye className="mr-2 h-4 w-4" />
                         View Profile
                       </Button>
@@ -148,11 +149,6 @@ export default function CollegeConnect() {
         </div>
       ) : null}
 
-      <StudentProfileDrawer
-        studentId={selectedStudentId}
-        open={Boolean(selectedStudentId)}
-        onClose={() => setSelectedStudentId(null)}
-      />
     </div>
   );
 }

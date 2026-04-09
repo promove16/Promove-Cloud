@@ -8,7 +8,7 @@ import { Button } from '../../components/ui/Button';
 import { Card } from '../../components/ui/Card';
 import { Input } from '../../components/ui/Input';
 import { Spinner } from '../../components/ui/Spinner';
-import { StudentProfileDrawer } from './StudentProfileDrawer';
+import { getStudentPortfolioViewPath } from '../marketplace/navigation';
 
 const MAX_INNOVATION_SCORE = 1000;
 const scoreMarks = [0, 250, 500, 750, MAX_INNOVATION_SCORE];
@@ -20,7 +20,6 @@ export default function TalentSearch() {
   const [institution, setInstitution] = useState('');
   const [minScore, setMinScore] = useState(0);
   const [maxScore, setMaxScore] = useState(MAX_INNOVATION_SCORE);
-  const [selectedStudentId, setSelectedStudentId] = useState<string | null>(null);
 
   const params = useMemo(
     () => ({
@@ -91,7 +90,7 @@ export default function TalentSearch() {
       </div>
 
       <div className="mt-5 flex flex-wrap gap-3">
-        <Button onClick={() => setSelectedStudentId(student._id)}>
+        <Button onClick={() => navigate(getStudentPortfolioViewPath(student._id))}>
           <Eye className="mr-2 h-4 w-4" />
           View Profile
         </Button>
@@ -234,16 +233,6 @@ export default function TalentSearch() {
           )}
         </section>
       </div>
-
-      <StudentProfileDrawer
-        studentId={selectedStudentId}
-        open={Boolean(selectedStudentId)}
-        onClose={() => setSelectedStudentId(null)}
-        onChanged={() => {
-          pipelineQuery.refetch();
-          discoverQuery.refetch();
-        }}
-      />
     </div>
   );
 }

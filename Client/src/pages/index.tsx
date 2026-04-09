@@ -12,6 +12,7 @@ import {
   Outlet,
   createBrowserRouter,
   isRouteErrorResponse,
+  useLocation,
   useParams,
   useRouteError,
 } from "react-router-dom";
@@ -151,11 +152,6 @@ const UserProfilePage = lazy(() =>
 const SettingsPage = lazy(() =>
   import("../features/settings/SettingsPage").then((module) => ({
     default: module.SettingsPage,
-  })),
-);
-const InvitationPage = lazy(() =>
-  import("../features/invitations/InvitationPage").then((module) => ({
-    default: module.InvitationPage,
   })),
 );
 const Homepage = lazy(() =>
@@ -417,19 +413,19 @@ function StudentPortfolioRedirect() {
   return <Navigate to={getStudentPortfolioViewPath(id)} replace />;
 }
 
+function InvitationsRedirect() {
+  const location = useLocation();
+  const params = new URLSearchParams(location.search);
+  params.set("view", "requests");
+
+  return <Navigate to={`/dashboard/messages?${params.toString()}`} replace />;
+}
+
 const NON_ADMIN_DASHBOARD_ROLES = [
   UserRole.STUDENT,
   UserRole.MENTOR,
   UserRole.INVESTOR,
   UserRole.RECRUITER,
-];
-
-const INVITATION_ROLES = [
-  UserRole.STUDENT,
-  UserRole.INVESTOR,
-  UserRole.RECRUITER,
-  UserRole.MENTOR,
-  UserRole.ADMIN,
 ];
 
 export const router = createBrowserRouter([
@@ -758,11 +754,7 @@ export const router = createBrowserRouter([
           },
           {
             path: "invitations",
-            element: (
-              <ProtectedRolesRoute roles={INVITATION_ROLES}>
-                <LazyPage component={InvitationPage} />
-              </ProtectedRolesRoute>
-            ),
+            element: <InvitationsRedirect />,
           },
           {
             path: "messages",

@@ -18,6 +18,7 @@ import {
   FileText,
 } from 'lucide-react';
 import { dmApi, DMConversation, DMMessage } from '../../api/dm.api';
+import { getConversationPreviewText } from '../../components/messaging/conversationPreview';
 import { useDM } from '../../hooks/useDM';
 import { useAuthStore } from '../../store/authStore';
 
@@ -213,9 +214,7 @@ function ConversationItem({
             className={`truncate text-xs ${convo.unreadCount > 0 ? 'font-semibold text-slate-300' : 'text-slate-500'}`}
           >
             {isMine ? 'You: ' : ''}
-            {convo.lastMessage.messageType === 'interview_request'
-              ? '📅 Interview request'
-              : convo.lastMessage.message || '…'}
+            {getConversationPreviewText(convo.lastMessage)}
           </p>
           {isMine && (
             <span className="flex-shrink-0">
