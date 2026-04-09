@@ -245,6 +245,65 @@ const resolveStudentInstitutionContext = async (institutionToken: string) => {
   };
 };
 
+const normalizeEducationInstitutionName = (value: string) =>
+  sanitizePlainText(value).toLowerCase();
+
+const preserveInstitutionEducationHistory = (
+  user: UserDocument,
+  nextInstitutionName: string,
+) => {
+  const currentInstitutionEducation = (user.education ?? []).find(
+    (entry) => entry.source === 'institution',
+  );
+
+  if (!currentInstitutionEducation) {
+    return;
+  }
+
+  const currentInstitutionName = normalizeEducationInstitutionName(
+    currentInstitutionEducation.institution,
+  );
+  const nextNormalizedInstitutionName = normalizeEducationInstitutionName(nextInstitutionName);
+
+  if (
+    !currentInstitutionName ||
+    currentInstitutionName === nextNormalizedInstitutionName
+  ) {
+    return;
+  }
+
+  const hasHistoricalCopy = (user.education ?? []).some(
+    (entry) =>
+      entry.source !== 'institution' &&
+      normalizeEducationInstitutionName(entry.institution) === currentInstitutionName,
+  );
+
+  if (hasHistoricalCopy) {
+    return;
+  }
+
+  const currentYear = new Date().getFullYear();
+  const preservedEntry = {
+    _id: currentInstitutionEducation._id,
+    institution: currentInstitutionEducation.institution,
+    degree: currentInstitutionEducation.degree,
+    fieldOfStudy: currentInstitutionEducation.fieldOfStudy,
+    ...(currentInstitutionEducation.startYear
+      ? { startYear: currentInstitutionEducation.startYear }
+      : {}),
+    endYear: currentInstitutionEducation.endYear ?? currentYear,
+    isCurrent: false,
+    grade: currentInstitutionEducation.grade,
+    activities: currentInstitutionEducation.activities,
+    description: currentInstitutionEducation.description,
+    source: 'manual' as const,
+  };
+
+  user.education = (user.education ?? []).map((entry) =>
+    entry === currentInstitutionEducation ? preservedEntry : entry,
+  ) as UserDocument['education'];
+};
+
 const assertUserCanAuthenticate = (user: UserDocument) => {
   if (user.role === UserRole.STUDENT && user.verificationStatus === 'rejected') {
     throw new ApiError(
@@ -597,12 +656,27 @@ export const submitInstitutionToken = async (userId: string, institutionToken: s
     throw new ApiError(404, 'USER_NOT_FOUND', 'Student account not found');
   }
 
-  if (user.institutionVerificationStatus === 'verified') {
-    throw new ApiError(409, 'INSTITUTION_ALREADY_VERIFIED', 'Institution already verified');
-  }
-
   const normalizedToken = institutionToken.trim().toUpperCase();
   const { tokenRecord, institution } = await resolveStudentInstitutionContext(normalizedToken);
+  const isSameInstitution =
+    Boolean(user.institutionId) && String(user.institutionId) === String(institution._id);
+  user.institutionToken = normalizedToken;
+
+  if (isSameInstitution && user.verificationStatus === 'verified') {
+    user.institutionVerificationStatus = 'verified';
+    user.institutionVerifiedAt = user.institutionVerifiedAt ?? new Date();
+    await syncInstitutionEducationForUser(user);
+    await user.save();
+
+    await registerTokenUsage(String(tokenRecord._id));
+
+    return {
+      message:
+        'Institution token updated. Your institution-managed education remains locked and synced.',
+      user: toSanitizedUser(user.toObject()),
+    };
+  }
+
   const matchedRoster = await findInstitutionRosterMatchByEmail(user.email);
 
   if (matchedRoster && String(matchedRoster.institutionId) !== String(institution._id)) {
@@ -613,13 +687,18 @@ export const submitInstitutionToken = async (userId: string, institutionToken: s
     );
   }
 
-  user.institutionToken = normalizedToken;
+  if (!isSameInstitution) {
+    preserveInstitutionEducationHistory(user, institution.displayName);
+  }
+
+  const verificationRequestedAt = new Date();
   user.institutionId = institution._id;
   user.institutionVerificationStatus = 'verified';
-  user.institutionVerifiedAt = new Date();
+  user.institutionVerifiedAt = verificationRequestedAt;
   user.verificationStatus = 'pending';
   user.registrationStage = 'institution_pending';
-  user.verificationRequestedAt = new Date();
+  user.verificationRequestedAt = verificationRequestedAt;
+  user.verifiedAt = undefined;
   user.verificationRejectedAt = undefined;
   user.verificationRejectedReason = undefined;
   user.accessGrantedBy = matchedRoster ? 'institution_roster' : 'institution_token';
@@ -636,7 +715,8 @@ export const submitInstitutionToken = async (userId: string, institutionToken: s
   }
 
   return {
-    message: 'Token submitted successfully. Your institution can now review your account.',
+    message:
+      'Institution token saved. Your institution can now review your account, and approved education will stay synced.',
     user: toSanitizedUser(user.toObject()),
   };
 };

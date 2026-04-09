@@ -185,6 +185,7 @@ export interface AuthUser {
   adminApprovedBy?: string | null;
   adminApprovalRejectedAt?: string;
   adminApprovalRejectedReason?: string;
+  institutionToken?: string | null;
   institutionProfile?: {
     institutionName?: string;
     location?: string;

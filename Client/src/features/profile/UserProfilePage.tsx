@@ -674,7 +674,7 @@ export function UserProfilePage() {
                     ) : null}
                   </div>
                   <p className="mt-3 text-xs leading-5 text-slate-500 dark:text-slate-400">
-                    This entry is synced from your verified institution access and stays highlighted on your portfolio. Add any previous or extra education below.
+                    This entry is synced from your approved institution access, stays locked on your portfolio, and updates automatically when your verified institution changes. Add any previous or future education below.
                   </p>
                 </div>
               ) : null}

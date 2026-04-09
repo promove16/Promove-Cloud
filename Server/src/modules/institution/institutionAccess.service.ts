@@ -264,6 +264,7 @@ export const reviewStudentVerification = async (
     student.institutionVerifiedAt = student.institutionVerifiedAt ?? student.verifiedAt;
     student.verificationRejectedAt = undefined;
     student.verificationRejectedReason = undefined;
+    await syncInstitutionEducationForUser(student);
   } else {
     student.verificationStatus = 'rejected';
     student.registrationStage = 'basic';

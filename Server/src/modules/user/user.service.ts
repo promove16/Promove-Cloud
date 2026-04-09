@@ -242,6 +242,9 @@ const computeProfileComplete = (user: Pick<IUser, 'role' | 'displayName' | 'bio'
   );
 
 type EducationResolverUser = Pick<IUser, 'role' | 'institutionId' | 'email' | 'education'>;
+type EducationEntryDraft = Omit<IUser['education'][number], '_id'> & {
+  _id?: IUser['education'][number]['_id'];
+};
 
 type InstitutionEducationContext = {
   institutionName: string;
@@ -321,7 +324,7 @@ const resolveInstitutionEducationContext = async (
 const buildInstitutionEducationEntry = (
   context: InstitutionEducationContext,
   existing?: IUser['education'][number],
-): IUser['education'][number] => {
+): EducationEntryDraft => {
   const startYear = existing?.startYear ?? parseAcademicYearStart(context.academicYear);
   const description = existing?.description
     ? sanitizePlainText(existing.description)

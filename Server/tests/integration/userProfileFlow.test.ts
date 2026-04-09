@@ -3,6 +3,7 @@ import { randomUUID } from 'crypto';
 import request from 'supertest';
 import app from '../../src/app';
 import { scoreQueue } from '../../src/config/bullmq';
+import { StudentAccessToken } from '../../src/modules/institution/studentAccessToken.model';
 import { InstitutionStudentRosterEntry } from '../../src/modules/institution/studentRoster.model';
 import { User } from '../../src/modules/user/user.model';
 import { UserRole } from '../../src/types/roles.types';
@@ -192,6 +193,159 @@ describe('user profile flow integration', () => {
     });
     expect(refreshedProfileResponse.body.data.education[1]).toMatchObject({
       institution: 'Town High School',
+      source: 'manual',
+    });
+  });
+
+  it('preserves approved institution history and syncs the new college education after token approval', async () => {
+    const school = await User.create({
+      email: `school-${randomUUID()}@example.com`,
+      passwordHash: await bcrypt.hash(PASSWORD, 12),
+      role: UserRole.SCHOOL,
+      displayName: 'Starter School',
+      profileComplete: true,
+      registrationStage: 'complete',
+      accessGrantedBy: 'admin',
+      accessExpiresAt: new Date(Date.now() + 365 * 24 * 60 * 60 * 1000),
+      isActive: true,
+      institutionToken: null,
+      institutionId: null,
+      institutionVerificationStatus: 'none',
+      verificationStatus: 'not_required',
+      adminApprovalStatus: 'approved',
+      institutionProfile: {
+        institutionName: 'Starter School',
+        location: 'India',
+        totalStudentsEnrolled: 600,
+        academicYear: '2025-26',
+        iicStarRating: 4.1,
+        policies: [],
+        stats: {
+          totalInnovationActivities: 0,
+          patentsFiled: 0,
+          totalMentoringHours: 0,
+          startupsLaunched: 0,
+          industryCollaborations: 0,
+        },
+      },
+    });
+
+    const college = await User.create({
+      email: `college-${randomUUID()}@example.com`,
+      passwordHash: await bcrypt.hash(PASSWORD, 12),
+      role: UserRole.COLLEGE,
+      displayName: 'Future College',
+      profileComplete: true,
+      registrationStage: 'complete',
+      accessGrantedBy: 'admin',
+      accessExpiresAt: new Date(Date.now() + 365 * 24 * 60 * 60 * 1000),
+      isActive: true,
+      institutionToken: null,
+      institutionId: null,
+      institutionVerificationStatus: 'none',
+      verificationStatus: 'not_required',
+      adminApprovalStatus: 'approved',
+      institutionProfile: {
+        institutionName: 'Future College',
+        location: 'India',
+        totalStudentsEnrolled: 2400,
+        academicYear: '2026-27',
+        iicStarRating: 4.7,
+        policies: [],
+        stats: {
+          totalInnovationActivities: 0,
+          patentsFiled: 0,
+          totalMentoringHours: 0,
+          startupsLaunched: 0,
+          industryCollaborations: 0,
+        },
+      },
+    });
+
+    const student = await createStudent({
+      email: `transition-${randomUUID()}@example.com`,
+      displayName: 'Transition Student',
+      institutionId: school._id,
+      institutionToken: 'SCH-START',
+      institutionVerificationStatus: 'verified',
+      verificationStatus: 'verified',
+      registrationStage: 'institution_verified',
+      institutionVerifiedAt: new Date(),
+      verifiedAt: new Date(),
+      profileComplete: true,
+      education: [
+        {
+          institution: 'Starter School',
+          degree: 'Class 12',
+          fieldOfStudy: 'Science',
+          startYear: 2024,
+          endYear: null,
+          isCurrent: true,
+          grade: 'A',
+          activities: 'Innovation lab',
+          description: 'Current session 2025-26',
+          source: 'institution',
+        },
+      ],
+    });
+
+    await StudentAccessToken.create({
+      institutionId: college._id,
+      institutionRole: UserRole.COLLEGE,
+      createdBy: college._id,
+      token: 'COL-NEXT',
+      isActive: true,
+      usageCount: 0,
+    });
+
+    await InstitutionStudentRosterEntry.create({
+      institutionId: college._id,
+      institutionRole: UserRole.COLLEGE,
+      createdBy: college._id,
+      displayName: student.displayName,
+      email: student.email,
+      gradeOrProgram: 'B.Tech CSE',
+      notes: '2026 innovation cohort',
+      source: 'manual',
+      status: 'invited',
+      isActive: true,
+    });
+
+    const studentAccessToken = await loginAs(student.email);
+
+    const submitTokenResponse = await request(app)
+      .post('/api/auth/submit-institution-token')
+      .set('Authorization', `Bearer ${studentAccessToken}`)
+      .send({ institutionToken: 'COL-NEXT' });
+
+    expect(submitTokenResponse.status).toBe(200);
+    expect(submitTokenResponse.body.data.user.institutionId).toBe(String(college._id));
+    expect(submitTokenResponse.body.data.user.verificationStatus).toBe('pending');
+
+    const collegeAccessToken = await loginAs(college.email);
+    const approvalResponse = await request(app)
+      .patch(`/api/college/student-verifications/${student._id.toString()}`)
+      .set('Authorization', `Bearer ${collegeAccessToken}`)
+      .send({ decision: 'approved' });
+
+    expect(approvalResponse.status).toBe(200);
+
+    const profileResponse = await request(app)
+      .get('/api/users/me')
+      .set('Authorization', `Bearer ${studentAccessToken}`);
+
+    expect(profileResponse.status).toBe(200);
+    expect(profileResponse.body.data.verificationStatus).toBe('verified');
+    expect(profileResponse.body.data.education[0]).toMatchObject({
+      institution: 'Future College',
+      degree: 'B.Tech CSE',
+      isCurrent: true,
+      source: 'institution',
+    });
+    expect(profileResponse.body.data.education[1]).toMatchObject({
+      institution: 'Starter School',
+      degree: 'Class 12',
+      isCurrent: false,
       source: 'manual',
     });
   });

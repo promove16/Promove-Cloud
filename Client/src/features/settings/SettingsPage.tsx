@@ -1,7 +1,7 @@
 import { type FormEvent, useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useForm } from 'react-hook-form';
-import { useQueryClient } from '@tanstack/react-query';
+import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { User, Bell, Shield, Palette, Settings2, Save, Loader2, Check, Lock, Globe, Monitor, Moon, Sun } from 'lucide-react';
 import { authApi } from '../../api/auth.api';
 import { userApi } from '../../api/user.api';
@@ -211,7 +211,16 @@ export function SettingsPage() {
   const [passwordError, setPasswordError] = useState('');
   const [passwordNotice, setPasswordNotice] = useState('');
   const [isChangingPassword, setIsChangingPassword] = useState(false);
+  const [institutionToken, setInstitutionToken] = useState('');
+  const [institutionTokenError, setInstitutionTokenError] = useState('');
+  const [institutionTokenNotice, setInstitutionTokenNotice] = useState('');
+  const [isSavingInstitutionToken, setIsSavingInstitutionToken] = useState(false);
   const role = authUser?.role ?? UserRole.STUDENT;
+  const profileQuery = useQuery({
+    queryKey: ['profile', 'me'],
+    queryFn: userApi.getMe,
+    enabled: role === UserRole.STUDENT,
+  });
 
   const { register, handleSubmit, watch, reset, formState: { errors } } = useForm<AccountValues>({
     defaultValues: { displayName: '', bio: '', timezone: 'UTC', language: 'en' },
@@ -301,6 +310,10 @@ export function SettingsPage() {
     role,
     settings,
   ]);
+
+  useEffect(() => {
+    setInstitutionToken(authUser?.institutionToken ?? '');
+  }, [authUser?.institutionToken]);
 
   const markSaved = (tab: TabId) => { setSavedTab(tab); setTimeout(() => setSavedTab(null), 2000); };
   const withSaveState = async (tab: TabId, action: () => Promise<void>) => {
@@ -468,6 +481,39 @@ export function SettingsPage() {
     }
   };
 
+  const onSaveInstitutionToken = async () => {
+    if (role !== UserRole.STUDENT) {
+      return;
+    }
+
+    const normalizedToken = institutionToken.trim().toUpperCase();
+    setInstitutionTokenError('');
+    setInstitutionTokenNotice('');
+
+    if (!normalizedToken) {
+      setInstitutionTokenError('Enter the token shared by your school or college.');
+      return;
+    }
+
+    setIsSavingInstitutionToken(true);
+
+    try {
+      const result = await authApi.submitInstitutionToken(normalizedToken);
+      setAuthUser(result.user);
+      setInstitutionToken(result.user.institutionToken ?? normalizedToken);
+
+      const refreshedProfile = await userApi.getMe();
+      queryClient.setQueryData(['profile', 'me'], refreshedProfile);
+      setInstitutionTokenNotice(result.message || 'Institution token saved.');
+    } catch (error) {
+      const apiError = (error as { response?: { data?: { error?: { message?: string } } } })
+        ?.response?.data?.error;
+      setInstitutionTokenError(apiError?.message ?? 'Unable to save institution token right now.');
+    } finally {
+      setIsSavingInstitutionToken(false);
+    }
+  };
+
   function SaveBtn({ tab, onSave }: { tab: TabId; onSave: () => void }) {
     const saved = savedTab === tab;
     const isTabSaving = savingTab === tab || isSaving;
@@ -486,6 +532,8 @@ export function SettingsPage() {
       </div>
     );
   }
+
+  const institutionEducation = profileQuery.data?.education?.find((entry) => entry.source === 'institution') ?? null;
 
   return (
       <div className="mx-auto w-full max-w-4xl p-6">
@@ -743,6 +791,84 @@ export function SettingsPage() {
                   <div className="space-y-5">
                     <ToggleRow label="Job Seeking" desc="Signal to recruiters that you are open to opportunities" checked={roleState.jobSeeking} onChange={(v) => setRoleState((r) => ({ ...r, jobSeeking: v }))} />
                     <ToggleRow label="Open to Mentorship" desc="Allow mentors to reach out and offer guidance" checked={roleState.openToMentorship} onChange={(v) => setRoleState((r) => ({ ...r, openToMentorship: v }))} />
+                  </div>
+                </div>
+                <div className={card}>
+                  <p className={sectionHdr}>Institution Access</p>
+                  <div className="space-y-5">
+                    <div className="rounded-xl border border-slate-800 bg-slate-950/60 p-4">
+                      <div className="flex flex-wrap items-center gap-2">
+                        <span className="rounded-full border border-cyan-500/30 bg-cyan-500/10 px-3 py-1 text-xs font-semibold uppercase tracking-[0.16em] text-cyan-300">
+                          Institution link {authUser?.institutionVerificationStatus ?? 'none'}
+                        </span>
+                        <span className="rounded-full border border-slate-700 px-3 py-1 text-xs font-semibold uppercase tracking-[0.16em] text-slate-300">
+                          Account approval {authUser?.verificationStatus ?? 'not_required'}
+                        </span>
+                      </div>
+                      <p className="mt-3 text-sm leading-6 text-slate-400">
+                        Institution-managed education is locked after approval. You can still add separate past or future education entries in your portfolio editor.
+                      </p>
+                    </div>
+
+                    <div>
+                      <label className={labelCls} htmlFor="institutionToken">Institution token</label>
+                      <div className="flex flex-col gap-3 md:flex-row">
+                        <input
+                          id="institutionToken"
+                          type="text"
+                          className={inputCls}
+                          placeholder="SCH-XXXXXXX or COL-XXXXXXX"
+                          value={institutionToken}
+                          onChange={(event) => setInstitutionToken(event.target.value)}
+                        />
+                        <button
+                          type="button"
+                          onClick={() => void onSaveInstitutionToken()}
+                          disabled={isSavingInstitutionToken}
+                          className="inline-flex items-center justify-center gap-2 rounded-xl bg-cyan-500 px-5 py-2.5 text-sm font-semibold text-slate-950 transition-colors hover:bg-cyan-400 disabled:cursor-not-allowed disabled:opacity-60 md:min-w-[180px]"
+                        >
+                          {isSavingInstitutionToken ? <Loader2 className="h-4 w-4 animate-spin" /> : <Save className="h-4 w-4" />}
+                          {isSavingInstitutionToken ? 'Saving Token...' : authUser?.institutionToken ? 'Update Token' : 'Add Token'}
+                        </button>
+                      </div>
+                      <p className="mt-2 text-xs leading-5 text-slate-500">
+                        Use the latest invitation token from your school or college. If it belongs to a different institution, your account will go back for that institution&apos;s review before approval.
+                      </p>
+                      {institutionTokenError ? (
+                        <div className="mt-3 rounded-xl border border-rose-500/20 bg-rose-500/10 px-4 py-3 text-sm text-rose-300">
+                          {institutionTokenError}
+                        </div>
+                      ) : null}
+                      {institutionTokenNotice ? (
+                        <div className="mt-3 rounded-xl border border-emerald-500/20 bg-emerald-500/10 px-4 py-3 text-sm text-emerald-300">
+                          {institutionTokenNotice}
+                        </div>
+                      ) : null}
+                    </div>
+
+                    <div className="rounded-xl border border-slate-800 bg-slate-950/60 p-4">
+                      <div className="text-sm font-semibold text-white">Institution-managed education</div>
+                      {profileQuery.isLoading ? (
+                        <p className="mt-2 text-sm text-slate-400">Loading linked education...</p>
+                      ) : institutionEducation ? (
+                        <div className="mt-3 space-y-1 text-sm">
+                          <div className="font-semibold text-white">{institutionEducation.institution}</div>
+                          <div className="text-slate-300">
+                            {[institutionEducation.degree, institutionEducation.fieldOfStudy].filter(Boolean).join(' in ') || 'Current academic profile'}
+                          </div>
+                          <div className="text-slate-400">
+                            {institutionEducation.isCurrent ? 'Current institution entry' : 'Historical institution entry'}
+                          </div>
+                          {institutionEducation.description ? (
+                            <p className="text-slate-400">{institutionEducation.description}</p>
+                          ) : null}
+                        </div>
+                      ) : (
+                        <p className="mt-2 text-sm text-slate-400">
+                          No institution-managed education has been synced yet. Once your institution token is approved, this section will update automatically.
+                        </p>
+                      )}
+                    </div>
                   </div>
                 </div>
                 <div className={card}>
