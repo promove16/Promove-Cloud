@@ -173,12 +173,6 @@ export interface UserProfile extends AuthUser {
   isActive?: boolean;
   accessExpiresAt?: string;
   discoverableToRecruiters?: boolean;
-  institutionProfile?: {
-    institutionName?: string;
-    location?: string;
-    academicYear?: string;
-    iicStarRating?: number;
-  };
   connectedAccounts?: {
     github: SocialConnection;
     linkedin: SocialConnection;
@@ -200,6 +194,8 @@ export interface UpdateUserProfilePayload {
   avatarWallpaper?: string;
   bio?: string;
   domain?: string;
+  headline?: string;
+  location?: string;
   githubUrl?: string;
   linkedinUrl?: string;
   websiteUrl?: string;
@@ -210,6 +206,37 @@ export interface UpdateUserProfilePayload {
   instagramUrl?: string;
   researchGateUrl?: string;
   mediumUrl?: string;
+  institutionProfile?: {
+    institutionName?: string;
+    location?: string;
+    totalStudentsEnrolled?: number;
+    academicYear?: string;
+    iicStarRating?: number;
+    organizationType?: string;
+    foundedYear?: number;
+    specialties?: string[];
+    locations?: string[];
+    alumniCount?: number;
+    employeeCount?: number;
+    contactEmail?: string;
+    contactPhone?: string;
+    policies?: Array<{
+      name: string;
+      status: 'Active' | 'On Track' | 'Pending' | 'Inactive';
+      lastUpdated?: string | null;
+    }>;
+    stats?: {
+      totalInnovationActivities?: number;
+      patentsFiled?: number;
+      totalMentoringHours?: number;
+      startupsLaunched?: number;
+      industryCollaborations?: number;
+      totalHRConnections?: number;
+      studentsPlaced?: number;
+      directShortlistsThisQuarter?: number;
+      topHiringSector?: string;
+    };
+  };
   skills?: ProfileSkill[];
   experience?: ProfileExperience[];
   education?: ProfileEducation[];

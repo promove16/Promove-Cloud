@@ -12,6 +12,7 @@ import {
   createJobController,
   deleteJobController,
   getCollegesController,
+  getLinkedCollegesController,
   getDashboardController,
   getDrivesController,
   getJobApplicationsController,
@@ -104,6 +105,7 @@ router.post('/drives/:driveId/register', authenticate, authorize(UserRole.STUDEN
 router.post('/drives/:driveId/submit-score', authenticate, authorize(UserRole.RECRUITER), asyncHandler(submitDriveScoreController));
 router.patch('/drives/:driveId/close', authenticate, authorize(UserRole.RECRUITER), asyncHandler(closeDriveController));
 router.get('/colleges', authenticate, authorize(UserRole.RECRUITER), connectionGuard(UserRole.COLLEGE), asyncHandler(getCollegesController));
+router.get('/colleges/linked', authenticate, authorize(UserRole.RECRUITER), asyncHandler(getLinkedCollegesController));
 router.get('/onboarding', authenticate, authorize(UserRole.RECRUITER), asyncHandler(getOnboardingController));
 router.post(
   '/onboarding/:studentId/reminder',

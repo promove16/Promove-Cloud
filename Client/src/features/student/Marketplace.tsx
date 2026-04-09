@@ -89,8 +89,137 @@ type MarketplaceRecruiterJob = RecruiterJobView & {
   recruiterLocation?: string;
 };
 
+type SidebarSectionId =
+  | 'workMode'
+  | 'experience'
+  | 'department'
+  | 'location'
+  | 'salary'
+  | 'domain'
+  | 'profileExperience'
+  | 'profileDepth';
+
+type SidebarOption = {
+  label: string;
+  value: string;
+  count: number;
+};
+
+const MAX_EXPERIENCE_FILTER = 12;
+
+const DEFAULT_SIDEBAR_SECTIONS: Record<SidebarSectionId, boolean> = {
+  workMode: true,
+  experience: true,
+  department: true,
+  location: true,
+  salary: true,
+  domain: true,
+  profileExperience: true,
+  profileDepth: true,
+};
+
+const WORK_MODE_LABELS: Record<NonNullable<RecruiterJobView['workMode']>, string> = {
+  'On-site': 'Work from office',
+  Remote: 'Remote',
+  Hybrid: 'Hybrid',
+};
+
+const WORK_MODE_ORDER = ['Work from office', 'Remote', 'Hybrid'];
+
 const formatCompactNumber = (value: number) =>
   new Intl.NumberFormat('en', { notation: 'compact', maximumFractionDigits: 1 }).format(value);
+
+const sortSidebarOptions = (map: Map<string, number>, preferredOrder?: string[]): SidebarOption[] =>
+  [...map.entries()]
+    .sort((left, right) => {
+      if (preferredOrder) {
+        const leftIndex = preferredOrder.indexOf(left[0]);
+        const rightIndex = preferredOrder.indexOf(right[0]);
+
+        if (leftIndex !== -1 || rightIndex !== -1) {
+          if (leftIndex === -1) {
+            return 1;
+          }
+
+          if (rightIndex === -1) {
+            return -1;
+          }
+
+          if (leftIndex !== rightIndex) {
+            return leftIndex - rightIndex;
+          }
+        }
+      }
+
+      return right[1] - left[1] || left[0].localeCompare(right[0]);
+    })
+    .map(([value, count]) => ({
+      label: value,
+      value,
+      count,
+    }));
+
+const getWorkModeLabel = (value?: RecruiterJobView['workMode']) => (value ? WORK_MODE_LABELS[value] : null);
+
+const getSalaryBucketLabel = (value?: string) => {
+  if (!value?.trim()) {
+    return 'Not disclosed';
+  }
+
+  const normalized = value.trim().toLowerCase();
+
+  if (normalized.includes('stipend') || normalized.includes('per month') || normalized.includes('/month')) {
+    return 'Stipend / monthly';
+  }
+
+  const numericValues = value.match(/\d+(?:\.\d+)?/g)?.map(Number).filter((item) => !Number.isNaN(item)) ?? [];
+
+  if (numericValues.length > 0 && /(lpa|lakh|lakhs|lac|lacs|ctc)/.test(normalized)) {
+    const topValue = Math.max(...numericValues);
+
+    if (topValue < 3) {
+      return 'Below 3 LPA';
+    }
+
+    if (topValue < 6) {
+      return '3 - 6 LPA';
+    }
+
+    if (topValue < 12) {
+      return '6 - 12 LPA';
+    }
+
+    return '12+ LPA';
+  }
+
+  return value.trim();
+};
+
+const parseExperienceYears = (value?: string) => {
+  if (!value?.trim()) {
+    return null;
+  }
+
+  const normalized = value.toLowerCase();
+
+  if (
+    normalized.includes('fresher') ||
+    normalized.includes('entry level') ||
+    normalized.includes('no experience')
+  ) {
+    return 0;
+  }
+
+  const matches = normalized.match(/\d+(?:\.\d+)?/g)?.map(Number).filter((item) => !Number.isNaN(item)) ?? [];
+
+  if (matches.length === 0) {
+    return null;
+  }
+
+  const valueInYears = Math.min(Math.ceil(Math.max(...matches)), MAX_EXPERIENCE_FILTER);
+
+  return valueInYears;
+};
 
 const formatMonthYear = (value?: string | null) => {
   if (!value) {
@@ -242,6 +371,87 @@ function ProfileAvatar({
       ) : (
         profile.displayName.slice(0, 1).toUpperCase()
       )}
+    </div>
+  );
+}
+
+function SidebarSection({
+  title,
+  isOpen,
+  onToggle,
+  children,
+}: {
+  title: string;
+  isOpen: boolean;
+  onToggle: () => void;
+  children: ReactNode;
+}) {
+  return (
+    <section className="border-t border-slate-200 pt-6 first:border-t-0 first:pt-0">
+      <button
+        type="button"
+        onClick={onToggle}
+        className="flex w-full items-center justify-between gap-3 text-left"
+      >
+        <span className="text-[1.15rem] font-semibold text-slate-950">{title}</span>
+        {isOpen ? (
+          <ChevronUp className="h-4 w-4 text-[#7f7ecb]" />
+        ) : (
+          <ChevronDown className="h-4 w-4 text-[#7f7ecb]" />
+        )}
+      </button>
+      {isOpen ? <div className="mt-4">{children}</div> : null}
+    </section>
+  );
+}
+
+function SidebarCheckboxList({
+  items,
+  selectedValues,
+  onToggle,
+  visibleCount = 4,
+  emptyText = 'No filter options available yet.',
+}: {
+  items: SidebarOption[];
+  selectedValues: string[];
+  onToggle: (value: string) => void;
+  visibleCount?: number;
+  emptyText?: string;
+}) {
+  const [showAll, setShowAll] = useState(false);
+
+  if (items.length === 0) {
+    return <div className="text-sm text-slate-500">{emptyText}</div>;
+  }
+
+  const visibleItems = showAll ? items : items.slice(0, visibleCount);
+
+  return (
+    <div className="space-y-3">
+      {visibleItems.map((item) => (
+        <label key={item.value} className="flex cursor-pointer items-start justify-between gap-3 text-[0.98rem]">
+          <span className="flex min-w-0 items-start gap-3 text-slate-700">
+            <input
+              type="checkbox"
+              checked={selectedValues.includes(item.value)}
+              onChange={() => onToggle(item.value)}
+              className="mt-1 h-4 w-4 rounded-[5px] border-[#aeb5d9] text-[#5b54f6] focus:ring-[#5b54f6]"
+            />
+            <span className="min-w-0">{item.label}</span>
+          </span>
+          <span className="shrink-0 text-[#7672b9]">({item.count})</span>
+        </label>
+      ))}
+
+      {items.length > visibleCount ? (
+        <button
+          type="button"
+          onClick={() => setShowAll((current) => !current)}
+          className="pt-1 text-sm font-semibold text-[#5b54f6] transition hover:text-[#463df2]"
+        >
+          {showAll ? 'View Less' : 'View More'}
+        </button>
+      ) : null}
     </div>
   );
 }
@@ -907,17 +1117,24 @@ export function Marketplace() {
   const [search, setSearch] = useState('');
   const [selectedDomains, setSelectedDomains] = useState<string[]>([]);
   const [selectedLocations, setSelectedLocations] = useState<string[]>([]);
+  const [selectedWorkModes, setSelectedWorkModes] = useState<string[]>([]);
+  const [selectedSalaryRanges, setSelectedSalaryRanges] = useState<string[]>([]);
+  const [selectedExperienceLimit, setSelectedExperienceLimit] = useState(MAX_EXPERIENCE_FILTER);
   const [selectedExperienceBand, setSelectedExperienceBand] = useState<'all' | '0-1' | '2-4' | '5+'>('all');
   const [selectedDepthFilters, setSelectedDepthFilters] = useState<Array<'skills' | 'experience' | 'projects'>>([]);
   const [selectedJobTypes, setSelectedJobTypes] = useState<RecruiterJobView['type'][]>([]);
   const [selectedJobPostedWindow, setSelectedJobPostedWindow] = useState<JobPostedWindow>('any');
   const [sortBy, setSortBy] = useState<'recommended' | 'name' | 'experience' | 'projects'>('recommended');
   const [jobSortBy, setJobSortBy] = useState<JobSortBy>('recommended');
+  const [sidebarSections, setSidebarSections] = useState<Record<SidebarSectionId, boolean>>(() => ({
+    ...DEFAULT_SIDEBAR_SECTIONS,
+  }));
   const [expandedRecruiterId, setExpandedRecruiterId] = useState<string | null>(null);
   const [selectedProfileId, setSelectedProfileId] = useState<string | null>(null);
   const [banner, setBanner] = useState<{ tone: 'success' | 'error'; message: string } | null>(null);
   const deferredSearch = useDeferredValue(search.trim().toLowerCase());
   const activeTab = tabs.find((tab) => tab.id === role) ?? tabs[0];
+  const isRecruiterJobsView = role === 'recruiter' && recruiterBrowseMode === 'jobs';
 
   const profilesQuery = useQuery({
     queryKey: ['marketplace', role],
@@ -1004,20 +1221,54 @@ export function Marketplace() {
 
   const jobFilterOptions = useMemo(() => {
     const jobs = recruiterJobsQuery.data ?? [];
+    const workModeCounts = new Map<string, number>();
     const domainCounts = new Map<string, number>();
     const locationCounts = new Map<string, number>();
+    const salaryCounts = new Map<string, number>();
     const typeCounts = new Map<RecruiterJobView['type'], number>();
+    let maxExperienceYears = 0;
+    let hasParsedExperience = false;
 
     for (const job of jobs) {
+      const workModeLabel = getWorkModeLabel(job.workMode);
+
+      if (workModeLabel) {
+        workModeCounts.set(workModeLabel, (workModeCounts.get(workModeLabel) ?? 0) + 1);
+      }
+
       domainCounts.set(job.domain, (domainCounts.get(job.domain) ?? 0) + 1);
       locationCounts.set(job.location, (locationCounts.get(job.location) ?? 0) + 1);
+      salaryCounts.set(
+        getSalaryBucketLabel(job.salaryExpectation),
+        (salaryCounts.get(getSalaryBucketLabel(job.salaryExpectation)) ?? 0) + 1,
+      );
       typeCounts.set(job.type, (typeCounts.get(job.type) ?? 0) + 1);
+
+      const experienceYears = parseExperienceYears(job.experienceLevel);
+
+      if (experienceYears !== null) {
+        hasParsedExperience = true;
+        maxExperienceYears = Math.max(maxExperienceYears, experienceYears);
+      }
     }
 
     return {
-      domains: [...domainCounts.entries()].sort((left, right) => right[1] - left[1] || left[0].localeCompare(right[0])),
-      locations: [...locationCounts.entries()].sort((left, right) => right[1] - left[1] || left[0].localeCompare(right[0])),
+      workModes: sortSidebarOptions(workModeCounts, WORK_MODE_ORDER),
+      domains: sortSidebarOptions(domainCounts),
+      locations: sortSidebarOptions(locationCounts),
+      salaryRanges: sortSidebarOptions(salaryCounts, [
+        'Below 3 LPA',
+        '3 - 6 LPA',
+        '6 - 12 LPA',
+        '12+ LPA',
+        'Stipend / monthly',
+        'Not disclosed',
+      ]),
       jobTypes: [...typeCounts.entries()].sort((left, right) => right[1] - left[1] || left[0].localeCompare(right[0])),
+      maxExperienceYears: hasParsedExperience
+        ? Math.max(1, Math.min(maxExperienceYears, MAX_EXPERIENCE_FILTER))
+        : MAX_EXPERIENCE_FILTER,
+      hasParsedExperience,
     };
   }, [recruiterJobsQuery.data]);
 
@@ -1104,6 +1355,26 @@ export function Marketplace() {
       filtered = filtered.filter((job) => selectedLocations.includes(job.location));
     }
 
+    if (selectedWorkModes.length > 0) {
+      filtered = filtered.filter((job) => {
+        const workModeLabel = getWorkModeLabel(job.workMode);
+        return workModeLabel !== null && selectedWorkModes.includes(workModeLabel);
+      });
+    }
+
+    if (selectedSalaryRanges.length > 0) {
+      filtered = filtered.filter((job) =>
+        selectedSalaryRanges.includes(getSalaryBucketLabel(job.salaryExpectation)),
+      );
+    }
+
+    if (selectedExperienceLimit < jobFilterOptions.maxExperienceYears) {
+      filtered = filtered.filter((job) => {
+        const experienceYears = parseExperienceYears(job.experienceLevel);
+        return experienceYears !== null && experienceYears <= selectedExperienceLimit;
+      });
+    }
+
     if (selectedJobTypes.length > 0) {
       filtered = filtered.filter((job) => selectedJobTypes.includes(job.type));
     }
@@ -1134,12 +1405,16 @@ export function Marketplace() {
     return sortable;
   }, [
     deferredSearch,
+    jobFilterOptions.maxExperienceYears,
     jobSortBy,
     recruiterJobsQuery.data,
     selectedDomains,
+    selectedExperienceLimit,
     selectedJobPostedWindow,
     selectedJobTypes,
     selectedLocations,
+    selectedSalaryRanges,
+    selectedWorkModes,
   ]);
 
   const marketplaceSummary = useMemo(() => {
@@ -1191,12 +1466,20 @@ export function Marketplace() {
     window.setTimeout(() => setBanner(null), 3000);
   };
 
+  const recruiterExperienceSliderMax = jobFilterOptions.maxExperienceYears;
+  const recruiterExperienceSliderValue = Math.min(selectedExperienceLimit, recruiterExperienceSliderMax);
+  const hasExperienceFilter = isRecruiterJobsView && recruiterExperienceSliderValue < recruiterExperienceSliderMax;
+
   const hasActiveFilters = Boolean(
     search.trim() ||
       selectedDomains.length > 0 ||
       selectedLocations.length > 0 ||
-      (role === 'recruiter' && recruiterBrowseMode === 'jobs'
-        ? selectedJobTypes.length > 0 || selectedJobPostedWindow !== 'any'
+      (isRecruiterJobsView
+        ? selectedWorkModes.length > 0 ||
+          selectedSalaryRanges.length > 0 ||
+          hasExperienceFilter ||
+          selectedJobTypes.length > 0 ||
+          selectedJobPostedWindow !== 'any'
         : selectedExperienceBand !== 'all' || selectedDepthFilters.length > 0),
   );
 
@@ -1206,6 +1489,26 @@ export function Marketplace() {
     setter: (value: T[]) => void,
   ) => {
     setter(current.includes(value) ? current.filter((item) => item !== value) : [...current, value]);
+  };
+
+  const toggleSidebarSection = (section: SidebarSectionId) => {
+    setSidebarSections((current) => ({
+      ...current,
+      [section]: !current[section],
+    }));
+  };
+
+  const clearFilters = () => {
+    setSearch('');
+    setSelectedDomains([]);
+    setSelectedLocations([]);
+    setSelectedWorkModes([]);
+    setSelectedSalaryRanges([]);
+    setSelectedExperienceLimit(MAX_EXPERIENCE_FILTER);
+    setSelectedExperienceBand('all');
+    setSelectedDepthFilters([]);
+    setSelectedJobTypes([]);
+    setSelectedJobPostedWindow('any');
   };
 
   return (
@@ -1223,13 +1526,7 @@ export function Marketplace() {
                   onClick={() =>
                     startTransition(() => {
                       setRole(tab.id);
-                      setSearch('');
-                      setSelectedDomains([]);
-                      setSelectedLocations([]);
-                      setSelectedExperienceBand('all');
-                      setSelectedDepthFilters([]);
-                      setSelectedJobTypes([]);
-                      setSelectedJobPostedWindow('any');
+                      clearFilters();
                       setSortBy('recommended');
                       setJobSortBy('recommended');
                       setRecruiterBrowseMode(tab.id === 'recruiter' ? 'jobs' : 'recruiters');
@@ -1251,210 +1548,218 @@ export function Marketplace() {
 
         <section className="flex min-h-0 flex-1 overflow-hidden border-y border-slate-800/80 bg-[linear-gradient(180deg,#101624_0%,#0c1220_100%)] text-slate-100">
           <div className="grid min-h-0 w-full gap-0 xl:grid-cols-[300px,minmax(0,1fr)] xl:divide-x xl:divide-slate-800/80">
-            <aside className="flex min-h-0 flex-col px-5 py-4">
-              <div className="flex items-center justify-between gap-3">
-                <div>
-                  <div className="text-xs uppercase tracking-[0.22em] text-slate-500">Filters</div>
-                  <h2 className="mt-2 text-2xl font-semibold text-white">All Filters</h2>
-                </div>
-                {hasActiveFilters ? (
-                  <button
-                    type="button"
-                    onClick={() => {
-                      setSearch('');
-                      setSelectedDomains([]);
-                      setSelectedLocations([]);
-                      setSelectedExperienceBand('all');
-                      setSelectedDepthFilters([]);
-                      setSelectedJobTypes([]);
-                      setSelectedJobPostedWindow('any');
-                    }}
-                    className="text-sm font-medium text-cyan-300 transition hover:text-cyan-200"
-                  >
-                    Clear
-                  </button>
-                ) : null}
-              </div>
-
-              <div className="mt-6 min-h-0 flex-1 space-y-6 overflow-y-auto pr-1">
-                <div className="border-t border-slate-800/80 pt-5">
-                  <div className="mb-3 text-lg font-semibold text-white">Search</div>
-                  <label className="relative block">
-                    <Search className="pointer-events-none absolute left-4 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-500" />
-                    <Input
-                      value={search}
-                      onChange={(event) => {
-                        const { value } = event.target;
-                        startTransition(() => setSearch(value));
-                      }}
-                      placeholder={
-                        role === 'recruiter' && recruiterBrowseMode === 'jobs'
-                          ? 'Search job title, company or recruiter'
-                          : `Search ${activeTab.label.toLowerCase()}, company or skill`
-                      }
-                      className="h-12 rounded-none border-0 border-b border-slate-700 bg-transparent pl-10 text-slate-100 focus:border-cyan-400 focus-visible:ring-0"
-                    />
-                  </label>
-                </div>
-
-                <div className="border-t border-slate-800/80 pt-5">
-                  <div className="mb-3 text-lg font-semibold text-white">Domain</div>
-                  <div className="space-y-3">
-                    {(role === 'recruiter' && recruiterBrowseMode === 'jobs'
-                      ? jobFilterOptions.domains
-                      : filterOptions.domains
-                    )
-                      .slice(0, 5)
-                      .map(([domain, count]) => (
-                      <label key={domain} className="flex cursor-pointer items-center justify-between gap-3 text-sm text-slate-300">
-                        <span className="flex items-center gap-3">
-                          <input
-                            type="checkbox"
-                            checked={selectedDomains.includes(domain)}
-                            onChange={() => toggleArrayFilter(domain, selectedDomains, setSelectedDomains)}
-                            className="h-4 w-4 rounded border-slate-600 bg-transparent text-cyan-400 focus:ring-cyan-500"
-                          />
-                          <span>{domain}</span>
-                        </span>
-                        <span className="text-slate-500">({count})</span>
-                      </label>
-                    ))}
+            <aside className="flex min-h-0 flex-col px-5 py-4 xl:pr-6">
+              <div className="flex min-h-0 flex-1 flex-col rounded-[28px] border border-[#dfe2f2] bg-white px-6 py-7 text-slate-900 shadow-[0_24px_60px_rgba(15,23,42,0.08)]">
+                <div className="flex items-start justify-between gap-3">
+                  <div>
+                    <h2 className="text-[1.8rem] font-semibold tracking-tight text-slate-950">All Filters</h2>
                   </div>
+                  {hasActiveFilters ? (
+                    <button
+                      type="button"
+                      onClick={clearFilters}
+                      className="text-sm font-semibold text-[#5b54f6] transition hover:text-[#463df2]"
+                    >
+                      Clear
+                    </button>
+                  ) : null}
                 </div>
 
-                <div className="border-t border-slate-800/80 pt-5">
-                  <div className="mb-3 text-lg font-semibold text-white">
-                    {role === 'recruiter' && recruiterBrowseMode === 'jobs' ? 'Job type' : 'Experience'}
-                  </div>
-                  <div className="space-y-3">
-                    {role === 'recruiter' && recruiterBrowseMode === 'jobs' ? (
-                      <>
-                        {jobFilterOptions.jobTypes.map(([jobType, count]) => (
-                          <label key={jobType} className="flex cursor-pointer items-center justify-between gap-3 text-sm text-slate-300">
-                            <span className="flex items-center gap-3">
+                <div className="mt-6 min-h-0 flex-1 space-y-6 overflow-y-auto pr-1">
+                  {isRecruiterJobsView ? (
+                    <>
+                      <SidebarSection
+                        title="Work mode"
+                        isOpen={sidebarSections.workMode}
+                        onToggle={() => toggleSidebarSection('workMode')}
+                      >
+                        <SidebarCheckboxList
+                          items={jobFilterOptions.workModes}
+                          selectedValues={selectedWorkModes}
+                          onToggle={(value) => toggleArrayFilter(value, selectedWorkModes, setSelectedWorkModes)}
+                          visibleCount={3}
+                          emptyText="Recruiters have not added work mode details yet."
+                        />
+                      </SidebarSection>
+
+                      <SidebarSection
+                        title="Experience"
+                        isOpen={sidebarSections.experience}
+                        onToggle={() => toggleSidebarSection('experience')}
+                      >
+                        {jobFilterOptions.hasParsedExperience ? (
+                          <div className="px-1 pt-8">
+                            <div className="relative">
+                              <div
+                                className="pointer-events-none absolute -top-9 z-10 rounded-full bg-[#1f1b5b] px-3 py-1 text-xs font-semibold text-white"
+                                style={{
+                                  left: `clamp(0.5rem, calc(${(recruiterExperienceSliderValue / recruiterExperienceSliderMax) * 100}% - 1.4rem), calc(100% - 3.4rem))`,
+                                }}
+                              >
+                                {hasExperienceFilter ? `${recruiterExperienceSliderValue} Yrs` : 'Any'}
+                              </div>
+                              <div className="absolute left-0 right-0 top-1/2 h-[3px] -translate-y-1/2 rounded-full bg-[#2d285f]" />
                               <input
-                                type="checkbox"
-                                checked={selectedJobTypes.includes(jobType)}
-                                onChange={() => toggleArrayFilter(jobType, selectedJobTypes, setSelectedJobTypes)}
-                                className="h-4 w-4 rounded border-slate-600 bg-transparent text-cyan-400 focus:ring-cyan-500"
+                                type="range"
+                                min={0}
+                                max={recruiterExperienceSliderMax}
+                                value={recruiterExperienceSliderValue}
+                                onChange={(event) => setSelectedExperienceLimit(Number(event.target.value))}
+                                className="relative h-6 w-full cursor-pointer appearance-none bg-transparent accent-[#1f1b5b]"
                               />
-                              <span>{jobType}</span>
-                            </span>
-                            <span className="text-slate-500">({count})</span>
-                          </label>
-                        ))}
-                      </>
-                    ) : (
-                      <>
-                        {[
-                          { label: '0-1 signals', value: '0-1' as const, count: filterOptions.experienceCounts['0-1'] },
-                          { label: '2-4 signals', value: '2-4' as const, count: filterOptions.experienceCounts['2-4'] },
-                          { label: '5+ signals', value: '5+' as const, count: filterOptions.experienceCounts['5+'] },
-                        ].map((option) => (
-                          <label key={option.value} className="flex cursor-pointer items-center justify-between gap-3 text-sm text-slate-300">
-                            <span className="flex items-center gap-3">
-                              <input
-                                type="radio"
-                                name="experience-band"
-                                checked={selectedExperienceBand === option.value}
-                                onChange={() => setSelectedExperienceBand(option.value)}
-                                className="h-4 w-4 border-slate-600 bg-transparent text-cyan-400 focus:ring-cyan-500"
-                              />
-                              <span>{option.label}</span>
-                            </span>
-                            <span className="text-slate-500">({option.count})</span>
-                          </label>
-                        ))}
-                        <button
-                          type="button"
-                          onClick={() => setSelectedExperienceBand('all')}
-                          className={`text-sm ${selectedExperienceBand === 'all' ? 'font-medium text-cyan-300' : 'text-slate-500 hover:text-slate-300'}`}
-                        >
-                          Any
-                        </button>
-                      </>
-                    )}
-                  </div>
-                </div>
+                            </div>
+                            <div className="mt-4 flex items-center justify-between text-sm text-[#7672a8]">
+                              <span>0 Yrs</span>
+                              <button
+                                type="button"
+                                onClick={() => setSelectedExperienceLimit(MAX_EXPERIENCE_FILTER)}
+                                className={`font-medium ${hasExperienceFilter ? 'text-[#7672a8] hover:text-[#5b54f6]' : 'text-[#5b54f6]'}`}
+                              >
+                                Any
+                              </button>
+                            </div>
+                          </div>
+                        ) : (
+                          <div className="text-sm leading-6 text-slate-500">
+                            Experience details will appear here when recruiters publish roles with structured experience requirements.
+                          </div>
+                        )}
+                      </SidebarSection>
 
-                <div className="border-t border-slate-800/80 pt-5">
-                  <div className="mb-3 text-lg font-semibold text-white">Location</div>
-                  <div className="space-y-3">
-                    {(role === 'recruiter' && recruiterBrowseMode === 'jobs'
-                      ? jobFilterOptions.locations
-                      : filterOptions.locations
-                    )
-                      .slice(0, 5)
-                      .map(([location, count]) => (
-                      <label key={location} className="flex cursor-pointer items-center justify-between gap-3 text-sm text-slate-300">
-                        <span className="flex items-center gap-3">
-                          <input
-                            type="checkbox"
-                            checked={selectedLocations.includes(location)}
-                            onChange={() => toggleArrayFilter(location, selectedLocations, setSelectedLocations)}
-                            className="h-4 w-4 rounded border-slate-600 bg-transparent text-cyan-400 focus:ring-cyan-500"
-                          />
-                          <span>{location}</span>
-                        </span>
-                        <span className="text-slate-500">({count})</span>
-                      </label>
-                    ))}
-                  </div>
-                </div>
+                      <SidebarSection
+                        title="Department"
+                        isOpen={sidebarSections.department}
+                        onToggle={() => toggleSidebarSection('department')}
+                      >
+                        <SidebarCheckboxList
+                          items={jobFilterOptions.domains}
+                          selectedValues={selectedDomains}
+                          onToggle={(value) => toggleArrayFilter(value, selectedDomains, setSelectedDomains)}
+                          emptyText="No departments available yet."
+                        />
+                      </SidebarSection>
 
-                <div className="border-t border-slate-800/80 pt-5">
-                  <div className="mb-3 text-lg font-semibold text-white">
-                    {role === 'recruiter' && recruiterBrowseMode === 'jobs' ? 'Posted' : 'Profile depth'}
-                  </div>
-                  <div className="space-y-3">
-                    {role === 'recruiter' && recruiterBrowseMode === 'jobs' ? (
-                      <>
-                        {[
-                          { label: 'Any time', value: 'any' as const },
-                          { label: 'Last 7 days', value: '7d' as const },
-                          { label: 'Last 30 days', value: '30d' as const },
-                        ].map((option) => (
-                          <label key={option.value} className="flex cursor-pointer items-center gap-3 text-sm text-slate-300">
-                            <input
-                              type="radio"
-                              name="job-posted-window"
-                              checked={selectedJobPostedWindow === option.value}
-                              onChange={() => setSelectedJobPostedWindow(option.value)}
-                              className="h-4 w-4 border-slate-600 bg-transparent text-cyan-400 focus:ring-cyan-500"
-                            />
-                            <span>{option.label}</span>
-                          </label>
-                        ))}
-                      </>
-                    ) : (
-                      <>
-                        {[
-                          { label: 'Has skills', value: 'skills' as const, count: filterOptions.depthCounts.skills },
-                          { label: 'Has experience', value: 'experience' as const, count: filterOptions.depthCounts.experience },
-                          { label: 'Has projects', value: 'projects' as const, count: filterOptions.depthCounts.projects },
-                        ].map((option) => (
-                          <label key={option.value} className="flex cursor-pointer items-center justify-between gap-3 text-sm text-slate-300">
-                            <span className="flex items-center gap-3">
-                              <input
-                                type="checkbox"
-                                checked={selectedDepthFilters.includes(option.value)}
-                                onChange={() =>
-                                  setSelectedDepthFilters((current) =>
-                                    current.includes(option.value)
-                                      ? current.filter((item) => item !== option.value)
-                                      : [...current, option.value],
-                                  )
-                                }
-                                className="h-4 w-4 rounded border-slate-600 bg-transparent text-cyan-400 focus:ring-cyan-500"
-                              />
-                              <span>{option.label}</span>
-                            </span>
-                            <span className="text-slate-500">({option.count})</span>
-                          </label>
-                        ))}
-                      </>
-                    )}
-                  </div>
+                      <SidebarSection
+                        title="Location"
+                        isOpen={sidebarSections.location}
+                        onToggle={() => toggleSidebarSection('location')}
+                      >
+                        <SidebarCheckboxList
+                          items={jobFilterOptions.locations}
+                          selectedValues={selectedLocations}
+                          onToggle={(value) => toggleArrayFilter(value, selectedLocations, setSelectedLocations)}
+                          emptyText="No job locations available yet."
+                        />
+                      </SidebarSection>
+
+                      <SidebarSection
+                        title="Salary"
+                        isOpen={sidebarSections.salary}
+                        onToggle={() => toggleSidebarSection('salary')}
+                      >
+                        <SidebarCheckboxList
+                          items={jobFilterOptions.salaryRanges}
+                          selectedValues={selectedSalaryRanges}
+                          onToggle={(value) => toggleArrayFilter(value, selectedSalaryRanges, setSelectedSalaryRanges)}
+                          emptyText="Salary details will appear when recruiters share them."
+                        />
+                      </SidebarSection>
+                    </>
+                  ) : (
+                    <>
+                      <SidebarSection
+                        title="Domain"
+                        isOpen={sidebarSections.domain}
+                        onToggle={() => toggleSidebarSection('domain')}
+                      >
+                        <SidebarCheckboxList
+                          items={filterOptions.domains.map(([domain, count]) => ({
+                            label: domain,
+                            value: domain,
+                            count,
+                          }))}
+                          selectedValues={selectedDomains}
+                          onToggle={(value) => toggleArrayFilter(value, selectedDomains, setSelectedDomains)}
+                          emptyText="No domains available yet."
+                        />
+                      </SidebarSection>
+
+                      <SidebarSection
+                        title="Experience"
+                        isOpen={sidebarSections.profileExperience}
+                        onToggle={() => toggleSidebarSection('profileExperience')}
+                      >
+                        <div className="space-y-3">
+                          {[
+                            { label: '0-1 signals', value: '0-1' as const, count: filterOptions.experienceCounts['0-1'] },
+                            { label: '2-4 signals', value: '2-4' as const, count: filterOptions.experienceCounts['2-4'] },
+                            { label: '5+ signals', value: '5+' as const, count: filterOptions.experienceCounts['5+'] },
+                          ].map((option) => (
+                            <label key={option.value} className="flex cursor-pointer items-start justify-between gap-3 text-[0.98rem]">
+                              <span className="flex items-start gap-3 text-slate-700">
+                                <input
+                                  type="radio"
+                                  name="experience-band"
+                                  checked={selectedExperienceBand === option.value}
+                                  onChange={() => setSelectedExperienceBand(option.value)}
+                                  className="mt-1 h-4 w-4 border-[#aeb5d9] text-[#5b54f6] focus:ring-[#5b54f6]"
+                                />
+                                <span>{option.label}</span>
+                              </span>
+                              <span className="shrink-0 text-[#7672b9]">({option.count})</span>
+                            </label>
+                          ))}
+                          <button
+                            type="button"
+                            onClick={() => setSelectedExperienceBand('all')}
+                            className={`pt-1 text-sm font-medium ${selectedExperienceBand === 'all' ? 'text-[#5b54f6]' : 'text-slate-500 hover:text-[#5b54f6]'}`}
+                          >
+                            Any
+                          </button>
+                        </div>
+                      </SidebarSection>
+
+                      <SidebarSection
+                        title="Location"
+                        isOpen={sidebarSections.location}
+                        onToggle={() => toggleSidebarSection('location')}
+                      >
+                        <SidebarCheckboxList
+                          items={filterOptions.locations.map(([location, count]) => ({
+                            label: location,
+                            value: location,
+                            count,
+                          }))}
+                          selectedValues={selectedLocations}
+                          onToggle={(value) => toggleArrayFilter(value, selectedLocations, setSelectedLocations)}
+                          emptyText="No locations available yet."
+                        />
+                      </SidebarSection>
+
+                      <SidebarSection
+                        title="Profile depth"
+                        isOpen={sidebarSections.profileDepth}
+                        onToggle={() => toggleSidebarSection('profileDepth')}
+                      >
+                        <SidebarCheckboxList
+                          items={[
+                            { label: 'Has skills', value: 'skills', count: filterOptions.depthCounts.skills },
+                            { label: 'Has experience', value: 'experience', count: filterOptions.depthCounts.experience },
+                            { label: 'Has projects', value: 'projects', count: filterOptions.depthCounts.projects },
+                          ]}
+                          selectedValues={selectedDepthFilters}
+                          onToggle={(value) =>
+                            setSelectedDepthFilters((current) =>
+                              current.includes(value as 'skills' | 'experience' | 'projects')
+                                ? current.filter((item) => item !== value)
+                                : [...current, value as 'skills' | 'experience' | 'projects'],
+                            )
+                          }
+                          visibleCount={3}
+                        />
+                      </SidebarSection>
+                    </>
+                  )}
                 </div>
               </div>
             </aside>
@@ -1494,13 +1799,7 @@ export function Marketplace() {
                             type="button"
                             onClick={() => {
                               setRecruiterBrowseMode(option.id);
-                              setSearch('');
-                              setSelectedDomains([]);
-                              setSelectedLocations([]);
-                              setSelectedExperienceBand('all');
-                              setSelectedDepthFilters([]);
-                              setSelectedJobTypes([]);
-                              setSelectedJobPostedWindow('any');
+                              clearFilters();
                             }}
                             className={`rounded-full px-4 py-2 text-sm transition ${
                               recruiterBrowseMode === option.id
@@ -1515,23 +1814,39 @@ export function Marketplace() {
                     ) : null}
                   </div>
 
-                  <div className="flex flex-col gap-3 sm:flex-row sm:items-center">
+                  <div className="flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-end">
+                    <label className="relative min-w-0 lg:w-[300px]">
+                      <Search className="pointer-events-none absolute left-4 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-500" />
+                      <Input
+                        value={search}
+                        onChange={(event) => {
+                          const { value } = event.target;
+                          startTransition(() => setSearch(value));
+                        }}
+                        placeholder={
+                          isRecruiterJobsView
+                            ? 'Search job title, company or recruiter'
+                            : `Search ${activeTab.label.toLowerCase()}, company or skill`
+                        }
+                        className="h-11 rounded-full border-slate-700 bg-slate-950/70 pl-10 text-slate-100 placeholder:text-slate-500 focus:border-cyan-400"
+                      />
+                    </label>
                     <div className="rounded-full border border-slate-700 bg-transparent px-4 py-2 text-sm text-slate-300">
-                      {hasActiveFilters ? 'Filters applied' : role === 'recruiter' && recruiterBrowseMode === 'jobs' ? 'All jobs' : 'All profiles'}
+                      {hasActiveFilters ? 'Filters applied' : isRecruiterJobsView ? 'All jobs' : 'All profiles'}
                     </div>
                     <label className="flex items-center gap-3 border-b border-slate-700 px-1 py-3 text-sm text-slate-400">
                       <span>Sort by:</span>
                       <select
-                        value={role === 'recruiter' && recruiterBrowseMode === 'jobs' ? jobSortBy : sortBy}
+                        value={isRecruiterJobsView ? jobSortBy : sortBy}
                         onChange={(event) =>
-                          role === 'recruiter' && recruiterBrowseMode === 'jobs'
+                          isRecruiterJobsView
                             ? setJobSortBy(event.target.value as JobSortBy)
                             : setSortBy(event.target.value as 'recommended' | 'name' | 'experience' | 'projects')
                         }
                         className="bg-transparent font-medium text-white outline-none"
                       >
                         <option value="recommended">Recommended</option>
-                        {role === 'recruiter' && recruiterBrowseMode === 'jobs' ? (
+                        {isRecruiterJobsView ? (
                           <>
                             <option value="recent">Most recent</option>
                             <option value="score">Lowest score</option>
@@ -1556,7 +1871,7 @@ export function Marketplace() {
                     ) : null}
                     {selectedDomains.map((domain) => (
                       <span key={domain} className="rounded-full border border-slate-700 px-3 py-1.5 text-xs text-slate-300">
-                        {domain}
+                        {isRecruiterJobsView ? `Department: ${domain}` : domain}
                       </span>
                     ))}
                     {selectedLocations.map((location) => (
@@ -1564,16 +1879,21 @@ export function Marketplace() {
                         {location}
                       </span>
                     ))}
-                    {role === 'recruiter' && recruiterBrowseMode === 'jobs' ? (
+                    {isRecruiterJobsView ? (
                       <>
-                        {selectedJobTypes.map((jobType) => (
-                          <span key={jobType} className="rounded-full border border-slate-700 px-3 py-1.5 text-xs text-slate-300">
-                            {jobType}
+                        {selectedWorkModes.map((workMode) => (
+                          <span key={workMode} className="rounded-full border border-slate-700 px-3 py-1.5 text-xs text-slate-300">
+                            {workMode}
                           </span>
                         ))}
-                        {selectedJobPostedWindow !== 'any' ? (
+                        {selectedSalaryRanges.map((salaryRange) => (
+                          <span key={salaryRange} className="rounded-full border border-slate-700 px-3 py-1.5 text-xs text-slate-300">
+                            Salary: {salaryRange}
+                          </span>
+                        ))}
+                        {hasExperienceFilter ? (
                           <span className="rounded-full border border-slate-700 px-3 py-1.5 text-xs text-slate-300">
-                            Posted: {selectedJobPostedWindow === '7d' ? 'Last 7 days' : 'Last 30 days'}
+                            Experience: up to {recruiterExperienceSliderValue} yrs
                           </span>
                         ) : null}
                       </>

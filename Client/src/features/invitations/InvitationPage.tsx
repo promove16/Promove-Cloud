@@ -2,6 +2,7 @@ import { FormEvent, useEffect, useMemo, useState } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { ArrowRight, ShieldX } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
+import { recruiterApi } from '../../api/recruiter.api';
 import { requestApi } from '../../api/request.api';
 import { workspaceApi } from '../../api/workspace.api';
 import { Button } from '../../components/ui/Button';
@@ -163,7 +164,7 @@ export function InvitationPage() {
   const [feedback, setFeedback] = useState('');
 
   const allowedPageRoles = useMemo(
-    () => [UserRole.COLLEGE, UserRole.STUDENT, UserRole.RECRUITER, UserRole.INVESTOR, UserRole.MENTOR],
+    () => [UserRole.STUDENT, UserRole.RECRUITER, UserRole.INVESTOR, UserRole.MENTOR],
     [],
   );
   const canOpenPage = Boolean(user && currentRole && allowedPageRoles.includes(currentRole));
@@ -186,6 +187,16 @@ export function InvitationPage() {
         currentRole &&
         WORKSPACE_INVITE_SENDER_ROLES.includes(currentRole as (typeof WORKSPACE_INVITE_SENDER_ROLES)[number]),
     ),
+  });
+  const recruiterHiringEventsQuery = useQuery({
+    queryKey: ['recruiter', 'hiring-events'],
+    queryFn: recruiterApi.getHiringEvents,
+    enabled: currentRole === UserRole.RECRUITER,
+  });
+  const recruiterJobsQuery = useQuery({
+    queryKey: ['recruiter', 'jobs'],
+    queryFn: recruiterApi.getJobs,
+    enabled: currentRole === UserRole.RECRUITER,
   });
 
   const ownedWorkspaces = useMemo(() => {
@@ -275,6 +286,15 @@ export function InvitationPage() {
   const incomingRequests = incomingQuery.data ?? [];
   const outgoingRequests = outgoingQuery.data ?? [];
   const isLoading = incomingQuery.isLoading || outgoingQuery.isLoading;
+  const recruiterEventStats = useMemo(() => {
+    const events = recruiterHiringEventsQuery.data ?? [];
+    const jobs = recruiterJobsQuery.data ?? [];
+    return {
+      events: events.length,
+      registrations: events.reduce((sum, event) => sum + event.participantsCount, 0),
+      activeJobs: jobs.filter((job) => job.isActive).length,
+    };
+  }, [recruiterHiringEventsQuery.data, recruiterJobsQuery.data]);
 
   if (!canOpenPage || !user || !currentRole) {
     return (
@@ -299,6 +319,32 @@ export function InvitationPage() {
       </section>
 
       {feedback ? <div className="border border-cyan-500/30 px-3 py-2 text-sm text-cyan-200">{feedback}</div> : null}
+
+      {currentRole === UserRole.RECRUITER ? (
+        <section className="border border-slate-800">
+          <div className="border-b border-slate-800 px-3 py-2 text-[11px] uppercase tracking-[0.28em] text-slate-500">
+            Recruiter Hiring Hub
+          </div>
+          <div className="grid gap-3 px-3 py-3 lg:grid-cols-[repeat(3,minmax(0,1fr))_auto_auto] lg:items-center">
+            <div className="rounded-xl border border-slate-800 px-4 py-3">
+              <div className="text-2xl font-semibold text-white">{recruiterEventStats.events}</div>
+              <div className="mt-1 text-sm text-slate-400">Hiring events created</div>
+            </div>
+            <div className="rounded-xl border border-slate-800 px-4 py-3">
+              <div className="text-2xl font-semibold text-white">{recruiterEventStats.registrations}</div>
+              <div className="mt-1 text-sm text-slate-400">Event registrations</div>
+            </div>
+            <div className="rounded-xl border border-slate-800 px-4 py-3">
+              <div className="text-2xl font-semibold text-white">{recruiterEventStats.activeJobs}</div>
+              <div className="mt-1 text-sm text-slate-400">Active recruiter jobs</div>
+            </div>
+            <Button onClick={() => navigate('/dashboard/recruiter/hiring-events')}>Open Hiring Events</Button>
+            <Button variant="secondary" onClick={() => navigate('/dashboard/recruiter/applications')}>
+              Open Pipeline
+            </Button>
+          </div>
+        </section>
+      ) : null}
 
       {WORKSPACE_INVITE_SENDER_ROLES.includes(currentRole as (typeof WORKSPACE_INVITE_SENDER_ROLES)[number]) ? (
         <section className="border border-slate-800">

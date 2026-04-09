@@ -1,3 +1,4 @@
+import { type ReactNode } from 'react';
 import { Link } from 'react-router-dom';
 import {
   ArrowRight,
@@ -53,6 +54,7 @@ type InstitutionOverviewDashboardProps = {
   studentTo?: (student: StudentLeaderboardItem) => string;
   eventTo?: (event: DashboardEvent) => string;
   projectTo?: (project: RecentProject) => string;
+  headerAction?: ReactNode;
   isLoading?: boolean;
 };
 
@@ -126,14 +128,18 @@ export function InstitutionOverviewDashboard({
   studentTo,
   eventTo,
   projectTo,
+  headerAction,
   isLoading = false,
 }: InstitutionOverviewDashboardProps) {
   return (
     <div className="space-y-8">
-      <section className="space-y-2">
-        <div className="text-[11px] uppercase tracking-[0.35em] text-cyan-300">{institutionLabel}</div>
-        <h1 className="text-3xl font-bold text-white md:text-4xl">{institutionName}</h1>
-        <p className="max-w-3xl text-slate-400">{subtitle}</p>
+      <section className="flex flex-col gap-4 lg:flex-row lg:items-end lg:justify-between">
+        <div className="space-y-2">
+          <div className="text-[11px] uppercase tracking-[0.35em] text-cyan-300">{institutionLabel}</div>
+          <h1 className="text-3xl font-bold text-white md:text-4xl">{institutionName}</h1>
+          <p className="max-w-3xl text-slate-400">{subtitle}</p>
+        </div>
+        {headerAction ? <div className="flex items-center">{headerAction}</div> : null}
       </section>
 
       <section className="grid gap-6 md:grid-cols-2 xl:grid-cols-4">

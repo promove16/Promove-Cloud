@@ -66,6 +66,7 @@ import {
   createEvent,
   createEventSchema,
   getEventRankings,
+  listCollegeHiringEvents as listCollegeHiringEventsService,
   listInstitutionEvents,
 } from '../event/event.service';
 
@@ -404,6 +405,7 @@ export const listCollegeEvents = async (collegeId: string): Promise<EventListIte
 export const addCollegeEventSubmissionScore = addSubmissionScore;
 export const computeCollegeEventRankings = computeEventRankings;
 export const getCollegeEventRankings = getEventRankings;
+export const getCollegeHiringEvents = (collegeId: string) => listCollegeHiringEventsService(collegeId);
 export const getCollegeInvestors = getInvestorDirectory;
 export const getCollegeProjects = (collegeId: string) => listInstitutionProjects(collegeId);
 export const getCollegePatents = (collegeId: string) => listInstitutionPatents(collegeId);

@@ -153,7 +153,7 @@ export interface RecruiterJobView {
   shortlistedCount: number;
   hasApplied?: boolean;
   applicationStage?: RecruiterJobApplicationStage;
-  applicationSource?: 'student_apply' | 'recruiter_invite';
+  applicationSource?: 'student_apply' | 'recruiter_invite' | 'hiring_event';
   applicationUpdatedAt?: string;
   createdAt: string;
   expiresAt?: string;
@@ -178,7 +178,7 @@ export type RecruiterJobApplicationStage =
 
 export interface RecruiterJobApplicantView extends RecruiterTalentSummary {
   stage: RecruiterJobApplicationStage;
-  source: 'student_apply' | 'recruiter_invite';
+  source: 'student_apply' | 'recruiter_invite' | 'hiring_event';
   appliedAt: string;
   updatedAt: string;
   note?: string;
@@ -198,7 +198,7 @@ export interface RecruiterStudentApplicationView {
     headline?: string;
   };
   stage: RecruiterJobApplicationStage;
-  source: 'student_apply' | 'recruiter_invite';
+  source: 'student_apply' | 'recruiter_invite' | 'hiring_event';
   appliedAt: string;
   updatedAt: string;
   note?: string;
@@ -261,4 +261,40 @@ export interface RecruiterListResponse<T> {
 export interface RecruiterMessageCheck {
   canContact: boolean;
   bridgeType?: 'HR_SHORTLIST' | 'ACTIVE_APPLICATION' | 'SCORE_MATCH' | 'LAUNCH_TRIGGER';
+}
+
+export interface RecruiterHiringEventParticipant {
+  studentId: string;
+  studentName: string;
+  avatar?: string;
+  innovationScore: number;
+  registeredAt: string;
+  submissionScore?: number;
+}
+
+export interface RecruiterHiringEventView {
+  _id: string;
+  title: string;
+  type: string;
+  category: 'hiring';
+  description: string;
+  scheduledAt: string;
+  isActive: boolean;
+  institutionId: string;
+  collegeName: string;
+  recruiterId: string;
+  linkedJobId?: string;
+  minimumInnovationScore: number;
+  participantsCount: number;
+  participants: RecruiterHiringEventParticipant[];
+  rankingsComputedAt?: string;
+  rankings: Array<{
+    rank: number;
+    studentId: string;
+    studentName: string;
+    avatar?: string;
+    compositeScore: number;
+    innovationScore: number;
+    submissionScore: number;
+  }>;
 }

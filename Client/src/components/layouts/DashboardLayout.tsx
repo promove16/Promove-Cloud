@@ -28,17 +28,62 @@ import {
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from '../../app/components/ui/dropdown-menu';
-import { DashboardNavItem, SIDEBAR_CONFIG } from './dashboardNavigation';
+import { DASHBOARD_ROUTE_LABELS, DashboardNavItem, SIDEBAR_CONFIG } from './dashboardNavigation';
 import { BusinessLogo } from '../branding/BusinessLogo';
 
 interface DashboardLayoutProps {
   role?: UserRole;
 }
 
+const SIDEBAR_PARENT_PATH_ALIASES: Partial<Record<UserRole, Record<string, string[]>>> = {
+  [UserRole.SCHOOL]: {
+    '/dashboard/school/operations': [
+      '/dashboard/school/students',
+      '/dashboard/school/mentors',
+      '/dashboard/school/events',
+      '/dashboard/school/projects',
+      '/dashboard/school/patents',
+      '/dashboard/school/startups',
+      '/dashboard/school/investors',
+    ],
+  },
+  [UserRole.COLLEGE]: {
+    '/dashboard/college/operations': [
+      '/dashboard/college/students',
+      '/dashboard/college/mentors',
+      '/dashboard/college/events',
+      '/dashboard/college/projects',
+      '/dashboard/college/investors',
+      '/dashboard/college/recruiters',
+    ],
+  },
+};
+
 const ACTIVE_NAV_ITEM_CLASS =
   'dashboard-theme-nav-active';
 const INACTIVE_NAV_ITEM_CLASS = 'dashboard-theme-muted dashboard-theme-hover';
 const INACTIVE_CHILD_NAV_ITEM_CLASS = 'dashboard-theme-subtle dashboard-theme-hover';
+
+const matchesPath = (pathname: string, path: string, exact = false) =>
+  pathname === path || (!exact && pathname.startsWith(`${path}/`));
+
+const isSidebarPathActive = (
+  pathname: string,
+  path: string,
+  exact = false,
+  role?: UserRole,
+) => {
+  if (matchesPath(pathname, path, exact)) {
+    return true;
+  }
+
+  if (exact || !role) {
+    return false;
+  }
+
+  const aliases = SIDEBAR_PARENT_PATH_ALIASES[role]?.[path] ?? [];
+  return aliases.some((alias) => matchesPath(pathname, alias));
+};
 
 function NotificationBell() {
   const navigate = useNavigate();
@@ -222,10 +267,12 @@ export function DashboardLayout({ children, role }: PropsWithChildren<DashboardL
 
   const resolvedRole = user?.role ?? role;
   const navItems = resolvedRole ? SIDEBAR_CONFIG[resolvedRole] : [];
+  const isMarketplaceRoute = location.pathname.includes('/marketplace');
   const dashboardHomePath = resolvedRole ? roleRedirect(resolvedRole) : '/dashboard';
   const hasMessagesItem = navItems.some(
     (item) => item.kind === 'link' && item.label === 'Messages',
   );
+  const routeLabels = resolvedRole ? DASHBOARD_ROUTE_LABELS[resolvedRole] ?? [] : [];
   const exactMatchPaths = useMemo(
     () =>
       new Set(
@@ -250,8 +297,7 @@ export function DashboardLayout({ children, role }: PropsWithChildren<DashboardL
     0,
   );
 
-  const isPathActive = (path: string, exact = false) =>
-    location.pathname === path || (!exact && location.pathname.startsWith(`${path}/`));
+  const isPathActive = (path: string, exact = false) => matchesPath(location.pathname, path, exact);
 
   const isHomePath = (path: string) => path === dashboardHomePath;
   const shouldMatchExactly = (path: string) => isHomePath(path) || exactMatchPaths.has(path);
@@ -274,8 +320,13 @@ export function DashboardLayout({ children, role }: PropsWithChildren<DashboardL
       }
     }
 
+    const matchedRouteLabel = routeLabels.find((item) => isPathActive(item.path));
+    if (matchedRouteLabel) {
+      return matchedRouteLabel.label;
+    }
+
     return 'Dashboard';
-  }, [location.pathname, navItems, exactMatchPaths]);
+  }, [location.pathname, navItems, exactMatchPaths, routeLabels]);
 
   if (!user) {
     return null;
@@ -304,7 +355,7 @@ export function DashboardLayout({ children, role }: PropsWithChildren<DashboardL
       }}
       className={({ isActive }) =>
         `flex items-center gap-3 rounded-2xl px-4 py-3 transition ${
-          isActive || isPathActive(path, shouldMatchExactly(path))
+          isActive || isSidebarPathActive(location.pathname, path, shouldMatchExactly(path), resolvedRole)
             ? ACTIVE_NAV_ITEM_CLASS
             : INACTIVE_NAV_ITEM_CLASS
         }`
@@ -455,7 +506,11 @@ export function DashboardLayout({ children, role }: PropsWithChildren<DashboardL
             </div>
           </header>
 
-          <main className="flex min-h-0 flex-1 flex-col overflow-y-auto px-4 py-6 lg:px-8">
+          <main
+            className={`flex min-h-0 flex-1 flex-col overflow-y-auto ${
+              isMarketplaceRoute ? 'p-0' : 'px-4 py-6 lg:px-8'
+            }`}
+          >
             {children ?? <Outlet />}
           </main>
         </div>

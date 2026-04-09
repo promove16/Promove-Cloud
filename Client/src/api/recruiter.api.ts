@@ -4,6 +4,7 @@ import {
   RecruiterCollegeCard,
   RecruiterDashboardData,
   RecruiterDriveView,
+  RecruiterHiringEventView,
   RecruiterJobDetail,
   RecruiterJobApplicantView,
   RecruiterJobApplicationStage,
@@ -182,6 +183,33 @@ export const recruiterApi = {
     const response = await api.get<ApiSuccessResponse<RecruiterDriveView[]>>('/api/recruiter/drives');
     return response.data.data;
   },
+  async getHiringEvents() {
+    const response = await api.get<ApiSuccessResponse<RecruiterHiringEventView[]>>('/api/events/hiring');
+    return response.data.data;
+  },
+  async createHiringEvent(payload: {
+    title: string;
+    collegeId: string;
+    type: 'Industry Connect Session' | 'Placement Hackathon' | 'Innovation Drive' | 'Other';
+    date: string;
+    description: string;
+    linkedJobId?: string;
+    minimumInnovationScore: number;
+  }) {
+    const response = await api.post<ApiSuccessResponse<RecruiterHiringEventView>>('/api/events/hiring', payload);
+    return response.data.data;
+  },
+  async selectStudentFromEvent(
+    eventId: string,
+    studentId: string,
+    payload: { jobId: string; note?: string },
+  ) {
+    const response = await api.post<ApiSuccessResponse<{ selected: boolean }>>(
+      `/api/events/hiring/${eventId}/select/${studentId}`,
+      payload,
+    );
+    return response.data.data;
+  },
   async createDrive(payload: {
     title: string;
     collegeId: string;
@@ -217,6 +245,10 @@ export const recruiterApi = {
   },
   async getColleges() {
     const response = await api.get<ApiSuccessResponse<RecruiterCollegeCard[]>>('/api/recruiter/colleges');
+    return response.data.data;
+  },
+  async getLinkedColleges() {
+    const response = await api.get<ApiSuccessResponse<RecruiterCollegeCard[]>>('/api/recruiter/colleges/linked');
     return response.data.data;
   },
   async getOnboarding() {

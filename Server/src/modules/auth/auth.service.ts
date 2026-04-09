@@ -68,12 +68,28 @@ const getAcademicYear = () => {
   return `${startYear}-${String((startYear + 1) % 100).padStart(2, '0')}`;
 };
 
-const buildDefaultInstitutionProfile = (displayName: string) => ({
+const buildDefaultInstitutionProfile = (displayName: string): {
+  institutionName: string;
+  location: string;
+  totalStudentsEnrolled: number;
+  academicYear: string;
+  iicStarRating: number;
+  organizationType?: string;
+  foundedYear?: number;
+  specialties: string[];
+  locations: string[];
+  alumniCount?: number;
+  employeeCount?: number;
+  contactEmail?: string;
+  contactPhone?: string;
+} => ({
   institutionName: displayName,
   location: 'India',
   totalStudentsEnrolled: 0,
   academicYear: getAcademicYear(),
   iicStarRating: 0,
+  specialties: [],
+  locations: [],
 });
 
 type TokenBasePayload = {
@@ -485,6 +501,14 @@ export const submitRegistrationRequest = async (payload: {
     totalStudentsEnrolled: number;
     academicYear: string;
     iicStarRating?: number;
+    organizationType?: string;
+    foundedYear?: number;
+    specialties?: string[];
+    locations?: string[];
+    alumniCount?: number;
+    employeeCount?: number;
+    contactEmail?: string;
+    contactPhone?: string;
   };
   institutionVerification?: {
     regulatoryBodies: Array<
@@ -601,6 +625,20 @@ export const submitRegistrationRequest = async (payload: {
       totalStudentsEnrolled: institutionProfile.totalStudentsEnrolled,
       academicYear: institutionProfile.academicYear,
       iicStarRating: institutionProfile.iicStarRating ?? 0,
+      ...(institutionProfile.organizationType
+        ? { organizationType: institutionProfile.organizationType }
+        : {}),
+      ...(institutionProfile.foundedYear ? { foundedYear: institutionProfile.foundedYear } : {}),
+      specialties: institutionProfile.specialties ?? [],
+      locations: institutionProfile.locations ?? [],
+      ...(typeof institutionProfile.alumniCount === 'number'
+        ? { alumniCount: institutionProfile.alumniCount }
+        : {}),
+      ...(typeof institutionProfile.employeeCount === 'number'
+        ? { employeeCount: institutionProfile.employeeCount }
+        : {}),
+      ...(institutionProfile.contactEmail ? { contactEmail: institutionProfile.contactEmail } : {}),
+      ...(institutionProfile.contactPhone ? { contactPhone: institutionProfile.contactPhone } : {}),
       policies: [],
       stats: {
         totalInnovationActivities: 0,

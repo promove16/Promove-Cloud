@@ -94,6 +94,48 @@ const institutionProfileSchema = new Schema<NonNullable<IUser['institutionProfil
       type: Date,
       default: undefined,
     },
+    organizationType: {
+      type: String,
+      trim: true,
+      maxlength: 120,
+      default: undefined,
+    },
+    foundedYear: {
+      type: Number,
+      min: 1800,
+      max: 3000,
+      default: undefined,
+    },
+    specialties: {
+      type: [String],
+      default: [],
+    },
+    locations: {
+      type: [String],
+      default: [],
+    },
+    alumniCount: {
+      type: Number,
+      min: 0,
+      default: undefined,
+    },
+    employeeCount: {
+      type: Number,
+      min: 0,
+      default: undefined,
+    },
+    contactEmail: {
+      type: String,
+      trim: true,
+      maxlength: 160,
+      default: undefined,
+    },
+    contactPhone: {
+      type: String,
+      trim: true,
+      maxlength: 40,
+      default: undefined,
+    },
     policies: {
       type: [institutionPolicySchema],
       default: [],

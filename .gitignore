@@ -12,6 +12,14 @@ docs/docs/
 postman/
 output/
 test-results/
+docs/
+output/playwright/
+scripts/manual-tests/
+Server/scripts/
+Server/dist/
+Client/dist/
+Client/guidelines/
+Client/ATTRIBUTIONS.md
 
 # One-off test scripts and results
 Server/scripts/verify-*.mjs

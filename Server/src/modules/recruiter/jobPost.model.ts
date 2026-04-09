@@ -2,7 +2,7 @@ import { Schema, Types, model } from 'mongoose';
 
 export type JobType = 'Full-time' | 'Internship' | 'Contract' | 'Part-time';
 export type JobWorkMode = 'On-site' | 'Hybrid' | 'Remote';
-export type JobApplicationSource = 'student_apply' | 'recruiter_invite';
+export type JobApplicationSource = 'student_apply' | 'recruiter_invite' | 'hiring_event';
 export type JobApplicationStage =
   | 'Invited Pending'
   | 'Invite Accepted'
@@ -60,7 +60,7 @@ const applicationRecordSchema = new Schema<IJobApplicationRecord>(
     },
     source: {
       type: String,
-      enum: ['student_apply', 'recruiter_invite'],
+      enum: ['student_apply', 'recruiter_invite', 'hiring_event'],
       default: 'student_apply',
       required: true,
     },

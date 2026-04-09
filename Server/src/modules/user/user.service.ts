@@ -76,7 +76,46 @@ const optionalYearSchema = z.preprocess(
   z.coerce.number().int().min(1900).max(3000).optional(),
 );
 
+const optionalInstitutionYearSchema = z.preprocess(
+  (value) => (value === '' || value === null || value === undefined ? undefined : value),
+  z.coerce.number().int().min(1800).max(3000).optional(),
+);
+
 const stringListSchema = z.array(z.string().trim().min(1).max(100)).max(24).default([]);
+const locationListSchema = z.array(z.string().trim().min(1).max(160)).max(12).default([]);
+const institutionPolicySchema = z.object({
+  name: z.string().trim().min(1).max(160),
+  status: z.enum(['Active', 'On Track', 'Pending', 'Inactive']),
+  lastUpdated: nullableDateSchema.optional(),
+});
+const institutionStatsSchema = z.object({
+  totalInnovationActivities: z.coerce.number().int().min(0).optional(),
+  patentsFiled: z.coerce.number().int().min(0).optional(),
+  totalMentoringHours: z.coerce.number().int().min(0).optional(),
+  startupsLaunched: z.coerce.number().int().min(0).optional(),
+  industryCollaborations: z.coerce.number().int().min(0).optional(),
+  totalHRConnections: z.coerce.number().int().min(0).optional(),
+  studentsPlaced: z.coerce.number().int().min(0).optional(),
+  directShortlistsThisQuarter: z.coerce.number().int().min(0).optional(),
+  topHiringSector: z.string().trim().max(120).optional().or(z.literal('')),
+});
+const institutionProfilePatchSchema = z.object({
+  institutionName: z.string().trim().min(2).max(160).optional(),
+  location: z.string().trim().min(2).max(160).optional(),
+  totalStudentsEnrolled: z.coerce.number().int().min(0).optional(),
+  academicYear: z.string().trim().min(4).max(20).optional(),
+  iicStarRating: z.coerce.number().min(0).max(5).optional(),
+  organizationType: z.string().trim().max(120).optional().or(z.literal('')),
+  foundedYear: optionalInstitutionYearSchema,
+  specialties: stringListSchema.optional(),
+  locations: locationListSchema.optional(),
+  alumniCount: z.coerce.number().int().min(0).optional(),
+  employeeCount: z.coerce.number().int().min(0).optional(),
+  contactEmail: z.string().trim().email().optional().or(z.literal('')),
+  contactPhone: z.string().trim().max(40).optional().or(z.literal('')),
+  policies: z.array(institutionPolicySchema).max(20).optional(),
+  stats: institutionStatsSchema.optional(),
+});
 
 const skillEntrySchema = z.object({
   name: z.string().trim().min(1).max(100),
@@ -155,6 +194,8 @@ export const updateMeSchema = z
     avatarWallpaper: optionalUrlSchema,
     bio: z.string().trim().max(500).optional().or(z.literal('')),
     domain: z.string().trim().max(120).optional().or(z.literal('')),
+    headline: z.string().trim().max(160).optional().or(z.literal('')),
+    location: z.string().trim().max(160).optional().or(z.literal('')),
     websiteUrl: optionalUrlSchema,
     githubUrl: optionalUrlSchema,
     linkedinUrl: optionalUrlSchema,
@@ -165,6 +206,7 @@ export const updateMeSchema = z
     instagramUrl: optionalUrlSchema,
     researchGateUrl: optionalUrlSchema,
     mediumUrl: optionalUrlSchema,
+    institutionProfile: institutionProfilePatchSchema.optional(),
     skills: z.array(skillEntrySchema).max(80).optional(),
     experience: z.array(experienceEntrySchema).max(25).optional(),
     education: z.array(educationEntrySchema).max(25).optional(),
@@ -1271,6 +1313,110 @@ const getExistingObjectId = (id: string | undefined) =>
 const normalizeStringList = (items: string[]) =>
   items.map((item) => sanitizePlainText(item)).filter(Boolean);
 
+const normalizeInstitutionPolicies = (
+  items: z.infer<typeof institutionPolicySchema>[],
+): NonNullable<IUser['institutionProfile']>['policies'] =>
+  items.map((policy) => ({
+    name: sanitizePlainText(policy.name),
+    status: policy.status,
+    ...(policy.lastUpdated ? { lastUpdated: policy.lastUpdated } : {}),
+  }));
+
+const normalizeInstitutionStats = (
+  stats: z.infer<typeof institutionStatsSchema>,
+): NonNullable<IUser['institutionProfile']>['stats'] => ({
+  totalInnovationActivities: stats.totalInnovationActivities ?? 0,
+  patentsFiled: stats.patentsFiled ?? 0,
+  totalMentoringHours: stats.totalMentoringHours ?? 0,
+  startupsLaunched: stats.startupsLaunched ?? 0,
+  industryCollaborations: stats.industryCollaborations ?? 0,
+  ...(typeof stats.totalHRConnections === 'number' ? { totalHRConnections: stats.totalHRConnections } : {}),
+  ...(typeof stats.studentsPlaced === 'number' ? { studentsPlaced: stats.studentsPlaced } : {}),
+  ...(typeof stats.directShortlistsThisQuarter === 'number'
+    ? { directShortlistsThisQuarter: stats.directShortlistsThisQuarter }
+    : {}),
+  ...(stats.topHiringSector ? { topHiringSector: sanitizePlainText(stats.topHiringSector) } : {}),
+});
+
+const applyInstitutionProfilePatch = (
+  current: IUser['institutionProfile'] | undefined,
+  patch: z.infer<typeof institutionProfilePatchSchema>,
+): IUser['institutionProfile'] => {
+  const baseStats = current?.stats ?? {
+    totalInnovationActivities: 0,
+    patentsFiled: 0,
+    totalMentoringHours: 0,
+    startupsLaunched: 0,
+    industryCollaborations: 0,
+  };
+
+  return {
+    institutionName: sanitizePlainText(patch.institutionName ?? current?.institutionName ?? ''),
+    location: sanitizePlainText(patch.location ?? current?.location ?? ''),
+    totalStudentsEnrolled: patch.totalStudentsEnrolled ?? current?.totalStudentsEnrolled ?? 0,
+    academicYear: sanitizePlainText(patch.academicYear ?? current?.academicYear ?? ''),
+    iicStarRating: patch.iicStarRating ?? current?.iicStarRating ?? 0,
+    ...(current?.iicLastUpdated ? { iicLastUpdated: current.iicLastUpdated } : {}),
+    ...(patch.organizationType !== undefined
+      ? patch.organizationType
+        ? { organizationType: sanitizePlainText(patch.organizationType) }
+        : {}
+      : current?.organizationType
+        ? { organizationType: current.organizationType }
+        : {}),
+    ...(patch.foundedYear !== undefined
+      ? patch.foundedYear
+        ? { foundedYear: patch.foundedYear }
+        : {}
+      : current?.foundedYear
+        ? { foundedYear: current.foundedYear }
+        : {}),
+    specialties:
+      patch.specialties !== undefined
+        ? normalizeStringList(patch.specialties)
+        : current?.specialties ?? [],
+    locations:
+      patch.locations !== undefined
+        ? patch.locations.map((item) => sanitizePlainText(item)).filter(Boolean)
+        : current?.locations ?? [],
+    ...(patch.alumniCount !== undefined
+      ? { alumniCount: patch.alumniCount }
+      : typeof current?.alumniCount === 'number'
+        ? { alumniCount: current.alumniCount }
+        : {}),
+    ...(patch.employeeCount !== undefined
+      ? { employeeCount: patch.employeeCount }
+      : typeof current?.employeeCount === 'number'
+        ? { employeeCount: current.employeeCount }
+        : {}),
+    ...(patch.contactEmail !== undefined
+      ? patch.contactEmail
+        ? { contactEmail: patch.contactEmail.trim().toLowerCase() }
+        : {}
+      : current?.contactEmail
+        ? { contactEmail: current.contactEmail }
+        : {}),
+    ...(patch.contactPhone !== undefined
+      ? patch.contactPhone
+        ? { contactPhone: sanitizePlainText(patch.contactPhone) }
+        : {}
+      : current?.contactPhone
+        ? { contactPhone: current.contactPhone }
+        : {}),
+    policies:
+      patch.policies !== undefined
+        ? normalizeInstitutionPolicies(patch.policies)
+        : current?.policies ?? [],
+    stats:
+      patch.stats !== undefined
+        ? {
+            ...baseStats,
+            ...normalizeInstitutionStats(patch.stats),
+          }
+        : baseStats,
+  };
+};
+
 const normalizeSkillEntries = (items: z.infer<typeof skillEntrySchema>[]): IUser['skills'] =>
   items.map((skill) => ({
     name: sanitizePlainText(skill.name),
@@ -1378,6 +1524,14 @@ export const updateCurrentUser = async (
     user.domain = payload.domain ? sanitizePlainText(payload.domain) : undefined;
   }
 
+  if (payload.headline !== undefined) {
+    user.headline = payload.headline ? sanitizePlainText(payload.headline) : '';
+  }
+
+  if (payload.location !== undefined) {
+    user.location = payload.location ? sanitizePlainText(payload.location) : '';
+  }
+
   if (payload.websiteUrl !== undefined) {
     user.websiteUrl = payload.websiteUrl || null;
   }
@@ -1416,6 +1570,22 @@ export const updateCurrentUser = async (
 
   if (payload.mediumUrl !== undefined) {
     user.mediumUrl = payload.mediumUrl || null;
+  }
+
+  if (payload.institutionProfile !== undefined) {
+    if (user.role !== UserRole.SCHOOL && user.role !== UserRole.COLLEGE) {
+      throw new ApiError(
+        400,
+        'INSTITUTION_PROFILE_NOT_SUPPORTED',
+        'Institution profile fields are only available for school and college accounts.',
+      );
+    }
+
+    user.institutionProfile = applyInstitutionProfilePatch(user.institutionProfile, payload.institutionProfile);
+
+    if (payload.institutionProfile.location !== undefined && payload.location === undefined) {
+      user.location = sanitizePlainText(payload.institutionProfile.location);
+    }
   }
 
   if (payload.skills !== undefined) {

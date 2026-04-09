@@ -2,15 +2,16 @@ import { Request, Response } from 'express';
 import { ApiResponse } from '../../utils/ApiResponse';
 import {
   cancelSchoolStudentRosterInvite,
+  createSchoolEvent,
   createManagedStudentCredentialsSchema,
   createSchoolMentorshipProgramRequest,
   createSchoolManagedStudentCredentials,
   createSchoolStudentAccessToken,
   createSchoolStudentRosterEntry,
   createStudentAccessTokenSchema,
+  getSchoolEventRankings,
   getInvestorDirectory,
   getLatestComplianceReport,
-  getInstitutionUpcomingEvents,
   getSchoolMentorshipPrograms,
   getSchoolPendingStudentVerifications,
   getSchoolStudentRoster,
@@ -20,6 +21,7 @@ import {
   getStudentLeaderboard,
   importSchoolStudentCredentials,
   importSchoolStudentRosterEntries,
+  listSchoolEvents,
   listInstitutionPatents,
   listInstitutionProjects,
   listInstitutionStartups,
@@ -28,6 +30,7 @@ import {
   reviewSchoolStudentVerification,
   reviewStudentVerificationSchema,
 } from './school.service';
+import { createEventSchema } from '../event/event.service';
 import { generateSchoolReport } from '../../services/complianceReport';
 import { ApiError } from '../../utils/ApiError';
 import { createInstitutionMentorshipProgramSchema } from '../mentor/mentor.validation';
@@ -69,9 +72,25 @@ export const listSchoolStartupsController = async (req: Request, res: Response) 
   res.status(200).json(new ApiResponse(data));
 };
 
+export const createSchoolEventController = async (req: Request, res: Response) => {
+  const payload = createEventSchema.parse(req.body);
+  const data = await createSchoolEvent(req.user!._id, req.user!._id, payload);
+  res.status(201).json(new ApiResponse(data));
+};
+
 export const listSchoolEventsController = async (req: Request, res: Response) => {
-  const data = await getInstitutionUpcomingEvents(req.user!._id);
+  const data = await listSchoolEvents(req.user!._id);
   res.status(200).json(new ApiResponse(data));
+};
+
+export const getSchoolEventRankingsController = async (req: Request, res: Response) => {
+  const rankings = await getSchoolEventRankings(String(req.params.eventId), req.user!._id);
+  res.status(200).json(
+    new ApiResponse({
+      formula: '(submissionScore * 0.6) + (innovationScore * 0.4)',
+      rankings,
+    }),
+  );
 };
 
 export const createSchoolComplianceReportController = async (req: Request, res: Response) => {

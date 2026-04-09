@@ -1,4 +1,4 @@
-import { useMemo } from "react";
+import { useMemo, useState } from "react";
 import { Link, useNavigate, useParams } from "react-router-dom";
 import { useQuery } from "@tanstack/react-query";
 import {
@@ -26,6 +26,7 @@ import {
   MarketplaceUserDetail,
   marketplaceApi,
 } from "../../api/marketplace.api";
+import { recruiterApi } from "../../api/recruiter.api";
 import { useAuthStore } from "../../store/authStore";
 import { UserRole } from "../../types/roles.types";
 import { getMarketplaceBasePath, getMarketplaceDetailPath } from "../../features/marketplace/navigation";
@@ -59,6 +60,7 @@ const formatDate = (value?: string) => (value ? dateFormatter.format(new Date(va
 const formatRole = (value: string) => value.charAt(0).toUpperCase() + value.slice(1);
 
 const isStartupDetail = (entity: MarketplaceEntityDetail): entity is MarketplaceStartupDetail => entity.entityType === "startup";
+const isInstitutionEntityType = (entityType: MarketplaceEntityType) => entityType === "school" || entityType === "college";
 
 const linkList = (profile: MarketplaceProfile) =>
   [
@@ -79,6 +81,8 @@ const jobStats = (job: MarketplaceJobSummary) => [
   { label: "Applicants", value: String(job.applicantCount) },
   { label: "Shortlisted", value: String(job.shortlistedCount) },
 ];
+
+const getJobActionLabel = (hasApplied: boolean) => (hasApplied ? "Applied" : "Apply now");
 
 export function MarketplaceDetail() {
   const navigate = useNavigate();
@@ -327,7 +331,36 @@ function ProfileDetailView({
   onMessage: (targetId: string) => void;
   dashboardRole: UserRole;
 }) {
+  const navigate = useNavigate();
   const links = linkList(entity);
+  const isInstitution = isInstitutionEntityType(entity.entityType);
+  const institutionProfile = entity.institutionProfile;
+  const isStudentRecruiterView =
+    dashboardRole === UserRole.STUDENT && entity.entityType === "recruiter";
+  const [appliedJobIds, setAppliedJobIds] = useState<Record<string, boolean>>({});
+  const [applyingJobId, setApplyingJobId] = useState<string | null>(null);
+  const [applyErrorJobId, setApplyErrorJobId] = useState<string | null>(null);
+  const [applyErrorMessage, setApplyErrorMessage] = useState<string | null>(null);
+
+  const handleApplyToJob = async (jobId: string) => {
+    if (applyingJobId || appliedJobIds[jobId]) {
+      return;
+    }
+
+    setApplyingJobId(jobId);
+    setApplyErrorJobId(null);
+    setApplyErrorMessage(null);
+
+    try {
+      await recruiterApi.applyToJob(jobId);
+      setAppliedJobIds((current) => ({ ...current, [jobId]: true }));
+    } catch {
+      setApplyErrorJobId(jobId);
+      setApplyErrorMessage("Unable to apply to this job right now.");
+    } finally {
+      setApplyingJobId(null);
+    }
+  };
 
   return (
     <div className="space-y-6">
@@ -396,21 +429,102 @@ function ProfileDetailView({
           <div className="rounded-[28px] border border-white/10 bg-[#090d1b] p-6">
             <div className="text-xs uppercase tracking-[0.28em] text-slate-500">Profile depth</div>
             <div className="mt-4 grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
-              <MetricCard label="Skills" value={String(entity.insightCounts.skills)} />
-              <MetricCard label="Experience" value={String(entity.insightCounts.experience)} />
-              <MetricCard label="Education" value={String(entity.insightCounts.education)} />
-              <MetricCard
-                label={entity.entityType === "recruiter" ? "Open Jobs" : "Projects"}
-                value={
-                  entity.entityType === "recruiter"
-                    ? String(entity.relatedCounts.jobs)
-                    : String(entity.insightCounts.portfolioProjects)
-                }
-              />
+              {isInstitution ? (
+                <>
+                  <MetricCard label="Students" value={String(institutionProfile?.totalStudentsEnrolled ?? 0)} />
+                  <MetricCard label="Alumni" value={String(institutionProfile?.alumniCount ?? 0)} />
+                  <MetricCard label="Startups" value={String(institutionProfile?.stats?.startupsLaunched ?? 0)} />
+                  <MetricCard label="Collaborations" value={String(institutionProfile?.stats?.industryCollaborations ?? 0)} />
+                </>
+              ) : (
+                <>
+                  <MetricCard label="Skills" value={String(entity.insightCounts.skills)} />
+                  <MetricCard label="Experience" value={String(entity.insightCounts.experience)} />
+                  <MetricCard label="Education" value={String(entity.insightCounts.education)} />
+                  <MetricCard
+                    label={entity.entityType === "recruiter" ? "Open Jobs" : "Projects"}
+                    value={
+                      entity.entityType === "recruiter"
+                        ? String(entity.relatedCounts.jobs)
+                        : String(entity.insightCounts.portfolioProjects)
+                    }
+                  />
+                </>
+              )}
             </div>
           </div>
 
-          {entity.skills && entity.skills.length > 0 ? (
+          {isInstitution ? (
+            <>
+              <div className="rounded-[28px] border border-white/10 bg-[#090d1b] p-6">
+                <div className="flex items-center gap-2 text-xs uppercase tracking-[0.28em] text-slate-500">
+                  <GraduationCap className="h-4 w-4" />
+                  Institution details
+                </div>
+                <div className="mt-4 grid gap-3 sm:grid-cols-2">
+                  <MetricCard label="Type" value={institutionProfile?.organizationType ?? formatRole(entity.entityType)} />
+                  <MetricCard label="Founded" value={institutionProfile?.foundedYear ? String(institutionProfile.foundedYear) : "Not added"} />
+                  <MetricCard label="Academic Year" value={institutionProfile?.academicYear ?? "Not added"} />
+                  <MetricCard label="IIC Rating" value={typeof institutionProfile?.iicStarRating === "number" ? institutionProfile.iicStarRating.toFixed(1) : "Not added"} />
+                  <MetricCard label="Faculty / Staff" value={typeof institutionProfile?.employeeCount === "number" ? String(institutionProfile.employeeCount) : "Not added"} />
+                  <MetricCard label="Top Hiring Sector" value={institutionProfile?.stats?.topHiringSector ?? "Not added"} />
+                </div>
+              </div>
+
+              {(institutionProfile?.specialties?.length ?? 0) > 0 ? (
+                <div className="rounded-[28px] border border-white/10 bg-[#090d1b] p-6">
+                  <div className="flex items-center gap-2 text-xs uppercase tracking-[0.28em] text-slate-500">
+                    <Sparkles className="h-4 w-4" />
+                    Specialties
+                  </div>
+                  <div className="mt-4 flex flex-wrap gap-2">
+                    {(institutionProfile?.specialties ?? []).map((specialty) => (
+                      <span key={specialty} className="rounded-full border border-white/10 bg-white/5 px-3 py-2 text-sm text-slate-200">
+                        {specialty}
+                      </span>
+                    ))}
+                  </div>
+                </div>
+              ) : null}
+
+              {(institutionProfile?.location || (institutionProfile?.locations?.length ?? 0) > 0) ? (
+                <div className="rounded-[28px] border border-white/10 bg-[#090d1b] p-6">
+                  <div className="flex items-center gap-2 text-xs uppercase tracking-[0.28em] text-slate-500">
+                    <MapPin className="h-4 w-4" />
+                    Locations
+                  </div>
+                  <div className="mt-4 grid gap-3 md:grid-cols-2">
+                    {[institutionProfile?.location, ...(institutionProfile?.locations ?? [])]
+                      .filter((location, index, items): location is string => Boolean(location) && items.indexOf(location) === index)
+                      .map((location) => (
+                        <div key={location} className="rounded-[22px] border border-white/10 bg-white/[0.03] p-4 text-sm text-slate-200">
+                          {location}
+                        </div>
+                      ))}
+                  </div>
+                </div>
+              ) : null}
+
+              {institutionProfile?.stats ? (
+                <div className="rounded-[28px] border border-white/10 bg-[#090d1b] p-6">
+                  <div className="flex items-center gap-2 text-xs uppercase tracking-[0.28em] text-slate-500">
+                    <FolderKanban className="h-4 w-4" />
+                    Outcomes
+                  </div>
+                  <div className="mt-4 grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
+                    <MetricCard label="Innovation Activities" value={String(institutionProfile.stats.totalInnovationActivities)} />
+                    <MetricCard label="Patents Filed" value={String(institutionProfile.stats.patentsFiled)} />
+                    <MetricCard label="Mentoring Hours" value={String(institutionProfile.stats.totalMentoringHours)} />
+                    <MetricCard label="Startups Launched" value={String(institutionProfile.stats.startupsLaunched)} />
+                    <MetricCard label="HR Connections" value={typeof institutionProfile.stats.totalHRConnections === "number" ? String(institutionProfile.stats.totalHRConnections) : "Not added"} />
+                    <MetricCard label="Students Placed" value={typeof institutionProfile.stats.studentsPlaced === "number" ? String(institutionProfile.stats.studentsPlaced) : "Not added"} />
+                    <MetricCard label="Shortlists This Quarter" value={typeof institutionProfile.stats.directShortlistsThisQuarter === "number" ? String(institutionProfile.stats.directShortlistsThisQuarter) : "Not added"} />
+                    <MetricCard label="Industry Collaborations" value={String(institutionProfile.stats.industryCollaborations)} />
+                  </div>
+                </div>
+              ) : null}
+            </>
+          ) : entity.skills && entity.skills.length > 0 ? (
             <div className="rounded-[28px] border border-white/10 bg-[#090d1b] p-6">
               <div className="flex items-center gap-2 text-xs uppercase tracking-[0.28em] text-slate-500">
                 <Sparkles className="h-4 w-4" />
@@ -426,7 +540,7 @@ function ProfileDetailView({
             </div>
           ) : null}
 
-          {entity.experienceHighlights && entity.experienceHighlights.length > 0 ? (
+          {!isInstitution && entity.experienceHighlights && entity.experienceHighlights.length > 0 ? (
             <div className="rounded-[28px] border border-white/10 bg-[#090d1b] p-6">
               <div className="flex items-center gap-2 text-xs uppercase tracking-[0.28em] text-slate-500">
                 <CalendarDays className="h-4 w-4" />
@@ -466,7 +580,7 @@ function ProfileDetailView({
             </div>
           ) : null}
 
-          {entity.educationHighlights && entity.educationHighlights.length > 0 ? (
+          {!isInstitution && entity.educationHighlights && entity.educationHighlights.length > 0 ? (
             <div className="rounded-[28px] border border-white/10 bg-[#090d1b] p-6">
               <div className="flex items-center gap-2 text-xs uppercase tracking-[0.28em] text-slate-500">
                 <GraduationCap className="h-4 w-4" />
@@ -491,7 +605,7 @@ function ProfileDetailView({
             </div>
           ) : null}
 
-          {entity.portfolioHighlights && entity.portfolioHighlights.length > 0 ? (
+          {!isInstitution && entity.portfolioHighlights && entity.portfolioHighlights.length > 0 ? (
             <div className="rounded-[28px] border border-white/10 bg-[#090d1b] p-6">
               <div className="flex items-center gap-2 text-xs uppercase tracking-[0.28em] text-slate-500">
                 <FolderKanban className="h-4 w-4" />
@@ -553,7 +667,11 @@ function ProfileDetailView({
                 Open Roles
               </div>
               <div className="mt-4 space-y-3">
-                {entity.relatedJobs.map((job) => (
+                {entity.relatedJobs.map((job) => {
+                  const hasApplied = Boolean(appliedJobIds[job._id]) || Boolean(job.hasApplied);
+                  const isApplying = applyingJobId === job._id;
+
+                  return (
                   <div key={job._id} className="rounded-[22px] border border-white/10 bg-white/[0.03] p-4">
                     <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
                       <div>
@@ -572,6 +690,29 @@ function ProfileDetailView({
                           {job.expiresAt ? <span>Closes {formatDate(job.expiresAt)}</span> : null}
                         </div>
                         <p className="mt-3 text-sm leading-6 text-slate-300">{job.description}</p>
+                        {isStudentRecruiterView ? (
+                          <div className="mt-4 flex flex-wrap gap-2">
+                            <button
+                              type="button"
+                              onClick={() => handleApplyToJob(job._id)}
+                              disabled={hasApplied || isApplying || !job.isActive}
+                              className="inline-flex items-center gap-2 rounded-full bg-cyan-400 px-4 py-2 text-sm font-semibold text-slate-950 transition hover:bg-cyan-300 disabled:cursor-not-allowed disabled:bg-slate-700 disabled:text-slate-300"
+                            >
+                              {isApplying ? "Applying..." : getJobActionLabel(hasApplied)}
+                            </button>
+                            <button
+                              type="button"
+                              onClick={() => navigate(`/marketplace/jobs/${job._id}`)}
+                              className="inline-flex items-center gap-2 rounded-full border border-white/10 bg-white/5 px-4 py-2 text-sm font-medium text-white transition hover:border-white/20 hover:bg-white/10"
+                            >
+                              View job
+                              <ArrowRight className="h-4 w-4" />
+                            </button>
+                          </div>
+                        ) : null}
+                        {applyErrorJobId === job._id && applyErrorMessage ? (
+                          <div className="mt-3 text-sm text-rose-300">{applyErrorMessage}</div>
+                        ) : null}
                       </div>
                       <div className="grid gap-2 sm:w-44">
                         {jobStats(job).map((stat) => (
@@ -583,7 +724,7 @@ function ProfileDetailView({
                       </div>
                     </div>
                   </div>
-                ))}
+                )})}
               </div>
             </div>
           ) : null}
@@ -622,9 +763,15 @@ function ProfileDetailView({
             <div className="mt-4 space-y-3 text-sm text-slate-300">
               <SidebarRow label="Role" value={formatRole(entity.entityType)} />
               <SidebarRow label="Domain" value={entity.domain ?? "Not specified"} />
-              <SidebarRow label="Location" value={entity.location ?? "Not specified"} />
-              <SidebarRow label="Skills" value={String(entity.insightCounts.skills)} />
-              <SidebarRow label="Projects" value={String(entity.insightCounts.portfolioProjects)} />
+              <SidebarRow label="Location" value={institutionProfile?.location ?? entity.location ?? "Not specified"} />
+              <SidebarRow label={isInstitution ? "Organization Type" : "Skills"} value={isInstitution ? institutionProfile?.organizationType ?? "Not specified" : String(entity.insightCounts.skills)} />
+              <SidebarRow label={isInstitution ? "Students" : "Projects"} value={isInstitution ? String(institutionProfile?.totalStudentsEnrolled ?? 0) : String(entity.insightCounts.portfolioProjects)} />
+              {isInstitution ? (
+                <SidebarRow
+                  label="Contact"
+                  value={institutionProfile?.contactEmail ?? institutionProfile?.contactPhone ?? "Not specified"}
+                />
+              ) : null}
               <SidebarRow
                 label="Recruiter Jobs"
                 value={entity.entityType === "recruiter" ? String(entity.relatedCounts.jobs) : "Not applicable"}

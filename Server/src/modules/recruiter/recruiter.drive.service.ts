@@ -2,11 +2,40 @@ import { UserRole } from '../../types/roles.types';
 import { ApiError } from '../../utils/ApiError';
 import { CampusDrive } from './campusDrive.model';
 import { PlacementRecord } from '../college/placementRecord.model';
+import { RequestRecord } from '../request/request.model';
+import { createRequestRecord } from '../request/request.service';
 import { User } from '../user/user.model';
 import { createBridge, getStudentCollegeId, mapCollege, mapDrive, mapPlacement, notifyUser } from './recruiter.mappers';
 import { RecruiterCollegeCard, RecruiterDriveView, RecruiterPlacementRow } from './recruiter.types';
 import { driveCreateSchema } from './recruiter.schemas';
 import { z } from 'zod';
+
+export const getLinkedCollegeIdsForRecruiter = async (recruiterId: string): Promise<string[]> => {
+  const requests = await RequestRecord.find({
+    type: 'college_recruiter_partnership',
+    fromUserId: recruiterId,
+    targetEntityType: 'college',
+    status: 'accepted',
+  })
+    .select('targetEntityId')
+    .lean();
+
+  return [...new Set(requests.map((request) => request.targetEntityId))];
+};
+
+export const assertRecruiterLinkedToCollege = async (
+  recruiterId: string,
+  collegeId: string,
+): Promise<void> => {
+  const linkedCollegeIds = await getLinkedCollegeIdsForRecruiter(recruiterId);
+  if (!linkedCollegeIds.includes(collegeId)) {
+    throw new ApiError(
+      403,
+      'COLLEGE_NOT_LINKED',
+      'Recruiter can only create hiring events for colleges with an accepted partnership.',
+    );
+  }
+};
 
 export const getRecruiterDrives = async (recruiterId: string): Promise<RecruiterDriveView[]> => {
   const drives = await CampusDrive.find({ recruiterId }).sort({ scheduledAt: -1 }).lean();
@@ -119,6 +148,24 @@ export const getRecruiterColleges = async (): Promise<RecruiterCollegeCard[]> =>
   return colleges.map(mapCollege);
 };
 
+export const getRecruiterLinkedColleges = async (recruiterId: string): Promise<RecruiterCollegeCard[]> => {
+  const linkedCollegeIds = await getLinkedCollegeIdsForRecruiter(recruiterId);
+  if (linkedCollegeIds.length === 0) {
+    return [];
+  }
+
+  const colleges = await User.find({
+    _id: { $in: linkedCollegeIds },
+    role: UserRole.COLLEGE,
+    isActive: true,
+  })
+    .select('_id displayName institutionProfile')
+    .sort({ updatedAt: -1 })
+    .lean();
+
+  return colleges.map(mapCollege);
+};
+
 export const getRecruiterOnboarding = async (recruiterId: string): Promise<RecruiterPlacementRow[]> => {
   const placements = await PlacementRecord.find({ recruiterId }).sort({ updatedAt: -1 }).lean();
   if (placements.length === 0) {
@@ -183,12 +230,40 @@ export const requestCollegePartnership = async (
     message?.trim() ||
     `${recruiterName} is interested in partnering with ${college.displayName} for placements and drives.`;
 
-  await notifyUser(
-    String(college._id),
-    'New partnership request',
-    body,
-    '/dashboard/college',
-  );
+  const existingAccepted = await RequestRecord.findOne({
+    type: 'college_recruiter_partnership',
+    fromUserId: recruiterId,
+    targetEntityType: 'college',
+    targetEntityId: String(college._id),
+    status: 'accepted',
+  })
+    .select('_id')
+    .lean();
+
+  if (existingAccepted) {
+    return { sent: true, alreadyLinked: true };
+  }
+
+  await createRequestRecord({
+    type: 'college_recruiter_partnership',
+    actionType: 'partner',
+    fromUserId: recruiterId,
+    toUserId: String(college._id),
+    targetEntityType: 'college',
+    targetEntityId: String(college._id),
+    targetEntityTitle: college.displayName,
+    targetRole: UserRole.COLLEGE,
+    requestedRole: 'partner',
+    message: body,
+    metadata: {
+      recruiterId,
+      collegeId: String(college._id),
+      recruiterName,
+    },
+    deepLink: '/dashboard/invitations',
+    acceptRedirect: '/dashboard/college',
+    declineRedirect: '/dashboard/college',
+  });
 
   return { sent: true };
 };

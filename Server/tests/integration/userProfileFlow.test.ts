@@ -72,6 +72,117 @@ describe('user profile flow integration', () => {
     expect(scoreAddSpy).not.toHaveBeenCalled();
   });
 
+  it('updates LinkedIn-style institution page fields for school and college accounts', async () => {
+    const institution = await User.create({
+      email: `institution-${randomUUID()}@example.com`,
+      passwordHash: await bcrypt.hash(PASSWORD, 12),
+      role: UserRole.COLLEGE,
+      displayName: 'Future Institute',
+      profileComplete: true,
+      registrationStage: 'complete',
+      accessGrantedBy: 'admin',
+      accessExpiresAt: new Date(Date.now() + 365 * 24 * 60 * 60 * 1000),
+      isActive: true,
+      institutionToken: null,
+      institutionId: null,
+      institutionVerificationStatus: 'none',
+      verificationStatus: 'not_required',
+      adminApprovalStatus: 'approved',
+      institutionProfile: {
+        institutionName: 'Future Institute',
+        location: 'Bengaluru, India',
+        totalStudentsEnrolled: 1800,
+        academicYear: '2025-26',
+        iicStarRating: 4.4,
+        specialties: [],
+        locations: [],
+        policies: [],
+        stats: {
+          totalInnovationActivities: 12,
+          patentsFiled: 4,
+          totalMentoringHours: 60,
+          startupsLaunched: 2,
+          industryCollaborations: 3,
+        },
+      },
+    });
+
+    const accessToken = await loginAs(institution.email);
+
+    const updateResponse = await request(app)
+      .patch('/api/users/me')
+      .set('Authorization', `Bearer ${accessToken}`)
+      .send({
+        domain: 'Higher Education',
+        headline: 'Research, innovation, and placements with industry depth.',
+        institutionProfile: {
+          organizationType: 'Private engineering college',
+          foundedYear: 2008,
+          alumniCount: 6200,
+          employeeCount: 240,
+          contactEmail: 'connect@future.example',
+          contactPhone: '+91-9876543210',
+          specialties: ['Robotics', 'Incubation', 'Campus hiring'],
+          locations: ['Bengaluru', 'Mysuru'],
+          stats: {
+            totalInnovationActivities: 32,
+            patentsFiled: 9,
+            startupsLaunched: 7,
+            industryCollaborations: 14,
+            studentsPlaced: 540,
+            totalHRConnections: 48,
+            directShortlistsThisQuarter: 21,
+            topHiringSector: 'AI & Software',
+          },
+        },
+      });
+
+    expect(updateResponse.status).toBe(200);
+    expect(updateResponse.body.data.domain).toBe('Higher Education');
+    expect(updateResponse.body.data.headline).toBe('Research, innovation, and placements with industry depth.');
+    expect(updateResponse.body.data.institutionProfile).toMatchObject({
+      organizationType: 'Private engineering college',
+      foundedYear: 2008,
+      alumniCount: 6200,
+      employeeCount: 240,
+      contactEmail: 'connect@future.example',
+      contactPhone: '+91-9876543210',
+      specialties: ['Robotics', 'Incubation', 'Campus hiring'],
+      locations: ['Bengaluru', 'Mysuru'],
+      stats: {
+        totalInnovationActivities: 32,
+        patentsFiled: 9,
+        startupsLaunched: 7,
+        industryCollaborations: 14,
+        studentsPlaced: 540,
+        totalHRConnections: 48,
+        directShortlistsThisQuarter: 21,
+        topHiringSector: 'AI & Software',
+      },
+    });
+
+    const refreshedInstitution = await User.findById(institution._id).lean();
+    expect(refreshedInstitution?.headline).toBe('Research, innovation, and placements with industry depth.');
+    expect(refreshedInstitution?.institutionProfile).toMatchObject({
+      organizationType: 'Private engineering college',
+      foundedYear: 2008,
+      alumniCount: 6200,
+      employeeCount: 240,
+      specialties: ['Robotics', 'Incubation', 'Campus hiring'],
+      locations: ['Bengaluru', 'Mysuru'],
+      stats: {
+        totalInnovationActivities: 32,
+        patentsFiled: 9,
+        startupsLaunched: 7,
+        industryCollaborations: 14,
+        studentsPlaced: 540,
+        totalHRConnections: 48,
+        directShortlistsThisQuarter: 21,
+        topHiringSector: 'AI & Software',
+      },
+    });
+  });
+
   it('keeps current-session education from institution access while preserving additional user education', async () => {
     const institution = await User.create({
       email: `college-${randomUUID()}@example.com`,

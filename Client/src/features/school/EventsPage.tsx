@@ -1,14 +1,5 @@
-import { schoolApi } from '../../api/school.api';
-import { InstitutionEventsPageBase } from '../institution/InstitutionEventsPageBase';
+import EventManager from '../college/EventManager';
 
 export default function EventsPage() {
-  return (
-    <InstitutionEventsPageBase
-      mode="school"
-      title="School Events"
-      subtitle="Upcoming institution events surfaced from the school overview."
-      basePath="/dashboard/school"
-      fetchEvents={schoolApi.getEvents}
-    />
-  );
+  return <EventManager mode="school" />;
 }

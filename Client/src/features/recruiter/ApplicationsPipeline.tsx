@@ -16,38 +16,13 @@ import { getMarketplaceDetailPath } from '../../features/marketplace/navigation'
 import { Button } from '../../components/ui/Button';
 import { Input } from '../../components/ui/Input';
 import { Spinner } from '../../components/ui/Spinner';
+import { APPLICATION_STAGE_BADGE, APPLICATION_STAGE_ORDER } from '../../utils/applicationStages';
 import type {
   RecruiterJobApplicantView,
   RecruiterJobApplicationStage,
   RecruiterJobDetail,
 } from '../../types/recruiter.types';
 import { UserRole } from '../../types/roles.types';
-
-const STAGE_ORDER: RecruiterJobApplicationStage[] = [
-  'Invited Pending',
-  'Invite Accepted',
-  'Applied',
-  'Screening',
-  'Shortlisted',
-  'Interview',
-  'Offered',
-  'Hired',
-  'Invite Declined',
-  'Rejected',
-];
-
-const STAGE_BADGE: Record<RecruiterJobApplicationStage, string> = {
-  'Invited Pending': 'border-amber-500/30 text-amber-300',
-  'Invite Accepted': 'border-emerald-500/30 text-emerald-300',
-  'Invite Declined': 'border-rose-500/30 text-rose-300',
-  Applied: 'border-slate-700 text-slate-300',
-  Screening: 'border-cyan-500/30 text-cyan-300',
-  Shortlisted: 'border-blue-500/30 text-blue-300',
-  Interview: 'border-violet-500/30 text-violet-300',
-  Offered: 'border-amber-500/30 text-amber-300',
-  Hired: 'border-emerald-500/30 text-emerald-300',
-  Rejected: 'border-rose-500/30 text-rose-300',
-};
 
 const compactActionClass =
   'inline-flex items-center justify-center gap-2 rounded-lg border border-slate-800 px-3 py-2 text-xs font-medium text-slate-200 transition hover:border-slate-700 hover:bg-slate-900';
@@ -88,12 +63,19 @@ const getApplicantSearchText = (applicant: RecruiterJobApplicantView) =>
     applicant.activeProject?.title,
     applicant.activeProject?.category,
     applicant.skills.join(' '),
+    applicant.source,
   ]
     .join(' ')
     .toLowerCase();
 
+const SOURCE_LABELS: Record<RecruiterJobApplicantView['source'], string> = {
+  student_apply: 'Applied',
+  recruiter_invite: 'Invited',
+  hiring_event: 'Hiring event',
+};
+
 const countByStage = (applications: RecruiterJobApplicantView[]) =>
-  STAGE_ORDER.reduce<Record<RecruiterJobApplicationStage, number>>((acc, stage) => {
+  APPLICATION_STAGE_ORDER.reduce<Record<RecruiterJobApplicationStage, number>>((acc, stage) => {
     acc[stage] = applications.filter((application) => application.stage === stage).length;
     return acc;
   }, {} as Record<RecruiterJobApplicationStage, number>);
@@ -101,7 +83,7 @@ const countByStage = (applications: RecruiterJobApplicantView[]) =>
 const getDefaultStage = (
   stageCounts: Record<RecruiterJobApplicationStage, number>,
 ): RecruiterJobApplicationStage =>
-  STAGE_ORDER.find((stage) => stageCounts[stage] > 0) ?? 'Applied';
+  APPLICATION_STAGE_ORDER.find((stage) => stageCounts[stage] > 0) ?? 'Applied';
 
 const formatCandidateCount = (count: number) => `${count} candidate${count === 1 ? '' : 's'}`;
 
@@ -428,7 +410,7 @@ export default function ApplicationsPipeline() {
                 </div>
 
                 <div className="flex flex-wrap gap-2">
-                  {STAGE_ORDER.map((stage) => {
+                  {APPLICATION_STAGE_ORDER.map((stage) => {
                     const isActive = activeStage === stage;
                     return (
                       <button
@@ -443,7 +425,9 @@ export default function ApplicationsPipeline() {
                         }`}
                       >
                         <span>{stage}</span>
-                        <span className={`rounded-full border px-2 py-0.5 text-[11px] ${STAGE_BADGE[stage]}`}>
+                        <span
+                          className={`rounded-full border px-2 py-0.5 text-[11px] ${APPLICATION_STAGE_BADGE[stage]}`}
+                        >
                           {stageCounts[stage]}
                         </span>
                       </button>
@@ -481,7 +465,9 @@ export default function ApplicationsPipeline() {
                           {formatCandidateCount(stageCounts[activeStage])} available in this stage.
                         </div>
                       </div>
-                      <div className={`rounded-full border px-2 py-0.5 text-[11px] ${STAGE_BADGE[activeStage]}`}>
+                      <div
+                        className={`rounded-full border px-2 py-0.5 text-[11px] ${APPLICATION_STAGE_BADGE[activeStage]}`}
+                      >
                         {stageCounts[activeStage]}
                       </div>
                     </div>
@@ -515,6 +501,11 @@ export default function ApplicationsPipeline() {
                                   <div className="truncate text-sm font-semibold text-white">{applicant.displayName}</div>
                                   <div className="mt-0.5 truncate text-xs text-slate-400">
                                     {applicant.institution?.name ?? 'Independent'}
+                                  </div>
+                                  <div className="mt-1">
+                                    <span className="rounded-full border border-slate-800 px-2 py-0.5 text-[11px] text-slate-300">
+                                      {SOURCE_LABELS[applicant.source]}
+                                    </span>
                                   </div>
                                   {applicant.activeProject ? (
                                     <div className="mt-1 truncate text-xs text-slate-500">
@@ -567,7 +558,7 @@ export default function ApplicationsPipeline() {
                                   disabled={isUpdating || pipelineUnavailable}
                                   className="w-full rounded-lg border border-slate-800 bg-slate-900 px-3 py-2 text-sm text-white focus:outline-none focus:ring-2 focus:ring-blue-500 disabled:opacity-60"
                                 >
-                                  {STAGE_ORDER.map((option) => (
+                                  {APPLICATION_STAGE_ORDER.map((option) => (
                                     <option key={option} value={option}>
                                       {option}
                                     </option>

@@ -3,7 +3,6 @@ import { ApiSuccessResponse } from '../types/auth.types';
 import {
   BulkCredentialImportResult,
   ComplianceReportRecord,
-  DashboardEvent,
   DirectoryInvestor,
   InstitutionPatent,
   InstitutionStartup,
@@ -18,6 +17,7 @@ import {
   TemporaryStudentCredentials,
   StudentVerificationReviewResponse,
 } from '../types/school.types';
+import { CollegeEvent, CollegeEventRankingsResponse } from '../types/college.types';
 import {
   CreateInstitutionMentorshipProgramInput,
   InstitutionMentorshipProgram,
@@ -57,8 +57,24 @@ export const schoolApi = {
     const response = await api.get<ApiSuccessResponse<InstitutionStartup[]>>('/api/school/startups');
     return response.data.data;
   },
-  async getEvents() {
-    const response = await api.get<ApiSuccessResponse<DashboardEvent[]>>('/api/school/events');
+  async listEvents() {
+    const response = await api.get<ApiSuccessResponse<CollegeEvent[]>>('/api/school/events');
+    return response.data.data;
+  },
+  async createEvent(payload: {
+    title: string;
+    type: 'Industry Connect Session' | 'Placement Hackathon' | 'Innovation Drive' | 'Other';
+    date: string;
+    description: string;
+    targetRoles?: Array<'student' | 'all'>;
+  }) {
+    const response = await api.post<ApiSuccessResponse<CollegeEvent>>('/api/school/events', payload);
+    return response.data.data;
+  },
+  async getEventRankings(eventId: string) {
+    const response = await api.get<ApiSuccessResponse<CollegeEventRankingsResponse>>(
+      `/api/school/events/${eventId}/rankings`,
+    );
     return response.data.data;
   },
   async generateComplianceReport() {

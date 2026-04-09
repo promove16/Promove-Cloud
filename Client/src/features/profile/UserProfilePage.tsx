@@ -76,6 +76,8 @@ type ProfileForm = {
   avatarWallpaper: string;
   bio: string;
   domain: string;
+  headline: string;
+  location: string;
   linkedinUrl: string;
   websiteUrl: string;
   twitterUrl: string;
@@ -91,6 +93,32 @@ type ProfileForm = {
   education: ProfileEducation[];
   certifications: ProfileCertification[];
   portfolioProjects: PortfolioProject[];
+  institutionProfile: {
+    institutionName: string;
+    location: string;
+    totalStudentsEnrolled: string;
+    academicYear: string;
+    iicStarRating: string;
+    organizationType: string;
+    foundedYear: string;
+    specialties: string[];
+    locations: string[];
+    alumniCount: string;
+    employeeCount: string;
+    contactEmail: string;
+    contactPhone: string;
+    stats: {
+      totalInnovationActivities: string;
+      patentsFiled: string;
+      totalMentoringHours: string;
+      startupsLaunched: string;
+      industryCollaborations: string;
+      totalHRConnections: string;
+      studentsPlaced: string;
+      directShortlistsThisQuarter: string;
+      topHiringSector: string;
+    };
+  };
 };
 
 const newId = () => `manual-${Date.now()}-${Math.random().toString(36).slice(2)}`;
@@ -111,6 +139,41 @@ const parseYear = (value: string) => {
   const year = Number(value);
   return Number.isFinite(year) && year > 0 ? year : null;
 };
+
+const parseOptionalInteger = (value: string) => {
+  if (!value.trim()) return undefined;
+  const parsed = Number(value);
+  return Number.isFinite(parsed) && parsed >= 0 ? parsed : undefined;
+};
+
+const toFormNumber = (value?: number | null) => (typeof value === 'number' ? String(value) : '');
+
+const createInstitutionProfileForm = (profile?: UserProfile['institutionProfile']): ProfileForm['institutionProfile'] => ({
+  institutionName: profile?.institutionName ?? '',
+  location: profile?.location ?? '',
+  totalStudentsEnrolled: toFormNumber(profile?.totalStudentsEnrolled),
+  academicYear: profile?.academicYear ?? '',
+  iicStarRating: toFormNumber(profile?.iicStarRating),
+  organizationType: profile?.organizationType ?? '',
+  foundedYear: toFormNumber(profile?.foundedYear),
+  specialties: profile?.specialties ?? [],
+  locations: profile?.locations ?? [],
+  alumniCount: toFormNumber(profile?.alumniCount),
+  employeeCount: toFormNumber(profile?.employeeCount),
+  contactEmail: profile?.contactEmail ?? '',
+  contactPhone: profile?.contactPhone ?? '',
+  stats: {
+    totalInnovationActivities: toFormNumber(profile?.stats?.totalInnovationActivities),
+    patentsFiled: toFormNumber(profile?.stats?.patentsFiled),
+    totalMentoringHours: toFormNumber(profile?.stats?.totalMentoringHours),
+    startupsLaunched: toFormNumber(profile?.stats?.startupsLaunched),
+    industryCollaborations: toFormNumber(profile?.stats?.industryCollaborations),
+    totalHRConnections: toFormNumber(profile?.stats?.totalHRConnections),
+    studentsPlaced: toFormNumber(profile?.stats?.studentsPlaced),
+    directShortlistsThisQuarter: toFormNumber(profile?.stats?.directShortlistsThisQuarter),
+    topHiringSector: profile?.stats?.topHiringSector ?? '',
+  },
+});
 
 const emptySkill = (): ProfileSkill => ({
   name: '',
@@ -321,6 +384,8 @@ export function UserProfilePage() {
     avatarWallpaper: '',
     bio: '',
     domain: '',
+    headline: '',
+    location: '',
     linkedinUrl: '',
     websiteUrl: '',
     twitterUrl: '',
@@ -336,6 +401,7 @@ export function UserProfilePage() {
     education: [],
     certifications: [],
     portfolioProjects: [],
+    institutionProfile: createInstitutionProfileForm(),
   });
 
   const profileQuery = useQuery({ queryKey: ['profile', 'me'], queryFn: userApi.getMe });
@@ -354,6 +420,8 @@ export function UserProfilePage() {
       avatarWallpaper: profileQuery.data.avatarWallpaper ?? '',
       bio: profileQuery.data.bio ?? '',
       domain: profileQuery.data.domain ?? '',
+      headline: profileQuery.data.headline ?? '',
+      location: profileQuery.data.location ?? profileQuery.data.institutionProfile?.location ?? '',
       linkedinUrl: profileQuery.data.linkedinUrl ?? '',
       websiteUrl: profileQuery.data.websiteUrl ?? '',
       twitterUrl: profileQuery.data.twitterUrl ?? '',
@@ -369,6 +437,7 @@ export function UserProfilePage() {
       education: profileQuery.data.education ?? [],
       certifications: profileQuery.data.certifications ?? [],
       portfolioProjects: profileQuery.data.portfolioProjects ?? [],
+      institutionProfile: createInstitutionProfileForm(profileQuery.data.institutionProfile),
     });
   }, [profileQuery.data]);
 
@@ -452,6 +521,7 @@ export function UserProfilePage() {
   const isBusy = updateMutation.isPending || socialMutation.isPending || startGithubMutation.isPending || importGithubMutation.isPending;
   const repoChoices = githubRepositoriesQuery.data ?? [];
   const publicProfileUrl = profile?.profileSlug && typeof window !== 'undefined' ? `${window.location.origin}/students/${profile.profileSlug}` : '';
+  const isInstitutionRole = currentUser?.role === UserRole.SCHOOL || currentUser?.role === UserRole.COLLEGE;
   const currentSessionEducation = useMemo(
     () => form.education.find((item) => isInstitutionEducation(item)) ?? null,
     [form.education],
@@ -461,14 +531,30 @@ export function UserProfilePage() {
     [form.education],
   );
   const completionStats = useMemo(
-    () => [
-      { label: 'Skills', value: form.skills.filter((skill) => skill.name.trim()).length },
-      { label: 'Experience', value: form.experience.filter((item) => item.title.trim()).length },
-      { label: 'Education', value: form.education.filter((item) => item.institution.trim()).length },
-      { label: 'Projects', value: form.portfolioProjects.filter((item) => item.title.trim()).length },
-      { label: 'Startups', value: startupsQuery.data?.length ?? 0 },
-    ],
-    [form.education, form.experience, form.portfolioProjects, form.skills, startupsQuery.data?.length],
+    () =>
+      isInstitutionRole
+        ? [
+            { label: 'Specialties', value: form.institutionProfile.specialties.filter(Boolean).length },
+            { label: 'Locations', value: form.institutionProfile.locations.filter(Boolean).length },
+            {
+              label: 'Metrics',
+              value: [
+                form.institutionProfile.stats.totalInnovationActivities,
+                form.institutionProfile.stats.patentsFiled,
+                form.institutionProfile.stats.startupsLaunched,
+                form.institutionProfile.stats.industryCollaborations,
+              ].filter((item) => item.trim()).length,
+            },
+            { label: 'Startups', value: startupsQuery.data?.length ?? 0 },
+          ]
+        : [
+            { label: 'Skills', value: form.skills.filter((skill) => skill.name.trim()).length },
+            { label: 'Experience', value: form.experience.filter((item) => item.title.trim()).length },
+            { label: 'Education', value: form.education.filter((item) => item.institution.trim()).length },
+            { label: 'Projects', value: form.portfolioProjects.filter((item) => item.title.trim()).length },
+            { label: 'Startups', value: startupsQuery.data?.length ?? 0 },
+          ],
+    [form.education, form.experience, form.institutionProfile, form.portfolioProjects, form.skills, isInstitutionRole, startupsQuery.data?.length],
   );
 
   if (!currentUser) return null;
@@ -481,6 +567,8 @@ export function UserProfilePage() {
       avatarWallpaper: form.avatarWallpaper.trim(),
       bio: form.bio.trim(),
       domain: form.domain.trim(),
+      headline: form.headline.trim(),
+      location: form.location.trim(),
       linkedinUrl: form.linkedinUrl.trim(),
       websiteUrl: form.websiteUrl.trim(),
       twitterUrl: form.twitterUrl.trim(),
@@ -491,11 +579,70 @@ export function UserProfilePage() {
       researchGateUrl: form.researchGateUrl.trim(),
       mediumUrl: form.mediumUrl.trim(),
       discoverableToRecruiters: currentUser.role === UserRole.STUDENT ? form.discoverableToRecruiters : undefined,
-      skills: form.skills.filter((skill) => skill.name.trim()),
-      experience: form.experience.filter((item) => item.title.trim() && item.company.trim()),
-      education: form.education.filter((item) => !isInstitutionEducation(item) && item.institution.trim()),
-      certifications: form.certifications.filter((item) => item.name.trim() && item.issuingOrganization.trim()),
-      portfolioProjects: form.portfolioProjects.filter((item) => item.title.trim()),
+      ...(isInstitutionRole
+        ? {
+            institutionProfile: {
+              institutionName: form.institutionProfile.institutionName.trim(),
+              location: form.institutionProfile.location.trim(),
+              ...(parseOptionalInteger(form.institutionProfile.totalStudentsEnrolled) !== undefined
+                ? { totalStudentsEnrolled: parseOptionalInteger(form.institutionProfile.totalStudentsEnrolled) }
+                : {}),
+              academicYear: form.institutionProfile.academicYear.trim(),
+              ...(parseOptionalInteger(form.institutionProfile.iicStarRating) !== undefined
+                ? { iicStarRating: parseOptionalInteger(form.institutionProfile.iicStarRating) }
+                : {}),
+              organizationType: form.institutionProfile.organizationType.trim(),
+              ...(parseOptionalInteger(form.institutionProfile.foundedYear) !== undefined
+                ? { foundedYear: parseOptionalInteger(form.institutionProfile.foundedYear) }
+                : {}),
+              specialties: form.institutionProfile.specialties.filter(Boolean),
+              locations: form.institutionProfile.locations.filter(Boolean),
+              ...(parseOptionalInteger(form.institutionProfile.alumniCount) !== undefined
+                ? { alumniCount: parseOptionalInteger(form.institutionProfile.alumniCount) }
+                : {}),
+              ...(parseOptionalInteger(form.institutionProfile.employeeCount) !== undefined
+                ? { employeeCount: parseOptionalInteger(form.institutionProfile.employeeCount) }
+                : {}),
+              contactEmail: form.institutionProfile.contactEmail.trim(),
+              contactPhone: form.institutionProfile.contactPhone.trim(),
+              stats: {
+                ...(parseOptionalInteger(form.institutionProfile.stats.totalInnovationActivities) !== undefined
+                  ? { totalInnovationActivities: parseOptionalInteger(form.institutionProfile.stats.totalInnovationActivities) }
+                  : {}),
+                ...(parseOptionalInteger(form.institutionProfile.stats.patentsFiled) !== undefined
+                  ? { patentsFiled: parseOptionalInteger(form.institutionProfile.stats.patentsFiled) }
+                  : {}),
+                ...(parseOptionalInteger(form.institutionProfile.stats.totalMentoringHours) !== undefined
+                  ? { totalMentoringHours: parseOptionalInteger(form.institutionProfile.stats.totalMentoringHours) }
+                  : {}),
+                ...(parseOptionalInteger(form.institutionProfile.stats.startupsLaunched) !== undefined
+                  ? { startupsLaunched: parseOptionalInteger(form.institutionProfile.stats.startupsLaunched) }
+                  : {}),
+                ...(parseOptionalInteger(form.institutionProfile.stats.industryCollaborations) !== undefined
+                  ? { industryCollaborations: parseOptionalInteger(form.institutionProfile.stats.industryCollaborations) }
+                  : {}),
+                ...(parseOptionalInteger(form.institutionProfile.stats.totalHRConnections) !== undefined
+                  ? { totalHRConnections: parseOptionalInteger(form.institutionProfile.stats.totalHRConnections) }
+                  : {}),
+                ...(parseOptionalInteger(form.institutionProfile.stats.studentsPlaced) !== undefined
+                  ? { studentsPlaced: parseOptionalInteger(form.institutionProfile.stats.studentsPlaced) }
+                  : {}),
+                ...(parseOptionalInteger(form.institutionProfile.stats.directShortlistsThisQuarter) !== undefined
+                  ? { directShortlistsThisQuarter: parseOptionalInteger(form.institutionProfile.stats.directShortlistsThisQuarter) }
+                  : {}),
+                ...(form.institutionProfile.stats.topHiringSector.trim()
+                  ? { topHiringSector: form.institutionProfile.stats.topHiringSector.trim() }
+                  : {}),
+              },
+            },
+          }
+        : {
+            skills: form.skills.filter((skill) => skill.name.trim()),
+            experience: form.experience.filter((item) => item.title.trim() && item.company.trim()),
+            education: form.education.filter((item) => !isInstitutionEducation(item) && item.institution.trim()),
+            certifications: form.certifications.filter((item) => item.name.trim() && item.issuingOrganization.trim()),
+            portfolioProjects: form.portfolioProjects.filter((item) => item.title.trim()),
+          }),
     });
   };
 
@@ -511,9 +658,13 @@ export function UserProfilePage() {
         <div className="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
           <div>
             <div className="text-xs font-semibold uppercase tracking-[0.24em] text-[#0a66c2]">Portfolio editor</div>
-            <h1 className="mt-2 text-3xl font-semibold text-slate-950 dark:text-white">LinkedIn-style profile contents</h1>
+            <h1 className="mt-2 text-3xl font-semibold text-slate-950 dark:text-white">
+              {isInstitutionRole ? 'LinkedIn-style institution page' : 'LinkedIn-style profile contents'}
+            </h1>
             <p className="mt-2 max-w-3xl text-sm leading-6 text-slate-600 dark:text-slate-400">
-              Fill the same sections that render on the portfolio page. LinkedIn and GitHub can still be used as fast-fill sources.
+              {isInstitutionRole
+                ? 'Schools and colleges use institution-page fields similar to LinkedIn Pages, with overview, specialties, locations, and outcomes instead of personal education and experience.'
+                : 'Fill the same sections that render on the portfolio page. LinkedIn and GitHub can still be used as fast-fill sources.'}
             </p>
           </div>
           <div className="flex flex-wrap gap-2">
@@ -541,10 +692,11 @@ export function UserProfilePage() {
         <div className="space-y-5">
           <EditorSection title="Intro" icon={<Linkedin className="h-5 w-5" />}>
             <div className="grid gap-4 md:grid-cols-2">
-              <Field label="Name" value={form.displayName} onChange={(value) => setForm((current) => ({ ...current, displayName: value }))} />
+              <Field label={isInstitutionRole ? 'Page name' : 'Name'} value={form.displayName} onChange={(value) => setForm((current) => ({ ...current, displayName: value }))} />
               <Field label="Avatar URL" type="url" value={form.avatar} onChange={(value) => setForm((current) => ({ ...current, avatar: value }))} />
               <Field label="Avatar wallpaper URL" type="url" value={form.avatarWallpaper} onChange={(value) => setForm((current) => ({ ...current, avatarWallpaper: value }))} />
-              <Field label="Headline / domain" value={form.domain} onChange={(value) => setForm((current) => ({ ...current, domain: value }))} placeholder="AI, robotics, full-stack engineering" />
+              <Field label={isInstitutionRole ? 'Industry / focus' : 'Headline / domain'} value={form.domain} onChange={(value) => setForm((current) => ({ ...current, domain: value }))} placeholder={isInstitutionRole ? 'Higher education, K-12, research, innovation' : 'AI, robotics, full-stack engineering'} />
+              <Field label={isInstitutionRole ? 'Tagline' : 'Headline'} value={form.headline} onChange={(value) => setForm((current) => ({ ...current, headline: value }))} placeholder={isInstitutionRole ? 'Building research, innovation, and placements at scale' : 'What should people notice first?'} />
               <Field label="LinkedIn URL" type="url" value={form.linkedinUrl} onChange={(value) => setForm((current) => ({ ...current, linkedinUrl: value }))} placeholder="https://linkedin.com/in/..." />
             </div>
             <div className="mt-4">
@@ -563,6 +715,288 @@ export function UserProfilePage() {
             ) : null}
           </EditorSection>
 
+          {isInstitutionRole ? (
+            <>
+              <EditorSection title="Institution details" icon={<GraduationCap className="h-5 w-5" />}>
+                <div className="grid gap-4 md:grid-cols-2">
+                  <Field
+                    label="Institution name"
+                    value={form.institutionProfile.institutionName}
+                    onChange={(value) =>
+                      setForm((current) => ({
+                        ...current,
+                        institutionProfile: { ...current.institutionProfile, institutionName: value },
+                      }))
+                    }
+                  />
+                  <Field
+                    label="Headquarters / primary campus"
+                    value={form.institutionProfile.location}
+                    onChange={(value) =>
+                      setForm((current) => ({
+                        ...current,
+                        location: value,
+                        institutionProfile: { ...current.institutionProfile, location: value },
+                      }))
+                    }
+                  />
+                  <Field
+                    label="Organization type"
+                    value={form.institutionProfile.organizationType}
+                    onChange={(value) =>
+                      setForm((current) => ({
+                        ...current,
+                        institutionProfile: { ...current.institutionProfile, organizationType: value },
+                      }))
+                    }
+                    placeholder={currentUser.role === UserRole.COLLEGE ? 'Private college, public university' : 'School, higher secondary school'}
+                  />
+                  <Field
+                    label="Founded year"
+                    type="number"
+                    value={form.institutionProfile.foundedYear}
+                    onChange={(value) =>
+                      setForm((current) => ({
+                        ...current,
+                        institutionProfile: { ...current.institutionProfile, foundedYear: value },
+                      }))
+                    }
+                  />
+                  <Field
+                    label="Total students"
+                    type="number"
+                    value={form.institutionProfile.totalStudentsEnrolled}
+                    onChange={(value) =>
+                      setForm((current) => ({
+                        ...current,
+                        institutionProfile: { ...current.institutionProfile, totalStudentsEnrolled: value },
+                      }))
+                    }
+                  />
+                  <Field
+                    label="Academic year"
+                    value={form.institutionProfile.academicYear}
+                    onChange={(value) =>
+                      setForm((current) => ({
+                        ...current,
+                        institutionProfile: { ...current.institutionProfile, academicYear: value },
+                      }))
+                    }
+                    placeholder="2026-27"
+                  />
+                  <Field
+                    label="Alumni count"
+                    type="number"
+                    value={form.institutionProfile.alumniCount}
+                    onChange={(value) =>
+                      setForm((current) => ({
+                        ...current,
+                        institutionProfile: { ...current.institutionProfile, alumniCount: value },
+                      }))
+                    }
+                  />
+                  <Field
+                    label="Faculty / staff count"
+                    type="number"
+                    value={form.institutionProfile.employeeCount}
+                    onChange={(value) =>
+                      setForm((current) => ({
+                        ...current,
+                        institutionProfile: { ...current.institutionProfile, employeeCount: value },
+                      }))
+                    }
+                  />
+                  <Field
+                    label="Public contact email"
+                    type="email"
+                    value={form.institutionProfile.contactEmail}
+                    onChange={(value) =>
+                      setForm((current) => ({
+                        ...current,
+                        institutionProfile: { ...current.institutionProfile, contactEmail: value },
+                      }))
+                    }
+                  />
+                  <Field
+                    label="Public contact phone"
+                    value={form.institutionProfile.contactPhone}
+                    onChange={(value) =>
+                      setForm((current) => ({
+                        ...current,
+                        institutionProfile: { ...current.institutionProfile, contactPhone: value },
+                      }))
+                    }
+                  />
+                  <Field
+                    label="IIC rating"
+                    type="number"
+                    value={form.institutionProfile.iicStarRating}
+                    onChange={(value) =>
+                      setForm((current) => ({
+                        ...current,
+                        institutionProfile: { ...current.institutionProfile, iicStarRating: value },
+                      }))
+                    }
+                  />
+                </div>
+                <div className="mt-4 grid gap-4 md:grid-cols-2">
+                  <Field
+                    label="Specialties / programs"
+                    value={form.institutionProfile.specialties.join(', ')}
+                    onChange={(value) =>
+                      setForm((current) => ({
+                        ...current,
+                        institutionProfile: { ...current.institutionProfile, specialties: fromListInput(value) },
+                      }))
+                    }
+                    placeholder="Entrepreneurship, incubation, robotics, placements"
+                  />
+                  <Field
+                    label="Additional locations"
+                    value={form.institutionProfile.locations.join(', ')}
+                    onChange={(value) =>
+                      setForm((current) => ({
+                        ...current,
+                        institutionProfile: { ...current.institutionProfile, locations: fromListInput(value) },
+                      }))
+                    }
+                    placeholder="Bengaluru, Hyderabad, Chennai"
+                  />
+                </div>
+              </EditorSection>
+
+              <EditorSection title="Outcomes & metrics" icon={<Rocket className="h-5 w-5" />}>
+                <div className="grid gap-4 md:grid-cols-2">
+                  <Field
+                    label="Innovation activities"
+                    type="number"
+                    value={form.institutionProfile.stats.totalInnovationActivities}
+                    onChange={(value) =>
+                      setForm((current) => ({
+                        ...current,
+                        institutionProfile: {
+                          ...current.institutionProfile,
+                          stats: { ...current.institutionProfile.stats, totalInnovationActivities: value },
+                        },
+                      }))
+                    }
+                  />
+                  <Field
+                    label="Patents filed"
+                    type="number"
+                    value={form.institutionProfile.stats.patentsFiled}
+                    onChange={(value) =>
+                      setForm((current) => ({
+                        ...current,
+                        institutionProfile: {
+                          ...current.institutionProfile,
+                          stats: { ...current.institutionProfile.stats, patentsFiled: value },
+                        },
+                      }))
+                    }
+                  />
+                  <Field
+                    label="Mentoring hours"
+                    type="number"
+                    value={form.institutionProfile.stats.totalMentoringHours}
+                    onChange={(value) =>
+                      setForm((current) => ({
+                        ...current,
+                        institutionProfile: {
+                          ...current.institutionProfile,
+                          stats: { ...current.institutionProfile.stats, totalMentoringHours: value },
+                        },
+                      }))
+                    }
+                  />
+                  <Field
+                    label="Startups launched"
+                    type="number"
+                    value={form.institutionProfile.stats.startupsLaunched}
+                    onChange={(value) =>
+                      setForm((current) => ({
+                        ...current,
+                        institutionProfile: {
+                          ...current.institutionProfile,
+                          stats: { ...current.institutionProfile.stats, startupsLaunched: value },
+                        },
+                      }))
+                    }
+                  />
+                  <Field
+                    label="Industry collaborations"
+                    type="number"
+                    value={form.institutionProfile.stats.industryCollaborations}
+                    onChange={(value) =>
+                      setForm((current) => ({
+                        ...current,
+                        institutionProfile: {
+                          ...current.institutionProfile,
+                          stats: { ...current.institutionProfile.stats, industryCollaborations: value },
+                        },
+                      }))
+                    }
+                  />
+                  <Field
+                    label="HR connections"
+                    type="number"
+                    value={form.institutionProfile.stats.totalHRConnections}
+                    onChange={(value) =>
+                      setForm((current) => ({
+                        ...current,
+                        institutionProfile: {
+                          ...current.institutionProfile,
+                          stats: { ...current.institutionProfile.stats, totalHRConnections: value },
+                        },
+                      }))
+                    }
+                  />
+                  <Field
+                    label="Students placed"
+                    type="number"
+                    value={form.institutionProfile.stats.studentsPlaced}
+                    onChange={(value) =>
+                      setForm((current) => ({
+                        ...current,
+                        institutionProfile: {
+                          ...current.institutionProfile,
+                          stats: { ...current.institutionProfile.stats, studentsPlaced: value },
+                        },
+                      }))
+                    }
+                  />
+                  <Field
+                    label="Direct shortlists this quarter"
+                    type="number"
+                    value={form.institutionProfile.stats.directShortlistsThisQuarter}
+                    onChange={(value) =>
+                      setForm((current) => ({
+                        ...current,
+                        institutionProfile: {
+                          ...current.institutionProfile,
+                          stats: { ...current.institutionProfile.stats, directShortlistsThisQuarter: value },
+                        },
+                      }))
+                    }
+                  />
+                  <Field
+                    label="Top hiring sector"
+                    value={form.institutionProfile.stats.topHiringSector}
+                    onChange={(value) =>
+                      setForm((current) => ({
+                        ...current,
+                        institutionProfile: {
+                          ...current.institutionProfile,
+                          stats: { ...current.institutionProfile.stats, topHiringSector: value },
+                        },
+                      }))
+                    }
+                  />
+                </div>
+              </EditorSection>
+            </>
+          ) : null}
+
           <EditorSection title="Links" icon={<Globe className="h-5 w-5" />}>
             <div className="grid gap-4 md:grid-cols-2">
               <Field label="Website" type="url" value={form.websiteUrl} onChange={(value) => setForm((current) => ({ ...current, websiteUrl: value }))} />
@@ -576,6 +1010,7 @@ export function UserProfilePage() {
             </div>
           </EditorSection>
 
+          {!isInstitutionRole ? (
           <EditorSection
             title="Skills"
             icon={<Award className="h-5 w-5" />}
@@ -612,7 +1047,9 @@ export function UserProfilePage() {
               {form.skills.length === 0 ? <div className="rounded-lg border border-dashed border-slate-300 p-4 text-sm text-slate-500 dark:border-slate-700">No skills yet.</div> : null}
             </div>
           </EditorSection>
+          ) : null}
 
+          {!isInstitutionRole ? (
           <EditorSection
             title="Experience"
             icon={<Briefcase className="h-5 w-5" />}
@@ -645,7 +1082,9 @@ export function UserProfilePage() {
               {form.experience.length === 0 ? <div className="rounded-lg border border-dashed border-slate-300 p-4 text-sm text-slate-500 dark:border-slate-700">No experience yet.</div> : null}
             </div>
           </EditorSection>
+          ) : null}
 
+          {!isInstitutionRole ? (
           <EditorSection
             title="Education"
             icon={<GraduationCap className="h-5 w-5" />}
@@ -701,7 +1140,9 @@ export function UserProfilePage() {
               {editableEducation.length === 0 ? <div className="rounded-lg border border-dashed border-slate-300 p-4 text-sm text-slate-500 dark:border-slate-700">No additional education yet.</div> : null}
             </div>
           </EditorSection>
+          ) : null}
 
+          {!isInstitutionRole ? (
           <EditorSection
             title="Licenses & certifications"
             icon={<Award className="h-5 w-5" />}
@@ -729,7 +1170,9 @@ export function UserProfilePage() {
               {form.certifications.length === 0 ? <div className="rounded-lg border border-dashed border-slate-300 p-4 text-sm text-slate-500 dark:border-slate-700">No certifications yet.</div> : null}
             </div>
           </EditorSection>
+          ) : null}
 
+          {!isInstitutionRole ? (
           <EditorSection
             title="Projects"
             icon={<Rocket className="h-5 w-5" />}
@@ -756,6 +1199,7 @@ export function UserProfilePage() {
               {form.portfolioProjects.length === 0 ? <div className="rounded-lg border border-dashed border-slate-300 p-4 text-sm text-slate-500 dark:border-slate-700">No projects yet.</div> : null}
             </div>
           </EditorSection>
+          ) : null}
 
           <div className="sticky bottom-4 z-10 flex justify-end">
             <SmallButton type="submit" disabled={isBusy}>
@@ -780,7 +1224,9 @@ export function UserProfilePage() {
           <EditorSection title="LinkedIn fast fill" icon={<Linkedin className="h-5 w-5" />}>
             <div className="space-y-3">
               <p className="text-sm leading-6 text-slate-600 dark:text-slate-400">
-                Add your public LinkedIn URL, confirm import, then fetch public profile data into these same portfolio fields.
+                {isInstitutionRole
+                  ? 'Use this only for a public LinkedIn profile link. Institution pages are edited manually below so your school or college page stays aligned with LinkedIn company and school Page patterns.'
+                  : 'Add your public LinkedIn URL, confirm import, then fetch public profile data into these same portfolio fields.'}
               </p>
               <label className="flex items-center gap-2 text-sm text-slate-600 dark:text-slate-400">
                 <input

@@ -15,6 +15,7 @@ import {
   getPublicRecruiterJob,
   getRecruiterJobApplications,
   getRecruiterColleges,
+  getRecruiterLinkedColleges,
   getRecruiterDashboard,
   getRecruiterDrives,
   getRecruiterJobs,
@@ -186,6 +187,11 @@ export const closeDriveController = async (req: Request, res: Response) => {
 
 export const getCollegesController = async (_req: Request, res: Response) => {
   const data = await getRecruiterColleges();
+  res.status(200).json(new ApiResponse(data));
+};
+
+export const getLinkedCollegesController = async (req: Request, res: Response) => {
+  const data = await getRecruiterLinkedColleges(req.user!._id);
   res.status(200).json(new ApiResponse(data));
 };
 

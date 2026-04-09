@@ -85,6 +85,10 @@ export const collegeApi = {
     const response = await api.get<ApiSuccessResponse<CollegeEvent[]>>('/api/college/events');
     return response.data.data;
   },
+  async listHiringEvents() {
+    const response = await api.get<ApiSuccessResponse<CollegeEvent[]>>('/api/college/events/hiring');
+    return response.data.data;
+  },
   async createEvent(payload: {
     title: string;
     type: 'Industry Connect Session' | 'Placement Hackathon' | 'Innovation Drive' | 'Other';

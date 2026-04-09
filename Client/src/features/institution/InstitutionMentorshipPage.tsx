@@ -1,5 +1,6 @@
 import { Building2, CalendarClock, UserCheck } from 'lucide-react';
 import { Card } from '../../components/ui/Card';
+import { InstitutionWorkspaceHeader } from './InstitutionWorkspaceHeader';
 import { MentorshipProgramPanel } from './MentorshipProgramPanel';
 import {
   CreateInstitutionMentorshipProgramInput,
@@ -21,13 +22,16 @@ export function InstitutionMentorshipPage({
   fetchPrograms,
   createProgram,
 }: InstitutionMentorshipPageProps) {
+  const mode = institutionLabel.toLowerCase() as 'school' | 'college';
+
   return (
     <div className="space-y-6">
-      <div>
-        <div className="mb-2 text-xs uppercase tracking-[0.3em] text-cyan-300">{institutionLabel} Workspace</div>
-        <h1 className="text-3xl font-bold text-white">Mentorship Requests</h1>
-        <p className="mt-2 max-w-3xl text-slate-400">{description}</p>
-      </div>
+      <InstitutionWorkspaceHeader
+        mode={mode}
+        eyebrow={`${institutionLabel} Workspace`}
+        title="Mentorship Requests"
+        description={description}
+      />
 
       <div className="grid gap-4 xl:grid-cols-3">
         {[

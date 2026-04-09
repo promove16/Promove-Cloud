@@ -81,6 +81,32 @@ type PublicUser = {
   education?: PublicEducationHighlight[];
   portfolioProjects?: PublicPortfolioHighlight[];
   githubStats?: PublicGithubStats;
+  institutionProfile?: {
+    institutionName: string;
+    location: string;
+    totalStudentsEnrolled: number;
+    academicYear: string;
+    iicStarRating: number;
+    organizationType?: string;
+    foundedYear?: number;
+    specialties?: string[];
+    locations?: string[];
+    alumniCount?: number;
+    employeeCount?: number;
+    contactEmail?: string;
+    contactPhone?: string;
+    stats?: {
+      totalInnovationActivities: number;
+      patentsFiled: number;
+      totalMentoringHours: number;
+      startupsLaunched: number;
+      industryCollaborations: number;
+      totalHRConnections?: number;
+      studentsPlaced?: number;
+      directShortlistsThisQuarter?: number;
+      topHiringSector?: string;
+    };
+  };
   lastLogin?: Date;
   discoverableToRecruiters?: boolean;
 };
@@ -272,6 +298,36 @@ const mapPublicUser = (user: PublicUser) => ({
       }
     : {}),
   ...(mapGithubStats(user.githubStats) ? { githubStats: mapGithubStats(user.githubStats) } : {}),
+  ...(user.institutionProfile
+    ? {
+        institutionProfile: {
+          institutionName: user.institutionProfile.institutionName,
+          location: user.institutionProfile.location,
+          totalStudentsEnrolled: user.institutionProfile.totalStudentsEnrolled,
+          academicYear: user.institutionProfile.academicYear,
+          iicStarRating: user.institutionProfile.iicStarRating,
+          ...(user.institutionProfile.organizationType
+            ? { organizationType: user.institutionProfile.organizationType }
+            : {}),
+          ...(user.institutionProfile.foundedYear ? { foundedYear: user.institutionProfile.foundedYear } : {}),
+          specialties: user.institutionProfile.specialties ?? [],
+          locations: user.institutionProfile.locations ?? [],
+          ...(typeof user.institutionProfile.alumniCount === 'number'
+            ? { alumniCount: user.institutionProfile.alumniCount }
+            : {}),
+          ...(typeof user.institutionProfile.employeeCount === 'number'
+            ? { employeeCount: user.institutionProfile.employeeCount }
+            : {}),
+          ...(user.institutionProfile.contactEmail
+            ? { contactEmail: user.institutionProfile.contactEmail }
+            : {}),
+          ...(user.institutionProfile.contactPhone
+            ? { contactPhone: user.institutionProfile.contactPhone }
+            : {}),
+          ...(user.institutionProfile.stats ? { stats: user.institutionProfile.stats } : {}),
+        },
+      }
+    : {}),
   insightCounts: {
     skills: user.skills?.length ?? 0,
     experience: user.experience?.length ?? 0,
@@ -468,7 +524,7 @@ export const listMarketplaceUsers = async (
     }),
   )
     .select(
-      'displayName avatar role domain bio headline location websiteUrl githubUrl linkedinUrl skills experience education portfolioProjects githubStats lastLogin discoverableToRecruiters',
+      'displayName avatar role domain bio headline location websiteUrl githubUrl linkedinUrl skills experience education portfolioProjects githubStats institutionProfile lastLogin discoverableToRecruiters',
     )
     .sort({ lastLogin: -1, updatedAt: -1 })
     .skip((page - 1) * limit)
@@ -558,7 +614,7 @@ const listMarketplaceStartups = async (requesterRole: UserRole, search?: string,
 const getMarketplaceUserDetail = async (requesterRole: UserRole, userId: string) => {
   const user = await User.findById(userId)
     .select(
-      'displayName avatar role domain bio headline location websiteUrl githubUrl linkedinUrl skills experience education portfolioProjects githubStats discoverableToRecruiters',
+      'displayName avatar role domain bio headline location websiteUrl githubUrl linkedinUrl skills experience education portfolioProjects githubStats institutionProfile discoverableToRecruiters',
     )
     .lean();
 

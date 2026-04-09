@@ -71,6 +71,27 @@ const eventSchema = new Schema<IEvent>(
       enum: ['Industry Connect Session', 'Placement Hackathon', 'Innovation Drive', 'Other'],
       required: true,
     },
+    category: {
+      type: String,
+      enum: ['internal', 'hiring'],
+      default: 'internal',
+      required: true,
+    },
+    recruiterId: {
+      type: Schema.Types.ObjectId,
+      ref: 'User',
+      default: undefined,
+    },
+    linkedJobId: {
+      type: Schema.Types.ObjectId,
+      ref: 'JobPost',
+      default: undefined,
+    },
+    minimumInnovationScore: {
+      type: Number,
+      min: 0,
+      default: undefined,
+    },
     description: {
       type: String,
       required: true,
@@ -104,5 +125,6 @@ const eventSchema = new Schema<IEvent>(
 );
 
 eventSchema.index({ institutionId: 1, scheduledAt: -1 });
+eventSchema.index({ recruiterId: 1, category: 1 });
 
 export const Event = model<IEvent>('Event', eventSchema);

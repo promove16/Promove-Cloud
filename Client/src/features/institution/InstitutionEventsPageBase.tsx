@@ -7,6 +7,7 @@ import { Button } from '../../components/ui/Button';
 import { Card } from '../../components/ui/Card';
 import { Spinner } from '../../components/ui/Spinner';
 import type { DashboardEvent } from '../../types/school.types';
+import { InstitutionWorkspaceHeader } from './InstitutionWorkspaceHeader';
 
 type Props = {
   mode: 'school' | 'college';
@@ -49,16 +50,17 @@ export function InstitutionEventsPageBase({
 
   return (
     <div className="space-y-6">
-      <div className="flex flex-col gap-4 lg:flex-row lg:items-end lg:justify-between">
-        <div>
-          <div className="text-xs uppercase tracking-[0.3em] text-cyan-300">Events</div>
-          <h1 className="mt-2 text-3xl font-bold text-white">{title}</h1>
-          <p className="mt-2 text-slate-400">{subtitle}</p>
-        </div>
-        <Button variant="secondary" onClick={() => navigate(basePath)}>
-          Back to Overview
-        </Button>
-      </div>
+      <InstitutionWorkspaceHeader
+        mode={mode}
+        eyebrow="Events"
+        title={title}
+        description={subtitle}
+        tabsAction={
+          <Button variant="secondary" onClick={() => navigate(basePath)}>
+            Back to Overview
+          </Button>
+        }
+      />
 
       {eventsQuery.isLoading ? (
         <div className="flex items-center justify-center py-12">

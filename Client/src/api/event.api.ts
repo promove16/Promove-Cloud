@@ -1,6 +1,6 @@
 import api from './axiosInstance';
 import { ApiSuccessResponse } from '../types/auth.types';
-import { CollegeEventRankingsResponse } from '../types/college.types';
+import { CollegeEvent, CollegeEventRankingsResponse } from '../types/college.types';
 
 export const eventApi = {
   async joinEvent(eventId: string) {
@@ -26,6 +26,10 @@ export const eventApi = {
     const response = await api.get<ApiSuccessResponse<CollegeEventRankingsResponse>>(
       `/api/events/${eventId}/rankings`,
     );
+    return response.data.data;
+  },
+  async listMyInstitutionEvents() {
+    const response = await api.get<ApiSuccessResponse<CollegeEvent[]>>('/api/events/my-institution');
     return response.data.data;
   },
 };

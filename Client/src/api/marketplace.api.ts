@@ -68,6 +68,33 @@ export interface MarketplaceInsightCounts {
   portfolioProjects: number;
 }
 
+export interface MarketplaceInstitutionProfile {
+  institutionName: string;
+  location: string;
+  totalStudentsEnrolled: number;
+  academicYear: string;
+  iicStarRating: number;
+  organizationType?: string;
+  foundedYear?: number;
+  specialties: string[];
+  locations: string[];
+  alumniCount?: number;
+  employeeCount?: number;
+  contactEmail?: string;
+  contactPhone?: string;
+  stats?: {
+    totalInnovationActivities: number;
+    patentsFiled: number;
+    totalMentoringHours: number;
+    startupsLaunched: number;
+    industryCollaborations: number;
+    totalHRConnections?: number;
+    studentsPlaced?: number;
+    directShortlistsThisQuarter?: number;
+    topHiringSector?: string;
+  };
+}
+
 export interface MarketplaceProfile {
   _id: string;
   entityType?: MarketplaceRole;
@@ -84,6 +111,7 @@ export interface MarketplaceProfile {
   educationHighlights?: MarketplaceEducationHighlight[];
   portfolioHighlights?: MarketplacePortfolioHighlight[];
   githubStats?: MarketplaceGithubStats;
+  institutionProfile?: MarketplaceInstitutionProfile;
   insightCounts: MarketplaceInsightCounts;
 }
 
@@ -205,6 +233,7 @@ const normalizeMarketplaceProfile = (profile: Partial<MarketplaceProfile>): Mark
   educationHighlights: profile.educationHighlights ?? [],
   portfolioHighlights: profile.portfolioHighlights ?? [],
   ...(profile.githubStats ? { githubStats: profile.githubStats } : {}),
+  ...(profile.institutionProfile ? { institutionProfile: profile.institutionProfile } : {}),
   insightCounts: {
     skills: profile.insightCounts?.skills ?? profile.skills?.length ?? 0,
     experience: profile.insightCounts?.experience ?? profile.experienceHighlights?.length ?? 0,

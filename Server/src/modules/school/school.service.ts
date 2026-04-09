@@ -60,6 +60,13 @@ import {
   StudentVerificationReviewResult,
 } from './school.types';
 import { UserRole } from '../../types/roles.types';
+import type { EventListItem } from '../college/college.types';
+import {
+  createEvent,
+  createEventSchema,
+  getEventRankings,
+  listInstitutionEvents,
+} from '../event/event.service';
 
 const DASHBOARD_TTL_SECONDS = 60 * 10;
 const STATS_TTL_SECONDS = 60 * 10;
@@ -258,6 +265,30 @@ export const getInstitutionUpcomingEvents = async (institutionId: string): Promi
     participantsCount: event.participants.length,
   }));
 };
+
+export const createSchoolEvent = (
+  schoolId: string,
+  createdBy: string,
+  payload: z.infer<typeof createEventSchema>,
+) => createEvent(schoolId, createdBy, payload);
+
+export const listSchoolEvents = async (schoolId: string): Promise<EventListItem[]> => {
+  const events = await listInstitutionEvents(schoolId);
+  const rankings = await Promise.all(
+    events.map(async (event) => ({
+      eventId: event._id,
+      rankings: await getEventRankings(event._id, schoolId),
+    })),
+  );
+  const rankingMap = new Map(rankings.map((entry) => [entry.eventId, entry.rankings]));
+
+  return events.map((event) => ({
+    ...event,
+    rankings: rankingMap.get(event._id) ?? [],
+  }));
+};
+
+export const getSchoolEventRankings = getEventRankings;
 
 export const getDashboardStats = async (
   institutionId: string,

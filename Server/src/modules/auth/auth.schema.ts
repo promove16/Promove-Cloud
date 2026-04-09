@@ -21,6 +21,14 @@ const institutionProfileInputSchema = z.object({
   totalStudentsEnrolled: z.coerce.number().int().min(1),
   academicYear: z.string().trim().min(4).max(20),
   iicStarRating: z.coerce.number().min(0).max(5).default(0),
+  organizationType: optionalProfileString(120),
+  foundedYear: z.coerce.number().int().min(1800).max(3000).optional(),
+  specialties: z.array(z.string().trim().min(1).max(120)).max(20).optional(),
+  locations: z.array(z.string().trim().min(1).max(160)).max(12).optional(),
+  alumniCount: z.coerce.number().int().min(0).optional(),
+  employeeCount: z.coerce.number().int().min(0).optional(),
+  contactEmail: z.string().trim().email().optional(),
+  contactPhone: optionalProfileString(40),
 });
 
 export const registerSchema = z

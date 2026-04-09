@@ -15,28 +15,15 @@ import { recruiterApi } from '../../api/recruiter.api';
 import { requestApi } from '../../api/request.api';
 import { Input } from '../../components/ui/Input';
 import { Spinner } from '../../components/ui/Spinner';
-import type {
-  RecruiterJobApplicationStage,
-  RecruiterStudentApplicationView,
-} from '../../types/recruiter.types';
+import { ApplicationStatusBar } from './ApplicationStatusBar';
+import { APPLICATION_STAGE_BADGE } from '../../utils/applicationStages';
+import type { RecruiterStudentApplicationView } from '../../types/recruiter.types';
 import type { WorkflowRequest } from '../../types/request.types';
-
-const STAGE_BADGE: Record<RecruiterJobApplicationStage, string> = {
-  'Invited Pending': 'border-amber-500/30 text-amber-300',
-  'Invite Accepted': 'border-emerald-500/30 text-emerald-300',
-  'Invite Declined': 'border-rose-500/30 text-rose-300',
-  Applied: 'border-slate-700 text-slate-200',
-  Screening: 'border-cyan-500/30 text-cyan-300',
-  Shortlisted: 'border-blue-500/30 text-blue-300',
-  Interview: 'border-violet-500/30 text-violet-300',
-  Offered: 'border-amber-500/30 text-amber-300',
-  Hired: 'border-emerald-500/30 text-emerald-300',
-  Rejected: 'border-rose-500/30 text-rose-300',
-};
 
 const SOURCE_COPY = {
   student_apply: 'Applied by you',
   recruiter_invite: 'Invited by recruiter',
+  hiring_event: 'From hiring event',
 } as const;
 
 const relativeLabel = (value: string) => {
@@ -259,7 +246,7 @@ export default function ApplicationsPage() {
                   <div className="flex flex-wrap items-center gap-2">
                     <div className="text-lg font-semibold text-white">{application.job.title}</div>
                     <span
-                      className={`rounded-full border px-2 py-0.5 text-[11px] uppercase tracking-[0.18em] ${STAGE_BADGE[application.stage]}`}
+                      className={`rounded-full border px-2 py-0.5 text-[11px] uppercase tracking-[0.18em] ${APPLICATION_STAGE_BADGE[application.stage]}`}
                     >
                       {application.stage}
                     </span>
@@ -329,6 +316,10 @@ export default function ApplicationsPage() {
                     <MessageCircle className="h-4 w-4" />
                     Message recruiter
                   </button>
+                </div>
+
+                <div className="xl:col-span-3">
+                  <ApplicationStatusBar application={application} />
                 </div>
               </article>
             ))}

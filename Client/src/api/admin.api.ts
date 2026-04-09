@@ -50,8 +50,17 @@ export interface AdminUserListItem {
   institutionProfile?: {
     institutionName?: string;
     location?: string;
+    totalStudentsEnrolled?: number;
     academicYear?: string;
     iicStarRating?: number;
+    organizationType?: string;
+    foundedYear?: number;
+    specialties?: string[];
+    locations?: string[];
+    alumniCount?: number;
+    employeeCount?: number;
+    contactEmail?: string;
+    contactPhone?: string;
   };
   createdAt: string;
 }

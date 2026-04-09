@@ -73,6 +73,14 @@ export interface InstitutionProfile {
   academicYear: string;
   iicStarRating: number;
   iicLastUpdated?: Date;
+  organizationType?: string;
+  foundedYear?: number;
+  specialties: string[];
+  locations: string[];
+  alumniCount?: number;
+  employeeCount?: number;
+  contactEmail?: string;
+  contactPhone?: string;
   policies: InstitutionPolicy[];
   stats: InstitutionStats;
 }

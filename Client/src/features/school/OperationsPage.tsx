@@ -19,6 +19,7 @@ import { useAuthStore } from '../../store/authStore';
 import { PatentShowcase } from '../shared/PatentShowcase';
 import { StudentIntakePanel } from '../institution/StudentIntakePanel';
 import { StudentAccessWorkspace } from '../institution/StudentAccessWorkspace';
+import { InstitutionWorkspaceHeader } from '../institution/InstitutionWorkspaceHeader';
 import {
   DashboardMetricRail,
   DashboardSection,
@@ -201,34 +202,20 @@ export default function OperationsPage() {
 
   return (
     <div className="space-y-8 pb-8">
-      <section className="grid gap-5 border-b border-slate-800/80 pb-5 xl:grid-cols-[minmax(0,1fr),320px]">
-        <div className="space-y-3">
-          <div className="text-[11px] uppercase tracking-[0.35em] text-cyan-300">School Operations</div>
-          <h1 className="max-w-4xl text-4xl font-semibold tracking-tight text-white">{institutionName}</h1>
-          <p className="max-w-2xl text-base leading-7 text-slate-400">
-            This page carries the heavier school workflows: approvals, access tokens, roster
-            intake, and other supporting tasks that no longer belong on the main overview.
-          </p>
-        </div>
-
-        <div className="rounded-2xl border border-slate-800/70 bg-slate-950/30 p-4">
-          <div className="flex items-center justify-between gap-4">
-            <div className="text-[11px] uppercase tracking-[0.3em] text-slate-500">Navigation</div>
-            <ArrowLeft className="h-4 w-4 text-cyan-300" />
-          </div>
-          <p className="mt-3 text-sm leading-6 text-slate-400">
-            Overview content stays on the dashboard. Use this workspace for the actions that need more room.
-          </p>
-          <div className="mt-4">
-            <Link to="/dashboard/school">
-              <Button variant="secondary" className="w-full justify-between">
-                Back to Dashboard
-                <ArrowLeft className="h-4 w-4" />
-              </Button>
-            </Link>
-          </div>
-        </div>
-      </section>
+      <InstitutionWorkspaceHeader
+        mode="school"
+        eyebrow="School Operations"
+        title={institutionName}
+        description="This page carries the heavier school workflows: approvals, access tokens, roster intake, and other supporting tasks that no longer belong on the main overview."
+        tabsAction={
+          <Link to="/dashboard/school">
+            <Button variant="secondary">
+              Back to Dashboard
+              <ArrowLeft className="ml-2 h-4 w-4" />
+            </Button>
+          </Link>
+        }
+      />
 
       <DashboardMetricRail columnsClassName="md:grid-cols-4" items={statusHintItems} />
 

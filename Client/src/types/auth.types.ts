@@ -6,6 +6,14 @@ export interface InstitutionProfileInput {
   totalStudentsEnrolled: number;
   academicYear: string;
   iicStarRating?: number;
+  organizationType?: string;
+  foundedYear?: number;
+  specialties?: string[];
+  locations?: string[];
+  alumniCount?: number;
+  employeeCount?: number;
+  contactEmail?: string;
+  contactPhone?: string;
 }
 
 export type InstitutionRegulatoryBody =
@@ -189,8 +197,28 @@ export interface AuthUser {
   institutionProfile?: {
     institutionName?: string;
     location?: string;
+    totalStudentsEnrolled?: number;
     academicYear?: string;
     iicStarRating?: number;
+    organizationType?: string;
+    foundedYear?: number;
+    specialties?: string[];
+    locations?: string[];
+    alumniCount?: number;
+    employeeCount?: number;
+    contactEmail?: string;
+    contactPhone?: string;
+    stats?: {
+      totalInnovationActivities: number;
+      patentsFiled: number;
+      totalMentoringHours: number;
+      startupsLaunched: number;
+      industryCollaborations: number;
+      totalHRConnections?: number;
+      studentsPlaced?: number;
+      directShortlistsThisQuarter?: number;
+      topHiringSector?: string;
+    };
   };
   institutionVerification?: InstitutionVerificationProfile;
   institutionVerificationStatus?: 'none' | 'pending' | 'verified' | 'failed';

@@ -1,11 +1,19 @@
 import { Request, Response } from 'express';
+import { ApiError } from '../../utils/ApiError';
 import { ApiResponse } from '../../utils/ApiResponse';
 import {
   addSubmissionScore,
   computeEventRankings,
+  createHiringEvent,
+  createHiringEventSchema,
   eventSubmissionSchema,
   getEventRankings,
+  getManagedEventRankings,
   joinEvent,
+  listRecruiterHiringEvents,
+  listStudentInstitutionEvents,
+  selectStudentFromEventSchema,
+  selectStudentFromHiringEvent,
 } from './event.service';
 
 export const joinEventController = async (req: Request, res: Response) => {
@@ -19,24 +27,80 @@ export const addSubmissionScoreController = async (req: Request, res: Response) 
     String(req.params.eventId),
     String(req.params.studentId),
     payload.score,
-    req.user!.institutionId,
+    {
+      actorId: req.user!._id,
+      role: req.user!.role,
+      institutionId: req.user!.institutionId,
+    },
   );
   res.status(200).json(new ApiResponse({ success: true }));
 };
 
 export const computeEventRankingsController = async (req: Request, res: Response) => {
   const eventId = String(req.params.eventId);
-  await computeEventRankings(eventId, req.user!.institutionId);
-  const rankings = await getEventRankings(eventId, req.user!.institutionId);
+  await computeEventRankings(eventId, {
+    actorId: req.user!._id,
+    role: req.user!.role,
+    institutionId: req.user!.institutionId,
+  });
+  const rankings =
+    req.user!.role === 'recruiter'
+      ? await getManagedEventRankings(eventId, {
+          actorId: req.user!._id,
+          role: req.user!.role,
+          institutionId: req.user!.institutionId,
+        })
+      : await getEventRankings(eventId, req.user!.institutionId ?? req.user!._id);
   res.status(200).json(new ApiResponse({ rankings }));
 };
 
 export const getEventRankingsController = async (req: Request, res: Response) => {
-  const rankings = await getEventRankings(String(req.params.eventId), req.user!.institutionId);
+  const rankings =
+    req.user!.role === 'recruiter'
+      ? await getManagedEventRankings(String(req.params.eventId), {
+          actorId: req.user!._id,
+          role: req.user!.role,
+          institutionId: req.user!.institutionId,
+        })
+      : await getEventRankings(
+          String(req.params.eventId),
+          req.user!.role === 'student' ? req.user!.institutionId : req.user!.institutionId ?? req.user!._id,
+        );
   res.status(200).json(
     new ApiResponse({
       formula: '(submissionScore * 0.6) + (innovationScore * 0.4)',
       rankings,
     }),
   );
+};
+
+export const listStudentInstitutionEventsController = async (req: Request, res: Response) => {
+  if (!req.user!.institutionId) {
+    throw new ApiError(403, 'NO_INSTITUTION', 'You are not linked to any institution');
+  }
+  const data = await listStudentInstitutionEvents(String(req.user!.institutionId));
+  res.status(200).json(new ApiResponse(data));
+};
+
+export const createHiringEventController = async (req: Request, res: Response) => {
+  const payload = createHiringEventSchema.parse(req.body);
+  const data = await createHiringEvent(req.user!._id, payload);
+  res.status(201).json(new ApiResponse(data));
+};
+
+export const listRecruiterHiringEventsController = async (req: Request, res: Response) => {
+  const data = await listRecruiterHiringEvents(req.user!._id);
+  res.status(200).json(new ApiResponse(data));
+};
+
+export const selectStudentFromHiringEventController = async (req: Request, res: Response) => {
+  const { jobId, note } = selectStudentFromEventSchema.parse(req.body);
+  const data = await selectStudentFromHiringEvent(
+    req.user!._id,
+    String(req.params.eventId),
+    String(req.params.studentId),
+    jobId,
+    note,
+  );
+  res.status(200).json(new ApiResponse(data));
 };

@@ -6,6 +6,8 @@ export type EventType =
   | 'Innovation Drive'
   | 'Other';
 
+export type EventCategory = 'internal' | 'hiring';
+
 export interface IEventParticipant {
   studentId: Types.ObjectId;
   submissionScore?: number;
@@ -26,12 +28,16 @@ export interface IEvent {
   createdBy: Types.ObjectId;
   title: string;
   type: EventType;
+  category: EventCategory;
   description: string;
   scheduledAt: Date;
   isActive: boolean;
   participants: IEventParticipant[];
   rankings: IEventRanking[];
   rankingsComputedAt?: Date;
+  recruiterId?: Types.ObjectId;
+  linkedJobId?: Types.ObjectId;
+  minimumInnovationScore?: number;
   createdAt: Date;
   updatedAt: Date;
 }

@@ -7,6 +7,7 @@ import { Card } from '../../components/ui/Card';
 import { Input } from '../../components/ui/Input';
 import { Spinner } from '../../components/ui/Spinner';
 import { MAX_INNOVATION_SCORE } from '../../constants/score';
+import { InstitutionWorkspaceHeader } from './InstitutionWorkspaceHeader';
 import { StudentJourneyDrawerBase } from './StudentJourneyDrawerBase';
 import { getScoreSocket } from '../../lib/socket';
 import { LeaderboardPage, StudentJourney, StudentLeaderboardItem } from '../../types/school.types';
@@ -96,25 +97,23 @@ export function LeaderboardPageBase({
   return (
     <>
       <div className="space-y-6">
-        <div className="flex flex-col gap-4 lg:flex-row lg:items-end lg:justify-between">
-          <div>
-            <div className="mb-2 flex items-center gap-2 text-xs uppercase tracking-[0.3em] text-cyan-300">
-              <Sparkles className="h-4 w-4" />
-              Ranked by Innovation Score
+        <InstitutionWorkspaceHeader
+          mode={mode}
+          eyebrow="Ranked by Innovation Score"
+          title={title}
+          description={subtitle}
+          tabsAction={
+            <div className="relative w-full lg:max-w-md">
+              <Search className="pointer-events-none absolute left-4 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-500" />
+              <Input
+                value={search}
+                onChange={(event) => setSearch(event.target.value)}
+                placeholder="Search student name"
+                className="pl-11"
+              />
             </div>
-            <h1 className="text-3xl font-bold text-white">{title}</h1>
-            <p className="mt-2 text-slate-400">{subtitle}</p>
-          </div>
-          <div className="relative w-full max-w-md">
-            <Search className="pointer-events-none absolute left-4 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-500" />
-            <Input
-              value={search}
-              onChange={(event) => setSearch(event.target.value)}
-              placeholder="Search student name"
-              className="pl-11"
-            />
-          </div>
-        </div>
+          }
+        />
 
         <Card className="overflow-hidden">
           <div className="grid grid-cols-[88px,1.6fr,180px,1.2fr,140px] border-b border-slate-800 bg-slate-900/70 px-5 py-4 text-xs uppercase tracking-[0.3em] text-slate-400">

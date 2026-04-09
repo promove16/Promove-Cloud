@@ -16,9 +16,15 @@ import { useAuth } from "../../context/AuthContext";
 import { OnboardingChecklist } from "../../../components/onboarding/OnboardingChecklist";
 import { StudentGithubProofPrompt } from "../../../components/onboarding/StudentGithubProofPrompt";
 import { dealApi } from "../../../api/deal.api";
+import { startupApi } from "../../../api/startup.api";
 import { workspaceApi } from "../../../api/workspace.api";
+import {
+  getStartupOverviewPath,
+  STARTUP_LAUNCH_NEW_PATH,
+} from "../../../features/startup/navigation";
 import { useInnovationScore } from "../../../hooks/useInnovationScore";
 import { useAuthStore } from "../../../store/authStore";
+import { Startup } from "../../../types/startup.types";
 import { Workspace } from "../../../types/workspace.types";
 import { MAX_INNOVATION_SCORE } from "../../../constants/score";
 
@@ -51,6 +57,142 @@ const getStageStatus = (
   return "upcoming";
 };
 
+const isStartupLive = (startup: Startup) =>
+  startup.stage === "Launched" ||
+  startup.launchedToInvestors ||
+  startup.launchedToMentors ||
+  startup.launchedToRecruiters;
+
+type StartupWorkflowStep = {
+  label: string;
+  detail: string;
+  complete: boolean;
+  current: boolean;
+  optional?: boolean;
+  weight: number;
+};
+
+const getStartupWorkflowSummary = (
+  startup: Startup,
+  activeDealCount: number,
+) => {
+  const profileReady = Boolean(
+    startup.name.trim() &&
+      startup.tagline.trim() &&
+      startup.category.trim() &&
+      startup.teamSize > 0,
+  );
+  const founderTeamBuilt = startup.teamSize > 1;
+  const reviewReady = startup.readiness.isReviewReady;
+  const isApproved = startup.reviewStatus === "approved";
+  const isUnderReview = startup.reviewStatus === "review_requested";
+  const hasChangesRequested = startup.reviewStatus === "changes_requested";
+  const launchedToMarketplace = Boolean(
+    startup.launchedToInvestors ||
+      startup.launchedToMentors ||
+      startup.launchedToRecruiters,
+  );
+  const investorDiscoveryLive = Boolean(startup.launchedToInvestors);
+  const investorApprovalReceived = activeDealCount > 0;
+
+  const steps: StartupWorkflowStep[] = [
+    {
+      label: "Create startup profile",
+      detail: profileReady
+        ? "Core startup identity is ready."
+        : "Name, tagline, category, and founder count are required.",
+      complete: profileReady,
+      current: !profileReady,
+      weight: 20,
+    },
+    {
+      label: "Build founder team",
+      detail: founderTeamBuilt
+        ? `${startup.teamSize} members are attached to this startup.`
+        : "A solo founder can continue; add collaborators when needed.",
+      complete: founderTeamBuilt,
+      current: false,
+      optional: true,
+      weight: 5,
+    },
+    {
+      label: "Complete startup review",
+      detail: reviewReady
+        ? "Startup review requirements are complete."
+        : `Still missing: ${startup.readiness.missingItems.slice(0, 3).join(", ") || "startup details"}`,
+      complete: reviewReady,
+      current: profileReady && !reviewReady,
+      weight: 20,
+    },
+    {
+      label: "Admin approval",
+      detail: isApproved
+        ? "Admin review is approved."
+        : isUnderReview
+          ? "Admin review is in progress."
+          : hasChangesRequested
+            ? "Admin requested changes before launch."
+            : "Submit the startup profile for admin review.",
+      complete: isApproved,
+      current: reviewReady && !isApproved,
+      weight: 20,
+    },
+    {
+      label: "Launch to marketplace",
+      detail: launchedToMarketplace
+        ? "Marketplace visibility is live."
+        : "Choose investor, mentor, or recruiter visibility after approval.",
+      complete: launchedToMarketplace,
+      current: isApproved && !launchedToMarketplace,
+      weight: 15,
+    },
+    {
+      label: "Investor interest",
+      detail: investorDiscoveryLive
+        ? "Investors can discover this startup."
+        : "Investor discovery starts after you launch to investors.",
+      complete: investorDiscoveryLive,
+      current: launchedToMarketplace && !investorDiscoveryLive,
+      weight: 10,
+    },
+    {
+      label: "Investor approval",
+      detail: investorApprovalReceived
+        ? "Investor interest is active for this startup."
+        : "Investor approval appears after a pitch receives interest.",
+      complete: investorApprovalReceived,
+      current: investorDiscoveryLive && !investorApprovalReceived,
+      weight: 10,
+    },
+  ];
+
+  const requiredWeight = steps
+    .filter((step) => !step.optional)
+    .reduce((sum, step) => sum + step.weight, 0);
+  const completedWeight = steps.reduce(
+    (sum, step) => sum + (step.complete ? step.weight : 0),
+    0,
+  );
+  const currentStep = steps.find((step) => step.current && !step.complete);
+  const partialWeight = currentStep ? currentStep.weight * 0.5 : 0;
+  const progressPercent = Math.round(
+    Math.min(
+      100,
+      ((completedWeight + partialWeight) / requiredWeight) * 100,
+    ),
+  );
+
+  return {
+    progressPercent,
+    nextAction: currentStep?.label ?? "Startup is live",
+    nextActionDetail: currentStep?.detail ?? "Launch workflow complete.",
+    readinessText: reviewReady
+      ? "Review ready"
+      : `${startup.readiness.missingItems.length} readiness items left`,
+    steps,
+  };
+};
+
 export function StudentDashboard() {
   const { user } = useAuth();
   const authUser = useAuthStore((state) => state.user);
@@ -67,9 +209,43 @@ export function StudentDashboard() {
     refetchInterval: 60_000,
   });
 
-  const workspaces = workspaceQuery.data ?? [];
-  const activeWorkspace = workspaces[0];
+  const startupQuery = useQuery({
+    queryKey: ["startup", "mine"],
+    queryFn: startupApi.mine,
+  });
+
+  const workspaceItems = workspaceQuery.data ?? [];
+  const problemWorkspaces = useMemo(
+    () =>
+      [...workspaceItems]
+        .filter((workspace) => Boolean(workspace.claimedProblemId))
+        .sort(
+          (left, right) =>
+            new Date(right.updatedAt).getTime() -
+            new Date(left.updatedAt).getTime(),
+        ),
+    [workspaceItems],
+  );
+  const startups = useMemo(
+    () =>
+      [...(startupQuery.data ?? [])].sort(
+        (left, right) =>
+          new Date(right.updatedAt).getTime() -
+          new Date(left.updatedAt).getTime(),
+      ),
+    [startupQuery.data],
+  );
+  const activeWorkspace = problemWorkspaces[0];
   const activeDeals = activeDealsQuery.data?.items ?? [];
+  const activeDealCountByStartupId = useMemo(() => {
+    const counts = new Map<string, number>();
+
+    for (const deal of activeDeals) {
+      counts.set(deal.startupId, (counts.get(deal.startupId) ?? 0) + 1);
+    }
+
+    return counts;
+  }, [activeDeals]);
   const innovationScore = Math.min(
     Math.max(scoreQuery.data?.score ?? authUser?.innovationScore ?? 0, 0),
     MAX_INNOVATION_SCORE,
@@ -104,9 +280,9 @@ export function StudentDashboard() {
         helper: `Top ${rankPercentile}%`,
       },
       {
-        label: "Active Workspaces",
-        value: String(workspaces.length),
-        helper: "Claims start workspaces immediately",
+        label: "Problem Workspaces",
+        value: String(problemWorkspaces.length),
+        helper: "Claimed from Problem Bank",
       },
       {
         label: "Progress Uploads",
@@ -119,7 +295,13 @@ export function StudentDashboard() {
         helper: "Launch engine connected",
       },
     ],
-    [innovationScore, rankPercentile, scoreQuery.data, weeklyDeltaLabel, workspaces.length],
+    [
+      innovationScore,
+      problemWorkspaces.length,
+      rankPercentile,
+      scoreQuery.data,
+      weeklyDeltaLabel,
+    ],
   );
 
   return (
@@ -263,7 +445,9 @@ export function StudentDashboard() {
 
         <div className="lg:col-span-2 rounded-2xl border border-slate-800 bg-slate-900 p-6">
           <div className="mb-6 flex items-center justify-between">
-            <h3 className="text-xl font-bold text-white">Active Problem Workspace</h3>
+            <h3 className="text-xl font-bold text-white">
+              Active Problem Workspace
+            </h3>
             <Link
               to={
                 activeWorkspace
@@ -349,17 +533,17 @@ export function StudentDashboard() {
 
       <div className="rounded-2xl border border-slate-800 bg-slate-900 p-6">
         <div className="mb-6 flex items-center justify-between">
-          <h3 className="text-xl font-bold text-white">Your Portfolio</h3>
+          <h3 className="text-xl font-bold text-white">Problem Solve</h3>
           <Link
-            to="/portfolio"
+            to={activeWorkspace ? "/product-workspace" : "/problem-bank"}
             className="text-sm font-semibold text-blue-400 hover:text-blue-300"
           >
-            View Portfolio
+            {activeWorkspace ? "View Problem Solve" : "Browse Problems"}
           </Link>
         </div>
         <div className="grid gap-4 md:grid-cols-2">
-          {workspaces.length > 0 ? (
-            workspaces.map((project) => (
+          {problemWorkspaces.length > 0 ? (
+            problemWorkspaces.map((project) => (
               <div
                 key={project._id}
                 className="group rounded-xl border border-slate-800 bg-slate-950 p-5 transition-all hover:border-blue-500/50"
@@ -395,101 +579,121 @@ export function StudentDashboard() {
             ))
           ) : (
             <div className="md:col-span-2 py-8 text-center text-slate-400">
-              Your Problem Bank workspace portfolio will appear here once you claim a
+              Your Problem Bank solves will appear here once you claim a
               problem.
             </div>
           )}
         </div>
       </div>
 
-      {/* Course Progress Module */}
       <div className="rounded-2xl border border-slate-800 bg-slate-900 p-6">
         <div className="mb-5 flex items-center justify-between">
           <div className="flex items-center gap-2">
-            <BookOpen className="h-5 w-5 text-cyan-400" />
-            <h3 className="text-xl font-bold text-white">Course Progress</h3>
+            <Rocket className="h-5 w-5 text-cyan-400" />
+            <h3 className="text-xl font-bold text-white">Startups</h3>
           </div>
-          {activeWorkspace ? (
-            <Link
-              to={`/product-workspace/${activeWorkspace._id}`}
-              className="text-sm font-semibold text-blue-400 hover:text-blue-300"
-            >
-              View Workspace
-            </Link>
-          ) : null}
+          <Link
+            to="/startup-launch"
+            className="text-sm font-semibold text-blue-400 hover:text-blue-300"
+          >
+            View Startups
+          </Link>
         </div>
-        {workspaceQuery.isLoading ? (
-          <div className="rounded-xl border border-dashed border-slate-700 bg-slate-950 p-6 text-center text-slate-400 text-sm">
-            Loading course progress...
+        {startupQuery.isLoading ? (
+          <div className="rounded-xl border border-dashed border-slate-700 bg-slate-950 p-6 text-center text-sm text-slate-400">
+            Loading startups...
           </div>
-        ) : workspaces.length === 0 ? (
+        ) : startupQuery.isError ? (
+          <div className="rounded-xl border border-dashed border-red-900/40 bg-slate-950 p-6 text-center text-sm text-red-200">
+            Unable to load startup progress right now.
+          </div>
+        ) : startups.length === 0 ? (
           <div className="rounded-xl border border-dashed border-slate-700 bg-slate-950 p-6 text-center">
             <BookOpen className="mx-auto mb-3 h-8 w-8 text-slate-600" />
             <p className="text-sm text-slate-400">
-              Claim a problem from the Problem Bank to start tracking course
-              progress.
+              Create a startup to track launch readiness, review status, and
+              investor progress.
             </p>
             <Link
-              to="/problem-bank"
+              to={STARTUP_LAUNCH_NEW_PATH}
               className="mt-3 inline-flex rounded-lg bg-gradient-to-r from-blue-600 to-purple-600 px-4 py-2 text-sm font-semibold text-white"
             >
-              Browse Problem Bank
+              Create Startup
             </Link>
           </div>
         ) : (
-          <div className="space-y-4">
-            {workspaces.slice(0, 3).map((ws) => {
-              const completedMilestones = ws.milestones.filter(
-                (m) => m.isCompleted,
-              ).length;
-              const totalMilestones = ws.milestones.length;
-              const nextMilestone = ws.milestones.find((m) => !m.isCompleted);
+          <div className="grid gap-4 md:grid-cols-2">
+            {startups.slice(0, 4).map((startup) => {
+              const workflow = getStartupWorkflowSummary(
+                startup,
+                activeDealCountByStartupId.get(startup._id) ?? 0,
+              );
+              const startupLive = isStartupLive(startup);
               return (
                 <div
-                  key={ws._id}
+                  key={startup._id}
                   className="rounded-xl border border-slate-800 bg-slate-950 p-4"
                 >
                   <div className="mb-3 flex items-start justify-between gap-3">
                     <div>
-                      <div className="font-semibold text-white">{ws.title}</div>
+                      <div className="font-semibold text-white">
+                        {startup.name || "Untitled Startup"}
+                      </div>
                       <div className="mt-0.5 text-xs text-slate-400">
-                        {ws.category} · {ws.stage}
+                        {startup.category} / {startup.stage}
                       </div>
                     </div>
                     <span className="flex-shrink-0 text-sm font-bold text-white">
-                      {ws.progressPercent}%
+                      {workflow.progressPercent}%
                     </span>
                   </div>
                   <div className="mb-3 h-2 w-full overflow-hidden rounded-full bg-slate-800">
                     <div
                       className="h-full rounded-full bg-gradient-to-r from-blue-500 to-purple-500 transition-all"
-                      style={{ width: `${ws.progressPercent}%` }}
+                      style={{ width: `${workflow.progressPercent}%` }}
                     />
                   </div>
-                  <div className="flex items-center justify-between text-xs text-slate-500">
+                  <div className="flex items-center justify-between gap-3 text-xs text-slate-500">
                     <span className="flex items-center gap-1">
-                      <CheckCircle2 className="h-3.5 w-3.5 text-emerald-400" />
-                      {completedMilestones}/{totalMilestones} milestones
+                      {startup.readiness.isReviewReady ? (
+                        <CheckCircle2 className="h-3.5 w-3.5 text-emerald-400" />
+                      ) : (
+                        <Clock className="h-3.5 w-3.5 text-amber-300" />
+                      )}
+                      {workflow.readinessText}
                     </span>
-                    {nextMilestone ? (
-                      <span className="flex items-center gap-1">
-                        <Target className="h-3.5 w-3.5 text-blue-400" />
-                        Next: {nextMilestone.name}
-                      </span>
-                    ) : (
-                      <span className="text-emerald-400">
-                        All milestones complete
-                      </span>
-                    )}
+                    <span
+                      className={`flex items-center gap-1 ${startupLive ? "text-emerald-400" : "text-slate-400"}`}
+                    >
+                      <Target
+                        className={`h-3.5 w-3.5 ${startupLive ? "text-emerald-400" : "text-blue-400"}`}
+                      />
+                      {workflow.nextAction}
+                    </span>
+                  </div>
+                  <p className="mt-3 text-xs leading-5 text-slate-500">
+                    {workflow.nextActionDetail}
+                  </p>
+                  <div className="mt-4 flex items-center justify-between border-t border-slate-800 pt-3 text-xs text-slate-400">
+                    <span>{startup.reviewStatus.replace(/_/g, " ")}</span>
+                    <span>{activeDealCountByStartupId.get(startup._id) ?? 0} active deals</span>
+                  </div>
+                  <div className="mt-3 text-right">
+                    <Link
+                      to={getStartupOverviewPath(startup._id)}
+                      className="text-xs font-semibold text-blue-400 hover:text-blue-300"
+                    >
+                      Open startup
+                    </Link>
                   </div>
                 </div>
               );
             })}
-            {workspaces.length > 3 ? (
-              <div className="text-center text-sm text-slate-500">
-                +{workspaces.length - 3} more workspaces —{" "}
+            {startups.length > 4 ? (
+              <div className="md:col-span-2 text-center text-sm text-slate-500">
+                +{startups.length - 4} more startups{" "}
                 <Link
-                  to="/product-workspace"
+                  to="/startup-launch"
                   className="text-blue-400 hover:text-blue-300"
                 >
                   View all

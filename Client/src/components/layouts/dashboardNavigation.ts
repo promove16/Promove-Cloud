@@ -1,6 +1,7 @@
 import {
   BarChart3,
   BriefcaseBusiness,
+  CalendarDays,
   Building2,
   FileText,
   Globe,
@@ -45,6 +46,11 @@ export interface DashboardNavActionItem {
 
 export type DashboardNavItem = DashboardNavLinkItem | DashboardNavGroupItem | DashboardNavActionItem;
 
+export interface DashboardRouteLabelItem {
+  path: string;
+  label: string;
+}
+
 export const SIDEBAR_CONFIG: Record<UserRole, DashboardNavItem[]> = {
   [UserRole.STUDENT]: [
     { kind: 'link', label: 'Dashboard', icon: Home, path: '/dashboard/student' },
@@ -53,6 +59,7 @@ export const SIDEBAR_CONFIG: Record<UserRole, DashboardNavItem[]> = {
     { kind: 'link', label: 'Portfolio', icon: Trophy, path: '/portfolio' },
     { kind: 'link', label: 'Marketplace', icon: Globe, path: getMarketplaceBasePath(UserRole.STUDENT) },
     { kind: 'link', label: 'Applications', icon: BriefcaseBusiness, path: '/dashboard/student/applications' },
+    { kind: 'link', label: 'Events', icon: CalendarDays, path: '/dashboard/student/events' },
     { kind: 'link', label: 'Invitations', icon: UserPlus, path: '/dashboard/invitations' },
     { kind: 'link', label: 'Messages', icon: MessageCircle, path: '/dashboard/messages' },
     { kind: 'link', label: 'Settings', icon: Settings, path: '/dashboard/settings' },
@@ -61,31 +68,19 @@ export const SIDEBAR_CONFIG: Record<UserRole, DashboardNavItem[]> = {
   [UserRole.SCHOOL]: [
     { kind: 'link', label: 'Dashboard', icon: Home, path: '/dashboard/school' },
     { kind: 'link', label: 'Operations', icon: Home, path: '/dashboard/school/operations' },
-    { kind: 'link', label: 'Problem Bank', icon: Sparkles, path: '/problem-bank' },
     { kind: 'link', label: 'Marketplace', icon: Globe, path: getMarketplaceBasePath(UserRole.SCHOOL) },
-    { kind: 'link', label: 'Student Innovators', icon: Users, path: '/dashboard/school/students' },
-    { kind: 'link', label: 'Investors', icon: Globe, path: '/dashboard/school/investors' },
-    { kind: 'link', label: 'Mentorship', icon: GraduationCap, path: '/dashboard/school/mentors' },
     { kind: 'link', label: 'Compliance Report', icon: FileText, path: '/dashboard/school/compliance' },
-    { kind: 'link', label: 'Invitations', icon: UserPlus, path: '/dashboard/invitations' },
-    { kind: 'link', label: 'Profile', icon: User, path: '/dashboard/profile' },
+    { kind: 'link', label: 'Portfolio', icon: Trophy, path: '/portfolio' },
     { kind: 'link', label: 'Settings', icon: Settings, path: '/dashboard/settings' },
     { kind: 'action', label: 'Logout', icon: LogOut, action: 'logout' },
   ],
   [UserRole.COLLEGE]: [
     { kind: 'link', label: 'Dashboard', icon: Home, path: '/dashboard/college' },
     { kind: 'link', label: 'Operations', icon: Home, path: '/dashboard/college/operations' },
-    { kind: 'link', label: 'Problem Bank', icon: Sparkles, path: '/problem-bank' },
     { kind: 'link', label: 'Marketplace', icon: Globe, path: getMarketplaceBasePath(UserRole.COLLEGE) },
-    { kind: 'link', label: 'Student Innovators', icon: Users, path: '/dashboard/college/students' },
-    { kind: 'link', label: 'Recruiters', icon: BriefcaseBusiness, path: '/dashboard/college/recruiters' },
-    { kind: 'link', label: 'Investors', icon: Globe, path: '/dashboard/college/investors' },
-    { kind: 'link', label: 'Mentorship', icon: GraduationCap, path: '/dashboard/college/mentors' },
     { kind: 'link', label: 'Placement Tracker', icon: BarChart3, path: '/dashboard/college/placement' },
-    { kind: 'link', label: 'Events', icon: Sparkles, path: '/dashboard/college/events' },
     { kind: 'link', label: 'Compliance Report', icon: FileText, path: '/dashboard/college/compliance' },
-    { kind: 'link', label: 'Invitations', icon: UserPlus, path: '/dashboard/invitations' },
-    { kind: 'link', label: 'Profile', icon: User, path: '/dashboard/profile' },
+    { kind: 'link', label: 'Portfolio', icon: Trophy, path: '/portfolio' },
     { kind: 'link', label: 'Settings', icon: Settings, path: '/dashboard/settings' },
     { kind: 'action', label: 'Logout', icon: LogOut, action: 'logout' },
   ],
@@ -121,6 +116,7 @@ export const SIDEBAR_CONFIG: Record<UserRole, DashboardNavItem[]> = {
     { kind: 'link', label: 'Talent Search', icon: Users, path: '/dashboard/recruiter/talent' },
     { kind: 'link', label: 'College Connect', icon: Building2, path: '/dashboard/recruiter/colleges' },
     { kind: 'link', label: 'Active Drives', icon: BarChart3, path: '/dashboard/recruiter/drives' },
+    { kind: 'link', label: 'Hiring Events', icon: CalendarDays, path: '/dashboard/recruiter/hiring-events' },
     { kind: 'link', label: 'Onboarding Tracker', icon: Trophy, path: '/dashboard/recruiter/onboarding' },
     { kind: 'link', label: 'Invitations', icon: UserPlus, path: '/dashboard/invitations' },
     { kind: 'action', label: 'Logout', icon: LogOut, action: 'logout' },
@@ -138,5 +134,24 @@ export const SIDEBAR_CONFIG: Record<UserRole, DashboardNavItem[]> = {
     { kind: 'link', label: 'Profile', icon: User, path: '/dashboard/profile' },
     { kind: 'link', label: 'Settings', icon: Settings, path: '/dashboard/settings' },
     { kind: 'action', label: 'Logout', icon: LogOut, action: 'logout' },
+  ],
+};
+
+export const DASHBOARD_ROUTE_LABELS: Partial<Record<UserRole, DashboardRouteLabelItem[]>> = {
+  [UserRole.SCHOOL]: [
+    { path: '/dashboard/school/operations', label: 'Operations' },
+    { path: '/dashboard/school/students', label: 'Student Innovators' },
+    { path: '/dashboard/school/mentors', label: 'Mentorship' },
+    { path: '/dashboard/school/events', label: 'Events' },
+    { path: '/dashboard/school/projects', label: 'Projects' },
+    { path: '/dashboard/school/patents', label: 'Patents' },
+    { path: '/dashboard/school/startups', label: 'Startups' },
+  ],
+  [UserRole.COLLEGE]: [
+    { path: '/dashboard/college/operations', label: 'Operations' },
+    { path: '/dashboard/college/students', label: 'Student Innovators' },
+    { path: '/dashboard/college/mentors', label: 'Mentorship' },
+    { path: '/dashboard/college/events', label: 'Events' },
+    { path: '/dashboard/college/projects', label: 'Projects' },
   ],
 };

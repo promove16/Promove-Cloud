@@ -74,12 +74,17 @@ export interface CollegeEvent {
   _id: string;
   title: string;
   type: string;
+  category?: 'internal' | 'hiring';
   description: string;
   scheduledAt: string;
   participantsCount: number;
   participants: CollegeEventParticipant[];
   rankingsComputedAt?: string;
   rankings: EventRanking[];
+  recruiterId?: string;
+  recruiterName?: string;
+  linkedJobId?: string;
+  minimumInnovationScore?: number;
 }
 
 export interface CollegeEventRankingsResponse {

@@ -1,81 +1,84 @@
-import { FormEvent, useState } from 'react';
-import { isAxiosError } from 'axios';
-import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
-import {
-  KeyRound,
-  ShieldCheck,
-  Sparkles,
-  Users,
-} from 'lucide-react';
-import { Button } from '../../components/ui/Button';
-import { collegeApi } from '../../api/college.api';
-import { StudentIntakePanel } from '../institution/StudentIntakePanel';
-import { StudentAccessWorkspace } from '../institution/StudentAccessWorkspace';
-import { PatentShowcase } from '../shared/PatentShowcase';
-import { ApiErrorResponse } from '../../types/auth.types';
-import { TemporaryStudentCredentials } from '../../types/college.types';
-import { BulkCredentialImportResult } from '../../types/school.types';
-import { useAuthStore } from '../../store/authStore';
-import {
-  DashboardSection,
-} from '../institution/dashboardSurface';
+import { FormEvent, useState } from "react";
+import { isAxiosError } from "axios";
+import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+import { KeyRound, ShieldCheck, Sparkles, Users } from "lucide-react";
+import { Button } from "../../components/ui/Button";
+import { collegeApi } from "../../api/college.api";
+import { InstitutionWorkspaceHeader } from "../institution/InstitutionWorkspaceHeader";
+import { StudentIntakePanel } from "../institution/StudentIntakePanel";
+import { StudentAccessWorkspace } from "../institution/StudentAccessWorkspace";
+import { PatentShowcase } from "../shared/PatentShowcase";
+import { ApiErrorResponse } from "../../types/auth.types";
+import { TemporaryStudentCredentials } from "../../types/college.types";
+import { BulkCredentialImportResult } from "../../types/school.types";
+import { useAuthStore } from "../../store/authStore";
+import { DashboardSection } from "../institution/dashboardSurface";
 
 type OperationsPageProps = {
   onBackToOverview?: () => void;
 };
 
-export default function OperationsPage({ onBackToOverview }: OperationsPageProps) {
+export default function OperationsPage({
+  onBackToOverview,
+}: OperationsPageProps) {
   const queryClient = useQueryClient();
   const authUser = useAuthStore((state) => state.user);
-  const [tokenLabel, setTokenLabel] = useState('');
+  const [tokenLabel, setTokenLabel] = useState("");
   const [latestTemporaryCredential, setLatestTemporaryCredential] =
     useState<TemporaryStudentCredentials | null>(null);
   const [bulkCredentialResult, setBulkCredentialResult] =
     useState<BulkCredentialImportResult | null>(null);
-  const [rosterNotice, setRosterNotice] = useState('');
+  const [rosterNotice, setRosterNotice] = useState("");
 
   const tokenQuery = useQuery({
-    queryKey: ['college-student-access-tokens'],
+    queryKey: ["college-student-access-tokens"],
     queryFn: collegeApi.getStudentAccessTokens,
   });
   const pendingStudentsQuery = useQuery({
-    queryKey: ['college-student-verifications'],
+    queryKey: ["college-student-verifications"],
     queryFn: collegeApi.getPendingStudentVerifications,
   });
   const rosterQuery = useQuery({
-    queryKey: ['college-student-roster'],
+    queryKey: ["college-student-roster"],
     queryFn: () => collegeApi.getStudentRoster(),
   });
 
   const createTokenMutation = useMutation({
     mutationFn: collegeApi.createStudentAccessToken,
     onSuccess: () => {
-      setTokenLabel('');
-      void queryClient.invalidateQueries({ queryKey: ['college-student-access-tokens'] });
+      setTokenLabel("");
+      void queryClient.invalidateQueries({
+        queryKey: ["college-student-access-tokens"],
+      });
     },
   });
   const createRosterEntryMutation = useMutation({
     mutationFn: collegeApi.createStudentRosterEntry,
     onSuccess: () => {
       void Promise.all([
-        queryClient.invalidateQueries({ queryKey: ['college-student-roster'] }),
-        queryClient.invalidateQueries({ queryKey: ['college-dashboard'] }),
+        queryClient.invalidateQueries({ queryKey: ["college-student-roster"] }),
+        queryClient.invalidateQueries({ queryKey: ["college-dashboard"] }),
       ]);
     },
   });
   const cancelInviteMutation = useMutation({
     mutationFn: collegeApi.cancelStudentInvite,
     onSuccess: () => {
-      setRosterNotice('Student invite cancelled.');
-      void queryClient.invalidateQueries({ queryKey: ['college-student-roster'] });
+      setRosterNotice("Student invite cancelled.");
+      void queryClient.invalidateQueries({
+        queryKey: ["college-student-roster"],
+      });
     },
     onError: (error) => {
       const message =
-        isAxiosError<ApiErrorResponse>(error) && error.response?.data?.error?.message
+        isAxiosError<ApiErrorResponse>(error) &&
+        error.response?.data?.error?.message
           ? error.response.data.error.message
-          : 'Unable to cancel this invite.';
+          : "Unable to cancel this invite.";
       setRosterNotice(message);
-      void queryClient.invalidateQueries({ queryKey: ['college-student-roster'] });
+      void queryClient.invalidateQueries({
+        queryKey: ["college-student-roster"],
+      });
     },
   });
   const createTemporaryCredentialMutation = useMutation({
@@ -83,9 +86,11 @@ export default function OperationsPage({ onBackToOverview }: OperationsPageProps
     onSuccess: (credential) => {
       setLatestTemporaryCredential(credential);
       void Promise.all([
-        queryClient.invalidateQueries({ queryKey: ['college-student-roster'] }),
-        queryClient.invalidateQueries({ queryKey: ['college-dashboard'] }),
-        queryClient.invalidateQueries({ queryKey: ['college-student-verifications'] }),
+        queryClient.invalidateQueries({ queryKey: ["college-student-roster"] }),
+        queryClient.invalidateQueries({ queryKey: ["college-dashboard"] }),
+        queryClient.invalidateQueries({
+          queryKey: ["college-student-verifications"],
+        }),
       ]);
     },
   });
@@ -93,8 +98,8 @@ export default function OperationsPage({ onBackToOverview }: OperationsPageProps
     mutationFn: collegeApi.importStudentRoster,
     onSuccess: () => {
       void Promise.all([
-        queryClient.invalidateQueries({ queryKey: ['college-student-roster'] }),
-        queryClient.invalidateQueries({ queryKey: ['college-dashboard'] }),
+        queryClient.invalidateQueries({ queryKey: ["college-student-roster"] }),
+        queryClient.invalidateQueries({ queryKey: ["college-dashboard"] }),
       ]);
     },
   });
@@ -103,8 +108,8 @@ export default function OperationsPage({ onBackToOverview }: OperationsPageProps
     onSuccess: (result) => {
       setBulkCredentialResult(result);
       void Promise.all([
-        queryClient.invalidateQueries({ queryKey: ['college-student-roster'] }),
-        queryClient.invalidateQueries({ queryKey: ['college-dashboard'] }),
+        queryClient.invalidateQueries({ queryKey: ["college-student-roster"] }),
+        queryClient.invalidateQueries({ queryKey: ["college-dashboard"] }),
       ]);
     },
   });
@@ -115,19 +120,21 @@ export default function OperationsPage({ onBackToOverview }: OperationsPageProps
       reason,
     }: {
       studentId: string;
-      decision: 'approved' | 'rejected';
+      decision: "approved" | "rejected";
       reason?: string;
     }) => collegeApi.reviewStudentVerification(studentId, { decision, reason }),
     onSuccess: () => {
       void Promise.all([
-        queryClient.invalidateQueries({ queryKey: ['college-student-verifications'] }),
-        queryClient.invalidateQueries({ queryKey: ['college-dashboard'] }),
-        queryClient.invalidateQueries({ queryKey: ['college-students'] }),
+        queryClient.invalidateQueries({
+          queryKey: ["college-student-verifications"],
+        }),
+        queryClient.invalidateQueries({ queryKey: ["college-dashboard"] }),
+        queryClient.invalidateQueries({ queryKey: ["college-students"] }),
       ]);
     },
   });
 
-  const institutionDomainHint = authUser?.email?.split('@')[1];
+  const institutionDomainHint = authUser?.email?.split("@")[1];
   const pendingTokens = tokenQuery.data ?? [];
   const pendingStudents = pendingStudentsQuery.data ?? [];
 
@@ -139,56 +146,67 @@ export default function OperationsPage({ onBackToOverview }: OperationsPageProps
   };
 
   const handleReject = (studentId: string) => {
-    const reason = window.prompt('Add a short reason for rejection (optional):')?.trim();
+    const reason = window
+      .prompt("Add a short reason for rejection (optional):")
+      ?.trim();
     reviewMutation.mutate({
       studentId,
-      decision: 'rejected',
+      decision: "rejected",
       ...(reason ? { reason } : {}),
     });
   };
 
   return (
-    <section className="flex min-h-0 flex-1 flex-col overflow-hidden rounded-[2rem] border border-slate-800/70 bg-slate-950/55">
-      <div className="flex flex-wrap items-start justify-between gap-4 border-b border-slate-800/70 px-6 py-5">
-        <div>
-          <div className="text-[11px] uppercase tracking-[0.35em] text-cyan-300">Operations Workspace</div>
-          <h1 className="mt-2 text-3xl font-semibold tracking-tight text-white">College operations page</h1>
-          <p className="mt-2 max-w-3xl text-sm leading-6 text-slate-400">
-            Token desk, approval queue, and student intake live here so the dashboard can stay
-            within one viewport.
-          </p>
-        </div>
-
-        {onBackToOverview ? (
-          <Button variant="secondary" onClick={onBackToOverview}>
-            Back to overview
-          </Button>
-        ) : null}
+    <section className="mx-2 my-2 flex min-h-[calc(100vh-5rem)] flex-1 flex-col lg:mx-2">
+      <div className="px-0 py-0">
+        <InstitutionWorkspaceHeader
+          mode="college"
+          eyebrow="Operations Workspace"
+          title="College operations page"
+          description="Token desk, approval queue, and student intake live here so the dashboard can stay within one viewport."
+          tabsAction={
+            onBackToOverview ? (
+              <Button variant="secondary" onClick={onBackToOverview}>
+                Back to overview
+              </Button>
+            ) : undefined
+          }
+        />
       </div>
 
-      <div className="min-h-0 flex-1 overflow-y-auto px-6 py-6">
+      <div className="min-h-0 flex-1 overflow-y-auto px-0 py-6">
         <div className="grid gap-3 border-b border-slate-800/70 pb-6 md:grid-cols-3">
           {[
             {
               icon: Users,
-              label: 'Student intake',
-              value: 'Manual, bulk, and temporary credential workflows stay available.',
+              label: "Student intake",
+              value:
+                "Manual, bulk, and temporary credential workflows stay available.",
             },
             {
               icon: KeyRound,
-              label: 'Token desk',
-              value: 'Generate and monitor student verification tokens from one place.',
+              label: "Token desk",
+              value:
+                "Generate and monitor student verification tokens from one place.",
             },
             {
               icon: Sparkles,
-              label: 'Approval queue',
-              value: 'Pending student registrations are reviewed from this page.',
+              label: "Approval queue",
+              value:
+                "Pending student registrations are reviewed from this page.",
             },
           ].map((item) => (
-            <div key={item.label} className="rounded-3xl border border-slate-800/70 bg-slate-900/30 p-4">
+            <div
+              key={item.label}
+              className="rounded-3xl border border-slate-800/70 bg-slate-900/30 p-4"
+            >
               <item.icon className="h-4 w-4 text-cyan-300" />
-              <div className="mt-3 text-sm font-medium text-white">{item.label}</div>
-              <div className="mt-1 text-sm leading-6 text-slate-400">{item.value}</div>
+              <div className="mt-3 text-sm font-medium text-white">
+                {item.label}
+              </div>
+              <div className="mt-1 text-sm leading-6 text-slate-400">
+                {item.value}
+              </div>
             </div>
           ))}
         </div>
@@ -205,7 +223,9 @@ export default function OperationsPage({ onBackToOverview }: OperationsPageProps
               isReviewingStudents={reviewMutation.isPending}
               onTokenLabelChange={setTokenLabel}
               onCreateToken={handleCreateToken}
-              onApproveStudent={(studentId) => reviewMutation.mutate({ studentId, decision: 'approved' })}
+              onApproveStudent={(studentId) =>
+                reviewMutation.mutate({ studentId, decision: "approved" })
+              }
               onRejectStudent={handleReject}
             />
 
@@ -225,20 +245,34 @@ export default function OperationsPage({ onBackToOverview }: OperationsPageProps
                   isRosterLoading={rosterQuery.isLoading}
                   isManualSubmitting={createRosterEntryMutation.isPending}
                   isImportSubmitting={importRosterMutation.isPending}
-                  isImportWithCredentialsSubmitting={importRosterWithCredentialsMutation.isPending}
-                  isTemporaryCredentialSubmitting={createTemporaryCredentialMutation.isPending}
+                  isImportWithCredentialsSubmitting={
+                    importRosterWithCredentialsMutation.isPending
+                  }
+                  isTemporaryCredentialSubmitting={
+                    createTemporaryCredentialMutation.isPending
+                  }
                   temporaryCredential={latestTemporaryCredential}
                   bulkCredentialResult={bulkCredentialResult}
-                  onCreateManualEntry={(payload) => createRosterEntryMutation.mutate(payload)}
+                  onCreateManualEntry={(payload) =>
+                    createRosterEntryMutation.mutate(payload)
+                  }
                   onCancelInvite={(rosterEntryId) => {
-                    if (window.confirm('Cancel this student invite?')) {
+                    if (window.confirm("Cancel this student invite?")) {
                       cancelInviteMutation.mutate(rosterEntryId);
                     }
                   }}
-                  cancellingInviteId={cancelInviteMutation.isPending ? cancelInviteMutation.variables : null}
+                  cancellingInviteId={
+                    cancelInviteMutation.isPending
+                      ? cancelInviteMutation.variables
+                      : null
+                  }
                   onImportFile={(file) => importRosterMutation.mutate(file)}
-                  onImportFileWithCredentials={(file) => importRosterWithCredentialsMutation.mutate(file)}
-                  onCreateTemporaryCredentials={(payload) => createTemporaryCredentialMutation.mutate(payload)}
+                  onImportFileWithCredentials={(file) =>
+                    importRosterWithCredentialsMutation.mutate(file)
+                  }
+                  onCreateTemporaryCredentials={(payload) =>
+                    createTemporaryCredentialMutation.mutate(payload)
+                  }
                 />
 
                 {rosterNotice ? (

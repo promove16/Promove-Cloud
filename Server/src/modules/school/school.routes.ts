@@ -13,8 +13,10 @@ import {
   createSchoolStudentAccessTokenController,
   createSchoolStudentRosterEntryController,
   createSchoolComplianceReportController,
+  createSchoolEventController,
   getLatestSchoolComplianceReportController,
   getSchoolDashboardController,
+  getSchoolEventRankingsController,
   getSchoolStudentJourneyController,
   importSchoolStudentCredentialsController,
   importSchoolStudentRosterController,
@@ -62,7 +64,9 @@ router.get('/students/:id/journey', asyncHandler(getSchoolStudentJourneyControll
 router.get('/projects', asyncHandler(listSchoolProjectsController));
 router.get('/patents', asyncHandler(listSchoolPatentsController));
 router.get('/startups', asyncHandler(listSchoolStartupsController));
+router.post('/events', asyncHandler(createSchoolEventController));
 router.get('/events', asyncHandler(listSchoolEventsController));
+router.get('/events/:eventId/rankings', asyncHandler(getSchoolEventRankingsController));
 router.get(
   '/investors',
   connectionGuard(UserRole.INVESTOR),

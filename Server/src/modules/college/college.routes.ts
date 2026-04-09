@@ -33,6 +33,7 @@ import {
   listCollegeStudentsController,
   reviewCollegeStudentVerificationController,
   updatePlacementStatusController,
+  listCollegeHiringEventsController,
 } from './college.controller';
 
 const router = Router();
@@ -74,6 +75,7 @@ router.patch(
 );
 router.post('/events', authorize(UserRole.COLLEGE), asyncHandler(createCollegeEventController));
 router.get('/events', authorize(UserRole.COLLEGE), asyncHandler(listCollegeEventsController));
+router.get('/events/hiring', authorize(UserRole.COLLEGE), asyncHandler(listCollegeHiringEventsController));
 router.get(
   '/events/:eventId/rankings',
   authorize(UserRole.COLLEGE),

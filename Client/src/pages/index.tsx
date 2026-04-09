@@ -112,6 +112,7 @@ const RecruiterOnboardingTracker = lazy(() =>
   })),
 );
 const RecruiterApplications = lazy(() => import("../features/recruiter/ApplicationsPipeline"));
+const RecruiterHiringEvents = lazy(() => import("../features/recruiter/HiringEvents"));
 
 const InvestorDashboard = lazy(() => import("../features/investor/Dashboard"));
 const InvestorStartupMarketplace = lazy(() => import("../features/investor/StartupMarketplace"));
@@ -203,6 +204,7 @@ const Portfolio = lazy(() =>
   })),
 );
 const StudentApplicationsPage = lazy(() => import("../features/student/ApplicationsPage"));
+const StudentEventsPage = lazy(() => import("../features/student/StudentEventsPage"));
 const MarketplaceJobDetail = lazy(() =>
   import("../features/student/MarketplaceJobDetail").then((module) => ({
     default: module.MarketplaceJobDetail,
@@ -401,20 +403,16 @@ function MarketplaceDetailRedirect() {
 
 const NON_ADMIN_DASHBOARD_ROLES = [
   UserRole.STUDENT,
-  UserRole.SCHOOL,
-  UserRole.COLLEGE,
   UserRole.MENTOR,
   UserRole.INVESTOR,
   UserRole.RECRUITER,
 ];
 
 const INVITATION_ROLES = [
-  UserRole.COLLEGE,
   UserRole.STUDENT,
   UserRole.INVESTOR,
   UserRole.RECRUITER,
   UserRole.MENTOR,
-  UserRole.SCHOOL,
   UserRole.ADMIN,
 ];
 
@@ -609,6 +607,7 @@ export const router = createBrowserRouter([
               { path: "mentor-sessions", element: <LazyPage component={StudentMentorSessions} /> },
               { path: "investor-deals", element: <Navigate to="/startup-launch" replace /> },
               { path: "applications", element: <LazyPage component={StudentApplicationsPage} /> },
+              { path: "events", element: <LazyPage component={StudentEventsPage} /> },
               { path: "marketplace", element: <LazyPage component={Marketplace} /> },
               { path: "marketplace/view/:entityType/:entityId", element: <LazyPage component={MarketplaceDetail} /> },
             ],
@@ -654,6 +653,7 @@ export const router = createBrowserRouter([
               { path: "applications", element: <LazyPage component={RecruiterApplications} /> },
               { path: "colleges", element: <LazyPage component={RecruiterCollegeConnect} /> },
               { path: "drives", element: <LazyPage component={RecruiterActiveDrives} /> },
+              { path: "hiring-events", element: <LazyPage component={RecruiterHiringEvents} /> },
               { path: "onboarding", element: <LazyPage component={RecruiterOnboardingTracker} /> },
               {
                 path: "messages",

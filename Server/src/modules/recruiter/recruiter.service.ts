@@ -25,6 +25,7 @@ export {
   closeRecruiterDrive,
   createRecruiterDrive,
   getRecruiterColleges,
+  getRecruiterLinkedColleges,
   getRecruiterDrives,
   getRecruiterOnboarding,
   markStudentHired,

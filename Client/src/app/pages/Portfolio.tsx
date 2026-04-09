@@ -136,6 +136,7 @@ export function Portfolio() {
   const [toast, setToast] = useState("");
   const [showLaunchModal, setShowLaunchModal] = useState(false);
   const isStudent = authUser?.role === UserRole.STUDENT;
+  const isInstitutionRole = authUser?.role === UserRole.SCHOOL || authUser?.role === UserRole.COLLEGE;
 
   const profileQuery = useQuery({ queryKey: ["profile", "me"], queryFn: () => userApi.getMe() });
   const score = useInnovationScore();
@@ -149,6 +150,7 @@ export function Portfolio() {
 
   const profile = profileQuery.data;
   const isOwner = Boolean(authUser?._id && profile?._id && authUser._id === profile._id);
+  const canManageProfile = isOwner;
   const canManagePortfolio = isStudent && isOwner;
   const displayName = profile?.displayName ?? authUser?.displayName ?? "Portfolio";
   const initials = displayName
@@ -214,12 +216,42 @@ export function Portfolio() {
     ...(profile?.certifications ?? []).slice(0, 2).map((item) => ({ kind: "Certification", title: item.name, body: item.issuingOrganization, url: item.credentialUrl, key: `cert-${item._id}` })),
     ...(profile?.education ?? []).slice(0, 1).map((item) => ({ kind: "Education", title: item.institution, body: `${item.degree}${item.fieldOfStudy ? ` in ${item.fieldOfStudy}` : ""}`, url: null, key: `edu-${item._id}` })),
   ];
-  const profileStats = [
-    { label: "Innovation Score", value: score.data?.score ?? profile?.innovationScore ?? 0 },
-    { label: "Projects", value: profile?.portfolioProjects?.length ?? 0 },
-    { label: "Skills", value: profile?.skills?.length ?? 0 },
-    { label: "Certifications", value: profile?.certifications?.length ?? 0 },
+  const institutionHighlights = [
+    {
+      kind: "Specialty",
+      title: profile?.institutionProfile?.specialties?.[0] ?? "Institution profile",
+      body: profile?.headline ?? profile?.domain ?? "Complete your institution page to surface your strongest focus areas.",
+      url: profile?.websiteUrl ?? null,
+      key: "institution-specialty",
+    },
+    {
+      kind: "Location",
+      title: profile?.institutionProfile?.location ?? "Primary campus",
+      body: profile?.institutionProfile?.locations?.slice(0, 3).join(" . ") || "Add branch or campus locations.",
+      url: null,
+      key: "institution-location",
+    },
+    {
+      kind: "Outcome",
+      title: `${profile?.institutionProfile?.stats?.startupsLaunched ?? 0} startups launched`,
+      body: `${profile?.institutionProfile?.stats?.industryCollaborations ?? 0} industry collaborations . ${profile?.institutionProfile?.stats?.patentsFiled ?? 0} patents filed`,
+      url: null,
+      key: "institution-outcomes",
+    },
   ];
+  const profileStats = isInstitutionRole
+    ? [
+        { label: "Students", value: profile?.institutionProfile?.totalStudentsEnrolled ?? 0 },
+        { label: "Alumni", value: profile?.institutionProfile?.alumniCount ?? 0 },
+        { label: "Startups", value: profile?.institutionProfile?.stats?.startupsLaunched ?? 0 },
+        { label: "Collaborations", value: profile?.institutionProfile?.stats?.industryCollaborations ?? 0 },
+      ]
+    : [
+        { label: "Innovation Score", value: score.data?.score ?? profile?.innovationScore ?? 0 },
+        { label: "Projects", value: profile?.portfolioProjects?.length ?? 0 },
+        { label: "Skills", value: profile?.skills?.length ?? 0 },
+        { label: "Certifications", value: profile?.certifications?.length ?? 0 },
+      ];
 
   const launchToRecruiters = async () => {
     try {
@@ -290,7 +322,7 @@ export function Portfolio() {
                     {!profile?.avatarWallpaper ? (
                       <div className="absolute inset-0 bg-[linear-gradient(120deg,_transparent_0%,_transparent_42%,_rgba(255,255,255,0.24)_43%,_rgba(255,255,255,0.24)_50%,_transparent_51%)]" />
                     ) : null}
-                    {canManagePortfolio ? (
+                    {canManageProfile ? (
                       <Link
                         to="/dashboard/profile"
                         className="absolute right-4 top-4 rounded-full bg-slate-950/90 p-2 text-cyan-200 shadow transition hover:bg-slate-800"
@@ -350,7 +382,7 @@ export function Portfolio() {
                         </div>
                       ) : null}
                       <div className="mt-4 flex flex-wrap gap-2">
-                        {canManagePortfolio ? (
+                        {canManageProfile ? (
                           <>
                             <Link
                               to="/dashboard/profile"
@@ -359,14 +391,18 @@ export function Portfolio() {
                               <Pencil className="h-4 w-4" />
                               Edit profile
                             </Link>
-                            <ProfileButton onClick={() => void copyShareLink()} disabled={!canShareProfile}>
-                              <Share2 className="h-4 w-4" />
-                              Share
-                            </ProfileButton>
-                            <ProfileButton onClick={() => setShowLaunchModal(true)}>
-                              <Rocket className="h-4 w-4" />
-                              Launch
-                            </ProfileButton>
+                            {isStudent ? (
+                              <ProfileButton onClick={() => void copyShareLink()} disabled={!canShareProfile}>
+                                <Share2 className="h-4 w-4" />
+                                Share
+                              </ProfileButton>
+                            ) : null}
+                            {isStudent ? (
+                              <ProfileButton onClick={() => setShowLaunchModal(true)}>
+                                <Rocket className="h-4 w-4" />
+                                Launch
+                              </ProfileButton>
+                            ) : null}
                             <ProfileButton onClick={downloadPdf}>
                               <Download className="h-4 w-4" />
                               PDF
@@ -404,10 +440,10 @@ export function Portfolio() {
                 {profile?.bio ? <p className="whitespace-pre-line text-sm leading-6 text-slate-200">{profile.bio}</p> : <Empty>No about summary has been added yet.</Empty>}
               </Section>
 
-              <Section title="Featured">
-                {featuredItems.length > 0 ? (
+              <Section title={isInstitutionRole ? "Page highlights" : "Featured"}>
+                {(isInstitutionRole ? institutionHighlights : featuredItems).length > 0 ? (
                   <div className="grid gap-3 md:grid-cols-3">
-                    {featuredItems.map((item) => (
+                    {(isInstitutionRole ? institutionHighlights : featuredItems).map((item) => (
                       <article key={item.key} className="overflow-hidden rounded-lg border border-slate-800 bg-slate-950/70">
                         <div className="flex h-24 items-center justify-center bg-cyan-500/10 text-cyan-200">
                           {item.kind === "Project" ? <Rocket className="h-8 w-8" /> : item.kind === "Certification" ? <Award className="h-8 w-8" /> : <GraduationCap className="h-8 w-8" />}
@@ -427,10 +463,107 @@ export function Portfolio() {
                     ))}
                   </div>
                 ) : (
-                  <Empty>Featured work will appear here when projects, education, or certifications are available.</Empty>
+                  <Empty>
+                    {isInstitutionRole
+                      ? "Institution highlights will appear here when specialties, locations, and outcomes are available."
+                      : "Featured work will appear here when projects, education, or certifications are available."}
+                  </Empty>
                 )}
               </Section>
 
+              {isInstitutionRole ? (
+                <>
+                  <Section title="Institution details">
+                    {profile?.institutionProfile ? (
+                      <div className="grid gap-3 md:grid-cols-2">
+                        <div className="rounded-lg border border-slate-800 bg-slate-950/70 p-4">
+                          <div className="text-xs uppercase tracking-[0.18em] text-slate-400">Type</div>
+                          <div className="mt-2 font-semibold text-white">
+                            {profile.institutionProfile.organizationType || (authUser?.role === UserRole.COLLEGE ? "College" : "School")}
+                          </div>
+                        </div>
+                        <div className="rounded-lg border border-slate-800 bg-slate-950/70 p-4">
+                          <div className="text-xs uppercase tracking-[0.18em] text-slate-400">Founded</div>
+                          <div className="mt-2 font-semibold text-white">{profile.institutionProfile.foundedYear ?? "Not added"}</div>
+                        </div>
+                        <div className="rounded-lg border border-slate-800 bg-slate-950/70 p-4">
+                          <div className="text-xs uppercase tracking-[0.18em] text-slate-400">Students</div>
+                          <div className="mt-2 font-semibold text-white">{profile.institutionProfile.totalStudentsEnrolled ?? 0}</div>
+                        </div>
+                        <div className="rounded-lg border border-slate-800 bg-slate-950/70 p-4">
+                          <div className="text-xs uppercase tracking-[0.18em] text-slate-400">Academic year</div>
+                          <div className="mt-2 font-semibold text-white">{profile.institutionProfile.academicYear || "Not added"}</div>
+                        </div>
+                        <div className="rounded-lg border border-slate-800 bg-slate-950/70 p-4">
+                          <div className="text-xs uppercase tracking-[0.18em] text-slate-400">Alumni</div>
+                          <div className="mt-2 font-semibold text-white">{profile.institutionProfile.alumniCount ?? "Not added"}</div>
+                        </div>
+                        <div className="rounded-lg border border-slate-800 bg-slate-950/70 p-4">
+                          <div className="text-xs uppercase tracking-[0.18em] text-slate-400">Faculty / staff</div>
+                          <div className="mt-2 font-semibold text-white">{profile.institutionProfile.employeeCount ?? "Not added"}</div>
+                        </div>
+                      </div>
+                    ) : (
+                      <Empty>No institution details have been added yet.</Empty>
+                    )}
+                  </Section>
+
+                  <Section title="Specialties">
+                    {(profile?.institutionProfile?.specialties ?? []).length > 0 ? (
+                      <div className="flex flex-wrap gap-2">
+                        {(profile?.institutionProfile?.specialties ?? []).map((specialty) => (
+                          <span key={specialty} className="rounded-full border border-cyan-400/60 bg-cyan-400/10 px-3 py-1 text-sm font-semibold text-cyan-100">
+                            {specialty}
+                          </span>
+                        ))}
+                      </div>
+                    ) : (
+                      <Empty>No specialties or flagship programs added yet.</Empty>
+                    )}
+                  </Section>
+
+                  <Section title="Locations">
+                    {(profile?.institutionProfile?.locations ?? []).length > 0 ? (
+                      <div className="grid gap-3 md:grid-cols-2">
+                        {[profile?.institutionProfile?.location, ...(profile?.institutionProfile?.locations ?? [])].filter(Boolean).map((location) => (
+                          <article key={location} className="rounded-lg border border-slate-800 bg-slate-950/70 p-4">
+                            <div className="inline-flex items-center gap-2 text-sm font-semibold text-white">
+                              <MapPin className="h-4 w-4 text-cyan-200" />
+                              {location}
+                            </div>
+                          </article>
+                        ))}
+                      </div>
+                    ) : (
+                      <Empty>No campus or branch locations added yet.</Empty>
+                    )}
+                  </Section>
+
+                  <Section title="Outcomes">
+                    {profile?.institutionProfile?.stats ? (
+                      <div className="grid gap-3 md:grid-cols-2">
+                        {[
+                          ["Innovation activities", profile.institutionProfile.stats.totalInnovationActivities],
+                          ["Patents filed", profile.institutionProfile.stats.patentsFiled],
+                          ["Mentoring hours", profile.institutionProfile.stats.totalMentoringHours],
+                          ["Startups launched", profile.institutionProfile.stats.startupsLaunched],
+                          ["Industry collaborations", profile.institutionProfile.stats.industryCollaborations],
+                          ["Students placed", profile.institutionProfile.stats.studentsPlaced ?? "Not added"],
+                          ["HR connections", profile.institutionProfile.stats.totalHRConnections ?? "Not added"],
+                          ["Top hiring sector", profile.institutionProfile.stats.topHiringSector ?? "Not added"],
+                        ].map(([label, value]) => (
+                          <div key={String(label)} className="rounded-lg border border-slate-800 bg-slate-950/70 p-4">
+                            <div className="text-xs uppercase tracking-[0.18em] text-slate-400">{label}</div>
+                            <div className="mt-2 font-semibold text-white">{value}</div>
+                          </div>
+                        ))}
+                      </div>
+                    ) : (
+                      <Empty>No institution outcomes have been added yet.</Empty>
+                    )}
+                  </Section>
+                </>
+              ) : (
               <Section title="Experience">
                 {(profile?.experience ?? []).length > 0 ? (
                   <div className="divide-y divide-slate-800">
@@ -452,7 +585,9 @@ export function Portfolio() {
                   </div>
                 ) : <Empty>No experience has been added yet.</Empty>}
               </Section>
+              )}
 
+              {!isInstitutionRole ? (
               <Section title="Education">
                 {(profile?.education ?? []).length > 0 ? (
                   <div className="divide-y divide-slate-800">
@@ -478,7 +613,9 @@ export function Portfolio() {
                   </div>
                 ) : <Empty>No education entries have been added yet.</Empty>}
               </Section>
+              ) : null}
 
+              {!isInstitutionRole ? (
               <Section title="Licenses & certifications">
                 {(profile?.certifications ?? []).length > 0 ? (
                   <div className="divide-y divide-slate-800">
@@ -504,7 +641,9 @@ export function Portfolio() {
                   </div>
                 ) : <Empty>No licenses or certifications have been added yet.</Empty>}
               </Section>
+              ) : null}
 
+              {!isInstitutionRole ? (
               <Section title="Skills">
                 {Object.keys(skillsByCategory).length > 0 ? (
                   <div className="space-y-4">
@@ -523,7 +662,9 @@ export function Portfolio() {
                   </div>
                 ) : <Empty>No skills have been added yet.</Empty>}
               </Section>
+              ) : null}
 
+              {!isInstitutionRole ? (
               <Section title="Projects">
                 {(profile?.portfolioProjects ?? []).length > 0 ? (
                   <div className="divide-y divide-slate-800">
@@ -549,6 +690,7 @@ export function Portfolio() {
                   </div>
                 ) : <Empty>No portfolio projects are available yet.</Empty>}
               </Section>
+              ) : null}
 
               <Section title="Startups">
                 {recentStartups.length > 0 ? (
