@@ -993,6 +993,7 @@ export const enrichCurrentUserFromSocialLinks = async (
     }
   }
 
+  await syncInstitutionEducationForUser(user);
   await ensureProfileSlug(user);
   user.profileComplete = computeProfileComplete(user);
 
@@ -1005,7 +1006,10 @@ export const enrichCurrentUserFromSocialLinks = async (
   );
 
   return {
-    user: toSanitizedUser(user.toObject() as UserLike),
+    user: {
+      ...toSanitizedUser(user.toObject() as UserLike),
+      education: user.education ?? [],
+    },
     summary: {
       githubImported,
       linkedinImported,

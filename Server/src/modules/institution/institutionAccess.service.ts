@@ -21,6 +21,7 @@ import {
   queueProfileCompletionMilestoneEmail,
 } from '../../services/retentionEmailService';
 import { sendTemporaryStudentCredentialsEmail } from '../../services/emailService';
+import { syncInstitutionEducationForUser } from '../user/user.service';
 
 const TOKEN_TTL_DAYS = 90;
 const MS_IN_YEAR = 365 * 24 * 60 * 60 * 1000;
@@ -376,6 +377,8 @@ export const createManagedStudentCredentials = async (
     ...(payload.rollNumber ? { rollNumber: payload.rollNumber } : {}),
     ...(payload.notes ? { notes: payload.notes } : {}),
   });
+  await syncInstitutionEducationForUser(createdStudent);
+  await createdStudent.save();
 
   await invalidateInstitutionCaches(institutionId);
 

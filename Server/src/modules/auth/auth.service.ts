@@ -8,7 +8,7 @@ import { AccessGrantedBy, SanitizedUser } from '../user/user.types';
 import { UserRole } from '../../types/roles.types';
 import { ApiError } from '../../utils/ApiError';
 import { logError } from '../../config/logger';
-import { toSanitizedUser } from '../user/user.service';
+import { syncInstitutionEducationForUser, toSanitizedUser } from '../user/user.service';
 import { getProfileCompletionProgress } from '../user/profileCompletion';
 import { sanitizePlainText } from '../../utils/sanitizeText';
 import { recordLoginActivity } from '../analytics/activity.service';
@@ -374,6 +374,8 @@ export const registerUser = async (payload: {
     institutionVerifiedAt: verificationTimestamp,
   });
 
+  await syncInstitutionEducationForUser(createdUser);
+
   if (profileComplete) {
     const newScore = await applyScore({
       userId: String(createdUser._id),
@@ -382,6 +384,8 @@ export const registerUser = async (payload: {
     });
     createdUser.innovationScore = newScore;
   }
+
+  await createdUser.save();
 
   const user = toSanitizedUser(createdUser.toObject());
 
@@ -619,6 +623,7 @@ export const submitInstitutionToken = async (userId: string, institutionToken: s
   user.verificationRejectedAt = undefined;
   user.verificationRejectedReason = undefined;
   user.accessGrantedBy = matchedRoster ? 'institution_roster' : 'institution_token';
+  await syncInstitutionEducationForUser(user);
   await user.save();
 
   await registerTokenUsage(String(tokenRecord._id));

@@ -9,6 +9,7 @@ import { User } from '../user/user.model';
 import { UserRole } from '../../types/roles.types';
 import { CampusDrive } from './campusDrive.model';
 import { JobPost } from './jobPost.model';
+import { resolveEducationEntriesForUser } from '../user/user.service';
 import {
   RecruiterDashboardData,
   RecruiterDashboardMatch,
@@ -300,6 +301,12 @@ export const getRecruiterTalentProfile = async (
         .select('_id displayName institutionProfile')
         .lean()
     : null;
+  const education = await resolveEducationEntriesForUser({
+    role: student.role,
+    institutionId: student.institutionId,
+    email: student.email,
+    education: student.education,
+  });
   const talent = mapTalent(student, {
     canContact: canRecruiterContactStudent(student, bridgeType),
     ...(bridgeType ? { bridgeType } : {}),
@@ -350,7 +357,7 @@ export const getRecruiterTalentProfile = async (
       stage: startup.stage,
       ...(startup.launchedAt ? { launchedAt: startup.launchedAt.toISOString() } : {}),
     })),
-    education: (student.education ?? []).map((education) => ({
+    education: education.map((education) => ({
       _id: String(education._id),
       institution: education.institution,
       degree: education.degree,

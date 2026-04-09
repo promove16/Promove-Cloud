@@ -3,6 +3,7 @@ import { randomUUID } from 'crypto';
 import request from 'supertest';
 import app from '../../src/app';
 import { scoreQueue } from '../../src/config/bullmq';
+import { InstitutionStudentRosterEntry } from '../../src/modules/institution/studentRoster.model';
 import { User } from '../../src/modules/user/user.model';
 import { UserRole } from '../../src/types/roles.types';
 
@@ -68,6 +69,131 @@ describe('user profile flow integration', () => {
 
     expect(secondResponse.status).toBe(200);
     expect(scoreAddSpy).not.toHaveBeenCalled();
+  });
+
+  it('keeps current-session education from institution access while preserving additional user education', async () => {
+    const institution = await User.create({
+      email: `college-${randomUUID()}@example.com`,
+      passwordHash: await bcrypt.hash(PASSWORD, 12),
+      role: UserRole.COLLEGE,
+      displayName: 'Builder College',
+      profileComplete: true,
+      registrationStage: 'complete',
+      accessGrantedBy: 'admin',
+      accessExpiresAt: new Date(Date.now() + 365 * 24 * 60 * 60 * 1000),
+      isActive: true,
+      institutionToken: null,
+      institutionId: null,
+      institutionVerificationStatus: 'none',
+      verificationStatus: 'not_required',
+      adminApprovalStatus: 'approved',
+      institutionProfile: {
+        institutionName: 'Builder College',
+        location: 'India',
+        totalStudentsEnrolled: 1200,
+        academicYear: '2025-26',
+        iicStarRating: 4.2,
+        policies: [],
+        stats: {
+          totalInnovationActivities: 0,
+          patentsFiled: 0,
+          totalMentoringHours: 0,
+          startupsLaunched: 0,
+          industryCollaborations: 0,
+        },
+      },
+    });
+
+    const student = await createStudent({
+      email: `student-${randomUUID()}@example.com`,
+      displayName: 'Institution Student',
+      institutionId: institution._id,
+      institutionToken: 'COL-ACCESS',
+      institutionVerificationStatus: 'verified',
+      verificationStatus: 'verified',
+      institutionVerifiedAt: new Date(),
+      verifiedAt: new Date(),
+    });
+
+    await InstitutionStudentRosterEntry.create({
+      institutionId: institution._id,
+      institutionRole: UserRole.COLLEGE,
+      createdBy: institution._id,
+      displayName: student.displayName,
+      email: student.email,
+      gradeOrProgram: 'B.Tech CSE',
+      notes: 'Innovation cohort',
+      source: 'manual',
+      status: 'verified',
+      linkedUserId: student._id,
+      registeredAt: new Date(),
+      reviewedAt: new Date(),
+      isActive: true,
+    });
+
+    const accessToken = await loginAs(student.email);
+
+    const initialProfileResponse = await request(app)
+      .get('/api/users/me')
+      .set('Authorization', `Bearer ${accessToken}`);
+
+    expect(initialProfileResponse.status).toBe(200);
+    expect(initialProfileResponse.body.data.education[0]).toMatchObject({
+      institution: 'Builder College',
+      degree: 'B.Tech CSE',
+      isCurrent: true,
+      source: 'institution',
+    });
+
+    const updateResponse = await request(app)
+      .patch('/api/users/me')
+      .set('Authorization', `Bearer ${accessToken}`)
+      .send({
+        education: [
+          {
+            institution: 'Town High School',
+            degree: 'Higher Secondary',
+            fieldOfStudy: 'Science',
+            startYear: 2021,
+            endYear: 2023,
+            isCurrent: false,
+            grade: '92%',
+            activities: 'Robotics club',
+            description: 'Built early prototypes.',
+            source: 'manual',
+          },
+        ],
+      });
+
+    expect(updateResponse.status).toBe(200);
+    expect(updateResponse.body.data.education).toHaveLength(2);
+    expect(updateResponse.body.data.education[0]).toMatchObject({
+      institution: 'Builder College',
+      degree: 'B.Tech CSE',
+      isCurrent: true,
+      source: 'institution',
+    });
+    expect(updateResponse.body.data.education[1]).toMatchObject({
+      institution: 'Town High School',
+      degree: 'Higher Secondary',
+      source: 'manual',
+    });
+
+    const refreshedProfileResponse = await request(app)
+      .get('/api/users/me')
+      .set('Authorization', `Bearer ${accessToken}`);
+
+    expect(refreshedProfileResponse.status).toBe(200);
+    expect(refreshedProfileResponse.body.data.education).toHaveLength(2);
+    expect(refreshedProfileResponse.body.data.education[0]).toMatchObject({
+      institution: 'Builder College',
+      degree: 'B.Tech CSE',
+      source: 'institution',
+    });
+    expect(refreshedProfileResponse.body.data.education[1]).toMatchObject({
+      institution: 'Town High School',
+      source: 'manual',
+    });
   });
 
   it('serves only verified public student profiles and filters private GitHub proof', async () => {

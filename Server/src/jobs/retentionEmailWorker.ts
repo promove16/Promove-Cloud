@@ -1,5 +1,14 @@
 import { Queue } from 'bullmq';
-import { bullmqConnection, createQueueWorker, hasBullMqRedisConnection, QueueJob } from '../config/bullmq';
+import {
+  bullmqConnection,
+  closeBullMqQueueSafely,
+  createQueueWorker,
+  disableRemoteBullMq,
+  hasActiveBullMqRedisConnection,
+  hasBullMqRedisConnection,
+  QueueJob,
+  shouldDisableBullMqRedis,
+} from '../config/bullmq';
 import { logError, logger } from '../config/logger';
 import {
   createWeeklyProgressSchedulerJob,
@@ -32,7 +41,13 @@ export const scheduleWeeklyProgressSummaryJob = async () => {
     return;
   }
 
+  if (!hasActiveBullMqRedisConnection()) {
+    logger.info('Skipping weekly progress summary scheduler because BullMQ Redis transport is unavailable.');
+    return;
+  }
+
   const queue = new Queue<EmailQueueJob>('emails', { connection: bullmqConnection });
+  let shouldForceCloseQueue = false;
 
   try {
     const schedulerJob = createWeeklyProgressSchedulerJob();
@@ -50,9 +65,15 @@ export const scheduleWeeklyProgressSummaryJob = async () => {
       },
     );
   } catch (error) {
+    if (shouldDisableBullMqRedis(error)) {
+      shouldForceCloseQueue = true;
+      disableRemoteBullMq(error);
+      return;
+    }
+
     logError('Failed to schedule weekly progress summary emails', error);
   } finally {
-    await queue.close().catch((error) => {
+    await closeBullMqQueueSafely(queue, shouldForceCloseQueue).catch((error) => {
       logError('Failed to close weekly progress summary queue', error);
     });
   }

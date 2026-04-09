@@ -277,37 +277,39 @@ export function Portfolio() {
         <div className="w-full space-y-4">
           {toast ? <div className="rounded-lg border border-cyan-400/30 bg-slate-950 p-3 text-sm font-medium text-cyan-100">{toast}</div> : null}
 
-          <section className="w-full overflow-hidden rounded-lg border border-slate-800 bg-slate-900/90 shadow-sm">
-                <div
-                  className={
-                    profile?.avatarWallpaper
-                      ? "relative h-48 bg-cover bg-center"
-                      : "relative h-48 bg-[linear-gradient(135deg,_#243a8f_0%,_#0a66c2_46%,_#0b5cab_64%,_#f5b841_65%,_#f59e0b_78%,_#0a66c2_79%,_#0f4c81_100%)]"
-                  }
-                  style={heroBackgroundStyle}
-                >
-                  {!profile?.avatarWallpaper ? (
-                    <div className="absolute inset-0 bg-[linear-gradient(120deg,_transparent_0%,_transparent_42%,_rgba(255,255,255,0.24)_43%,_rgba(255,255,255,0.24)_50%,_transparent_51%)]" />
-                  ) : null}
-                  {canManagePortfolio ? (
-                    <Link
-                      to="/dashboard/profile"
-                      className="absolute right-4 top-4 rounded-full bg-slate-950/90 p-2 text-cyan-200 shadow transition hover:bg-slate-800"
-                      aria-label="Edit intro"
-                    >
-                      <Pencil className="h-4 w-4" />
-                    </Link>
-                  ) : null}
-                </div>
+          <section className="w-full rounded-lg border border-slate-800 bg-slate-900/90 shadow-sm">
+                <div className="relative">
+                  <div
+                    className={
+                      profile?.avatarWallpaper
+                        ? "relative h-48 overflow-hidden rounded-t-lg bg-cover bg-center"
+                        : "relative h-48 overflow-hidden rounded-t-lg bg-[linear-gradient(135deg,_#243a8f_0%,_#0a66c2_46%,_#0b5cab_64%,_#f5b841_65%,_#f59e0b_78%,_#0a66c2_79%,_#0f4c81_100%)]"
+                    }
+                    style={heroBackgroundStyle}
+                  >
+                    {!profile?.avatarWallpaper ? (
+                      <div className="absolute inset-0 bg-[linear-gradient(120deg,_transparent_0%,_transparent_42%,_rgba(255,255,255,0.24)_43%,_rgba(255,255,255,0.24)_50%,_transparent_51%)]" />
+                    ) : null}
+                    {canManagePortfolio ? (
+                      <Link
+                        to="/dashboard/profile"
+                        className="absolute right-4 top-4 rounded-full bg-slate-950/90 p-2 text-cyan-200 shadow transition hover:bg-slate-800"
+                        aria-label="Edit intro"
+                      >
+                        <Pencil className="h-4 w-4" />
+                      </Link>
+                    ) : null}
+                  </div>
 
-                <div className="px-6 pb-6">
-                  <div className="-mt-20 flex items-end justify-between gap-4">
-                    <div className="flex h-40 w-40 items-center justify-center overflow-hidden rounded-full border-4 border-slate-900 bg-slate-800 text-5xl font-semibold text-cyan-200 shadow-sm">
+                  <div className="pointer-events-none absolute bottom-0 left-6 z-10 translate-y-1/2 sm:left-8">
+                    <div className="flex h-28 w-28 items-center justify-center overflow-hidden rounded-full border-4 border-slate-900 bg-slate-800 text-4xl font-semibold text-cyan-200 shadow-sm sm:h-40 sm:w-40 sm:text-5xl">
                       {profile?.avatar ? <img src={profile.avatar} alt={displayName} className="h-full w-full object-cover" /> : initials}
                     </div>
                   </div>
+                </div>
 
-                  <div className="mt-4 flex flex-col gap-5 lg:flex-row lg:items-start lg:justify-between">
+                <div className="px-6 pb-6 pt-16 sm:px-8 sm:pt-24">
+                  <div className="flex flex-col gap-5 lg:flex-row lg:items-start lg:justify-between">
                     <div className="min-w-0 flex-1">
                       <div className="flex flex-wrap items-center gap-2">
                         <h1 className="text-2xl font-semibold leading-tight text-white">{displayName}</h1>

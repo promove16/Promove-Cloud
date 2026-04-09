@@ -53,6 +53,14 @@ let remoteBullMqDisabledReason: string | null = null;
 const remoteQueues = new Set<Queue>();
 const remoteWorkers = new Set<Worker>();
 
+type BullMqQueueConnection = {
+  close: (force?: boolean) => Promise<void>;
+};
+
+type BullMqQueueWithInternalConnection = Queue & {
+  connection?: BullMqQueueConnection;
+};
+
 export type QueueJob<T> = {
   id?: string;
   name: string;
@@ -92,6 +100,28 @@ const shouldDisableRemoteBullMq = (error: unknown) =>
 
 const isRemoteBullMqActive = () => hasBullMqRedisConnection && !remoteBullMqDisabledReason;
 
+export const hasActiveBullMqRedisConnection = () => isRemoteBullMqActive();
+
+const closeBullMqQueue = async (queue: Queue, force = false) => {
+  if (!force) {
+    await queue.close();
+    return;
+  }
+
+  // Queue does not expose a force-close API, but transport failures need an immediate disconnect.
+  const internalConnection = (queue as BullMqQueueWithInternalConnection).connection;
+  if (internalConnection?.close) {
+    await internalConnection.close(true);
+    return;
+  }
+
+  await queue.disconnect();
+};
+
+export const closeBullMqQueueSafely = async (queue: Queue, force = false) => {
+  await closeBullMqQueue(queue, force);
+};
+
 const closeRemoteBullMqResources = () => {
   const workers = Array.from(remoteWorkers);
   const queues = Array.from(remoteQueues);
@@ -100,19 +130,19 @@ const closeRemoteBullMqResources = () => {
   remoteQueues.clear();
 
   workers.forEach((worker) => {
-    void worker.close().catch((error) => {
+    void worker.close(true).catch((error) => {
       logError('Failed to close BullMQ worker after Redis shutdown', error);
     });
   });
 
   queues.forEach((queue) => {
-    void queue.close().catch((error) => {
+    void closeBullMqQueue(queue, true).catch((error) => {
       logError('Failed to close BullMQ queue after Redis shutdown', error);
     });
   });
 };
 
-const disableRemoteBullMq = (error: unknown) => {
+export const disableRemoteBullMq = (error: unknown) => {
   if (remoteBullMqDisabledReason) {
     return;
   }
@@ -125,6 +155,8 @@ const disableRemoteBullMq = (error: unknown) => {
   );
   closeRemoteBullMqResources();
 };
+
+export const shouldDisableBullMqRedis = (error: unknown) => shouldDisableRemoteBullMq(error);
 
 const getBackoffDelay = (opts?: JobsOptions, attempt = 1) => {
   const backoff = opts?.backoff;
