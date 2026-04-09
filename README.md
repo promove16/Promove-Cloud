@@ -217,6 +217,23 @@ Transitional frontend note:
 
 ## Local Setup
 
+### Start both apps from the repo root
+
+```bash
+npm run dev
+```
+
+This starts the backend from `Server/` and the frontend from `Client/` in one terminal session.
+Install dependencies in both packages first:
+
+```bash
+cd Server
+npm install
+
+cd ../Client
+npm install
+```
+
 ### Backend
 
 ```bash
@@ -267,6 +284,17 @@ Frontend environment values:
 - If unset, the client defaults to `/api`
 
 ## Build, Test, And Run
+
+### Root dev runner
+
+```bash
+npm run dev
+```
+
+Useful root shortcuts:
+- `npm run dev` starts both Client and Server.
+- `npm run dev:client` starts only the frontend.
+- `npm run dev:server` starts only the backend.
 
 ### Client
 

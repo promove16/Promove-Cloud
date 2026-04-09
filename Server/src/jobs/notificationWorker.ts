@@ -1,5 +1,4 @@
 import { createQueueWorker, QueueJob } from '../config/bullmq';
-import { redis } from '../config/redis';
 import { io } from '../config/socket';
 import { NotificationService } from '../modules/notification/notification.service';
 
@@ -42,9 +41,6 @@ export const startNotificationWorker = () => {
       if (io) {
         io.of('/notifications').to(`user:${userId}`).emit('notification:new', notification);
       }
-
-      await redis.lpush(`notif:${userId}`, JSON.stringify(notification));
-      await redis.expire(`notif:${userId}`, 172800);
     },
   );
 

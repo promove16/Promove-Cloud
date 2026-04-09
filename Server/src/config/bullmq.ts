@@ -5,6 +5,11 @@ import { ApiRequestActivityPayload } from '../modules/analytics/activity.types';
 
 export const hasBullMqRedisConnection = env.BULLMQ_USE_REDIS && Boolean(env.UPSTASH_REDIS_PASSWORD);
 
+const DEFAULT_JOB_OPTIONS: Pick<JobsOptions, 'removeOnComplete' | 'removeOnFail'> = {
+  removeOnComplete: 100,
+  removeOnFail: 100,
+};
+
 const baseConnection = {
   host: env.UPSTASH_REDIS_HOST,
   port: 6379,
@@ -67,13 +72,19 @@ const isBullMqRedisRequestLimitError = (error: unknown) => {
 const isRemoteBullMqActive = () => hasBullMqRedisConnection && !remoteBullMqDisabledReason;
 
 const closeRemoteBullMqResources = () => {
-  remoteWorkers.forEach((worker) => {
+  const workers = Array.from(remoteWorkers);
+  const queues = Array.from(remoteQueues);
+
+  remoteWorkers.clear();
+  remoteQueues.clear();
+
+  workers.forEach((worker) => {
     void worker.close().catch((error) => {
       logError('Failed to close BullMQ worker after Redis shutdown', error);
     });
   });
 
-  remoteQueues.forEach((queue) => {
+  queues.forEach((queue) => {
     void queue.close().catch((error) => {
       logError('Failed to close BullMQ queue after Redis shutdown', error);
     });
@@ -118,12 +129,19 @@ const emitLocalFailure = <T>(queueName: string, job: QueueJob<T>, error: Error) 
   handlers.forEach((handler) => handler(job as QueueJob<unknown> | undefined, error));
 };
 
+const withDefaultJobOptions = (opts?: JobsOptions): JobsOptions => ({
+  ...opts,
+  removeOnComplete: opts?.removeOnComplete ?? DEFAULT_JOB_OPTIONS.removeOnComplete,
+  removeOnFail: opts?.removeOnFail ?? DEFAULT_JOB_OPTIONS.removeOnFail,
+});
+
 const addLocalJob = async <T>(
   queueName: string,
   jobName: string,
   data: T,
   opts?: JobsOptions,
 ) => {
+  const normalizedOpts = withDefaultJobOptions(opts);
   const id = `${queueName}-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
   const processor = localProcessors.get(queueName) as
     | ((job: QueueJob<T>, options?: JobsOptions) => Promise<void>)
@@ -138,7 +156,7 @@ const addLocalJob = async <T>(
 
   void Promise.resolve().then(async () => {
     try {
-      await processor({ id, name: jobName, data }, opts);
+      await processor({ id, name: jobName, data }, normalizedOpts);
     } catch (error) {
       logError(`Local queue "${queueName}" job "${jobName}" failed`, error);
     }
@@ -209,16 +227,18 @@ const createSafeQueue = <T>(queueName: string): QueueLike<T> => {
 
   return {
     add: async (jobName: string, data: T, opts?: JobsOptions) => {
+      const normalizedOpts = withDefaultJobOptions(opts);
+
       if (!queue || !isRemoteBullMqActive()) {
-        return addLocalJob(queueName, jobName, data, opts);
+        return addLocalJob(queueName, jobName, data, normalizedOpts);
       }
 
       try {
-        return await queue.add(jobName, data, opts);
+        return await queue.add(jobName, data, normalizedOpts);
       } catch (error) {
         if (isBullMqRedisRequestLimitError(error)) {
           disableRemoteBullMq(error);
-          return addLocalJob(queueName, jobName, data, opts);
+          return addLocalJob(queueName, jobName, data, normalizedOpts);
         }
 
         logError(`BullMQ queue "${queueName}" add failed for job "${jobName}"`, error);

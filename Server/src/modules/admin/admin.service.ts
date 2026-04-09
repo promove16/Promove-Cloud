@@ -865,14 +865,32 @@ const deleteRefreshTokensForUser = async (userId: string) => {
     scan?: (cursor: string) => Promise<[string, string[]]>;
   };
   const scan = typeof redisClient.scan === 'function' ? redisClient.scan.bind(redisClient) : null;
+  const sessionIndexKey = `session-index:${userId}`;
 
   if (!scan) {
+    try {
+      const indexedTokenIds = ((await redis.smembers(sessionIndexKey)) as string[]) ?? [];
+      if (indexedTokenIds.length === 0) {
+        await redis.del(sessionIndexKey);
+        return;
+      }
+
+      await Promise.all([
+        ...indexedTokenIds.map((tokenId) => redis.del(`refresh:${tokenId}`)),
+        ...indexedTokenIds.map((tokenId) => redis.del(`session:${userId}:${tokenId}`)),
+        redis.del(sessionIndexKey),
+      ]);
+    } catch (error) {
+      logError(`Failed to delete refresh tokens for user ${userId}`, error);
+    }
     return;
   }
 
   try {
     let cursor = '0';
-    const keysToDelete: string[] = [];
+    const tokenIds = new Set<string>(
+      (((await redis.smembers(sessionIndexKey)) as string[]) ?? []).filter(Boolean),
+    );
 
     do {
       const [nextCursor, keys] = await scan(cursor);
@@ -881,14 +899,25 @@ const deleteRefreshTokensForUser = async (userId: string) => {
         if (!key.startsWith('refresh:')) continue;
         const value = await redis.get<string>(key);
         if (value === userId) {
-          keysToDelete.push(key);
+          tokenIds.add(key.slice('refresh:'.length));
         }
       }
     } while (cursor !== '0');
 
-    if (keysToDelete.length > 0) {
-      await Promise.all(keysToDelete.map((key) => redis.del(key)));
+    if (tokenIds.size > 0) {
+      const deleteTargets = Array.from(tokenIds).flatMap((tokenId) => [
+        `refresh:${tokenId}`,
+        `session:${userId}:${tokenId}`,
+      ]);
+
+      await Promise.all([
+        ...deleteTargets.map((key) => redis.del(key)),
+        redis.del(sessionIndexKey),
+      ]);
+      return;
     }
+
+    await redis.del(sessionIndexKey);
   } catch (error) {
     logError(`Failed to delete refresh tokens for user ${userId}`, error);
   }
@@ -963,7 +992,6 @@ export const updateUserRole = async (adminId: string, userId: string, role: User
 
   user.role = role;
   await user.save();
-  await redis.del(`session:${userId}`);
   await deleteRefreshTokensForUser(userId);
   await createAudit(adminId, 'USER_ROLE_CHANGED', userId, 'User', { previousRole, nextRole: role });
   return userListItem(user.toObject());
@@ -973,10 +1001,7 @@ export const updateUserAccess = async (adminId: string, userId: string, isActive
   const user = await findUser(userId);
   user.isActive = isActive;
   await user.save();
-  await redis.del(`session:${userId}`);
-  if (!isActive) {
-    await deleteRefreshTokensForUser(userId);
-  }
+  await deleteRefreshTokensForUser(userId);
   await createAudit(adminId, isActive ? 'USER_ACTIVATED' : 'USER_DEACTIVATED', userId, 'User', { isActive });
   return userListItem(user.toObject());
 };

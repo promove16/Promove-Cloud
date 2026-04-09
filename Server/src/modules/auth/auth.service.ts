@@ -32,6 +32,9 @@ import {
 
 const REFRESH_TTL_SECONDS = 30 * 24 * 60 * 60;
 const MS_IN_YEAR = 365 * 24 * 60 * 60 * 1000;
+const refreshSessionKey = (tokenId: string) => `refresh:${tokenId}`;
+const userSessionKey = (userId: string, tokenId: string) => `session:${userId}:${tokenId}`;
+const userSessionIndexKey = (userId: string) => `session-index:${userId}`;
 
 interface AuthResult {
   accessToken: string;
@@ -117,9 +120,9 @@ const persistRefreshSession = async (
   user: SanitizedUser,
 ) => {
   await Promise.all([
-    redis.set(`refresh:${refreshTokenId}`, user._id, { ex: REFRESH_TTL_SECONDS }),
+    redis.set(refreshSessionKey(refreshTokenId), user._id, { ex: REFRESH_TTL_SECONDS }),
     redis.set(
-      `session:${user._id}:${refreshTokenId}`,
+      userSessionKey(user._id, refreshTokenId),
       JSON.stringify({
         userId: user._id,
         role: user.role,
@@ -128,6 +131,16 @@ const persistRefreshSession = async (
       }),
       { ex: REFRESH_TTL_SECONDS },
     ),
+    redis.sadd(userSessionIndexKey(user._id), refreshTokenId),
+    redis.expire(userSessionIndexKey(user._id), REFRESH_TTL_SECONDS),
+  ]);
+};
+
+const deleteRefreshSession = async (userId: string, refreshTokenId: string) => {
+  await Promise.all([
+    redis.del(refreshSessionKey(refreshTokenId)),
+    redis.del(userSessionKey(userId, refreshTokenId)),
+    redis.srem(userSessionIndexKey(userId), refreshTokenId),
   ]);
 };
 
@@ -686,7 +699,7 @@ export const refreshUserToken = async (refreshToken: string | undefined): Promis
     throw new ApiError(401, 'UNAUTHORIZED', 'Invalid or expired token');
   }
 
-  const key = `refresh:${decoded.tokenId}`;
+  const key = refreshSessionKey(decoded.tokenId);
   let storedUserId: string | null;
 
   try {
@@ -701,10 +714,7 @@ export const refreshUserToken = async (refreshToken: string | undefined): Promis
   }
 
   try {
-    await Promise.all([
-      redis.del(key),
-      redis.del(`session:${decoded._id}:${decoded.tokenId}`),
-    ]);
+    await deleteRefreshSession(decoded._id, decoded.tokenId);
   } catch (error) {
     logError('Failed to rotate refresh session in Redis', error);
     throw createAuthSessionStoreError();
@@ -739,8 +749,7 @@ export const logoutUser = async (refreshToken: string | undefined) => {
       algorithms: ['RS256'],
     }) as RefreshPayload;
 
-    await redis.del(`refresh:${decoded.tokenId}`);
-    await redis.del(`session:${decoded._id}:${decoded.tokenId}`);
+    await deleteRefreshSession(decoded._id, decoded.tokenId);
   } catch (_error) {
     return;
   }
