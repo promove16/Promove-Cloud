@@ -23,6 +23,7 @@ import {
 } from './user.service';
 import { getOnboardingStatus, claimOnboardingStep } from './onboarding.service';
 import { User } from './user.model';
+import { canSearchUserForDm } from '../dm/dm.permissions';
 
 export const getMe = async (req: Request, res: Response) => {
   if (!req.user) {
@@ -219,8 +220,17 @@ export const searchUsers = async (req: Request, res: Response) => {
     },
     { _id: 1, displayName: 1, avatar: 1, role: 1 },
   )
-    .limit(15)
+    .limit(30)
     .lean();
 
-  res.status(200).json(new ApiResponse(candidates));
+  const candidateAccess = await Promise.all(
+    candidates.map(async (candidate) => ({
+      candidate,
+      allowed: await canSearchUserForDm(req.user!._id, String(candidate._id)),
+    })),
+  );
+
+  res
+    .status(200)
+    .json(new ApiResponse(candidateAccess.filter((entry) => entry.allowed).map((entry) => entry.candidate).slice(0, 15)));
 };

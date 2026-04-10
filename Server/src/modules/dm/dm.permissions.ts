@@ -287,11 +287,11 @@ export const ensureDmAccess = async (senderId: string, recipientId: string, quer
     return context;
   }
 
-  throw new ApiError(
-    403,
-    'DM_REQUEST_REQUIRED',
-    'A conversation request must be accepted before direct messaging is available',
-  );
+  if (await canInitiateFirstContact(context.sender, context.recipient, queryType)) {
+    return context;
+  }
+
+  throw new ApiError(403, 'DM_PERMISSION_DENIED', 'You do not have permission to contact this user');
 };
 
 export const ensureDmThreadAccess = async (viewerId: string, partnerId: string) => {
