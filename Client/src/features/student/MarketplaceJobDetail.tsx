@@ -97,13 +97,13 @@ function DetailSection({
   }
 
   return (
-    <section className="border-t border-slate-800/80 py-6">
-      <div className="grid gap-5 xl:grid-cols-[220px,minmax(0,1fr)]">
+    <section className="border-t border-slate-800/80 py-8">
+      <div className="grid gap-6 lg:grid-cols-[220px,minmax(0,1fr)] xl:grid-cols-[240px,minmax(0,1fr)]">
         <div>
           <div className="text-xs uppercase tracking-[0.28em] text-slate-500">{title}</div>
           {subtitle ? <p className="mt-2 text-sm leading-6 text-slate-400">{subtitle}</p> : null}
         </div>
-        <div className="space-y-3">
+        <div className="space-y-3.5">
           {items.map((item) => (
             <div key={item} className="flex gap-3 text-sm leading-6 text-slate-200">
               <span className="mt-2 h-1.5 w-1.5 rounded-full bg-cyan-300" />
@@ -118,7 +118,7 @@ function DetailSection({
 
 function InfoTile({ label, value }: { label: string; value: string }) {
   return (
-    <div className="border-l border-slate-800/80 pl-4">
+    <div className="min-w-0 py-1">
       <div className="text-[11px] uppercase tracking-[0.24em] text-slate-500">{label}</div>
       <div className="mt-2 text-sm font-medium text-white">{value}</div>
     </div>
@@ -197,8 +197,8 @@ export function MarketplaceJobDetail() {
 
   return (
     <DashboardLayout role="student">
-      <div className="flex h-full min-h-0 flex-col gap-4 overflow-hidden text-white">
-        <div className="flex-none">
+      <div className="-mx-4 -my-6 min-h-[calc(100vh-5rem)] bg-[#0a0f1d] px-4 py-6 text-white sm:px-5 lg:-mx-8 lg:px-8 lg:py-8">
+        <div className="mx-auto flex w-full max-w-[96rem] min-h-full flex-col gap-6">
           <Link
             to="/marketplace"
             className="inline-flex items-center gap-2 rounded-full border border-slate-800 bg-slate-950/60 px-4 py-2 text-sm font-medium text-slate-200 transition hover:border-slate-700 hover:text-white"
@@ -206,10 +206,9 @@ export function MarketplaceJobDetail() {
             <ArrowLeft className="h-4 w-4" />
             Back to marketplace
           </Link>
-        </div>
 
-        <div className="marketplace-scroll flex min-h-0 flex-1 overflow-y-auto border-y border-slate-800/80 bg-[linear-gradient(180deg,#101624_0%,#0c1220_100%)]">
-          <div className="w-full px-5 py-5">
+          <div className="marketplace-scroll min-h-0 flex-1 overflow-y-auto rounded-[30px] border border-slate-800/80 bg-[linear-gradient(180deg,#101624_0%,#0c1220_100%)] shadow-[0_24px_80px_rgba(0,0,0,0.28)]">
+            <div className="w-full px-5 py-6 sm:px-7 sm:py-7 lg:px-8 lg:py-8 xl:px-10">
             {jobQuery.isLoading ? (
               <div className="flex min-h-[40vh] items-center justify-center">
                 <Spinner />
@@ -223,9 +222,9 @@ export function MarketplaceJobDetail() {
             ) : null}
 
             {job ? (
-              <div className="grid gap-8 xl:grid-cols-[minmax(0,1fr),340px]">
+              <div className="grid gap-8 xl:grid-cols-[minmax(0,1fr),340px] xl:gap-10">
                 <div className="min-w-0">
-                  <section className="border-b border-slate-800/80 pb-6">
+                  <section className="border-b border-slate-800/80 pb-8">
                     <div className="flex flex-wrap items-center gap-2 text-xs uppercase tracking-[0.28em] text-cyan-300">
                       <span>{job.type}</span>
                       <span className="text-slate-600">|</span>
@@ -244,9 +243,9 @@ export function MarketplaceJobDetail() {
                       ) : null}
                     </div>
 
-                    <h1 className="mt-3 text-4xl font-semibold tracking-tight text-white">{job.title}</h1>
+                    <h1 className="mt-4 text-3xl font-semibold tracking-tight text-white sm:text-4xl">{job.title}</h1>
 
-                    <div className="mt-3 flex flex-wrap items-center gap-x-2 gap-y-2 text-sm text-slate-300">
+                    <div className="mt-4 flex flex-wrap items-center gap-x-2 gap-y-2 text-sm text-slate-300">
                       <span className="font-semibold text-white">{job.company}</span>
                       <span className="text-slate-600">|</span>
                       <span>{recruiter?.displayName ?? 'Recruiter'}</span>
@@ -257,7 +256,7 @@ export function MarketplaceJobDetail() {
                       </span>
                     </div>
 
-                    <div className="mt-5 grid gap-4 md:grid-cols-2 xl:grid-cols-4">
+                    <div className="mt-6 grid gap-4 border-t border-slate-800/80 pt-5 md:grid-cols-2 md:divide-x md:divide-slate-800/80 xl:grid-cols-4">
                       <InfoTile label="Salary" value={job.salaryExpectation ?? 'To be discussed'} />
                       <InfoTile label="Experience" value={job.experienceLevel ?? 'Open to aligned profiles'} />
                       <InfoTile label="Openings" value={typeof job.openings === 'number' ? String(job.openings) : 'Not specified'} />
@@ -265,8 +264,8 @@ export function MarketplaceJobDetail() {
                     </div>
                   </section>
 
-                  <section className="border-t border-slate-800/80 py-6">
-                    <div className="grid gap-5 xl:grid-cols-[220px,minmax(0,1fr)]">
+                  <section className="border-t border-slate-800/80 py-8">
+                    <div className="grid gap-6 lg:grid-cols-[220px,minmax(0,1fr)] xl:grid-cols-[240px,minmax(0,1fr)]">
                       <div>
                         <div className="text-xs uppercase tracking-[0.28em] text-slate-500">About Company</div>
                         <p className="mt-2 text-sm leading-6 text-slate-400">Recruiter-provided company context and public profile summary.</p>
@@ -287,8 +286,8 @@ export function MarketplaceJobDetail() {
                     </div>
                   </section>
 
-                  <section className="border-t border-slate-800/80 py-6">
-                    <div className="grid gap-5 xl:grid-cols-[220px,minmax(0,1fr)]">
+                  <section className="border-t border-slate-800/80 py-8">
+                    <div className="grid gap-6 lg:grid-cols-[220px,minmax(0,1fr)] xl:grid-cols-[240px,minmax(0,1fr)]">
                       <div>
                         <div className="text-xs uppercase tracking-[0.28em] text-slate-500">Role Overview</div>
                         <p className="mt-2 text-sm leading-6 text-slate-400">High-level summary before the full JD.</p>
@@ -324,7 +323,7 @@ export function MarketplaceJobDetail() {
                   />
 
                   {relatedJobs.length > 0 ? (
-                    <section className="border-t border-slate-800/80 py-6">
+                    <section className="border-t border-slate-800/80 py-8">
                       <div className="flex items-center justify-between gap-4">
                         <div>
                           <div className="text-xs uppercase tracking-[0.28em] text-slate-500">More Jobs</div>
@@ -355,8 +354,8 @@ export function MarketplaceJobDetail() {
                   ) : null}
                 </div>
 
-                <aside className="space-y-4 xl:sticky xl:top-0 xl:self-start">
-                  <section className="border border-slate-800/80 bg-slate-950/60 p-5">
+                <aside className="space-y-4 xl:sticky xl:top-6 xl:self-start">
+                  <section className="rounded-[24px] border border-slate-800/80 bg-slate-950/70 p-5 sm:p-6">
                     <div className="flex items-center gap-3">
                       <div className="flex h-14 w-14 items-center justify-center rounded-xl bg-gradient-to-br from-cyan-500 to-emerald-500 text-lg font-semibold text-white">
                         {(recruiter?.displayName ?? job.company).slice(0, 1).toUpperCase()}
@@ -386,7 +385,7 @@ export function MarketplaceJobDetail() {
                     </div>
                   </section>
 
-                  <section className="border border-slate-800/80 bg-slate-950/60 p-5">
+                  <section className="rounded-[24px] border border-slate-800/80 bg-slate-950/70 p-5 sm:p-6">
                     <div className="text-xs uppercase tracking-[0.28em] text-slate-500">Application Snapshot</div>
                     <div className="mt-4 space-y-4">
                       <div className="flex items-start gap-3 text-sm text-slate-300">
@@ -422,7 +421,7 @@ export function MarketplaceJobDetail() {
                     </div>
                   </section>
 
-                  <section className="border border-slate-800/80 bg-slate-950/60 p-5">
+                  <section className="rounded-[24px] border border-slate-800/80 bg-slate-950/70 p-5 sm:p-6">
                     <div className="text-xs uppercase tracking-[0.28em] text-slate-500">Recruiter Profile</div>
                     <div className="mt-4 space-y-3 text-sm text-slate-300">
                       <div className="font-medium text-white">{recruiter?.displayName ?? 'Recruiter'}</div>
@@ -450,6 +449,7 @@ export function MarketplaceJobDetail() {
                 </aside>
               </div>
             ) : null}
+            </div>
           </div>
         </div>
       </div>

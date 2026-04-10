@@ -113,15 +113,17 @@ export const listConversations = async (req: Request, res: Response) => {
     { $limit: 50 },
   ]);
 
+  const filteredRecent = recent.filter((conversation) => String(conversation._id) !== String(myId));
+
   // Fetch user profiles for conversation partners
-  const partnerIds = recent.map((r) => r._id);
+  const partnerIds = filteredRecent.map((r) => r._id);
   const users = await User.find({ _id: { $in: partnerIds } })
     .select('_id displayName avatar role')
     .lean();
 
   const userMap = new Map(users.map((u) => [u._id.toString(), u]));
 
-  const conversations = recent.map((r) => ({
+  const conversations = filteredRecent.map((r) => ({
     partnerId: r._id,
     partner: userMap.get(r._id.toString()) ?? null,
     lastMessage: {

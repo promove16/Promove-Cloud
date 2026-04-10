@@ -10,8 +10,8 @@ import { useAuthStore } from '../../store/authStore';
 import { UserRole } from '../../types/roles.types';
 import { WorkflowRequest } from '../../types/request.types';
 import {
+  getRequestTypeLabel,
   REQUEST_STATUS_COLOR_CLASSES,
-  REQUEST_TYPE_LABELS,
   formatRequestStamp,
   formatRequestStatus,
   getRequestActorLabel,
@@ -29,6 +29,33 @@ function getErrorMessage(error: unknown, fallback: string) {
     (error as { response?: { data?: { error?: { message?: string } } } })?.response?.data?.error?.message ??
     fallback
   );
+}
+
+function getConversationRequestPartnerId(request: WorkflowRequest, viewerUserId?: string) {
+  if (request.type !== 'generic' || request.actionType !== 'connect' || request.targetEntityType !== 'conversation') {
+    return null;
+  }
+
+  if (viewerUserId) {
+    if (request.fromUserId === viewerUserId) {
+      return request.toUserId ?? request.targetEntityId ?? null;
+    }
+
+    if (request.toUserId === viewerUserId || request.targetEntityId === viewerUserId) {
+      return request.fromUserId;
+    }
+  }
+
+  return request.toUserId ?? request.fromUserId ?? null;
+}
+
+function getRequestNavigationTarget(request: WorkflowRequest, viewerUserId?: string) {
+  const conversationPartnerId = getConversationRequestPartnerId(request, viewerUserId);
+  if (conversationPartnerId) {
+    return `/dashboard/messages/${conversationPartnerId}`;
+  }
+
+  return request.acceptRedirect ?? request.deepLink ?? request.declineRedirect ?? null;
 }
 
 function RequestRow({
@@ -77,7 +104,7 @@ function RequestRow({
     >
       <div className="min-w-0">
         <div className="text-sm font-medium text-white">
-          {REQUEST_TYPE_LABELS[request.type]} for {entityName}
+          {getRequestTypeLabel(request)} for {entityName}
         </div>
         <div className="mt-1 text-xs text-slate-500">
           {direction === 'incoming' ? 'From' : 'To'} {actorLabel}
@@ -161,7 +188,7 @@ function RequestDetailCard({
         <div className="flex flex-col gap-3 xl:flex-row xl:items-start xl:justify-between">
           <div className="min-w-0">
             <div className="text-lg font-semibold text-white">
-              {REQUEST_TYPE_LABELS[request.type]} for {entityName}
+              {getRequestTypeLabel(request)} for {entityName}
             </div>
             <div className="mt-2 flex flex-wrap gap-x-4 gap-y-2 text-sm text-slate-400">
               <span>{direction === 'incoming' ? 'From' : 'To'} {actorLabel}</span>
@@ -365,8 +392,13 @@ export function InvitationPage({ selectedRequestId, onSelectRequest }: Invitatio
     },
     onSuccess: async (request, variables) => {
       await refreshRequests();
-      if (variables.action === 'accept' && (request.acceptRedirect || request.deepLink)) {
-        navigate(request.acceptRedirect ?? request.deepLink!);
+      const nextTarget =
+        variables.action === 'accept'
+          ? getRequestNavigationTarget(request, user?._id) ?? getRequestNavigationTarget(variables.request, user?._id)
+          : null;
+
+      if (nextTarget) {
+        navigate(nextTarget);
         return;
       }
       setFeedback(`Request ${request.status}.`);
@@ -458,7 +490,7 @@ export function InvitationPage({ selectedRequestId, onSelectRequest }: Invitatio
             >
               {requestEntries.map(({ request, direction }) => (
                 <option key={request._id} value={request._id} className="bg-slate-950">
-                  {(direction === 'incoming' ? 'Incoming' : 'Outgoing')} · {REQUEST_TYPE_LABELS[request.type]} · {getRequestEntityName(request)}
+                  {(direction === 'incoming' ? 'Incoming' : 'Outgoing')} · {getRequestTypeLabel(request)} · {getRequestEntityName(request)}
                 </option>
               ))}
             </select>

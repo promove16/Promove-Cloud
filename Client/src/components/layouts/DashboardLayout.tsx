@@ -1,4 +1,4 @@
-import { PropsWithChildren, useMemo, useState } from 'react';
+import { PropsWithChildren, useEffect, useMemo, useRef, useState } from 'react';
 import { NavLink, Outlet, useLocation, useNavigate } from 'react-router-dom';
 import {
   Bell,
@@ -36,6 +36,8 @@ interface DashboardLayoutProps {
   role?: UserRole;
 }
 
+type SidebarNotificationSection = 'applications' | 'events' | 'messages';
+
 const SIDEBAR_PARENT_PATH_ALIASES: Partial<Record<UserRole, Record<string, string[]>>> = {
   [UserRole.SCHOOL]: {
     '/dashboard/school/operations': [
@@ -64,6 +66,16 @@ const ACTIVE_NAV_ITEM_CLASS =
   'dashboard-theme-nav-active';
 const INACTIVE_NAV_ITEM_CLASS = 'dashboard-theme-muted dashboard-theme-hover';
 const INACTIVE_CHILD_NAV_ITEM_CLASS = 'dashboard-theme-subtle dashboard-theme-hover';
+const SIDEBAR_NOTIFICATION_PATHS: Record<SidebarNotificationSection, string[]> = {
+  applications: ['/dashboard/student/applications', '/dashboard/recruiter/applications'],
+  events: [
+    '/dashboard/student/events',
+    '/dashboard/school/events',
+    '/dashboard/college/events',
+    '/dashboard/recruiter/hiring-events',
+  ],
+  messages: ['/dashboard/messages', '/dashboard/recruiter/messages'],
+};
 
 const matchesPath = (pathname: string, path: string, exact = false) =>
   pathname === path || (!exact && pathname.startsWith(`${path}/`));
@@ -86,10 +98,102 @@ const isSidebarPathActive = (
   return aliases.some((alias) => matchesPath(pathname, alias));
 };
 
-function NotificationBell() {
+const normalizeNotificationPath = (target: string) => {
+  const trimmedTarget = target.trim();
+  if (!trimmedTarget) {
+    return '';
+  }
+
+  try {
+    const parsed = new URL(trimmedTarget, 'https://promove.local');
+    return (parsed.pathname.replace(/\/+$/, '') || '/');
+  } catch {
+    return trimmedTarget.split(/[?#]/, 1)[0]?.replace(/\/+$/, '') || trimmedTarget;
+  }
+};
+
+const getNotificationTargets = (notification: NotificationItem) =>
+  [
+    notification.link,
+    notification.metadata?.deepLink,
+    notification.metadata?.acceptRedirect,
+    notification.metadata?.declineRedirect,
+  ]
+    .filter((target): target is string => typeof target === 'string' && target.trim().length > 0)
+    .map(normalizeNotificationPath);
+
+const hasNotificationTarget = (targets: string[], pathPrefixes: string[]) =>
+  targets.some((target) =>
+    pathPrefixes.some((pathPrefix) => {
+      const normalizedPrefix = normalizeNotificationPath(pathPrefix);
+      return target === normalizedPrefix || target.startsWith(`${normalizedPrefix}/`);
+    }),
+  );
+
+const doesCurrentPathMatchTargets = (pathname: string, targets: string[]) => {
+  const normalizedPathname = normalizeNotificationPath(pathname);
+  return targets.some((target) =>
+    normalizedPathname === target || normalizedPathname.startsWith(`${target}/`),
+  );
+};
+
+const getUnreadSidebarNotificationState = (notifications: NotificationItem[]) =>
+  notifications.reduce<Record<SidebarNotificationSection, boolean>>(
+    (state, notification) => {
+      if (notification.isRead) {
+        return state;
+      }
+
+      const targets = getNotificationTargets(notification);
+      const requestedPermission = notification.metadata?.requestedPermission ?? '';
+
+      if (
+        !state.applications &&
+        (hasNotificationTarget(targets, SIDEBAR_NOTIFICATION_PATHS.applications) ||
+          requestedPermission === 'job_application' ||
+          notification.metadata?.requestType === 'recruiter_job_invite')
+      ) {
+        state.applications = true;
+      }
+
+      if (
+        !state.events &&
+        (hasNotificationTarget(targets, SIDEBAR_NOTIFICATION_PATHS.events) ||
+          notification.metadata?.requestType === 'college_event_invite' ||
+          notification.metadata?.requestType === 'campus_drive_registration')
+      ) {
+        state.events = true;
+      }
+
+      if (
+        !state.messages &&
+        (hasNotificationTarget(targets, SIDEBAR_NOTIFICATION_PATHS.messages) ||
+          notification.type === 'chat_invite' ||
+          requestedPermission.startsWith('dm_') ||
+          (notification.metadata?.requestType === 'generic' &&
+            notification.metadata?.actionType === 'connect'))
+      ) {
+        state.messages = true;
+      }
+
+      return state;
+    },
+    {
+      applications: false,
+      events: false,
+      messages: false,
+    },
+  );
+
+function NotificationBell({
+  notifications,
+  unreadCount,
+}: {
+  notifications: NotificationItem[];
+  unreadCount: number;
+}) {
   const navigate = useNavigate();
   const queryClient = useQueryClient();
-  const { data, unreadCount } = useNotifications();
   const [inviteFeedback, setInviteFeedback] = useState<string | null>(null);
 
   const markReadMutation = useMutation({
@@ -144,9 +248,6 @@ function NotificationBell() {
       );
     },
   });
-
-  const notifications = data ?? [];
-
   return (
     <DropdownMenu>
       <DropdownMenuTrigger asChild>
@@ -265,6 +366,8 @@ export function DashboardLayout({ children, role }: PropsWithChildren<DashboardL
   const logoutMutation = useLogoutMutation();
   const user = useAuthStore((state) => state.user);
   const [sidebarOpen, setSidebarOpen] = useState(false);
+  const queryClient = useQueryClient();
+  const autoMarkedNotificationIds = useRef<Set<string>>(new Set());
 
   const resolvedRole = user?.role ?? role;
   const navItems = resolvedRole ? SIDEBAR_CONFIG[resolvedRole] : [];
@@ -273,6 +376,7 @@ export function DashboardLayout({ children, role }: PropsWithChildren<DashboardL
   const hasMessagesItem = navItems.some(
     (item) => item.kind === 'link' && item.label === 'Messages',
   );
+  const { data: notificationsData, unreadCount: unreadNotificationsCount } = useNotifications();
   const routeLabels = resolvedRole ? DASHBOARD_ROUTE_LABELS[resolvedRole] ?? [] : [];
   const exactMatchPaths = useMemo(
     () =>
@@ -297,6 +401,40 @@ export function DashboardLayout({ children, role }: PropsWithChildren<DashboardL
     (total, conversation) => total + conversation.unreadCount,
     0,
   );
+  const notifications = notificationsData ?? [];
+  const unreadSidebarNotificationState = useMemo(
+    () => getUnreadSidebarNotificationState(notifications),
+    [notifications],
+  );
+
+  useEffect(() => {
+    const matchingUnreadNotifications = notifications.filter((notification) => {
+      if (notification.isRead || autoMarkedNotificationIds.current.has(notification._id)) {
+        return false;
+      }
+
+      return doesCurrentPathMatchTargets(location.pathname, getNotificationTargets(notification));
+    });
+
+    if (matchingUnreadNotifications.length === 0) {
+      return;
+    }
+
+    matchingUnreadNotifications.forEach((notification) => {
+      autoMarkedNotificationIds.current.add(notification._id);
+
+      notificationApi
+        .markRead(notification._id)
+        .then((updated) => {
+          queryClient.setQueryData<NotificationItem[] | undefined>(['notifications'], (current) =>
+            current?.map((item) => (item._id === updated._id ? updated : item)),
+          );
+        })
+        .catch(() => {
+          autoMarkedNotificationIds.current.delete(notification._id);
+        });
+    });
+  }, [location.pathname, notifications, queryClient]);
 
   const isPathActive = (path: string, exact = false) => matchesPath(location.pathname, path, exact);
 
@@ -345,6 +483,30 @@ export function DashboardLayout({ children, role }: PropsWithChildren<DashboardL
     navigate('/login', { replace: true });
   };
 
+  const getNavNotificationText = (label: string) => {
+    if (label === 'Messages' && unreadMessagesCount > 0) {
+      return `${unreadMessagesCount} unread messages`;
+    }
+
+    return `Unread ${label.toLowerCase()} notifications`;
+  };
+
+  const shouldShowNavIndicator = (label: string) => {
+    if (label === 'Applications') {
+      return unreadSidebarNotificationState.applications;
+    }
+
+    if (label === 'Events' || label === 'Hiring Events') {
+      return unreadSidebarNotificationState.events;
+    }
+
+    if (label === 'Messages') {
+      return unreadMessagesCount > 0 || unreadSidebarNotificationState.messages;
+    }
+
+    return false;
+  };
+
   const renderLink = (label: string, path: string, Icon: LucideIcon) => (
     <NavLink
       key={label}
@@ -364,11 +526,14 @@ export function DashboardLayout({ children, role }: PropsWithChildren<DashboardL
     >
       <Icon className="h-5 w-5" />
       <span>{label}</span>
-      {label === 'Messages' && unreadMessagesCount > 0 ? (
-        <span
-          aria-label={`${unreadMessagesCount} unread messages`}
-          className="ml-auto inline-flex h-2.5 w-2.5 rounded-full bg-cyan-400 shadow-[0_0_10px_rgba(34,211,238,0.7)]"
-        />
+      {shouldShowNavIndicator(label) ? (
+        <>
+          <span
+            aria-hidden="true"
+            className="ml-auto inline-flex h-2.5 w-2.5 rounded-full bg-cyan-400 shadow-[0_0_10px_rgba(34,211,238,0.7)]"
+          />
+          <span className="sr-only">{getNavNotificationText(label)}</span>
+        </>
       ) : null}
     </NavLink>
   );
@@ -491,7 +656,7 @@ export function DashboardLayout({ children, role }: PropsWithChildren<DashboardL
 
               <div className="flex items-center gap-3">
                 <GlobalWorkspaceInviteDialog />
-                <NotificationBell />
+                <NotificationBell notifications={notifications} unreadCount={unreadNotificationsCount} />
                 <NavLink
                   to="/portfolio"
                   className="dashboard-theme-border dashboard-theme-surface dashboard-theme-hover flex items-center gap-3 rounded-2xl border px-4 py-2 transition hover:border-cyan-500/40"

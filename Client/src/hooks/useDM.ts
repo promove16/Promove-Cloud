@@ -26,12 +26,37 @@ export const useDM = (partnerId?: string) => {
   const [onlineUsers, setOnlineUsers] = useState<Set<string>>(new Set());
   const typingTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
   const typingDebounce = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const lastMarkedReadKey = useRef<string | null>(null);
   
   // Use ref to always get the current partnerId, preventing stale closures
   const partnerIdRef = useRef<string | undefined>(partnerId);
   useEffect(() => {
     partnerIdRef.current = partnerId;
   }, [partnerId]);
+
+  const markThreadAsRead = useCallback(
+    (targetPartnerId: string, marker: string) => {
+      const readKey = `${targetPartnerId}:${marker}`;
+      if (lastMarkedReadKey.current === readKey) return;
+      lastMarkedReadKey.current = readKey;
+
+      const socket = getDmSocket();
+      if (!socket.connected) socket.connect();
+      socket.emit('dm:read', { partnerId: targetPartnerId });
+
+      dmApi
+        .markAsRead(targetPartnerId)
+        .then(() => {
+          queryClient.invalidateQueries({ queryKey: ['dm', 'conversations'] });
+        })
+        .catch(() => {
+          if (lastMarkedReadKey.current === readKey) {
+            lastMarkedReadKey.current = null;
+          }
+        });
+    },
+    [queryClient],
+  );
 
   // Fetch thread history
   const threadQuery = useQuery({
@@ -107,12 +132,21 @@ export const useDM = (partnerId?: string) => {
       
       setLiveMessages((cur) =>
         cur.map((m) =>
-          m.senderId === readBy && !m.readAt
+          m.senderId === currentUserId && m.recipientId === readBy && !m.readAt
             ? { ...m, readAt }
             : m,
         ),
       );
-      queryClient.invalidateQueries({ queryKey: ['dm', 'thread', currentPartnerId] });
+      queryClient.setQueryData<DMMessage[] | undefined>(
+        ['dm', 'thread', currentPartnerId],
+        (current) =>
+          current?.map((m) =>
+            m.senderId === currentUserId && m.recipientId === readBy && !m.readAt
+              ? { ...m, readAt }
+              : m,
+          ),
+      );
+      queryClient.invalidateQueries({ queryKey: ['dm', 'conversations'] });
     };
 
     const handleError = (error: { message: string }) => {
@@ -132,22 +166,12 @@ export const useDM = (partnerId?: string) => {
       socket.off('dm:messages-read', handleMessagesRead);
       socket.off('dm:error', handleError);
     };
-  }, [queryClient]);
+  }, [currentUserId, queryClient]);
 
   // Clear live messages when partner changes
   useEffect(() => {
     setLiveMessages([]);
   }, [partnerId]);
-
-  // Auto-mark messages as read when thread is opened
-  useEffect(() => {
-    if (!partnerId) return;
-    const socket = getDmSocket();
-    if (socket.connected) {
-      socket.emit('dm:read', { partnerId });
-    }
-    dmApi.markAsRead(partnerId).catch(() => {});
-  }, [partnerId, threadQuery.data]);
 
   // Merge history + live, deduplicate
   const messages = (() => {
@@ -161,6 +185,17 @@ export const useDM = (partnerId?: string) => {
       })
       .sort((a, b) => new Date(a.sentAt).getTime() - new Date(b.sentAt).getTime());
   })();
+
+  const latestUnreadIncomingMessageId = partnerId
+    ? [...messages]
+        .reverse()
+        .find((message) => message.senderId === partnerId && !message.readAt)?._id
+    : undefined;
+
+  useEffect(() => {
+    if (!partnerId || !latestUnreadIncomingMessageId) return;
+    markThreadAsRead(partnerId, latestUnreadIncomingMessageId);
+  }, [latestUnreadIncomingMessageId, markThreadAsRead, partnerId]);
 
   // Secure send - use ref for current partnerId
   const sendMessage = useCallback(

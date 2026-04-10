@@ -6,6 +6,7 @@ import { Deal } from '../deal/deal.model';
 import { DirectMessage, QueryType } from './dm.model';
 import { MentorSession } from '../mentor/mentorSession.model';
 import { RelevanceBridge } from '../recruiter/relevanceBridge.model';
+import { RequestRecord } from '../request/request.model';
 import { Startup } from '../startup/startup.model';
 import { User } from '../user/user.model';
 import { Workspace } from '../workspace/workspace.model';
@@ -129,6 +130,37 @@ const hasInvestorStudentRelationship = async (investorId: string, studentId: str
     }),
   );
 
+const hasAcceptedConversationRequest = async (userIdA: string, userIdB: string) => {
+  const [idA, idB] = [new Types.ObjectId(userIdA), new Types.ObjectId(userIdB)];
+  return Boolean(
+    await RequestRecord.exists({
+      type: 'generic',
+      actionType: 'connect',
+      targetEntityType: 'conversation',
+      status: 'accepted',
+      $or: [
+        { fromUserId: idA, toUserId: idB },
+        { fromUserId: idB, toUserId: idA },
+      ],
+    }),
+  );
+};
+
+const hasConversationRequest = async (userIdA: string, userIdB: string) => {
+  const [idA, idB] = [new Types.ObjectId(userIdA), new Types.ObjectId(userIdB)];
+  return Boolean(
+    await RequestRecord.exists({
+      type: 'generic',
+      actionType: 'connect',
+      targetEntityType: 'conversation',
+      $or: [
+        { fromUserId: idA, toUserId: idB },
+        { fromUserId: idB, toUserId: idA },
+      ],
+    }),
+  );
+};
+
 const hasAllowedRolePair = (senderRole: UserRole, recipientRole: UserRole) =>
   (ALLOWED_CONNECTIONS[senderRole] ?? []).includes(recipientRole);
 
@@ -251,22 +283,33 @@ export const ensureDmAccess = async (senderId: string, recipientId: string, quer
     return context;
   }
 
-  const allowed = await canInitiateFirstContact(context.sender, context.recipient, queryType);
-  if (!allowed) {
-    throw new ApiError(
-      403,
-      'DM_PERMISSION_DENIED',
-      'You do not have permission to start this conversation',
-    );
+  if (await hasAcceptedConversationRequest(senderId, recipientId)) {
+    return context;
   }
 
-  return context;
+  throw new ApiError(
+    403,
+    'DM_REQUEST_REQUIRED',
+    'A conversation request must be accepted before direct messaging is available',
+  );
 };
 
 export const ensureDmThreadAccess = async (viewerId: string, partnerId: string) => {
   const context = await buildAccessContext(viewerId, partnerId);
 
+  if (String(context.sender._id) === String(context.recipient._id)) {
+    throw new ApiError(400, 'SELF_MESSAGE', 'You cannot open a conversation with yourself');
+  }
+
   if (context.hasExistingConversation) {
+    return context;
+  }
+
+  if (await hasConversationRequest(viewerId, partnerId)) {
+    return context;
+  }
+
+  if (await hasAcceptedConversationRequest(viewerId, partnerId)) {
     return context;
   }
 

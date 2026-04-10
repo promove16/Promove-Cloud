@@ -92,6 +92,9 @@ const jobStats = (job: MarketplaceJobSummary) => [
 ];
 
 const getJobActionLabel = (hasApplied: boolean) => (hasApplied ? "Applied" : "Apply now");
+const marketplaceDetailShellClassName =
+  "min-h-[calc(100vh-7rem)] bg-[radial-gradient(circle_at_top,#16213d_0%,#0a0f1d_34%,#050814_100%)] text-slate-100";
+const marketplaceDetailContentClassName = "w-full px-4 py-5 sm:px-6 lg:px-8";
 
 export function MarketplaceDetail() {
   const navigate = useNavigate();
@@ -125,8 +128,12 @@ export function MarketplaceDetail() {
 
   if (!entityType || !entityId) {
     return (
-      <div className="rounded-[28px] border border-rose-500/20 bg-rose-500/10 px-6 py-6 text-sm text-rose-100">
-        Invalid marketplace detail route.
+      <div className={marketplaceDetailShellClassName}>
+        <div className={marketplaceDetailContentClassName}>
+          <div className="rounded-[28px] border border-rose-500/20 bg-rose-500/10 px-6 py-6 text-sm text-rose-100">
+            Invalid marketplace detail route.
+          </div>
+        </div>
       </div>
     );
   }
@@ -140,36 +147,40 @@ export function MarketplaceDetail() {
   }
 
   return (
-    <div className="space-y-6">
-      <div className="flex flex-wrap items-center justify-between gap-3">
-        <Link
-          to={`${getMarketplaceBasePath(dashboardRole)}?role=${entityType}`}
-          className="inline-flex items-center gap-2 rounded-full border border-white/10 bg-white/5 px-4 py-2 text-sm font-medium text-slate-200 transition hover:border-white/20 hover:bg-white/10"
-        >
-          <ArrowLeft className="h-4 w-4" />
-          Back to marketplace
-        </Link>
+    <div className={marketplaceDetailShellClassName}>
+      <div className={marketplaceDetailContentClassName}>
+        <div className="space-y-6">
+          <div className="flex flex-wrap items-center justify-between gap-3">
+            <Link
+              to={`${getMarketplaceBasePath(dashboardRole)}?role=${entityType}`}
+              className="inline-flex items-center gap-2 rounded-full border border-white/10 bg-white/5 px-4 py-2 text-sm font-medium text-slate-200 transition hover:border-white/20 hover:bg-white/10"
+            >
+              <ArrowLeft className="h-4 w-4" />
+              Back to marketplace
+            </Link>
+          </div>
+
+          {detailQuery.isLoading ? (
+            <div className="rounded-[32px] border border-white/10 bg-[#090d1b] px-6 py-10 text-sm text-slate-400">
+              Loading detail view...
+            </div>
+          ) : null}
+
+          {detailQuery.isError ? (
+            <div className="rounded-[32px] border border-rose-500/20 bg-rose-500/10 px-6 py-6 text-sm text-rose-100">
+              Unable to load this marketplace record right now.
+            </div>
+          ) : null}
+
+          {entity ? (
+            isStartupDetail(entity) ? (
+              <StartupDetailView entity={entity} onMessage={handleMessage} />
+            ) : (
+              <ProfileDetailView entity={entity} onMessage={handleMessage} dashboardRole={dashboardRole} />
+            )
+          ) : null}
+        </div>
       </div>
-
-      {detailQuery.isLoading ? (
-        <div className="rounded-[32px] border border-white/10 bg-[#090d1b] px-6 py-10 text-sm text-slate-400">
-          Loading detail view...
-        </div>
-      ) : null}
-
-      {detailQuery.isError ? (
-        <div className="rounded-[32px] border border-rose-500/20 bg-rose-500/10 px-6 py-6 text-sm text-rose-100">
-          Unable to load this marketplace record right now.
-        </div>
-      ) : null}
-
-      {entity ? (
-        isStartupDetail(entity) ? (
-          <StartupDetailView entity={entity} onMessage={handleMessage} />
-        ) : (
-          <ProfileDetailView entity={entity} onMessage={handleMessage} dashboardRole={dashboardRole} />
-        )
-      ) : null}
     </div>
   );
 }
@@ -182,8 +193,8 @@ function StartupDetailView({
   onMessage: (targetId: string) => void;
 }) {
   return (
-    <div className="space-y-4">
-      <section className="relative overflow-hidden border-b border-white/10 pb-5">
+    <div className="space-y-6">
+      <section className="relative overflow-hidden rounded-[32px] border border-white/10 bg-[#090d1b] px-6 py-6 shadow-[0_30px_120px_rgba(15,23,42,0.32)] sm:px-8 sm:py-7 lg:px-10">
         <div className="pointer-events-none absolute inset-0 bg-[radial-gradient(circle_at_top_left,rgba(34,211,238,0.12),transparent_34%),radial-gradient(circle_at_top_right,rgba(217,70,239,0.1),transparent_30%)]" />
         <div className="relative flex flex-col gap-4 xl:flex-row xl:items-start xl:justify-between">
           <div className="space-y-3">
@@ -228,9 +239,9 @@ function StartupDetailView({
         </div>
       </section>
 
-      <section className="grid gap-4 xl:grid-cols-[minmax(0,1fr),300px]">
-        <div className="space-y-5">
-          <div className="border-t border-white/10 pt-4">
+      <section className="grid gap-6 xl:grid-cols-[minmax(0,1fr),300px]">
+        <div className="space-y-6 rounded-[32px] border border-white/10 bg-[#090d1b] p-5 shadow-[0_24px_80px_rgba(15,23,42,0.24)] sm:p-6">
+          <div>
             <div className="text-[11px] uppercase tracking-[0.28em] text-slate-500">Startup signals</div>
             <div className="mt-3 grid gap-2 sm:grid-cols-2 xl:grid-cols-4">
               <MetricCard compact label="Launch Score" value={String(entity.innovationScoreAtLaunch)} />
@@ -244,7 +255,7 @@ function StartupDetailView({
             </div>
           </div>
 
-          <div className="border-t border-white/10 pt-4">
+          <div className="border-t border-white/10 pt-5">
             <div className="flex items-center gap-2 text-[11px] uppercase tracking-[0.28em] text-slate-500">
               <Users className="h-4 w-4" />
               Founder Team
@@ -262,8 +273,17 @@ function StartupDetailView({
                       </div>
                       {founder.bio ? <p className="mt-2 text-sm leading-6 text-slate-300">{founder.bio}</p> : null}
                     </div>
-                    <div className="rounded-full border border-cyan-400/20 bg-cyan-400/10 px-3 py-1 text-xs font-semibold text-cyan-100">
-                      Score {founder.innovationScore}
+                    <div className="flex items-center gap-2">
+                      <button
+                        onClick={() => onMessage(founder._id)}
+                        className="inline-flex items-center gap-1.5 rounded-full border border-white/10 px-3 py-1 text-xs font-medium text-slate-300 transition hover:border-white/20 hover:bg-white/5"
+                      >
+                        <MessageCircle className="h-3.5 w-3.5" />
+                        Message
+                      </button>
+                      <div className="rounded-full border border-cyan-400/20 bg-cyan-400/10 px-3 py-1 text-xs font-semibold text-cyan-100">
+                        Score {founder.innovationScore}
+                      </div>
                     </div>
                   </div>
                 </div>
@@ -272,7 +292,7 @@ function StartupDetailView({
           </div>
 
           {entity.project ? (
-            <div className="border-t border-white/10 pt-4">
+            <div className="border-t border-white/10 pt-5">
               <div className="flex items-center gap-2 text-[11px] uppercase tracking-[0.28em] text-slate-500">
                 <FolderKanban className="h-4 w-4" />
                 Related Project
@@ -304,8 +324,8 @@ function StartupDetailView({
           ) : null}
         </div>
 
-        <aside className="space-y-5">
-          <div className="border-t border-white/10 pt-4">
+        <aside className="space-y-6 rounded-[32px] border border-white/10 bg-[#090d1b] p-5 shadow-[0_24px_80px_rgba(15,23,42,0.24)] sm:p-6">
+          <div>
             <div className="text-[11px] uppercase tracking-[0.28em] text-slate-500">Traction</div>
             <div className="mt-3 space-y-2">
               <SignalPill compact label="Patent Filed" active={entity.traction.patentFiled} />
@@ -320,7 +340,7 @@ function StartupDetailView({
           </div>
 
           {entity.sharePool ? (
-            <div className="border-t border-white/10 pt-4">
+            <div className="border-t border-white/10 pt-5">
               <div className="text-[11px] uppercase tracking-[0.28em] text-slate-500">Equity window</div>
               <div className="mt-3 space-y-2 text-sm text-slate-300">
                 <SidebarRow compact label="Total Shares" value={String(entity.sharePool.totalShares)} />

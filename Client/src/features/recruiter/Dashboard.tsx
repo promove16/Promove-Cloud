@@ -233,7 +233,7 @@ export default function RecruiterDashboard() {
       <PatentShowcase />
 
       <Dialog open={modalMode !== null} onOpenChange={(open: boolean) => setModalMode(open ? modalMode : null)}>
-        <DialogContent className="max-w-2xl border-slate-800 bg-slate-950 text-white">
+        <DialogContent className="sm:max-w-2xl border-slate-800 bg-slate-950 text-white">
           {modalMode === 'job' ? (
             <>
               <DialogHeader>

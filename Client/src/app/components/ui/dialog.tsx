@@ -1,4 +1,5 @@
 import { createContext, useContext, type HTMLAttributes, type ReactNode } from 'react';
+import { createPortal } from 'react-dom';
 import { XIcon } from 'lucide-react';
 import { cn } from './utils';
 
@@ -27,7 +28,11 @@ function DialogTrigger({ ...props }: HTMLAttributes<HTMLButtonElement>) {
 }
 
 function DialogPortal({ children }: { children?: ReactNode }) {
-  return <>{children}</>;
+  if (typeof document === 'undefined') {
+    return null;
+  }
+
+  return createPortal(children, document.body);
 }
 
 function DialogClose({ className, children, ...props }: HTMLAttributes<HTMLButtonElement>) {
@@ -76,7 +81,7 @@ function DialogContent({
       <DialogOverlay />
       <div
         className={cn(
-          'fixed left-1/2 top-1/2 z-50 grid w-full max-w-[calc(100%-2rem)] -translate-x-1/2 -translate-y-1/2 gap-4 rounded-2xl border border-slate-800 bg-slate-950 p-6 text-white shadow-2xl shadow-black/40 sm:max-w-lg',
+          'fixed left-1/2 top-1/2 z-50 grid max-h-[calc(100vh-2rem)] w-[calc(100%-2rem)] -translate-x-1/2 -translate-y-1/2 gap-4 overflow-y-auto rounded-2xl border border-slate-800 bg-slate-950 p-6 text-white shadow-2xl shadow-black/40',
           className,
         )}
         {...props}

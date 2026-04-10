@@ -1,6 +1,6 @@
-import { useEffect, useRef, useState, useCallback } from 'react';
+import { useEffect, useMemo, useRef, useState, useCallback } from 'react';
 import { useParams, useNavigate, useSearchParams } from 'react-router-dom';
-import { useQuery, useQueryClient } from '@tanstack/react-query';
+import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { isAxiosError } from 'axios';
 import {
   MessageCircle, Search, Send, ArrowLeft, Calendar, ExternalLink, PenSquare, Users,
@@ -25,9 +25,10 @@ import {
   StartupInviteTargetType,
   buildStartupHandshakeDmMessage,
 } from '../../features/marketplace/StartupInviteModal';
+import { getMarketplaceBasePath } from '../../features/marketplace/navigation';
 import { InvitationPage } from '../../features/invitations/InvitationPage';
 import {
-  REQUEST_TYPE_LABELS,
+  getRequestTypeLabel,
   formatRequestStatus,
   getRequestActorLabel,
   getRequestEntityName,
@@ -44,6 +45,8 @@ type PendingAttachmentState = {
   fileSize: number;
   isUploading: boolean;
 };
+
+type DMHookState = ReturnType<typeof useDM>;
 
 const attachmentMaxSizeBytes = 10 * 1024 * 1024;
 const allowedAttachmentMimeTypes = new Set([
@@ -79,6 +82,12 @@ const formatMessageDate = (value: string) => {
   if (date.toDateString() === today.toDateString()) return 'Today';
   if (date.toDateString() === yesterday.toDateString()) return 'Yesterday';
   return date.toLocaleDateString('en-IN', { day: 'numeric', month: 'long', year: 'numeric' });
+};
+
+const formatAttachmentSize = (bytes: number) => {
+  if (bytes < 1024) return `${bytes} B`;
+  if (bytes < 1024 * 1024) return `${Math.round(bytes / 1024)} KB`;
+  return `${(bytes / (1024 * 1024)).toFixed(1)} MB`;
 };
 
 const timeAgo = (value: string) => {
@@ -803,6 +812,120 @@ function FirstContactPanel({ partnerName, partnerRole, currentUserRole, onSend, 
   );
 }
 
+function ConversationRequestStateCard({
+  request,
+  direction,
+  partnerName,
+  isUpdating,
+  onAccept,
+  onDecline,
+  onWithdraw,
+}: {
+  request: WorkflowRequest;
+  direction: 'incoming' | 'outgoing';
+  partnerName: string;
+  isUpdating: boolean;
+  onAccept: (request: WorkflowRequest) => void;
+  onDecline: (request: WorkflowRequest) => void;
+  onWithdraw: (request: WorkflowRequest) => void;
+}) {
+  const isPending = request.status === 'pending';
+  const isAccepted = request.status === 'accepted';
+  const isDeclined = request.status === 'declined';
+  const isWithdrawn = request.status === 'withdrawn';
+  const isExpired = request.status === 'expired';
+
+  return (
+    <div className="mx-auto flex w-full max-w-xl flex-col gap-4 rounded-[1.5rem] border border-slate-800 bg-slate-900/60 px-6 py-6 text-center">
+      <div className="mx-auto flex h-14 w-14 items-center justify-center rounded-2xl bg-gradient-to-br from-cyan-500/20 to-emerald-500/20 text-cyan-300">
+        <UserPlus className="h-7 w-7" />
+      </div>
+      <div>
+        <div className="text-[11px] uppercase tracking-[0.24em] text-slate-500">{getRequestTypeLabel(request)}</div>
+        <h3 className="mt-2 text-xl font-semibold text-white">
+          {direction === 'incoming' ? `${partnerName} wants to connect` : `Request sent to ${partnerName}`}
+        </h3>
+        {request.message ? (
+          <div className="mt-4 rounded-2xl border border-slate-800 bg-slate-950/70 px-4 py-3 text-left text-sm leading-6 text-slate-200">
+            {request.message}
+          </div>
+        ) : null}
+      </div>
+
+      {isPending && direction === 'incoming' ? (
+        <>
+          <p className="text-sm text-slate-400">
+            Accept this conversation request to unlock direct messaging with {partnerName}.
+          </p>
+          <div className="flex flex-wrap items-center justify-center gap-3">
+            <button
+              type="button"
+              onClick={() => onAccept(request)}
+              disabled={isUpdating}
+              className="rounded-xl bg-gradient-to-r from-cyan-500 to-emerald-500 px-4 py-2 text-sm font-semibold text-white transition hover:opacity-90 disabled:opacity-50"
+            >
+              Accept
+            </button>
+            <button
+              type="button"
+              onClick={() => onDecline(request)}
+              disabled={isUpdating}
+              className="rounded-xl border border-slate-700 bg-slate-800/70 px-4 py-2 text-sm font-semibold text-slate-200 transition hover:bg-slate-800 disabled:opacity-50"
+            >
+              Decline
+            </button>
+          </div>
+        </>
+      ) : null}
+
+      {isPending && direction === 'outgoing' ? (
+        <>
+          <p className="text-sm text-slate-400">
+            {partnerName} will see this request in Messages. Once accepted, both of you can start chatting here.
+          </p>
+          <div className="flex items-center justify-center gap-3">
+            <span className="rounded-full border border-amber-500/30 bg-amber-500/10 px-3 py-1 text-xs font-semibold uppercase tracking-[0.2em] text-amber-300">
+              Pending
+            </span>
+            <button
+              type="button"
+              onClick={() => onWithdraw(request)}
+              disabled={isUpdating}
+              className="rounded-xl border border-slate-700 bg-slate-800/70 px-4 py-2 text-sm font-semibold text-slate-200 transition hover:bg-slate-800 disabled:opacity-50"
+            >
+              Withdraw
+            </button>
+          </div>
+        </>
+      ) : null}
+
+      {isAccepted ? (
+        <p className="text-sm text-emerald-300">
+          Conversation request accepted. You can start chatting with {partnerName}.
+        </p>
+      ) : null}
+
+      {isDeclined ? (
+        <p className="text-sm text-rose-300">
+          This conversation request was declined.
+        </p>
+      ) : null}
+
+      {isWithdrawn ? (
+        <p className="text-sm text-slate-400">
+          This conversation request was withdrawn.
+        </p>
+      ) : null}
+
+      {isExpired ? (
+        <p className="text-sm text-slate-400">
+          This conversation request expired before it was accepted.
+        </p>
+      ) : null}
+    </div>
+  );
+}
+
 function MessageBubble({
   msg,
   isMine,
@@ -967,6 +1090,85 @@ function MessageBubble({
   );
 }
 
+function PendingAttachmentDraftCard({
+  attachment,
+  partnerName,
+  onRemove,
+  onSend,
+  sendDisabled,
+}: {
+  attachment: PendingAttachmentState;
+  partnerName: string;
+  onRemove: () => void;
+  onSend: () => void;
+  sendDisabled: boolean;
+}) {
+  const isImage = attachment.fileType === 'image';
+  const statusLabel = attachment.isUploading ? 'Uploading attachment...' : 'Attachment ready to send';
+  const statusHint = attachment.isUploading
+    ? 'Please wait for the upload to finish before sending.'
+    : `This ${isImage ? 'image' : 'file'} is still a draft. Click Send to deliver it to ${partnerName}.`;
+
+  return (
+    <div className="mb-3 rounded-2xl border border-cyan-500/20 bg-cyan-500/5 p-3">
+      <div className="mb-3 flex items-start justify-between gap-3">
+        <div>
+          <div className="text-sm font-medium text-cyan-100">{statusLabel}</div>
+          <p className="mt-1 text-xs text-slate-300">{statusHint}</p>
+        </div>
+        <button
+          type="button"
+          onClick={onRemove}
+          className="flex h-8 w-8 flex-shrink-0 items-center justify-center rounded-full bg-slate-900/80 text-slate-300 transition hover:bg-slate-800 hover:text-white"
+          aria-label="Remove attachment draft"
+        >
+          <X className="h-4 w-4" />
+        </button>
+      </div>
+
+      <div className="rounded-2xl border border-slate-800 bg-slate-950/80 p-3">
+        {isImage ? (
+          <>
+            <img
+              src={attachment.previewUrl}
+              alt={attachment.fileName}
+              className="max-h-[240px] w-auto max-w-full rounded-xl object-cover"
+            />
+            <div className="mt-2 flex items-center justify-between gap-3 text-xs text-slate-400">
+              <span className="truncate">{attachment.fileName}</span>
+              <span className="flex-shrink-0">{formatAttachmentSize(attachment.fileSize)}</span>
+            </div>
+          </>
+        ) : (
+          <div className="flex items-center gap-3 rounded-xl border border-slate-800 bg-slate-900/80 p-3">
+            <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-red-500/20 text-red-400">
+              <FileText className="h-5 w-5" />
+            </div>
+            <div className="min-w-0">
+              <p className="truncate text-sm font-medium text-white">{attachment.fileName}</p>
+              <p className="text-xs text-slate-400">PDF • {formatAttachmentSize(attachment.fileSize)}</p>
+            </div>
+          </div>
+        )}
+      </div>
+
+      <div className="mt-3 flex items-center justify-between gap-3">
+        <div className="text-xs text-slate-400">
+          {attachment.isUploading ? 'Upload in progress' : 'Draft is ready in the composer'}
+        </div>
+        <button
+          type="button"
+          onClick={onSend}
+          disabled={sendDisabled}
+          className="inline-flex h-9 items-center justify-center rounded-full bg-cyan-500 px-4 text-sm font-medium text-white transition hover:bg-cyan-400 disabled:cursor-not-allowed disabled:opacity-40"
+        >
+          Send {isImage ? 'image' : 'file'}
+        </button>
+      </div>
+    </div>
+  );
+}
+
 function DateSeparator({ date }: { date: string }) {
   return (
     <div className="flex items-center gap-4 py-4">
@@ -978,22 +1180,34 @@ function DateSeparator({ date }: { date: string }) {
 }
 
 function ChatPanel({
-  partnerId,
   partnerName,
   partnerRole,
   isFirstContact,
   onSendWithQuery,
   initialQueryType,
+  conversationRequest,
+  conversationRequestDirection,
+  conversationRequestUpdating,
+  onAcceptConversationRequest,
+  onDeclineConversationRequest,
+  onWithdrawConversationRequest,
+  dm,
 }: {
-  partnerId: string;
   partnerName: string;
   partnerRole?: string;
   isFirstContact?: boolean;
   onSendWithQuery?: (message: string, queryType: QueryType) => void;
   initialQueryType?: QueryType | null;
+  conversationRequest?: WorkflowRequest | null;
+  conversationRequestDirection?: 'incoming' | 'outgoing' | null;
+  conversationRequestUpdating?: boolean;
+  onAcceptConversationRequest?: (request: WorkflowRequest) => void;
+  onDeclineConversationRequest?: (request: WorkflowRequest) => void;
+  onWithdrawConversationRequest?: (request: WorkflowRequest) => void;
+  dm: DMHookState;
 }) {
   const currentUser = useAuthStore((s) => s.user);
-  const { messages, sendMessage, sendTyping, typingFromPartner, isLoading } = useDM(partnerId);
+  const { messages, sendMessage, sendTyping, typingFromPartner, isLoading } = dm;
   const [draft, setDraft] = useState('');
   const [showAttachments, setShowAttachments] = useState(false);
   const [pendingAttachment, setPendingAttachment] = useState<PendingAttachmentState | null>(null);
@@ -1013,7 +1227,7 @@ function ChatPanel({
         behavior: 'smooth',
       });
     });
-  }, [messages.length, pendingAttachment?.previewUrl, pendingAttachment?.isUploading]);
+  }, [messages.length]);
 
   useEffect(() => () => {
     if (pendingAttachment?.localObjectUrl) {
@@ -1137,26 +1351,10 @@ function ChatPanel({
     messagesWithDateSeparators.push(msg);
   });
 
-  const pendingPreviewMessage: DMMessage | null = pendingAttachment
-    ? {
-        _id: 'pending-attachment-preview',
-        senderId: currentUser?._id ?? '',
-        recipientId: partnerId,
-        message: '',
-        messageType: 'text',
-        attachmentUrl: pendingAttachment.previewUrl,
-        attachmentType: pendingAttachment.fileType,
-        attachmentName: pendingAttachment.fileName,
-        readAt: null,
-        sentAt: new Date().toISOString(),
-        isOptimistic: true,
-      }
-    : null;
-  const pendingAttachmentStatus = pendingAttachment
-    ? pendingAttachment.isUploading
-      ? `Uploading ${pendingAttachment.fileType === 'image' ? 'image' : 'file'}...`
-      : 'Ready to send'
-    : undefined;
+  const canCompose =
+    !conversationRequest || conversationRequest.status === 'accepted';
+  const shouldShowConversationRequestCard =
+    Boolean(conversationRequest && conversationRequest.status !== 'accepted' && conversationRequestDirection);
 
   return (
     <div className="flex min-h-0 flex-1 flex-col">
@@ -1164,6 +1362,18 @@ function ChatPanel({
       <div ref={threadRef} className="min-h-0 flex-1 overflow-y-auto px-4 py-4">
         {isLoading ? (
           <div className="flex h-full items-center justify-center text-slate-500">Loading messages...</div>
+        ) : shouldShowConversationRequestCard && conversationRequest && conversationRequestDirection ? (
+          <div className="flex h-full items-center justify-center">
+            <ConversationRequestStateCard
+              request={conversationRequest}
+              direction={conversationRequestDirection}
+              partnerName={partnerName}
+              isUpdating={Boolean(conversationRequestUpdating)}
+              onAccept={onAcceptConversationRequest ?? (() => undefined)}
+              onDecline={onDeclineConversationRequest ?? (() => undefined)}
+              onWithdraw={onWithdrawConversationRequest ?? (() => undefined)}
+            />
+          </div>
         ) : messages.length === 0 ? (
           isFirstContact && onSendWithQuery ? (
             <div className="min-h-0 flex-1 overflow-y-auto">
@@ -1217,24 +1427,12 @@ function ChatPanel({
                 <span>{partnerName} is typing...</span>
               </div>
             ) : null}
-            {pendingPreviewMessage ? (
-              <MessageBubble
-                key={pendingPreviewMessage._id}
-                msg={pendingPreviewMessage}
-                isMine={true}
-                partnerName={partnerName}
-                currentUserName={currentUser?.displayName ?? 'Me'}
-                showAvatar={messages.length === 0 || messages[messages.length - 1]?.senderId !== currentUser?._id}
-                statusText={pendingAttachmentStatus}
-                onRemoveAttachment={removeAttachment}
-                disableAttachmentOpen={pendingAttachment?.isUploading}
-              />
-            ) : null}
           </div>
         )}
       </div>
 
       {/* Input bar */}
+      {canCompose ? (
       <div className="border-t border-slate-800 px-4 py-3">
         {/* Attachment picker */}
         {showAttachments && (
@@ -1277,6 +1475,16 @@ function ChatPanel({
           </div>
         ) : null}
 
+        {pendingAttachment ? (
+          <PendingAttachmentDraftCard
+            attachment={pendingAttachment}
+            partnerName={partnerName}
+            onRemove={removeAttachment}
+            onSend={handleSend}
+            sendDisabled={isUploading || (!draft.trim() && !pendingAttachment)}
+          />
+        ) : null}
+
         <div className="flex items-end gap-3">
           <button
             type="button"
@@ -1299,12 +1507,16 @@ function ChatPanel({
             type="button"
             onClick={handleSend}
             disabled={isUploading || (!draft.trim() && !pendingAttachment)}
-            className="flex h-10 w-10 flex-shrink-0 items-center justify-center rounded-full bg-cyan-500 text-white transition hover:bg-cyan-400 disabled:opacity-40"
+            className={`flex h-10 flex-shrink-0 items-center justify-center rounded-full bg-cyan-500 text-white transition hover:bg-cyan-400 disabled:opacity-40 ${
+              pendingAttachment ? 'gap-2 px-4' : 'w-10'
+            }`}
           >
             <Send className="h-4 w-4" />
+            {pendingAttachment ? <span className="text-sm font-medium">Send</span> : null}
           </button>
         </div>
       </div>
+      ) : null}
     </div>
   );
 }
@@ -1332,7 +1544,7 @@ function RequestSidebarItem({
 }) {
   const actor = getRequestActorLabel(request, direction);
   const avatarLetter = actor.charAt(0).toUpperCase();
-  const typeLabel = REQUEST_TYPE_LABELS[request.type] ?? 'Request';
+  const typeLabel = getRequestTypeLabel(request);
   const statusColor = STATUS_COLORS[request.status];
   const entityName = getRequestEntityName(request);
 
@@ -1379,7 +1591,8 @@ export function MessagesPage() {
   const searchTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const menuRef = useRef<HTMLDivElement>(null);
 
-  const { partner: partnerProfile, isPartnerOnline, sendMessage } = useDM(partnerId);
+  const dm = useDM(partnerId);
+  const { partner: partnerProfile, isPartnerOnline, sendMessage } = dm;
 
   useEffect(() => {
     const handleClickOutside = (event: MouseEvent) => {
@@ -1390,6 +1603,12 @@ export function MessagesPage() {
     document.addEventListener('mousedown', handleClickOutside);
     return () => document.removeEventListener('mousedown', handleClickOutside);
   }, []);
+
+  useEffect(() => {
+    if (partnerId && currentUser?._id && partnerId === currentUser._id) {
+      navigate('/dashboard/messages', { replace: true });
+    }
+  }, [currentUser?._id, navigate, partnerId]);
 
   const conversationsQuery = useQuery({
     queryKey: ['dm', 'conversations'],
@@ -1415,12 +1634,12 @@ export function MessagesPage() {
   const incomingRequestsQuery = useQuery({
     queryKey: ['requests', 'incoming'],
     queryFn: requestApi.incoming,
-    enabled: searchParams.get('view') === 'requests',
+    enabled: searchParams.get('view') === 'requests' || Boolean(partnerId),
   });
   const outgoingRequestsQuery = useQuery({
     queryKey: ['requests', 'outgoing'],
     queryFn: requestApi.outgoing,
-    enabled: searchParams.get('view') === 'requests',
+    enabled: searchParams.get('view') === 'requests' || Boolean(partnerId),
   });
   const sidebarIncoming = incomingRequestsQuery.data ?? [];
   const sidebarOutgoing = outgoingRequestsQuery.data ?? [];
@@ -1431,12 +1650,48 @@ export function MessagesPage() {
   ];
   const hasSelectedRequest = sidebarRequestEntries.some((entry) => entry.request._id === selectedRequestId);
 
-  const conversations = (conversationsQuery.data ?? []).filter((c) => {
-    if (!search) return true;
-    return (c.partner?.displayName ?? '').toLowerCase().includes(search.toLowerCase());
-  });
+  const allConversations = conversationsQuery.data ?? [];
+  const searchTerm = search.trim();
+  const normalizedSearchTerm = searchTerm.toLowerCase();
+  const isGlobalSearchActive = searchTerm.length >= 2;
+  const existingPartnerIds = useMemo(
+    () => new Set(allConversations.map((conversation) => conversation.partnerId)),
+    [allConversations],
+  );
+  const conversationMap = useMemo(
+    () => new Map(allConversations.map((conversation) => [conversation.partnerId, conversation])),
+    [allConversations],
+  );
+  const filteredConversations = useMemo(() => {
+    if (!normalizedSearchTerm) {
+      return allConversations;
+    }
 
-  const activeConvo = conversations.find((c) => c.partnerId === partnerId);
+    return allConversations.filter((conversation) =>
+      (conversation.partner?.displayName ?? '').toLowerCase().includes(normalizedSearchTerm),
+    );
+  }, [allConversations, normalizedSearchTerm]);
+  const searchedConversations = useMemo(() => {
+    if (!isGlobalSearchActive) {
+      return [] as DMConversation[];
+    }
+
+    return userSearchResults
+      .map((user) => conversationMap.get(user._id))
+      .filter((conversation): conversation is DMConversation => Boolean(conversation));
+  }, [conversationMap, isGlobalSearchActive, userSearchResults]);
+  const searchedNewUsers = useMemo(() => {
+    if (!isGlobalSearchActive) {
+      return [] as typeof userSearchResults;
+    }
+
+    return userSearchResults.filter((user) => !existingPartnerIds.has(user._id));
+  }, [existingPartnerIds, isGlobalSearchActive, userSearchResults]);
+  const sidebarConversations = isGlobalSearchActive ? searchedConversations : filteredConversations;
+  const conversations = sidebarConversations;
+  const newUsers = searchedNewUsers;
+
+  const activeConvo = allConversations.find((c) => c.partnerId === partnerId);
   const partnerName = activeConvo?.partner?.displayName
     ?? partnerProfile?.displayName
     ?? (partnerId ? 'Loading...' : 'Unknown');
@@ -1465,47 +1720,127 @@ export function MessagesPage() {
       ? requestedQueryType
       : getAutoQueryTypeForRole(partnerRole, currentUser?.role);
 
-  const getFirstContactKey = (userId: string) => `dm_first_contact_${userId}_${currentUser?._id}`;
+  const [requestSentName, setRequestSentName] = useState<string | null>(null);
+  const partnerConversationRequestEntry = useMemo(() => {
+    if (!partnerId) {
+      return null;
+    }
 
-  const isFirstContact = partnerId ? !localStorage.getItem(getFirstContactKey(partnerId)) : false;
+    const entries = [
+      ...sidebarIncoming.map((request) => ({ request, direction: 'incoming' as const })),
+      ...sidebarOutgoing.map((request) => ({ request, direction: 'outgoing' as const })),
+    ].filter(
+      ({ request, direction }) =>
+        request.type === 'generic' &&
+        request.actionType === 'connect' &&
+        request.targetEntityType === 'conversation' &&
+        ((direction === 'incoming' && request.fromUserId === partnerId) ||
+          (direction === 'outgoing' && request.toUserId === partnerId)),
+    );
 
-  const markAsContacted = (userId: string) => {
-    localStorage.setItem(getFirstContactKey(userId), 'true');
-  };
+    if (entries.length === 0) {
+      return null;
+    }
+
+    const priority = new Map<WorkflowRequest['status'], number>([
+      ['pending', 0],
+      ['accepted', 1],
+      ['declined', 2],
+      ['withdrawn', 3],
+      ['expired', 4],
+      ['cancelled', 5],
+      ['completed', 6],
+    ]);
+
+    return [...entries].sort((left, right) => {
+      const statusDelta = (priority.get(left.request.status) ?? 99) - (priority.get(right.request.status) ?? 99);
+      if (statusDelta !== 0) {
+        return statusDelta;
+      }
+
+      return new Date(right.request.updatedAt).getTime() - new Date(left.request.updatedAt).getTime();
+    })[0];
+  }, [partnerId, sidebarIncoming, sidebarOutgoing]);
+  const partnerConversationRequest = partnerConversationRequestEntry?.request ?? null;
+  const partnerConversationRequestDirection = partnerConversationRequestEntry?.direction ?? null;
+  const canChatDirectly = Boolean(partnerId && (existingPartnerIds.has(partnerId) || partnerConversationRequest?.status === 'accepted'));
+  const isFirstContact = Boolean(partnerId) && !canChatDirectly && !partnerConversationRequest;
+
+  const refreshConversationState = useCallback(async () => {
+    await Promise.all([
+      queryClient.invalidateQueries({ queryKey: ['requests'] }),
+      queryClient.invalidateQueries({ queryKey: ['notifications'] }),
+      queryClient.invalidateQueries({ queryKey: ['dm', 'conversations'] }),
+      ...(partnerId ? [queryClient.invalidateQueries({ queryKey: ['dm', 'thread', partnerId] })] : []),
+      ...(partnerId ? [queryClient.invalidateQueries({ queryKey: ['dm', 'partner', partnerId] })] : []),
+    ]);
+  }, [partnerId, queryClient]);
+
+  const requestActionMutation = useMutation({
+    mutationFn: async (params: { type: 'accept' | 'decline' | 'withdraw'; requestId: string }) => {
+      if (params.type === 'accept') {
+        return requestApi.accept(params.requestId);
+      }
+      if (params.type === 'decline') {
+        return requestApi.decline(params.requestId);
+      }
+      return requestApi.withdraw(params.requestId);
+    },
+    onSuccess: async () => {
+      await refreshConversationState();
+    },
+  });
 
   const handleSelect = (pid: string, pname: string, prole?: string) => {
-    if (!localStorage.getItem(getFirstContactKey(pid))) {
+    const hasConversationRequest = [...sidebarIncoming, ...sidebarOutgoing].some(
+      (request) =>
+        request.type === 'generic' &&
+        request.actionType === 'connect' &&
+        request.targetEntityType === 'conversation' &&
+        (request.fromUserId === pid || request.toUserId === pid),
+    );
+
+    if (existingPartnerIds.has(pid) || hasConversationRequest) {
+      navigate(`/dashboard/messages/${pid}`);
+      queryClient.invalidateQueries({ queryKey: ['dm', 'thread', pid] });
+      setSearch('');
+      setUserSearchResults([]);
+    } else {
       setPendingPartnerId(pid);
       setPendingPartnerName(pname);
       setPendingPartnerRole(prole ?? '');
       setPendingQueryType(getAutoQueryTypeForRole(prole, currentUser?.role));
       setShowQueryModal(true);
-    } else {
-      navigate(`/dashboard/messages/${pid}`);
-      queryClient.invalidateQueries({ queryKey: ['dm', 'thread', pid] });
-      setSearch('');
-      setUserSearchResults([]);
     }
   };
 
+  const submitConversationRequest = useCallback(
+    async (targetUserId: string, targetName: string, queryType: QueryType, message?: string) => {
+      await requestApi.create({
+        requestType: 'generic',
+        actionType: 'connect',
+        toUserId: targetUserId,
+        targetEntityType: 'conversation',
+        targetEntityId: targetUserId,
+        targetEntityTitle: targetName || 'User',
+        message: message || '',
+        deepLink: `/dashboard/messages/${targetUserId}`,
+        acceptRedirect: `/dashboard/messages/${targetUserId}`,
+        metadata: { queryType },
+      });
+      setRequestSentName(targetName);
+      await refreshConversationState();
+    },
+    [refreshConversationState],
+  );
+
   const handleQuerySelect = async (queryType: QueryType, customMessage?: string) => {
     if (pendingPartnerId) {
-      markAsContacted(pendingPartnerId);
-      if (customMessage) {
-        // Use dmApi directly for the first message before navigation
-        try {
-          await dmApi.send(pendingPartnerId, { 
-            message: customMessage, 
-            messageType: 'text', 
-            queryType 
-          });
-        } catch (err) {
-          console.error('Failed to send initial message:', err);
-        }
+      try {
+        await submitConversationRequest(pendingPartnerId, pendingPartnerName || 'User', queryType, customMessage);
+      } catch (err) {
+        console.error('Failed to send conversation request:', err);
       }
-      navigate(`/dashboard/messages/${pendingPartnerId}`);
-      queryClient.invalidateQueries({ queryKey: ['dm', 'thread', pendingPartnerId] });
-      queryClient.invalidateQueries({ queryKey: ['dm', 'conversations'] });
       setSearch('');
       setUserSearchResults([]);
     }
@@ -1520,6 +1855,27 @@ export function MessagesPage() {
     setShowMenu(false);
     setShowReportModal(true);
   };
+
+  const handleAcceptConversationRequest = useCallback(
+    (request: WorkflowRequest) => {
+      requestActionMutation.mutate({ type: 'accept', requestId: request._id });
+    },
+    [requestActionMutation],
+  );
+
+  const handleDeclineConversationRequest = useCallback(
+    (request: WorkflowRequest) => {
+      requestActionMutation.mutate({ type: 'decline', requestId: request._id });
+    },
+    [requestActionMutation],
+  );
+
+  const handleWithdrawConversationRequest = useCallback(
+    (request: WorkflowRequest) => {
+      requestActionMutation.mutate({ type: 'withdraw', requestId: request._id });
+    },
+    [requestActionMutation],
+  );
 
   const handleStartupRequestCreated = useCallback(
     (payload: StartupHandshakeDmPayload) => {
@@ -1555,10 +1911,6 @@ export function MessagesPage() {
       }
     }, 400);
   }, []);
-
-  // Filter out users who already have a conversation
-  const existingPartnerIds = new Set((conversationsQuery.data ?? []).map((c) => c.partnerId));
-  const newUsers = userSearchResults.filter((u) => !existingPartnerIds.has(u._id));
 
   const view: 'chats' | 'requests' = searchParams.get('view') === 'requests' ? 'requests' : 'chats';
 
@@ -1676,7 +2028,7 @@ export function MessagesPage() {
                 id="msg-search-input"
                 value={search}
                 onChange={(e) => handleSearchChange(e.target.value)}
-                placeholder="Search conversations or users"
+                placeholder="Search by name or email..."
                 className="w-full rounded-xl border border-slate-700 bg-slate-950 py-2 pl-9 pr-3 text-sm text-white outline-none focus:border-cyan-500 placeholder:text-slate-500"
               />
             </div>
@@ -1687,12 +2039,12 @@ export function MessagesPage() {
           <div className="min-h-0 flex-1 overflow-y-auto">
             {conversationsQuery.isLoading ? (
               <div className="py-8 text-center text-sm text-slate-500">Loading...</div>
-            ) : conversations.length === 0 && !search ? (
-              <div className="flex flex-col items-center gap-3 py-12 text-center">
+            ) : sidebarConversations.length === 0 && !searchTerm ? (
+              <div className="flex flex-col items-center gap-3 px-4 py-12 text-center">
                 <MessageCircle className="h-10 w-10 text-slate-700" />
-                <p className="text-sm text-slate-500">No conversations yet.</p>
-                <p className="text-xs text-slate-600">
-                  Search for a user above to start chatting, or find people in the Marketplace.
+                <p className="text-sm text-slate-500">No conversations yet</p>
+                <p className="text-xs leading-relaxed text-slate-600">
+                  Type a name above to find people you can message. Try searching by role, domain, or institution.
                 </p>
               </div>
             ) : (
@@ -1745,7 +2097,13 @@ export function MessagesPage() {
                 ) : null}
 
                 {search.trim().length >= 2 && conversations.length === 0 && newUsers.length === 0 && !isSearchingUsers ? (
-                  <div className="px-3 py-6 text-center text-xs text-slate-500">No users found matching "{search}"</div>
+                  <div className="flex flex-col items-center gap-2 px-4 py-6 text-center">
+                    <Search className="h-6 w-6 text-slate-700" />
+                    <p className="text-xs text-slate-500">No users found matching &ldquo;{search}&rdquo;</p>
+                    <p className="text-[11px] leading-relaxed text-slate-600">
+                      Search matches active users by name or email. Try a different search term if this person still does not appear.
+                    </p>
+                  </div>
                 ) : null}
               </>
             )}
@@ -1875,7 +2233,7 @@ export function MessagesPage() {
                     <span className="capitalize text-slate-500">{partnerRole}</span>
                   </div>
                 </div>
-                {startupInviteTarget && startupActionConfig ? (
+                {canChatDirectly && startupInviteTarget && startupActionConfig ? (
                   <button
                     type="button"
                     onClick={() => setShowStartupInviteModal(true)}
@@ -1914,7 +2272,7 @@ export function MessagesPage() {
                             {visibleAssociationTypes.has('project_mentor') ? (
                               <button
                                 type="button"
-                                disabled={!partnerId}
+                                disabled={!partnerId || !canChatDirectly}
                                 onClick={() => {
                                   if (partnerId) {
                                     sendMessage({ message: 'Hi! I would like to associate you as a Project Mentor for my project.', messageType: 'text', queryType: 'project_mentor' });
@@ -1930,7 +2288,7 @@ export function MessagesPage() {
                             {visibleAssociationTypes.has('project_join') ? (
                               <button
                                 type="button"
-                                disabled={!partnerId}
+                                disabled={!partnerId || !canChatDirectly}
                                 onClick={() => {
                                   if (partnerId) {
                                     sendMessage({ message: 'Hi! I would love to join your project if you are open to collaborators.', messageType: 'text', queryType: 'project_join' });
@@ -1946,7 +2304,7 @@ export function MessagesPage() {
                             {visibleAssociationTypes.has('investor') ? (
                               <button
                                 type="button"
-                                disabled={!partnerId}
+                                disabled={!partnerId || !canChatDirectly}
                                 onClick={() => {
                                   if (partnerId) {
                                     sendMessage({ message: 'Hi! I have an exciting startup that I would like to share with you and discuss as a potential investor.', messageType: 'text', queryType: 'investor' });
@@ -1962,7 +2320,7 @@ export function MessagesPage() {
                             {visibleAssociationTypes.has('recruiter') ? (
                               <button
                                 type="button"
-                                disabled={!partnerId}
+                                disabled={!partnerId || !canChatDirectly}
                                 onClick={() => {
                                   if (partnerId) {
                                     sendMessage({ message: 'Hi! I am interested in career opportunities and would like to connect with you as a Recruiter.', messageType: 'text', queryType: 'recruiter' });
@@ -1978,7 +2336,7 @@ export function MessagesPage() {
                             {visibleAssociationTypes.has('hiring_event') ? (
                               <button
                                 type="button"
-                                disabled={!partnerId}
+                                disabled={!partnerId || !canChatDirectly}
                                 onClick={() => {
                                   if (partnerId) {
                                     sendMessage({ message: 'Hi! I would like to organize a hiring event with your college and discuss student talent for open roles.', messageType: 'text', queryType: 'hiring_event' });
@@ -2032,30 +2390,82 @@ export function MessagesPage() {
               </div>
             </div>
             <ChatPanel 
-              partnerId={partnerId} 
               partnerName={partnerName} 
               partnerRole={partnerRole}
               isFirstContact={isFirstContact}
               initialQueryType={isFirstContact ? contextualQueryType : null}
-              onSendWithQuery={(message, queryType) => {
-                markAsContacted(partnerId);
+              conversationRequest={partnerConversationRequest}
+              conversationRequestDirection={partnerConversationRequestDirection}
+              conversationRequestUpdating={requestActionMutation.isPending}
+              onAcceptConversationRequest={handleAcceptConversationRequest}
+              onDeclineConversationRequest={handleDeclineConversationRequest}
+              onWithdrawConversationRequest={handleWithdrawConversationRequest}
+              dm={dm}
+              onSendWithQuery={async (message, queryType) => {
+                if (!partnerId) {
+                  return;
+                }
                 if (searchParams.has('queryType')) {
                   const nextParams = new URLSearchParams(searchParams);
                   nextParams.delete('queryType');
                   setSearchParams(nextParams, { replace: true });
                 }
-                sendMessage({ message, messageType: 'text', queryType });
+                await submitConversationRequest(partnerId, partnerName, queryType, message);
               }}
             />
           </>
         ) : (
-          <div className="flex min-h-0 flex-1 items-center justify-center gap-4 text-center">
-            <MessageCircle className="h-14 w-14 text-slate-700" />
+          <div className="flex min-h-0 flex-1 flex-col items-center justify-center gap-4 text-center px-4">
+            {requestSentName ? (
+              <div className="mb-4 rounded-2xl border border-emerald-500/20 bg-emerald-500/10 px-6 py-4 text-center">
+                <div className="flex items-center justify-center gap-2 text-emerald-300">
+                  <Check className="h-5 w-5" />
+                  <span className="text-sm font-semibold">Conversation request sent to {requestSentName}</span>
+                </div>
+                <p className="mt-1 text-xs text-emerald-200/70">
+                  They will see your request in their inbox. Once accepted, you can start chatting.
+                </p>
+                <button
+                  type="button"
+                  onClick={() => setRequestSentName(null)}
+                  className="mt-3 text-xs text-emerald-400 transition hover:text-emerald-300"
+                >
+                  Dismiss
+                </button>
+              </div>
+            ) : null}
+            <div className="flex h-20 w-20 items-center justify-center rounded-full bg-slate-800/60">
+              <MessageCircle className="h-10 w-10 text-slate-600" />
+            </div>
             <div>
               <h3 className="text-xl font-semibold text-white">Your Messages</h3>
-              <p className="max-w-sm text-sm text-slate-400">
-                Select a conversation or search for a user to start messaging.
+              <p className="mt-2 max-w-md text-sm text-slate-400">
+                Search for people by name to start a direct conversation, or browse the Marketplace to discover users you can connect with.
               </p>
+            </div>
+            <div className="mt-2 flex flex-wrap items-center justify-center gap-3">
+              <button
+                type="button"
+                onClick={() => {
+                  const input = document.querySelector<HTMLInputElement>('#msg-search-input');
+                  if (input) {
+                    input.focus();
+                    input.scrollIntoView({ behavior: 'smooth' });
+                  }
+                }}
+                className="inline-flex items-center gap-2 rounded-full border border-cyan-500/30 bg-cyan-500/10 px-4 py-2 text-sm font-medium text-cyan-200 transition hover:bg-cyan-500/20"
+              >
+                <UserPlus className="h-4 w-4" />
+                Find People
+              </button>
+              <button
+                type="button"
+                onClick={() => navigate(getMarketplaceBasePath(currentUser?.role))}
+                className="inline-flex items-center gap-2 rounded-full border border-white/10 bg-white/5 px-4 py-2 text-sm font-medium text-slate-300 transition hover:bg-white/10"
+              >
+                <Search className="h-4 w-4" />
+                Browse Marketplace
+              </button>
             </div>
           </div>
         )}

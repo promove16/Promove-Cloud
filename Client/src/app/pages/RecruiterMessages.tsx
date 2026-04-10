@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState, useCallback } from 'react';
+import { useEffect, useMemo, useRef, useState, useCallback } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import {
@@ -21,6 +21,8 @@ import { dmApi, DMConversation, DMMessage } from '../../api/dm.api';
 import { getConversationPreviewText } from '../../components/messaging/conversationPreview';
 import { useDM } from '../../hooks/useDM';
 import { useAuthStore } from '../../store/authStore';
+
+type DMHookState = ReturnType<typeof useDM>;
 
 const dt = (value: string) =>
   new Date(value).toLocaleString('en-IN', {
@@ -376,17 +378,16 @@ function ScheduleInterviewModal({
 
 /* ─── Chat Panel ─── */
 function ChatPanel({
-  partnerId,
   partnerName,
   onOpenSchedule,
+  dm,
 }: {
-  partnerId: string;
   partnerName: string;
   onOpenSchedule: () => void;
+  dm: DMHookState;
 }) {
   const currentUser = useAuthStore((s) => s.user);
-  const { messages, sendMessage, sendTyping, typingFromPartner, isLoading } =
-    useDM(partnerId);
+  const { messages, sendMessage, sendTyping, typingFromPartner, isLoading } = dm;
   const [draft, setDraft] = useState('');
   const [showSchedule, setShowSchedule] = useState(false);
   const threadRef = useRef<HTMLDivElement>(null);
@@ -598,14 +599,47 @@ export function RecruiterMessagesPage() {
     refetchInterval: 30_000,
   });
 
-  const conversations = (conversationsQuery.data ?? []).filter((c) => {
-    if (!search) return true;
-    return (c.partner?.displayName ?? '')
-      .toLowerCase()
-      .includes(search.toLowerCase());
-  });
+  const allConversations = conversationsQuery.data ?? [];
+  const searchTerm = search.trim();
+  const normalizedSearchTerm = searchTerm.toLowerCase();
+  const isGlobalSearchActive = searchTerm.length >= 2;
+  const existingPartnerIds = useMemo(
+    () => new Set(allConversations.map((conversation) => conversation.partnerId)),
+    [allConversations],
+  );
+  const conversationMap = useMemo(
+    () => new Map(allConversations.map((conversation) => [conversation.partnerId, conversation])),
+    [allConversations],
+  );
+  const filteredConversations = useMemo(() => {
+    if (!normalizedSearchTerm) {
+      return allConversations;
+    }
 
-  const activeConvo = conversations.find((c) => c.partnerId === partnerId);
+    return allConversations.filter((conversation) =>
+      (conversation.partner?.displayName ?? '').toLowerCase().includes(normalizedSearchTerm),
+    );
+  }, [allConversations, normalizedSearchTerm]);
+  const searchedConversations = useMemo(() => {
+    if (!isGlobalSearchActive) {
+      return [] as DMConversation[];
+    }
+
+    return userSearchResults
+      .map((user) => conversationMap.get(user._id))
+      .filter((conversation): conversation is DMConversation => Boolean(conversation));
+  }, [conversationMap, isGlobalSearchActive, userSearchResults]);
+  const searchedNewUsers = useMemo(() => {
+    if (!isGlobalSearchActive) {
+      return [] as typeof userSearchResults;
+    }
+
+    return userSearchResults.filter((user) => !existingPartnerIds.has(user._id));
+  }, [existingPartnerIds, isGlobalSearchActive, userSearchResults]);
+  const conversations = isGlobalSearchActive ? searchedConversations : filteredConversations;
+  const newUsers = searchedNewUsers;
+
+  const activeConvo = allConversations.find((c) => c.partnerId === partnerId);
   // Use partner profile from API if not in conversation list (new chat)
   const partnerName = activeConvo?.partner?.displayName
     ?? dmHook.partner?.displayName
@@ -644,10 +678,6 @@ export function RecruiterMessagesPage() {
       }
     }, 400);
   }, []);
-
-  // Filter out users who already have a conversation
-  const existingPartnerIds = new Set((conversationsQuery.data ?? []).map((c) => c.partnerId));
-  const newUsers = userSearchResults.filter((u) => !existingPartnerIds.has(u._id));
 
   return (
     <div className="-mx-4 -my-6 flex h-[calc(100%+3rem)] min-h-0 overflow-hidden bg-slate-950 lg:-mx-8">
@@ -752,7 +782,13 @@ export function RecruiterMessagesPage() {
               ) : null}
 
               {search.trim().length >= 2 && conversations.length === 0 && newUsers.length === 0 && !isSearchingUsers ? (
-                <div className="px-3 py-6 text-center text-xs text-slate-500">No users found matching &ldquo;{search}&rdquo;</div>
+                <div className="flex flex-col items-center gap-2 px-4 py-6 text-center">
+                  <Search className="h-6 w-6 text-slate-700" />
+                  <p className="text-xs text-slate-500">No users found matching &ldquo;{search}&rdquo;</p>
+                  <p className="text-[11px] leading-relaxed text-slate-600">
+                    Search matches active users by name or email. Try a different search term if this person still does not appear.
+                  </p>
+                </div>
               ) : null}
             </>
           )}
@@ -812,9 +848,9 @@ export function RecruiterMessagesPage() {
               </button>
             </div>
             <ChatPanel
-              partnerId={partnerId}
               partnerName={partnerName}
               onOpenSchedule={() => setShowHeaderSchedule(true)}
+              dm={dmHook}
             />
 
             {/* Header-triggered schedule modal */}

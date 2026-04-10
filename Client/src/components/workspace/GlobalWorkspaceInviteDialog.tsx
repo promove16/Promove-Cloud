@@ -137,7 +137,7 @@ export function GlobalWorkspaceInviteDialog() {
       </Button>
 
       <Dialog open={open} onOpenChange={setOpen}>
-        <DialogContent className="max-w-2xl border-slate-800 bg-slate-950 text-white">
+        <DialogContent className="sm:max-w-2xl border-slate-800 bg-slate-950 text-white">
           <DialogHeader>
             <DialogTitle>Send workspace invite</DialogTitle>
             <DialogDescription>
@@ -151,8 +151,8 @@ export function GlobalWorkspaceInviteDialog() {
             </div>
           ) : null}
 
-          <div className="grid gap-4 md:grid-cols-[200px_180px_minmax(0,1fr)]">
-            <div>
+          <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-[minmax(0,1.2fr)_180px_minmax(0,1fr)]">
+            <div className="min-w-0 md:col-span-2 lg:col-span-1">
               <label className="mb-2 block text-xs font-semibold uppercase tracking-[0.24em] text-slate-500">
                 Workspace
               </label>
@@ -169,7 +169,7 @@ export function GlobalWorkspaceInviteDialog() {
               </select>
             </div>
 
-            <div>
+            <div className="min-w-0">
               <label className="mb-2 block text-xs font-semibold uppercase tracking-[0.24em] text-slate-500">
                 Role
               </label>
@@ -186,7 +186,7 @@ export function GlobalWorkspaceInviteDialog() {
               </select>
             </div>
 
-            <div>
+            <div className="min-w-0">
               <label className="mb-2 block text-xs font-semibold uppercase tracking-[0.24em] text-slate-500">
                 Student email
               </label>

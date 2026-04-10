@@ -18,6 +18,14 @@ export const REQUEST_TYPE_LABELS: Record<WorkflowRequest['type'], string> = {
   patent_request_review: 'Patent request review',
 };
 
+export function getRequestTypeLabel(request: WorkflowRequest) {
+  if (request.type === 'generic' && request.actionType === 'connect' && request.targetEntityType === 'conversation') {
+    return 'Conversation request';
+  }
+
+  return REQUEST_TYPE_LABELS[request.type] ?? 'Request';
+}
+
 export const REQUEST_STATUS_COLOR_CLASSES: Record<WorkflowRequest['status'], string> = {
   pending: 'text-amber-300 border-amber-500/30 bg-amber-500/10',
   accepted: 'text-emerald-300 border-emerald-500/30 bg-emerald-500/10',

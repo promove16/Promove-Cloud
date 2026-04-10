@@ -188,8 +188,8 @@ export function QueryTypeModal({
       <div className="mx-4 w-full max-w-md rounded-2xl border border-slate-700 bg-slate-900 shadow-2xl">
         <div className="flex items-center justify-between border-b border-slate-700 p-4">
           <div>
-            <h2 className="text-lg font-bold text-white">New Message to {recipientName}</h2>
-            <p className="text-sm text-slate-400">What would you like to discuss?</p>
+            <h2 className="text-lg font-bold text-white">Connect with {recipientName}</h2>
+            <p className="text-sm text-slate-400">Send a conversation request. What would you like to discuss?</p>
           </div>
           <button
             onClick={onClose}
@@ -267,7 +267,7 @@ export function QueryTypeModal({
                   disabled={!customMessage.trim()}
                   className="mt-3 w-full rounded-xl bg-gradient-to-r from-cyan-500 to-emerald-500 py-2.5 text-sm font-semibold text-white transition hover:opacity-90 disabled:opacity-40"
                 >
-                  Send Message
+                  Send Request
                 </button>
               </div>
             </div>
