@@ -243,11 +243,11 @@ export default function OperationsPage() {
         <DashboardSection
           eyebrow="Student Onboarding"
           title="Student onboarding"
-          description="Create managed student intake records, import rosters, and issue temporary credentials."
+          description="Email roster invites, import student lists, and issue temporary credentials from one shared onboarding flow."
         >
           <StudentIntakePanel
             heading="Feed student data manually or from Excel"
-            description="Create a school-managed roster, email temporary credentials for managed student accounts, or issue tokens for approved self-service signup."
+            description="Create a school-managed roster and email invites automatically. Students who register with the same invited email get direct dashboard access, while token-only signups still wait for approval."
             secondaryFieldLabel="Class / Section"
             secondaryFieldPlaceholder="Grade 12 - A"
             roster={rosterQuery.data ?? []}

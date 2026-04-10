@@ -13,14 +13,21 @@ import {
   createSchoolStudentAccessTokenController,
   createSchoolStudentRosterEntryController,
   createSchoolComplianceReportController,
+  createSchoolComplianceActionController,
+  createSchoolComplianceAlertController,
+  createSchoolComplianceIncidentController,
   createSchoolEventController,
   getLatestSchoolComplianceReportController,
+  getSchoolComplianceOverviewController,
   getSchoolDashboardController,
   getSchoolEventRankingsController,
   getSchoolStudentJourneyController,
   importSchoolStudentCredentialsController,
   importSchoolStudentRosterController,
   listSchoolEventsController,
+  listSchoolComplianceActionsController,
+  listSchoolComplianceAlertsController,
+  listSchoolComplianceIncidentsController,
   listSchoolMentorshipProgramsController,
   listSchoolPatentsController,
   listSchoolProjectsController,
@@ -30,7 +37,10 @@ import {
   listSchoolInvestorsController,
   listSchoolStartupsController,
   listSchoolStudentsController,
+  markSchoolComplianceAlertReadController,
   reviewSchoolStudentVerificationController,
+  updateSchoolComplianceActionController,
+  updateSchoolComplianceIncidentController,
 } from './school.controller';
 
 const router = Router();
@@ -77,6 +87,22 @@ router.get(
   '/compliance-report/latest',
   asyncHandler(getLatestSchoolComplianceReportController),
 );
+router.get('/compliance/overview', asyncHandler(getSchoolComplianceOverviewController));
+router.get('/compliance/incidents', asyncHandler(listSchoolComplianceIncidentsController));
+router.post('/compliance/incidents', asyncHandler(createSchoolComplianceIncidentController));
+router.patch(
+  '/compliance/incidents/:incidentId',
+  asyncHandler(updateSchoolComplianceIncidentController),
+);
+router.get('/compliance/alerts', asyncHandler(listSchoolComplianceAlertsController));
+router.post('/compliance/alerts', asyncHandler(createSchoolComplianceAlertController));
+router.patch(
+  '/compliance/alerts/:alertId/read',
+  asyncHandler(markSchoolComplianceAlertReadController),
+);
+router.get('/compliance/actions', asyncHandler(listSchoolComplianceActionsController));
+router.post('/compliance/actions', asyncHandler(createSchoolComplianceActionController));
+router.patch('/compliance/actions/:actionId', asyncHandler(updateSchoolComplianceActionController));
 router.get('/student-access-tokens', asyncHandler(listSchoolStudentAccessTokensController));
 router.post('/student-access-tokens', asyncHandler(createSchoolStudentAccessTokenController));
 router.get('/student-roster', asyncHandler(listSchoolStudentRosterController));

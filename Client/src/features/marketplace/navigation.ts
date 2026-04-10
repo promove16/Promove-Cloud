@@ -3,7 +3,6 @@ import type { MarketplaceEntityType } from "../../api/marketplace.api";
 
 const MARKETPLACE_ROLES = new Set<UserRole>([
   UserRole.STUDENT,
-  UserRole.SCHOOL,
   UserRole.COLLEGE,
   UserRole.MENTOR,
   UserRole.INVESTOR,
@@ -11,6 +10,9 @@ const MARKETPLACE_ROLES = new Set<UserRole>([
 ]);
 
 export const getMarketplaceBasePath = (role?: UserRole) => {
+  if (role === UserRole.SCHOOL) {
+    return "/dashboard/school";
+  }
   const resolvedRole = role && MARKETPLACE_ROLES.has(role) ? role : UserRole.STUDENT;
   return `/dashboard/${resolvedRole}/marketplace`;
 };

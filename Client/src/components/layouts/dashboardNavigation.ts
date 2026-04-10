@@ -66,8 +66,7 @@ export const SIDEBAR_CONFIG: Record<UserRole, DashboardNavItem[]> = {
   [UserRole.SCHOOL]: [
     { kind: 'link', label: 'Dashboard', icon: Home, path: '/dashboard/school' },
     { kind: 'link', label: 'Operations', icon: Home, path: '/dashboard/school/operations' },
-    { kind: 'link', label: 'Marketplace', icon: Globe, path: getMarketplaceBasePath(UserRole.SCHOOL) },
-    { kind: 'link', label: 'Compliance Report', icon: FileText, path: '/dashboard/school/compliance' },
+    { kind: 'link', label: 'Analytics', icon: BarChart3, path: '/dashboard/school/analytics' },
     { kind: 'link', label: 'Portfolio', icon: Trophy, path: '/portfolio' },
     { kind: 'link', label: 'Messages', icon: MessageCircle, path: '/dashboard/messages' },
     { kind: 'link', label: 'Settings', icon: Settings, path: '/dashboard/settings' },
@@ -78,7 +77,7 @@ export const SIDEBAR_CONFIG: Record<UserRole, DashboardNavItem[]> = {
     { kind: 'link', label: 'Operations', icon: Home, path: '/dashboard/college/operations' },
     { kind: 'link', label: 'Marketplace', icon: Globe, path: getMarketplaceBasePath(UserRole.COLLEGE) },
     { kind: 'link', label: 'Placement Tracker', icon: BarChart3, path: '/dashboard/college/placement' },
-    { kind: 'link', label: 'Compliance Report', icon: FileText, path: '/dashboard/college/compliance' },
+    { kind: 'link', label: 'Analytics', icon: BarChart3, path: '/dashboard/college/analytics' },
     { kind: 'link', label: 'Portfolio', icon: Trophy, path: '/portfolio' },
     { kind: 'link', label: 'Messages', icon: MessageCircle, path: '/dashboard/messages' },
     { kind: 'link', label: 'Settings', icon: Settings, path: '/dashboard/settings' },
@@ -144,6 +143,7 @@ export const DASHBOARD_ROUTE_LABELS: Partial<Record<UserRole, DashboardRouteLabe
     { path: '/dashboard/school/projects', label: 'Projects' },
     { path: '/dashboard/school/patents', label: 'Patents' },
     { path: '/dashboard/school/startups', label: 'Startups' },
+    { path: '/dashboard/school/analytics', label: 'Analytics' },
   ],
   [UserRole.COLLEGE]: [
     { path: '/dashboard/college/operations', label: 'Operations' },
@@ -151,5 +151,6 @@ export const DASHBOARD_ROUTE_LABELS: Partial<Record<UserRole, DashboardRouteLabe
     { path: '/dashboard/college/mentors', label: 'Mentorship' },
     { path: '/dashboard/college/events', label: 'Events' },
     { path: '/dashboard/college/projects', label: 'Projects' },
+    { path: '/dashboard/college/analytics', label: 'Analytics' },
   ],
 };

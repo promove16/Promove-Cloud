@@ -6,6 +6,14 @@ type Props = {
 };
 
 export default function HiringPartnersList({ partners }: Props) {
+  if (partners.length === 0) {
+    return (
+      <Card className="p-5 text-sm text-slate-400">
+        No recruiters with active jobs or drives are linked to this college yet.
+      </Card>
+    );
+  }
+
   return (
     <div className="grid gap-4 xl:grid-cols-2">
       {partners.map((partner) => (

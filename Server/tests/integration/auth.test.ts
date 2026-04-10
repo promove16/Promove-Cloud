@@ -7,6 +7,10 @@ import app from '../../src/app';
 import { env } from '../../src/config/env';
 import { InstitutionStudentRosterEntry } from '../../src/modules/institution/studentRoster.model';
 import { User } from '../../src/modules/user/user.model';
+import {
+  sendInstitutionStudentInviteEmail,
+  sendTemporaryStudentCredentialsEmail,
+} from '../../src/services/emailService';
 import { UserRole } from '../../src/types/roles.types';
 
 const PASSWORD = 'Password123!';
@@ -17,6 +21,11 @@ jest.mock('../../src/services/cloudinaryService', () => ({
     public_id: `mock-${randomUUID()}`,
   })),
   deleteFromCloudinary: jest.fn(async () => undefined),
+}));
+
+jest.mock('../../src/services/emailService', () => ({
+  sendTemporaryStudentCredentialsEmail: jest.fn(async () => undefined),
+  sendInstitutionStudentInviteEmail: jest.fn(async () => undefined),
 }));
 
 const createApprovedUser = async (input: {
@@ -105,6 +114,10 @@ const attachInstitutionDocuments = (
 };
 
 describe('auth integration', () => {
+  beforeEach(() => {
+    jest.clearAllMocks();
+  });
+
   describe('POST /api/auth/register', () => {
     it('rejects student signup without an institution token', async () => {
       const response = await request(app).post('/api/auth/register').send({
@@ -200,8 +213,273 @@ describe('auth integration', () => {
       });
 
       expect(response.status).toBe(201);
+      expect(response.body.data.accessToken).toEqual(expect.any(String));
       expect(response.body.data.user.accessGrantedBy).toBe('institution_roster');
-      expect(response.body.data.user.verificationStatus).toBe('pending');
+      expect(response.body.data.user.verificationStatus).toBe('verified');
+      expect(response.body.data.user.institutionVerificationStatus).toBe('verified');
+      expect(response.body.data.user.isActive).toBe(true);
+      expect(response.body.data.user.registrationStage).toBe('institution_verified');
+      expect(response.headers['set-cookie']?.[0]).toContain('refreshToken=');
+
+      const created = await User.findOne({ email: rosterEmail }).lean();
+      expect(created?.verificationStatus).toBe('verified');
+      expect(created?.isActive).toBe(true);
+
+      const rosterEntry = await InstitutionStudentRosterEntry.findOne({ email: rosterEmail }).lean();
+      expect(rosterEntry?.status).toBe('verified');
+      expect(String(rosterEntry?.linkedUserId)).toBe(String(created?._id));
+
+      const pendingResponse = await request(app)
+        .get('/api/school/student-verifications')
+        .set('Authorization', `Bearer ${accessToken}`);
+
+      expect(pendingResponse.status).toBe(200);
+      expect(pendingResponse.body.data).toHaveLength(0);
+
+      const loginResponse = await request(app).post('/api/auth/login').send({
+        email: rosterEmail,
+        password: PASSWORD,
+      });
+
+      expect(loginResponse.status).toBe(200);
+      expect(loginResponse.body.data.user.verificationStatus).toBe('verified');
+    });
+
+    it('sends a roster invite email when a school adds a student manually', async () => {
+      const schoolEmail = `manual-${randomUUID()}@school.test`;
+      await createApprovedUser({
+        role: UserRole.SCHOOL,
+        email: schoolEmail,
+        displayName: 'Manual Invite School',
+        institutionProfile: {
+          institutionName: 'Manual Invite School',
+          location: 'Mumbai',
+          totalStudentsEnrolled: 640,
+          academicYear: '2025-26',
+        },
+      });
+
+      const { token, accessToken } = await createInstitutionToken(UserRole.SCHOOL, schoolEmail);
+      const rosterEmail = `manual-invite-${randomUUID()}@school.test`;
+
+      const response = await request(app)
+        .post('/api/school/student-roster/manual')
+        .set('Authorization', `Bearer ${accessToken}`)
+        .send({
+          displayName: 'Invite Student',
+          email: rosterEmail,
+          gradeOrProgram: 'Class 11',
+        });
+
+      expect(response.status).toBe(201);
+      expect(sendInstitutionStudentInviteEmail).toHaveBeenCalledTimes(1);
+      expect(sendInstitutionStudentInviteEmail).toHaveBeenCalledWith(
+        expect.objectContaining({
+          toEmail: rosterEmail,
+          studentEmail: rosterEmail,
+          institutionName: 'Manual Invite School',
+          institutionRole: UserRole.SCHOOL,
+          inviteLink: expect.stringContaining(`inviteeEmail=${encodeURIComponent(rosterEmail)}`),
+        }),
+      );
+      expect(sendInstitutionStudentInviteEmail).toHaveBeenCalledWith(
+        expect.objectContaining({
+          inviteLink: expect.stringContaining(`institutionToken=${encodeURIComponent(token)}`),
+        }),
+      );
+    });
+
+    it('sends invite emails for created roster rows during import', async () => {
+      const schoolEmail = `import-${randomUUID()}@school.test`;
+      await createApprovedUser({
+        role: UserRole.SCHOOL,
+        email: schoolEmail,
+        displayName: 'Import Invite School',
+        institutionProfile: {
+          institutionName: 'Import Invite School',
+          location: 'Delhi',
+          totalStudentsEnrolled: 1100,
+          academicYear: '2025-26',
+        },
+      });
+
+      const { token, accessToken } = await createInstitutionToken(UserRole.SCHOOL, schoolEmail);
+      const workbook = new ExcelJS.Workbook();
+      const worksheet = workbook.addWorksheet('Students');
+      const rows = [
+        {
+          displayName: 'Import Student One',
+          email: `import-one-${randomUUID()}@school.test`,
+          gradeOrProgram: 'Class 11',
+        },
+        {
+          displayName: 'Import Student Two',
+          email: `import-two-${randomUUID()}@school.test`,
+          gradeOrProgram: 'Class 12',
+        },
+      ];
+      worksheet.columns = [
+        { header: 'displayName', key: 'displayName' },
+        { header: 'email', key: 'email' },
+        { header: 'gradeOrProgram', key: 'gradeOrProgram' },
+      ];
+      worksheet.addRows(rows);
+      const workbookBuffer = Buffer.from(await workbook.xlsx.writeBuffer());
+
+      const response = await request(app)
+        .post('/api/school/student-roster/import')
+        .set('Authorization', `Bearer ${accessToken}`)
+        .attach('file', workbookBuffer, 'students.xlsx');
+
+      expect(response.status).toBe(200);
+      expect(response.body.data.createdCount).toBe(2);
+      expect(sendInstitutionStudentInviteEmail).toHaveBeenCalledTimes(2);
+      rows.forEach((row) => {
+        expect(sendInstitutionStudentInviteEmail).toHaveBeenCalledWith(
+          expect.objectContaining({
+            toEmail: row.email,
+            studentEmail: row.email,
+            institutionName: 'Import Invite School',
+            institutionRole: UserRole.SCHOOL,
+            inviteLink: expect.stringContaining(`inviteeEmail=${encodeURIComponent(row.email)}`),
+          }),
+        );
+      });
+      expect(sendInstitutionStudentInviteEmail).toHaveBeenCalledWith(
+        expect.objectContaining({
+          inviteLink: expect.stringContaining(`institutionToken=${encodeURIComponent(token)}`),
+        }),
+      );
+    });
+
+    it('rejects signup when a roster-matched email uses another institution token', async () => {
+      const rosterSchoolEmail = `roster-owner-${randomUUID()}@school.test`;
+      await createApprovedUser({
+        role: UserRole.SCHOOL,
+        email: rosterSchoolEmail,
+        displayName: 'Roster Owner School',
+        institutionProfile: {
+          institutionName: 'Roster Owner School',
+          location: 'Pune',
+          totalStudentsEnrolled: 750,
+          academicYear: '2025-26',
+        },
+      });
+      const { accessToken: rosterOwnerAccessToken } = await createInstitutionToken(
+        UserRole.SCHOOL,
+        rosterSchoolEmail,
+      );
+
+      const otherSchoolEmail = `other-owner-${randomUUID()}@school.test`;
+      await createApprovedUser({
+        role: UserRole.SCHOOL,
+        email: otherSchoolEmail,
+        displayName: 'Other School',
+        institutionProfile: {
+          institutionName: 'Other School',
+          location: 'Ahmedabad',
+          totalStudentsEnrolled: 980,
+          academicYear: '2025-26',
+        },
+      });
+      const { token: otherToken } = await createInstitutionToken(UserRole.SCHOOL, otherSchoolEmail);
+
+      const rosterEmail = `mismatch-${randomUUID()}@school.test`;
+      const rosterResponse = await request(app)
+        .post('/api/school/student-roster/manual')
+        .set('Authorization', `Bearer ${rosterOwnerAccessToken}`)
+        .send({
+          displayName: 'Mismatch Student',
+          email: rosterEmail,
+          gradeOrProgram: 'Class 9',
+        });
+
+      expect(rosterResponse.status).toBe(201);
+
+      const response = await request(app).post('/api/auth/register').send({
+        email: rosterEmail,
+        password: PASSWORD,
+        displayName: 'Mismatch Student',
+        role: 'student',
+        institutionToken: otherToken,
+      });
+
+      expect(response.status).toBe(409);
+      expect(response.body.error.code).toBe('INSTITUTION_TOKEN_MISMATCH');
+    });
+
+    it('rejects creating a roster entry when the student email is already linked to another institution', async () => {
+      const firstSchoolEmail = `first-${randomUUID()}@school.test`;
+      const { user: firstSchool } = await createApprovedUser({
+        role: UserRole.SCHOOL,
+        email: firstSchoolEmail,
+        displayName: 'First School',
+        institutionProfile: {
+          institutionName: 'First School',
+          location: 'Chennai',
+          totalStudentsEnrolled: 860,
+          academicYear: '2025-26',
+        },
+      });
+      const firstSchoolLogin = await loginAs(firstSchoolEmail);
+
+      const claimedEmail = `claimed-${randomUUID()}@school.test`;
+      await User.create({
+        email: claimedEmail,
+        passwordHash: await bcrypt.hash(PASSWORD, 12),
+        role: UserRole.STUDENT,
+        displayName: 'Claimed Student',
+        profileComplete: true,
+        registrationStage: 'institution_verified',
+        accessGrantedBy: 'institution_roster',
+        accessExpiresAt: new Date(Date.now() + 365 * 24 * 60 * 60 * 1000),
+        isActive: true,
+        institutionToken: 'SCH-CLAIMED',
+        institutionId: firstSchool._id,
+        institutionVerificationStatus: 'verified',
+        verificationStatus: 'verified',
+        adminApprovalStatus: 'not_required',
+        institutionVerifiedAt: new Date(),
+        verificationRequestedAt: new Date(),
+        verifiedAt: new Date(),
+      });
+
+      const secondSchoolEmail = `second-${randomUUID()}@school.test`;
+      await createApprovedUser({
+        role: UserRole.SCHOOL,
+        email: secondSchoolEmail,
+        displayName: 'Second School',
+        institutionProfile: {
+          institutionName: 'Second School',
+          location: 'Jaipur',
+          totalStudentsEnrolled: 910,
+          academicYear: '2025-26',
+        },
+      });
+      const secondSchoolLogin = await loginAs(secondSchoolEmail);
+
+      const firstRosterResponse = await request(app)
+        .post('/api/school/student-roster/manual')
+        .set('Authorization', `Bearer ${firstSchoolLogin.accessToken}`)
+        .send({
+          displayName: 'Claimed Student',
+          email: claimedEmail,
+          gradeOrProgram: 'Class 12',
+        });
+
+      expect(firstRosterResponse.status).toBe(201);
+
+      const secondRosterResponse = await request(app)
+        .post('/api/school/student-roster/manual')
+        .set('Authorization', `Bearer ${secondSchoolLogin.accessToken}`)
+        .send({
+          displayName: 'Claimed Student',
+          email: claimedEmail,
+          gradeOrProgram: 'Class 12',
+        });
+
+      expect(secondRosterResponse.status).toBe(409);
+      expect(secondRosterResponse.body.error.code).toBe('STUDENT_EMAIL_ALREADY_CLAIMED');
     });
 
     it('allows a school to cancel a pending student invite', async () => {

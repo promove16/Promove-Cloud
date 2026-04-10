@@ -39,6 +39,18 @@ import { createEventSchema } from '../event/event.service';
 import { generateCollegeReport } from '../../services/complianceReport';
 import { ApiError } from '../../utils/ApiError';
 import { createInstitutionMentorshipProgramSchema } from '../mentor/mentor.validation';
+import {
+  createComplianceAction,
+  createComplianceAlert,
+  createComplianceIncident,
+  getComplianceOverview,
+  listComplianceActions,
+  listComplianceAlerts,
+  listComplianceIncidents,
+  markComplianceAlertRead,
+  updateComplianceAction,
+  updateComplianceIncident,
+} from '../institution/institutionCompliance.service';
 
 export const getCollegeDashboardController = async (req: Request, res: Response) => {
   const data = await getCollegeDashboard(req.user!._id);
@@ -66,8 +78,8 @@ export const listCollegeInvestorsController = async (_req: Request, res: Respons
   res.status(200).json(new ApiResponse(data));
 };
 
-export const listCollegeRecruitersController = async (_req: Request, res: Response) => {
-  const data = await getRecruiterDirectory();
+export const listCollegeRecruitersController = async (req: Request, res: Response) => {
+  const data = await getRecruiterDirectory(req.user!._id);
   res.status(200).json(new ApiResponse(data));
 };
 
@@ -134,6 +146,66 @@ export const createCollegeComplianceReportController = async (req: Request, res:
 
 export const getLatestCollegeComplianceReportController = async (req: Request, res: Response) => {
   const data = await getLatestCollegeComplianceReport(req.user!._id);
+  res.status(200).json(new ApiResponse(data));
+};
+
+export const getCollegeComplianceOverviewController = async (req: Request, res: Response) => {
+  const data = await getComplianceOverview(req.user!._id, 'college');
+  res.status(200).json(new ApiResponse(data));
+};
+
+export const listCollegeComplianceIncidentsController = async (req: Request, res: Response) => {
+  const data = await listComplianceIncidents(req.user!._id, 'college', req.query);
+  res.status(200).json(new ApiResponse(data));
+};
+
+export const createCollegeComplianceIncidentController = async (req: Request, res: Response) => {
+  const data = await createComplianceIncident(req.user!._id, 'college', req.user!._id, req.body);
+  res.status(201).json(new ApiResponse(data));
+};
+
+export const updateCollegeComplianceIncidentController = async (req: Request, res: Response) => {
+  const data = await updateComplianceIncident(
+    req.user!._id,
+    'college',
+    String(req.params.incidentId),
+    req.body,
+  );
+  res.status(200).json(new ApiResponse(data));
+};
+
+export const listCollegeComplianceAlertsController = async (req: Request, res: Response) => {
+  const data = await listComplianceAlerts(req.user!._id, 'college', req.query);
+  res.status(200).json(new ApiResponse(data));
+};
+
+export const createCollegeComplianceAlertController = async (req: Request, res: Response) => {
+  const data = await createComplianceAlert(req.user!._id, 'college', req.user!._id, req.body);
+  res.status(201).json(new ApiResponse(data));
+};
+
+export const markCollegeComplianceAlertReadController = async (req: Request, res: Response) => {
+  const data = await markComplianceAlertRead(req.user!._id, 'college', String(req.params.alertId));
+  res.status(200).json(new ApiResponse(data));
+};
+
+export const listCollegeComplianceActionsController = async (req: Request, res: Response) => {
+  const data = await listComplianceActions(req.user!._id, 'college');
+  res.status(200).json(new ApiResponse(data));
+};
+
+export const createCollegeComplianceActionController = async (req: Request, res: Response) => {
+  const data = await createComplianceAction(req.user!._id, 'college', req.user!._id, req.body);
+  res.status(201).json(new ApiResponse(data));
+};
+
+export const updateCollegeComplianceActionController = async (req: Request, res: Response) => {
+  const data = await updateComplianceAction(
+    req.user!._id,
+    'college',
+    String(req.params.actionId),
+    req.body,
+  );
   res.status(200).json(new ApiResponse(data));
 };
 

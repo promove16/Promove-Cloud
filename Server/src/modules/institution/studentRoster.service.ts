@@ -1,10 +1,13 @@
 import { z } from 'zod';
 import { Readable } from 'stream';
 import ExcelJS from 'exceljs';
+import { env } from '../../config/env';
 import { UserRole } from '../../types/roles.types';
 import { ApiError } from '../../utils/ApiError';
 import { sanitizePlainText } from '../../utils/sanitizeText';
+import { sendInstitutionStudentInviteEmail } from '../../services/emailService';
 import { User } from '../user/user.model';
+import { StudentAccessToken } from './studentAccessToken.model';
 import {
   InstitutionStudentRosterEntry,
   IInstitutionStudentRosterEntry,
@@ -73,6 +76,8 @@ export type StudentRosterImportSummary = {
   skipped: number;
   importedRows: number;
   entries: StudentRosterEntryView[];
+  createdEntries: StudentRosterEntryView[];
+  updatedEntries: StudentRosterEntryView[];
   errors: Array<{
     row: number;
     email?: string;
@@ -86,11 +91,19 @@ export type CancelStudentRosterInviteResult = {
   cancelledAt: Date;
 };
 
+type InstitutionRosterOwner = {
+  _id: { toString(): string };
+  role: UserRole.SCHOOL | UserRole.COLLEGE;
+  displayName: string;
+};
+
 const assertInstitutionRole = async (
   institutionId: string,
   institutionRole: UserRole.SCHOOL | UserRole.COLLEGE,
 ) => {
-  const institution = await User.findById(institutionId).select('_id role displayName').lean();
+  const institution = await User.findById(institutionId)
+    .select('_id role displayName')
+    .lean<InstitutionRosterOwner | null>();
 
   if (!institution || institution.role !== institutionRole) {
     throw new ApiError(404, 'INSTITUTION_NOT_FOUND', 'Institution account not found');
@@ -100,6 +113,59 @@ const assertInstitutionRole = async (
 };
 
 const normalizeEmail = (email: string) => email.trim().toLowerCase();
+
+const resolveLatestActiveInstitutionToken = async (institutionId: string) => {
+  const activeToken = await StudentAccessToken.findOne({
+    institutionId,
+    isActive: true,
+    $or: [{ expiresAt: null }, { expiresAt: { $gt: new Date() } }],
+  })
+    .sort({ createdAt: -1 })
+    .select('token')
+    .lean();
+
+  return activeToken?.token ?? null;
+};
+
+const buildInstitutionStudentInviteLink = async (
+  institution: InstitutionRosterOwner,
+  inviteeEmail: string,
+) => {
+  const inviteUrl = new URL('/signup', env.CLIENT_URL);
+  const activeToken = await resolveLatestActiveInstitutionToken(String(institution._id));
+
+  inviteUrl.searchParams.set('inviteRole', UserRole.STUDENT);
+  inviteUrl.searchParams.set('inviteeEmail', normalizeEmail(inviteeEmail));
+  inviteUrl.searchParams.set('inviterName', institution.displayName);
+  inviteUrl.searchParams.set(
+    'purpose',
+    'Register with this same email to activate your student dashboard access.',
+  );
+
+  if (activeToken) {
+    inviteUrl.searchParams.set('institutionToken', activeToken);
+  }
+
+  return inviteUrl.toString();
+};
+
+const sendStudentRosterInviteIfNeeded = async (
+  institution: InstitutionRosterOwner,
+  entry: StudentRosterEntryView,
+) => {
+  if (entry.status !== 'invited' || entry.linkedUserId) {
+    return;
+  }
+
+  const inviteLink = await buildInstitutionStudentInviteLink(institution, entry.email);
+  await sendInstitutionStudentInviteEmail({
+    toEmail: entry.email,
+    studentEmail: entry.email,
+    institutionName: institution.displayName,
+    institutionRole: institution.role,
+    inviteLink,
+  });
+};
 
 const deriveRosterStatus = (user?: StudentRosterLinkedUser | null): StudentRosterStatus => {
   if (!user) {
@@ -355,8 +421,11 @@ export const createStudentRosterEntry = async (
   createdBy: string,
   payload: StudentRosterInput,
 ): Promise<StudentRosterEntryView> => {
-  await assertInstitutionRole(institutionId, institutionRole);
+  const institution = await assertInstitutionRole(institutionId, institutionRole);
   const result = await upsertRosterEntry(institutionId, institutionRole, createdBy, payload, 'manual');
+  if (result.created) {
+    await sendStudentRosterInviteIfNeeded(institution, result.entry);
+  }
   return result.entry;
 };
 
@@ -422,7 +491,7 @@ export const importStudentRosterEntries = async (
   createdBy: string,
   file: { originalname: string; buffer: Buffer },
 ): Promise<StudentRosterImportSummary> => {
-  await assertInstitutionRole(institutionId, institutionRole);
+  const institution = await assertInstitutionRole(institutionId, institutionRole);
 
   const source: StudentRosterSource = /\.xlsx?$/i.test(file.originalname) ? 'xlsx' : 'csv';
   const rows = await workbookRowsToPayloads(file.buffer, file.originalname);
@@ -432,6 +501,8 @@ export const importStudentRosterEntries = async (
   }
 
   const entries: StudentRosterEntryView[] = [];
+  const createdEntries: StudentRosterEntryView[] = [];
+  const updatedEntries: StudentRosterEntryView[] = [];
   const errors: StudentRosterImportSummary['errors'] = [];
   let createdCount = 0;
   let updatedCount = 0;
@@ -448,11 +519,17 @@ export const importStudentRosterEntries = async (
         file.originalname,
       );
 
+      if (result.created) {
+        await sendStudentRosterInviteIfNeeded(institution, result.entry);
+      }
+
       entries.push(result.entry);
       if (result.created) {
         createdCount += 1;
+        createdEntries.push(result.entry);
       } else {
         updatedCount += 1;
+        updatedEntries.push(result.entry);
       }
     } catch (error) {
       const message =
@@ -479,6 +556,8 @@ export const importStudentRosterEntries = async (
     skipped: errors.length,
     importedRows: rows.length,
     entries,
+    createdEntries,
+    updatedEntries,
     errors,
   };
 };

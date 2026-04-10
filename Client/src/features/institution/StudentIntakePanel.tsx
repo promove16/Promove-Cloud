@@ -314,7 +314,7 @@ export function StudentIntakePanel({
                     className={`${inputCls} min-h-[80px] resize-none`}
                   />
                   <Button type="submit" disabled={isManualSubmitting} className="w-full">
-                    {isManualSubmitting ? 'Saving...' : 'Add Student'}
+                    {isManualSubmitting ? 'Saving...' : 'Add Student Invite'}
                   </Button>
                 </form>
               )}
@@ -463,6 +463,12 @@ export function StudentIntakePanel({
                       {lastImportMessage}
                     </div>
                   )}
+
+                  {!bulkCredentialResult && !withCredentials ? (
+                    <div className="rounded-lg border border-slate-800 bg-slate-950/70 px-4 py-3 text-xs text-slate-400">
+                      Roster imports send email invites automatically. Students who register with the same email go straight to verified access.
+                    </div>
+                  ) : null}
 
                   {/* Bulk credential results */}
                   {bulkCredentialResult && (
@@ -629,7 +635,7 @@ export function StudentIntakePanel({
                     </div>
                   ) : roster.length === 0 ? (
                     <div className="rounded-lg border border-dashed border-slate-800 px-4 py-8 text-center text-sm text-slate-400">
-                      No students added yet. Use "Add Student" or "Import Roster" to get started.
+                      No students added yet. Use "Add Student" or "Import Roster" to send invites and build your onboarding list.
                     </div>
                   ) : (
                     <div className="space-y-2">

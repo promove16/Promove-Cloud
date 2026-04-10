@@ -161,9 +161,9 @@ export default function OperationsPage({
       <div className="px-0 py-0">
         <InstitutionWorkspaceHeader
           mode="college"
-          eyebrow="Operations Workspace"
-          title="College operations page"
-          description="Token desk, approval queue, and student intake live here so the dashboard can stay within one viewport."
+          eyebrow="Other Workspace"
+          title="College other workspace"
+          description="Token desk, approval queue, and student intake live here so student innovators can stay as the default landing view."
           tabsAction={
             onBackToOverview ? (
               <Button variant="secondary" onClick={onBackToOverview}>
@@ -181,7 +181,7 @@ export default function OperationsPage({
               icon: Users,
               label: "Student intake",
               value:
-                "Manual, bulk, and temporary credential workflows stay available.",
+                "Manual and bulk roster entries now email invites, while temporary credentials remain available.",
             },
             {
               icon: KeyRound,
@@ -193,7 +193,7 @@ export default function OperationsPage({
               icon: Sparkles,
               label: "Approval queue",
               value:
-                "Pending student registrations are reviewed from this page.",
+                "Review token-only registrations here when they were not pre-invited on the roster.",
             },
           ].map((item) => (
             <div
@@ -232,12 +232,12 @@ export default function OperationsPage({
             <DashboardSection
               eyebrow="Student Onboarding"
               title="Student onboarding"
-              description="Create managed student intake records, import rosters, and issue temporary credentials."
+              description="Email roster invites, import student lists, and issue temporary credentials from one shared onboarding flow."
             >
               <div className="space-y-4">
                 <StudentIntakePanel
                   heading="Feed student intake data for your college"
-                  description="Build a managed roster, email temporary student credentials, or issue tokens for approved self-service signup."
+                  description="Build a managed roster and email invites automatically. Students who register with the same invited email get direct dashboard access, while token-only signups still wait for approval."
                   secondaryFieldLabel="Program / Year"
                   secondaryFieldPlaceholder="B.Tech CSE - 3rd Year"
                   roster={rosterQuery.data ?? []}

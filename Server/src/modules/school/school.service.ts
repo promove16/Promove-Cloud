@@ -42,11 +42,14 @@ import {
   listStudentRosterQuerySchema,
   manualStudentRosterEntrySchema,
 } from '../institution/studentRoster.service';
+import { sendStudentRosterInvite } from '../institution/studentInvite.service';
 import {
   DashboardEventView,
   InstitutionPatentView,
   InstitutionStartupView,
   InvestorProfileView,
+  InstitutionTrendGraph,
+  InstitutionTrendSeries,
   LeaderboardPage,
   PendingStudentVerificationView,
   RecentActivityCounts,
@@ -72,6 +75,7 @@ const DASHBOARD_TTL_SECONDS = 60 * 10;
 const STATS_TTL_SECONDS = 60 * 10;
 const INVESTORS_TTL_SECONDS = 60 * 15;
 const MAX_TIEBREAKER_EPOCH = 9999999999999;
+const TREND_RANGE_DAYS = 30;
 
 type StudentLeaderboardCacheUser = {
   _id: Types.ObjectId;
@@ -148,6 +152,133 @@ const countRecentInstitutionActivity = async (
     scoreEventsLast30Days,
     patentsLast30Days,
     startupsLast30Days,
+  };
+};
+
+const buildTrendLabels = (rangeDays: number) => {
+  const labels: string[] = [];
+  const start = new Date();
+  start.setUTCHours(0, 0, 0, 0);
+  start.setUTCDate(start.getUTCDate() - (rangeDays - 1));
+
+  for (let index = 0; index < rangeDays; index += 1) {
+    const day = new Date(start);
+    day.setUTCDate(start.getUTCDate() + index);
+    labels.push(day.toISOString().slice(0, 10));
+  }
+
+  return { labels, startDate: start };
+};
+
+const mergeTrendCounts = (
+  labels: string[],
+  counts: Array<{ _id: string; count: number }>,
+): number[] => {
+  const countMap = new Map(counts.map((entry) => [entry._id, entry.count]));
+  return labels.map((label) => countMap.get(label) ?? 0);
+};
+
+const aggregateCountByDay = async (
+  aggregatePromise: Promise<Array<{ _id: string; count: number }>>,
+): Promise<Array<{ _id: string; count: number }>> => aggregatePromise;
+
+export const getInstitutionTrendGraph = async (
+  studentIds: Types.ObjectId[],
+  rangeDays = TREND_RANGE_DAYS,
+): Promise<InstitutionTrendGraph> => {
+  const { labels, startDate } = buildTrendLabels(rangeDays);
+
+  if (studentIds.length === 0) {
+    return {
+      labels,
+      rangeDays,
+      series: [
+        { label: 'Innovation Activities', color: '#38bdf8', values: labels.map(() => 0) },
+        { label: 'Project Updates', color: '#34d399', values: labels.map(() => 0) },
+        { label: 'Patents Filed', color: '#f59e0b', values: labels.map(() => 0) },
+        { label: 'Startups Launched', color: '#f472b6', values: labels.map(() => 0) },
+      ],
+    };
+  }
+
+  const [activityCounts, projectCounts, patentCounts, startupCounts] = await Promise.all([
+    aggregateCountByDay(
+      ScoreEvent.aggregate<{ _id: string; count: number }>([
+        { $match: { userId: { $in: studentIds }, createdAt: { $gte: startDate } } },
+        {
+          $group: {
+            _id: {
+              $dateToString: { format: '%Y-%m-%d', date: '$createdAt' },
+            },
+            count: { $sum: 1 },
+          },
+        },
+        { $sort: { _id: 1 } },
+      ]),
+    ),
+    aggregateCountByDay(
+      Workspace.aggregate<{ _id: string; count: number }>([
+        { $match: { ownerId: { $in: studentIds }, isActive: true, updatedAt: { $gte: startDate } } },
+        {
+          $group: {
+            _id: {
+              $dateToString: { format: '%Y-%m-%d', date: '$updatedAt' },
+            },
+            count: { $sum: 1 },
+          },
+        },
+        { $sort: { _id: 1 } },
+      ]),
+    ),
+    aggregateCountByDay(
+      Patent.aggregate<{ _id: string; count: number }>([
+        { $match: { studentId: { $in: studentIds }, submittedAt: { $gte: startDate } } },
+        {
+          $group: {
+            _id: {
+              $dateToString: { format: '%Y-%m-%d', date: '$submittedAt' },
+            },
+            count: { $sum: 1 },
+          },
+        },
+        { $sort: { _id: 1 } },
+      ]),
+    ),
+    aggregateCountByDay(
+      Startup.aggregate<{ _id: string; count: number }>([
+        {
+          $match: {
+            founderIds: { $in: studentIds },
+            $or: [{ launchedAt: { $gte: startDate } }, { createdAt: { $gte: startDate } }],
+          },
+        },
+        {
+          $group: {
+            _id: {
+              $dateToString: {
+                format: '%Y-%m-%d',
+                date: { $ifNull: ['$launchedAt', '$createdAt'] },
+              },
+            },
+            count: { $sum: 1 },
+          },
+        },
+        { $sort: { _id: 1 } },
+      ]),
+    ),
+  ]);
+
+  const series: InstitutionTrendSeries[] = [
+    { label: 'Innovation Activities', color: '#38bdf8', values: mergeTrendCounts(labels, activityCounts) },
+    { label: 'Project Updates', color: '#34d399', values: mergeTrendCounts(labels, projectCounts) },
+    { label: 'Patents Filed', color: '#f59e0b', values: mergeTrendCounts(labels, patentCounts) },
+    { label: 'Startups Launched', color: '#f472b6', values: mergeTrendCounts(labels, startupCounts) },
+  ];
+
+  return {
+    labels,
+    rangeDays,
+    series,
   };
 };
 
@@ -618,7 +749,7 @@ export const getStudentJourney = async (
 };
 
 export const getSchoolDashboard = async (institutionId: string): Promise<SchoolDashboardPayload> => {
-  const cacheKey = `school:dashboard:${institutionId}`;
+  const cacheKey = `school:dashboard:v2:${institutionId}`;
   const cached = await redis.get<string>(cacheKey);
 
   const cachedDashboard = readRedisJson<SchoolDashboardPayload>(cached);
@@ -635,13 +766,14 @@ export const getSchoolDashboard = async (institutionId: string): Promise<SchoolD
   }
 
   const studentIds = await getStudentIdsForInstitution(institutionId);
-  const [stats, topStudentsPage, upcomingEvents, recentActivityCounts, recentProjects, iicTelemetry] =
+  const [stats, topStudentsPage, upcomingEvents, recentActivityCounts, recentProjects, trendGraph, iicTelemetry] =
     await Promise.all([
       getDashboardStats(institutionId, studentIds),
       getStudentLeaderboard(institutionId, undefined, 5),
       getInstitutionUpcomingEvents(institutionId),
       getRecentActivityCounts(studentIds),
       getRecentInstitutionProjects(studentIds),
+      getInstitutionTrendGraph(studentIds),
       getInstitutionIicTelemetry(institutionId, 'school'),
     ]);
 
@@ -676,6 +808,7 @@ export const getSchoolDashboard = async (institutionId: string): Promise<SchoolD
       : undefined,
     stats,
     recentActivityCounts,
+    trendGraph,
     upcomingEvents,
     topStudents: topStudentsPage.items,
     recentProjects,
@@ -715,11 +848,25 @@ export const reviewSchoolStudentVerification = (
 ): Promise<StudentVerificationReviewResult> =>
   reviewStudentVerification(schoolId, UserRole.SCHOOL, reviewerId, studentId, payload);
 
-export const createSchoolStudentRosterEntry = (
+export const createSchoolStudentRosterEntry = async (
   schoolId: string,
   actorId: string,
   payload: z.infer<typeof manualStudentRosterEntrySchema>,
-) => createStudentRosterEntry(schoolId, UserRole.SCHOOL, actorId, payload);
+) => {
+  const entry = await createStudentRosterEntry(schoolId, UserRole.SCHOOL, actorId, payload);
+
+  if (entry.status === 'invited' && !entry.linkedUserId) {
+    await sendStudentRosterInvite({
+      institutionId: schoolId,
+      institutionRole: UserRole.SCHOOL,
+      createdBy: actorId,
+      studentEmail: entry.email,
+      studentName: entry.displayName,
+    });
+  }
+
+  return entry;
+};
 
 export const cancelSchoolStudentRosterInvite = (
   schoolId: string,
@@ -733,11 +880,32 @@ export const createSchoolManagedStudentCredentials = (
 ): Promise<TemporaryStudentCredentialsView> =>
   createManagedStudentCredentials(schoolId, UserRole.SCHOOL, actorId, payload);
 
-export const importSchoolStudentRosterEntries = (
+export const importSchoolStudentRosterEntries = async (
   schoolId: string,
   actorId: string,
   file: { originalname: string; buffer: Buffer },
-) => importStudentRosterEntries(schoolId, UserRole.SCHOOL, actorId, file);
+) => {
+  const result = await importStudentRosterEntries(schoolId, UserRole.SCHOOL, actorId, file);
+  const createdEntries = result.createdEntries ?? [];
+
+  if (createdEntries.length > 0) {
+    await Promise.all(
+      createdEntries
+        .filter((entry) => entry.status === 'invited' && !entry.linkedUserId)
+        .map((entry) =>
+          sendStudentRosterInvite({
+            institutionId: schoolId,
+            institutionRole: UserRole.SCHOOL,
+            createdBy: actorId,
+            studentEmail: entry.email,
+            studentName: entry.displayName,
+          }),
+        ),
+    );
+  }
+
+  return result;
+};
 
 export const importSchoolStudentCredentials = (
   schoolId: string,

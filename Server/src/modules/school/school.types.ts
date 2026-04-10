@@ -78,6 +78,8 @@ export interface StudentRosterImportResult {
   skipped: number;
   importedRows: number;
   entries: StudentRosterEntryView[];
+  createdEntries?: StudentRosterEntryView[];
+  updatedEntries?: StudentRosterEntryView[];
   errors: Array<{
     row: number;
     message: string;
@@ -128,6 +130,18 @@ export interface RecentActivityCounts {
   scoreEventsLast30Days: number;
   patentsLast30Days: number;
   startupsLast30Days: number;
+}
+
+export interface InstitutionTrendSeries {
+  label: string;
+  color: string;
+  values: number[];
+}
+
+export interface InstitutionTrendGraph {
+  labels: string[];
+  series: InstitutionTrendSeries[];
+  rangeDays: number;
 }
 
 export interface RecentProjectView {
@@ -206,6 +220,7 @@ export interface SchoolDashboardPayload {
   institutionProfile?: InstitutionProfile;
   stats: SchoolDashboardStats;
   recentActivityCounts: RecentActivityCounts;
+  trendGraph: InstitutionTrendGraph;
   upcomingEvents: DashboardEventView[];
   topStudents: StudentLeaderboardItem[];
   recentProjects: RecentProjectView[];

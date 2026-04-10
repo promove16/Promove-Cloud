@@ -309,7 +309,7 @@ describe('user profile flow integration', () => {
     });
   });
 
-  it('preserves approved institution history and syncs the new college education after token approval', async () => {
+  it('preserves approved institution history and syncs the new college education after a roster-matched token update', async () => {
     const school = await User.create({
       email: `school-${randomUUID()}@example.com`,
       passwordHash: await bcrypt.hash(PASSWORD, 12),
@@ -432,15 +432,18 @@ describe('user profile flow integration', () => {
 
     expect(submitTokenResponse.status).toBe(200);
     expect(submitTokenResponse.body.data.user.institutionId).toBe(String(college._id));
-    expect(submitTokenResponse.body.data.user.verificationStatus).toBe('pending');
+    expect(submitTokenResponse.body.data.user.verificationStatus).toBe('verified');
+    expect(submitTokenResponse.body.data.user.registrationStage).toBe('institution_verified');
+    expect(submitTokenResponse.body.data.user.isActive).toBe(true);
 
-    const collegeAccessToken = await loginAs(college.email);
-    const approvalResponse = await request(app)
-      .patch(`/api/college/student-verifications/${student._id.toString()}`)
-      .set('Authorization', `Bearer ${collegeAccessToken}`)
-      .send({ decision: 'approved' });
+    const rosterEntry = await InstitutionStudentRosterEntry.findOne({
+      institutionId: college._id,
+      email: student.email,
+      isActive: true,
+    }).lean();
 
-    expect(approvalResponse.status).toBe(200);
+    expect(rosterEntry?.status).toBe('verified');
+    expect(String(rosterEntry?.linkedUserId)).toBe(student._id.toString());
 
     const profileResponse = await request(app)
       .get('/api/users/me')

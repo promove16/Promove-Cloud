@@ -51,6 +51,7 @@ export function SignupPage() {
     searchParams.get("institutionToken")?.trim() ??
     searchParams.get("token")?.trim() ??
     "";
+  const isInviteFlow = Boolean(invitedInstitutionToken);
   const inviterName = searchParams.get("inviterName")?.trim() ?? "";
   const invitePurpose = searchParams.get("purpose")?.trim() ?? "";
   const requestAccessLink = useMemo(() => {
@@ -157,7 +158,11 @@ export function SignupPage() {
           <h1 className="mb-2 text-3xl font-bold text-white">
             Create Your Account
           </h1>
-          <p className="text-slate-400">Student registration starts here</p>
+          <p className="text-slate-400">
+            {isInviteFlow
+              ? "Use your invitation to complete student registration"
+              : "Student registration starts here"}
+          </p>
         </div>
 
         {invitedRole === UserRole.STUDENT ? (
@@ -203,7 +208,9 @@ export function SignupPage() {
             </div>
             <p className="mt-3 text-sm text-slate-400">
               Students can register only with a school or college invitation
-              token. Your account stays pending until that institution approves it.
+              token. If your email matches a roster invite, your dashboard is
+              ready immediately after signup. Token-only signups still wait for
+              institution approval.
             </p>
           </div>
 
@@ -246,8 +253,14 @@ export function SignupPage() {
                     placeholder="name@example.com"
                     className="w-full rounded-lg border border-slate-800 bg-slate-950 py-3 pl-12 pr-4 text-white placeholder-slate-500 focus:border-blue-500 focus:outline-none"
                     required
+                    disabled={Boolean(invitedEmail)}
                   />
                 </div>
+                {invitedEmail ? (
+                  <p className="mt-2 text-xs text-slate-500">
+                    This email is locked to your invitation.
+                  </p>
+                ) : null}
               </div>
 
               <div>
@@ -327,24 +340,36 @@ export function SignupPage() {
             <label className="mb-2 block text-sm font-semibold text-white">
               Institution Token <span className="text-red-400">*</span>
             </label>
-            <div className="relative">
-              <Ticket className="absolute left-4 top-1/2 h-5 w-5 -translate-y-1/2 text-slate-400" />
-              <input
-                type="text"
-                value={formData.institutionToken}
-                onChange={(event) =>
-                  updateField("institutionToken", event.target.value)
-                }
-                placeholder="SCH-AB12CD34"
-                className="w-full rounded-lg border border-slate-800 bg-slate-950 py-3 pl-12 pr-4 text-white placeholder-slate-500 focus:border-blue-500 focus:outline-none"
-                required
-              />
-            </div>
-            <p className="mt-2 text-xs text-slate-500">
-              Use the token issued from your school or college dashboard.
-            </p>
+            {isInviteFlow ? (
+              <div className="rounded-2xl border border-slate-800 bg-slate-950/70 p-4 text-sm text-slate-300">
+                Your invitation includes the institution token. You do not need to enter it.
+                <div className="mt-3 font-mono text-xs text-cyan-300">
+                  {formData.institutionToken}
+                </div>
+              </div>
+            ) : (
+              <>
+                <div className="relative">
+                  <Ticket className="absolute left-4 top-1/2 h-5 w-5 -translate-y-1/2 text-slate-400" />
+                  <input
+                    type="text"
+                    value={formData.institutionToken}
+                    onChange={(event) =>
+                      updateField("institutionToken", event.target.value)
+                    }
+                    placeholder="SCH-AB12CD34"
+                    className="w-full rounded-lg border border-slate-800 bg-slate-950 py-3 pl-12 pr-4 text-white placeholder-slate-500 focus:border-blue-500 focus:outline-none"
+                    required
+                  />
+                </div>
+                <p className="mt-2 text-xs text-slate-500">
+                  Use the token issued from your school or college dashboard.
+                </p>
+              </>
+            )}
             <div className="mt-3 rounded-2xl border border-slate-800 bg-slate-950/70 p-4 text-sm text-slate-400">
-              Token-verified signups stay inactive until the matching institution approves them.
+              Matching roster invites activate immediately. Students who only
+              have a token still move into the institution review queue.
             </div>
           </div>
 

@@ -1,9 +1,14 @@
 import {
+  ComplianceActionRecord,
+  ComplianceAlertRecord,
+  ComplianceIncidentRecord,
+  ComplianceOverviewData,
   ComplianceReportRecord,
   DashboardEvent,
   InstitutionPatent,
   InstitutionProfile,
   InstitutionStartup,
+  InstitutionTrendGraph,
   PendingStudentVerification,
   RecentProject,
   TemporaryStudentCredentials,
@@ -46,6 +51,7 @@ export interface CollegeDashboardData {
     patentsLast30Days: number;
     startupsLast30Days: number;
   };
+  trendGraph: InstitutionTrendGraph;
   upcomingEvents: DashboardEvent[];
   topStudents: StudentLeaderboardItem[];
   recentProjects: RecentProject[];
@@ -101,6 +107,10 @@ export interface PlacementStatusUpdateResponse {
 }
 
 export type {
+  ComplianceActionRecord,
+  ComplianceAlertRecord,
+  ComplianceIncidentRecord,
+  ComplianceOverviewData,
   ComplianceReportRecord,
   InstitutionPatent,
   InstitutionStartup,

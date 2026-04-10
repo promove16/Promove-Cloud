@@ -168,7 +168,7 @@ const allTabs: MarketplaceTab[] = [
 const roleLaneIds: Partial<Record<UserRole, MarketplaceEntityType[]>> = {
   [UserRole.STUDENT]: ["recruiter", "student", "mentor", "investor", "startup"],
   [UserRole.SCHOOL]: ["student", "mentor", "investor", "startup"],
-  [UserRole.COLLEGE]: ["student", "recruiter", "mentor", "investor", "startup"],
+  [UserRole.COLLEGE]: ["investor", "recruiter"],
   [UserRole.MENTOR]: ["student", "college", "school"],
   [UserRole.INVESTOR]: ["startup", "college", "school", "student"],
 };

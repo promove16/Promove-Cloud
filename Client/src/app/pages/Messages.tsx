@@ -1617,6 +1617,8 @@ export function MessagesPage() {
   });
 
   const isStudentRole = currentUser?.role === UserRole.STUDENT;
+  const isInstitutionRole = currentUser?.role === UserRole.SCHOOL || currentUser?.role === UserRole.COLLEGE;
+  const canAccessRequestsView = !isInstitutionRole;
 
   const startupsQuery = useQuery({
     queryKey: ['startups', 'mine'],
@@ -1634,12 +1636,12 @@ export function MessagesPage() {
   const incomingRequestsQuery = useQuery({
     queryKey: ['requests', 'incoming'],
     queryFn: requestApi.incoming,
-    enabled: searchParams.get('view') === 'requests' || Boolean(partnerId),
+    enabled: (canAccessRequestsView && searchParams.get('view') === 'requests') || Boolean(partnerId),
   });
   const outgoingRequestsQuery = useQuery({
     queryKey: ['requests', 'outgoing'],
     queryFn: requestApi.outgoing,
-    enabled: searchParams.get('view') === 'requests' || Boolean(partnerId),
+    enabled: (canAccessRequestsView && searchParams.get('view') === 'requests') || Boolean(partnerId),
   });
   const sidebarIncoming = incomingRequestsQuery.data ?? [];
   const sidebarOutgoing = outgoingRequestsQuery.data ?? [];
@@ -1912,7 +1914,19 @@ export function MessagesPage() {
     }, 400);
   }, []);
 
-  const view: 'chats' | 'requests' = searchParams.get('view') === 'requests' ? 'requests' : 'chats';
+  const view: 'chats' | 'requests' =
+    canAccessRequestsView && searchParams.get('view') === 'requests' ? 'requests' : 'chats';
+
+  useEffect(() => {
+    if (canAccessRequestsView || searchParams.get('view') !== 'requests') {
+      return;
+    }
+
+    const next = new URLSearchParams(searchParams);
+    next.delete('view');
+    next.delete('requestId');
+    setSearchParams(next, { replace: true });
+  }, [canAccessRequestsView, searchParams, setSearchParams]);
 
   const switchToChats = () => {
     const next = new URLSearchParams(searchParams);
@@ -2009,16 +2023,18 @@ export function MessagesPage() {
               <MessageCircle className="h-3.5 w-3.5" />
               Chats
             </button>
-            <button
-              type="button"
-              onClick={switchToRequests}
-              className={`flex flex-1 items-center justify-center gap-1.5 rounded-md py-1.5 text-xs font-medium transition ${
-                view === 'requests' ? 'bg-slate-800 text-white' : 'text-slate-500 hover:text-slate-300'
-              }`}
-            >
-              <Inbox className="h-3.5 w-3.5" />
-              Requests
-            </button>
+            {canAccessRequestsView ? (
+              <button
+                type="button"
+                onClick={switchToRequests}
+                className={`flex flex-1 items-center justify-center gap-1.5 rounded-md py-1.5 text-xs font-medium transition ${
+                  view === 'requests' ? 'bg-slate-800 text-white' : 'text-slate-500 hover:text-slate-300'
+                }`}
+              >
+                <Inbox className="h-3.5 w-3.5" />
+                Requests
+              </button>
+            ) : null}
           </div>
 
           {view === 'chats' ? (

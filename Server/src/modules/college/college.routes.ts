@@ -12,7 +12,11 @@ import {
   createCollegeStudentAccessTokenController,
   createCollegeStudentRosterEntryController,
   createCollegeComplianceReportController,
+  createCollegeComplianceActionController,
+  createCollegeComplianceAlertController,
+  createCollegeComplianceIncidentController,
   createCollegeEventController,
+  getCollegeComplianceOverviewController,
   getCollegeDashboardController,
   getCollegeEventRankingsController,
   getCollegePlacementController,
@@ -21,6 +25,9 @@ import {
   importCollegeStudentCredentialsController,
   importCollegeStudentRosterController,
   listCollegeMentorshipProgramsController,
+  listCollegeComplianceActionsController,
+  listCollegeComplianceAlertsController,
+  listCollegeComplianceIncidentsController,
   listCollegePendingStudentVerificationsController,
   listCollegePatentsController,
   listCollegeProjectsController,
@@ -31,7 +38,10 @@ import {
   listCollegeRecruitersController,
   listCollegeStartupsController,
   listCollegeStudentsController,
+  markCollegeComplianceAlertReadController,
   reviewCollegeStudentVerificationController,
+  updateCollegeComplianceActionController,
+  updateCollegeComplianceIncidentController,
   updatePlacementStatusController,
   listCollegeHiringEventsController,
 } from './college.controller';
@@ -90,6 +100,56 @@ router.get(
   '/compliance-report/latest',
   authorize(UserRole.COLLEGE),
   asyncHandler(getLatestCollegeComplianceReportController),
+);
+router.get(
+  '/compliance/overview',
+  authorize(UserRole.COLLEGE),
+  asyncHandler(getCollegeComplianceOverviewController),
+);
+router.get(
+  '/compliance/incidents',
+  authorize(UserRole.COLLEGE),
+  asyncHandler(listCollegeComplianceIncidentsController),
+);
+router.post(
+  '/compliance/incidents',
+  authorize(UserRole.COLLEGE),
+  asyncHandler(createCollegeComplianceIncidentController),
+);
+router.patch(
+  '/compliance/incidents/:incidentId',
+  authorize(UserRole.COLLEGE),
+  asyncHandler(updateCollegeComplianceIncidentController),
+);
+router.get(
+  '/compliance/alerts',
+  authorize(UserRole.COLLEGE),
+  asyncHandler(listCollegeComplianceAlertsController),
+);
+router.post(
+  '/compliance/alerts',
+  authorize(UserRole.COLLEGE),
+  asyncHandler(createCollegeComplianceAlertController),
+);
+router.patch(
+  '/compliance/alerts/:alertId/read',
+  authorize(UserRole.COLLEGE),
+  asyncHandler(markCollegeComplianceAlertReadController),
+);
+router.get(
+  '/compliance/actions',
+  authorize(UserRole.COLLEGE),
+  asyncHandler(listCollegeComplianceActionsController),
+);
+router.post(
+  '/compliance/actions',
+  authorize(UserRole.COLLEGE),
+  asyncHandler(createCollegeComplianceActionController),
+);
+router.patch(
+  '/compliance/actions/:actionId',
+  authorize(UserRole.COLLEGE),
+  asyncHandler(updateCollegeComplianceActionController),
 );
 router.get(
   '/student-access-tokens',

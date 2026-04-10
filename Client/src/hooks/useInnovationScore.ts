@@ -5,21 +5,26 @@ import { getScoreSocket } from '../lib/socket';
 import { useAuthStore } from '../store/authStore';
 import { ScoreResponse, ScoreUpdatedEvent } from '../types/score.types';
 
-export const useInnovationScore = () => {
+interface UseInnovationScoreOptions {
+  enabled?: boolean;
+}
+
+export const useInnovationScore = ({ enabled = true }: UseInnovationScoreOptions = {}) => {
   const queryClient = useQueryClient();
   const isAuthenticated = useAuthStore((state) => state.isAuthenticated);
   const authUser = useAuthStore((state) => state.user);
   const setUser = useAuthStore((state) => state.setUser);
+  const canFetchScore = isAuthenticated && enabled;
 
   const query = useQuery({
     queryKey: ['score', 'me'],
     queryFn: () => scoreApi.getMyScore(),
     staleTime: 5 * 60 * 1000,
-    enabled: isAuthenticated,
+    enabled: canFetchScore,
   });
 
   useEffect(() => {
-    if (!isAuthenticated) {
+    if (!canFetchScore) {
       return;
     }
 
@@ -53,15 +58,19 @@ export const useInnovationScore = () => {
       socket.off('score:updated', handleUpdate);
       socket.disconnect();
     };
-  }, [isAuthenticated, queryClient, setUser]);
+  }, [canFetchScore, queryClient, setUser]);
 
   useEffect(() => {
+    if (!enabled) {
+      return;
+    }
+
     if (!authUser || query.data?.score === undefined || authUser.innovationScore === query.data.score) {
       return;
     }
 
     setUser({ ...authUser, innovationScore: query.data.score });
-  }, [authUser, query.data?.score, setUser]);
+  }, [authUser, enabled, query.data?.score, setUser]);
 
   return query;
 };

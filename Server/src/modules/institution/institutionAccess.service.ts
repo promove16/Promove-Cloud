@@ -15,13 +15,13 @@ import {
 import { StudentVerificationReviewResult } from '../school/school.types';
 import { User } from '../user/user.model';
 import { getProfileCompletionProgress } from '../user/profileCompletion';
-import { StudentAccessToken } from './studentAccessToken.model';
 import {
   queueInstitutionVerifiedEmail,
   queueProfileCompletionMilestoneEmail,
 } from '../../services/retentionEmailService';
 import { sendTemporaryStudentCredentialsEmail } from '../../services/emailService';
 import { syncInstitutionEducationForUser } from '../user/user.service';
+import { StudentAccessToken } from './studentAccessToken.model';
 
 const TOKEN_TTL_DAYS = 90;
 const MS_IN_YEAR = 365 * 24 * 60 * 60 * 1000;
@@ -175,6 +175,33 @@ export const createStudentAccessToken = async (
     ...(created.expiresAt ? { expiresAt: created.expiresAt } : {}),
     createdAt: created.createdAt,
   };
+};
+
+export const getOrCreateActiveStudentAccessToken = async (
+  institutionId: string,
+  institutionRole: UserRole.SCHOOL | UserRole.COLLEGE,
+  createdBy: string,
+) => {
+  await assertInstitutionRole(institutionId, institutionRole);
+
+  const now = new Date();
+  const existing = await StudentAccessToken.findOne({
+    institutionId,
+    isActive: true,
+    $or: [{ expiresAt: null }, { expiresAt: { $gt: now } }],
+  })
+    .sort({ createdAt: -1 })
+    .lean();
+
+  if (existing) {
+    return existing.token;
+  }
+
+  const created = await createStudentAccessToken(institutionId, institutionRole, createdBy, {
+    label: 'Roster Invite',
+  });
+
+  return created.token;
 };
 
 export const listStudentAccessTokens = async (

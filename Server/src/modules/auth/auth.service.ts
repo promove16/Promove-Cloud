@@ -28,6 +28,7 @@ import {
 import {
   findInstitutionRosterMatchByEmail,
   markStudentRosterEntryRegistered,
+  syncStudentRosterVerificationStatus,
 } from '../institution/studentRoster.service';
 
 const REFRESH_TTL_SECONDS = 30 * 24 * 60 * 60;
@@ -379,6 +380,36 @@ const issueAuthResultForUser = async (user: UserDocument): Promise<AuthResult> =
   };
 };
 
+const applyVerifiedInstitutionAccessToStudent = async (
+  user: UserDocument,
+  input: {
+    institutionId: string;
+    institutionToken: string;
+    accessGrantedBy: AccessGrantedBy;
+    verificationTimestamp?: Date;
+  },
+) => {
+  const verificationTimestamp = input.verificationTimestamp ?? new Date();
+
+  user.institutionId = input.institutionId as unknown as UserDocument['institutionId'];
+  user.institutionToken = input.institutionToken;
+  user.institutionVerificationStatus = 'verified';
+  user.institutionVerifiedAt = verificationTimestamp;
+  user.verificationStatus = 'verified';
+  user.registrationStage = 'institution_verified';
+  user.verificationRequestedAt = verificationTimestamp;
+  user.verifiedAt = verificationTimestamp;
+  user.verificationRejectedAt = undefined;
+  user.verificationRejectedReason = undefined;
+  user.accessGrantedBy = input.accessGrantedBy;
+  user.isActive = true;
+
+  await syncInstitutionEducationForUser(user);
+  await user.save();
+
+  return verificationTimestamp;
+};
+
 export const registerUser = async (payload: {
   email: string;
   password: string;
@@ -426,6 +457,7 @@ export const registerUser = async (payload: {
 
   const accessGrantedBy: AccessGrantedBy = matchedRoster ? 'institution_roster' : 'institution_token';
   const verificationTimestamp = new Date();
+  const shouldAutoVerifyFromRoster = Boolean(matchedRoster);
 
   const createdUser = await User.create({
     email: payload.email.toLowerCase(),
@@ -438,15 +470,16 @@ export const registerUser = async (payload: {
     institutionToken: institutionTokenValue,
     institutionId: studentInstitutionContext.institution._id,
     profileComplete,
-    registrationStage: 'institution_pending',
+    registrationStage: shouldAutoVerifyFromRoster ? 'institution_verified' : 'institution_pending',
     accessGrantedBy,
     accessExpiresAt: new Date(Date.now() + MS_IN_YEAR),
-    isActive: false,
+    isActive: shouldAutoVerifyFromRoster,
     institutionVerificationStatus: 'verified',
-    verificationStatus: 'pending',
+    verificationStatus: shouldAutoVerifyFromRoster ? 'verified' : 'pending',
     adminApprovalStatus: 'not_required',
     verificationRequestedAt: verificationTimestamp,
     institutionVerifiedAt: verificationTimestamp,
+    ...(shouldAutoVerifyFromRoster ? { verifiedAt: verificationTimestamp } : {}),
   });
 
   await syncInstitutionEducationForUser(createdUser);
@@ -469,7 +502,12 @@ export const registerUser = async (payload: {
   }
 
   if (matchedRoster) {
-    await markStudentRosterEntryRegistered(String(matchedRoster.institutionId), payload.email, user._id);
+    await syncStudentRosterVerificationStatus(
+      String(matchedRoster.institutionId),
+      payload.email,
+      user._id,
+      'verified',
+    );
   }
 
   await queueWelcomeEmail(String(createdUser._id));
@@ -478,6 +516,16 @@ export const registerUser = async (payload: {
     0,
     getProfileCompletionProgress(createdUser.toObject()).percent,
   );
+
+  if (shouldAutoVerifyFromRoster) {
+    const authResult = await issueAuthResultForUser(createdUser);
+
+    return {
+      ...authResult,
+      nextStep: 'profile_setup',
+      message: 'Your institution invite was matched and your student dashboard is ready.',
+    };
+  }
 
   return {
     pendingApproval: true,
@@ -730,26 +778,54 @@ export const submitInstitutionToken = async (userId: string, institutionToken: s
   }
 
   const verificationRequestedAt = new Date();
-  user.institutionId = institution._id;
-  user.institutionVerificationStatus = 'verified';
-  user.institutionVerifiedAt = verificationRequestedAt;
-  user.verificationStatus = 'pending';
-  user.registrationStage = 'institution_pending';
-  user.verificationRequestedAt = verificationRequestedAt;
-  user.verifiedAt = undefined;
-  user.verificationRejectedAt = undefined;
-  user.verificationRejectedReason = undefined;
-  user.accessGrantedBy = matchedRoster ? 'institution_roster' : 'institution_token';
-  await syncInstitutionEducationForUser(user);
-  await user.save();
+  const shouldAutoVerifyFromRoster = Boolean(matchedRoster);
+
+  if (shouldAutoVerifyFromRoster) {
+    await applyVerifiedInstitutionAccessToStudent(user, {
+      institutionId: String(institution._id),
+      institutionToken: normalizedToken,
+      accessGrantedBy: 'institution_roster',
+      verificationTimestamp: verificationRequestedAt,
+    });
+  } else {
+    user.institutionId = institution._id;
+    user.institutionVerificationStatus = 'verified';
+    user.institutionVerifiedAt = verificationRequestedAt;
+    user.verificationStatus = 'pending';
+    user.registrationStage = 'institution_pending';
+    user.verificationRequestedAt = verificationRequestedAt;
+    user.verifiedAt = undefined;
+    user.verificationRejectedAt = undefined;
+    user.verificationRejectedReason = undefined;
+    user.accessGrantedBy = 'institution_token';
+    await syncInstitutionEducationForUser(user);
+    await user.save();
+  }
 
   await registerTokenUsage(String(tokenRecord._id));
   if (matchedRoster) {
-    await markStudentRosterEntryRegistered(
-      String(matchedRoster.institutionId),
-      user.email,
-      String(user._id),
-    );
+    if (shouldAutoVerifyFromRoster) {
+      await syncStudentRosterVerificationStatus(
+        String(matchedRoster.institutionId),
+        user.email,
+        String(user._id),
+        'verified',
+      );
+    } else {
+      await markStudentRosterEntryRegistered(
+        String(matchedRoster.institutionId),
+        user.email,
+        String(user._id),
+      );
+    }
+  }
+
+  if (shouldAutoVerifyFromRoster) {
+    return {
+      message:
+        'Institution token saved. Your roster invite was verified and you now have direct student access.',
+      user: toSanitizedUser(user.toObject()),
+    };
   }
 
   return {

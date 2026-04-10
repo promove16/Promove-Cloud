@@ -1,8 +1,11 @@
-import { CalendarDays, GraduationCap, Settings2, Users } from 'lucide-react';
-import { NavLink, useLocation } from 'react-router-dom';
-import { getOptionTabClassName, getOptionTabsListClassName } from '../../components/ui/OptionTabs';
+import { CalendarDays, GraduationCap, Settings2, Users } from "lucide-react";
+import { NavLink, useLocation } from "react-router-dom";
+import {
+  getOptionTabClassName,
+  getOptionTabsListClassName,
+} from "../../components/ui/OptionTabs";
 
-type InstitutionWorkspaceMode = 'school' | 'college';
+type InstitutionWorkspaceMode = "school" | "college";
 
 type WorkspaceMenuItem = {
   label: string;
@@ -10,18 +13,45 @@ type WorkspaceMenuItem = {
   icon: typeof Users;
 };
 
-const INSTITUTION_WORKSPACE_ITEMS: Record<InstitutionWorkspaceMode, WorkspaceMenuItem[]> = {
+const INSTITUTION_WORKSPACE_ITEMS: Record<
+  InstitutionWorkspaceMode,
+  WorkspaceMenuItem[]
+> = {
   school: [
-    { label: 'Student Innovators', path: '/dashboard/school/students', icon: Users },
-    { label: 'Mentorship', path: '/dashboard/school/mentors', icon: GraduationCap },
-    { label: 'Operations', path: '/dashboard/school/operations', icon: Settings2 },
-    { label: 'Events', path: '/dashboard/school/events', icon: CalendarDays },
+    {
+      label: "Student Innovators",
+      path: "/dashboard/school/students",
+      icon: Users,
+    },
+    {
+      label: "Mentorship",
+      path: "/dashboard/school/mentors",
+      icon: GraduationCap,
+    },
+    {
+      label: "Operations",
+      path: "/dashboard/school/operations",
+      icon: Settings2,
+    },
+    { label: "Events", path: "/dashboard/school/events", icon: CalendarDays },
   ],
   college: [
-    { label: 'Student Innovators', path: '/dashboard/college/students', icon: Users },
-    { label: 'Mentorship', path: '/dashboard/college/mentors', icon: GraduationCap },
-    { label: 'Operations', path: '/dashboard/college/operations', icon: Settings2 },
-    { label: 'Events', path: '/dashboard/college/events', icon: CalendarDays },
+    {
+      label: "Student Innovators",
+      path: "/dashboard/college/students",
+      icon: Users,
+    },
+    {
+      label: "Mentorship",
+      path: "/dashboard/college/mentors",
+      icon: GraduationCap,
+    },
+    {
+      label: "Student Tokens",
+      path: "/dashboard/college/operations",
+      icon: Settings2,
+    },
+    { label: "Events", path: "/dashboard/college/events", icon: CalendarDays },
   ],
 };
 
@@ -45,8 +75,18 @@ export function InstitutionWorkspaceMenu({
           const isActive = isPathMatch(location.pathname, item.path);
 
           return (
-            <NavLink key={item.path} to={item.path} className={getOptionTabClassName({ active: isActive })}>
-              <span className={isActive ? 'text-cyan-300' : 'text-slate-500 group-hover:text-slate-300'}>
+            <NavLink
+              key={item.path}
+              to={item.path}
+              className={getOptionTabClassName({ active: isActive })}
+            >
+              <span
+                className={
+                  isActive
+                    ? "text-cyan-300"
+                    : "text-slate-500 group-hover:text-slate-300"
+                }
+              >
                 <item.icon className="h-4 w-4" />
               </span>
               <span>{item.label}</span>

@@ -1,6 +1,9 @@
 import api from './axiosInstance';
 import { ApiSuccessResponse } from '../types/auth.types';
 import {
+  ComplianceActionRecord,
+  ComplianceAlertRecord,
+  ComplianceIncidentRecord,
   CollegeDashboardData,
   CollegeEvent,
   CollegeEventRankingsResponse,
@@ -19,6 +22,7 @@ import {
 import { BulkCredentialImportResult } from '../types/school.types';
 import {
   ComplianceReportRecord,
+  ComplianceOverviewData,
   DirectoryInvestor,
   LeaderboardPage,
   StudentJourney,
@@ -114,6 +118,118 @@ export const collegeApi = {
   async getLatestComplianceReport() {
     const response = await api.get<ApiSuccessResponse<ComplianceReportRecord | null>>(
       '/api/college/compliance-report/latest',
+    );
+    return response.data.data;
+  },
+  async getComplianceOverview() {
+    const response = await api.get<ApiSuccessResponse<ComplianceOverviewData>>(
+      '/api/college/compliance/overview',
+    );
+    return response.data.data;
+  },
+  async getComplianceIncidents(params?: {
+    status?: ComplianceIncidentRecord['status'];
+    severity?: ComplianceIncidentRecord['severity'];
+    limit?: number;
+  }) {
+    const response = await api.get<ApiSuccessResponse<ComplianceIncidentRecord[]>>(
+      '/api/college/compliance/incidents',
+      { params },
+    );
+    return response.data.data;
+  },
+  async createComplianceIncident(payload: {
+    title: string;
+    description?: string;
+    category: ComplianceIncidentRecord['category'];
+    severity?: ComplianceIncidentRecord['severity'];
+    status?: ComplianceIncidentRecord['status'];
+    source?: ComplianceIncidentRecord['source'];
+    assignedTo?: string;
+    dueAt?: string;
+    relatedStudentId?: string;
+  }) {
+    const response = await api.post<ApiSuccessResponse<ComplianceIncidentRecord>>(
+      '/api/college/compliance/incidents',
+      payload,
+    );
+    return response.data.data;
+  },
+  async updateComplianceIncident(incidentId: string, payload: Partial<{
+    title: string;
+    description?: string;
+    category: ComplianceIncidentRecord['category'];
+    severity: ComplianceIncidentRecord['severity'];
+    status: ComplianceIncidentRecord['status'];
+    assignedTo?: string;
+    dueAt?: string;
+    relatedStudentId?: string;
+  }>) {
+    const response = await api.patch<ApiSuccessResponse<ComplianceIncidentRecord>>(
+      `/api/college/compliance/incidents/${incidentId}`,
+      payload,
+    );
+    return response.data.data;
+  },
+  async getComplianceAlerts(params?: { unreadOnly?: boolean; limit?: number }) {
+    const response = await api.get<ApiSuccessResponse<ComplianceAlertRecord[]>>(
+      '/api/college/compliance/alerts',
+      { params },
+    );
+    return response.data.data;
+  },
+  async createComplianceAlert(payload: {
+    title: string;
+    message: string;
+    level?: ComplianceAlertRecord['level'];
+    incidentId?: string;
+    ruleKey?: string;
+  }) {
+    const response = await api.post<ApiSuccessResponse<ComplianceAlertRecord>>(
+      '/api/college/compliance/alerts',
+      payload,
+    );
+    return response.data.data;
+  },
+  async markComplianceAlertRead(alertId: string) {
+    const response = await api.patch<ApiSuccessResponse<ComplianceAlertRecord>>(
+      `/api/college/compliance/alerts/${alertId}/read`,
+    );
+    return response.data.data;
+  },
+  async getComplianceActions() {
+    const response = await api.get<ApiSuccessResponse<ComplianceActionRecord[]>>(
+      '/api/college/compliance/actions',
+    );
+    return response.data.data;
+  },
+  async createComplianceAction(payload: {
+    incidentId?: string;
+    title: string;
+    details?: string;
+    ownerId?: string;
+    dueAt?: string;
+    status?: ComplianceActionRecord['status'];
+    priority?: ComplianceActionRecord['priority'];
+  }) {
+    const response = await api.post<ApiSuccessResponse<ComplianceActionRecord>>(
+      '/api/college/compliance/actions',
+      payload,
+    );
+    return response.data.data;
+  },
+  async updateComplianceAction(actionId: string, payload: Partial<{
+    title: string;
+    details?: string;
+    ownerId?: string;
+    dueAt?: string;
+    status: ComplianceActionRecord['status'];
+    priority: ComplianceActionRecord['priority'];
+    completionNote?: string;
+  }>) {
+    const response = await api.patch<ApiSuccessResponse<ComplianceActionRecord>>(
+      `/api/college/compliance/actions/${actionId}`,
+      payload,
     );
     return response.data.data;
   },

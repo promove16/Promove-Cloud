@@ -1,836 +1,279 @@
-import { type ReactNode, useEffect, useMemo, useState } from "react";
-import { useQuery, useQueryClient } from "@tanstack/react-query";
-import {
-  Award,
-  Briefcase,
-  Building2,
-  Download,
-  ExternalLink,
-  Github,
-  Globe,
-  GraduationCap,
-  Instagram,
-  Linkedin,
-  Link2,
-  MapPin,
-  Pencil,
-  Rocket,
-  Share2,
-  ShieldCheck,
-  Sparkles,
-  Star,
-  Twitter,
-  Youtube,
-} from "lucide-react";
-import { jsPDF } from "jspdf";
-import { Link, useSearchParams } from "react-router-dom";
-import { DashboardLayout } from "../components/DashboardLayout";
-import { type ProfileSkill, userApi } from "../../api/user.api";
-import { scoreApi } from "../../api/score.api";
+import { useMemo } from "react";
+import { useQuery } from "@tanstack/react-query";
+import { collegeApi } from "../../api/college.api";
+import { schoolApi } from "../../api/school.api";
 import { startupApi } from "../../api/startup.api";
-import { workspaceApi } from "../../api/workspace.api";
-import { studentApi } from "../../api/student.api";
-import { useAuthStore } from "../../store/authStore";
+import { userApi } from "../../api/user.api";
+import type { CollegeDashboardData } from "../../types/college.types";
+import type { SchoolDashboardData } from "../../types/school.types";
 import { useInnovationScore } from "../../hooks/useInnovationScore";
-import { DEFAULT_STARTUP_IPR_PROFILE } from "../../features/startup/iprIntake";
-import { getStartupOverviewPath } from "../../features/startup/navigation";
+import { useAuthStore } from "../../store/authStore";
 import { UserRole } from "../../types/roles.types";
+import { DashboardLayout } from "../components/DashboardLayout";
+import { EducationSection } from "./portfolio/components/EducationSection";
+import { ExperienceSection } from "./portfolio/components/ExperienceSection";
+import { InstitutionInsightsSection } from "./portfolio/components/InstitutionInsightsSection";
+import { PortfolioHero } from "./portfolio/components/PortfolioHero";
+import { SkillsFeaturedSection } from "./portfolio/components/SkillsFeaturedSection";
+import { StartupList } from "./portfolio/components/StartupList";
 
-const eventLabel: Record<string, string> = {
-  PROBLEM_CLAIMED: "Claimed a new problem",
-  PROBLEM_COMPLETED: "Completed a problem",
-  PROGRESS_UPLOADED: "Uploaded workspace progress",
-  PATENT_SUBMITTED: "Patent filed",
-  STARTUP_LAUNCHED: "Startup launched",
-  GITHUB_CONNECTED: "Connected GitHub profile",
-  LINKEDIN_CONNECTED: "Connected LinkedIn profile",
-  RESUME_UPLOADED: "Uploaded resume",
-  PROFILE_COMPLETE: "Completed profile",
-};
-
-const experienceTypeLabel: Record<string, string> = {
-  full_time: "Full-time",
-  part_time: "Part-time",
-  internship: "Internship",
-  freelance: "Freelance",
-  volunteer: "Volunteer",
-};
-
-const categoryLabel: Record<string, string> = {
-  programming: "Programming",
-  design: "Design",
-  business: "Business",
-  research: "Research",
-  other: "Other",
-};
-
-function formatDate(dateStr: string | null | undefined): string {
+function formatMonthYear(dateStr: string | null | undefined): string {
   if (!dateStr) return "";
   return new Date(dateStr).toLocaleDateString("en-IN", { month: "short", year: "numeric" });
 }
 
-function formatDateTime(dateStr: string | null | undefined): string {
-  if (!dateStr) return "";
-  return new Date(dateStr).toLocaleString("en-IN", { day: "numeric", month: "short", year: "numeric" });
-}
-
-function Section({ title, children }: { title: string; children: ReactNode }) {
-  return (
-    <section className="rounded-lg border border-slate-800 bg-slate-900/90 p-4 text-slate-100 shadow-sm">
-      <div className="flex items-center justify-between gap-3">
-        <h2 className="text-xl font-semibold">{title}</h2>
-      </div>
-      <div className="mt-4">{children}</div>
-    </section>
-  );
-}
-
-function Empty({ children }: { children: ReactNode }) {
-  return (
-    <div className="rounded-lg border border-dashed border-slate-700 bg-slate-950/70 p-4 text-sm text-slate-400">
-      {children}
-    </div>
-  );
-}
-
-function LogoTile({ children }: { children: ReactNode }) {
-  return (
-    <div className="flex h-12 w-12 flex-shrink-0 items-center justify-center rounded bg-cyan-500/10 text-cyan-200">
-      {children}
-    </div>
-  );
-}
-
-function ProfileButton({
-  children,
-  primary,
-  onClick,
-  disabled,
-}: {
-  children: ReactNode;
-  primary?: boolean;
-  onClick?: () => void;
-  disabled?: boolean;
-}) {
-  return (
-    <button
-      type="button"
-      onClick={onClick}
-      disabled={disabled}
-      className={
-        primary
-          ? "inline-flex items-center gap-2 rounded-full bg-cyan-400 px-4 py-1.5 text-sm font-semibold text-slate-950 transition hover:bg-cyan-300 disabled:cursor-not-allowed disabled:opacity-50"
-          : "inline-flex items-center gap-2 rounded-full border border-cyan-400/70 px-4 py-1.5 text-sm font-semibold text-cyan-200 transition hover:border-cyan-300 hover:bg-cyan-400/10 hover:text-cyan-100 disabled:cursor-not-allowed disabled:opacity-50"
-      }
-    >
-      {children}
-    </button>
-  );
+function toTitleCase(value: string) {
+  return value
+    .split("_")
+    .map((part) => part.charAt(0).toUpperCase() + part.slice(1))
+    .join(" ");
 }
 
 export function Portfolio() {
-  const queryClient = useQueryClient();
-  const [searchParams, setSearchParams] = useSearchParams();
   const authUser = useAuthStore((state) => state.user);
-  const setUser = useAuthStore((state) => state.setUser);
-  const [toast, setToast] = useState("");
-  const [showLaunchModal, setShowLaunchModal] = useState(false);
-  const isStudent = authUser?.role === UserRole.STUDENT;
-  const isInstitutionRole = authUser?.role === UserRole.SCHOOL || authUser?.role === UserRole.COLLEGE;
+  const resolvedRole = authUser?.role ?? UserRole.STUDENT;
+  const isStudentRole = resolvedRole === UserRole.STUDENT;
 
   const profileQuery = useQuery({ queryKey: ["profile", "me"], queryFn: () => userApi.getMe() });
-  const score = useInnovationScore();
-  const workspaces = useQuery({ queryKey: ["workspaces"], queryFn: () => workspaceApi.list(), enabled: isStudent });
-  const scoreHistory = useQuery({
-    queryKey: ["score", "history", authUser?._id],
-    queryFn: () => scoreApi.getScoreHistory(authUser!._id),
-    enabled: isStudent && Boolean(authUser?._id),
+  const score = useInnovationScore({ enabled: isStudentRole });
+  const startups = useQuery({
+    queryKey: ["startup", "mine"],
+    queryFn: () => startupApi.mine(),
+    enabled: isStudentRole,
   });
-  const startups = useQuery({ queryKey: ["startup", "mine"], queryFn: () => startupApi.mine(), enabled: isStudent });
+  const institutionDashboardQuery = useQuery<SchoolDashboardData | CollegeDashboardData>({
+    queryKey: ["institution", "dashboard", resolvedRole],
+    queryFn: () =>
+      resolvedRole === UserRole.COLLEGE ? collegeApi.getDashboard() : schoolApi.getDashboard(),
+    enabled: resolvedRole === UserRole.SCHOOL || resolvedRole === UserRole.COLLEGE,
+  });
 
   const profile = profileQuery.data;
-  const isOwner = Boolean(authUser?._id && profile?._id && authUser._id === profile._id);
-  const canManageProfile = isOwner;
-  const canManagePortfolio = isStudent && isOwner;
+  const isInstitutionRole = resolvedRole === UserRole.SCHOOL || resolvedRole === UserRole.COLLEGE;
+  const institutionProfile = profile?.institutionProfile ?? institutionDashboardQuery.data?.institutionProfile;
+  const institutionStats =
+    profile?.institutionProfile?.stats ?? institutionDashboardQuery.data?.institutionProfile?.stats;
+  const institutionOverviewProfile = institutionDashboardQuery.data?.institutionProfile ?? institutionProfile;
+  const institutionOverviewStats = institutionDashboardQuery.data?.institutionProfile?.stats ?? institutionStats;
+  const schoolDashboard =
+    resolvedRole === UserRole.SCHOOL
+      ? (institutionDashboardQuery.data as Awaited<ReturnType<typeof schoolApi.getDashboard>> | undefined)
+      : undefined;
+  const collegeDashboard =
+    resolvedRole === UserRole.COLLEGE
+      ? (institutionDashboardQuery.data as Awaited<ReturnType<typeof collegeApi.getDashboard>> | undefined)
+      : undefined;
+  const institutionPolicies =
+    ((institutionOverviewProfile as { policies?: Array<{ name: string; status: string }> } | undefined)?.policies ??
+      []);
+
   const displayName = profile?.displayName ?? authUser?.displayName ?? "Portfolio";
+  const institutionName = institutionProfile?.institutionName ?? displayName;
   const initials = displayName
     .split(" ")
     .map((part) => part[0])
     .join("")
     .slice(0, 2)
     .toUpperCase();
-  const publicProfileUrl = profile?.profileSlug && typeof window !== "undefined" ? `${window.location.origin}/students/${profile.profileSlug}` : "";
-  const canShareProfile = Boolean(profile?.verificationStatus === "verified" && profile?.profileComplete && profile?.profileSlug);
-  const launchSourceWorkspace = (workspaces.data ?? []).length === 1 ? workspaces.data?.[0] : null;
-  const heroBackgroundStyle = profile?.avatarWallpaper
-    ? {
-        backgroundImage: `linear-gradient(180deg, rgba(15, 23, 42, 0.18), rgba(15, 23, 42, 0.44)), url(${profile.avatarWallpaper})`,
-      }
-    : undefined;
+  const location =
+    institutionDashboardQuery.data?.institutionProfile?.location ??
+    institutionProfile?.location ??
+    profile?.location ??
+    "Location not added";
+  const primaryRole = profile?.headline ?? (isInstitutionRole ? "Institution Lead" : "Innovation Contributor");
+  const innovationScore = isStudentRole ? score.data?.score ?? profile?.innovationScore ?? 0 : 0;
 
-  useEffect(() => {
-    const githubStatus = searchParams.get("github");
-    if (!githubStatus) return;
-    setToast(githubStatus === "connected" ? "GitHub connected. Your proof signals will update shortly." : searchParams.get("message") ?? "GitHub connection failed.");
-    void queryClient.invalidateQueries({ queryKey: ["profile", "me"] });
-    const next = new URLSearchParams(searchParams);
-    next.delete("github");
-    next.delete("message");
-    setSearchParams(next, { replace: true });
-  }, [queryClient, searchParams, setSearchParams]);
+  const currentExperience = useMemo(() => {
+    const experience = profile?.experience ?? [];
+    return experience.find((item) => item.isCurrent) ?? experience[0] ?? null;
+  }, [profile?.experience]);
 
-  const skillsByCategory = useMemo(() => {
-    const grouped: Record<string, ProfileSkill[]> = {};
-    for (const skill of profile?.skills ?? []) {
-      const category = skill.category ?? "other";
-      grouped[category] = [...(grouped[category] ?? []), skill];
-    }
-    return grouped;
-  }, [profile?.skills]);
+  const heroPrimaryRole = isInstitutionRole
+    ? primaryRole
+    : currentExperience?.title ?? profile?.headline ?? primaryRole;
+  const heroTitle = isInstitutionRole
+    ? institutionName
+    : currentExperience?.company ?? profile?.domain ?? displayName;
+  const heroName = !isInstitutionRole || displayName !== heroTitle ? displayName : undefined;
 
-  const socialLinks = [
-    { label: "LinkedIn", url: profile?.linkedinUrl, icon: Linkedin },
-    { label: "GitHub", url: profile?.githubUrl, icon: Github },
-    { label: "Website", url: profile?.websiteUrl, icon: Globe },
-    { label: "Twitter", url: profile?.twitterUrl, icon: Twitter },
-    { label: "YouTube", url: profile?.youtubeUrl, icon: Youtube },
-    { label: "Instagram", url: profile?.instagramUrl, icon: Instagram },
-    { label: "Behance", url: profile?.behanceUrl, icon: Link2 },
-    { label: "Dribbble", url: profile?.dribbbleUrl, icon: Link2 },
-    { label: "ResearchGate", url: profile?.researchGateUrl, icon: Link2 },
-    { label: "Medium", url: profile?.mediumUrl, icon: Link2 },
-  ];
-  const visibleSocialLinks = socialLinks.filter((link) => Boolean(link.url));
-  const publicRepos = (profile?.githubProof?.importedRepos ?? []).filter((repo) => !repo.isPrivate).slice(0, 3);
-  const recentActivity = (profile?.githubProof?.recentActivity ?? []).filter((activity) => !activity.isPrivate).slice(0, 4);
-  const recentWorkspaces = useMemo(
-    () => [...(workspaces.data ?? [])].sort((left, right) => new Date(right.updatedAt).getTime() - new Date(left.updatedAt).getTime()).slice(0, 3),
-    [workspaces.data],
+  const institutionHeroDetails = useMemo(
+    () => [
+      {
+        label: "Organization",
+        value:
+          institutionOverviewProfile?.organizationType ??
+          (resolvedRole === UserRole.SCHOOL ? "School" : "College"),
+      },
+      { label: "Location", value: location },
+      { label: "Academic Year", value: institutionOverviewProfile?.academicYear ?? "Not added" },
+    ],
+    [institutionOverviewProfile?.academicYear, institutionOverviewProfile?.organizationType, location, resolvedRole],
   );
-  const recentStartups = useMemo(
-    () => [...(startups.data ?? [])].sort((left, right) => new Date(right.updatedAt).getTime() - new Date(left.updatedAt).getTime()).slice(0, 3),
+
+  const previousEntries = useMemo(
+    () =>
+      (profile?.experience ?? [])
+        .filter((item) => item._id !== currentExperience?._id)
+        .slice(0, 3)
+        .map((item) => ({
+          company: item.company,
+          role: item.title,
+        })),
+    [currentExperience?._id, profile?.experience],
+  );
+
+  const aboutText =
+    profile?.bio?.trim() ||
+    (isInstitutionRole
+      ? "No institution overview added yet."
+      : `${displayName} is building a portfolio around innovation, execution, and measurable outcomes.`);
+
+  const experienceItems = (profile?.experience ?? []).map((item) => ({
+    id: item._id,
+    title: item.title,
+    company: item.company,
+    location: item.location,
+    period: `${formatMonthYear(item.startDate)} - ${item.isCurrent ? "currently" : formatMonthYear(item.endDate)}`,
+  }));
+
+  const educationItems = (profile?.education ?? []).map((item) => ({
+    id: item._id,
+    period: `${item.startYear ?? ""} - ${item.isCurrent ? "Present" : item.endYear ?? ""}`,
+    institution: item.institution,
+    details: [item.degree, item.fieldOfStudy, item.description].filter(Boolean).join(", "),
+  }));
+
+  const skills = (profile?.skills ?? []).map((item) => item.name);
+  const featuredItems = (profile?.portfolioProjects ?? []).map((project) => ({
+    id: project._id,
+    title: project.title,
+    subtitle: project.description || project.techStack.slice(0, 3).join(", "),
+  }));
+
+  const startupItems = useMemo(
+    () =>
+      [...(startups.data ?? [])]
+        .sort((left, right) => new Date(right.updatedAt).getTime() - new Date(left.updatedAt).getTime())
+        .slice(0, 6)
+        .map((startup) => ({
+          id: startup._id,
+          title: startup.name || "Untitled Startup",
+          description: startup.tagline || "No startup description added yet.",
+          tags: [startup.category, startup.stage].filter((item): item is string => Boolean(item)).slice(0, 3),
+          status:
+            startup.stage === "Launched"
+              ? "Launched"
+              : startup.reviewStatus === "approved"
+                ? "Approved"
+                : startup.reviewStatus === "draft"
+                  ? "Draft"
+                  : toTitleCase(startup.reviewStatus),
+        })),
     [startups.data],
   );
-  const featuredItems = [
-    ...(profile?.portfolioProjects ?? []).slice(0, 3).map((item) => ({ kind: "Project", title: item.title, body: item.description, url: item.liveUrl ?? item.repoUrl, key: `project-${item._id}` })),
-    ...(profile?.certifications ?? []).slice(0, 2).map((item) => ({ kind: "Certification", title: item.name, body: item.issuingOrganization, url: item.credentialUrl, key: `cert-${item._id}` })),
-    ...(profile?.education ?? []).slice(0, 1).map((item) => ({ kind: "Education", title: item.institution, body: `${item.degree}${item.fieldOfStudy ? ` in ${item.fieldOfStudy}` : ""}`, url: null, key: `edu-${item._id}` })),
-  ];
-  const institutionHighlights = [
-    {
-      kind: "Specialty",
-      title: profile?.institutionProfile?.specialties?.[0] ?? "Institution profile",
-      body: profile?.headline ?? profile?.domain ?? "Complete your institution page to surface your strongest focus areas.",
-      url: profile?.websiteUrl ?? null,
-      key: "institution-specialty",
-    },
-    {
-      kind: "Location",
-      title: profile?.institutionProfile?.location ?? "Primary campus",
-      body: profile?.institutionProfile?.locations?.slice(0, 3).join(" . ") || "Add branch or campus locations.",
-      url: null,
-      key: "institution-location",
-    },
-    {
-      kind: "Outcome",
-      title: `${profile?.institutionProfile?.stats?.startupsLaunched ?? 0} startups launched`,
-      body: `${profile?.institutionProfile?.stats?.industryCollaborations ?? 0} industry collaborations . ${profile?.institutionProfile?.stats?.patentsFiled ?? 0} patents filed`,
-      url: null,
-      key: "institution-outcomes",
-    },
-  ];
-  const profileStats = isInstitutionRole
+
+  const profileStrengthStats = isStudentRole
     ? [
-        { label: "Students", value: profile?.institutionProfile?.totalStudentsEnrolled ?? 0 },
-        { label: "Alumni", value: profile?.institutionProfile?.alumniCount ?? 0 },
-        { label: "Startups", value: profile?.institutionProfile?.stats?.startupsLaunched ?? 0 },
-        { label: "Collaborations", value: profile?.institutionProfile?.stats?.industryCollaborations ?? 0 },
+        { label: "Innovation Score", value: innovationScore },
+        { label: "Projects", value: featuredItems.length },
+        { label: "Skills", value: skills.length },
+        { label: "Certifications", value: profile?.certifications?.length ?? 0 },
       ]
     : [
-        { label: "Innovation Score", value: score.data?.score ?? profile?.innovationScore ?? 0 },
-        { label: "Projects", value: profile?.portfolioProjects?.length ?? 0 },
-        { label: "Skills", value: profile?.skills?.length ?? 0 },
-        { label: "Certifications", value: profile?.certifications?.length ?? 0 },
+        { label: "Experience", value: experienceItems.length },
+        { label: "Skills", value: skills.length },
+        { label: "Projects", value: featuredItems.length },
+        { label: "Education", value: educationItems.length },
       ];
 
-  const launchToRecruiters = async () => {
-    try {
-      if ((startups.data?.length ?? 0) === 0) {
-        await startupApi.create({
-          projectId: launchSourceWorkspace?._id,
-          name: launchSourceWorkspace?.title ?? "Student Innovation Profile",
-          tagline: "Portfolio launch",
-          category: launchSourceWorkspace?.category ?? "Innovation",
-          stage: "Pre-Launch",
-          activeProducts: 1,
-          teamSize: launchSourceWorkspace?.teamMembers?.length ?? 1,
-          traction: { patentFiled: false, mvpBuilt: false, revenueGenerating: false },
-          businessProfile: { problemStatement: "", solutionSummary: "", targetCustomers: "", marketAnalysis: "", revenueModel: "", goToMarketPlan: "" },
-          registrationProfile: { ...DEFAULT_STARTUP_IPR_PROFILE },
-        });
-      }
-      const result = await studentApi.launchToRecruiters();
-      setUser(result.user);
-      setToast("Your portfolio is now visible to recruiters matching your skill set.");
-      setShowLaunchModal(false);
-      await queryClient.invalidateQueries({ queryKey: ["startup", "mine"] });
-      await queryClient.invalidateQueries({ queryKey: ["marketplace"] });
-    } catch (error) {
-      setToast((error as { response?: { data?: { error?: { message?: string } } } })?.response?.data?.error?.message ?? "Unable to launch your portfolio to recruiters.");
-    }
-  };
+  const institutionFields =
+    resolvedRole === UserRole.SCHOOL
+      ? [
+          { label: "Organization", value: institutionOverviewProfile?.organizationType ?? "School" },
+          { label: "Academic Year", value: institutionOverviewProfile?.academicYear ?? "Not added" },
+          { label: "IIC Rating", value: institutionOverviewProfile?.iicStarRating ?? 0 },
+          { label: "Founded", value: institutionOverviewProfile?.foundedYear ?? "Not added" },
+          { label: "Students", value: institutionOverviewProfile?.totalStudentsEnrolled ?? 0 },
+          { label: "Mentoring Hours", value: institutionOverviewStats?.totalMentoringHours ?? 0 },
+          { label: "Patents Filed", value: institutionOverviewStats?.patentsFiled ?? 0 },
+          { label: "Contact Email", value: institutionOverviewProfile?.contactEmail ?? "Not added" },
+        ]
+      : [
+          { label: "Organization", value: institutionOverviewProfile?.organizationType ?? "College" },
+          { label: "Academic Year", value: institutionOverviewProfile?.academicYear ?? "Not added" },
+          { label: "Students", value: institutionOverviewProfile?.totalStudentsEnrolled ?? 0 },
+          { label: "Students Placed", value: institutionOverviewStats?.studentsPlaced ?? 0 },
+          { label: "HR Connections", value: institutionOverviewStats?.totalHRConnections ?? 0 },
+          { label: "Collaborations", value: institutionOverviewStats?.industryCollaborations ?? 0 },
+          { label: "Hiring Sector", value: institutionOverviewStats?.topHiringSector ?? "Not added" },
+          { label: "Contact Phone", value: institutionOverviewProfile?.contactPhone ?? "Not added" },
+        ];
 
-  const copyShareLink = async () => {
-    if (!publicProfileUrl) {
-      setToast("Public portfolio link is not available yet.");
-      return;
-    }
-    try {
-      await navigator.clipboard.writeText(publicProfileUrl);
-      setToast("Public portfolio link copied.");
-    } catch {
-      setToast("Unable to copy the public portfolio link.");
-    }
-  };
+  const institutionTrendGraph = schoolDashboard?.trendGraph ?? collegeDashboard?.trendGraph;
 
-  const downloadPdf = () => {
-    const pdf = new jsPDF();
-    pdf.setFontSize(18);
-    pdf.text(displayName, 14, 20);
-    pdf.setFontSize(12);
-    pdf.text(`Innovation Score: ${score.data?.score ?? profile?.innovationScore ?? 0}`, 14, 30);
-    if (profile?.bio) pdf.text(pdf.splitTextToSize(profile.bio, 180), 14, 42);
-    pdf.save("promove-portfolio.pdf");
-  };
+  if (!authUser) {
+    return null;
+  }
 
   return (
-    <DashboardLayout role={authUser?.role ?? "student"}>
-      <div className="-mx-4 -my-6 min-h-[calc(100vh-5rem)] bg-[#050816] px-4 py-5 text-slate-100 lg:-mx-8 lg:px-8">
-        <div className="w-full space-y-4">
-          {toast ? <div className="rounded-lg border border-cyan-400/30 bg-slate-950 p-3 text-sm font-medium text-cyan-100">{toast}</div> : null}
-
-          <section className="w-full rounded-lg border border-slate-800 bg-slate-900/90 shadow-sm">
-                <div className="relative">
-                  <div
-                    className={
-                      profile?.avatarWallpaper
-                        ? "relative h-48 overflow-hidden rounded-t-lg bg-cover bg-center"
-                        : "relative h-48 overflow-hidden rounded-t-lg bg-[linear-gradient(135deg,_#243a8f_0%,_#0a66c2_46%,_#0b5cab_64%,_#f5b841_65%,_#f59e0b_78%,_#0a66c2_79%,_#0f4c81_100%)]"
-                    }
-                    style={heroBackgroundStyle}
-                  >
-                    {!profile?.avatarWallpaper ? (
-                      <div className="absolute inset-0 bg-[linear-gradient(120deg,_transparent_0%,_transparent_42%,_rgba(255,255,255,0.24)_43%,_rgba(255,255,255,0.24)_50%,_transparent_51%)]" />
-                    ) : null}
-                    {canManageProfile ? (
-                      <Link
-                        to="/dashboard/profile"
-                        className="absolute right-4 top-4 rounded-full bg-slate-950/90 p-2 text-cyan-200 shadow transition hover:bg-slate-800"
-                        aria-label="Edit intro"
-                      >
-                        <Pencil className="h-4 w-4" />
-                      </Link>
-                    ) : null}
-                  </div>
-
-                  <div className="pointer-events-none absolute bottom-0 left-6 z-10 translate-y-1/2 sm:left-8">
-                    <div className="flex h-28 w-28 items-center justify-center overflow-hidden rounded-full border-4 border-slate-900 bg-slate-800 text-4xl font-semibold text-cyan-200 shadow-sm sm:h-40 sm:w-40 sm:text-5xl">
-                      {profile?.avatar ? <img src={profile.avatar} alt={displayName} className="h-full w-full object-cover" /> : initials}
-                    </div>
-                  </div>
-                </div>
-
-                <div className="px-6 pb-6 pt-16 sm:px-8 sm:pt-24">
-                  <div className="flex flex-col gap-5 lg:flex-row lg:items-start lg:justify-between">
-                    <div className="min-w-0 flex-1">
-                      <div className="flex flex-wrap items-center gap-2">
-                        <h1 className="text-2xl font-semibold leading-tight text-white">{displayName}</h1>
-                        {profile?.verificationStatus === "verified" ? (
-                          <span className="inline-flex items-center gap-1 rounded-full bg-[#e3f9e5] px-2.5 py-1 text-xs font-semibold text-[#057642]">
-                            <ShieldCheck className="h-3.5 w-3.5" />
-                            Verified
-                          </span>
-                        ) : null}
-                      </div>
-                      <p className="mt-1 text-base text-slate-200">{profile?.headline || profile?.domain || "Innovation profile"}</p>
-                      <div className="mt-2 flex flex-wrap items-center gap-x-2 gap-y-1 text-sm text-slate-400">
-                        {profile?.domain ? <span>{profile.domain}</span> : null}
-                        {profile?.location ? (
-                          <>
-                            <span aria-hidden="true">.</span>
-                            <span className="inline-flex items-center gap-1"><MapPin className="h-3.5 w-3.5" />{profile.location}</span>
-                          </>
-                        ) : null}
-                        {profile?.institutionProfile?.institutionName ? (
-                          <>
-                            <span aria-hidden="true">.</span>
-                            <span>{profile.institutionProfile.institutionName}</span>
-                          </>
-                        ) : null}
-                      </div>
-                      {visibleSocialLinks.length > 0 ? (
-                        <div className="mt-2 flex flex-wrap gap-2 text-sm font-semibold text-cyan-200">
-                          {visibleSocialLinks.slice(0, 6).map((link) => {
-                            const Icon = link.icon;
-                            return (
-                              <a key={link.label} href={link.url ?? ""} target="_blank" rel="noreferrer" className="inline-flex items-center gap-1 hover:underline">
-                                <Icon className="h-3.5 w-3.5" />
-                                {link.label}
-                              </a>
-                            );
-                          })}
-                        </div>
-                      ) : null}
-                      <div className="mt-4 flex flex-wrap gap-2">
-                        {canManageProfile ? (
-                          <>
-                            <Link
-                              to="/dashboard/profile"
-                              className="inline-flex items-center gap-2 rounded-full bg-cyan-400 px-4 py-1.5 text-sm font-semibold text-slate-950 transition hover:bg-cyan-300"
-                            >
-                              <Pencil className="h-4 w-4" />
-                              Edit profile
-                            </Link>
-                            {isStudent ? (
-                              <ProfileButton onClick={() => void copyShareLink()} disabled={!canShareProfile}>
-                                <Share2 className="h-4 w-4" />
-                                Share
-                              </ProfileButton>
-                            ) : null}
-                            {isStudent ? (
-                              <ProfileButton onClick={() => setShowLaunchModal(true)}>
-                                <Rocket className="h-4 w-4" />
-                                Launch
-                              </ProfileButton>
-                            ) : null}
-                            <ProfileButton onClick={downloadPdf}>
-                              <Download className="h-4 w-4" />
-                              PDF
-                            </ProfileButton>
-                          </>
-                        ) : null}
-                      </div>
-                    </div>
-
-                    <div className="min-w-[220px] space-y-3 text-sm">
-                      {profile?.institutionProfile?.institutionName ? (
-                        <div className="flex items-center gap-2 font-semibold text-slate-200">
-                          <Building2 className="h-5 w-5 text-slate-400" />
-                          {profile.institutionProfile.institutionName}
-                        </div>
-                      ) : null}
-                      <div className="flex items-center gap-2 font-semibold text-slate-200">
-                        <Sparkles className="h-5 w-5 text-slate-400" />
-                        Innovation Score {score.data?.score ?? profile?.innovationScore ?? 0}
-                      </div>
-                    </div>
-                  </div>
-
-                  {canManagePortfolio && !canShareProfile ? (
-                    <div className="mt-4 rounded-lg border border-amber-400/30 bg-amber-400/10 p-3 text-sm text-amber-100">
-                      Public sharing unlocks after your profile is complete and your institution has verified your account.
-                    </div>
-                  ) : null}
-                </div>
-          </section>
-
-          <div className="grid gap-6 xl:grid-cols-[minmax(0,1fr)_300px] 2xl:grid-cols-[minmax(0,1fr)_320px]">
-            <main className="space-y-3">
-              <Section title="About">
-                {profile?.bio ? <p className="whitespace-pre-line text-sm leading-6 text-slate-200">{profile.bio}</p> : <Empty>No about summary has been added yet.</Empty>}
-              </Section>
-
-              <Section title={isInstitutionRole ? "Page highlights" : "Featured"}>
-                {(isInstitutionRole ? institutionHighlights : featuredItems).length > 0 ? (
-                  <div className="grid gap-3 md:grid-cols-3">
-                    {(isInstitutionRole ? institutionHighlights : featuredItems).map((item) => (
-                      <article key={item.key} className="overflow-hidden rounded-lg border border-slate-800 bg-slate-950/70">
-                        <div className="flex h-24 items-center justify-center bg-cyan-500/10 text-cyan-200">
-                          {item.kind === "Project" ? <Rocket className="h-8 w-8" /> : item.kind === "Certification" ? <Award className="h-8 w-8" /> : <GraduationCap className="h-8 w-8" />}
-                        </div>
-                        <div className="p-3">
-                          <div className="text-xs text-slate-400">{item.kind}</div>
-                          <h3 className="mt-1 line-clamp-2 text-sm font-semibold">{item.title}</h3>
-                          {item.body ? <p className="mt-1 line-clamp-2 text-xs text-slate-400">{item.body}</p> : null}
-                          {item.url ? (
-                            <a href={item.url} target="_blank" rel="noreferrer" className="mt-2 inline-flex items-center gap-1 text-xs font-semibold text-cyan-200 hover:underline">
-                              View
-                              <ExternalLink className="h-3 w-3" />
-                            </a>
-                          ) : null}
-                        </div>
-                      </article>
-                    ))}
-                  </div>
-                ) : (
-                  <Empty>
-                    {isInstitutionRole
-                      ? "Institution highlights will appear here when specialties, locations, and outcomes are available."
-                      : "Featured work will appear here when projects, education, or certifications are available."}
-                  </Empty>
-                )}
-              </Section>
-
-              {isInstitutionRole ? (
-                <>
-                  <Section title="Institution details">
-                    {profile?.institutionProfile ? (
-                      <div className="grid gap-3 md:grid-cols-2">
-                        <div className="rounded-lg border border-slate-800 bg-slate-950/70 p-4">
-                          <div className="text-xs uppercase tracking-[0.18em] text-slate-400">Type</div>
-                          <div className="mt-2 font-semibold text-white">
-                            {profile.institutionProfile.organizationType || (authUser?.role === UserRole.COLLEGE ? "College" : "School")}
-                          </div>
-                        </div>
-                        <div className="rounded-lg border border-slate-800 bg-slate-950/70 p-4">
-                          <div className="text-xs uppercase tracking-[0.18em] text-slate-400">Founded</div>
-                          <div className="mt-2 font-semibold text-white">{profile.institutionProfile.foundedYear ?? "Not added"}</div>
-                        </div>
-                        <div className="rounded-lg border border-slate-800 bg-slate-950/70 p-4">
-                          <div className="text-xs uppercase tracking-[0.18em] text-slate-400">Students</div>
-                          <div className="mt-2 font-semibold text-white">{profile.institutionProfile.totalStudentsEnrolled ?? 0}</div>
-                        </div>
-                        <div className="rounded-lg border border-slate-800 bg-slate-950/70 p-4">
-                          <div className="text-xs uppercase tracking-[0.18em] text-slate-400">Academic year</div>
-                          <div className="mt-2 font-semibold text-white">{profile.institutionProfile.academicYear || "Not added"}</div>
-                        </div>
-                        <div className="rounded-lg border border-slate-800 bg-slate-950/70 p-4">
-                          <div className="text-xs uppercase tracking-[0.18em] text-slate-400">Alumni</div>
-                          <div className="mt-2 font-semibold text-white">{profile.institutionProfile.alumniCount ?? "Not added"}</div>
-                        </div>
-                        <div className="rounded-lg border border-slate-800 bg-slate-950/70 p-4">
-                          <div className="text-xs uppercase tracking-[0.18em] text-slate-400">Faculty / staff</div>
-                          <div className="mt-2 font-semibold text-white">{profile.institutionProfile.employeeCount ?? "Not added"}</div>
-                        </div>
-                      </div>
-                    ) : (
-                      <Empty>No institution details have been added yet.</Empty>
-                    )}
-                  </Section>
-
-                  <Section title="Specialties">
-                    {(profile?.institutionProfile?.specialties ?? []).length > 0 ? (
-                      <div className="flex flex-wrap gap-2">
-                        {(profile?.institutionProfile?.specialties ?? []).map((specialty) => (
-                          <span key={specialty} className="rounded-full border border-cyan-400/60 bg-cyan-400/10 px-3 py-1 text-sm font-semibold text-cyan-100">
-                            {specialty}
-                          </span>
-                        ))}
-                      </div>
-                    ) : (
-                      <Empty>No specialties or flagship programs added yet.</Empty>
-                    )}
-                  </Section>
-
-                  <Section title="Locations">
-                    {(profile?.institutionProfile?.locations ?? []).length > 0 ? (
-                      <div className="grid gap-3 md:grid-cols-2">
-                        {[profile?.institutionProfile?.location, ...(profile?.institutionProfile?.locations ?? [])].filter(Boolean).map((location) => (
-                          <article key={location} className="rounded-lg border border-slate-800 bg-slate-950/70 p-4">
-                            <div className="inline-flex items-center gap-2 text-sm font-semibold text-white">
-                              <MapPin className="h-4 w-4 text-cyan-200" />
-                              {location}
-                            </div>
-                          </article>
-                        ))}
-                      </div>
-                    ) : (
-                      <Empty>No campus or branch locations added yet.</Empty>
-                    )}
-                  </Section>
-
-                  <Section title="Outcomes">
-                    {profile?.institutionProfile?.stats ? (
-                      <div className="grid gap-3 md:grid-cols-2">
-                        {[
-                          ["Innovation activities", profile.institutionProfile.stats.totalInnovationActivities],
-                          ["Patents filed", profile.institutionProfile.stats.patentsFiled],
-                          ["Mentoring hours", profile.institutionProfile.stats.totalMentoringHours],
-                          ["Startups launched", profile.institutionProfile.stats.startupsLaunched],
-                          ["Industry collaborations", profile.institutionProfile.stats.industryCollaborations],
-                          ["Students placed", profile.institutionProfile.stats.studentsPlaced ?? "Not added"],
-                          ["HR connections", profile.institutionProfile.stats.totalHRConnections ?? "Not added"],
-                          ["Top hiring sector", profile.institutionProfile.stats.topHiringSector ?? "Not added"],
-                        ].map(([label, value]) => (
-                          <div key={String(label)} className="rounded-lg border border-slate-800 bg-slate-950/70 p-4">
-                            <div className="text-xs uppercase tracking-[0.18em] text-slate-400">{label}</div>
-                            <div className="mt-2 font-semibold text-white">{value}</div>
-                          </div>
-                        ))}
-                      </div>
-                    ) : (
-                      <Empty>No institution outcomes have been added yet.</Empty>
-                    )}
-                  </Section>
-                </>
-              ) : (
-              <Section title="Experience">
-                {(profile?.experience ?? []).length > 0 ? (
-                  <div className="divide-y divide-slate-800">
-                    {(profile?.experience ?? []).map((exp) => (
-                      <article key={exp._id} className="flex gap-3 py-4 first:pt-0 last:pb-0">
-                        <LogoTile><Briefcase className="h-5 w-5" /></LogoTile>
-                        <div className="min-w-0">
-                          <h3 className="font-semibold">{exp.title}</h3>
-                          <div className="text-sm text-slate-200">{exp.company}</div>
-                          <div className="mt-0.5 text-sm text-slate-400">
-                            {formatDate(exp.startDate)} - {exp.isCurrent ? "Present" : formatDate(exp.endDate ?? undefined)}
-                            {exp.location ? ` . ${exp.location}` : ""} . {experienceTypeLabel[exp.type] ?? exp.type}
-                          </div>
-                          {exp.description ? <p className="mt-2 whitespace-pre-line text-sm leading-6 text-slate-300">{exp.description}</p> : null}
-                          {exp.skills.length > 0 ? <div className="mt-2 text-sm font-semibold text-slate-300">{exp.skills.slice(0, 6).join(" . ")}</div> : null}
-                        </div>
-                      </article>
-                    ))}
-                  </div>
-                ) : <Empty>No experience has been added yet.</Empty>}
-              </Section>
-              )}
-
-              {!isInstitutionRole ? (
-              <Section title="Education">
-                {(profile?.education ?? []).length > 0 ? (
-                  <div className="divide-y divide-slate-800">
-                    {(profile?.education ?? []).map((edu) => (
-                      <article key={edu._id} className={`flex gap-3 py-4 first:pt-0 last:pb-0 ${edu.source === "institution" ? "rounded-lg bg-cyan-500/5 px-3" : ""}`}>
-                        <LogoTile><GraduationCap className="h-5 w-5" /></LogoTile>
-                        <div className="min-w-0">
-                          <div className="flex flex-wrap items-center gap-2">
-                            <h3 className="font-semibold">{edu.institution}</h3>
-                            {edu.source === "institution" ? (
-                              <span className="rounded-full bg-cyan-500/10 px-2.5 py-1 text-[11px] font-semibold uppercase tracking-[0.16em] text-cyan-300">
-                                Current session
-                              </span>
-                            ) : null}
-                          </div>
-                          <div className="text-sm text-slate-200">{[edu.degree, edu.fieldOfStudy].filter(Boolean).join(", ")}</div>
-                          <div className="mt-0.5 text-sm text-slate-400">{edu.startYear ? `${edu.startYear} - ` : ""}{edu.isCurrent ? "Present" : edu.endYear ?? ""}{edu.grade ? ` . Grade: ${edu.grade}` : ""}</div>
-                          {edu.description ? <p className="mt-2 text-sm leading-6 text-slate-300">{edu.description}</p> : null}
-                          {edu.activities ? <p className="mt-1 text-sm text-slate-400">{edu.activities}</p> : null}
-                        </div>
-                      </article>
-                    ))}
-                  </div>
-                ) : <Empty>No education entries have been added yet.</Empty>}
-              </Section>
-              ) : null}
-
-              {!isInstitutionRole ? (
-              <Section title="Licenses & certifications">
-                {(profile?.certifications ?? []).length > 0 ? (
-                  <div className="divide-y divide-slate-800">
-                    {(profile?.certifications ?? []).map((cert) => (
-                      <article key={cert._id} className="flex gap-3 py-4 first:pt-0 last:pb-0">
-                        <LogoTile><Award className="h-5 w-5" /></LogoTile>
-                        <div className="min-w-0 flex-1">
-                          <div className="flex items-start justify-between gap-3">
-                            <div>
-                              <h3 className="font-semibold">{cert.name}</h3>
-                              <div className="text-sm text-slate-200">{cert.issuingOrganization}</div>
-                              <div className="mt-0.5 text-sm text-slate-400">
-                                {cert.issueDate ? `Issued ${formatDate(cert.issueDate)}` : ""}
-                                {cert.expiryDate ? ` . Expires ${formatDate(cert.expiryDate)}` : ""}
-                              </div>
-                              {cert.credentialId ? <div className="mt-1 text-xs text-slate-500">Credential ID {cert.credentialId}</div> : null}
-                            </div>
-                            {cert.credentialUrl ? <a href={cert.credentialUrl} target="_blank" rel="noreferrer" className="text-cyan-200 hover:underline"><ExternalLink className="h-4 w-4" /></a> : null}
-                          </div>
-                        </div>
-                      </article>
-                    ))}
-                  </div>
-                ) : <Empty>No licenses or certifications have been added yet.</Empty>}
-              </Section>
-              ) : null}
-
-              {!isInstitutionRole ? (
-              <Section title="Skills">
-                {Object.keys(skillsByCategory).length > 0 ? (
-                  <div className="space-y-4">
-                    {Object.entries(skillsByCategory).map(([category, skills]) => (
-                      <div key={category}>
-                        <h3 className="font-semibold">{categoryLabel[category] ?? category}</h3>
-                        <div className="mt-2 flex flex-wrap gap-2">
-                          {skills.map((skill) => (
-                            <span key={`${skill.name}-${skill.source}`} className="rounded-full border border-cyan-400/60 bg-cyan-400/10 px-3 py-1 text-sm font-semibold text-cyan-100">
-                              {skill.name}
-                            </span>
-                          ))}
-                        </div>
-                      </div>
-                    ))}
-                  </div>
-                ) : <Empty>No skills have been added yet.</Empty>}
-              </Section>
-              ) : null}
-
-              {!isInstitutionRole ? (
-              <Section title="Projects">
-                {(profile?.portfolioProjects ?? []).length > 0 ? (
-                  <div className="divide-y divide-slate-800">
-                    {(profile?.portfolioProjects ?? []).map((project) => (
-                      <article key={project._id} className="flex gap-3 py-4 first:pt-0 last:pb-0">
-                        <LogoTile><Rocket className="h-5 w-5" /></LogoTile>
-                        <div className="min-w-0 flex-1">
-                          <div className="flex items-start justify-between gap-3">
-                            <div>
-                              <h3 className="font-semibold">{project.title}</h3>
-                              {project.description ? <p className="mt-1 text-sm leading-6 text-slate-300">{project.description}</p> : null}
-                            </div>
-                            {project.stars > 0 ? <span className="inline-flex flex-shrink-0 items-center gap-1 text-xs font-semibold text-amber-300"><Star className="h-3.5 w-3.5 fill-current" />{project.stars}</span> : null}
-                          </div>
-                          {project.techStack.length > 0 ? <div className="mt-2 text-sm font-semibold text-slate-300">{project.techStack.slice(0, 8).join(" . ")}</div> : null}
-                          <div className="mt-2 flex flex-wrap gap-4 text-sm font-semibold text-cyan-200">
-                            {project.repoUrl ? <a href={project.repoUrl} target="_blank" rel="noreferrer" className="hover:underline">Repository</a> : null}
-                            {project.liveUrl ? <a href={project.liveUrl} target="_blank" rel="noreferrer" className="hover:underline">Live demo</a> : null}
-                          </div>
-                        </div>
-                      </article>
-                    ))}
-                  </div>
-                ) : <Empty>No portfolio projects are available yet.</Empty>}
-              </Section>
-              ) : null}
-
-              <Section title="Startups">
-                {recentStartups.length > 0 ? (
-                  <div className="divide-y divide-slate-800">
-                    {recentStartups.map((startup) => (
-                      <article key={startup._id} className="flex gap-3 py-4 first:pt-0 last:pb-0">
-                        <LogoTile><Building2 className="h-5 w-5" /></LogoTile>
-                        <div className="min-w-0 flex-1">
-                          <Link to={getStartupOverviewPath(startup._id)} className="font-semibold text-white hover:text-cyan-200 hover:underline">
-                            {startup.name || "Untitled Startup"}
-                          </Link>
-                          {startup.tagline ? <p className="mt-1 text-sm leading-6 text-slate-300">{startup.tagline}</p> : null}
-                          <div className="mt-2 flex flex-wrap gap-2 text-xs text-slate-400">
-                            {startup.category ? <span>{startup.category}</span> : null}
-                            <span>{startup.stage}</span>
-                            <span>{startup.teamSize} member{startup.teamSize === 1 ? "" : "s"}</span>
-                            <span className="capitalize">{startup.reviewStatus.replace(/_/g, " ")}</span>
-                          </div>
-                        </div>
-                      </article>
-                    ))}
-                  </div>
-                ) : <Empty>No startups are linked to this profile yet.</Empty>}
-              </Section>
-            </main>
-
-            <aside className="space-y-3">
-              <section className="rounded-lg border border-slate-800 bg-slate-900/90 p-4 text-slate-100 shadow-sm">
-                <h2 className="font-semibold">Profile strength</h2>
-                <div className="mt-4 space-y-3">
-                  {profileStats.map((stat) => (
-                    <div key={stat.label} className="flex items-center justify-between text-sm">
-                      <span className="text-slate-400">{stat.label}</span>
-                      <span className="font-semibold text-white">{stat.value}</span>
-                    </div>
-                  ))}
-                </div>
-              </section>
-
-              <section className="rounded-lg border border-slate-800 bg-slate-900/90 p-4 text-slate-100 shadow-sm">
-                <h2 className="font-semibold">Activity</h2>
-                {recentActivity.length > 0 ? (
-                  <div className="mt-4 divide-y divide-slate-800">
-                    {recentActivity.map((activity) => (
-                      <article key={activity.id} className="py-4 first:pt-0 last:pb-0">
-                        <div className="flex items-start gap-3">
-                          <LogoTile><Github className="h-5 w-5" /></LogoTile>
-                          <div className="min-w-0">
-                            <h3 className="font-semibold text-white">{activity.title}</h3>
-                            <p className="mt-1 text-sm leading-6 text-slate-300">{activity.summary}</p>
-                            <div className="mt-1 text-xs text-slate-500">
-                              {[activity.repoFullName, formatDateTime(activity.occurredAt)].filter(Boolean).join(" . ")}
-                            </div>
-                          </div>
-                        </div>
-                      </article>
-                    ))}
-                  </div>
-                ) : (scoreHistory.data ?? []).length > 0 ? (
-                  <div className="mt-4 divide-y divide-slate-800">
-                    {(scoreHistory.data ?? []).slice(0, 5).map((event) => (
-                      <article key={event._id} className="py-4 first:pt-0 last:pb-0">
-                        <h3 className="font-semibold text-white">{eventLabel[event.trigger] ?? event.trigger}</h3>
-                        <p className="mt-1 text-sm text-slate-400">Innovation score updated to {event.scoreAfter} (+{event.delta}).</p>
-                      </article>
-                    ))}
-                  </div>
-                ) : (
-                  <div className="mt-4">
-                    <Empty>No recent public activity is available yet.</Empty>
-                  </div>
-                )}
-              </section>
-
-              <section className="rounded-lg border border-slate-800 bg-slate-900/90 p-4 text-slate-100 shadow-sm">
-                <h2 className="font-semibold">Public profile & URL</h2>
-                <p className="mt-2 break-all text-sm text-slate-400">{publicProfileUrl || "Public portfolio link is not available yet."}</p>
-                <button type="button" onClick={() => void copyShareLink()} disabled={!publicProfileUrl} className="mt-3 text-sm font-semibold text-cyan-200 disabled:text-slate-600">
-                  Copy public link
-                </button>
-              </section>
-
-              <section className="rounded-lg border border-slate-800 bg-slate-900/90 p-4 text-slate-100 shadow-sm">
-                <h2 className="font-semibold">GitHub signal</h2>
-                {profile?.githubStats ? (
-                  <div className="mt-4 space-y-3 text-sm">
-                    <div className="flex justify-between"><span className="text-slate-400">Repositories</span><span className="font-semibold text-white">{profile.githubStats.totalRepos}</span></div>
-                    <div className="flex justify-between"><span className="text-slate-400">Stars</span><span className="font-semibold text-white">{profile.githubStats.totalStars}</span></div>
-                    <div className="flex justify-between"><span className="text-slate-400">Forks</span><span className="font-semibold text-white">{profile.githubStats.totalForks}</span></div>
-                    <div className="flex justify-between"><span className="text-slate-400">Contributions/yr</span><span className="font-semibold text-white">{profile.githubStats.contributionsLastYear}</span></div>
-                    {profile.githubStats.topLanguages.length > 0 ? <p className="pt-2 text-xs text-slate-500">{profile.githubStats.topLanguages.slice(0, 5).map((lang) => `${lang.language} ${lang.percentage}%`).join(" . ")}</p> : null}
-                  </div>
-                ) : <div className="mt-3 text-sm text-slate-400">No GitHub signal is available yet.</div>}
-              </section>
-
-              {publicRepos.length > 0 ? (
-                <section className="rounded-lg border border-slate-800 bg-slate-900/90 p-4 text-slate-100 shadow-sm">
-                  <h2 className="font-semibold">Repositories</h2>
-                  <div className="mt-3 space-y-3">
-                    {publicRepos.map((repo) => (
-                      <a key={repo.repoId} href={repo.url} target="_blank" rel="noreferrer" className="block rounded-lg p-2 transition hover:bg-slate-800">
-                        <div className="text-sm font-semibold text-cyan-200">{repo.fullName}</div>
-                        <div className="mt-1 line-clamp-2 text-xs text-slate-400">{repo.description || "No description added."}</div>
-                        <div className="mt-2 text-xs text-slate-500">{[repo.primaryLanguage, `${repo.stars} stars`].filter(Boolean).join(" . ")}</div>
-                      </a>
-                    ))}
-                  </div>
-                </section>
-              ) : null}
-
-              {canManagePortfolio && recentWorkspaces.length > 0 ? (
-                <section className="rounded-lg border border-slate-800 bg-slate-900/90 p-4 text-slate-100 shadow-sm">
-                  <h2 className="font-semibold">Innovation workspaces</h2>
-                  <div className="mt-3 space-y-3">
-                    {recentWorkspaces.map((ws) => (
-                      <div key={ws._id}>
-                        <div className="text-sm font-semibold">{ws.title}</div>
-                        <div className="mt-1 text-xs text-slate-400">{ws.category} . {ws.stage}</div>
-                        <div className="mt-2 h-1.5 overflow-hidden rounded-full bg-slate-800"><div className="h-full rounded-full bg-cyan-400" style={{ width: `${ws.progressPercent}%` }} /></div>
-                      </div>
-                    ))}
-                  </div>
-                </section>
-              ) : null}
-            </aside>
+    <DashboardLayout role={resolvedRole}>
+      <div className="-mx-4 -my-6 min-h-[calc(100vh-5rem)] bg-[#050816] px-4 py-6 text-slate-100 lg:-mx-8 lg:px-8">
+        {profileQuery.isLoading ? (
+          <div className="rounded-2xl border border-slate-800 bg-slate-900 p-6 text-sm text-slate-400">
+            Loading portfolio...
           </div>
-        </div>
+        ) : profileQuery.isError ? (
+          <div className="rounded-2xl border border-rose-500/30 bg-rose-500/10 p-6 text-sm text-rose-200">
+            Unable to load your portfolio right now.
+          </div>
+        ) : (
+          <div className="space-y-8">
+            {isInstitutionRole ? (
+              <>
+                <PortfolioHero
+                  initials={initials}
+                  avatarUrl={profile?.avatar}
+                  name={heroName}
+                  primaryRole={heroPrimaryRole}
+                  title={heroTitle}
+                  detailsLabel="Overview"
+                  details={institutionHeroDetails}
+                />
+                <InstitutionInsightsSection
+                  role={resolvedRole}
+                  aboutText={aboutText}
+                  fields={institutionFields}
+                  trendGraph={institutionTrendGraph}
+                  specialties={institutionOverviewProfile?.specialties ?? []}
+                  locations={institutionOverviewProfile?.locations ?? []}
+                  policies={institutionPolicies.map((policy) => ({
+                    name: policy.name,
+                    status: policy.status,
+                  }))}
+                />
+              </>
+            ) : (
+              <div className="space-y-10">
+                <PortfolioHero
+                  initials={initials}
+                  avatarUrl={profile?.avatar}
+                  name={heroName}
+                  primaryRole={heroPrimaryRole}
+                  title={heroTitle}
+                  previousEntries={previousEntries}
+                  stats={profileStrengthStats}
+                  innovationScore={isStudentRole ? innovationScore : undefined}
+                />
 
-        {showLaunchModal && canManagePortfolio ? (
-          <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-6">
-            <div className="w-full max-w-lg rounded-lg border border-slate-800 bg-slate-900 p-6 text-slate-100 shadow-2xl">
-              <h2 className="text-2xl font-semibold text-white">Launch Portfolio to Recruiters</h2>
-              <p className="mt-3 text-sm leading-6 text-slate-400">Confirm to make your portfolio visible to recruiters who match your innovation score and activity history.</p>
-              <div className="mt-6 flex justify-end gap-3">
-                <ProfileButton onClick={() => setShowLaunchModal(false)}>Cancel</ProfileButton>
-                <ProfileButton primary onClick={() => void launchToRecruiters()}>Confirm Launch</ProfileButton>
+                <ExperienceSection items={experienceItems} />
+                <SkillsFeaturedSection skills={skills} featured={featuredItems} />
+                <EducationSection items={educationItems} />
+
+                {resolvedRole === UserRole.STUDENT ? <StartupList startups={startupItems} /> : null}
               </div>
-            </div>
+            )}
           </div>
-        ) : null}
+        )}
       </div>
     </DashboardLayout>
   );

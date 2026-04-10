@@ -51,8 +51,8 @@ const SIDEBAR_PARENT_PATH_ALIASES: Partial<Record<UserRole, Record<string, strin
     ],
   },
   [UserRole.COLLEGE]: {
-    '/dashboard/college/operations': [
-      '/dashboard/college/students',
+    '/dashboard/college/students': [
+      '/dashboard/college/operations',
       '/dashboard/college/mentors',
       '/dashboard/college/events',
       '/dashboard/college/projects',

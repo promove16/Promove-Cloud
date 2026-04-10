@@ -66,7 +66,7 @@ export default function Dashboard() {
       eventsTitle="Upcoming Events"
       eventsEmptyMessage="No upcoming events are scheduled yet."
       recentProjectsTitle="Recent Projects"
-      recentProjectsAction={{ label: 'Open Operations', to: '/dashboard/college/operations' }}
+      recentProjectsAction={{ label: 'Open Operations', to: '/dashboard/college/students' }}
       recentProjectsEmptyMessage="No active student projects are available yet."
       announcementTitle="Placement pipeline is live"
       announcementBody={`${stats?.studentsPlaced ?? 0} students are already marked as placed, with ${stats?.activeHRPartners ?? 0} active hiring partners and ${recentActivity?.startupsLast30Days ?? 0} startup launches recorded in the last 30 days. Use the placement tracker for recruiter outcomes and the operations workspace for intake management.`}

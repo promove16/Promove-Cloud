@@ -17,9 +17,7 @@ export default function PlacementTracker() {
 
   const inProgressCount = useMemo(
     () =>
-      (data?.placementTable ?? []).filter((record) =>
-        ['Shortlisted', 'In Progress', 'Discovered'].includes(record.status),
-      ).length,
+      (data?.placementTable ?? []).filter((record) => record.status === 'In Progress').length,
     [data?.placementTable],
   );
 

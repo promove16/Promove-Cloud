@@ -1,3 +1,4 @@
+import { Types } from 'mongoose';
 import { z } from 'zod';
 import { redis } from '../../config/redis';
 import { ApiError } from '../../utils/ApiError';
@@ -6,6 +7,8 @@ import { NotificationService } from '../notification/notification.service';
 import { User } from '../user/user.model';
 import { UserRole } from '../../types/roles.types';
 import { Event } from '../event/event.model';
+import { CampusDrive } from '../recruiter/campusDrive.model';
+import { JobPost } from '../recruiter/jobPost.model';
 import {
   createInstitutionMentorshipProgram,
   listInstitutionMentorshipPrograms,
@@ -29,9 +32,11 @@ import {
   listStudentRosterQuerySchema,
   manualStudentRosterEntrySchema,
 } from '../institution/studentRoster.service';
+import { sendStudentRosterInvite } from '../institution/studentInvite.service';
 import {
   getDashboardStats,
   getInvestorDirectory,
+  getInstitutionTrendGraph,
   getInstitutionUpcomingEvents,
   getLatestComplianceReport,
   getRecentActivityCounts,
@@ -46,7 +51,11 @@ import {
   calculateEstimatedIicRating,
   getInstitutionIicTelemetry,
 } from '../institution/iicRating.service';
-import { TemporaryStudentCredentialsView } from '../school/school.types';
+import {
+  InstitutionTrendGraph,
+  InstitutionTrendSeries,
+  TemporaryStudentCredentialsView,
+} from '../school/school.types';
 import { PlacementRecord } from './placementRecord.model';
 import {
   CollegeDashboardPayload,
@@ -86,15 +95,45 @@ const getCollegeStudentIds = async (collegeId: string) => {
   return students.map((student) => student._id);
 };
 
-export const getRecruiterDirectory = async (): Promise<RecruiterDirectoryItem[]> => {
-  const cacheKey = 'college:recruiters';
+export const getRecruiterDirectory = async (collegeId?: string): Promise<RecruiterDirectoryItem[]> => {
+  const cacheKey = `college:recruiters:${collegeId ?? 'all'}`;
   const cached = await redis.get<string>(cacheKey);
   const cachedDirectory = readRedisJson<RecruiterDirectoryItem[]>(cached);
   if (cachedDirectory) {
     return cachedDirectory;
   }
 
+  const [placementRecords, activeDrives] = await Promise.all([
+    PlacementRecord.find({
+      ...(collegeId ? { collegeId } : {}),
+      recruiterId: { $exists: true },
+    })
+      .select('recruiterId collegeId status')
+      .lean(),
+    CampusDrive.find({
+      isActive: true,
+      ...(collegeId ? { collegeId } : {}),
+    })
+      .select('recruiterId collegeId')
+      .lean(),
+  ]);
+
+  const relevantRecruiterIds = Array.from(
+    new Set(
+      [...placementRecords, ...activeDrives]
+        .map((entry) => entry.recruiterId)
+        .filter((recruiterId): recruiterId is NonNullable<typeof recruiterId> => Boolean(recruiterId))
+        .map((recruiterId) => String(recruiterId)),
+    ),
+  );
+
+  if (relevantRecruiterIds.length === 0) {
+    await redis.set(cacheKey, JSON.stringify([]), { ex: 60 * 15 });
+    return [];
+  }
+
   const recruiters = await User.find({
+    _id: { $in: relevantRecruiterIds },
     role: UserRole.RECRUITER,
     isActive: true,
   })
@@ -103,35 +142,59 @@ export const getRecruiterDirectory = async (): Promise<RecruiterDirectoryItem[]>
     .lean();
 
   const recruiterIds = recruiters.map((recruiter) => recruiter._id);
-  const placementRecords =
+  const activeJobs =
     recruiterIds.length > 0
-      ? await PlacementRecord.find({ recruiterId: { $in: recruiterIds } })
-          .select('recruiterId collegeId status')
+      ? await JobPost.find({
+          recruiterId: { $in: recruiterIds },
+          isActive: true,
+        })
+          .select('recruiterId')
           .lean()
       : [];
 
+  const activeJobCountByRecruiter = new Map<string, number>();
+  for (const job of activeJobs) {
+    const key = String(job.recruiterId);
+    activeJobCountByRecruiter.set(key, (activeJobCountByRecruiter.get(key) ?? 0) + 1);
+  }
+
+  const activeDriveCountByRecruiter = new Map<string, number>();
+  for (const drive of activeDrives) {
+    const key = String(drive.recruiterId);
+    activeDriveCountByRecruiter.set(key, (activeDriveCountByRecruiter.get(key) ?? 0) + 1);
+  }
+
   const payload = recruiters.map((recruiter) => {
-    const matchingRecords = placementRecords.filter(
-      (record) => String(record.recruiterId) === String(recruiter._id),
-    );
+    const recruiterId = String(recruiter._id);
+    const activePositions = activeJobCountByRecruiter.get(recruiterId) ?? 0;
+    const driveCount = activeDriveCountByRecruiter.get(recruiterId) ?? 0;
 
     return {
-      _id: String(recruiter._id),
+      _id: recruiterId,
       displayName: recruiter.displayName,
       ...(recruiter.avatar ? { avatar: recruiter.avatar } : {}),
       company: recruiter.domain ? `${recruiter.domain} Hiring` : 'Campus Hiring Partner',
-      activePositions: matchingRecords.filter((record) =>
-        ['Shortlisted', 'Hired', 'In Progress'].includes(record.status),
-      ).length,
-      activeDrives: new Set(matchingRecords.map((record) => String(record.collegeId))).size,
+      activePositions,
+      activeDrives: driveCount,
       domains: recruiter.domain ? [recruiter.domain] : [],
     };
-  });
+  })
+    .filter((recruiter) => recruiter.activePositions > 0 || recruiter.activeDrives > 0 || matchingCollegeActivityExists(placementRecords, recruiter._id))
+    .sort((left, right) =>
+      right.activePositions - left.activePositions ||
+      right.activeDrives - left.activeDrives ||
+      left.displayName.localeCompare(right.displayName),
+    );
 
   await redis.set(cacheKey, JSON.stringify(payload), { ex: 60 * 15 });
 
   return payload;
 };
+
+const matchingCollegeActivityExists = (
+  placementRecords: Array<{ recruiterId?: unknown }>,
+  recruiterId: string,
+) => placementRecords.some((record) => String(record.recruiterId) === recruiterId);
 
 const getPlacementTracker = async (collegeId: string): Promise<PlacementTrackerPayload> => {
   const studentIds = await getCollegeStudentIds(collegeId);
@@ -194,7 +257,7 @@ const getPlacementTracker = async (collegeId: string): Promise<PlacementTrackerP
       return right.innovationScore - left.innovationScore;
     });
 
-  const recruiterDirectory = await getRecruiterDirectory();
+  const recruiterDirectory = await getRecruiterDirectory(collegeId);
   const studentsPlaced = placementTable.filter((record) => record.status === 'Hired').length;
   const totalInnovators = studentIds.length;
 
@@ -218,8 +281,45 @@ const getPlacementTracker = async (collegeId: string): Promise<PlacementTrackerP
   };
 };
 
+const getCollegePlacementTrendSeries = async (
+  collegeId: string,
+  labels: string[],
+): Promise<InstitutionTrendSeries> => {
+  if (labels.length === 0) {
+    return { label: 'Placements', color: '#a78bfa', values: [] };
+  }
+
+  const startDate = new Date(`${labels[0]}T00:00:00.000Z`);
+  const counts = await PlacementRecord.aggregate<{ _id: string; count: number }>([
+    {
+      $match: {
+        collegeId: new Types.ObjectId(collegeId),
+        status: { $in: ['Shortlisted', 'Hired'] },
+        updatedAt: { $gte: startDate },
+      },
+    },
+    {
+      $group: {
+        _id: {
+          $dateToString: { format: '%Y-%m-%d', date: '$updatedAt' },
+        },
+        count: { $sum: 1 },
+      },
+    },
+    { $sort: { _id: 1 } },
+  ]);
+
+  const countMap = new Map(counts.map((entry) => [entry._id, entry.count]));
+
+  return {
+    label: 'Placements',
+    color: '#a78bfa',
+    values: labels.map((label) => countMap.get(label) ?? 0),
+  };
+};
+
 export const getCollegeDashboard = async (institutionId: string): Promise<CollegeDashboardPayload> => {
-  const cacheKey = `college:dashboard:${institutionId}`;
+  const cacheKey = `college:dashboard:v2:${institutionId}`;
   const cached = await redis.get<string>(cacheKey);
 
   const cachedDashboard = readRedisJson<CollegeDashboardPayload>(cached);
@@ -244,6 +344,7 @@ export const getCollegeDashboard = async (institutionId: string): Promise<Colleg
     upcomingEvents,
     recentActivityCounts,
     recentProjects,
+    schoolTrendGraph,
     iicTelemetry,
   ] = await Promise.all([
     getDashboardStats(institutionId, studentIds),
@@ -252,6 +353,7 @@ export const getCollegeDashboard = async (institutionId: string): Promise<Colleg
     getInstitutionUpcomingEvents(institutionId),
     getRecentActivityCounts(studentIds),
     getRecentInstitutionProjects(studentIds),
+    getInstitutionTrendGraph(studentIds),
     getInstitutionIicTelemetry(institutionId, 'college'),
   ]);
 
@@ -260,6 +362,32 @@ export const getCollegeDashboard = async (institutionId: string): Promise<Colleg
     studentsPlaced: placement.studentsPlaced,
     activeHRPartners: placement.hiringPartners.length,
     placementVelocity: placement.placementVelocity,
+  };
+  const placementTrendSeries = await getCollegePlacementTrendSeries(
+    institutionId,
+    schoolTrendGraph.labels,
+  );
+  const trendGraph: InstitutionTrendGraph = {
+    labels: schoolTrendGraph.labels,
+    rangeDays: schoolTrendGraph.rangeDays,
+    series: [
+      schoolTrendGraph.series.find((item) => item.label === 'Innovation Activities') ?? {
+        label: 'Innovation Activities',
+        color: '#38bdf8',
+        values: schoolTrendGraph.labels.map(() => 0),
+      },
+      schoolTrendGraph.series.find((item) => item.label === 'Project Updates') ?? {
+        label: 'Project Updates',
+        color: '#34d399',
+        values: schoolTrendGraph.labels.map(() => 0),
+      },
+      placementTrendSeries,
+      schoolTrendGraph.series.find((item) => item.label === 'Startups Launched') ?? {
+        label: 'Startups Launched',
+        color: '#f472b6',
+        values: schoolTrendGraph.labels.map(() => 0),
+      },
+    ],
   };
 
   const iicRating = calculateEstimatedIicRating({
@@ -297,6 +425,7 @@ export const getCollegeDashboard = async (institutionId: string): Promise<Colleg
       : undefined,
     stats,
     recentActivityCounts,
+    trendGraph,
     upcomingEvents,
     topStudents: topStudentsPage.items,
     recentProjects,
@@ -441,11 +570,25 @@ export const reviewCollegeStudentVerification = (
 ): Promise<StudentVerificationReviewResult> =>
   reviewStudentVerification(collegeId, UserRole.COLLEGE, reviewerId, studentId, payload);
 
-export const createCollegeStudentRosterEntry = (
+export const createCollegeStudentRosterEntry = async (
   collegeId: string,
   actorId: string,
   payload: z.infer<typeof manualStudentRosterEntrySchema>,
-) => createStudentRosterEntry(collegeId, UserRole.COLLEGE, actorId, payload);
+) => {
+  const entry = await createStudentRosterEntry(collegeId, UserRole.COLLEGE, actorId, payload);
+
+  if (entry.status === 'invited' && !entry.linkedUserId) {
+    await sendStudentRosterInvite({
+      institutionId: collegeId,
+      institutionRole: UserRole.COLLEGE,
+      createdBy: actorId,
+      studentEmail: entry.email,
+      studentName: entry.displayName,
+    });
+  }
+
+  return entry;
+};
 
 export const cancelCollegeStudentRosterInvite = (
   collegeId: string,
@@ -459,11 +602,32 @@ export const createCollegeManagedStudentCredentials = (
 ): Promise<TemporaryStudentCredentialsView> =>
   createManagedStudentCredentials(collegeId, UserRole.COLLEGE, actorId, payload);
 
-export const importCollegeStudentRosterEntries = (
+export const importCollegeStudentRosterEntries = async (
   collegeId: string,
   actorId: string,
   file: { originalname: string; buffer: Buffer },
-) => importStudentRosterEntries(collegeId, UserRole.COLLEGE, actorId, file);
+) => {
+  const result = await importStudentRosterEntries(collegeId, UserRole.COLLEGE, actorId, file);
+  const createdEntries = result.createdEntries ?? [];
+
+  if (createdEntries.length > 0) {
+    await Promise.all(
+      createdEntries
+        .filter((entry) => entry.status === 'invited' && !entry.linkedUserId)
+        .map((entry) =>
+          sendStudentRosterInvite({
+            institutionId: collegeId,
+            institutionRole: UserRole.COLLEGE,
+            createdBy: actorId,
+            studentEmail: entry.email,
+            studentName: entry.displayName,
+          }),
+        ),
+    );
+  }
+
+  return result;
+};
 
 export const importCollegeStudentCredentials = (
   collegeId: string,

@@ -87,6 +87,18 @@ export interface SchoolDashboardStats {
   industryCollaborations: number;
 }
 
+export interface InstitutionTrendSeries {
+  label: string;
+  color: string;
+  values: number[];
+}
+
+export interface InstitutionTrendGraph {
+  labels: string[];
+  series: InstitutionTrendSeries[];
+  rangeDays: number;
+}
+
 export interface RecentProject {
   _id: string;
   studentId: string;
@@ -129,6 +141,7 @@ export interface SchoolDashboardData {
     patentsLast30Days: number;
     startupsLast30Days: number;
   };
+  trendGraph: InstitutionTrendGraph;
   upcomingEvents: DashboardEvent[];
   topStudents: StudentLeaderboardItem[];
   recentProjects: RecentProject[];
@@ -268,6 +281,8 @@ export interface StudentRosterImportResult {
   skipped: number;
   importedRows: number;
   entries: StudentRosterEntry[];
+  createdEntries?: StudentRosterEntry[];
+  updatedEntries?: StudentRosterEntry[];
   errors: Array<{
     row: number;
     email?: string;
@@ -283,4 +298,115 @@ export interface ComplianceReportRecord {
   pdfUrl: string;
   academicYear: string;
   kpis: Record<string, number>;
+}
+
+export type ComplianceFrameworkStatus = 'on_track' | 'in_progress' | 'needs_attention';
+export type ComplianceIncidentSeverity = 'low' | 'medium' | 'high' | 'critical';
+export type ComplianceIncidentStatus = 'open' | 'in_progress' | 'resolved' | 'dismissed';
+export type ComplianceIncidentCategory =
+  | 'attendance'
+  | 'submission'
+  | 'security'
+  | 'discipline'
+  | 'policy'
+  | 'other';
+export type ComplianceIncidentSource = 'manual' | 'system';
+export type ComplianceAlertLevel = 'info' | 'warning' | 'critical';
+export type ComplianceActionStatus = 'pending' | 'in_progress' | 'completed';
+export type ComplianceActionPriority = 'low' | 'medium' | 'high';
+
+export interface ComplianceFrameworkItem {
+  name: string;
+  status: ComplianceFrameworkStatus;
+  displayStatus: string;
+  lastUpdated?: string;
+  scoreLevel: string;
+}
+
+export interface ComplianceIncidentRecord {
+  _id: string;
+  title: string;
+  description?: string;
+  category: ComplianceIncidentCategory;
+  severity: ComplianceIncidentSeverity;
+  status: ComplianceIncidentStatus;
+  source: ComplianceIncidentSource;
+  reportedBy: string;
+  assignedTo?: string;
+  dueAt?: string;
+  relatedStudentId?: string;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface ComplianceAlertRecord {
+  _id: string;
+  title: string;
+  message: string;
+  level: ComplianceAlertLevel;
+  isRead: boolean;
+  incidentId?: string;
+  ruleKey?: string;
+  createdBy?: string;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface ComplianceActionRecord {
+  _id: string;
+  incidentId?: string;
+  title: string;
+  details?: string;
+  ownerId?: string;
+  dueAt?: string;
+  status: ComplianceActionStatus;
+  priority: ComplianceActionPriority;
+  completedAt?: string;
+  completionNote?: string;
+  createdBy: string;
+  createdAt: string;
+  updatedAt: string;
+  isOverdue: boolean;
+}
+
+export interface ComplianceAuditItem {
+  _id: string;
+  type: 'incident' | 'alert' | 'action';
+  title: string;
+  detail: string;
+  createdAt: string;
+}
+
+export interface ComplianceOverviewData {
+  institutionType: 'school' | 'college';
+  frameworkSummary: {
+    total: number;
+    onTrack: number;
+    inProgress: number;
+    needsAttention: number;
+  };
+  incidentSummary: {
+    total: number;
+    open: number;
+    inProgress: number;
+    resolved: number;
+    critical: number;
+  };
+  alertSummary: {
+    total: number;
+    unread: number;
+    critical: number;
+  };
+  actionSummary: {
+    total: number;
+    pending: number;
+    inProgress: number;
+    completed: number;
+    overdue: number;
+  };
+  frameworks: ComplianceFrameworkItem[];
+  latestIncidents: ComplianceIncidentRecord[];
+  latestAlerts: ComplianceAlertRecord[];
+  latestActions: ComplianceActionRecord[];
+  auditTrail: ComplianceAuditItem[];
 }

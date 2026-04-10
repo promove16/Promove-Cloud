@@ -21,7 +21,7 @@ export default function PlacementStatusTable({ records }: Props) {
   const filteredRecords = useMemo(
     () =>
       records.filter((record) =>
-        `${record.studentName} ${record.companyName ?? ''} ${record.status}`
+        `${record.studentName} ${record.recruiterName ?? ''} ${record.companyName ?? ''} ${record.status}`
           .toLowerCase()
           .includes(search.toLowerCase()),
       ),
@@ -35,7 +35,7 @@ export default function PlacementStatusTable({ records }: Props) {
         <Input
           value={search}
           onChange={(event) => setSearch(event.target.value)}
-          placeholder="Search by student, company, or status"
+          placeholder="Search by student, recruiter, company, or status"
         />
       </div>
       <div className="grid grid-cols-[1.3fr,180px,160px,1fr,160px] border-b border-slate-800 bg-slate-900/70 px-5 py-4 text-xs uppercase tracking-[0.3em] text-slate-400">
@@ -46,24 +46,30 @@ export default function PlacementStatusTable({ records }: Props) {
         <div>Last Updated</div>
       </div>
       <div className="divide-y divide-slate-800">
-        {filteredRecords.map((record) => (
-          <div key={record._id} className="grid grid-cols-[1.3fr,180px,160px,1fr,160px] items-center gap-4 px-5 py-4">
-            <div className="font-semibold text-white">{record.studentName}</div>
-            <div className="text-slate-300">{record.innovationScore}</div>
-            <div
-              title="Status is updated by recruiters"
-              className={`inline-flex w-fit rounded-full border px-3 py-1 text-xs font-semibold ${statusTone[record.status]}`}
-            >
-              {record.status}
+        {filteredRecords.length > 0 ? (
+          filteredRecords.map((record) => (
+            <div key={record._id} className="grid grid-cols-[1.3fr,180px,160px,1fr,160px] items-center gap-4 px-5 py-4">
+              <div className="font-semibold text-white">{record.studentName}</div>
+              <div className="text-slate-300">{record.innovationScore}</div>
+              <div
+                title="Status is updated by recruiters"
+                className={`inline-flex w-fit rounded-full border px-3 py-1 text-xs font-semibold ${statusTone[record.status]}`}
+              >
+                {record.status}
+              </div>
+              <div className="text-slate-400">
+                {record.companyName ?? record.recruiterName ?? 'Awaiting recruiter action'}
+              </div>
+              <div className="text-sm text-slate-500">
+                {new Date(record.updatedAt).toLocaleDateString('en-IN')}
+              </div>
             </div>
-            <div className="text-slate-400">
-              {record.companyName ?? record.recruiterName ?? 'Awaiting recruiter action'}
-            </div>
-            <div className="text-sm text-slate-500">
-              {new Date(record.updatedAt).toLocaleDateString('en-IN')}
-            </div>
+          ))
+        ) : (
+          <div className="px-5 py-8 text-sm text-slate-400">
+            No placement records match the current search.
           </div>
-        ))}
+        )}
       </div>
     </Card>
   );
