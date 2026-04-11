@@ -80,7 +80,9 @@ export default function UserManagement() {
           User data is unavailable right now.
         </Card>
       ) : (
-        <Outlet context={{ users, isLoading: usersQuery.isLoading }} />
+        <div key={location.pathname}>
+          <Outlet context={{ users, isLoading: usersQuery.isLoading }} />
+        </div>
       )}
     </div>
   );

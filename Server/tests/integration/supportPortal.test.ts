@@ -225,7 +225,6 @@ describe('support portal', () => {
       .set(authHeader(admin))
       .send({ note: 'You may update the startup and resubmit it for review.' });
 
-    console.log(JSON.stringify(unlockResponse.body, null, 2));
     expect(unlockResponse.status).toBe(200);
     expect(unlockResponse.body.data.status).toBe('resolved');
     expect(unlockResponse.body.data.relatedStartup).toEqual(

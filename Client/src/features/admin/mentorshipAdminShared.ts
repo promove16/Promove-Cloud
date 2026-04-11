@@ -1,3 +1,4 @@
+import type { ClipboardEvent, DragEvent, KeyboardEvent } from 'react';
 import { type AdminUserListItem } from '../../api/admin.api';
 
 export type MentorFormState = {
@@ -38,6 +39,41 @@ export type ProgramFormState = {
 
 export const formLabelClassName =
   'mb-2 block text-[11px] font-semibold uppercase tracking-[0.18em] text-slate-400';
+
+const allowedDateTimePickerKeys = new Set([
+  'Tab',
+  'Shift',
+  'Escape',
+  'Enter',
+  'ArrowLeft',
+  'ArrowRight',
+  'ArrowUp',
+  'ArrowDown',
+  'Home',
+  'End',
+]);
+
+export const createPickerOnlyDateTimeInputHandlers = (clearValue: () => void) => ({
+  inputMode: 'none' as const,
+  step: 60,
+  onKeyDown: (event: KeyboardEvent<HTMLInputElement>) => {
+    if (event.key === 'Backspace' || event.key === 'Delete') {
+      event.preventDefault();
+      clearValue();
+      return;
+    }
+
+    if (!allowedDateTimePickerKeys.has(event.key)) {
+      event.preventDefault();
+    }
+  },
+  onPaste: (event: ClipboardEvent<HTMLInputElement>) => {
+    event.preventDefault();
+  },
+  onDrop: (event: DragEvent<HTMLInputElement>) => {
+    event.preventDefault();
+  },
+});
 
 export const emptyMentorForm = (): MentorFormState => ({
   displayName: '',

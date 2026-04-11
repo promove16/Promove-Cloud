@@ -99,6 +99,12 @@ const buildTicketTitle = (draft: string) =>
     .replace(/\s+/g, ' ')
     .slice(0, 80) || 'Support request';
 
+const upsertTicketList = (tickets: SupportTicket[] | undefined, ticket: SupportTicket) =>
+  [ticket, ...(tickets ?? []).filter((item) => item._id !== ticket._id)].sort(
+    (left, right) =>
+      new Date(right.lastActivityAt).getTime() - new Date(left.lastActivityAt).getTime(),
+  );
+
 export function SupportFloatingWidget() {
   const user = useAuthStore((state) => state.user);
   const queryClient = useQueryClient();
@@ -134,6 +140,14 @@ export function SupportFloatingWidget() {
         priority: inferredCategory === 'deals_payments' ? 'high' : 'medium',
       }),
     onSuccess: async (ticket) => {
+      queryClient.setQueryData<SupportTicket[]>(
+        ['support', 'tickets', 'widget'],
+        (current) => upsertTicketList(current, ticket),
+      );
+      queryClient.setQueriesData<SupportTicket[]>(
+        { queryKey: ['support', 'tickets'] },
+        (current) => upsertTicketList(current, ticket),
+      );
       setAssistantReply(`I have created ticket ${ticket.ticketCode}. Support will follow up here as needed.`);
       setActiveTab('tickets');
       setDraft('');

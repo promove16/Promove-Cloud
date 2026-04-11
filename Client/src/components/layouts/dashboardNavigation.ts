@@ -129,7 +129,6 @@ export const SIDEBAR_CONFIG: Record<UserRole, DashboardNavItem[]> = {
     { kind: 'link', label: 'Mentorship', icon: GraduationCap, path: '/dashboard/admin/mentorship' },
     { kind: 'link', label: 'Help Desk', icon: LifeBuoy, path: '/dashboard/admin/help-desk' },
     { kind: 'link', label: 'Analytics', icon: BarChart3, path: '/dashboard/admin/analytics' },
-    { kind: 'link', label: 'Messages', icon: MessageCircle, path: '/dashboard/messages' },
     { kind: 'link', label: 'Profile', icon: User, path: '/dashboard/profile' },
     { kind: 'link', label: 'Settings', icon: Settings, path: '/dashboard/settings' },
     { kind: 'action', label: 'Logout', icon: LogOut, action: 'logout' },

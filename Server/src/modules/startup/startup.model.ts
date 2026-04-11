@@ -39,6 +39,11 @@ const startupSchema = new Schema<IStartup>(
       enum: ['Pre-Idea', 'Ideation', 'MVP', 'Pre-Launch', 'Launched'],
       default: 'Pre-Idea',
     },
+    phase: {
+      type: String,
+      enum: ['creation', 'building', 'launched'],
+      default: 'creation',
+    },
     pitchDeckUrl: { type: String, default: undefined },
     pitchDeckName: { type: String, default: undefined },
     teamSize: { type: Number, default: 1 },

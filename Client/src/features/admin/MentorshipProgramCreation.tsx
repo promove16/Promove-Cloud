@@ -6,6 +6,7 @@ import { Card } from '../../components/ui/Card';
 import { UserRole } from '../../types/roles.types';
 import { getApiErrorMessage } from '../../utils/apiError';
 import {
+  createPickerOnlyDateTimeInputHandlers,
   emptyProgramForm,
   formLabelClassName,
   getInstitutionLabel,
@@ -203,6 +204,7 @@ export default function MentorshipProgramCreation() {
               type="datetime-local"
               value={programForm.preferredDate}
               onChange={(event) => updateProgramForm({ preferredDate: event.target.value })}
+              {...createPickerOnlyDateTimeInputHandlers(() => updateProgramForm({ preferredDate: '' }))}
               className="w-full rounded-lg border border-slate-800 bg-slate-950 px-4 py-3 text-white"
               required
             />
@@ -213,6 +215,7 @@ export default function MentorshipProgramCreation() {
               type="datetime-local"
               value={programForm.scheduledAt}
               onChange={(event) => updateProgramForm({ scheduledAt: event.target.value })}
+              {...createPickerOnlyDateTimeInputHandlers(() => updateProgramForm({ scheduledAt: '' }))}
               className="w-full rounded-lg border border-slate-800 bg-slate-950 px-4 py-3 text-white"
               required
             />

@@ -24,6 +24,89 @@ const authHeader = (user: { _id: { toString(): string }; email: string; role: Us
 });
 
 describe('startup review readiness integration', () => {
+  it('lists review-requested startups for admins without crashing on sparse legacy fields', async () => {
+    const founder = await User.create({
+      email: `student-${Math.random().toString(36).slice(2, 10)}@example.com`,
+      passwordHash: 'hashed-password',
+      role: UserRole.STUDENT,
+      displayName: 'Legacy Startup Founder',
+      accessGrantedBy: 'self_registered',
+      accessExpiresAt: new Date(Date.now() + 365 * 24 * 60 * 60 * 1000),
+      isActive: true,
+      innovationScore: 52,
+      profileComplete: true,
+      registrationStage: 'profile_setup',
+      verificationStatus: 'verified',
+      adminApprovalStatus: 'not_required',
+    });
+
+    const admin = await User.create({
+      email: `admin-${Math.random().toString(36).slice(2, 10)}@example.com`,
+      passwordHash: 'hashed-password',
+      role: UserRole.ADMIN,
+      displayName: 'Admin Startup Reviewer',
+      accessGrantedBy: 'admin',
+      accessExpiresAt: new Date(Date.now() + 365 * 24 * 60 * 60 * 1000),
+      isActive: true,
+      innovationScore: 0,
+      profileComplete: true,
+      registrationStage: 'complete',
+      verificationStatus: 'not_required',
+      adminApprovalStatus: 'approved',
+      adminApprovedAt: new Date(),
+    });
+
+    await Startup.create({
+      founderIds: [founder._id],
+      name: 'Legacy Review Startup',
+      tagline: 'A startup that should still render in admin review',
+      category: 'Software',
+      stage: 'Pre-Launch',
+      teamSize: 1,
+      activeProducts: 1,
+      traction: {
+        patentFiled: false,
+        mvpBuilt: false,
+        revenueGenerating: false,
+      },
+      registrationProfile: {
+        problemStatement: 'This startup addresses a validated logistics issue for student founders in distributed teams.',
+        solutionDifferentiation: 'It unifies startup readiness, compliance documents, and approval routing in one system.',
+        coreInnovation: 'The innovation is an approval-aware startup operating workflow.',
+        priorArtStatus: 'Comparable startup tooling was reviewed and gaps remain in governed launch approvals.',
+        workingMechanism: 'The workflow validates submissions, missing items, and review status before launch.',
+        keyComponents: 'Startup profile, admin review, and supporting documents.',
+        developmentStage: 'idea',
+        documentationReadiness: 'Core documents are assembled and ready.',
+        inventorOwnership: 'team',
+        developmentContext: 'Developed within an institution startup launch process.',
+        targetMarkets: 'Student founders, incubators, and early-stage investors.',
+        commercializationStrategy: 'build_startup',
+        publicDisclosureStatus: 'There has been no harmful disclosure.',
+        legalAgreements: 'Founder ownership is documented.',
+        ipProtectionType: 'patent',
+      },
+      reviewStatus: 'review_requested',
+      reviewRequestedAt: new Date(),
+      documents: [],
+      isActive: true,
+    });
+
+    const response = await request(app)
+      .get('/api/admin/startups?status=review_requested')
+      .set(authHeader(admin));
+
+    expect(response.status).toBe(200);
+    expect(response.body.data).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({
+          name: 'Legacy Review Startup',
+          reviewStatus: 'review_requested',
+        }),
+      ]),
+    );
+  });
+
   it('rejects review requests for incomplete startup registration profiles', async () => {
     const founder = await User.create({
       email: `student-${Math.random().toString(36).slice(2, 10)}@example.com`,

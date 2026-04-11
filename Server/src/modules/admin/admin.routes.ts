@@ -33,7 +33,7 @@ import {
   resolveHelpDeskTicketController,
   reviewDealController,
   reviewRegistrationRequestController,
-reviewStartupController,
+  reviewStartupController,
   unlockLaunchFormController,
   reviewMentorshipProgramController,
   reviewProjectMentorAssignmentController,
@@ -82,6 +82,11 @@ router.patch('/patents/:id/reject', asyncHandler(rejectPatentController));
 router.get('/awards', asyncHandler(getAwardsController));
 router.patch('/awards/:id/approve', asyncHandler(approveAwardController));
 router.patch('/awards/:id/reject', asyncHandler(rejectAwardController));
+router.get('/deals', asyncHandler(getDealsController));
+router.get('/deals/:id', asyncHandler(getDealController));
+router.patch('/deals/:id/approve-stage', asyncHandler(approveDealStageController));
+router.patch('/deals/:id/review', asyncHandler(reviewDealController));
+router.patch('/deals/:id/investor-role', asyncHandler(updateDealInvestorRoleController));
 router.get('/startups', asyncHandler(getStartupReviewsController));
 router.patch('/startups/:id/review', asyncHandler(reviewStartupController));
 router.patch('/startups/:id/unlock-launch-form', asyncHandler(unlockLaunchFormController));

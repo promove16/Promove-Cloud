@@ -82,6 +82,7 @@ export interface StartupEditAccess {
   requiresAdminUnlock: boolean;
   unlockedByAdmin: boolean;
   reason: string;
+  phase: 'creation' | 'building' | 'launched';
   unlockedAt?: Date;
   unlockedBy?: Types.ObjectId | null;
   unlockReason?: string;
@@ -104,6 +105,7 @@ export interface IStartup {
   tagline: string;
   category: string;
   stage: 'Pre-Idea' | 'Ideation' | 'MVP' | 'Pre-Launch' | 'Launched';
+  phase: 'creation' | 'building' | 'launched';
   pitchDeckUrl?: string;
   pitchDeckName?: string;
   teamSize: number;

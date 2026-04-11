@@ -133,6 +133,7 @@ export const startupSchema = z.object({
   tagline: z.string().trim().min(0).max(200).default(''),
   category: z.string().trim().min(0).max(100).default(''),
   stage: z.enum(['Pre-Idea', 'Ideation', 'MVP', 'Pre-Launch', 'Launched']).default('Pre-Idea'),
+  phase: z.enum(['creation', 'building', 'launched']).default('creation'),
   fundingNeeded: z.number().optional(),
   activeProducts: z.number().int().min(0).default(1),
   teamSize: z.number().int().min(1).default(1),
@@ -235,6 +236,7 @@ export const buildStartupEditAccess = (startup: Record<string, any>): StartupEdi
     requiresAdminUnlock: isLocked,
     unlockedByAdmin,
     reason,
+    phase: startup.phase || autoAdvancePhase(startup),
     launchFormLocked: isLaunchFormLocked,
     launchFormCanEdit: !isLaunchFormLocked,
     launchFormRequiresUnlock: isLaunchFormLocked,
@@ -261,6 +263,33 @@ const assertLaunchFormEditable = (startup: Record<string, any>) => {
   if (editAccess.launchFormLocked && !editAccess.launchFormUnlockedByAdmin) {
     throw new ApiError(423, 'LAUNCH_FORM_LOCKED', editAccess.launchFormReason);
   }
+};
+
+const PHASE_TRANSITION_MAP: Record<string, string[]> = {
+  creation: ['building', 'launched'],
+  building: ['creation', 'launched'],
+  launched: [],
+};
+
+const validatePhaseTransition = (currentPhase: string, newPhase: string): boolean => {
+  const allowedTransitions = PHASE_TRANSITION_MAP[currentPhase] || [];
+  return allowedTransitions.includes(newPhase);
+};
+
+const autoAdvancePhase = (startup: Record<string, any>): string => {
+  if (startup.phase === 'creation') {
+    const hasBusinessProfile = startup.businessProfile?.problemStatement?.trim()?.length > 10;
+    const hasTeam = (startup.founderIds?.length ?? 0) > 0;
+    if (hasBusinessProfile && hasTeam) {
+      return 'building';
+    }
+  }
+  if (startup.phase === 'building') {
+    if (startup.reviewStatus === 'approved' && startup.launchedToInvestors) {
+      return 'launched';
+    }
+  }
+  return startup.phase || 'creation';
 };
 
 const prepareStartupForEditableMutation = (startup: InstanceType<typeof Startup>) => {
@@ -457,6 +486,14 @@ const getRequiredStartupDocumentCategories = (startup: {
     : ['technical_documentation'];
 };
 
+const toIsoString = (value: unknown) => {
+  if (!value) return undefined;
+  if (value instanceof Date) return value.toISOString();
+
+  const normalized = new Date(String(value));
+  return Number.isNaN(normalized.getTime()) ? undefined : normalized.toISOString();
+};
+
 const buildStartupReadiness = (startup: {
   name?: string;
   tagline?: string;
@@ -491,6 +528,7 @@ const buildStartupReadiness = (startup: {
   };
 }): StartupReadiness => {
   const missingItems: string[] = [];
+  const founderIds = Array.isArray(startup.founderIds) ? startup.founderIds : [];
   const documents = startup.documents ?? [];
   const uploadedDocumentCategories = Array.from(
     new Set(
@@ -509,7 +547,7 @@ const buildStartupReadiness = (startup: {
   addMissing(!startup.name?.trim(), 'startup name');
   addMissing(!startup.tagline?.trim(), 'startup tagline');
   addMissing(!startup.category?.trim(), 'startup category');
-  addMissing(startup.founderIds.length === 0, 'at least one founder');
+  addMissing(founderIds.length === 0, 'at least one founder');
   addMissing((startup.registrationProfile?.problemStatement?.trim().length ?? 0) < 40, 'IPR problem statement');
   addMissing(
     (startup.registrationProfile?.solutionDifferentiation?.trim().length ?? 0) < 40,
@@ -660,7 +698,12 @@ const serializeStartup = (startup: { toObject?: () => Record<string, any> } | Re
     ? (startup as { toObject: () => Record<string, any> }).toObject()
     : (startup as Record<string, any>);
 
-  return sanitizeStartupForClient(base);
+  const withPhase = { ...base };
+  if (!withPhase.phase) {
+    withPhase.phase = autoAdvancePhase(base);
+  }
+
+  return sanitizeStartupForClient(withPhase);
 };
 
 export const createStartupProfile = async (userId: string, payload: z.infer<typeof startupSchema>) => {
@@ -812,6 +855,7 @@ startup.launchedToInvestors = startup.launchedToInvestors || payload.launchTo ==
   startup.innovationScoreAtLaunch = score;
   startup.launchFormLocked = true;
   startup.launchFormLockedAt = new Date();
+  startup.phase = 'launched';
   if (payload.launchTo !== 'recruiters') {
     startup.stage = 'Launched';
   }
@@ -1131,7 +1175,13 @@ export const listStartupsForAdmin = async (status?: 'draft' | 'review_requested'
       };
     }>>();
 
-  const founderIds = [...new Set(startups.flatMap((startup) => startup.founderIds.map(String)))];
+  const founderIds = [
+    ...new Set(
+      startups.flatMap((startup) =>
+        (Array.isArray(startup.founderIds) ? startup.founderIds : []).map(String),
+      ),
+    ),
+  ];
   const founders =
     founderIds.length > 0
       ? await User.find({ _id: { $in: founderIds } })
@@ -1148,6 +1198,8 @@ export const listStartupsForAdmin = async (status?: 'draft' | 'review_requested'
   const founderMap = new Map(founders.map((founder) => [String(founder._id), founder]));
 
   return startups.map((startup) => {
+    const founderIds = Array.isArray(startup.founderIds) ? startup.founderIds : [];
+    const documents = Array.isArray(startup.documents) ? startup.documents : [];
     const readiness = buildStartupReadiness(startup);
 
     return {
@@ -1161,16 +1213,20 @@ export const listStartupsForAdmin = async (status?: 'draft' | 'review_requested'
       teamSize: startup.teamSize,
       launchedToInvestors: startup.launchedToInvestors,
       launchedToMentors: startup.launchedToMentors,
-      ...(startup.launchedAt ? { launchedAt: startup.launchedAt.toISOString() } : {}),
+      ...(toIsoString(startup.launchedAt) ? { launchedAt: toIsoString(startup.launchedAt) } : {}),
       reviewStatus: startup.reviewStatus,
-      ...(startup.reviewRequestedAt ? { reviewRequestedAt: startup.reviewRequestedAt.toISOString() } : {}),
-      ...(startup.adminReviewedAt ? { adminReviewedAt: startup.adminReviewedAt.toISOString() } : {}),
+      ...(toIsoString(startup.reviewRequestedAt)
+        ? { reviewRequestedAt: toIsoString(startup.reviewRequestedAt) }
+        : {}),
+      ...(toIsoString(startup.adminReviewedAt)
+        ? { adminReviewedAt: toIsoString(startup.adminReviewedAt) }
+        : {}),
       ...(startup.adminReviewedBy ? { adminReviewedBy: String(startup.adminReviewedBy) } : {}),
       ...(startup.adminNotes ? { adminNotes: startup.adminNotes } : {}),
       editAccess: {
         ...buildStartupEditAccess(startup),
-        ...(startup.adminEditUnlockApprovedAt
-          ? { unlockedAt: startup.adminEditUnlockApprovedAt.toISOString() }
+        ...(toIsoString(startup.adminEditUnlockApprovedAt)
+          ? { unlockedAt: toIsoString(startup.adminEditUnlockApprovedAt) }
           : {}),
         ...(startup.adminEditUnlockApprovedBy
           ? { unlockedBy: String(startup.adminEditUnlockApprovedBy) }
@@ -1181,17 +1237,17 @@ export const listStartupsForAdmin = async (status?: 'draft' | 'review_requested'
       traction: startup.traction,
       registrationProfile: startup.registrationProfile,
       readiness,
-      documents: startup.documents.map((document) => ({
+      documents: documents.map((document) => ({
         _id: String(document._id),
         category: document.category,
         fileUrl: document.fileUrl,
         fileType: document.fileType,
         fileName: document.fileName,
         fileSizeBytes: document.fileSizeBytes,
-        uploadedAt: document.uploadedAt.toISOString(),
+        uploadedAt: toIsoString(document.uploadedAt) ?? new Date(0).toISOString(),
         ...(document.note ? { note: document.note } : {}),
       })),
-      founders: startup.founderIds
+      founders: founderIds
         .map((founderId) => founderMap.get(String(founderId)))
         .filter((founder): founder is NonNullable<typeof founder> => Boolean(founder))
         .map((founder) => ({
@@ -1201,8 +1257,8 @@ export const listStartupsForAdmin = async (status?: 'draft' | 'review_requested'
           innovationScore: founder.innovationScore ?? 0,
           ...(founder.domain ? { domain: founder.domain } : {}),
         })),
-      createdAt: startup.createdAt.toISOString(),
-      updatedAt: startup.updatedAt.toISOString(),
+      createdAt: toIsoString(startup.createdAt) ?? new Date(0).toISOString(),
+      updatedAt: toIsoString(startup.updatedAt) ?? new Date(0).toISOString(),
     };
   });
 };

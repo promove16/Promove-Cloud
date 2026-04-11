@@ -426,8 +426,17 @@ function StudentPortfolioRedirect() {
 
 function InvitationsRedirect() {
   const location = useLocation();
+  const user = useAuthStore((state) => state.user);
   const params = new URLSearchParams(location.search);
   params.set("view", "requests");
+
+  if (!user) {
+    return <Navigate to="/login" replace />;
+  }
+
+  if (user.role === UserRole.ADMIN) {
+    return <Navigate to={roleRedirect(user.role)} replace />;
+  }
 
   return <Navigate to={`/dashboard/messages?${params.toString()}`} replace />;
 }
@@ -437,6 +446,14 @@ const NON_ADMIN_DASHBOARD_ROLES = [
   UserRole.MENTOR,
   UserRole.INVESTOR,
   UserRole.RECRUITER,
+];
+
+const SHARED_MESSAGES_ROLES = [
+  UserRole.STUDENT,
+  UserRole.SCHOOL,
+  UserRole.COLLEGE,
+  UserRole.MENTOR,
+  UserRole.INVESTOR,
 ];
 
 export const router = createBrowserRouter([
@@ -777,7 +794,7 @@ export const router = createBrowserRouter([
           },
             {
               path: "messages",
-              element: <ProtectedAnyRoute />,
+              element: <ProtectedRolesRoute roles={SHARED_MESSAGES_ROLES} />,
               children: [
                 { index: true, element: <LazyPage component={MessagesPage} /> },
                 { path: ":partnerId", element: <LazyPage component={MessagesPage} /> },

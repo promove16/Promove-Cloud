@@ -57,12 +57,7 @@ import {
   updateUserRole,
   verifyMilestone,
 } from './admin.service';
-import {
-  approveStartupEditUnlock,
-  listStartupsForAdmin,
-  reviewStartupSubmission,
-  reviewStartupSubmissionSchema,
-} from '../startup/startup.service';
+import * as startupService from '../startup/startup.service';
 
 const getParam = (value: string | string[] | undefined) =>
   Array.isArray(value) ? value[0] : value;
@@ -204,7 +199,7 @@ export const getStartupReviewsController = async (req: Request, res: Response) =
     throw new ApiError(400, 'INVALID_STATUS', 'Invalid startup review status');
   }
 
-  const startups = await listStartupsForAdmin(
+  const startups = await startupService.listStartupsForAdmin(
     rawStatus as 'draft' | 'review_requested' | 'changes_requested' | 'approved' | undefined,
   );
   res.status(200).json(new ApiResponse(startups));
@@ -214,8 +209,8 @@ export const reviewStartupController = async (req: Request, res: Response) => {
   if (!req.user) throw new ApiError(401, 'UNAUTHORIZED', 'Invalid or expired token');
   const startupId = getParam(req.params.id);
   if (!startupId || !isObjectId(startupId)) throw new ApiError(400, 'INVALID_ID', 'Invalid ID format');
-  const payload = reviewStartupSubmissionSchema.parse(req.body);
-  const startup = await reviewStartupSubmission(req.user._id, startupId, payload);
+  const payload = startupService.reviewStartupSubmissionSchema.parse(req.body);
+  const startup = await startupService.reviewStartupSubmission(req.user._id, startupId, payload);
   res.status(200).json(new ApiResponse(startup));
 };
 
@@ -224,7 +219,7 @@ export const unlockLaunchFormController = async (req: Request, res: Response) =>
   const startupId = getParam(req.params.id);
   if (!startupId || !isObjectId(startupId)) throw new ApiError(400, 'INVALID_ID', 'Invalid ID format');
   const { reason } = req.body as { reason?: string };
-  const startup = await approveStartupEditUnlock(req.user._id, startupId, { reason });
+  const startup = await startupService.approveLaunchFormUnlock(req.user._id, startupId, { reason });
   res.status(200).json(new ApiResponse(startup));
 };
 

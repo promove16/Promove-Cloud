@@ -105,6 +105,43 @@ const approveDealThroughAdmin = async ({
 };
 
 describe('investment workflow integration', () => {
+  it('lists admin deals from the admin router', async () => {
+    const founder = await createUser(UserRole.STUDENT, { displayName: 'Admin Deals Founder' });
+    const investor = await createUser(UserRole.INVESTOR, { displayName: 'Admin Deals Investor' });
+    const admin = await createUser(UserRole.ADMIN, {
+      displayName: 'Admin Deals Reviewer',
+      accessGrantedBy: 'admin',
+      adminApprovalStatus: 'approved',
+      adminApprovedAt: new Date(),
+    });
+    const startup = await createStartup(founder._id.toString());
+
+    const expressResponse = await request(app)
+      .post(`/api/investor/express-interest/${startup._id}`)
+      .set(authHeader(investor))
+      .send({
+        investorType: 'penny',
+        proposedAmountINR: 25000,
+        proposedEquityPercent: 2,
+        chosenRole: 'shareholder',
+      });
+
+    expect(expressResponse.status).toBe(201);
+
+    const response = await request(app)
+      .get('/api/admin/deals')
+      .set(authHeader(admin));
+
+    expect(response.status).toBe(200);
+    expect(response.body.data).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({
+          _id: expressResponse.body.data._id,
+        }),
+      ]),
+    );
+  });
+
   it('creates a penny investment without changing startup allocation before admin approval', async () => {
     const founder = await createUser(UserRole.STUDENT, { displayName: 'Founder One' });
     const investor = await createUser(UserRole.INVESTOR, { displayName: 'Penny Investor' });

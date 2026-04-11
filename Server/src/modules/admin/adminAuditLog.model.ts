@@ -3,6 +3,7 @@ import { Schema, Types, model } from 'mongoose';
 export type AdminAction =
   | 'STARTUP_APPROVED'
   | 'STARTUP_CHANGES_REQUESTED'
+  | 'STARTUP_EDIT_UNLOCKED'
   | 'DEAL_REJECTED'
   | 'PATENT_APPROVED'
   | 'PATENT_REJECTED'
@@ -47,6 +48,7 @@ const adminAuditLogSchema = new Schema<IAdminAuditLog>(
       enum: [
         'STARTUP_APPROVED',
         'STARTUP_CHANGES_REQUESTED',
+        'STARTUP_EDIT_UNLOCKED',
         'DEAL_REJECTED',
         'PATENT_APPROVED',
         'PATENT_REJECTED',

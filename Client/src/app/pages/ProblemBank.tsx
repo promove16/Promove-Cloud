@@ -164,6 +164,10 @@ export function ProblemBank() {
         .map((workspace) => [workspace.claimedProblemId!, workspace._id]),
     );
   }, [canClaimProblems, workspacesQuery.data]);
+  const primaryProblemWorkspaceId = useMemo(
+    () => (workspacesQuery.data ?? []).find((workspace) => Boolean(workspace.claimedProblemId))?._id ?? null,
+    [workspacesQuery.data],
+  );
 
   const getProblemWorkspaceId = (problem: Problem) =>
     problem.viewerState?.workspaceId ??
@@ -318,7 +322,9 @@ export function ProblemBank() {
             {canOpenProductWorkspace ? (
               <button
                 type="button"
-                onClick={() => navigate("/product-workspace")}
+                onClick={() =>
+                  navigate(primaryProblemWorkspaceId ? `/product-workspace/${primaryProblemWorkspaceId}` : "/product-workspace")
+                }
                 className="rounded-xl bg-gradient-to-r from-cyan-600 to-blue-600 px-5 py-3 text-sm font-semibold text-white"
               >
                 Open Product Workshop

@@ -6,6 +6,7 @@ import { Button } from '../../components/ui/Button';
 import { Card } from '../../components/ui/Card';
 import { getApiErrorMessage } from '../../utils/apiError';
 import {
+  createPickerOnlyDateTimeInputHandlers,
   emptyAssignmentDraft,
   formLabelClassName,
   type AssignmentDraft,
@@ -155,6 +156,9 @@ export default function MentorshipRequests() {
                       type="datetime-local"
                       value={draft.scheduledAt}
                       onChange={(event) => updateDraft(program._id, { scheduledAt: event.target.value })}
+                      {...createPickerOnlyDateTimeInputHandlers(() =>
+                        updateDraft(program._id, { scheduledAt: '' }),
+                      )}
                       className="w-full rounded-lg border border-slate-800 bg-slate-950 px-4 py-3 text-white"
                     />
                   </div>
