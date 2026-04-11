@@ -1,15 +1,199 @@
 # ProMove
 
-ProMove is a role-based innovation cloud for students, schools, colleges, mentors, investors, recruiters, and admins. It combines student innovation workflows, institution verification, investor deal flow, recruiter hiring, mentor sessions, marketplace discovery, notifications, and admin controls into one monorepo.
+ProMove is a comprehensive **role-based innovation cloud platform** designed to bridge the gap between students, educational institutions, mentors, investors, and recruiters. The platform facilitates student innovation workflows, startup development, patent submissions, campus placements, mentorship programs, and investment deal flow management.
 
-The repository has two active applications:
-- `Client/` is the React + Vite frontend.
-- `Server/` is the Express + TypeScript API.
+## About the Project
 
-See also:
-- [SRS](docs/SRS.md)
+ProMove provides a unified ecosystem where:
+
+- **Students** can build projects, submit patents, launch startups, join events, and grow their innovation scores
+- **Schools & Colleges** can verify student identities, manage rosters, track placements, and run compliance reports
+- **Mentors** can guide students through sessions and provide workspace feedback
+- **Investors** can discover startups, express interest, and progress deals through staged approvals
+- **Recruiters** can search talent, post jobs, manage campus drives, and track hiring outcomes
+- **Admins** can control access, review patents/awards, verify deals, and monitor system analytics
+
+## Tech Stack
+
+### Frontend (Client)
+- **React 18** with TypeScript
+- **Vite 5** for fast development and builds
+- **React Router 6** for navigation
+- **TanStack Query** for server state management
+- **Zustand** for client state management
+- **Axios** for HTTP requests
+- **Tailwind CSS** for styling
+- **Socket.IO client** for real-time updates
+- **Recharts** for data visualization
+- **Lucide React** for icons
+
+### Backend (Server)
+- **Node.js** with Express 5
+- **TypeScript** for type safety
+- **MongoDB** with Mongoose for persistence
+- **Upstash Redis** for caching, sessions, and queues
+- **BullMQ** for background job processing
+- **Socket.IO** for real-time communication
+- **JWT** access/refresh token authentication
+- **Cloudinary** for file uploads
+- **AWS SES / Nodemailer** for emails
+- **PDFKit** for document generation
+- **Zod** for validation
+- **Winston** for logging
+- **ExcelJS** for spreadsheet exports
+
+## Architecture
+
+ProMove follows a **layered monorepo architecture**:
+
+```
+┌─────────────────────────────────────────────────────────────┐
+│                        ProMove                              │
+├─────────────────────────────────────────────────────────────┤
+│  Client/                  │  Server/                        │
+│  ─────────               │  ────────                        │
+│  React SPA               │  Express API                     │
+│  Vite build              │  MongoDB + Mongoose             │
+│  Tailwind CSS            │  Upstash Redis                   │
+│  Zustand + TanStack      │  BullMQ workers                  │
+│  Socket.IO client        │  Socket.IO server                │
+└─────────────────────────────────────────────────────────────┘
+```
+
+- **Client**: Role-based SPA with protected routes per user type
+- **Server**: Domain-modular REST API with middleware-based auth
+- **Database**: MongoDB for domain data, Redis for caching/queues
+- **Real-time**: Socket.IO namespaces for notifications, chat, scores
+
+## Project Structure
+
+```
+ProMove/
+├── Client/                    # React frontend application
+│   ├── src/
+│   │   ├── api/             # API wrappers (auth, user, startup, etc.)
+│   │   ├── components/      # UI components (layouts, messaging, workspace)
+│   │   ├── features/         # Role-based pages (student, mentor, investor...)
+│   │   ├── hooks/            # Custom hooks (auth, socket, notifications)
+│   │   ├── store/            # Zustand state management
+│   │   ├── types/            # TypeScript type definitions
+│   │   ├── styles/           # CSS and Tailwind themes
+│   │   └── utils/            # Utilities and helpers
+│   └── package.json
+│
+├── Server/                   # Express backend application
+│   ├── src/
+│   │   ├── config/          # Environment, DB, Redis, Socket, Logger
+│   │   ├── middleware/      # Auth, authorization, rate limiting
+│   │   ├── modules/         # Domain modules (auth, user, startup, etc.)
+│   │   ├── services/        # Business logic (email, score engine, cloudinary)
+│   │   ├── jobs/            # BullMQ workers
+│   │   ├── sockets/         # Socket.IO handlers
+│   │   ├── utils/           # Helpers and utilities
+│   │   └── types/           # TypeScript types
+│   └── package.json
+│
+├── docs/                    # Documentation (SRS, Architecture, etc.)
+├── postman/                # API collections and environments
+├── scripts/                # Development and testing scripts
+└── docker-compose.yml      # Local development setup
+```
+
+## API Domains
+
+The backend is organized into domain modules:
+
+| Domain | Description |
+|--------|-------------|
+| `auth` | Registration, login, refresh tokens, logout |
+| `user` | Profile management, social enrichment |
+| `innovationScore` | Score tracking and history |
+| `problemBank` | Problem listing and claiming |
+| `workspace` | Project boards, tasks, milestones, chat |
+| `patent` | Patent submission and tracking |
+| `startup` | Startup creation and pitch deck uploads |
+| `deal` | Investor deal flow and cap table |
+| `investor` | Startup discovery, portfolio management |
+| `marketplace` | Public profile discovery |
+| `notification` | Real-time notifications |
+| `recruiter` | Talent search, jobs, campus drives |
+| `mentor` | Student guidance sessions |
+| `school` | Student verification, compliance |
+| `college` | Placement tracking, events |
+| `event` | Event participation and scoring |
+| `admin` | User management, analytics |
+
+## User Roles
+
+| Role | Core Features |
+|------|---------------|
+| **Student** | Workspace, patents, startups, marketplace, events, innovation score |
+| **School** | Student verification, tokens, leaderboard, compliance |
+| **College** | Student verification, placements, events, compliance |
+| **Mentor** | Student feed, sessions, feedback |
+| **Investor** | Startup discovery, deal stages, portfolio |
+| **Recruiter** | Talent search, jobs, drives, hiring pipeline |
+| **Admin** | User control, patent review, deal approval, analytics |
+
+## Getting Started
+
+### Prerequisites
+- Node.js 20+
+- MongoDB instance
+- Upstash Redis account
+- Cloudinary account (for uploads)
+- AWS SES or SMTP for emails
+
+### Installation
+
+```bash
+# Install root dependencies
+npm install
+
+# Install client and server
+cd Client && npm install
+cd ../Server && npm install
+```
+
+### Development
+
+```bash
+# Run both apps
+npm run dev
+
+# Or run separately
+npm run dev:client   # Frontend on http://localhost:5173
+npm run dev:server  # Backend on http://localhost:5000
+```
+
+### Docker
+
+```bash
+docker compose up --build
+```
+
+## Environment Variables
+
+Required backend variables (see `.env.example`):
+- `MONGODB_URI` - MongoDB connection string
+- `UPSTASH_REDIS_*` - Redis credentials
+- `JWT_ACCESS_SECRET` / `JWT_REFRESH_SECRET` - Token secrets
+- `CLOUDINARY_*` - Cloudinary config
+- `AWS_*` - AWS SES credentials
+
+Frontend:
+- `VITE_API_BASE_URL` - API base URL (default: `/api`)
+
+## Documentation
+
+- [Software Requirements Specification](docs/SRS.md)
 - [Architecture Diagrams](docs/ARCHITECTURE_DIAGRAMS.md)
 - [Code Structure](docs/CODE_STRUCTURE.md)
+- [RBAC Roadmap](docs/RBAC_ROADMAP.md)
+
+## License
+
+See [LICENSE](LICENSE) and [COPYRIGHT.md](COPYRIGHT.md) for details.
 
 ## Vision
 
