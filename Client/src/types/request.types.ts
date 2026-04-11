@@ -2,6 +2,7 @@ export type RequestStatus = 'pending' | 'accepted' | 'declined' | 'withdrawn' | 
 
 export type RequestType =
   | 'generic'
+  | 'helpdesk_ticket'
   | 'workspace_member'
   | 'workspace_chat_access'
   | 'startup_member'

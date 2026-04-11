@@ -505,7 +505,7 @@ const buildStatList = (item: MarketplaceDirectoryItem) => {
   if (userItem.entityType === "investor") {
     return [
       { label: "Portfolio", value: String(userItem.relatedCounts.startups) },
-      { label: "Experience", value: String(userItem.insightCounts.experience) },
+      { label: "Skills", value: String(userItem.insightCounts.skills) },
       { label: "Education", value: String(userItem.insightCounts.education) },
       {
         label: "Repos",
@@ -551,7 +551,6 @@ const buildMetaList = (item: MarketplaceDirectoryItem) => {
       return [
         userItem.domain ?? "",
         `${userItem.relatedCounts.startups} portfolio startups`,
-        `${userItem.insightCounts.experience} experience`,
       ].filter(Boolean);
     case "mentor":
       return [
@@ -674,7 +673,9 @@ const getItemSignals = (item: MarketplaceDirectoryItem) => {
 
   return uniqueValues([
     userItem.insightCounts.portfolioProjects > 0 ? "Portfolio Ready" : "",
-    userItem.insightCounts.experience > 0 ? "Experience Listed" : "",
+    userItem.entityType !== "investor" && userItem.insightCounts.experience > 0
+      ? "Experience Listed"
+      : "",
     userItem.relatedCounts.startups > 0 ? "Startup Linked" : "",
     (userItem.githubStats?.totalRepos ?? 0) > 0 ? "GitHub Proof" : "",
     userItem.entityType === "recruiter" && userItem.relatedCounts.jobs > 0
@@ -687,6 +688,7 @@ const getUserExperienceCount = (item: MarketplaceDirectoryItem) => {
   const userItem = getUserItem(item);
   if (
     !userItem ||
+    userItem.entityType === "investor" ||
     userItem.entityType === "school" ||
     userItem.entityType === "college"
   ) {
@@ -1499,90 +1501,6 @@ function GeneralMarketplace({ dashboardRole }: { dashboardRole: UserRole }) {
     };
 
     if (entityType === "startup") {
-      const scoreMax = maxValue(getStartupScore);
-      const fundingMax = maxValue(getStartupFunding);
-      const teamMax = maxValue(getStartupTeamSize);
-
-      sections.primary.push(
-        {
-          kind: "checkbox",
-          id: "stage",
-          title: "Stage",
-          filterKey: "stage",
-          options: buildFacetOptions(sourceItems, (item) =>
-            isStartupItem(item) ? [item.stage] : [],
-          ),
-        },
-        {
-          kind: "checkbox",
-          id: "category",
-          title: "Sector",
-          filterKey: "category",
-          options: buildFacetOptions(sourceItems, (item) =>
-            isStartupItem(item) ? [item.category] : [],
-          ),
-        },
-        {
-          kind: "checkbox",
-          id: "launchTargets",
-          title: "Launch target",
-          filterKey: "launchTargets",
-          options: buildFacetOptions(sourceItems, (item) =>
-            isStartupItem(item) ? item.launchTargets : [],
-          ),
-        },
-      );
-
-      if (scoreMax > 0) {
-        sections.primary.push({
-          kind: "range",
-          id: "score",
-          title: "Innovation score",
-          filterKey: "score",
-          max: scoreMax,
-          step: getRangeStep(scoreMax),
-          minLabel: "0",
-          maxLabel: "Any",
-          formatSelected: (value) => `${value}+`,
-        });
-      }
-
-      sections.advanced.push({
-        kind: "checkbox",
-        id: "traction",
-        title: "Traction",
-        filterKey: "traction",
-        options: buildFacetOptions(sourceItems, getStartupTractionTags),
-      });
-
-      if (fundingMax > 0) {
-        sections.advanced.push({
-          kind: "range",
-          id: "funding",
-          title: "Funding needed",
-          filterKey: "funding",
-          max: fundingMax,
-          step: getRangeStep(fundingMax),
-          minLabel: currency.format(0),
-          maxLabel: "Any",
-          formatSelected: (value) => `${currency.format(value)}+`,
-        });
-      }
-
-      if (teamMax > 0) {
-        sections.advanced.push({
-          kind: "range",
-          id: "team",
-          title: "Team size",
-          filterKey: "team",
-          max: teamMax,
-          step: getRangeStep(teamMax),
-          minLabel: "0",
-          maxLabel: "Any",
-          formatSelected: (value) => `${value}+`,
-        });
-      }
-
       return sections;
     }
 
@@ -1694,7 +1612,7 @@ function GeneralMarketplace({ dashboardRole }: { dashboardRole: UserRole }) {
       },
     );
 
-    if (experienceMax > 0) {
+    if (entityType !== "investor" && experienceMax > 0) {
       sections.primary.push({
         kind: "range",
         id: "experience",
@@ -1925,6 +1843,7 @@ function GeneralMarketplace({ dashboardRole }: { dashboardRole: UserRole }) {
       }
 
       if (
+        entityType !== "investor" &&
         rangeFilters.experience > 0 &&
         getUserExperienceCount(userItem) < rangeFilters.experience
       ) {
@@ -2035,6 +1954,8 @@ function GeneralMarketplace({ dashboardRole }: { dashboardRole: UserRole }) {
     ? recruiterJobItems.length
     : totalCount;
   const hasActiveFilters = activeFilterChips.length > 0;
+  const hasFilterSections =
+    filterSections.primary.length > 0 || filterSections.advanced.length > 0;
 
   const handleMessage = (targetId: string) => {
     const storageKey = `dm_first_contact_${targetId}`;
@@ -2197,113 +2118,115 @@ function GeneralMarketplace({ dashboardRole }: { dashboardRole: UserRole }) {
           </div>
         </section>
 
-        <div className="mt-6 grid gap-6 xl:grid-cols-[320px,minmax(0,1fr)]">
-          <aside className="xl:sticky xl:top-4 xl:self-start">
-            <div className="pr-4 xl:pr-8">
-              <div className="flex items-center justify-between gap-3">
-                <div>
-                  <div className="text-xl font-semibold text-white">
-                    All Filters
+        <div className={`mt-6 grid gap-6 ${hasFilterSections ? "xl:grid-cols-[320px,minmax(0,1fr)]" : ""}`}>
+          {hasFilterSections ? (
+            <aside className="xl:sticky xl:top-4 xl:self-start">
+              <div className="pr-4 xl:pr-8">
+                <div className="flex items-center justify-between gap-3">
+                  <div>
+                    <div className="text-xl font-semibold text-white">
+                      All Filters
+                    </div>
+                    <p className="mt-1 text-sm text-slate-400">
+                      Naukri-style grouped filters with live counts.
+                    </p>
                   </div>
-                  <p className="mt-1 text-sm text-slate-400">
-                    Naukri-style grouped filters with live counts.
-                  </p>
+                  <Filter className="h-5 w-5 text-slate-500" />
                 </div>
-                <Filter className="h-5 w-5 text-slate-500" />
-              </div>
 
-              <div className="mt-5 space-y-5">
-                {filterSections.primary.map((section) =>
-                  section.kind === "checkbox" ? (
-                    <FilterCheckboxGroup
-                      key={section.id}
-                      title={section.title}
-                      options={section.options}
-                      selectedValues={optionFilters[section.filterKey]}
-                      onToggle={(value) =>
-                        toggleOptionFilter(section.filterKey, value)
-                      }
-                    />
-                  ) : (
-                    <FilterRangeGroup
-                      key={section.id}
-                      title={section.title}
-                      value={rangeFilters[section.filterKey]}
-                      max={section.max}
-                      step={section.step}
-                      minLabel={section.minLabel}
-                      maxLabel={section.maxLabel}
-                      formatSelected={section.formatSelected}
-                      onChange={(value) =>
-                        setRangeFilters((current) => ({
-                          ...current,
-                          [section.filterKey]: value,
-                        }))
-                      }
-                    />
-                  ),
-                )}
+                <div className="mt-5 space-y-5">
+                  {filterSections.primary.map((section) =>
+                    section.kind === "checkbox" ? (
+                      <FilterCheckboxGroup
+                        key={section.id}
+                        title={section.title}
+                        options={section.options}
+                        selectedValues={optionFilters[section.filterKey]}
+                        onToggle={(value) =>
+                          toggleOptionFilter(section.filterKey, value)
+                        }
+                      />
+                    ) : (
+                      <FilterRangeGroup
+                        key={section.id}
+                        title={section.title}
+                        value={rangeFilters[section.filterKey]}
+                        max={section.max}
+                        step={section.step}
+                        minLabel={section.minLabel}
+                        maxLabel={section.maxLabel}
+                        formatSelected={section.formatSelected}
+                        onChange={(value) =>
+                          setRangeFilters((current) => ({
+                            ...current,
+                            [section.filterKey]: value,
+                          }))
+                        }
+                      />
+                    ),
+                  )}
 
-                {filterSections.advanced.length ? (
-                  <div className="border-t border-slate-800 pt-5">
+                  {filterSections.advanced.length ? (
+                    <div className="border-t border-slate-800 pt-5">
+                      <button
+                        type="button"
+                        onClick={() => setShowMoreFilters((current) => !current)}
+                        className="inline-flex items-center gap-2 rounded-full border border-slate-700 bg-slate-900/75 px-4 py-2 text-sm font-semibold text-slate-200 transition hover:border-cyan-400/50 hover:bg-slate-800"
+                      >
+                        <SlidersHorizontal className="h-4 w-4" />
+                        {showMoreFilters ? "Hide More Filters" : "More Filters"}
+                      </button>
+                    </div>
+                  ) : null}
+
+                  {showMoreFilters
+                    ? filterSections.advanced.map((section) =>
+                        section.kind === "checkbox" ? (
+                          <FilterCheckboxGroup
+                            key={section.id}
+                            title={section.title}
+                            options={section.options}
+                            selectedValues={optionFilters[section.filterKey]}
+                            onToggle={(value) =>
+                              toggleOptionFilter(section.filterKey, value)
+                            }
+                          />
+                        ) : (
+                          <FilterRangeGroup
+                            key={section.id}
+                            title={section.title}
+                            value={rangeFilters[section.filterKey]}
+                            max={section.max}
+                            step={section.step}
+                            minLabel={section.minLabel}
+                            maxLabel={section.maxLabel}
+                            formatSelected={section.formatSelected}
+                            onChange={(value) =>
+                              setRangeFilters((current) => ({
+                                ...current,
+                                [section.filterKey]: value,
+                              }))
+                            }
+                          />
+                        ),
+                      )
+                    : null}
+                </div>
+
+                {hasActiveFilters ? (
+                  <div className="mt-6 border-t border-slate-800 pt-5">
                     <button
                       type="button"
-                      onClick={() => setShowMoreFilters((current) => !current)}
-                      className="inline-flex items-center gap-2 rounded-full border border-slate-700 bg-slate-900/75 px-4 py-2 text-sm font-semibold text-slate-200 transition hover:border-cyan-400/50 hover:bg-slate-800"
+                      onClick={clearAllFilters}
+                      className="text-sm font-semibold text-cyan-300 transition hover:text-cyan-200"
                     >
-                      <SlidersHorizontal className="h-4 w-4" />
-                      {showMoreFilters ? "Hide More Filters" : "More Filters"}
+                      Clear all filters
                     </button>
                   </div>
                 ) : null}
-
-                {showMoreFilters
-                  ? filterSections.advanced.map((section) =>
-                      section.kind === "checkbox" ? (
-                        <FilterCheckboxGroup
-                          key={section.id}
-                          title={section.title}
-                          options={section.options}
-                          selectedValues={optionFilters[section.filterKey]}
-                          onToggle={(value) =>
-                            toggleOptionFilter(section.filterKey, value)
-                          }
-                        />
-                      ) : (
-                        <FilterRangeGroup
-                          key={section.id}
-                          title={section.title}
-                          value={rangeFilters[section.filterKey]}
-                          max={section.max}
-                          step={section.step}
-                          minLabel={section.minLabel}
-                          maxLabel={section.maxLabel}
-                          formatSelected={section.formatSelected}
-                          onChange={(value) =>
-                            setRangeFilters((current) => ({
-                              ...current,
-                              [section.filterKey]: value,
-                            }))
-                          }
-                        />
-                      ),
-                    )
-                  : null}
               </div>
-
-              {hasActiveFilters ? (
-                <div className="mt-6 border-t border-slate-800 pt-5">
-                  <button
-                    type="button"
-                    onClick={clearAllFilters}
-                    className="text-sm font-semibold text-cyan-300 transition hover:text-cyan-200"
-                  >
-                    Clear all filters
-                  </button>
-                </div>
-              ) : null}
-            </div>
-          </aside>
+            </aside>
+          ) : null}
 
           <main className="min-w-0">
             <div className="pb-5">
@@ -2318,6 +2241,16 @@ function GeneralMarketplace({ dashboardRole }: { dashboardRole: UserRole }) {
                 </div>
 
                 <div className="flex flex-col gap-3 sm:flex-row sm:items-center">
+                  {isStudentRecruiterJobView ? (
+                    <button
+                      type="button"
+                      onClick={() => navigate("/dashboard/student/applications")}
+                      className={secondaryActionClassName}
+                    >
+                      <BriefcaseBusiness className="h-4 w-4" />
+                      My Applications
+                    </button>
+                  ) : null}
                   <label className="relative block min-w-[260px]">
                     <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-500" />
                     <input
@@ -2395,7 +2328,9 @@ function GeneralMarketplace({ dashboardRole }: { dashboardRole: UserRole }) {
                   {listingLabel}
                 </div>
                 <div className="text-sm text-slate-400">
-                  Filters update instantly as you adjust the rail.
+                  {hasFilterSections
+                    ? "Filters update instantly as you adjust the rail."
+                    : "Startup listings are shown without extra marketplace filters."}
                 </div>
               </div>
 

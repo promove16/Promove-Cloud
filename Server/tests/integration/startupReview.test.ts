@@ -73,6 +73,86 @@ describe('startup review readiness integration', () => {
     expect(updatedStartup?.reviewStatus).toBe('draft');
   });
 
+  it('locks startup edits after the founder submits for admin review', async () => {
+    const founder = await User.create({
+      email: `student-${Math.random().toString(36).slice(2, 10)}@example.com`,
+      passwordHash: 'hashed-password',
+      role: UserRole.STUDENT,
+      displayName: 'Locked Startup Founder',
+      accessGrantedBy: 'self_registered',
+      accessExpiresAt: new Date(Date.now() + 365 * 24 * 60 * 60 * 1000),
+      isActive: true,
+      innovationScore: 52,
+      profileComplete: true,
+      registrationStage: 'profile_setup',
+      verificationStatus: 'verified',
+      adminApprovalStatus: 'not_required',
+    });
+
+    const startup = await Startup.create({
+      founderIds: [founder._id],
+      name: 'Locked Review Startup',
+      tagline: 'Submitted startup should be frozen',
+      category: 'Software',
+      stage: 'Pre-Launch',
+      teamSize: 1,
+      activeProducts: 1,
+      pitchDeckUrl: 'https://example.com/pitch.pdf',
+      traction: {
+        patentFiled: false,
+        mvpBuilt: true,
+        revenueGenerating: false,
+      },
+      registrationProfile: {
+        problemStatement: 'This innovation solves a verified logistics workflow issue for distributed student teams.',
+        solutionDifferentiation: 'It combines startup review readiness, patent gating, and launch approval into one workflow.',
+        coreInnovation: 'The core innovation is a governed startup launch workflow tied to admin decisions.',
+        priorArtStatus: 'Adjacent products were reviewed and no matching workflow was identified.',
+        workingMechanism: 'The system validates startup data, documents, and admin review before marketplace launch.',
+        keyComponents: 'Startup profile, review workflow, supporting documents, and approval history.',
+        developmentStage: 'idea',
+        documentationReadiness: 'Required startup documentation is complete.',
+        inventorOwnership: 'team',
+        developmentContext: 'Built in a student-led startup preparation flow.',
+        targetMarkets: 'Student founders, campus incubators, and early-stage investors.',
+        commercializationStrategy: 'build_startup',
+        publicDisclosureStatus: 'No harmful public disclosure has happened.',
+        legalAgreements: 'Founder ownership and consent are documented.',
+        ipProtectionType: 'patent',
+      },
+      documents: [
+        {
+          category: 'design_plan_sketch',
+          fileUrl: 'https://example.com/sketch.png',
+          fileType: 'image',
+          fileName: 'sketch.png',
+          fileSizeBytes: 512,
+          uploadedAt: new Date(),
+          uploadedBy: founder._id,
+        },
+      ],
+      reviewStatus: 'review_requested',
+      reviewRequestedAt: new Date(),
+      isActive: true,
+    });
+
+    const response = await request(app)
+      .patch(`/api/startup/${startup._id}`)
+      .set(authHeader(founder))
+      .send({ tagline: 'This should be blocked while review is pending.' });
+
+    expect(response.status).toBe(423);
+    expect(response.body.error).toEqual(
+      expect.objectContaining({
+        code: 'STARTUP_PROFILE_LOCKED',
+      }),
+    );
+
+    const unchangedStartup = await Startup.findById(startup._id).lean();
+    expect(unchangedStartup?.tagline).toBe('Submitted startup should be frozen');
+    expect(unchangedStartup?.reviewStatus).toBe('review_requested');
+  });
+
   it('creates admin audit logs for startup approval and change requests', async () => {
     const founder = await User.create({
       email: `student-${Math.random().toString(36).slice(2, 10)}@example.com`,

@@ -22,6 +22,8 @@ const formatDate = (value: string) =>
     year: 'numeric',
   });
 
+const formatStatusLabel = (value?: string | null) => (value ?? 'draft').replace(/_/g, ' ');
+
 export function InstitutionStartupsPageBase({
   mode,
   title,
@@ -64,7 +66,7 @@ export function InstitutionStartupsPageBase({
             <Badge>{selectedStartup.stage}</Badge>
             <Badge className="border-slate-700 bg-slate-900 text-slate-300">{selectedStartup.category}</Badge>
             <Badge className="border-violet-500/30 bg-violet-500/10 text-violet-300">
-              {selectedStartup.reviewStatus.replace(/_/g, ' ')}
+              {formatStatusLabel(selectedStartup.reviewStatus)}
             </Badge>
           </div>
           <h2 className="mt-3 text-2xl font-semibold text-white">{selectedStartup.name}</h2>
@@ -115,7 +117,7 @@ export function InstitutionStartupsPageBase({
                 </div>
               </div>
               <div className="rounded-2xl border border-slate-800 bg-slate-950/80 px-4 py-3 text-sm text-slate-300">
-                {startup.reviewStatus.replace(/_/g, ' ')}
+                {formatStatusLabel(startup.reviewStatus)}
               </div>
             </div>
           </Card>

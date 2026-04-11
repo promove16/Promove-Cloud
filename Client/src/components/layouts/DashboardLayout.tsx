@@ -20,6 +20,7 @@ import { useNotifications } from '../../hooks/useNotifications';
 import { trackNavigationClick } from '../../lib/activityTracker';
 import { NotificationItem } from '../../types/notification.types';
 import { roleRedirect } from '../../utils/roleRedirect';
+import { SupportFloatingWidget } from '../../features/support/SupportFloatingWidget';
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -691,6 +692,8 @@ export function DashboardLayout({ children, role }: PropsWithChildren<DashboardL
           onClick={() => setSidebarOpen(false)}
         />
       ) : null}
+
+      <SupportFloatingWidget />
     </div>
   );
 }

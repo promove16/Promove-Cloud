@@ -11,7 +11,7 @@ import { Workspace } from '../workspace/workspace.model';
 import problemBankSeedData from './problemBank.seed.json';
 import { Problem } from './problem.model';
 import { ProblemSubmission } from './problemSubmission.model';
-import { ProblemCategory, ProblemDifficulty } from './problem.types';
+import { PROBLEM_CATEGORIES, ProblemCategory, ProblemDifficulty } from './problem.types';
 
 const defaultSecurityNotice =
   'Upload only project-safe evidence. Do not share secrets, credentials, private keys, personal data, or production database exports.';
@@ -32,14 +32,60 @@ type ProblemBankSeedRecord = {
 
 const seedProblemRecords = problemBankSeedData as ProblemBankSeedRecord[];
 
-const sourceCategoryMap: Record<string, ProblemCategory> = {
-  'Agriculture & AgriTech': 'Agriculture',
-  'Renewable Energy & Sustainability': 'Environment',
-  'Healthcare & MedTech': 'Healthcare',
-  'Education & Skill Development (EdTech)': 'Education',
-  'Smart Cities & Infrastructure': 'Technology',
-  'Finance & Financial Inclusion (FinTech)': 'Technology',
-  'Manufacturing & Industry 4.0': 'Technology',
+const problemCategorySet = new Set<string>(PROBLEM_CATEGORIES);
+
+const legacyCategoryMap: Partial<Record<string, ProblemCategory>> = {
+  Agriculture: 'Agriculture & AgriTech',
+  Environment: 'Renewable Energy & Sustainability',
+  Healthcare: 'Healthcare & MedTech',
+  Education: 'Education & Skill Development (EdTech)',
+  Technology: 'Smart Cities & Infrastructure',
+  'Rural Development': 'Agriculture & AgriTech',
+};
+
+const resolveProblemCategory = (
+  category?: string | null,
+  domain?: string | null,
+): ProblemCategory => {
+  if (domain && problemCategorySet.has(domain)) {
+    return domain as ProblemCategory;
+  }
+
+  if (category && problemCategorySet.has(category)) {
+    return category as ProblemCategory;
+  }
+
+  if (category && legacyCategoryMap[category]) {
+    return legacyCategoryMap[category];
+  }
+
+  if (domain) {
+    const normalizedDomain = domain.toLowerCase();
+
+    if (/(transport|mobility|traffic|logistics)/i.test(normalizedDomain)) {
+      return 'Transportation & Mobility';
+    }
+    if (/(finance|financial|fintech|bank|payment|credit|insurance)/i.test(normalizedDomain)) {
+      return 'Finance & Financial Inclusion (FinTech)';
+    }
+    if (/(manufactur|industry|factory|industrial|supply chain)/i.test(normalizedDomain)) {
+      return 'Manufacturing & Industry 4.0';
+    }
+    if (/(energy|climate|sustain|environment|renewable)/i.test(normalizedDomain)) {
+      return 'Renewable Energy & Sustainability';
+    }
+    if (/(health|med|clinical|hospital|care)/i.test(normalizedDomain)) {
+      return 'Healthcare & MedTech';
+    }
+    if (/(education|skill|learning|edtech)/i.test(normalizedDomain)) {
+      return 'Education & Skill Development (EdTech)';
+    }
+    if (/(agri|farm|crop|food|rural)/i.test(normalizedDomain)) {
+      return 'Agriculture & AgriTech';
+    }
+  }
+
+  return 'Smart Cities & Infrastructure';
 };
 
 const defaultSeedDifficulty: ProblemDifficulty = 'Medium';
@@ -61,15 +107,7 @@ const submissionConfigSchema = z.object({
 export const createProblemSchema = z.object({
   title: z.string().trim().min(3).max(160),
   description: z.string().trim().min(20).max(1200),
-  category: z.enum([
-    'Agriculture',
-    'Technology',
-    'Healthcare',
-    'Education',
-    'Environment',
-    'Rural Development',
-    'Other',
-  ]),
+  category: z.enum(PROBLEM_CATEGORIES),
   difficulty: z.enum(['Easy', 'Medium', 'Hard']),
   domain: z.string().trim().min(2).max(120),
   tags: arrayField(12, 40),
@@ -176,6 +214,7 @@ export const clearProblemCaches = async () => {
 
 const normalizeProblemInput = (payload: z.infer<typeof createProblemSchema>) => ({
   ...payload,
+  category: resolveProblemCategory(payload.category, payload.domain),
   postedBy: payload.sponsorName?.trim() || 'ProMove Admin',
   targetBeneficiaries: payload.targetBeneficiaries ?? [],
   deliverables: payload.deliverables ?? [],
@@ -208,7 +247,7 @@ const getSeedTags = (record: ProblemBankSeedRecord) => {
 
 const buildSeedProblemDocuments = () =>
   seedProblemRecords.map((record) => {
-    const category = sourceCategoryMap[record.sourceCategory] ?? 'Other';
+    const category = resolveProblemCategory(record.sourceCategory, record.sourceCategory);
     const sourceRef = `Problem Bank version 01, category ${record.sourceCategoryNumber}, item ${record.number}, page ${record.sourcePage}`;
 
     return {
@@ -293,6 +332,7 @@ const getUniqueTeamMemberIds = (workspace: {
 
 const withTenantScopedClaimState = <T extends Record<string, any>>(problem: T) => ({
   ...problem,
+  category: resolveProblemCategory(problem.category, problem.domain),
   claimStatus: 'open' as const,
   maxClaims: Number.MAX_SAFE_INTEGER,
   claimedBy: undefined,
@@ -458,7 +498,11 @@ export const listProblems = async (query: Record<string, unknown>, userId: strin
 
   const filter: Record<string, unknown> = { publicationStatus: 'published' };
   if (typeof query.category === 'string' && query.category && query.category !== 'All Problems') {
-    filter.category = query.category;
+    const category = resolveProblemCategory(query.category, query.category);
+    filter.$or = [
+      { category },
+      { domain: category },
+    ];
   }
   if (typeof query.difficulty === 'string' && query.difficulty) {
     filter.difficulty = query.difficulty;
@@ -582,6 +626,14 @@ export const updateAdminProblem = async (
 
   Object.assign(problem, {
     ...payload,
+    ...(payload.category !== undefined || payload.domain !== undefined
+      ? {
+          category: resolveProblemCategory(
+            payload.category ?? problem.category,
+            payload.domain ?? problem.domain,
+          ),
+        }
+      : {}),
     ...(payload.sponsorName !== undefined
       ? {
           postedBy: payload.sponsorName.trim() || 'ProMove Admin',
@@ -821,7 +873,7 @@ export const listProblemReviewRequests = async (
   const [problems, workspaces, users] = await Promise.all([
     problemIds.length > 0
       ? Problem.find({ _id: { $in: problemIds } })
-          .select('_id title category difficulty')
+          .select('_id title category domain difficulty')
           .lean()
       : Promise.resolve([]),
     workspaceIds.length > 0
@@ -851,7 +903,10 @@ export const listProblemReviewRequests = async (
       problem: {
         _id: String(submission.problemId),
         title: problemById.get(String(submission.problemId))?.title ?? 'Problem',
-        category: problemById.get(String(submission.problemId))?.category ?? 'Other',
+        category: resolveProblemCategory(
+          problemById.get(String(submission.problemId))?.category,
+          problemById.get(String(submission.problemId))?.domain,
+        ),
         difficulty: problemById.get(String(submission.problemId))?.difficulty ?? 'Medium',
       },
       workspace: {

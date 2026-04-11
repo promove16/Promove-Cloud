@@ -11,7 +11,7 @@ import { UserRole } from '../../types/roles.types';
 import { normalizeInnovationScore } from '../innovationScore/score.utils';
 import { Workspace } from '../workspace/workspace.model';
 import { AdminAuditLog } from '../admin/adminAuditLog.model';
-import type { StartupDocumentCategory, StartupReadiness } from './startup.types';
+import type { StartupDocumentCategory, StartupEditAccess, StartupReadiness } from './startup.types';
 
 const pdfFileNamePattern = /\.pdf$/i;
 
@@ -192,6 +192,88 @@ const clearReviewMetadata = (startup: InstanceType<typeof Startup>) => {
   startup.adminReviewedAt = undefined;
   startup.adminReviewedBy = null;
   startup.adminNotes = undefined;
+};
+
+const clearAdminEditUnlock = (startup: InstanceType<typeof Startup>) => {
+  startup.adminEditUnlockActive = false;
+  startup.adminEditUnlockApprovedAt = undefined;
+  startup.adminEditUnlockApprovedBy = null;
+  startup.adminEditUnlockReason = undefined;
+};
+
+export const buildStartupEditAccess = (startup: Record<string, any>): StartupEditAccess => {
+  const reviewStatus = startup.reviewStatus ?? 'draft';
+  const unlockedByAdmin = Boolean(startup.adminEditUnlockActive);
+  const isLocked =
+    (reviewStatus === 'review_requested' || reviewStatus === 'approved') && !unlockedByAdmin;
+
+  let reason = 'Startup profile can be edited.';
+  if (unlockedByAdmin && (reviewStatus === 'review_requested' || reviewStatus === 'approved')) {
+    reason = 'Admin approved a temporary edit unlock. Save your changes and submit again for review.';
+  } else if (reviewStatus === 'review_requested') {
+    reason = 'Startup profile is locked while admin review is pending.';
+  } else if (reviewStatus === 'approved') {
+    reason = 'Startup profile is locked after approval. Raise a Smart Help request if you need updates.';
+  } else if (reviewStatus === 'changes_requested') {
+    reason = 'Admin requested changes. Update the startup and submit it again for review.';
+  }
+
+  const launchFormLocked = Boolean(startup.launchFormLocked);
+  const launchFormUnlockedByAdmin = Boolean(startup.launchFormUnlockedByAdmin);
+  const isLaunchFormLocked = launchFormLocked && !launchFormUnlockedByAdmin;
+
+  let launchFormReason = 'Launch form can be edited.';
+  if (launchFormUnlockedByAdmin && launchFormLocked) {
+    launchFormReason = 'Admin approved temporary edit unlock for launch form.';
+  } else if (launchFormLocked) {
+    launchFormReason = 'Launch form is locked after submission. Raise a Smart Help request to edit.';
+  }
+
+  return {
+    isLocked,
+    canEdit: !isLocked,
+    requiresAdminUnlock: isLocked,
+    unlockedByAdmin,
+    reason,
+    launchFormLocked: isLaunchFormLocked,
+    launchFormCanEdit: !isLaunchFormLocked,
+    launchFormRequiresUnlock: isLaunchFormLocked,
+    launchFormUnlockedByAdmin,
+    launchFormReason,
+    ...(startup.adminEditUnlockApprovedAt ? { unlockedAt: startup.adminEditUnlockApprovedAt } : {}),
+    ...(startup.adminEditUnlockApprovedBy ? { unlockedBy: startup.adminEditUnlockApprovedBy } : {}),
+    ...(startup.adminEditUnlockReason ? { unlockReason: startup.adminEditUnlockReason } : {}),
+    ...(startup.launchFormUnlockedAt ? { launchFormUnlockedAt: startup.launchFormUnlockedAt } : {}),
+    ...(startup.launchFormUnlockedBy ? { launchFormUnlockedBy: startup.launchFormUnlockedBy } : {}),
+    ...(startup.launchFormUnlockReason ? { launchFormUnlockReason: startup.launchFormUnlockReason } : {}),
+  };
+};
+
+const assertStartupEditable = (startup: Record<string, any>) => {
+  const editAccess = buildStartupEditAccess(startup);
+  if (editAccess.isLocked) {
+    throw new ApiError(423, 'STARTUP_PROFILE_LOCKED', editAccess.reason);
+  }
+};
+
+const assertLaunchFormEditable = (startup: Record<string, any>) => {
+  const editAccess = buildStartupEditAccess(startup);
+  if (editAccess.launchFormLocked && !editAccess.launchFormUnlockedByAdmin) {
+    throw new ApiError(423, 'LAUNCH_FORM_LOCKED', editAccess.launchFormReason);
+  }
+};
+
+const prepareStartupForEditableMutation = (startup: InstanceType<typeof Startup>) => {
+  assertStartupEditable(startup.toObject());
+
+  if (
+    startup.adminEditUnlockActive &&
+    (startup.reviewStatus === 'review_requested' || startup.reviewStatus === 'approved')
+  ) {
+    startup.reviewStatus = 'draft';
+    clearReviewMetadata(startup);
+    clearAdminEditUnlock(startup);
+  }
 };
 
 const normalizeRegistrationProfile = (
@@ -548,20 +630,30 @@ const calculateStartupInnovationScore = (startup: Record<string, any>) => {
   );
 };
 
-const sanitizeStartupForClient = (startup: Record<string, any>) => ({
-  ...startup,
-  documents: (startup.documents ?? []).map((document: Record<string, any>) => ({
-    _id: document._id,
-    category: document.category,
-    fileUrl: document.fileUrl,
-    fileType: document.fileType,
-    fileName: document.fileName,
-    fileSizeBytes: document.fileSizeBytes,
-    uploadedAt: document.uploadedAt,
-    ...(document.note ? { note: document.note } : {}),
-  })),
-  readiness: buildStartupReadiness(startup as never),
-});
+const sanitizeStartupForClient = (startup: Record<string, any>) => {
+  const editAccess = buildStartupEditAccess(startup);
+
+  return {
+    ...startup,
+    reviewStatus: startup.reviewStatus ?? 'draft',
+    documents: (startup.documents ?? []).map((document: Record<string, any>) => ({
+      _id: document._id,
+      category: document.category,
+      fileUrl: document.fileUrl,
+      fileType: document.fileType,
+      fileName: document.fileName,
+      fileSizeBytes: document.fileSizeBytes,
+      uploadedAt: document.uploadedAt,
+      ...(document.note ? { note: document.note } : {}),
+    })),
+    editAccess: {
+      ...editAccess,
+      ...(editAccess.unlockedAt ? { unlockedAt: editAccess.unlockedAt.toISOString() } : {}),
+      ...(editAccess.unlockedBy ? { unlockedBy: String(editAccess.unlockedBy) } : {}),
+    },
+    readiness: buildStartupReadiness(startup as never),
+  };
+};
 
 const serializeStartup = (startup: { toObject?: () => Record<string, any> } | Record<string, any>) => {
   const base = typeof (startup as { toObject?: () => Record<string, any> }).toObject === 'function'
@@ -621,6 +713,7 @@ export const updateStartupProfile = async (
   payload: Partial<z.infer<typeof startupSchema>>,
 ) => {
   const startup = await getStartupForFounder(startupId, userId);
+  prepareStartupForEditableMutation(startup);
   const startupSnapshot = startup.toObject();
   const mergedPayload = buildStartupInput({
     ...startupSnapshot,
@@ -659,11 +752,6 @@ export const updateStartupProfile = async (
 
   Object.assign(startup, startupPayload);
 
-  if (startup.reviewStatus === 'review_requested') {
-    startup.reviewStatus = 'draft';
-    clearReviewMetadata(startup);
-  }
-
   await startup.save();
   return serializeStartup(startup);
 };
@@ -689,6 +777,7 @@ export const requestStartupReview = async (startupId: string, userId: string) =>
   startup.adminReviewedAt = undefined;
   startup.adminReviewedBy = null;
   startup.adminNotes = undefined;
+  clearAdminEditUnlock(startup);
   await startup.save();
 
   return serializeStartup(startup);
@@ -716,11 +805,13 @@ export const launchStartup = async (
 
   const score = calculateStartupInnovationScore(startup.toObject());
 
-  startup.launchedToInvestors = startup.launchedToInvestors || payload.launchTo === 'investors' || payload.launchTo === 'both';
+startup.launchedToInvestors = startup.launchedToInvestors || payload.launchTo === 'investors' || payload.launchTo === 'both';
   startup.launchedToMentors = startup.launchedToMentors || payload.launchTo === 'mentors' || payload.launchTo === 'both';
   startup.launchedToRecruiters = startup.launchedToRecruiters || payload.launchTo === 'recruiters';
   startup.launchedAt = new Date();
   startup.innovationScoreAtLaunch = score;
+  startup.launchFormLocked = true;
+  startup.launchFormLockedAt = new Date();
   if (payload.launchTo !== 'recruiters') {
     startup.stage = 'Launched';
   }
@@ -823,16 +914,48 @@ export const uploadPitchDeck = async (startupId: string, userId: string, file: E
     throw new ApiError(400, 'INVALID_FILE_TYPE', 'Only PDF files are allowed');
   }
   const startup = await getStartupForFounder(startupId, userId);
+  prepareStartupForEditableMutation(startup);
   const uploaded = await uploadToCloudinary(file.buffer, 'promove/startups', 'raw', { format: 'pdf' });
   startup.pitchDeckUrl = uploaded.secure_url;
   startup.pitchDeckName = file.originalname;
 
-  if (startup.reviewStatus === 'review_requested') {
-    startup.reviewStatus = 'draft';
-    clearReviewMetadata(startup);
+  await startup.save();
+return serializeStartup(startup);
+};
+
+export const approveLaunchFormUnlock = async (
+  adminId: string,
+  startupId: string,
+  options?: { reason?: string; sourceTicketId?: string },
+) => {
+  const startup = await Startup.findById(startupId);
+
+  if (!startup || !startup.isActive) {
+    throw new ApiError(404, 'STARTUP_NOT_FOUND', 'Startup not found');
   }
 
+  const currentEditAccess = buildStartupEditAccess(startup.toObject());
+  if (!currentEditAccess.launchFormLocked || currentEditAccess.launchFormUnlockedByAdmin) {
+    throw new ApiError(409, 'LAUNCH_FORM_ALREADY_EDITABLE', 'Launch form is already editable.');
+  }
+
+  startup.launchFormUnlockedByAdmin = true;
+  startup.launchFormUnlockedAt = new Date();
+  startup.launchFormUnlockedBy = new Types.ObjectId(adminId);
+  startup.launchFormUnlockReason = options?.reason?.trim() || undefined;
   await startup.save();
+
+  await AdminAuditLog.create({
+    adminId: new Types.ObjectId(adminId),
+    action: 'LAUNCH_FORM_UNLOCKED',
+    targetId: startup._id,
+    targetModel: 'Startup',
+    metadata: {
+      ...(startup.launchFormUnlockReason ? { unlockReason: startup.launchFormUnlockReason } : {}),
+      ...(options?.sourceTicketId ? { sourceTicketId: options.sourceTicketId } : {}),
+    },
+  });
+
   return serializeStartup(startup);
 };
 
@@ -843,6 +966,7 @@ export const uploadStartupDocument = async (
   payload: z.infer<typeof startupDocumentUploadSchema>,
 ) => {
   const startup = await getStartupForFounder(startupId, userId);
+  prepareStartupForEditableMutation(startup);
   const fileType = file.mimetype === 'application/pdf' ? 'pdf' : 'image';
   const uploaded = await uploadToCloudinary(
     file.buffer,
@@ -873,17 +997,14 @@ export const uploadStartupDocument = async (
     cloudinaryPublicId: uploaded.public_id,
   });
 
-  if (startup.reviewStatus === 'review_requested') {
-    startup.reviewStatus = 'draft';
-    clearReviewMetadata(startup);
-  }
-
   await startup.save();
   return serializeStartup(startup);
 };
 
 export const deleteStartupDocument = async (startupId: string, userId: string, documentId: string) => {
   const startup = await getStartupForFounder(startupId, userId);
+  prepareStartupForEditableMutation(startup);
+  assertLaunchFormEditable(startup.toObject());
   const document = startup.documents.find((item) => String(item._id) === documentId);
 
   if (!document) {
@@ -899,17 +1020,13 @@ export const deleteStartupDocument = async (startupId: string, userId: string, d
 
   startup.documents = startup.documents.filter((item) => String(item._id) !== documentId);
 
-  if (startup.reviewStatus === 'review_requested') {
-    startup.reviewStatus = 'draft';
-    clearReviewMetadata(startup);
-  }
-
   await startup.save();
   return serializeStartup(startup);
 };
 
 export const promoteToCoFounder = async (startupId: string, userId: string, memberId: string) => {
   const startup = await getStartupForFounder(startupId, userId);
+  prepareStartupForEditableMutation(startup);
 
   const isTeamMember = startup.teamMemberIds.some((id) => String(id) === memberId);
   if (!isTeamMember) {
@@ -930,6 +1047,7 @@ export const promoteToCoFounder = async (startupId: string, userId: string, memb
 
 export const demoteFromCoFounder = async (startupId: string, userId: string, memberId: string) => {
   const startup = await getStartupForFounder(startupId, userId);
+  prepareStartupForEditableMutation(startup);
 
   if (String(memberId) === String(userId)) {
     throw new ApiError(400, 'CANNOT_DEMOTE_SELF', 'You cannot demote yourself from founder.');
@@ -970,6 +1088,10 @@ export const listStartupsForAdmin = async (status?: 'draft' | 'review_requested'
       adminReviewedAt?: Date;
       adminReviewedBy?: Types.ObjectId | null;
       adminNotes?: string;
+      adminEditUnlockActive: boolean;
+      adminEditUnlockApprovedAt?: Date;
+      adminEditUnlockApprovedBy?: Types.ObjectId | null;
+      adminEditUnlockReason?: string;
       createdAt: Date;
       updatedAt: Date;
       pitchDeckUrl?: string;
@@ -1045,6 +1167,15 @@ export const listStartupsForAdmin = async (status?: 'draft' | 'review_requested'
       ...(startup.adminReviewedAt ? { adminReviewedAt: startup.adminReviewedAt.toISOString() } : {}),
       ...(startup.adminReviewedBy ? { adminReviewedBy: String(startup.adminReviewedBy) } : {}),
       ...(startup.adminNotes ? { adminNotes: startup.adminNotes } : {}),
+      editAccess: {
+        ...buildStartupEditAccess(startup),
+        ...(startup.adminEditUnlockApprovedAt
+          ? { unlockedAt: startup.adminEditUnlockApprovedAt.toISOString() }
+          : {}),
+        ...(startup.adminEditUnlockApprovedBy
+          ? { unlockedBy: String(startup.adminEditUnlockApprovedBy) }
+          : {}),
+      },
       ...(startup.pitchDeckUrl ? { pitchDeckUrl: startup.pitchDeckUrl } : {}),
       ...(startup.pitchDeckName ? { pitchDeckName: startup.pitchDeckName } : {}),
       traction: startup.traction,
@@ -1098,6 +1229,7 @@ export const reviewStartupSubmission = async (
   startup.adminReviewedAt = new Date();
   startup.adminReviewedBy = new Types.ObjectId(adminId);
   startup.adminNotes = payload.adminNotes?.trim() || undefined;
+  clearAdminEditUnlock(startup);
 
   if (payload.decision === 'approved') {
     startup.reviewRequestedAt = startup.reviewRequestedAt ?? new Date();
@@ -1114,5 +1246,42 @@ export const reviewStartupSubmission = async (
       ...(startup.adminNotes ? { adminNotes: startup.adminNotes } : {}),
     },
   });
+  return serializeStartup(startup);
+};
+
+export const approveStartupEditUnlock = async (
+  adminId: string,
+  startupId: string,
+  options?: { reason?: string; sourceTicketId?: string },
+) => {
+  const startup = await Startup.findById(startupId);
+
+  if (!startup || !startup.isActive) {
+    throw new ApiError(404, 'STARTUP_NOT_FOUND', 'Startup not found');
+  }
+
+  const currentEditAccess = buildStartupEditAccess(startup.toObject());
+  if (!currentEditAccess.isLocked && !startup.adminEditUnlockActive) {
+    throw new ApiError(409, 'STARTUP_ALREADY_EDITABLE', 'Startup profile is already editable.');
+  }
+
+  startup.adminEditUnlockActive = true;
+  startup.adminEditUnlockApprovedAt = new Date();
+  startup.adminEditUnlockApprovedBy = new Types.ObjectId(adminId);
+  startup.adminEditUnlockReason = options?.reason?.trim() || undefined;
+  await startup.save();
+
+  await AdminAuditLog.create({
+    adminId: new Types.ObjectId(adminId),
+    action: 'STARTUP_EDIT_UNLOCKED',
+    targetId: startup._id,
+    targetModel: 'Startup',
+    metadata: {
+      reviewStatus: startup.reviewStatus,
+      ...(startup.adminEditUnlockReason ? { unlockReason: startup.adminEditUnlockReason } : {}),
+      ...(options?.sourceTicketId ? { sourceTicketId: options.sourceTicketId } : {}),
+    },
+  });
+
   return serializeStartup(startup);
 };

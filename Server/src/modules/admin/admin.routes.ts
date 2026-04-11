@@ -12,6 +12,7 @@ import {
   approvePatentController,
   getAnalyticsController,
   getAnalyticsLogsController,
+  getHelpDeskTicketsController,
   getAnalyticsUserDetailController,
   getAnalyticsUsersController,
   getInvestmentTypeAnalyticsController,
@@ -29,9 +30,11 @@ import {
   rejectRegistrationRequestController,
   rejectAwardController,
   rejectPatentController,
+  resolveHelpDeskTicketController,
   reviewDealController,
   reviewRegistrationRequestController,
-  reviewStartupController,
+reviewStartupController,
+  unlockLaunchFormController,
   reviewMentorshipProgramController,
   reviewProjectMentorAssignmentController,
   resetSoleInvestorController,
@@ -81,16 +84,14 @@ router.patch('/awards/:id/approve', asyncHandler(approveAwardController));
 router.patch('/awards/:id/reject', asyncHandler(rejectAwardController));
 router.get('/startups', asyncHandler(getStartupReviewsController));
 router.patch('/startups/:id/review', asyncHandler(reviewStartupController));
-router.get('/deals', asyncHandler(getDealsController));
-router.get('/deals/:id', asyncHandler(getDealController));
-router.patch('/deals/:id/review', asyncHandler(reviewDealController));
-router.patch('/deals/:id/approve-stage', asyncHandler(approveDealStageController));
-router.patch('/deals/:id/investor-role', asyncHandler(updateDealInvestorRoleController));
+router.patch('/startups/:id/unlock-launch-form', asyncHandler(unlockLaunchFormController));
 router.get('/startups/:id/cap-table', asyncHandler(getStartupCapTableController));
 router.post('/startups/:id/reset-sole-investor', asyncHandler(resetSoleInvestorController));
 router.get('/investments/by-type', asyncHandler(getInvestmentTypeAnalyticsController));
 router.patch('/milestones/:id/verify', asyncHandler(verifyMilestoneController));
 router.get('/analytics', asyncHandler(getAnalyticsController));
+router.get('/help-desk', asyncHandler(getHelpDeskTicketsController));
+router.patch('/help-desk/:id/resolve', asyncHandler(resolveHelpDeskTicketController));
 router.get('/analytics/logs', asyncHandler(getAnalyticsLogsController));
 router.get('/analytics/users', asyncHandler(getAnalyticsUsersController));
 router.get('/analytics/users/:userId', asyncHandler(getAnalyticsUserDetailController));

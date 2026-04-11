@@ -1,3 +1,16 @@
+export const PROBLEM_CATEGORIES = [
+  'Agriculture & AgriTech',
+  'Renewable Energy & Sustainability',
+  'Healthcare & MedTech',
+  'Education & Skill Development (EdTech)',
+  'Smart Cities & Infrastructure',
+  'Transportation & Mobility',
+  'Finance & Financial Inclusion (FinTech)',
+  'Manufacturing & Industry 4.0',
+] as const;
+
+export type ProblemCategory = (typeof PROBLEM_CATEGORIES)[number];
+
 export type ProblemViewerStatus =
   | 'in_progress'
   | 'review_requested'
@@ -40,14 +53,7 @@ export interface Problem {
   _id: string;
   title: string;
   description: string;
-  category:
-    | 'Agriculture'
-    | 'Technology'
-    | 'Healthcare'
-    | 'Education'
-    | 'Environment'
-    | 'Rural Development'
-    | 'Other';
+  category: ProblemCategory;
   difficulty: 'Easy' | 'Medium' | 'Hard';
   domain: string;
   tags: string[];

@@ -1617,8 +1617,17 @@ export function MessagesPage() {
   });
 
   const isStudentRole = currentUser?.role === UserRole.STUDENT;
-  const isInstitutionRole = currentUser?.role === UserRole.SCHOOL || currentUser?.role === UserRole.COLLEGE;
-  const canAccessRequestsView = !isInstitutionRole;
+  const canAccessRequestsView = Boolean(
+    currentUser?.role &&
+      [
+        UserRole.STUDENT,
+        UserRole.SCHOOL,
+        UserRole.COLLEGE,
+        UserRole.MENTOR,
+        UserRole.INVESTOR,
+        UserRole.RECRUITER,
+      ].includes(currentUser.role),
+  );
 
   const startupsQuery = useQuery({
     queryKey: ['startups', 'mine'],

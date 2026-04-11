@@ -2,7 +2,7 @@ import { ChangeEvent, useEffect, useMemo, useState } from "react";
 import { useNavigate, useOutletContext, useParams } from "react-router-dom";
 import { isAxiosError } from "axios";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { CheckCircle, Download, FileText, Rocket, Send, ShieldCheck, Target, TrendingUp, Upload, Users, X } from "lucide-react";
+import { CheckCircle, Download, FileText, FolderKanban, Rocket, Send, ShieldCheck, Target, TrendingUp, Upload, Users, X } from "lucide-react";
 import { dealApi } from "../../api/deal.api";
 import { startupApi, StartupPayload } from "../../api/startup.api";
 import { workspaceApi } from "../../api/workspace.api";
@@ -90,7 +90,7 @@ export function StartupLaunch() {
   const isNew = !startupId;
 
   const [showLaunchModal, setShowLaunchModal] = useState(false);
-  const [launchTarget, setLaunchTarget] = useState<"investors" | "mentors" | "both" | "recruiters">("both");
+  const [launchTarget, setLaunchTarget] = useState<"investors" | "mentors" | "both">("both");
   const [toast, setToast] = useState("");
   const [pendingPitchDeckName, setPendingPitchDeckName] = useState("");
   const [pendingDocumentCategory, setPendingDocumentCategory] = useState<StartupDocumentCategory | null>(null);
@@ -223,13 +223,13 @@ export function StartupLaunch() {
   });
 
   const launchStartup = useMutation({
-    mutationFn: async (launchTo: "investors" | "mentors" | "both" | "recruiters") => {
+    mutationFn: async (launchTo: "investors" | "mentors" | "both") => {
       const savedStartup = startup?._id ? startup : await persistStartup.mutateAsync();
       return startupApi.launch(savedStartup._id, launchTo);
     },
-    onSuccess: async (_value, launchTo) => {
+    onSuccess: async () => {
       setShowLaunchModal(false);
-      setToast(launchTo === "recruiters" ? "Your profile is now visible to recruiters matching your skill set." : "Your startup is now live! Investors and mentors can discover you.");
+      setToast("Your startup is now live! Investors and mentors can discover you.");
       await Promise.all([
         queryClient.invalidateQueries({ queryKey: ["startup"] }),
         queryClient.invalidateQueries({ queryKey: ["score", "me"] }),
@@ -314,20 +314,6 @@ export function StartupLaunch() {
     uploadDocument.mutate({ file, category });
   };
 
-  const handleWorkspaceChange = (workspaceId: string) => {
-    const nextWorkspace = workspaces.find((workspace) => workspace._id === workspaceId);
-    const nextTeamSize =
-      nextWorkspace?.teamMembers?.length ??
-      nextWorkspace?.teamMemberIds?.length ??
-      1;
-
-    setForm((current) => ({
-      ...current,
-      projectId: workspaceId || undefined,
-      teamSize: nextTeamSize,
-    }));
-  };
-
   const updateRegistrationField = <K extends keyof StartupRegistrationProfile>(
     key: K,
     value: StartupRegistrationProfile[K],
@@ -409,6 +395,9 @@ export function StartupLaunch() {
   const isApproved = reviewStatus === "approved";
   const isUnderReview = reviewStatus === "review_requested";
   const hasChangesRequested = reviewStatus === "changes_requested";
+  const editAccess = startup?.editAccess;
+  const isEditingLocked = Boolean(!isNew && editAccess?.isLocked);
+  const editLockReason = editAccess?.reason ?? "";
   const readiness = currentReadiness ?? startup?.readiness;
   const reviewTone =
     reviewStatus === "approved"
@@ -434,7 +423,6 @@ export function StartupLaunch() {
         : reviewStatus === "changes_requested"
           ? "Update the startup profile based on admin notes and submit it again for review."
           : "Complete the business plan, the IPR intake questionnaire, and the required supporting files before submitting for admin review.";
-  const founderMembers = activeWorkspace?.teamMembers ?? [];
   const profileStatusLabel = startup?.launchedAt
     ? "Live"
     : isApproved
@@ -489,7 +477,7 @@ export function StartupLaunch() {
     },
     {
       label: "Launch to marketplace",
-      detail: marketplaceLive ? "Marketplace visibility is live." : "Choose investor, mentor, or recruiter visibility after approval.",
+      detail: marketplaceLive ? "Marketplace visibility is live." : "Choose investor or mentor visibility after approval.",
       status: marketplaceLive ? "complete" : canOpenLaunchModal ? "current" : "blocked",
     },
     {
@@ -518,8 +506,8 @@ export function StartupLaunch() {
       ? "Required IPR intake answers and document uploads are complete."
       : `Still missing: ${readiness?.missingItems.slice(0, 3).join(", ") || "IPR details"}`,
     activeWorkspace
-      ? `Optional workspace link: ${activeWorkspace.title}.`
-      : "No workspace is linked; this startup remains independent.",
+      ? `Workspace tab linked: ${activeWorkspace.title}.`
+      : "No product workspace is linked to this startup yet.",
     requiredDocumentCategories.length > 0
       ? `${requiredDocumentCategories.length} IPR supporting upload ${requiredDocumentCategories.length === 1 ? "is" : "are"} required at the current stage.`
       : "No mandatory IPR uploads are required at the current stage yet.",
@@ -531,12 +519,36 @@ export function StartupLaunch() {
     "w-full rounded-xl border border-slate-800 bg-slate-950 px-4 py-3 text-sm text-white placeholder:text-slate-500 outline-none transition focus:border-blue-500";
   const textareaClassName = `${fieldClassName} min-h-28 resize-y`;
   const isRequestReviewBusy = requestReview.isPending || persistStartup.isPending;
-  const isRequestReviewBlocked = Boolean(!readiness?.isReviewReady || isApproved || isUnderReview);
-  const requestReviewBlockedReason = isApproved
+  const isRequestReviewBlocked = Boolean(isEditingLocked || !readiness?.isReviewReady || isApproved || isUnderReview);
+  const requestReviewBlockedReason = isEditingLocked
+    ? editLockReason
+    : isApproved
     ? "Startup is already approved."
     : isUnderReview
       ? "Startup review is already pending."
       : formatReadinessActionMessage(readiness?.missingItems ?? []);
+  const startupUnlockRequestPath = useMemo(() => {
+    if (!currentStartupId) {
+      return "/dashboard/help-desk/new?category=startup_patent";
+    }
+
+    const params = new URLSearchParams({
+      category: "startup_patent",
+      priority: "medium",
+      relatedEntityType: "startup",
+      relatedEntityId: currentStartupId,
+      referenceText: form.name || startup?.name || "Startup profile lock",
+      title: `Request startup edit unlock for ${form.name || startup?.name || "startup"}`,
+      description:
+        `The startup profile is locked after submission or approval and I need admin-approved access to update it.\n\n` +
+        `Startup: ${form.name || startup?.name || "Unknown startup"}\n` +
+        `Current review status: ${reviewStatus}\n` +
+        `Reason shown: ${editLockReason || "Profile is locked for review governance."}\n\n` +
+        `Please approve a temporary edit unlock so I can update the startup and resubmit it for review.`,
+    });
+
+    return `/dashboard/help-desk/new?${params.toString()}`;
+  }, [currentStartupId, editLockReason, form.name, reviewStatus, startup?.name]);
   const handleRequestReviewClick = () => {
     if (isRequestReviewBusy) {
       return;
@@ -588,6 +600,7 @@ export function StartupLaunch() {
               <button
                 type="button"
                 onClick={() => deleteDocument.mutate({ startupId: startup!._id, documentId: uploadedDocument._id })}
+                disabled={isEditingLocked}
                 className="rounded-lg border border-slate-700 px-3 py-2 text-xs font-semibold text-slate-200"
               >
                 Remove
@@ -597,8 +610,14 @@ export function StartupLaunch() {
         ) : (
           <label className={uploadLabelClassName}>
             <Upload className="h-4 w-4 text-cyan-300" />
-            {isUploading ? "Uploading..." : "Upload PDF or image (max 3MB)"}
-            <input type="file" accept="application/pdf,.pdf,image/*" className="hidden" onChange={(event) => handleStartupDocumentSelect(spec.category, event)} />
+            {isEditingLocked ? "Uploads are locked" : isUploading ? "Uploading..." : "Upload PDF or image (max 3MB)"}
+            <input
+              type="file"
+              accept="application/pdf,.pdf,image/*"
+              className="hidden"
+              disabled={isEditingLocked}
+              onChange={(event) => handleStartupDocumentSelect(spec.category, event)}
+            />
           </label>
         )}
       </div>
@@ -720,6 +739,18 @@ export function StartupLaunch() {
                   Admin notes: {startup.adminNotes}
                 </div>
               ) : null}
+              {isEditingLocked ? (
+                <div className="rounded-xl border border-amber-500/20 bg-amber-500/10 px-4 py-3 text-sm text-amber-100">
+                  {editLockReason}
+                  <button
+                    type="button"
+                    onClick={() => navigate(startupUnlockRequestPath)}
+                    className="ml-3 font-semibold text-cyan-200 underline underline-offset-4"
+                  >
+                    Raise Smart Help request
+                  </button>
+                </div>
+              ) : null}
               {readiness ? (
                 <div className="rounded-xl border border-white/10 bg-slate-950/40 px-4 py-3 text-sm text-slate-200">
                   {readiness.isReviewReady
@@ -788,28 +819,8 @@ export function StartupLaunch() {
 
       <div className={isNew ? "space-y-8" : "grid gap-8 xl:grid-cols-[minmax(0,1.7fr)_320px]"}>
         <div className="space-y-8">
+          <fieldset disabled={isEditingLocked} className="space-y-8">
           <div className={`${sectionClassName} grid gap-4 md:grid-cols-2`}>
-              <div>
-                <label className="block text-sm font-semibold text-white mb-2">Optional workspace link</label>
-                <select
-                  value={selectedWorkspaceId}
-                  onChange={(event) => handleWorkspaceChange(event.target.value)}
-                  className={fieldClassName}
-                  disabled={workspaceQuery.isLoading}
-                >
-                  <option value="">No linked workspace</option>
-                  {workspaces.map((workspace) => (
-                    <option key={workspace._id} value={workspace._id}>
-                      {workspace.title}
-                    </option>
-                  ))}
-                </select>
-                <div className="mt-2 text-xs text-slate-500">
-                  {activeWorkspace
-                    ? `Team context will follow ${activeWorkspace.title}.`
-                    : "Keep this empty when the startup is not based on an existing workspace."}
-                </div>
-              </div>
               <div>
                 <label className="block text-sm font-semibold text-white mb-2">Startup name</label>
                 <input value={form.name} onChange={(event) => setForm((current) => ({ ...current, name: event.target.value }))} className={fieldClassName} />
@@ -841,6 +852,50 @@ export function StartupLaunch() {
                 <input type="number" value={form.activeProducts} onChange={(event) => setForm((current) => ({ ...current, activeProducts: Number(event.target.value) || 1 }))} className={fieldClassName} />
               </div>
           </div>
+
+          {!isNew ? (
+            <div className={sectionClassName}>
+              <div className="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
+                <div>
+                  <div className="text-xs uppercase tracking-[0.24em] text-cyan-300">Linked Product Workspace</div>
+                  <h2 className="mt-2 text-xl font-semibold text-white">Manage workspace from a dedicated child page</h2>
+                  <p className="mt-2 max-w-3xl text-sm text-slate-400">
+                    This startup now keeps its product workspace in a separate tab. Link an independent workspace there to sync founder access and execution progress.
+                  </p>
+                </div>
+                <button
+                  type="button"
+                  onClick={() => navigate(getStartupSectionPath(startupId!, "product-workspace"))}
+                  className="inline-flex items-center gap-2 rounded-xl border border-cyan-500/30 bg-cyan-500/10 px-4 py-2.5 text-sm font-semibold text-cyan-100 transition hover:border-cyan-400/50 hover:bg-cyan-500/15"
+                >
+                  <FolderKanban className="h-4 w-4" />
+                  Open Workspace Tab
+                </button>
+              </div>
+              <div className="mt-5 grid gap-3 md:grid-cols-3">
+                <div className="rounded-xl border border-slate-800 bg-slate-950/70 p-4">
+                  <div className="text-xs uppercase tracking-[0.2em] text-slate-500">Workspace</div>
+                  <div className="mt-2 text-base font-semibold text-white">
+                    {activeWorkspace?.title ?? "Not linked"}
+                  </div>
+                </div>
+                <div className="rounded-xl border border-slate-800 bg-slate-950/70 p-4">
+                  <div className="text-xs uppercase tracking-[0.2em] text-slate-500">Stage</div>
+                  <div className="mt-2 text-base font-semibold text-white">
+                    {activeWorkspace?.stage ?? "Not linked"}
+                  </div>
+                </div>
+                <div className="rounded-xl border border-slate-800 bg-slate-950/70 p-4">
+                  <div className="text-xs uppercase tracking-[0.2em] text-slate-500">Team Context</div>
+                  <div className="mt-2 text-base font-semibold text-white">
+                    {activeWorkspace
+                      ? `${activeWorkspace.teamMembers?.length ?? activeWorkspace.teamMemberIds?.length ?? 0} members`
+                      : "No team synced"}
+                  </div>
+                </div>
+              </div>
+            </div>
+          ) : null}
 
           <div className={`${sectionClassName} space-y-5`}>
               <div className="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
@@ -972,7 +1027,7 @@ export function StartupLaunch() {
                 </div>
                 <label className="flex items-center gap-3 px-4 py-4 bg-slate-950/70 border border-dashed border-slate-700 rounded-2xl text-white cursor-pointer">
                   <Upload className="w-5 h-5 text-cyan-300" />
-                  {uploadPitch.isPending ? "Uploading pitch deck PDF..." : "Upload pitch deck PDF"}
+                  {isEditingLocked ? "Pitch deck changes are locked" : uploadPitch.isPending ? "Uploading pitch deck PDF..." : "Upload pitch deck PDF"}
                   <input type="file" accept="application/pdf,.pdf" className="hidden" onChange={handlePitchDeckSelect} />
                 </label>
                 <div className="mt-3 text-sm text-slate-400">
@@ -1048,40 +1103,11 @@ export function StartupLaunch() {
               </div>
           </div>
           ) : null}
+          </fieldset>
         </div>
 
         {!isNew ? (
           <div className="space-y-8 xl:sticky xl:top-6 self-start">
-            <div className="overflow-hidden rounded-2xl border border-slate-800/70 bg-slate-900/40">
-              <div className="border-b border-slate-800/70 px-6 py-5">
-                <div className="text-xs font-semibold uppercase tracking-[0.24em] text-cyan-300">Founder Team</div>
-                <h3 className="mt-2 font-semibold text-white">Active workspace members</h3>
-              </div>
-              <div className="px-6 py-5">
-                {founderMembers.length > 0 ? (
-                  <div className="space-y-3">
-                    {founderMembers.map((member) => (
-                      <div key={member._id} className="rounded-xl border border-slate-800 bg-slate-950/80 p-4 flex items-center gap-3">
-                        <div className="w-10 h-10 rounded-full bg-gradient-to-br from-blue-500 to-purple-500 flex items-center justify-center text-white font-bold">
-                          {member.avatar ? <img src={member.avatar} alt={member.displayName} className="w-10 h-10 rounded-full object-cover" /> : member.displayName.slice(0, 1).toUpperCase()}
-                        </div>
-                        <div>
-                          <div className="font-semibold text-white">{member.displayName}</div>
-                          <div className="text-sm text-slate-400">{member.role}</div>
-                        </div>
-                      </div>
-                    ))}
-                  </div>
-                ) : (
-                  <div className="rounded-xl border border-dashed border-slate-800 bg-slate-950/60 px-4 py-5 text-sm text-slate-400">
-                    {activeWorkspace
-                      ? "No workspace members were returned for this startup yet."
-                      : "Link a workspace to sync founders and team access for this startup."}
-                  </div>
-                )}
-              </div>
-            </div>
-
             <div className="overflow-hidden rounded-2xl border border-slate-800/70 bg-slate-900/40">
               <div className="border-b border-slate-800/70 px-6 py-5">
                 <div className="text-xs font-semibold uppercase tracking-[0.24em] text-cyan-300">Launch Checklist</div>
@@ -1093,7 +1119,7 @@ export function StartupLaunch() {
                     <li key={item}>{item}</li>
                   ))}
                   <li>Investor Outreach lets you shortlist investors and send pitch requests for this startup directly</li>
-                  <li>Launch to recruiters is available from your Portfolio too</li>
+                  <li>Use the Product Workspace tab when this startup needs its own linked workspace and synced founder roster</li>
                 </ul>
                 {readiness?.requiredDocumentCategories.length ? (
                   <div className="mt-4 rounded-xl border border-slate-800 bg-slate-950/70 px-4 py-3">
@@ -1162,7 +1188,9 @@ export function StartupLaunch() {
             <p className="mt-1 text-sm text-slate-400">
               {isNew
                 ? "Create the startup first, then return here to submit it for review."
-                : launchBlockedReason || "Save changes after reviewing the full profile, then launch to the marketplace from here."}
+                : isEditingLocked
+                  ? `${editLockReason} Raise a Smart Help request if you need admin-approved edits.`
+                  : launchBlockedReason || "Save changes after reviewing the full profile, then launch to the marketplace from here."}
             </p>
           </div>
           <div className="flex flex-wrap items-center gap-3 sm:justify-end">
@@ -1182,6 +1210,15 @@ export function StartupLaunch() {
                 >
                   {isRequestReviewBusy ? "Submitting..." : isApproved ? "Approved" : isUnderReview ? "Under Review" : "Submit for Review"}
                 </button>
+                {isEditingLocked ? (
+                  <button
+                    type="button"
+                    onClick={() => navigate(startupUnlockRequestPath)}
+                    className="rounded-xl border border-cyan-500/30 bg-cyan-500/10 px-4 py-3 text-sm font-semibold text-cyan-100 transition hover:border-cyan-400/50 hover:bg-cyan-500/15"
+                  >
+                    Request Edit Unlock
+                  </button>
+                ) : null}
                 <button
                   type="button"
                   onClick={handleLaunchClick}
@@ -1199,10 +1236,10 @@ export function StartupLaunch() {
             <button
               type="button"
               onClick={() => persistStartup.mutate()}
-              disabled={persistStartup.isPending}
+              disabled={persistStartup.isPending || isEditingLocked}
               className="rounded-xl bg-white px-5 py-3 text-sm font-semibold text-slate-950 transition hover:bg-slate-100 disabled:cursor-not-allowed disabled:opacity-60"
             >
-              {persistStartup.isPending ? "Saving..." : isNew ? "Create Startup Draft" : reviewStatus === "draft" ? "Save Draft" : "Save Profile"}
+              {persistStartup.isPending ? "Saving..." : isNew ? "Create Startup Draft" : isEditingLocked ? "Profile Locked" : reviewStatus === "draft" ? "Save Draft" : "Save Profile"}
             </button>
           </div>
         </div>
@@ -1213,24 +1250,23 @@ export function StartupLaunch() {
               <div className="flex items-center justify-between mb-6">
                 <h2 className="text-2xl font-bold text-white">Launch Your Startup To:</h2>
                 <button type="button" onClick={() => setShowLaunchModal(false)} className="text-slate-400 hover:text-white"><X className="w-5 h-5" /></button>
-              </div>
-              <div className="mb-5 rounded-lg border border-cyan-500/20 bg-cyan-500/10 px-4 py-3 text-sm text-cyan-100">
-                Approved student-created startups can be launched to investors, mentors, or recruiters. Workspace links are optional and do not come from the Problem Bank unless you choose one.
-              </div>
-              <div className="space-y-3 mb-6">
-                {[
-                  ["investors", "Launch to Investors"],
-                  ["mentors", "Launch to Mentors"],
-                  ["both", "Launch to Both (Recommended)"],
-                  ["recruiters", "Launch to Recruiters"],
-                ].map(([value, label]) => (
-                  <button
-                    key={value}
-                    type="button"
-                    onClick={() => setLaunchTarget(value as "investors" | "mentors" | "both" | "recruiters")}
-                    className={`w-full text-left px-5 py-4 rounded-xl text-white transition ${
-                      launchTarget === value
-                        ? "border border-blue-500/50 bg-blue-500/10"
+                </div>
+                <div className="mb-5 rounded-lg border border-cyan-500/20 bg-cyan-500/10 px-4 py-3 text-sm text-cyan-100">
+                  Approved student-created startups can be launched to investors, mentors, or both. Use the dedicated workspace tab when this startup needs its own linked product workspace.
+                </div>
+                <div className="space-y-3 mb-6">
+                  {[
+                    ["investors", "Launch to Investors"],
+                    ["mentors", "Launch to Mentors"],
+                    ["both", "Launch to Both (Recommended)"],
+                  ].map(([value, label]) => (
+                    <button
+                      key={value}
+                      type="button"
+                      onClick={() => setLaunchTarget(value as "investors" | "mentors" | "both")}
+                      className={`w-full text-left px-5 py-4 rounded-xl text-white transition ${
+                        launchTarget === value
+                          ? "border border-blue-500/50 bg-blue-500/10"
                         : "border border-slate-800 bg-slate-950 hover:border-blue-500/40"
                     }`}
                   >

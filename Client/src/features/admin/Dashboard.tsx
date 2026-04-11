@@ -6,6 +6,7 @@ import {
   BriefcaseBusiness,
   FileText,
   GraduationCap,
+  LifeBuoy,
   ShieldCheck,
   Sparkles,
   Users,
@@ -133,6 +134,14 @@ export default function Dashboard() {
         icon: GraduationCap,
       },
       {
+        label: 'Help Desk',
+        path: '/dashboard/admin/help-desk',
+        eyebrow: 'Support queue',
+        description: 'Resolve text-based query tickets and publish admin notes back to the original requester.',
+        meta: 'Ticket queue for platform issues',
+        icon: LifeBuoy,
+      },
+      {
         label: 'Analytics',
         path: '/dashboard/admin/analytics',
         eyebrow: 'Platform insights',
@@ -164,6 +173,9 @@ export default function Dashboard() {
               </Button>
               <Button variant="secondary" onClick={() => navigate('/dashboard/admin/mentorship/requests')}>
                 Open Mentorship
+              </Button>
+              <Button variant="secondary" onClick={() => navigate('/dashboard/admin/help-desk')}>
+                Open Help Desk
               </Button>
               <Button onClick={() => navigate('/dashboard/admin/analytics')}>
                 Open Analytics

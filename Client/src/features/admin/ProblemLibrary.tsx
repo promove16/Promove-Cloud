@@ -4,13 +4,13 @@ import { type AdminProblem, type AdminProblemPayload, adminApi } from '../../api
 import { Button } from '../../components/ui/Button';
 import { Card } from '../../components/ui/Card';
 import { Spinner } from '../../components/ui/Spinner';
-import { type Problem } from '../../types/problem.types';
+import { PROBLEM_CATEGORIES, type Problem } from '../../types/problem.types';
 import { getApiErrorMessage } from '../../utils/apiError';
 
 const emptyForm: AdminProblemPayload = {
   title: '',
   description: '',
-  category: 'Technology',
+  category: 'Agriculture & AgriTech',
   difficulty: 'Medium',
   domain: '',
   tags: [],
@@ -201,7 +201,7 @@ export default function ProblemLibrary() {
               }
               className="rounded-xl border border-slate-800 bg-slate-950 px-4 py-3 text-white"
             >
-              {['Agriculture', 'Technology', 'Healthcare', 'Education', 'Environment', 'Rural Development', 'Other'].map((item) => (
+              {PROBLEM_CATEGORIES.map((item) => (
                 <option key={item} value={item}>
                   {item}
                 </option>

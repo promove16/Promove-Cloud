@@ -13,12 +13,14 @@ import {
   awardRejectSchema,
   createMentorProfileSchema,
   dealReviewSchema,
+  helpDeskTicketsQuerySchema,
   listMentorshipProgramsQuerySchema,
   listRegistrationRequestsQuerySchema,
   listUsersQuerySchema,
   milestoneVerifySchema,
   patentRejectSchema,
   registrationRequestReviewSchema,
+  resolveHelpDeskTicketSchema,
 } from './admin.validation';
 import {
   approveAward,
@@ -35,12 +37,14 @@ import {
   getAnalyticsLogs,
   getAnalyticsUserDetail,
   getAnalyticsUsers,
+  getHelpDeskTickets,
   getInvestmentTypeBreakdown,
   listAwards,
   listDealsAwaitingApproval,
   listPatents,
   listRegistrationRequests,
   listUsers,
+  resolveHelpDeskTicket,
   reviewDeal,
   reviewRegistrationRequest,
   rejectAward,
@@ -54,6 +58,7 @@ import {
   verifyMilestone,
 } from './admin.service';
 import {
+  approveStartupEditUnlock,
   listStartupsForAdmin,
   reviewStartupSubmission,
   reviewStartupSubmissionSchema,
@@ -214,6 +219,15 @@ export const reviewStartupController = async (req: Request, res: Response) => {
   res.status(200).json(new ApiResponse(startup));
 };
 
+export const unlockLaunchFormController = async (req: Request, res: Response) => {
+  if (!req.user) throw new ApiError(401, 'UNAUTHORIZED', 'Invalid or expired token');
+  const startupId = getParam(req.params.id);
+  if (!startupId || !isObjectId(startupId)) throw new ApiError(400, 'INVALID_ID', 'Invalid ID format');
+  const { reason } = req.body as { reason?: string };
+  const startup = await approveStartupEditUnlock(req.user._id, startupId, { reason });
+  res.status(200).json(new ApiResponse(startup));
+};
+
 export const getDealController = async (req: Request, res: Response) => {
   const dealId = getParam(req.params.id);
   if (!dealId || !isObjectId(dealId)) throw new ApiError(400, 'INVALID_ID', 'Invalid ID format');
@@ -279,10 +293,23 @@ export const getAnalyticsUsersController = async (req: Request, res: Response) =
   res.status(200).json(new ApiResponse(await getAnalyticsUsers(query.q, query.limit)));
 };
 
+export const getHelpDeskTicketsController = async (req: Request, res: Response) => {
+  const query = helpDeskTicketsQuerySchema.parse(req.query);
+  res.status(200).json(new ApiResponse(await getHelpDeskTickets(query.status)));
+};
+
 export const getAnalyticsUserDetailController = async (req: Request, res: Response) => {
   const userId = getParam(req.params.userId);
   if (!userId || !isObjectId(userId)) throw new ApiError(400, 'INVALID_ID', 'Invalid ID format');
   res.status(200).json(new ApiResponse(await getAnalyticsUserDetail(userId)));
+};
+
+export const resolveHelpDeskTicketController = async (req: Request, res: Response) => {
+  if (!req.user) throw new ApiError(401, 'UNAUTHORIZED', 'Invalid or expired token');
+  const requestId = getParam(req.params.id);
+  if (!requestId || !isObjectId(requestId)) throw new ApiError(400, 'INVALID_ID', 'Invalid ID format');
+  const payload = resolveHelpDeskTicketSchema.parse(req.body);
+  res.status(200).json(new ApiResponse(await resolveHelpDeskTicket(req.user._id, requestId, payload)));
 };
 
 export const verifyMilestoneController = async (req: Request, res: Response) => {

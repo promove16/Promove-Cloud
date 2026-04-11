@@ -621,7 +621,7 @@ export const listInstitutionStartups = async (
       .filter((name): name is string => Boolean(name)),
     activeProducts: startup.activeProducts,
     teamSize: startup.teamSize,
-    reviewStatus: startup.reviewStatus,
+    reviewStatus: startup.reviewStatus ?? 'draft',
     ...(startup.launchedAt ? { launchedAt: startup.launchedAt.toISOString() } : {}),
     updatedAt: startup.updatedAt.toISOString(),
   }));

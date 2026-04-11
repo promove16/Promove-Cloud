@@ -1,13 +1,17 @@
 import { Types } from 'mongoose';
 
-export type ProblemCategory =
-  | 'Agriculture'
-  | 'Technology'
-  | 'Healthcare'
-  | 'Education'
-  | 'Environment'
-  | 'Rural Development'
-  | 'Other';
+export const PROBLEM_CATEGORIES = [
+  'Agriculture & AgriTech',
+  'Renewable Energy & Sustainability',
+  'Healthcare & MedTech',
+  'Education & Skill Development (EdTech)',
+  'Smart Cities & Infrastructure',
+  'Transportation & Mobility',
+  'Finance & Financial Inclusion (FinTech)',
+  'Manufacturing & Industry 4.0',
+] as const;
+
+export type ProblemCategory = (typeof PROBLEM_CATEGORIES)[number];
 
 export type ProblemDifficulty = 'Easy' | 'Medium' | 'Hard';
 export type ProblemPublicationStatus = 'draft' | 'published' | 'archived';

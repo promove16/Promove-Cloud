@@ -76,6 +76,25 @@ export interface StartupReadiness {
   uploadedDocumentCategories: StartupDocumentCategory[];
 }
 
+export interface StartupEditAccess {
+  isLocked: boolean;
+  canEdit: boolean;
+  requiresAdminUnlock: boolean;
+  unlockedByAdmin: boolean;
+  reason: string;
+  unlockedAt?: Date;
+  unlockedBy?: Types.ObjectId | null;
+  unlockReason?: string;
+  launchFormLocked: boolean;
+  launchFormCanEdit: boolean;
+  launchFormRequiresUnlock: boolean;
+  launchFormUnlockedByAdmin: boolean;
+  launchFormReason: string;
+  launchFormUnlockedAt?: Date;
+  launchFormUnlockedBy?: Types.ObjectId | null;
+  launchFormUnlockReason?: string;
+}
+
 export interface IStartup {
   _id: Types.ObjectId;
   founderIds: Types.ObjectId[];
@@ -97,6 +116,12 @@ export interface IStartup {
   launchedToMentors: boolean;
   launchedToRecruiters: boolean;
   launchedAt?: Date;
+  launchFormLocked: boolean;
+  launchFormLockedAt?: Date;
+  launchFormUnlockedByAdmin: boolean;
+  launchFormUnlockedAt?: Date;
+  launchFormUnlockedBy?: Types.ObjectId | null;
+  launchFormUnlockReason?: string;
   innovationScoreAtLaunch: number;
   totalShares: number;
   availableShares: number;
@@ -116,6 +141,11 @@ export interface IStartup {
   adminReviewedAt?: Date;
   adminReviewedBy?: Types.ObjectId | null;
   adminNotes?: string;
+  adminEditUnlockActive: boolean;
+  adminEditUnlockApprovedAt?: Date;
+  adminEditUnlockApprovedBy?: Types.ObjectId | null;
+  adminEditUnlockReason?: string;
+  editAccess?: StartupEditAccess;
   readiness?: StartupReadiness;
   isActive: boolean;
   createdAt: Date;

@@ -348,7 +348,14 @@ export function InvitationPage({ selectedRequestId, onSelectRequest }: Invitatio
   const [feedback, setFeedback] = useState('');
 
   const allowedPageRoles = useMemo(
-    () => [UserRole.STUDENT, UserRole.RECRUITER, UserRole.INVESTOR, UserRole.MENTOR],
+    () => [
+      UserRole.STUDENT,
+      UserRole.SCHOOL,
+      UserRole.COLLEGE,
+      UserRole.RECRUITER,
+      UserRole.INVESTOR,
+      UserRole.MENTOR,
+    ],
     [],
   );
   const canOpenPage = Boolean(user && currentRole && allowedPageRoles.includes(currentRole));

@@ -81,7 +81,7 @@ function getPortfolioStats(entity: MarketplaceUserDetail) {
   if (entity.entityType === "investor") {
     return [
       { label: "Portfolio", value: entity.relatedCounts.startups },
-      { label: "Experience", value: entity.insightCounts.experience },
+      { label: "Skills", value: entity.insightCounts.skills },
       { label: "Education", value: entity.insightCounts.education },
       { label: "Repos", value: entity.githubStats?.totalRepos ?? 0 },
     ];
@@ -236,7 +236,7 @@ export function UserPortfolioViewContent({
   const portfolioHighlights = entity?.portfolioHighlights ?? [];
 
   const previousEntries = useMemo(() => {
-    if (!entity || isInstitution) return [];
+    if (!entity || isInstitution || entity.entityType === "investor") return [];
     return experienceHighlights.slice(0, 3).map((e) => ({
       company: e.company,
       role: e.title,
@@ -496,39 +496,40 @@ export function UserPortfolioViewContent({
                       </section>
                     ) : null}
 
-                    {/* Experience timeline */}
-                    <section className="rounded-2xl border border-slate-800 bg-slate-900 p-4 sm:p-6">
-                      <div className="flex items-center justify-between border-b border-slate-800 pb-3">
-                        <h3 className="text-[34px] font-semibold leading-none text-slate-100">Experience</h3>
-                        <span className="text-sm font-medium text-sky-600">Show Details</span>
-                      </div>
-                      {experienceHighlights.length > 0 ? (
-                        <div className="relative mt-4 pl-10">
-                          <div className="absolute bottom-2 left-3.5 top-2 w-px bg-slate-800" />
-                          <div className="space-y-6">
-                            {experienceHighlights.slice(0, 4).map((item, index) => (
-                              <article key={`${item.company}-${item.title}-${index}`} className="relative border-b border-slate-800 pb-5 last:border-b-0 last:pb-0">
-                                <span className={`absolute -left-10 top-1 h-4 w-4 rounded-full border-2 ${index === 0 ? "border-cyan-400" : "border-slate-600"} bg-slate-950`} />
-                                <div className="grid gap-3 sm:grid-cols-[minmax(0,1fr)_180px]">
-                                  <div>
-                                    <div className="text-2xl font-medium text-slate-100">
-                                      {item.title} <span className="mx-2 text-slate-500">—</span>
-                                      <span className="text-xl text-slate-400">{item.company}</span>
-                                    </div>
-                                    {item.location ? <div className="mt-1 text-sm text-slate-400">{item.location}</div> : null}
-                                  </div>
-                                  <div className="text-right text-sm font-medium text-slate-400">
-                                    {formatDate(item.startDate)} - {item.isCurrent ? "currently" : formatDate(item.endDate ?? undefined)}
-                                  </div>
-                                </div>
-                              </article>
-                            ))}
-                          </div>
+                    {entity.entityType !== "investor" ? (
+                      <section className="rounded-2xl border border-slate-800 bg-slate-900 p-4 sm:p-6">
+                        <div className="flex items-center justify-between border-b border-slate-800 pb-3">
+                          <h3 className="text-[34px] font-semibold leading-none text-slate-100">Experience</h3>
+                          <span className="text-sm font-medium text-sky-600">Show Details</span>
                         </div>
-                      ) : (
-                        <div className="mt-4 text-sm text-slate-400">No experience has been added yet.</div>
-                      )}
-                    </section>
+                        {experienceHighlights.length > 0 ? (
+                          <div className="relative mt-4 pl-10">
+                            <div className="absolute bottom-2 left-3.5 top-2 w-px bg-slate-800" />
+                            <div className="space-y-6">
+                              {experienceHighlights.slice(0, 4).map((item, index) => (
+                                <article key={`${item.company}-${item.title}-${index}`} className="relative border-b border-slate-800 pb-5 last:border-b-0 last:pb-0">
+                                  <span className={`absolute -left-10 top-1 h-4 w-4 rounded-full border-2 ${index === 0 ? "border-cyan-400" : "border-slate-600"} bg-slate-950`} />
+                                  <div className="grid gap-3 sm:grid-cols-[minmax(0,1fr)_180px]">
+                                    <div>
+                                      <div className="text-2xl font-medium text-slate-100">
+                                        {item.title} <span className="mx-2 text-slate-500">-</span>
+                                        <span className="text-xl text-slate-400">{item.company}</span>
+                                      </div>
+                                      {item.location ? <div className="mt-1 text-sm text-slate-400">{item.location}</div> : null}
+                                    </div>
+                                    <div className="text-right text-sm font-medium text-slate-400">
+                                      {formatDate(item.startDate)} - {item.isCurrent ? "currently" : formatDate(item.endDate ?? undefined)}
+                                    </div>
+                                  </div>
+                                </article>
+                              ))}
+                            </div>
+                          </div>
+                        ) : (
+                          <div className="mt-4 text-sm text-slate-400">No experience has been added yet.</div>
+                        )}
+                      </section>
+                    ) : null}
 
                     {/* Skills + Featured */}
                     <section className="grid gap-4 lg:grid-cols-2">

@@ -132,6 +132,8 @@ const createAuthSessionStoreError = () =>
     'Authentication session store is temporarily unavailable. Please try again.',
   );
 
+const shouldAllowRedisAuthFallback = () => env.AUTH_ALLOW_REDIS_AUTH_FALLBACK;
+
 const persistRefreshSession = async (
   refreshTokenId: string,
   user: SanitizedUser,
@@ -359,6 +361,68 @@ const assertUserCanAuthenticate = (user: UserDocument) => {
   if (!user.isActive && user.role !== UserRole.STUDENT) {
     throw new ApiError(403, 'ACCESS_DISABLED', 'Your account is currently inactive');
   }
+};
+
+const comparePasswordWithHash = async (
+  password: string,
+  passwordHash: string | null | undefined,
+) => {
+  if (!passwordHash) {
+    return false;
+  }
+
+  try {
+    return await bcrypt.compare(password, passwordHash);
+  } catch (error) {
+    logError('Failed to compare stored password hash', error);
+    return false;
+  }
+};
+
+const getLegacyPasswordHash = async (userId: UserDocument['_id']) => {
+  const legacyUser = await User.collection.findOne(
+    { _id: userId },
+    { projection: { password: 1 } },
+  );
+
+  return typeof legacyUser?.password === 'string' && legacyUser.password.length > 0
+    ? legacyUser.password
+    : null;
+};
+
+const upgradeLegacyPasswordHash = async (
+  user: UserDocument,
+  legacyPasswordHash: string,
+) => {
+  await User.collection.updateOne(
+    { _id: user._id },
+    {
+      $set: { passwordHash: legacyPasswordHash },
+      $unset: { password: '' },
+    },
+  );
+
+  user.passwordHash = legacyPasswordHash;
+};
+
+const verifyLoginPassword = async (user: UserDocument, password: string) => {
+  const currentPasswordHash =
+    typeof user.passwordHash === 'string' && user.passwordHash.length > 0
+      ? user.passwordHash
+      : undefined;
+
+  if (await comparePasswordWithHash(password, currentPasswordHash)) {
+    return true;
+  }
+
+  const legacyPasswordHash = await getLegacyPasswordHash(user._id);
+
+  if (!(await comparePasswordWithHash(password, legacyPasswordHash))) {
+    return false;
+  }
+
+  await upgradeLegacyPasswordHash(user, legacyPasswordHash!);
+  return true;
 };
 
 const issueAuthResultForUser = async (user: UserDocument): Promise<AuthResult> => {
@@ -868,7 +932,7 @@ export const loginUser = async (payload: {
     throw new ApiError(401, 'INVALID_CREDENTIALS', 'Invalid email or password');
   }
 
-  const passwordMatches = await bcrypt.compare(payload.password, user.passwordHash);
+  const passwordMatches = await verifyLoginPassword(user, payload.password);
 
   if (!passwordMatches) {
     throw new ApiError(401, 'INVALID_CREDENTIALS', 'Invalid email or password');
@@ -905,7 +969,12 @@ export const refreshUserToken = async (refreshToken: string | undefined): Promis
     storedUserId = await redis.get<string>(key);
   } catch (error) {
     logError('Failed to read refresh session from Redis', error);
-    throw createAuthSessionStoreError();
+
+    if (!shouldAllowRedisAuthFallback()) {
+      throw createAuthSessionStoreError();
+    }
+
+    storedUserId = decoded._id;
   }
 
   if (!storedUserId || storedUserId !== decoded._id) {
@@ -916,7 +985,10 @@ export const refreshUserToken = async (refreshToken: string | undefined): Promis
     await deleteRefreshSession(decoded._id, decoded.tokenId);
   } catch (error) {
     logError('Failed to rotate refresh session in Redis', error);
-    throw createAuthSessionStoreError();
+
+    if (!shouldAllowRedisAuthFallback()) {
+      throw createAuthSessionStoreError();
+    }
   }
 
   const user = await User.findById(decoded._id);

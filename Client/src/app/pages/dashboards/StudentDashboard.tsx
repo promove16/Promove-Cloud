@@ -629,6 +629,10 @@ export function StudentDashboard() {
                 activeDealCountByStartupId.get(startup._id) ?? 0,
               );
               const startupLive = isStartupLive(startup);
+              const reviewStatusLabel = (startup.reviewStatus ?? "draft").replace(
+                /_/g,
+                " ",
+              );
               return (
                 <div
                   key={startup._id}
@@ -675,7 +679,7 @@ export function StudentDashboard() {
                     {workflow.nextActionDetail}
                   </p>
                   <div className="mt-4 flex items-center justify-between border-t border-slate-800 pt-3 text-xs text-slate-400">
-                    <span>{startup.reviewStatus.replace(/_/g, " ")}</span>
+                    <span>{reviewStatusLabel}</span>
                     <span>{activeDealCountByStartupId.get(startup._id) ?? 0} active deals</span>
                   </div>
                   <div className="mt-3 text-right">

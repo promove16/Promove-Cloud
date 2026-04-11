@@ -5,6 +5,7 @@ import { randomUUID } from 'crypto';
 import request from 'supertest';
 import app from '../../src/app';
 import { env } from '../../src/config/env';
+import { redis } from '../../src/config/redis';
 import { InstitutionStudentRosterEntry } from '../../src/modules/institution/studentRoster.model';
 import { User } from '../../src/modules/user/user.model';
 import {
@@ -569,6 +570,46 @@ describe('auth integration', () => {
       expect(response.body.error.code).toBe('ADMIN_APPROVAL_PENDING');
     });
 
+    it('allows legacy users with a password field to log in and upgrades their record', async () => {
+      const email = `legacy-${randomUUID()}@example.com`;
+      const legacyPasswordHash = await bcrypt.hash(PASSWORD, 12);
+
+      await User.collection.insertOne({
+        email,
+        password: legacyPasswordHash,
+        role: UserRole.MENTOR,
+        displayName: 'Legacy Mentor',
+        profileComplete: true,
+        registrationStage: 'complete',
+        accessGrantedBy: 'admin',
+        accessExpiresAt: new Date(Date.now() + 365 * 24 * 60 * 60 * 1000),
+        isActive: true,
+        institutionToken: null,
+        institutionId: null,
+        institutionVerificationStatus: 'none',
+        verificationStatus: 'not_required',
+        adminApprovalStatus: 'approved',
+        adminApprovedAt: new Date(),
+        createdAt: new Date(),
+        updatedAt: new Date(),
+      });
+
+      const response = await request(app).post('/api/auth/login').send({
+        email,
+        password: PASSWORD,
+      });
+
+      expect(response.status).toBe(200);
+      expect(response.body.data.user.email).toBe(email);
+
+      const upgradedUser = await User.collection.findOne(
+        { email },
+        { projection: { password: 1, passwordHash: 1 } },
+      );
+      expect(upgradedUser?.passwordHash).toBe(legacyPasswordHash);
+      expect(upgradedUser?.password).toBeUndefined();
+    });
+
     it('accepts a college registration request only when required verification documents are uploaded', async () => {
       const email = `college-${randomUUID()}@example.com`;
       const requiredCategories = [
@@ -1021,6 +1062,63 @@ describe('auth integration', () => {
 
       expect(response.status).toBe(401);
       expect(response.body.error.code).toBe('UNAUTHORIZED');
+    });
+
+    it('falls back to JWT refresh when Redis session reads time out and fallback is enabled', async () => {
+      const originalFallback = env.AUTH_ALLOW_REDIS_AUTH_FALLBACK;
+      env.AUTH_ALLOW_REDIS_AUTH_FALLBACK = true;
+
+      const { email } = await createApprovedUser({
+        role: UserRole.STUDENT,
+        email: `student-${randomUUID()}@example.com`,
+        displayName: 'Redis Fallback Student',
+      });
+
+      const login = await loginAs(email);
+      const redisGetSpy = jest
+        .spyOn(redis, 'get')
+        .mockRejectedValueOnce(new Error('The operation was aborted due to timeout'));
+
+      try {
+        const response = await request(app)
+          .post('/api/auth/refresh')
+          .set('Cookie', login.cookie!);
+
+        expect(response.status).toBe(200);
+        expect(response.body.data.accessToken).toEqual(expect.any(String));
+        expect(response.headers['set-cookie']?.[0]).toContain('refreshToken=');
+      } finally {
+        env.AUTH_ALLOW_REDIS_AUTH_FALLBACK = originalFallback;
+        redisGetSpy.mockRestore();
+      }
+    });
+
+    it('returns 503 when Redis session reads time out and fallback is disabled', async () => {
+      const originalFallback = env.AUTH_ALLOW_REDIS_AUTH_FALLBACK;
+      env.AUTH_ALLOW_REDIS_AUTH_FALLBACK = false;
+
+      const { email } = await createApprovedUser({
+        role: UserRole.STUDENT,
+        email: `student-${randomUUID()}@example.com`,
+        displayName: 'Strict Redis Student',
+      });
+
+      const login = await loginAs(email);
+      const redisGetSpy = jest
+        .spyOn(redis, 'get')
+        .mockRejectedValueOnce(new Error('The operation was aborted due to timeout'));
+
+      try {
+        const response = await request(app)
+          .post('/api/auth/refresh')
+          .set('Cookie', login.cookie!);
+
+        expect(response.status).toBe(503);
+        expect(response.body.error.code).toBe('AUTH_SESSION_STORE_UNAVAILABLE');
+      } finally {
+        env.AUTH_ALLOW_REDIS_AUTH_FALLBACK = originalFallback;
+        redisGetSpy.mockRestore();
+      }
     });
   });
 });

@@ -132,14 +132,11 @@ export const claimEmailRequestsForUser = async (
   }
 
   await RequestRecord.updateMany(
-    scopedRequestFilter(
-      {
-        recipientEmail: normalizedEmail,
-        status: 'pending',
-        $or: [{ toUserId: { $exists: false } }, { toUserId: null }],
-      },
-      institutionId,
-    ),
+    {
+      recipientEmail: normalizedEmail,
+      status: 'pending',
+      $or: [{ toUserId: { $exists: false } }, { toUserId: null }],
+    },
     { $set: { toUserId: objectId(userId) } },
   );
 };
@@ -187,7 +184,7 @@ type RequestView = {
   toUser?: UserSummary;
 };
 
-const serializeRequests = async (requests: IRequest[]): Promise<RequestView[]> => {
+export const serializeRequests = async (requests: IRequest[]): Promise<RequestView[]> => {
   const userIds = Array.from(
     new Set(
       requests.flatMap((request) => [
@@ -442,18 +439,14 @@ export const listIncomingRequests = async (
   institutionId?: string | null,
 ) => {
   await claimEmailRequestsForUser(userId, email, institutionId);
-  const requests = await RequestRecord.find(
-    scopedRequestFilter(requestRecipientFilter(userId, normalizeEmail(email) ?? ''), institutionId),
-  )
+  const requests = await RequestRecord.find(requestRecipientFilter(userId, normalizeEmail(email) ?? ''))
     .sort({ status: 1, createdAt: -1 })
     .lean<IRequest[]>();
   return serializeRequests(requests);
 };
 
 export const listOutgoingRequests = async (userId: string, institutionId?: string | null) => {
-  const requests = await RequestRecord.find(
-    scopedRequestFilter({ fromUserId: objectId(userId) }, institutionId),
-  )
+  const requests = await RequestRecord.find({ fromUserId: objectId(userId) })
     .sort({ status: 1, createdAt: -1 })
     .lean<IRequest[]>();
   return serializeRequests(requests);
@@ -468,7 +461,7 @@ export const getRequestForUser = async (
   await claimEmailRequestsForUser(userId, email, institutionId);
   const request = await RequestRecord.findOne({
     _id: requestId,
-    ...scopedRequestFilter(requestVisibilityFilter(userId, normalizeEmail(email) ?? ''), institutionId),
+    ...requestVisibilityFilter(userId, normalizeEmail(email) ?? ''),
   }).lean<IRequest | null>();
 
   if (!request) {
@@ -487,7 +480,7 @@ const getActionableRecipientRequest = async (
   await claimEmailRequestsForUser(userId, email, institutionId);
   const request = await RequestRecord.findOne({
     _id: requestId,
-    ...scopedRequestFilter(requestRecipientFilter(userId, normalizeEmail(email) ?? ''), institutionId),
+    ...requestRecipientFilter(userId, normalizeEmail(email) ?? ''),
   });
 
   if (!request) {
@@ -599,9 +592,7 @@ export const withdrawRequest = async (
   actorUserId: string,
   institutionId?: string | null,
 ) => {
-  const request = await RequestRecord.findOne(
-    scopedRequestFilter({ _id: requestId, fromUserId: actorUserId }, institutionId),
-  );
+  const request = await RequestRecord.findOne({ _id: requestId, fromUserId: actorUserId });
 
   if (!request) {
     throw new ApiError(404, 'REQUEST_NOT_FOUND', 'Request not found.');

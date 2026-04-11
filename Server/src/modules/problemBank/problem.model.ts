@@ -1,5 +1,5 @@
 import { Schema, model } from 'mongoose';
-import { IProblem } from './problem.types';
+import { IProblem, PROBLEM_CATEGORIES } from './problem.types';
 
 const submissionConfigSchema = new Schema<IProblem['submissionConfig']>(
   {
@@ -22,7 +22,7 @@ const problemSchema = new Schema<IProblem>(
     category: {
       type: String,
       required: true,
-      enum: ['Agriculture', 'Technology', 'Healthcare', 'Education', 'Environment', 'Rural Development', 'Other'],
+      enum: PROBLEM_CATEGORIES,
     },
     difficulty: {
       type: String,

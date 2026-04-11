@@ -10,7 +10,6 @@ import {
   ArrowLeft,
   CheckCircle,
   Clock,
-  Filter,
   Loader2,
   Search,
   Tag,
@@ -22,84 +21,16 @@ import {
 import { DashboardLayout } from "../components/DashboardLayout";
 import { problemBankApi } from "../../api/problemBank.api";
 import { workspaceApi } from "../../api/workspace.api";
-import { Problem, ProblemLeaderboardEntry } from "../../types/problem.types";
+import {
+  PROBLEM_CATEGORIES,
+  Problem,
+  ProblemLeaderboardEntry,
+} from "../../types/problem.types";
 import { useAuthStore } from "../../store/authStore";
 import { UserRole } from "../../types/roles.types";
 import { getApiErrorMessage } from "../../utils/apiError";
 
-const categoryOptions = [
-  "All Problems",
-  "Agriculture",
-  "Environment",
-  "Healthcare",
-  "Technology",
-  "Education",
-  "Rural Development",
-  "Other",
-];
-
-const allDifficultyFilter = "All Difficulties";
-const allDomainFilter = "All Domains";
-const difficultyOptions = [
-  allDifficultyFilter,
-  "Easy",
-  "Medium",
-  "Hard",
-] as const;
-
-const domainFiltersByCategory: Record<
-  Problem["category"] | "All Problems",
-  string[]
-> = {
-  "All Problems": [
-    "Agriculture & AgriTech",
-    "Renewable Energy & Sustainability",
-    "Healthcare & MedTech",
-    "Education & Skill Development (EdTech)",
-    "Smart Cities & Infrastructure",
-    "Finance & Financial Inclusion (FinTech)",
-    "Manufacturing & Industry 4.0",
-    "Agritech",
-    "Supply Chain",
-    "FinTech",
-    "Accessibility",
-    "EdTech",
-    "HealthTech",
-    "Sustainability",
-    "Climate",
-    "Hardware",
-    "IoT",
-    "Software",
-    "Employment",
-    "Commerce",
-    "Mobility",
-  ],
-  Agriculture: ["Agriculture & AgriTech", "Agritech", "Supply Chain", "FinTech", "Climate", "IoT"],
-  Environment: ["Renewable Energy & Sustainability", "Sustainability", "Climate", "Hardware", "Water", "IoT"],
-  Healthcare: ["Healthcare & MedTech", "HealthTech", "Diagnostics", "Accessibility", "IoT"],
-  Technology: [
-    "Smart Cities & Infrastructure",
-    "Finance & Financial Inclusion (FinTech)",
-    "Manufacturing & Industry 4.0",
-    "IoT",
-    "Software",
-    "Hardware",
-    "AI",
-    "Automation",
-  ],
-  Education: ["Education & Skill Development (EdTech)", "EdTech", "Accessibility", "Learning", "Software"],
-  "Rural Development": [
-    "Employment",
-    "Commerce",
-    "Supply Chain",
-    "Accessibility",
-  ],
-  Other: ["Mobility", "Accessibility", "Commerce", "Safety"],
-};
-
-const getDomainFilters = (category: string) =>
-  domainFiltersByCategory[category as Problem["category"] | "All Problems"] ??
-  domainFiltersByCategory["All Problems"];
+const categoryOptions = ["All Problems", ...PROBLEM_CATEGORIES];
 
 const timeAgo = (value: string) => {
   const milliseconds = Date.now() - new Date(value).getTime();
@@ -170,10 +101,6 @@ export function ProblemBank() {
   const queryClient = useQueryClient();
   const authUser = useAuthStore((state) => state.user);
   const [selectedCategory, setSelectedCategory] = useState("All Problems");
-  const [selectedDifficulty, setSelectedDifficulty] =
-    useState<(typeof difficultyOptions)[number]>(allDifficultyFilter);
-  const [selectedDomain, setSelectedDomain] = useState(allDomainFilter);
-  const [showMoreFilters, setShowMoreFilters] = useState(false);
   const [searchValue, setSearchValue] = useState("");
   const [selectedProblemId, setSelectedProblemId] = useState<string | null>(
     null,
@@ -190,25 +117,11 @@ export function ProblemBank() {
     viewerRole === UserRole.STUDENT ||
     viewerRole === UserRole.MENTOR ||
     viewerRole === UserRole.INVESTOR;
-  const domainOptions = useMemo(
-    () => getDomainFilters(selectedCategory),
-    [selectedCategory],
-  );
-  const hasMoreFilters =
-    selectedDifficulty !== allDifficultyFilter ||
-    selectedDomain !== allDomainFilter;
-  const activeFilterCount =
-    (selectedCategory === "All Problems" ? 0 : 1) +
-    (selectedDifficulty === allDifficultyFilter ? 0 : 1) +
-    (selectedDomain === allDomainFilter ? 0 : 1) +
-    (deferredSearchQuery ? 1 : 0);
 
   const problemsQuery = useInfiniteQuery({
     queryKey: [
       "problems",
       selectedCategory,
-      selectedDifficulty,
-      selectedDomain,
       deferredSearchQuery,
     ],
     queryFn: ({ pageParam = 1 }) =>
@@ -218,11 +131,6 @@ export function ProblemBank() {
         search: deferredSearchQuery || undefined,
         category:
           selectedCategory === "All Problems" ? undefined : selectedCategory,
-        difficulty:
-          selectedDifficulty === allDifficultyFilter
-            ? undefined
-            : selectedDifficulty,
-        domain: selectedDomain === allDomainFilter ? undefined : selectedDomain,
       }),
     getNextPageParam: (lastPage) => {
       const { meta } = lastPage;
@@ -265,15 +173,6 @@ export function ProblemBank() {
   const selectedProblemWorkspaceId = selectedProblem
     ? getProblemWorkspaceId(selectedProblem)
     : null;
-
-  useEffect(() => {
-    if (
-      selectedDomain !== allDomainFilter &&
-      !domainOptions.includes(selectedDomain)
-    ) {
-      setSelectedDomain(allDomainFilter);
-    }
-  }, [domainOptions, selectedDomain]);
 
   useEffect(() => {
     setReviewNote("");
@@ -399,24 +298,6 @@ export function ProblemBank() {
     setSelectedProblemId(null);
   };
 
-  const resetFilters = () => {
-    setSelectedCategory("All Problems");
-    setSelectedDifficulty(allDifficultyFilter);
-    setSelectedDomain(allDomainFilter);
-    setSearchValue("");
-  };
-
-  const selectCategory = (category: string) => {
-    setSelectedCategory(category);
-    if (
-      selectedDomain !== allDomainFilter &&
-      !getDomainFilters(category).includes(selectedDomain)
-    ) {
-      setSelectedDomain(allDomainFilter);
-    }
-    setShowMoreFilters(true);
-  };
-
   return (
     <DashboardLayout role={viewerRole}>
       <div className="-mx-4 -my-6 min-h-full space-y-6 bg-black px-4 py-6 lg:-mx-8 lg:px-8">
@@ -458,104 +339,14 @@ export function ProblemBank() {
                 className="w-full rounded-lg border border-slate-800 bg-slate-950 py-3 pl-12 pr-4 text-white placeholder-slate-500 focus:border-blue-500 focus:outline-none"
               />
             </div>
-            <button
-              type="button"
-              onClick={() => setShowMoreFilters((current) => !current)}
-              className="flex items-center justify-center gap-2 rounded-lg bg-slate-800 px-6 py-3 font-semibold text-white transition-colors hover:bg-slate-700"
-              aria-expanded={showMoreFilters}
-            >
-              <Filter className="h-5 w-5" />
-              More Filters
-              {activeFilterCount > 0 ? (
-                <span className="rounded-full bg-cyan-500 px-2 py-0.5 text-xs font-bold text-slate-950">
-                  {activeFilterCount}
-                </span>
-              ) : null}
-            </button>
           </div>
-
-          {showMoreFilters ? (
-            <div className="mt-5 space-y-5 border-t border-slate-800 pt-5">
-              <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
-                <div>
-                  <div className="text-xs uppercase tracking-[0.24em] text-slate-500">
-                    More Filters
-                  </div>
-                  <h2 className="mt-1 text-lg font-semibold text-white">
-                    {selectedCategory === "All Problems"
-                      ? "Filters across all categories"
-                      : `${selectedCategory} filters`}
-                  </h2>
-                </div>
-                {activeFilterCount > 0 ? (
-                  <button
-                    type="button"
-                    onClick={resetFilters}
-                    className="self-start rounded-lg border border-slate-800 px-4 py-2 text-sm font-semibold text-slate-300 transition hover:border-slate-600 hover:text-white sm:self-auto"
-                  >
-                    Clear filters
-                  </button>
-                ) : null}
-              </div>
-
-              <div className="grid gap-5 lg:grid-cols-[0.85fr_1.15fr]">
-                <div>
-                  <div className="mb-3 text-sm font-semibold text-slate-300">
-                    Difficulty
-                  </div>
-                  <div className="flex flex-wrap gap-2">
-                    {difficultyOptions.map((difficulty) => (
-                      <button
-                        key={difficulty}
-                        type="button"
-                        onClick={() => setSelectedDifficulty(difficulty)}
-                        className={`rounded-lg border px-3 py-2 text-sm font-medium transition ${
-                          selectedDifficulty === difficulty
-                            ? "border-cyan-400 bg-cyan-500/15 text-cyan-200"
-                            : "border-slate-800 bg-black text-slate-400 hover:border-slate-700 hover:text-slate-200"
-                        }`}
-                      >
-                        {difficulty}
-                      </button>
-                    ))}
-                  </div>
-                </div>
-
-                <div>
-                  <div className="mb-3 text-sm font-semibold text-slate-300">
-                    Domain presets
-                  </div>
-                  <div className="flex flex-wrap gap-2">
-                    {[allDomainFilter, ...domainOptions].map((domain) => (
-                      <button
-                        key={domain}
-                        type="button"
-                        onClick={() => setSelectedDomain(domain)}
-                        className={`rounded-lg border px-3 py-2 text-sm font-medium transition ${
-                          selectedDomain === domain
-                            ? "border-blue-400 bg-blue-500/15 text-blue-200"
-                            : "border-slate-800 bg-black text-slate-400 hover:border-slate-700 hover:text-slate-200"
-                        }`}
-                      >
-                        {domain}
-                      </button>
-                    ))}
-                  </div>
-                  <p className="mt-3 text-xs leading-5 text-slate-500">
-                    Domain presets change with the selected category so the
-                    result list stays focused.
-                  </p>
-                </div>
-              </div>
-            </div>
-          ) : null}
         </div>
 
         <div className="flex flex-wrap gap-2">
           {categoryOptions.map((category) => (
             <button
               key={category}
-              onClick={() => selectCategory(category)}
+              onClick={() => setSelectedCategory(category)}
               className={`rounded-lg px-4 py-2 font-medium transition-all ${
                 selectedCategory === category
                   ? "bg-blue-600 text-white"
@@ -566,32 +357,6 @@ export function ProblemBank() {
             </button>
           ))}
         </div>
-
-        {hasMoreFilters ? (
-          <div className="flex flex-wrap items-center gap-2 text-sm text-slate-400">
-            <span>Active filters:</span>
-            {selectedDifficulty !== allDifficultyFilter ? (
-              <button
-                type="button"
-                onClick={() => setSelectedDifficulty(allDifficultyFilter)}
-                className="inline-flex items-center gap-2 rounded-full border border-cyan-500/30 bg-cyan-500/10 px-3 py-1.5 text-xs font-semibold text-cyan-200"
-              >
-                {selectedDifficulty}
-                <X className="h-3.5 w-3.5" />
-              </button>
-            ) : null}
-            {selectedDomain !== allDomainFilter ? (
-              <button
-                type="button"
-                onClick={() => setSelectedDomain(allDomainFilter)}
-                className="inline-flex items-center gap-2 rounded-full border border-blue-500/30 bg-blue-500/10 px-3 py-1.5 text-xs font-semibold text-blue-200"
-              >
-                {selectedDomain}
-                <X className="h-3.5 w-3.5" />
-              </button>
-            ) : null}
-          </div>
-        ) : null}
 
         {feedback ? (
           <div className="rounded-lg border border-blue-500/20 bg-blue-500/10 p-4 text-sm text-blue-300">

@@ -79,6 +79,25 @@ export interface StartupReadiness {
   uploadedDocumentCategories: StartupDocumentCategory[];
 }
 
+export interface StartupEditAccess {
+  isLocked: boolean;
+  canEdit: boolean;
+  requiresAdminUnlock: boolean;
+  unlockedByAdmin: boolean;
+  reason: string;
+  unlockedAt?: string;
+  unlockedBy?: string | null;
+  unlockReason?: string;
+  launchFormLocked: boolean;
+  launchFormCanEdit: boolean;
+  launchFormRequiresUnlock: boolean;
+  launchFormUnlockedByAdmin: boolean;
+  launchFormReason: string;
+  launchFormUnlockedAt?: string;
+  launchFormUnlockedBy?: string | null;
+  launchFormUnlockReason?: string;
+}
+
 export interface Startup {
   _id: string;
   founderIds: string[];
@@ -114,6 +133,7 @@ export interface Startup {
   adminReviewedAt?: string;
   adminReviewedBy?: string | null;
   adminNotes?: string;
+  editAccess: StartupEditAccess;
   readiness: StartupReadiness;
   isActive: boolean;
   createdAt: string;

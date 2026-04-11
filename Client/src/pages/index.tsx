@@ -91,6 +91,8 @@ const AdminMentorshipProjects = lazy(() => import("../features/admin/MentorshipP
 const AdminProblemBank = lazy(() => import("../features/admin/ProblemBank"));
 const AdminProblemLibrary = lazy(() => import("../features/admin/ProblemLibrary"));
 const AdminProblemReviewQueue = lazy(() => import("../features/admin/ProblemReviewQueue"));
+const SupportAdminConsolePage = lazy(() => import("../features/support/SupportAdminConsolePage"));
+const SupportAdminTicketRoute = lazy(() => import("../features/support/SupportAdminTicketRoute"));
 
 const RecruiterDashboard = lazy(() => import("../features/recruiter/RecruiterDashboardExperience"));
 const RecruiterTalentSearch = lazy(() =>
@@ -136,6 +138,11 @@ const NewStartupPage = lazy(() =>
 const StartupLaunchShell = lazy(() =>
   import("../features/startup/StartupLaunchShell").then((module) => ({
     default: module.StartupLaunchShell,
+  })),
+);
+const StartupWorkspace = lazy(() =>
+  import("../features/startup/StartupWorkspace").then((module) => ({
+    default: module.StartupWorkspace,
   })),
 );
 const InvestorOutreach = lazy(() =>
@@ -242,6 +249,10 @@ const RecruiterMessagesPage = lazy(() =>
     default: module.RecruiterMessagesPage,
   })),
 );
+const SupportHelpDeskPage = lazy(() => import("../features/support/SupportHelpDeskPage"));
+const SupportRaiseQueryPage = lazy(() => import("../features/support/SupportRaiseQueryPage"));
+const SupportTicketListPage = lazy(() => import("../features/support/SupportTicketListPage"));
+const SupportUserTicketRoute = lazy(() => import("../features/support/SupportUserTicketRoute"));
 
 function RootLayout() {
   useRouteActivityTracking();
@@ -542,22 +553,23 @@ export const router = createBrowserRouter([
         path: "/startup-launch/new/overview",
         element: <Navigate to="/startup-launch/new" replace />,
       },
-      {
-        path: "/startup-launch/:startupId",
-        element: (
-          <ProtectedRoleRoute role={UserRole.STUDENT}>
-            <LazyPage component={StartupLaunchShell} />
+        {
+          path: "/startup-launch/:startupId",
+          element: (
+            <ProtectedRoleRoute role={UserRole.STUDENT}>
+              <LazyPage component={StartupLaunchShell} />
           </ProtectedRoleRoute>
         ),
-        children: [
-          { index: true, element: <Navigate to="overview" replace /> },
-          { path: "overview", element: <LazyPage component={StartupLaunch} /> },
-          { path: "investor-outreach", element: <LazyPage component={InvestorOutreach} /> },
-          { path: "cap-table", element: <LazyPage component={StartupCapTable} /> },
-          { path: "investor-deals", element: <LazyPage component={StudentInvestorDeals} /> },
-          { path: "patent-support", element: <LazyPage component={PatentSupport} /> },
-        ],
-      },
+          children: [
+            { index: true, element: <Navigate to="overview" replace /> },
+            { path: "overview", element: <LazyPage component={StartupLaunch} /> },
+            { path: "investor-outreach", element: <LazyPage component={InvestorOutreach} /> },
+            { path: "product-workspace", element: <LazyPage component={StartupWorkspace} /> },
+            { path: "cap-table", element: <LazyPage component={StartupCapTable} /> },
+            { path: "investor-deals", element: <LazyPage component={StudentInvestorDeals} /> },
+            { path: "patent-support", element: <LazyPage component={PatentSupport} /> },
+          ],
+        },
       {
         path: "/portfolio",
         element: (
@@ -738,6 +750,13 @@ export const router = createBrowserRouter([
                   { path: "projects", element: <LazyPage component={AdminMentorshipProjects} /> },
                 ],
               },
+              {
+                path: "help-desk",
+                children: [
+                  { index: true, element: <LazyPage component={SupportAdminConsolePage} /> },
+                  { path: ":ticketId", element: <LazyPage component={SupportAdminTicketRoute} /> },
+                ],
+              },
               { path: "analytics", element: <LazyPage component={AdminAnalyticsTemporary} /> },
               { path: "analytics/*", element: <LazyPage component={AdminAnalyticsTemporary} /> },
             ],
@@ -756,17 +775,27 @@ export const router = createBrowserRouter([
             path: "invitations",
             element: <InvitationsRedirect />,
           },
-          {
-            path: "messages",
-            element: <ProtectedAnyRoute />,
-            children: [
-              { index: true, element: <LazyPage component={MessagesPage} /> },
-              { path: ":partnerId", element: <LazyPage component={MessagesPage} /> },
-            ],
-          },
-          {
-            path: "school",
-            element: <ProtectedRoleRoute role={UserRole.SCHOOL} />,
+            {
+              path: "messages",
+              element: <ProtectedAnyRoute />,
+              children: [
+                { index: true, element: <LazyPage component={MessagesPage} /> },
+                { path: ":partnerId", element: <LazyPage component={MessagesPage} /> },
+              ],
+            },
+            {
+              path: "help-desk",
+              element: <ProtectedAnyRoute />,
+              children: [
+                { index: true, element: <LazyPage component={SupportHelpDeskPage} /> },
+                { path: "new", element: <LazyPage component={SupportRaiseQueryPage} /> },
+                { path: "tickets", element: <LazyPage component={SupportTicketListPage} /> },
+                { path: ":ticketId", element: <LazyPage component={SupportUserTicketRoute} /> },
+              ],
+            },
+            {
+              path: "school",
+              element: <ProtectedRoleRoute role={UserRole.SCHOOL} />,
             children: [
               { index: true, element: <LazyPage component={SchoolDashboard} /> },
               { path: "operations", element: <LazyPage component={SchoolOperationsPage} /> },

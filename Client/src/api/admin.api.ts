@@ -27,6 +27,7 @@ import {
 } from '../types/mentorship.types';
 import { PatentFilingDocuments, PatentSupportingDocument } from '../types/patent.types';
 import { Problem } from '../types/problem.types';
+import { RequestStatus, WorkflowRequest } from '../types/request.types';
 import { UserRole } from '../types/roles.types';
 import { StartupDocument, StartupReadiness, StartupRegistrationProfile, StartupReviewStatus } from '../types/startup.types';
 import { MentorStudentProfile } from './mentor.api';
@@ -686,6 +687,19 @@ export const adminApi = {
   },
   async getAnalytics() {
     const response = await api.get<ApiSuccessResponse<AdminAnalyticsData>>('/api/admin/analytics');
+    return response.data.data;
+  },
+  async getHelpDeskTickets(params?: { status?: Extract<RequestStatus, 'pending' | 'completed'> | 'all' }) {
+    const response = await api.get<ApiSuccessResponse<WorkflowRequest[]>>('/api/admin/help-desk', {
+      params,
+    });
+    return response.data.data;
+  },
+  async resolveHelpDeskTicket(requestId: string, payload: { resolutionNotes: string }) {
+    const response = await api.patch<ApiSuccessResponse<WorkflowRequest>>(
+      `/api/admin/help-desk/${requestId}/resolve`,
+      payload,
+    );
     return response.data.data;
   },
   async getAnalyticsLogs(params?: { limit?: number }) {

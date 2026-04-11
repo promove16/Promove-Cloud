@@ -8,6 +8,7 @@ type InstitutionWorkspaceHeaderProps = {
   description: string;
   headerAction?: ReactNode;
   tabsAction?: ReactNode;
+  showMenu?: boolean;
 };
 
 export function InstitutionWorkspaceHeader({
@@ -17,6 +18,7 @@ export function InstitutionWorkspaceHeader({
   description,
   headerAction,
   tabsAction,
+  showMenu = true,
 }: InstitutionWorkspaceHeaderProps) {
   return (
     <section className="space-y-5">
@@ -29,10 +31,12 @@ export function InstitutionWorkspaceHeader({
         {headerAction ? <div className="shrink-0">{headerAction}</div> : null}
       </div>
 
-      <div className="flex flex-col gap-4 border-b border-slate-800/80 pb-4 xl:flex-row xl:items-end xl:justify-between">
-        <InstitutionWorkspaceMenu mode={mode} className="min-w-0 flex-1" />
-        {tabsAction ? <div className="shrink-0">{tabsAction}</div> : null}
-      </div>
+      {showMenu || tabsAction ? (
+        <div className="flex flex-col gap-4 border-b border-slate-800/80 pb-4 xl:flex-row xl:items-end xl:justify-between">
+          {showMenu ? <InstitutionWorkspaceMenu mode={mode} className="min-w-0 flex-1" /> : <div className="min-w-0 flex-1" />}
+          {tabsAction ? <div className="shrink-0">{tabsAction}</div> : null}
+        </div>
+      ) : null}
     </section>
   );
 }

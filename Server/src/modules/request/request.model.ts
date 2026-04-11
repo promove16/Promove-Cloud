@@ -2,6 +2,7 @@ import { HydratedDocument, Schema, Types, model } from 'mongoose';
 
 export const REQUEST_TYPES = [
   'generic',
+  'helpdesk_ticket',
   'workspace_member',
   'workspace_chat_access',
   'startup_member',

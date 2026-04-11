@@ -2,6 +2,7 @@ import {
   BarChart3,
   BriefcaseBusiness,
   FileText,
+  FolderKanban,
   Rocket,
   Send,
   type LucideIcon,
@@ -38,6 +39,14 @@ export const STARTUP_LAUNCH_SECTION_LINKS: StartupLaunchSectionLink[] = [
       "Founder-managed investor shortlisting, pitch requests, and fundraising conversations.",
     segment: "investor-outreach",
     icon: Send,
+  },
+  {
+    label: "Product Workspace",
+    shortLabel: "Workspace",
+    description:
+      "Link a dedicated product workspace to this startup and review the founder team synced from it.",
+    segment: "product-workspace",
+    icon: FolderKanban,
   },
   {
     label: "Cap Table",

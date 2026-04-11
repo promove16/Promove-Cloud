@@ -72,6 +72,33 @@ export default function Dashboard() {
       announcementTitle="Operations workspace is ready"
       announcementBody={`${recentActivity?.scoreEventsLast30Days ?? 0} score events, ${recentActivity?.patentsLast30Days ?? 0} patents, and ${recentActivity?.startupsLast30Days ?? 0} startups were recorded in the last 30 days. Use the operations workspace for tokens, roster intake, and verification review.`}
       announcementAction={{ label: 'Open Operations', to: '/dashboard/school/operations' }}
+      showcaseTitle="School Showcase"
+      showcaseDescription="Highlight the institution's innovation credibility through rating, mentorship, and startup delivery signals."
+      showcaseCards={[
+        {
+          title: 'IIC Rating',
+          value: `${iicRating} / 5`,
+          description: 'Current institution innovation rating visible to the ecosystem.',
+          icon: Award,
+          color: 'from-cyan-500 to-blue-500',
+        },
+        {
+          title: 'Mentorship Hours',
+          value: String(stats?.totalMentoringHours ?? 0),
+          description: 'Recorded mentorship support delivered to student innovators.',
+          icon: Users,
+          color: 'from-violet-500 to-fuchsia-500',
+          to: '/dashboard/school/mentors',
+        },
+        {
+          title: 'Startup Launches',
+          value: String(stats?.startupsLaunched ?? 0),
+          description: 'Student startups launched from the school innovation pipeline.',
+          icon: TrendingUp,
+          color: 'from-amber-500 to-orange-500',
+          to: '/dashboard/school/startups',
+        },
+      ]}
       quickStats={[
         { label: 'IIC Star Rating', value: `${iicRating} / 5` },
         { label: 'Mentoring Hours', value: String(stats?.totalMentoringHours ?? 0) },

@@ -2,6 +2,7 @@ import { WorkflowRequest } from '../../types/request.types';
 
 export const REQUEST_TYPE_LABELS: Record<WorkflowRequest['type'], string> = {
   generic: 'Workflow request',
+  helpdesk_ticket: 'Help desk ticket',
   workspace_member: 'Workspace invite',
   workspace_chat_access: 'Workspace chat access',
   startup_member: 'Startup invite',

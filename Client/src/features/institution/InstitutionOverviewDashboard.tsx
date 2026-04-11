@@ -25,6 +25,15 @@ type OverviewQuickStat = {
   value: string;
 };
 
+type OverviewShowcaseCard = {
+  title: string;
+  value: string;
+  description: string;
+  icon: LucideIcon;
+  color: string;
+  to?: string;
+};
+
 type OverviewAction = {
   label: string;
   to: string;
@@ -48,6 +57,9 @@ type InstitutionOverviewDashboardProps = {
   announcementAction?: OverviewAction;
   statCards: OverviewStatCard[];
   quickStats: OverviewQuickStat[];
+  showcaseTitle?: string;
+  showcaseDescription?: string;
+  showcaseCards?: OverviewShowcaseCard[];
   topStudents: StudentLeaderboardItem[];
   upcomingEvents: DashboardEvent[];
   recentProjects: RecentProject[];
@@ -122,6 +134,9 @@ export function InstitutionOverviewDashboard({
   announcementAction,
   statCards,
   quickStats,
+  showcaseTitle,
+  showcaseDescription,
+  showcaseCards = [],
   topStudents,
   upcomingEvents,
   recentProjects,
@@ -340,6 +355,38 @@ export function InstitutionOverviewDashboard({
           </div>
         </div>
       </section>
+
+      {showcaseCards.length > 0 ? (
+        <section className="rounded-2xl border border-slate-800 bg-slate-900/85 p-6">
+          <div className="mb-6">
+            <h2 className="text-xl font-bold text-white">{showcaseTitle ?? 'Institution Showcase'}</h2>
+            {showcaseDescription ? (
+              <p className="mt-2 max-w-3xl text-sm text-slate-400">{showcaseDescription}</p>
+            ) : null}
+          </div>
+
+          <div className={`grid gap-4 ${showcaseCards.length >= 4 ? 'xl:grid-cols-4 md:grid-cols-2' : 'md:grid-cols-3'}`}>
+            {showcaseCards.map((card) => (
+              <Link
+                key={card.title}
+                to={card.to ?? '#'}
+                className={`rounded-2xl border border-slate-800 bg-slate-950/80 p-5 transition hover:border-slate-700 ${
+                  card.to ? 'block' : 'pointer-events-none block'
+                }`}
+              >
+                <div className="flex items-start justify-between gap-4">
+                  <div className={`flex h-12 w-12 items-center justify-center rounded-xl bg-gradient-to-br ${card.color}`}>
+                    <card.icon className="h-6 w-6 text-white" />
+                  </div>
+                  <div className="text-right text-2xl font-bold text-white">{card.value}</div>
+                </div>
+                <div className="mt-4 text-base font-semibold text-white">{card.title}</div>
+                <p className="mt-2 text-sm leading-6 text-slate-400">{card.description}</p>
+              </Link>
+            ))}
+          </div>
+        </section>
+      ) : null}
 
       <section className="grid gap-6 md:grid-cols-3">
         {quickStats.map((stat) => (
