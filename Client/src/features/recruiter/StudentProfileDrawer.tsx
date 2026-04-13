@@ -51,7 +51,7 @@ export function StudentProfileDrawer({
 
   const handleMessage = () => {
     if (!studentId) return;
-    navigate(`/dashboard/recruiter/messages/${studentId}`);
+    navigate(`/dashboard/messages/${studentId}`);
   };
 
   const handleShortlist = async () => {

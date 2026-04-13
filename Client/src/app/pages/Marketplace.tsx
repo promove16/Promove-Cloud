@@ -2086,7 +2086,7 @@ function GeneralMarketplace({ dashboardRole }: { dashboardRole: UserRole }) {
               </div>
             </div>
 
-            <div className="overflow-x-auto pb-3">
+            <div className="overflow-x-auto px-1 py-1.5">
               <div className="flex min-w-max items-center gap-2">
                 {availableTabs.map((tab) => {
                   const Icon = tab.icon;

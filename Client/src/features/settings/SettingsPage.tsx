@@ -12,6 +12,7 @@ import { applyTheme } from '../../hooks/useTheme';
 import { UserRole } from '../../types/roles.types';
 import { OptionTabs } from '../../components/ui/OptionTabs';
 import { AuthPasswordField } from '../auth/AuthPasswordField';
+import { SupportFloatingWidget } from '../support/SupportFloatingWidget';
 
 // ─── Layout helper ────────────────────────────────────────────────────────────
 
@@ -536,6 +537,7 @@ export function SettingsPage() {
   const institutionEducation = profileQuery.data?.education?.find((entry) => entry.source === 'institution') ?? null;
 
   return (
+    <>
       <div className="mx-auto w-full max-w-4xl p-6">
 
         {/* Header */}
@@ -983,5 +985,7 @@ export function SettingsPage() {
           </div>
         )}
       </div>
+      <SupportFloatingWidget />
+    </>
   );
 }

@@ -9,6 +9,7 @@ import { UserRole } from '../../types/roles.types';
 import { JobPost } from '../recruiter/jobPost.model';
 import { assertRecruiterLinkedToCollege } from '../recruiter/recruiter.drive.service';
 import { createBridge, notifyUser } from '../recruiter/recruiter.mappers';
+import { registerRequestHandler } from '../request/request.service';
 
 export const createEventSchema = z.object({
   title: z.string().trim().min(2).max(160),
@@ -45,6 +46,20 @@ export const createHiringEventSchema = z.object({
 export const selectStudentFromEventSchema = z.object({
   jobId: z.string().regex(/^[0-9a-fA-F]{24}$/, 'Invalid job ID'),
   note: z.string().trim().min(2).max(500).optional(),
+});
+
+const collegeEventInviteMetadataSchema = z.object({
+  title: z.string().trim().min(2).max(160),
+  type: z.enum([
+    'Industry Connect Session',
+    'Placement Hackathon',
+    'Innovation Drive',
+    'Other',
+  ]),
+  date: z.string().datetime(),
+  description: z.string().trim().min(10).max(2000),
+  linkedJobId: z.string().regex(/^[0-9a-fA-F]{24}$/).optional(),
+  minimumInnovationScore: z.coerce.number().min(0).default(0),
 });
 
 const eventTenantFilter = (eventId: string, institutionId?: string | null) => ({
@@ -619,3 +634,87 @@ export const selectStudentFromHiringEvent = async (
 
   return { selected: true };
 };
+
+registerRequestHandler('college_event_invite', {
+  validateAccept: async (request, actorUserId) => {
+    if (String(request.toUserId) !== actorUserId) {
+      throw new ApiError(403, 'FORBIDDEN', 'Only the target college can accept this hiring event plan');
+    }
+
+    const payload = collegeEventInviteMetadataSchema.parse(request.metadata ?? {});
+    const collegeId = request.targetEntityId;
+
+    await assertRecruiterLinkedToCollege(String(request.fromUserId), collegeId);
+
+    const college = await User.findOne({
+      _id: collegeId,
+      role: UserRole.COLLEGE,
+      isActive: true,
+    })
+      .select('_id')
+      .lean();
+
+    if (!college) {
+      throw new ApiError(404, 'COLLEGE_NOT_FOUND', 'College not found');
+    }
+
+    if (payload.linkedJobId) {
+      const job = await JobPost.findOne({
+        _id: payload.linkedJobId,
+        recruiterId: request.fromUserId,
+        isActive: true,
+      })
+        .select('_id')
+        .lean();
+
+      if (!job) {
+        throw new ApiError(404, 'JOB_NOT_FOUND', 'Linked job not found');
+      }
+    }
+  },
+  onAccept: async (request) => {
+    const payload = collegeEventInviteMetadataSchema.parse(request.metadata ?? {});
+    const collegeId = request.targetEntityId;
+
+    let event = await Event.findOne({ sourceRequestId: request._id });
+
+    if (!event) {
+      event = await Event.create({
+        institutionId: collegeId,
+        createdBy: request.fromUserId,
+        sourceRequestId: request._id,
+        recruiterId: request.fromUserId,
+        title: payload.title,
+        type: payload.type,
+        category: 'hiring',
+        description: payload.description,
+        scheduledAt: new Date(payload.date),
+        isActive: true,
+        participants: [],
+        rankings: [],
+        ...(payload.linkedJobId ? { linkedJobId: payload.linkedJobId } : {}),
+        minimumInnovationScore: payload.minimumInnovationScore,
+      });
+    }
+
+    const recruiterPath = `/dashboard/recruiter/hiring-events?eventId=${String(event._id)}`;
+    const collegePath = `/dashboard/college/events?tab=hiring&eventId=${String(event._id)}`;
+
+    request.metadata = {
+      ...(request.metadata ?? {}),
+      eventId: String(event._id),
+    };
+    request.deepLink = recruiterPath;
+    request.acceptRedirect = collegePath;
+    request.declineRedirect = '/dashboard/invitations';
+    await request.save();
+
+    const college = await User.findById(collegeId).select('displayName').lean();
+    await notifyUser(
+      String(request.fromUserId),
+      'Hiring event approved',
+      `${college?.displayName ?? 'The college'} accepted "${payload.title}". You can now score participants and move top students into the hiring pipeline.`,
+      recruiterPath,
+    );
+  },
+});

@@ -1,5 +1,5 @@
 import { Request, Response } from 'express';
-import { uploadToCloudinary } from '../../services/cloudinaryService';
+import { uploadFile } from '../../services/fileStorageService';
 import { ApiError } from '../../utils/ApiError';
 import { ApiResponse } from '../../utils/ApiResponse';
 import {
@@ -221,17 +221,17 @@ export const uploadSupportAttachmentController = async (req: Request, res: Respo
   }
 
   const isPdf = req.file.mimetype === 'application/pdf' || /\.pdf$/i.test(req.file.originalname);
-  const upload = await uploadToCloudinary(
-    req.file.buffer,
-    `support/${user._id}`,
-    isPdf ? 'raw' : 'image',
-    isPdf ? { format: 'pdf' } : undefined,
-  );
+  const upload = await uploadFile({
+    buffer: req.file.buffer,
+    folder: `support/${user._id}`,
+    fileName: req.file.originalname,
+    contentType: req.file.mimetype || (isPdf ? 'application/pdf' : 'image/jpeg'),
+  });
 
   res.json(
     new ApiResponse({
-      url: upload.secure_url,
-      publicId: upload.public_id,
+      url: upload.url,
+      publicId: upload.key,
       fileName: req.file.originalname,
       fileSize: req.file.size,
       mimeType: req.file.mimetype || undefined,

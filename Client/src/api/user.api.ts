@@ -75,6 +75,30 @@ export interface PortfolioProject {
   languages: string[];
 }
 
+export interface PortfolioService {
+  _id: string;
+  icon?: string;
+  title: string;
+  description: string;
+}
+
+export interface PortfolioTestimonial {
+  _id: string;
+  name: string;
+  role: string;
+  text: string;
+}
+
+export interface PortfolioBlogPost {
+  _id: string;
+  tag: string;
+  title: string;
+  excerpt: string;
+  tagColor: string;
+  url: string | null;
+  publishedAt: string | null;
+}
+
 export interface GithubLanguageStat {
   language: string;
   percentage: number;
@@ -153,6 +177,43 @@ export interface GithubRepositoryChoice {
   imported: boolean;
 }
 
+export interface PortfolioContent {
+  heroEyebrow?: string;
+  heroTitle?: string;
+  heroDescription?: string;
+  primaryButtonLabel?: string;
+  secondaryButtonLabel?: string;
+  statOneLabel?: string;
+  statTwoLabel?: string;
+  statThreeLabel?: string;
+  statFourLabel?: string;
+  aboutTitle?: string;
+  aboutEmpty?: string;
+  experienceTitle?: string;
+  experienceEmpty?: string;
+  skillsTitle?: string;
+  skillsEmpty?: string;
+  projectsTitle?: string;
+  projectsEmpty?: string;
+  educationTitle?: string;
+  educationEmpty?: string;
+  certificationsTitle?: string;
+  certificationsEmpty?: string;
+  startupsTitle?: string;
+  startupsEmpty?: string;
+  linksTitle?: string;
+  linksEmpty?: string;
+  institutionDetailsTitle?: string;
+  institutionDetailsEmpty?: string;
+  institutionSpecialtiesTitle?: string;
+  institutionSpecialtiesEmpty?: string;
+  institutionLocationsTitle?: string;
+  institutionLocationsEmpty?: string;
+  institutionOutcomesTitle?: string;
+  institutionOutcomesEmpty?: string;
+  footerNote?: string;
+}
+
 export interface UserProfile extends AuthUser {
   bio?: string;
   domain?: string;
@@ -182,6 +243,10 @@ export interface UserProfile extends AuthUser {
   education?: ProfileEducation[];
   certifications?: ProfileCertification[];
   portfolioProjects?: PortfolioProject[];
+  portfolioServices?: PortfolioService[];
+  portfolioTestimonials?: PortfolioTestimonial[];
+  portfolioBlogPosts?: PortfolioBlogPost[];
+  portfolioContent?: PortfolioContent;
   githubStats?: GithubStats;
   githubProof?: GithubProof;
   createdAt?: string;
@@ -242,6 +307,10 @@ export interface UpdateUserProfilePayload {
   education?: ProfileEducation[];
   certifications?: ProfileCertification[];
   portfolioProjects?: PortfolioProject[];
+  portfolioServices?: PortfolioService[];
+  portfolioTestimonials?: PortfolioTestimonial[];
+  portfolioBlogPosts?: PortfolioBlogPost[];
+  portfolioContent?: PortfolioContent;
   profileComplete?: boolean;
   discoverableToRecruiters?: boolean;
 }
@@ -338,6 +407,10 @@ export interface PublicStudentProfile {
   education: ProfileEducation[];
   certifications: ProfileCertification[];
   portfolioProjects: PortfolioProject[];
+  portfolioServices: PortfolioService[];
+  portfolioTestimonials: PortfolioTestimonial[];
+  portfolioBlogPosts: PortfolioBlogPost[];
+  portfolioContent?: PortfolioContent;
   githubStats: GithubStats;
   githubProof: {
     importedRepos: GithubImportedRepo[];

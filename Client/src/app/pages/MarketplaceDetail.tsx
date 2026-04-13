@@ -1,5 +1,5 @@
 import { useMemo, useState } from "react";
-import { Link, useNavigate, useParams } from "react-router-dom";
+import { Link, Navigate, useNavigate, useParams } from "react-router-dom";
 import { useQuery } from "@tanstack/react-query";
 import {
   ArrowLeft,
@@ -27,8 +27,6 @@ import {
   MarketplaceUserDetail,
   marketplaceApi,
 } from "../../api/marketplace.api";
-import { UserPortfolioViewContent } from "../../features/profile/UserPortfolioViewPage";
-import { StudentPortfolioViewContent } from "../../features/student/StudentPortfolioViewPage";
 import {
   getStartupInviteActionLabel,
   isStartupInviteTargetType,
@@ -38,7 +36,12 @@ import {
 import { recruiterApi } from "../../api/recruiter.api";
 import { useAuthStore } from "../../store/authStore";
 import { UserRole } from "../../types/roles.types";
-import { getMarketplaceBasePath, getMarketplaceDetailPath } from "../../features/marketplace/navigation";
+import {
+  getMarketplaceBasePath,
+  getMarketplaceDetailPath,
+  getStudentPortfolioViewPath,
+  getUserPortfolioViewPath,
+} from "../../features/marketplace/navigation";
 
 const money = new Intl.NumberFormat("en-IN", {
   style: "currency",
@@ -139,11 +142,19 @@ export function MarketplaceDetail() {
   }
 
   if (entityType === "student") {
-    return <StudentPortfolioViewContent />;
+    return <Navigate to={getStudentPortfolioViewPath(entityId)} replace />;
   }
 
   if (entityType !== "startup") {
-    return <UserPortfolioViewContent />;
+    return (
+      <Navigate
+        to={getUserPortfolioViewPath(
+          entityType as "school" | "college" | "mentor" | "investor" | "recruiter",
+          entityId,
+        )}
+        replace
+      />
+    );
   }
 
   return (

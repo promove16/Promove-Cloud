@@ -5,6 +5,7 @@ import {
   ArrowRight,
   BriefcaseBusiness,
   Building2,
+  CalendarDays,
   Eye,
   Mail,
   Search,
@@ -13,7 +14,13 @@ import {
   X,
 } from "lucide-react";
 import { recruiterApi } from "../../api/recruiter.api";
+import { requestApi } from "../../api/request.api";
 import { getStudentPortfolioViewPath } from "../marketplace/navigation";
+import {
+  RECRUITER_PAGE_CONTENT_CLASS,
+  RecruiterSectionNav,
+  recruiterMarketplaceSectionItems,
+} from "./RecruiterSectionNav";
 import {
   RecruiterCollegeCard,
   RecruiterJobDetail,
@@ -23,23 +30,49 @@ import {
 import { UserRole } from "../../types/roles.types";
 
 type RecruiterMarketplaceLane = "students" | "colleges";
+type RecruiterEventPlanningRequest = Awaited<ReturnType<typeof requestApi.outgoing>>[number];
+
+const hiringEventTypes = [
+  "Industry Connect Session",
+  "Placement Hackathon",
+  "Innovation Drive",
+  "Other",
+] as const;
+
+type HiringEventPlanFormState = {
+  collegeId: string;
+  collegeName: string;
+  title: string;
+  type: (typeof hiringEventTypes)[number];
+  date: string;
+  description: string;
+  linkedJobId: string;
+  minimumInnovationScore: string;
+  message: string;
+};
 
 const recruiterTabs: Array<{
   id: RecruiterMarketplaceLane;
   label: string;
+  eyebrow: string;
   description: string;
+  helper: string;
   icon: typeof Users;
 }> = [
   {
     id: "students",
     label: "Students",
+    eyebrow: "Talent Directory",
     description: "Find student innovators by name, domain, project signal, or institution fit.",
+    helper: "Students ready for review",
     icon: Users,
   },
   {
     id: "colleges",
     label: "Colleges",
+    eyebrow: "College Directory",
     description: "Browse colleges with active innovation pipelines and placement readiness signals.",
+    helper: "Institution pipeline overview",
     icon: Building2,
   },
 ];
@@ -142,6 +175,46 @@ const primaryButtonClass =
   "inline-flex items-center gap-2 rounded-full bg-cyan-400 px-4 py-2 text-sm font-semibold text-slate-950 transition hover:bg-cyan-300 disabled:cursor-wait disabled:opacity-60";
 const subtleTagClass =
   "rounded-full border border-slate-700 bg-slate-900/75 px-2.5 py-1 text-xs text-slate-200";
+
+const createInitialHiringEventPlan = (college?: RecruiterCollegeCard): HiringEventPlanFormState => ({
+  collegeId: college?._id ?? "",
+  collegeName: college?.displayName ?? "",
+  title: college ? `${college.displayName} Hiring Event` : "",
+  type: hiringEventTypes[0],
+  date: "",
+  description: "",
+  linkedJobId: "",
+  minimumInnovationScore: "0",
+  message: "",
+});
+
+const parseRequestDateInput = (value?: string) => {
+  if (!value) {
+    return "";
+  }
+
+  const parsed = new Date(value);
+  if (Number.isNaN(parsed.getTime())) {
+    return "";
+  }
+
+  return new Date(parsed.getTime() - parsed.getTimezoneOffset() * 60_000)
+    .toISOString()
+    .slice(0, 16);
+};
+
+const getLatestCollegeEventRequest = (
+  requests: RecruiterEventPlanningRequest[],
+  collegeId: string,
+) =>
+  requests
+    .filter(
+      (request) =>
+        request.type === "college_event_invite" &&
+        request.targetEntityType === "college" &&
+        request.targetEntityId === collegeId,
+    )
+    .sort((left, right) => new Date(right.updatedAt).getTime() - new Date(left.updatedAt).getTime())[0] ?? null;
 
 function RecruiterStudentCard({
   student,
@@ -381,15 +454,176 @@ function InviteStudentModal({
   );
 }
 
+function PlanHiringEventModal({
+  form,
+  activeJobs,
+  isSubmitting,
+  onChange,
+  onClose,
+  onSubmit,
+}: {
+  form: HiringEventPlanFormState;
+  activeJobs: RecruiterJobDetail[];
+  isSubmitting: boolean;
+  onChange: (patch: Partial<HiringEventPlanFormState>) => void;
+  onClose: () => void;
+  onSubmit: () => void;
+}) {
+  const canSubmit =
+    Boolean(form.collegeId) &&
+    Boolean(form.title.trim()) &&
+    Boolean(form.date) &&
+    Boolean(form.description.trim());
+
+  return (
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-950/75 px-4 backdrop-blur-sm">
+      <div className="w-full max-w-3xl rounded-3xl border border-slate-800 bg-slate-950 shadow-2xl shadow-black/40">
+        <div className="flex items-start justify-between gap-4 border-b border-slate-800 px-6 py-5">
+          <div>
+            <div className="text-xs uppercase tracking-[0.28em] text-cyan-300">College Approval</div>
+            <h2 className="mt-2 text-2xl font-semibold text-white">Plan a hiring event</h2>
+            <p className="mt-2 text-sm text-slate-400">
+              Send the event plan to {form.collegeName || "the college"} for approval. The event workspace opens
+              after acceptance.
+            </p>
+          </div>
+          <button
+            type="button"
+            onClick={onClose}
+            className="rounded-xl border border-slate-800 p-2 text-slate-400 transition hover:text-white"
+          >
+            <X className="h-5 w-5" />
+          </button>
+        </div>
+
+        <div className="grid gap-4 px-6 py-5 md:grid-cols-2">
+          <label className="space-y-2">
+            <span className="text-xs uppercase tracking-[0.22em] text-slate-500">Event Title</span>
+            <input
+              value={form.title}
+              onChange={(event) => onChange({ title: event.target.value })}
+              placeholder="Campus hiring showcase"
+              className="w-full rounded-2xl border border-slate-800 bg-slate-900 px-4 py-3 text-sm text-white outline-none transition placeholder:text-slate-500 focus:border-cyan-400/50"
+            />
+          </label>
+
+          <label className="space-y-2">
+            <span className="text-xs uppercase tracking-[0.22em] text-slate-500">Event Type</span>
+            <select
+              value={form.type}
+              onChange={(event) =>
+                onChange({ type: event.target.value as HiringEventPlanFormState["type"] })
+              }
+              className="w-full rounded-2xl border border-slate-800 bg-slate-900 px-4 py-3 text-sm text-white outline-none transition focus:border-cyan-400/50"
+            >
+              {hiringEventTypes.map((type) => (
+                <option key={type} value={type}>
+                  {type}
+                </option>
+              ))}
+            </select>
+          </label>
+
+          <label className="space-y-2">
+            <span className="text-xs uppercase tracking-[0.22em] text-slate-500">Schedule</span>
+            <input
+              type="datetime-local"
+              value={form.date}
+              onChange={(event) => onChange({ date: event.target.value })}
+              className="w-full rounded-2xl border border-slate-800 bg-slate-900 px-4 py-3 text-sm text-white outline-none transition focus:border-cyan-400/50"
+            />
+          </label>
+
+          <label className="space-y-2">
+            <span className="text-xs uppercase tracking-[0.22em] text-slate-500">Linked Job</span>
+            <select
+              value={form.linkedJobId}
+              onChange={(event) => onChange({ linkedJobId: event.target.value })}
+              className="w-full rounded-2xl border border-slate-800 bg-slate-900 px-4 py-3 text-sm text-white outline-none transition focus:border-cyan-400/50"
+            >
+              <option value="">Link later</option>
+              {activeJobs.map((job) => (
+                <option key={job._id} value={job._id}>
+                  {job.title} / {job.company}
+                </option>
+              ))}
+            </select>
+          </label>
+
+          <label className="space-y-2 md:col-span-2">
+            <span className="text-xs uppercase tracking-[0.22em] text-slate-500">Description</span>
+            <textarea
+              value={form.description}
+              onChange={(event) => onChange({ description: event.target.value })}
+              rows={4}
+              placeholder="Describe the format, target cohort, evaluation criteria, and recruiter intent."
+              className="w-full rounded-2xl border border-slate-800 bg-slate-900 px-4 py-3 text-sm text-white outline-none transition placeholder:text-slate-500 focus:border-cyan-400/50"
+            />
+          </label>
+
+          <label className="space-y-2">
+            <span className="text-xs uppercase tracking-[0.22em] text-slate-500">Minimum Score</span>
+            <input
+              type="number"
+              min={0}
+              value={form.minimumInnovationScore}
+              onChange={(event) => onChange({ minimumInnovationScore: event.target.value })}
+              className="w-full rounded-2xl border border-slate-800 bg-slate-900 px-4 py-3 text-sm text-white outline-none transition focus:border-cyan-400/50"
+            />
+          </label>
+
+          <label className="space-y-2">
+            <span className="text-xs uppercase tracking-[0.22em] text-slate-500">Approval Note</span>
+            <input
+              value={form.message}
+              onChange={(event) => onChange({ message: event.target.value })}
+              placeholder="Optional note for the college team"
+              className="w-full rounded-2xl border border-slate-800 bg-slate-900 px-4 py-3 text-sm text-white outline-none transition placeholder:text-slate-500 focus:border-cyan-400/50"
+            />
+          </label>
+        </div>
+
+        <div className="flex justify-end gap-3 border-t border-slate-800 px-6 py-5">
+          <button type="button" onClick={onClose} className={secondaryButtonClass}>
+            Cancel
+          </button>
+          <button type="button" onClick={onSubmit} disabled={isSubmitting || !canSubmit} className={primaryButtonClass}>
+            <CalendarDays className="h-4 w-4" />
+            {isSubmitting ? "Sending..." : "Send for Approval"}
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
 function RecruiterCollegeCardView({
   college,
+  planningRequest,
+  activeEventId,
   onViewStudents,
   onPlanEvent,
+  onOpenEvent,
+  onOpenRequest,
 }: {
   college: RecruiterCollegeCard;
-  onViewStudents: (collegeName: string) => void;
-  onPlanEvent: (collegeId: string) => void;
+  planningRequest?: RecruiterEventPlanningRequest | null;
+  activeEventId?: string | null;
+  onViewStudents: (college: RecruiterCollegeCard) => void;
+  onPlanEvent: (college: RecruiterCollegeCard) => void;
+  onOpenEvent: (eventId: string) => void;
+  onOpenRequest: (requestId: string) => void;
 }) {
+  const hasActiveEvent = Boolean(activeEventId);
+  const isPendingApproval = planningRequest?.status === "pending" && !hasActiveEvent;
+  const statusPill = hasActiveEvent
+    ? "Event approved"
+    : isPendingApproval
+    ? "Approval pending"
+    : planningRequest?.status === "declined"
+    ? "Needs replan"
+    : null;
+
   return (
     <article className="px-4 py-5 transition hover:bg-slate-900/35 sm:px-6">
       <div className="flex flex-col gap-4 xl:flex-row xl:items-start xl:justify-between">
@@ -405,6 +639,11 @@ function RecruiterCollegeCardView({
                 <span className="rounded-full bg-cyan-400/10 px-2.5 py-1 text-xs font-medium text-cyan-100 ring-1 ring-inset ring-cyan-400/20">
                   Velocity {college.placementVelocity}%
                 </span>
+                {statusPill ? (
+                  <span className="rounded-full border border-slate-700 bg-slate-900/80 px-2.5 py-1 text-xs font-medium text-slate-200">
+                    {statusPill}
+                  </span>
+                ) : null}
               </div>
               <p className="text-sm font-medium text-cyan-100">{college.location}</p>
               <p className="max-w-3xl text-sm text-slate-300">{college.focusLabel}</p>
@@ -424,15 +663,24 @@ function RecruiterCollegeCardView({
         </div>
 
         <div className="flex shrink-0 flex-wrap gap-2 xl:justify-end">
+          {hasActiveEvent && activeEventId ? (
+            <button onClick={() => onOpenEvent(activeEventId)} className={secondaryButtonClass}>
+              <CalendarDays className="h-4 w-4" />
+              Open Event
+            </button>
+          ) : isPendingApproval && planningRequest ? (
+            <button onClick={() => onOpenRequest(planningRequest._id)} className={secondaryButtonClass}>
+              <Mail className="h-4 w-4" />
+              Pending Approval
+            </button>
+          ) : (
+            <button onClick={() => onPlanEvent(college)} className={secondaryButtonClass}>
+              <Mail className="h-4 w-4" />
+              Plan Hiring Event
+            </button>
+          )}
           <button
-            onClick={() => onPlanEvent(college._id)}
-            className={secondaryButtonClass}
-          >
-            <Mail className="h-4 w-4" />
-            Plan Hiring Event
-          </button>
-          <button
-            onClick={() => onViewStudents(college.displayName)}
+            onClick={() => onViewStudents(college)}
             className={primaryButtonClass}
           >
             View Students
@@ -451,7 +699,12 @@ export function RecruiterMarketplace({ dashboardRole: _dashboardRole }: { dashbo
   const [shortlistingId, setShortlistingId] = useState<string | null>(null);
   const [inviteStudentId, setInviteStudentId] = useState<string | null>(null);
   const [inviteNote, setInviteNote] = useState("");
+  const [eventPlanForm, setEventPlanForm] = useState<HiringEventPlanFormState>(createInitialHiringEventPlan());
   const [inviteFeedback, setInviteFeedback] = useState<{
+    tone: "success" | "error";
+    message: string;
+  } | null>(null);
+  const [eventPlanFeedback, setEventPlanFeedback] = useState<{
     tone: "success" | "error";
     message: string;
   } | null>(null);
@@ -471,6 +724,16 @@ export function RecruiterMarketplace({ dashboardRole: _dashboardRole }: { dashbo
   const collegesQuery = useQuery({
     queryKey: ["marketplace", "recruiter", "colleges"],
     queryFn: recruiterApi.getColleges,
+    enabled: lane === "colleges",
+  });
+  const eventPlanningRequestsQuery = useQuery({
+    queryKey: ["requests", "outgoing", "college-event-invites"],
+    queryFn: requestApi.outgoing,
+    enabled: lane === "colleges",
+  });
+  const hiringEventsQuery = useQuery({
+    queryKey: ["recruiter", "hiring-events"],
+    queryFn: recruiterApi.getHiringEvents,
     enabled: lane === "colleges",
   });
   const jobsQuery = useQuery({
@@ -493,6 +756,35 @@ export function RecruiterMarketplace({ dashboardRole: _dashboardRole }: { dashbo
     const needle = deferredQuery.toLowerCase();
     return source.filter((college) => getCollegeSearchText(college).includes(needle));
   }, [collegesQuery.data, deferredQuery]);
+  const collegePlanningRequests = useMemo(
+    () =>
+      (eventPlanningRequestsQuery.data ?? []).filter(
+        (request) => request.type === "college_event_invite" && request.targetEntityType === "college",
+      ),
+    [eventPlanningRequestsQuery.data],
+  );
+  const latestPlanningRequestByCollege = useMemo(
+    () =>
+      new Map(
+        colleges.map((college) => [
+          college._id,
+          getLatestCollegeEventRequest(collegePlanningRequests, college._id),
+        ]),
+      ),
+    [collegePlanningRequests, colleges],
+  );
+  const latestHiringEventByCollege = useMemo(() => {
+    const eventMap = new Map<string, Awaited<ReturnType<typeof recruiterApi.getHiringEvents>>[number]>();
+
+    (hiringEventsQuery.data ?? []).forEach((event) => {
+      const current = eventMap.get(event.institutionId);
+      if (!current || new Date(event.scheduledAt).getTime() > new Date(current.scheduledAt).getTime()) {
+        eventMap.set(event.institutionId, event);
+      }
+    });
+
+    return eventMap;
+  }, [hiringEventsQuery.data]);
 
   const totalCount = lane === "students" ? students.length : colleges.length;
   const isLoading = lane === "students" ? studentsQuery.isLoading : collegesQuery.isLoading;
@@ -514,6 +806,7 @@ export function RecruiterMarketplace({ dashboardRole: _dashboardRole }: { dashbo
           ? "The student already applied. The hiring bridge is now ready for follow-up."
           : "Invite sent. The student now has an application entry in their hiring flow.",
       });
+      const studentId = inviteStudentId;
       setInviteStudentId(null);
       setInviteNote("");
       await Promise.all([
@@ -522,11 +815,60 @@ export function RecruiterMarketplace({ dashboardRole: _dashboardRole }: { dashbo
         queryClient.invalidateQueries({ queryKey: ["recruiter", "job-applications", jobId] }),
         queryClient.invalidateQueries({ queryKey: ["recruiter", "dashboard"] }),
       ]);
+      if (studentId && !result.alreadyInvited) {
+        navigate(`/dashboard/recruiter/applications/${studentId}?jobId=${jobId}`);
+      }
     },
     onError: (error) => {
       setInviteFeedback({
         tone: "error",
         message: error instanceof Error ? error.message : "Unable to invite this student right now.",
+      });
+    },
+  });
+  const planEventMutation = useMutation({
+    mutationFn: () =>
+      requestApi.create({
+        requestType: "college_event_invite",
+        actionType: "approve",
+        toUserId: eventPlanForm.collegeId,
+        targetEntityType: "college",
+        targetEntityId: eventPlanForm.collegeId,
+        targetEntityTitle: eventPlanForm.collegeName,
+        targetRole: "college",
+        requestedRole: "host",
+        requestedPermission: "college_hiring_event",
+        message: eventPlanForm.message.trim() || undefined,
+        metadata: {
+          entityName: eventPlanForm.title.trim(),
+          title: eventPlanForm.title.trim(),
+          type: eventPlanForm.type,
+          date: new Date(eventPlanForm.date).toISOString(),
+          description: eventPlanForm.description.trim(),
+          minimumInnovationScore: Number(eventPlanForm.minimumInnovationScore || "0"),
+          collegeId: eventPlanForm.collegeId,
+          ...(eventPlanForm.linkedJobId ? { linkedJobId: eventPlanForm.linkedJobId } : {}),
+        },
+        deepLink: "/dashboard/invitations",
+        acceptRedirect: "/dashboard/college/events?tab=hiring",
+        declineRedirect: "/dashboard/invitations",
+      }),
+    onSuccess: async (request) => {
+      setEventPlanFeedback({
+        tone: "success",
+        message: `Approval request sent to ${eventPlanForm.collegeName}. The event workspace will open once the college accepts.`,
+      });
+      setEventPlanForm(createInitialHiringEventPlan());
+      await Promise.all([
+        queryClient.invalidateQueries({ queryKey: ["requests", "outgoing"] }),
+        queryClient.invalidateQueries({ queryKey: ["recruiter", "hiring-events"] }),
+      ]);
+      navigate(`/dashboard/invitations?requestId=${request._id}`);
+    },
+    onError: (error) => {
+      setEventPlanFeedback({
+        tone: "error",
+        message: error instanceof Error ? error.message : "Unable to send the hiring event request right now.",
       });
     },
   });
@@ -559,84 +901,164 @@ export function RecruiterMarketplace({ dashboardRole: _dashboardRole }: { dashbo
     }
   };
 
-  const handleViewCollegeStudents = (collegeName: string) =>
-    setSearchParams(buildSearchParams({ lane: "students", institution: collegeName }));
+  const handleViewCollegeStudents = (college: RecruiterCollegeCard) =>
+    navigate(
+      `/dashboard/recruiter/colleges/${college._id}/students?institution=${encodeURIComponent(college.displayName)}`,
+    );
 
   const openInviteModal = (studentId: string) => {
     setInviteFeedback(null);
     setInviteStudentId(studentId);
   };
 
+  const openPlanEventModal = (college: RecruiterCollegeCard) => {
+    const latestRequest = latestPlanningRequestByCollege.get(college._id);
+
+    setEventPlanFeedback(null);
+    setEventPlanForm({
+      ...createInitialHiringEventPlan(college),
+      ...(latestRequest?.metadata && typeof latestRequest.metadata === "object"
+        ? {
+            title:
+              typeof latestRequest.metadata.title === "string"
+                ? latestRequest.metadata.title
+                : `${college.displayName} Hiring Event`,
+            type:
+              hiringEventTypes.find((type) => type === latestRequest.metadata?.type) ?? hiringEventTypes[0],
+            date: parseRequestDateInput(
+              typeof latestRequest.metadata.date === "string" ? latestRequest.metadata.date : undefined,
+            ),
+            description:
+              typeof latestRequest.metadata.description === "string" ? latestRequest.metadata.description : "",
+            linkedJobId:
+              typeof latestRequest.metadata.linkedJobId === "string" ? latestRequest.metadata.linkedJobId : "",
+            minimumInnovationScore:
+              typeof latestRequest.metadata.minimumInnovationScore === "number" ||
+              typeof latestRequest.metadata.minimumInnovationScore === "string"
+                ? String(latestRequest.metadata.minimumInnovationScore)
+                : "0",
+            message: latestRequest.message ?? "",
+          }
+        : {}),
+    });
+  };
+
   return (
     <>
-      <div className="space-y-6">
-        <section className="border-b border-slate-800/80 pb-5">
-          <div className="flex flex-col gap-4 xl:flex-row xl:items-end xl:justify-between">
-            <div className="space-y-2">
-              <div className="text-xs uppercase tracking-[0.28em] text-cyan-300/80">
-                {lane === "students" ? "Talent Directory" : "College Directory"}
-              </div>
-              <div className="flex flex-wrap items-center gap-x-4 gap-y-2">
-                <h1 className="text-2xl font-semibold tracking-tight text-white">{activeTab.label}</h1>
-                <span className="text-sm text-slate-300">{formatCompactNumber(totalCount)} results</span>
-                {focusedInstitution && lane === "students" ? (
-                  <span className="rounded-full border border-cyan-400/20 bg-cyan-400/10 px-3 py-1 text-xs text-cyan-100">
-                    {focusedInstitution}
+      <div className={`${RECRUITER_PAGE_CONTENT_CLASS} space-y-6`}>
+        <section className="space-y-4 rounded-3xl border border-slate-800/80 bg-slate-950/45 px-5 py-5 sm:px-6">
+          <div className="flex flex-col gap-5 xl:flex-row xl:items-start xl:justify-between">
+            <div className="max-w-3xl space-y-3">
+              <RecruiterSectionNav items={recruiterMarketplaceSectionItems} />
+              <div className="space-y-2">
+                <div className="text-xs uppercase tracking-[0.28em] text-cyan-300/80">{activeTab.eyebrow}</div>
+                <div className="flex flex-wrap items-center gap-x-4 gap-y-2">
+                  <h1 className="text-3xl font-semibold tracking-tight text-white">{activeTab.label}</h1>
+                  <span className="rounded-full border border-slate-800 bg-slate-900/80 px-3 py-1 text-sm text-slate-300">
+                    {formatCompactNumber(totalCount)} results
                   </span>
+                  {focusedInstitution && lane === "students" ? (
+                    <span className="rounded-full border border-cyan-400/20 bg-cyan-400/10 px-3 py-1 text-xs text-cyan-100">
+                      {focusedInstitution}
+                    </span>
+                  ) : null}
+                </div>
+                <p className="max-w-3xl text-sm leading-6 text-slate-400">{activeTab.description}</p>
+              </div>
+            </div>
+
+            <div className="w-full max-w-xl xl:pt-8">
+              <div className="rounded-3xl border border-slate-800/80 bg-slate-950/80 p-4 shadow-[0_16px_32px_rgba(2,6,23,0.18)]">
+                <div className="mb-3 text-xs uppercase tracking-[0.24em] text-slate-500">Search Directory</div>
+                <label className="relative block">
+                  <Search className="pointer-events-none absolute left-4 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400" />
+                  <input
+                    value={query}
+                    onChange={(event) => updateSearch(event.target.value)}
+                    placeholder={lane === "students" ? "Search students, domains, or institutions" : "Search colleges or locations"}
+                    className="w-full rounded-2xl border border-slate-700 bg-slate-900/90 py-3 pl-11 pr-4 text-sm text-slate-100 outline-none transition placeholder:text-slate-400 focus:border-cyan-400/60"
+                  />
+                </label>
+              </div>
+            </div>
+          </div>
+
+          <div className="grid gap-4 border-t border-slate-800/80 pt-5 lg:grid-cols-[minmax(0,1fr)_auto] lg:items-end">
+            <div className="grid gap-3 sm:grid-cols-2">
+              {recruiterTabs.map((tab) => {
+                const Icon = tab.icon;
+                const isActive = tab.id === lane;
+
+                return (
+                  <button
+                    key={tab.id}
+                    onClick={() => handleLaneChange(tab.id)}
+                    className={`group rounded-3xl border p-4 text-left transition ${
+                      isActive
+                        ? "border-cyan-400/45 bg-cyan-400/10 shadow-[0_20px_40px_rgba(8,145,178,0.15)]"
+                        : "border-slate-800 bg-slate-950/75 hover:border-slate-700 hover:bg-slate-900/85"
+                    }`}
+                  >
+                    <div className="flex items-start justify-between gap-3">
+                      <div
+                        className={`flex h-11 w-11 shrink-0 items-center justify-center rounded-2xl ring-1 transition ${
+                          isActive
+                            ? "bg-cyan-400 text-slate-950 ring-cyan-300/40"
+                            : "bg-slate-900 text-slate-300 ring-slate-700 group-hover:text-white"
+                        }`}
+                      >
+                        <Icon className="h-5 w-5" />
+                      </div>
+
+                      <span
+                        className={`rounded-full px-2.5 py-1 text-[11px] font-medium uppercase tracking-[0.2em] ${
+                          isActive
+                            ? "bg-cyan-950/60 text-cyan-100 ring-1 ring-inset ring-cyan-400/30"
+                            : "bg-slate-900/90 text-slate-400 ring-1 ring-inset ring-slate-800"
+                        }`}
+                      >
+                        {isActive ? "Active" : "Browse"}
+                      </span>
+                    </div>
+
+                    <div className="mt-4 space-y-2">
+                      <div className={`text-base font-semibold ${isActive ? "text-white" : "text-slate-200"}`}>
+                        {tab.label}
+                      </div>
+                      <p className={`text-sm leading-6 ${isActive ? "text-cyan-50" : "text-slate-400"}`}>
+                        {tab.description}
+                      </p>
+                    </div>
+                  </button>
+                );
+              })}
+            </div>
+
+            <div className="flex flex-col gap-3 lg:items-end">
+              <div className="flex flex-wrap items-center gap-2 lg:justify-end">
+                <span className="rounded-full border border-cyan-400/20 bg-cyan-400/10 px-3 py-1.5 text-sm text-cyan-100">
+                  {activeTab.helper}
+                </span>
+                <span className="rounded-full border border-slate-700 bg-slate-900/80 px-3 py-1.5 text-sm text-slate-300">
+                  {formatCompactNumber(totalCount)} results in view
+                </span>
+                {focusedInstitution && lane === "students" ? (
+                  <button
+                    onClick={() => setSearchParams(buildSearchParams({ lane: "students", query }))}
+                    className="rounded-full border border-slate-700 bg-slate-900/70 px-3 py-1.5 text-sm text-slate-200 transition hover:border-cyan-400/50 hover:bg-slate-800/80"
+                  >
+                    Clear institution
+                  </button>
                 ) : null}
               </div>
-              <p className="max-w-2xl text-sm leading-6 text-slate-300">{activeTab.description}</p>
-            </div>
 
-            <div className="w-full max-w-md">
-              <label className="relative block">
-                <Search className="pointer-events-none absolute left-4 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400" />
-                <input
-                  value={query}
-                  onChange={(event) => updateSearch(event.target.value)}
-                  placeholder={lane === "students" ? "Search students, domains, or institutions" : "Search colleges or locations"}
-                  className="w-full rounded-full border border-slate-700 bg-slate-900/85 py-3 pl-11 pr-4 text-sm text-slate-100 outline-none transition placeholder:text-slate-400 focus:border-cyan-400/60"
-                />
-              </label>
+              <p className="max-w-md text-sm leading-6 text-slate-400 lg:text-right">
+                {lane === "students"
+                  ? "Search by student, domain, or institution while keeping the active review context visible."
+                  : "Review college strength, placement readiness, and innovation activity before opening student cohorts."}
+              </p>
             </div>
           </div>
-        </section>
-
-        <section className="flex flex-wrap items-center gap-3 border-b border-slate-800/80 pb-4">
-          <div className="inline-flex rounded-full border border-slate-700 bg-slate-900/80 p-1">
-            {recruiterTabs.map((tab) => {
-              const Icon = tab.icon;
-              const isActive = tab.id === lane;
-
-              return (
-                <button
-                  key={tab.id}
-                  onClick={() => handleLaneChange(tab.id)}
-                  className={`inline-flex items-center gap-2 rounded-full px-4 py-2 text-sm transition ${
-                    isActive
-                      ? "bg-cyan-400 text-slate-950 shadow-[0_0_0_1px_rgba(34,211,238,0.16)]"
-                      : "text-slate-300 hover:bg-slate-800/80 hover:text-white"
-                  }`}
-                >
-                  <Icon className="h-4 w-4" />
-                  {tab.label}
-                </button>
-              );
-            })}
-          </div>
-
-          <div className="text-sm text-slate-300">
-            {lane === "students" ? "Students ready for review" : "Institution pipeline overview"}
-          </div>
-
-          {focusedInstitution && lane === "students" ? (
-            <button
-              onClick={() => setSearchParams(buildSearchParams({ lane: "students", query }))}
-              className="rounded-full border border-slate-700 bg-slate-900/70 px-3 py-1.5 text-sm text-slate-200 transition hover:border-cyan-400/50 hover:bg-slate-800/80"
-            >
-              Clear institution
-            </button>
-          ) : null}
         </section>
 
         {inviteFeedback ? (
@@ -648,6 +1070,18 @@ export function RecruiterMarketplace({ dashboardRole: _dashboardRole }: { dashbo
             }`}
           >
             {inviteFeedback.message}
+          </div>
+        ) : null}
+
+        {eventPlanFeedback ? (
+          <div
+            className={`rounded-2xl border px-4 py-3 text-sm ${
+              eventPlanFeedback.tone === "success"
+                ? "border-emerald-500/20 bg-emerald-500/10 text-emerald-100"
+                : "border-rose-500/20 bg-rose-500/10 text-rose-100"
+            }`}
+          >
+            {eventPlanFeedback.message}
           </div>
         ) : null}
 
@@ -685,7 +1119,7 @@ export function RecruiterMarketplace({ dashboardRole: _dashboardRole }: { dashbo
                       invitingStudentId={inviteMutation.isPending ? inviteStudentId : null}
                       shortlistingId={shortlistingId}
                       onInvite={openInviteModal}
-                      onMessage={(studentId) => navigate(`/dashboard/recruiter/messages/${studentId}`)}
+                      onMessage={(studentId) => navigate(`/dashboard/messages/${studentId}`)}
                       onShortlist={handleShortlist}
                       onViewProfile={(studentId) => navigate(getStudentPortfolioViewPath(studentId))}
                     />
@@ -694,8 +1128,12 @@ export function RecruiterMarketplace({ dashboardRole: _dashboardRole }: { dashbo
                     <RecruiterCollegeCardView
                       key={college._id}
                       college={college}
+                      planningRequest={latestPlanningRequestByCollege.get(college._id)}
+                      activeEventId={latestHiringEventByCollege.get(college._id)?._id ?? null}
                       onViewStudents={handleViewCollegeStudents}
-                      onPlanEvent={(collegeId) => navigate(`/dashboard/messages/${collegeId}?queryType=hiring_event`)}
+                      onPlanEvent={openPlanEventModal}
+                      onOpenEvent={(eventId) => navigate(`/dashboard/recruiter/hiring-events?eventId=${eventId}`)}
+                      onOpenRequest={(requestId) => navigate(`/dashboard/invitations?requestId=${requestId}`)}
                     />
                   ))}
             </div>
@@ -716,6 +1154,20 @@ export function RecruiterMarketplace({ dashboardRole: _dashboardRole }: { dashbo
           onNoteChange={setInviteNote}
           onInvite={(jobId) => inviteMutation.mutate(jobId)}
           onGoToRecruiterHome={() => navigate("/dashboard/recruiter")}
+        />
+      ) : null}
+
+      {eventPlanForm.collegeId ? (
+        <PlanHiringEventModal
+          form={eventPlanForm}
+          activeJobs={activeJobs}
+          isSubmitting={planEventMutation.isPending}
+          onChange={(patch) => setEventPlanForm((current) => ({ ...current, ...patch }))}
+          onClose={() => {
+            if (planEventMutation.isPending) return;
+            setEventPlanForm(createInitialHiringEventPlan());
+          }}
+          onSubmit={() => planEventMutation.mutate()}
         />
       ) : null}
     </>

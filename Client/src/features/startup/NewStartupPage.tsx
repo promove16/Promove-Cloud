@@ -1,15 +1,15 @@
-import { useNavigate } from 'react-router-dom';
-import { ArrowLeft } from 'lucide-react';
-import { DashboardLayout } from '../../app/components/DashboardLayout';
-import { StartupLaunch } from '../../app/pages/StartupLaunch';
-import { STARTUP_LAUNCH_LIST_PATH } from './navigation';
+import { useNavigate } from "react-router-dom";
+import { ArrowLeft } from "lucide-react";
+import { DashboardLayout } from "../../app/components/DashboardLayout";
+import { StartupLaunch } from "../../app/pages/StartupLaunch";
+import { STARTUP_LAUNCH_LIST_PATH } from "./navigation";
 
 export function NewStartupPage() {
   const navigate = useNavigate();
 
   return (
     <DashboardLayout role="student">
-      <div className="mx-auto w-full max-w-7xl space-y-4">
+      <div className="mx-auto w-full max-w-[96rem] space-y-4">
         <button
           onClick={() => navigate(STARTUP_LAUNCH_LIST_PATH)}
           className="inline-flex items-center gap-2 text-sm text-slate-400 transition hover:text-white"

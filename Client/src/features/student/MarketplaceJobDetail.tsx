@@ -1,4 +1,4 @@
-import { useMemo, useState } from 'react';
+import { useMemo } from 'react';
 import { Link, useNavigate, useParams } from 'react-router-dom';
 import { useQuery } from '@tanstack/react-query';
 import {
@@ -128,8 +128,6 @@ function InfoTile({ label, value }: { label: string; value: string }) {
 export function MarketplaceJobDetail() {
   const navigate = useNavigate();
   const { jobId } = useParams();
-  const [hasApplied, setHasApplied] = useState(false);
-  const [isApplying, setIsApplying] = useState(false);
 
   const jobQuery = useQuery({
     queryKey: ['marketplace', 'job-detail', jobId],
@@ -156,32 +154,13 @@ export function MarketplaceJobDetail() {
     [job?._id, relatedJobsQuery.data],
   );
 
-  const applied = hasApplied || Boolean(job?.hasApplied);
-  const applicationLabel =
-    job?.applicationSource === 'recruiter_invite' ? 'Invited' : 'Applied';
-
   const responsibilityList = buildDetailList(job?.keyResponsibilities ?? [], job?.description);
   const requirementList = buildDetailList(job?.requirements ?? [], recruiter?.skills?.map((skill) => skill.name).join('. '));
   const benefitList = buildDetailList(job?.benefits ?? [], job?.companyOverview);
   const applicationSteps = buildDetailList(
     job?.applicationSteps ?? [],
-    'Apply from this page. The recruiter reviews profiles and contacts shortlisted students directly.',
+    'Apply from the marketplace jobs feed. The recruiter reviews profiles and contacts shortlisted students directly.',
   );
-
-  const handleApply = async () => {
-    if (!job || applied || isApplying) {
-      return;
-    }
-
-    setIsApplying(true);
-
-    try {
-      await recruiterApi.applyToJob(job._id);
-      setHasApplied(true);
-    } finally {
-      setIsApplying(false);
-    }
-  };
 
   const handleMessage = () => {
     if (!job) {
@@ -199,13 +178,22 @@ export function MarketplaceJobDetail() {
     <DashboardLayout role="student">
       <div className="-mx-4 -my-6 min-h-[calc(100vh-5rem)] bg-[#0a0f1d] px-4 py-6 text-white sm:px-5 lg:-mx-8 lg:px-8 lg:py-8">
         <div className="mx-auto flex w-full max-w-[96rem] min-h-full flex-col gap-6">
-          <Link
-            to="/marketplace"
-            className="inline-flex items-center gap-2 rounded-full border border-slate-800 bg-slate-950/60 px-4 py-2 text-sm font-medium text-slate-200 transition hover:border-slate-700 hover:text-white"
-          >
-            <ArrowLeft className="h-4 w-4" />
-            Back to marketplace
-          </Link>
+          <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+            <Link
+              to="/marketplace"
+              className="inline-flex items-center gap-2 rounded-full border border-slate-800 bg-slate-950/60 px-4 py-2 text-sm font-medium text-slate-200 transition hover:border-slate-700 hover:text-white"
+            >
+              <ArrowLeft className="h-4 w-4" />
+              Back to marketplace
+            </Link>
+            <Link
+              to="/dashboard/student/applications"
+              className="inline-flex items-center gap-2 rounded-full border border-slate-700 bg-slate-950/60 px-4 py-2 text-sm font-medium text-slate-200 transition hover:border-cyan-400/50 hover:text-white"
+            >
+              <BriefcaseBusiness className="h-4 w-4" />
+              My applications
+            </Link>
+          </div>
 
           <div className="marketplace-scroll min-h-0 flex-1 overflow-y-auto rounded-[30px] border border-slate-800/80 bg-[linear-gradient(180deg,#101624_0%,#0c1220_100%)] shadow-[0_24px_80px_rgba(0,0,0,0.28)]">
             <div className="w-full px-5 py-6 sm:px-7 sm:py-7 lg:px-8 lg:py-8 xl:px-10">
@@ -367,13 +355,6 @@ export function MarketplaceJobDetail() {
                     </div>
 
                     <div className="mt-5 space-y-3">
-                      <Button
-                        className="h-11 w-full rounded-full bg-gradient-to-r from-indigo-600 to-fuchsia-600 text-white hover:from-indigo-500 hover:to-fuchsia-500"
-                        onClick={handleApply}
-                        disabled={applied || isApplying || !job.isActive}
-                      >
-                        {isApplying ? 'Applying...' : applied ? applicationLabel : 'Apply now'}
-                      </Button>
                       <Button
                         variant="secondary"
                         className="h-11 w-full rounded-full border-slate-700 bg-transparent text-slate-200 hover:border-slate-500 hover:bg-slate-900/40"

@@ -218,7 +218,7 @@ export default function RecruiterDashboard() {
                     Shortlist
                   </Button>
                   {student.canContact ? (
-                    <Button variant="secondary" onClick={() => navigate(`/dashboard/recruiter/messages/${student._id}`)}>
+                    <Button variant="secondary" onClick={() => navigate(`/dashboard/messages/${student._id}`)}>
                       <ArrowRight className="mr-2 h-4 w-4" />
                       Message
                     </Button>

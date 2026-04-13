@@ -71,6 +71,8 @@ const workspaceSchema = new Schema(
             uploadedAt: { type: Date, default: () => new Date() },
             note: { type: String, default: undefined },
             category: { type: String, enum: ['bug_report', 'error_log', 'screenshot', 'test_result', 'design_mockup', 'other'], default: 'other' },
+            storageProvider: { type: String, enum: ['cloudinary', 's3'], default: undefined },
+            storageKey: { type: String, default: undefined },
             cloudinaryPublicId: { type: String, default: undefined },
           },
           { _id: true },

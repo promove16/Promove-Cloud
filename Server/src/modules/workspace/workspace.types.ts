@@ -38,6 +38,8 @@ export interface IWorkspace {
     uploadedAt: Date;
     note?: string;
     category: string;
+    storageProvider?: 'cloudinary' | 's3';
+    storageKey?: string;
     cloudinaryPublicId?: string;
   }>;
   repoSubmissions: Array<{

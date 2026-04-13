@@ -189,6 +189,70 @@ const portfolioProjectEntrySchema = z.object({
   languages: stringListSchema,
 });
 
+const portfolioServiceEntrySchema = z.object({
+  _id: z.string().trim().optional(),
+  icon: z.string().trim().max(16).optional().or(z.literal('')),
+  title: z.string().trim().min(1).max(120),
+  description: z.string().trim().max(400).default(''),
+});
+
+const portfolioTestimonialEntrySchema = z.object({
+  _id: z.string().trim().optional(),
+  name: z.string().trim().min(1).max(120),
+  role: z.string().trim().max(160).default(''),
+  text: z.string().trim().max(500).default(''),
+});
+
+const portfolioBlogPostEntrySchema = z.object({
+  _id: z.string().trim().optional(),
+  tag: z.string().trim().min(1).max(40),
+  title: z.string().trim().min(1).max(160),
+  excerpt: z.string().trim().max(500).default(''),
+  tagColor: z.string().trim().max(32).default('#7c3aed'),
+  url: nullableUrlSchema.default(null),
+  publishedAt: nullableDateSchema.default(null),
+});
+
+const portfolioTextFieldSchema = (max: number) =>
+  z.string().trim().max(max).optional().or(z.literal(''));
+
+const portfolioContentPatchSchema = z.object({
+  heroEyebrow: portfolioTextFieldSchema(80),
+  heroTitle: portfolioTextFieldSchema(160),
+  heroDescription: portfolioTextFieldSchema(500),
+  primaryButtonLabel: portfolioTextFieldSchema(60),
+  secondaryButtonLabel: portfolioTextFieldSchema(60),
+  statOneLabel: portfolioTextFieldSchema(60),
+  statTwoLabel: portfolioTextFieldSchema(60),
+  statThreeLabel: portfolioTextFieldSchema(60),
+  statFourLabel: portfolioTextFieldSchema(60),
+  aboutTitle: portfolioTextFieldSchema(80),
+  aboutEmpty: portfolioTextFieldSchema(200),
+  experienceTitle: portfolioTextFieldSchema(80),
+  experienceEmpty: portfolioTextFieldSchema(200),
+  skillsTitle: portfolioTextFieldSchema(80),
+  skillsEmpty: portfolioTextFieldSchema(200),
+  projectsTitle: portfolioTextFieldSchema(80),
+  projectsEmpty: portfolioTextFieldSchema(200),
+  educationTitle: portfolioTextFieldSchema(80),
+  educationEmpty: portfolioTextFieldSchema(200),
+  certificationsTitle: portfolioTextFieldSchema(80),
+  certificationsEmpty: portfolioTextFieldSchema(200),
+  startupsTitle: portfolioTextFieldSchema(80),
+  startupsEmpty: portfolioTextFieldSchema(200),
+  linksTitle: portfolioTextFieldSchema(80),
+  linksEmpty: portfolioTextFieldSchema(200),
+  institutionDetailsTitle: portfolioTextFieldSchema(80),
+  institutionDetailsEmpty: portfolioTextFieldSchema(200),
+  institutionSpecialtiesTitle: portfolioTextFieldSchema(80),
+  institutionSpecialtiesEmpty: portfolioTextFieldSchema(200),
+  institutionLocationsTitle: portfolioTextFieldSchema(80),
+  institutionLocationsEmpty: portfolioTextFieldSchema(200),
+  institutionOutcomesTitle: portfolioTextFieldSchema(80),
+  institutionOutcomesEmpty: portfolioTextFieldSchema(200),
+  footerNote: portfolioTextFieldSchema(200),
+});
+
 export const updateMeSchema = z
   .object({
     displayName: z.string().trim().min(2).max(100).optional(),
@@ -214,6 +278,10 @@ export const updateMeSchema = z
     education: z.array(educationEntrySchema).max(25).optional(),
     certifications: z.array(certificationEntrySchema).max(40).optional(),
     portfolioProjects: z.array(portfolioProjectEntrySchema).max(40).optional(),
+    portfolioServices: z.array(portfolioServiceEntrySchema).max(20).optional(),
+    portfolioTestimonials: z.array(portfolioTestimonialEntrySchema).max(20).optional(),
+    portfolioBlogPosts: z.array(portfolioBlogPostEntrySchema).max(20).optional(),
+    portfolioContent: portfolioContentPatchSchema.optional(),
     profileComplete: z.boolean().optional(),
     discoverableToRecruiters: z.boolean().optional(),
   })
@@ -531,6 +599,7 @@ export const toSanitizedUser = (user: UserLike): SanitizedUser => ({
   ...(user.institutionToken !== undefined ? { institutionToken: user.institutionToken ?? null } : {}),
   ...(user.institutionId ? { institutionId: user.institutionId.toString() } : { institutionId: null }),
   ...(user.institutionProfile ? { institutionProfile: user.institutionProfile } : {}),
+  ...(user.portfolioContent ? { portfolioContent: user.portfolioContent } : {}),
   ...(user.institutionVerification
     ? { institutionVerification: toSanitizedInstitutionVerification(user.institutionVerification) }
     : {}),
@@ -561,6 +630,9 @@ export const toSanitizedUser = (user: UserLike): SanitizedUser => ({
   education: user.education ?? [],
   certifications: user.certifications ?? [],
   portfolioProjects: user.portfolioProjects ?? [],
+  portfolioServices: user.portfolioServices ?? [],
+  portfolioTestimonials: user.portfolioTestimonials ?? [],
+  portfolioBlogPosts: user.portfolioBlogPosts ?? [],
   resume: user.resume ?? {
     fileUrl: null,
     fileName: null,
@@ -1493,6 +1565,103 @@ const normalizePortfolioProjectEntries = (
     languages: normalizeStringList(project.languages),
   })) as IUser['portfolioProjects'];
 
+const normalizePortfolioServiceEntries = (
+  items: z.infer<typeof portfolioServiceEntrySchema>[],
+): IUser['portfolioServices'] =>
+  items.map((service) => ({
+    ...getExistingObjectId(service._id),
+    ...(service.icon ? { icon: sanitizePlainText(service.icon) } : {}),
+    title: sanitizePlainText(service.title),
+    description: sanitizePlainText(service.description),
+  })) as IUser['portfolioServices'];
+
+const normalizePortfolioTestimonialEntries = (
+  items: z.infer<typeof portfolioTestimonialEntrySchema>[],
+): IUser['portfolioTestimonials'] =>
+  items.map((testimonial) => ({
+    ...getExistingObjectId(testimonial._id),
+    name: sanitizePlainText(testimonial.name),
+    role: sanitizePlainText(testimonial.role),
+    text: sanitizePlainText(testimonial.text),
+  })) as IUser['portfolioTestimonials'];
+
+const normalizePortfolioBlogPostEntries = (
+  items: z.infer<typeof portfolioBlogPostEntrySchema>[],
+): IUser['portfolioBlogPosts'] =>
+  items.map((post) => ({
+    ...getExistingObjectId(post._id),
+    tag: sanitizePlainText(post.tag),
+    title: sanitizePlainText(post.title),
+    excerpt: sanitizePlainText(post.excerpt),
+    tagColor: sanitizePlainText(post.tagColor) || '#7c3aed',
+    url: post.url ?? null,
+    publishedAt: post.publishedAt,
+  })) as IUser['portfolioBlogPosts'];
+
+const applyPortfolioContentPatch = (
+  current: IUser['portfolioContent'] | undefined,
+  patch: z.infer<typeof portfolioContentPatchSchema>,
+): IUser['portfolioContent'] => ({
+  heroEyebrow: sanitizePlainText(patch.heroEyebrow ?? current?.heroEyebrow ?? ''),
+  heroTitle: sanitizePlainText(patch.heroTitle ?? current?.heroTitle ?? ''),
+  heroDescription: sanitizePlainText(patch.heroDescription ?? current?.heroDescription ?? ''),
+  primaryButtonLabel: sanitizePlainText(
+    patch.primaryButtonLabel ?? current?.primaryButtonLabel ?? '',
+  ),
+  secondaryButtonLabel: sanitizePlainText(
+    patch.secondaryButtonLabel ?? current?.secondaryButtonLabel ?? '',
+  ),
+  statOneLabel: sanitizePlainText(patch.statOneLabel ?? current?.statOneLabel ?? ''),
+  statTwoLabel: sanitizePlainText(patch.statTwoLabel ?? current?.statTwoLabel ?? ''),
+  statThreeLabel: sanitizePlainText(patch.statThreeLabel ?? current?.statThreeLabel ?? ''),
+  statFourLabel: sanitizePlainText(patch.statFourLabel ?? current?.statFourLabel ?? ''),
+  aboutTitle: sanitizePlainText(patch.aboutTitle ?? current?.aboutTitle ?? ''),
+  aboutEmpty: sanitizePlainText(patch.aboutEmpty ?? current?.aboutEmpty ?? ''),
+  experienceTitle: sanitizePlainText(patch.experienceTitle ?? current?.experienceTitle ?? ''),
+  experienceEmpty: sanitizePlainText(patch.experienceEmpty ?? current?.experienceEmpty ?? ''),
+  skillsTitle: sanitizePlainText(patch.skillsTitle ?? current?.skillsTitle ?? ''),
+  skillsEmpty: sanitizePlainText(patch.skillsEmpty ?? current?.skillsEmpty ?? ''),
+  projectsTitle: sanitizePlainText(patch.projectsTitle ?? current?.projectsTitle ?? ''),
+  projectsEmpty: sanitizePlainText(patch.projectsEmpty ?? current?.projectsEmpty ?? ''),
+  educationTitle: sanitizePlainText(patch.educationTitle ?? current?.educationTitle ?? ''),
+  educationEmpty: sanitizePlainText(patch.educationEmpty ?? current?.educationEmpty ?? ''),
+  certificationsTitle: sanitizePlainText(
+    patch.certificationsTitle ?? current?.certificationsTitle ?? '',
+  ),
+  certificationsEmpty: sanitizePlainText(
+    patch.certificationsEmpty ?? current?.certificationsEmpty ?? '',
+  ),
+  startupsTitle: sanitizePlainText(patch.startupsTitle ?? current?.startupsTitle ?? ''),
+  startupsEmpty: sanitizePlainText(patch.startupsEmpty ?? current?.startupsEmpty ?? ''),
+  linksTitle: sanitizePlainText(patch.linksTitle ?? current?.linksTitle ?? ''),
+  linksEmpty: sanitizePlainText(patch.linksEmpty ?? current?.linksEmpty ?? ''),
+  institutionDetailsTitle: sanitizePlainText(
+    patch.institutionDetailsTitle ?? current?.institutionDetailsTitle ?? '',
+  ),
+  institutionDetailsEmpty: sanitizePlainText(
+    patch.institutionDetailsEmpty ?? current?.institutionDetailsEmpty ?? '',
+  ),
+  institutionSpecialtiesTitle: sanitizePlainText(
+    patch.institutionSpecialtiesTitle ?? current?.institutionSpecialtiesTitle ?? '',
+  ),
+  institutionSpecialtiesEmpty: sanitizePlainText(
+    patch.institutionSpecialtiesEmpty ?? current?.institutionSpecialtiesEmpty ?? '',
+  ),
+  institutionLocationsTitle: sanitizePlainText(
+    patch.institutionLocationsTitle ?? current?.institutionLocationsTitle ?? '',
+  ),
+  institutionLocationsEmpty: sanitizePlainText(
+    patch.institutionLocationsEmpty ?? current?.institutionLocationsEmpty ?? '',
+  ),
+  institutionOutcomesTitle: sanitizePlainText(
+    patch.institutionOutcomesTitle ?? current?.institutionOutcomesTitle ?? '',
+  ),
+  institutionOutcomesEmpty: sanitizePlainText(
+    patch.institutionOutcomesEmpty ?? current?.institutionOutcomesEmpty ?? '',
+  ),
+  footerNote: sanitizePlainText(patch.footerNote ?? current?.footerNote ?? ''),
+});
+
 export const updateCurrentUser = async (
   userId: string,
   payload: z.infer<typeof updateMeSchema>,
@@ -1610,6 +1779,22 @@ export const updateCurrentUser = async (
     user.portfolioProjects = normalizePortfolioProjectEntries(payload.portfolioProjects);
   }
 
+  if (payload.portfolioServices !== undefined) {
+    user.portfolioServices = normalizePortfolioServiceEntries(payload.portfolioServices);
+  }
+
+  if (payload.portfolioTestimonials !== undefined) {
+    user.portfolioTestimonials = normalizePortfolioTestimonialEntries(payload.portfolioTestimonials);
+  }
+
+  if (payload.portfolioBlogPosts !== undefined) {
+    user.portfolioBlogPosts = normalizePortfolioBlogPostEntries(payload.portfolioBlogPosts);
+  }
+
+  if (payload.portfolioContent !== undefined) {
+    user.portfolioContent = applyPortfolioContentPatch(user.portfolioContent, payload.portfolioContent);
+  }
+
   if (payload.discoverableToRecruiters !== undefined) {
     user.discoverableToRecruiters = payload.discoverableToRecruiters;
   }
@@ -1673,6 +1858,10 @@ const buildStudentPortfolioProfile = async (student: IUser): Promise<PublicStude
     education,
     certifications: student.certifications ?? [],
     portfolioProjects: student.portfolioProjects ?? [],
+    portfolioServices: student.portfolioServices ?? [],
+    portfolioTestimonials: student.portfolioTestimonials ?? [],
+    portfolioBlogPosts: student.portfolioBlogPosts ?? [],
+    ...(student.portfolioContent ? { portfolioContent: student.portfolioContent } : {}),
     githubStats: student.githubStats ?? {
       totalRepos: 0,
       totalStars: 0,

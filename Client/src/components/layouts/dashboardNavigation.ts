@@ -58,7 +58,6 @@ export const SIDEBAR_CONFIG: Record<UserRole, DashboardNavItem[]> = {
     { kind: 'link', label: 'Startup', icon: Rocket, path: STARTUP_LAUNCH_BASE_PATH },
     { kind: 'link', label: 'Portfolio', icon: Trophy, path: '/portfolio' },
     { kind: 'link', label: 'Marketplace', icon: Globe, path: getMarketplaceBasePath(UserRole.STUDENT) },
-    { kind: 'link', label: 'Applications', icon: BriefcaseBusiness, path: '/dashboard/student/applications' },
     { kind: 'link', label: 'Events', icon: CalendarDays, path: '/dashboard/student/events' },
     { kind: 'link', label: 'Messages', icon: MessageCircle, path: '/dashboard/messages' },
     { kind: 'link', label: 'Settings', icon: Settings, path: '/dashboard/settings' },
@@ -87,6 +86,7 @@ export const SIDEBAR_CONFIG: Record<UserRole, DashboardNavItem[]> = {
   [UserRole.MENTOR]: [
     { kind: 'link', label: 'Dashboard', icon: Home, path: '/dashboard/mentor' },
     { kind: 'link', label: 'Problem Bank', icon: Sparkles, path: '/problem-bank' },
+    { kind: 'link', label: 'Portfolio', icon: Trophy, path: '/portfolio' },
     { kind: 'link', label: 'Marketplace', icon: Globe, path: getMarketplaceBasePath(UserRole.MENTOR) },
     { kind: 'link', label: 'Student Feed', icon: Users, path: '/dashboard/mentor/students' },
     { kind: 'link', label: 'Sessions', icon: GraduationCap, path: '/dashboard/mentor/sessions' },
@@ -98,6 +98,7 @@ export const SIDEBAR_CONFIG: Record<UserRole, DashboardNavItem[]> = {
   [UserRole.INVESTOR]: [
     { kind: 'link', label: 'Dashboard', icon: Home, path: '/dashboard/investor' },
     { kind: 'link', label: 'Problem Bank', icon: Sparkles, path: '/problem-bank' },
+    { kind: 'link', label: 'Portfolio', icon: Trophy, path: '/portfolio' },
     { kind: 'link', label: 'Marketplace', icon: Globe, path: getMarketplaceBasePath(UserRole.INVESTOR) },
     { kind: 'link', label: 'Startups', icon: Rocket, path: '/dashboard/investor/startups' },
     { kind: 'link', label: 'Institutions', icon: Building2, path: '/dashboard/investor/institutions' },
@@ -109,14 +110,10 @@ export const SIDEBAR_CONFIG: Record<UserRole, DashboardNavItem[]> = {
   ],
   [UserRole.RECRUITER]: [
     { kind: 'link', label: 'Dashboard', icon: Home, path: '/dashboard/recruiter' },
+    { kind: 'link', label: 'Portfolio', icon: Trophy, path: '/portfolio' },
     { kind: 'link', label: 'Marketplace', icon: Globe, path: getMarketplaceBasePath(UserRole.RECRUITER) },
-    { kind: 'link', label: 'Applications', icon: BriefcaseBusiness, path: '/dashboard/recruiter/applications' },
-    { kind: 'link', label: 'Talent Search', icon: Users, path: '/dashboard/recruiter/talent' },
-    { kind: 'link', label: 'College Connect', icon: Building2, path: '/dashboard/recruiter/colleges' },
-    { kind: 'link', label: 'Active Drives', icon: BarChart3, path: '/dashboard/recruiter/drives' },
-    { kind: 'link', label: 'Hiring Events', icon: CalendarDays, path: '/dashboard/recruiter/hiring-events' },
-    { kind: 'link', label: 'Onboarding Tracker', icon: Trophy, path: '/dashboard/recruiter/onboarding' },
-    { kind: 'link', label: 'Messages', icon: MessageCircle, path: '/dashboard/recruiter/messages' },
+    { kind: 'link', label: 'Drive', icon: BarChart3, path: '/dashboard/recruiter/drives' },
+    { kind: 'link', label: 'Messages', icon: MessageCircle, path: '/dashboard/messages' },
     { kind: 'action', label: 'Logout', icon: LogOut, action: 'logout' },
   ],
   [UserRole.ADMIN]: [
@@ -153,5 +150,11 @@ export const DASHBOARD_ROUTE_LABELS: Partial<Record<UserRole, DashboardRouteLabe
     { path: '/dashboard/college/events', label: 'Events' },
     { path: '/dashboard/college/projects', label: 'Projects' },
     { path: '/dashboard/college/analytics', label: 'Analytics' },
+  ],
+  [UserRole.RECRUITER]: [
+    { path: '/dashboard/recruiter/applications', label: 'Applications' },
+    { path: '/dashboard/recruiter/colleges', label: 'College Students' },
+    { path: '/dashboard/recruiter/hiring-events', label: 'Hiring Events' },
+    { path: '/dashboard/recruiter/onboarding', label: 'Onboarding Tracker' },
   ],
 };

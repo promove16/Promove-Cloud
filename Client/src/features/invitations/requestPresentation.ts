@@ -56,6 +56,11 @@ const METADATA_LABELS: Record<string, string> = {
   queryType: 'Conversation context',
   messageId: 'Message reference',
   recipientRole: 'Recipient role',
+  title: 'Event title',
+  type: 'Event type',
+  date: 'Scheduled for',
+  description: 'Event brief',
+  minimumInnovationScore: 'Minimum score',
 };
 
 const HIDDEN_METADATA_KEYS = new Set([
@@ -66,6 +71,7 @@ const HIDDEN_METADATA_KEYS = new Set([
   'jobId',
   'collegeId',
   'recruiterId',
+  'eventId',
   'deepLink',
   'acceptRedirect',
   'declineRedirect',

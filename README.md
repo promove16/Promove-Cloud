@@ -86,7 +86,7 @@ ProMove/
 │   │   ├── config/          # Environment, DB, Redis, Socket, Logger
 │   │   ├── middleware/      # Auth, authorization, rate limiting
 │   │   ├── modules/         # Domain modules (auth, user, startup, etc.)
-│   │   ├── services/        # Business logic (email, score engine, cloudinary)
+│   │   ├── services/        # Business logic (email, score engine, storage)
 │   │   ├── jobs/            # BullMQ workers
 │   │   ├── sockets/         # Socket.IO handlers
 │   │   ├── utils/           # Helpers and utilities
@@ -178,7 +178,8 @@ Required backend variables (see `.env.example`):
 - `MONGODB_URI` - MongoDB connection string
 - `UPSTASH_REDIS_*` - Redis credentials
 - `JWT_ACCESS_SECRET` / `JWT_REFRESH_SECRET` - Token secrets
-- `CLOUDINARY_*` - Cloudinary config
+- `CLOUDINARY_*` - Cloudinary upload config
+- `AWS_S3_*` - optional future S3 upload config
 - `AWS_*` - AWS SES credentials
 
 Frontend:

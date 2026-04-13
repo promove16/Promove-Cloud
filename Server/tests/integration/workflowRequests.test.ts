@@ -2,6 +2,7 @@ import jwt from 'jsonwebtoken';
 import request from 'supertest';
 import app from '../../src/app';
 import { env } from '../../src/config/env';
+import { Event } from '../../src/modules/event/event.model';
 import { RequestRecord } from '../../src/modules/request/request.model';
 import { User } from '../../src/modules/user/user.model';
 import { UserRole } from '../../src/types/roles.types';
@@ -135,5 +136,89 @@ describe('workflow requests', () => {
         status: 'accepted',
       }),
     ]);
+  });
+
+  it('creates a recruiter hiring event only after the college accepts the event invite request', async () => {
+    const recruiter = await createUser(UserRole.RECRUITER, 'Apex Recruiter');
+    const college = await createUser(UserRole.COLLEGE, 'North Campus', {
+      institutionProfile: {
+        institutionName: 'North Campus',
+        location: 'Warangal',
+        totalStudentsEnrolled: 1400,
+        academicYear: '2025-26',
+        iicStarRating: 4.5,
+      },
+    });
+
+    await RequestRecord.create({
+      type: 'college_recruiter_partnership',
+      actionType: 'partner',
+      fromUserId: recruiter._id,
+      toUserId: college._id,
+      targetEntityType: 'college',
+      targetEntityId: college._id.toString(),
+      targetEntityTitle: college.displayName,
+      status: 'accepted',
+      message: 'Accepted partnership',
+      respondedAt: new Date(),
+      expiresAt: new Date(Date.now() + 24 * 60 * 60 * 1000),
+      auditTrail: [{ status: 'created', actorUserId: recruiter._id, at: new Date() }],
+    });
+
+    const createResponse = await request(app)
+      .post('/api/workflow-requests')
+      .set(authHeader(recruiter))
+      .send({
+        requestType: 'college_event_invite',
+        actionType: 'approve',
+        toUserId: college._id.toString(),
+        targetEntityType: 'college',
+        targetEntityId: college._id.toString(),
+        targetEntityTitle: college.displayName,
+        targetRole: 'college',
+        requestedRole: 'host',
+        requestedPermission: 'college_hiring_event',
+        metadata: {
+          entityName: 'North Campus Hiring Sprint',
+          title: 'North Campus Hiring Sprint',
+          type: 'Placement Hackathon',
+          date: '2026-05-10T09:00:00.000Z',
+          description: 'Shortlist top students through recruiter and college scoring.',
+          minimumInnovationScore: 72,
+        },
+      });
+
+    expect(createResponse.status).toBe(201);
+    expect(await Event.find()).toHaveLength(0);
+
+    const acceptResponse = await request(app)
+      .post(`/api/workflow-requests/${createResponse.body.data._id}/accept`)
+      .set(authHeader(college))
+      .send();
+
+    expect(acceptResponse.status).toBe(200);
+    expect(acceptResponse.body.data).toEqual(
+      expect.objectContaining({
+        status: 'accepted',
+        deepLink: expect.stringContaining('/dashboard/recruiter/hiring-events?eventId='),
+        acceptRedirect: expect.stringContaining('/dashboard/college/events?tab=hiring&eventId='),
+      }),
+    );
+
+    const events = await Event.find().lean();
+    expect(events).toHaveLength(1);
+    expect(String(events[0].sourceRequestId)).toBe(createResponse.body.data._id);
+    expect(String(events[0].institutionId)).toBe(college._id.toString());
+    expect(String(events[0].recruiterId)).toBe(recruiter._id.toString());
+    expect(events[0].title).toBe('North Campus Hiring Sprint');
+    expect(events[0].minimumInnovationScore).toBe(72);
+
+    const updatedRequest = await RequestRecord.findById(createResponse.body.data._id).lean();
+    expect(updatedRequest?.metadata).toEqual(
+      expect.objectContaining({
+        title: 'North Campus Hiring Sprint',
+        eventId: String(events[0]._id),
+      }),
+    );
   });
 });

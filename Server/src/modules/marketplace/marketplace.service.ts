@@ -205,6 +205,32 @@ const compactString = (value?: string | null) => {
   return trimmed ? trimmed : undefined;
 };
 
+type PublicUserMapOptions = {
+  skillLimit?: number;
+  experienceLimit?: number;
+  educationLimit?: number;
+  portfolioLimit?: number;
+};
+
+const sliceWithOptionalLimit = <T>(items: T[] | undefined, limit?: number) => {
+  const source = items ?? [];
+  return typeof limit === 'number' ? source.slice(0, limit) : source;
+};
+
+const MARKETPLACE_CARD_LIMITS: Required<PublicUserMapOptions> = {
+  skillLimit: 8,
+  experienceLimit: 3,
+  educationLimit: 2,
+  portfolioLimit: 3,
+};
+
+const MARKETPLACE_DETAIL_LIMITS: PublicUserMapOptions = {
+  skillLimit: 16,
+  experienceLimit: 12,
+  educationLimit: 8,
+  portfolioLimit: 12,
+};
+
 const isAppliedStage = (stage?: IJobApplicationRecord['stage']) =>
   Boolean(stage && !['Invited Pending', 'Invite Declined'].includes(stage));
 
@@ -256,7 +282,7 @@ const mapGithubStats = (githubStats?: PublicGithubStats) => {
   return githubStats;
 };
 
-const mapPublicUser = (user: PublicUser) => ({
+const mapPublicUser = (user: PublicUser, options: PublicUserMapOptions = MARKETPLACE_CARD_LIMITS) => ({
   _id: user._id.toString(),
   displayName: user.displayName,
   ...(user.avatar ? { avatar: user.avatar } : {}),
@@ -268,9 +294,8 @@ const mapPublicUser = (user: PublicUser) => ({
   ...(mapLinkSet(user) ? { links: mapLinkSet(user) } : {}),
   ...(user.skills && user.skills.length > 0
     ? {
-        skills: user.skills
+        skills: sliceWithOptionalLimit(user.skills, options.skillLimit)
           .filter((skill) => compactString(skill.name))
-          .slice(0, 8)
           .map((skill) => ({
             name: skill.name.trim(),
             level: skill.level,
@@ -279,7 +304,7 @@ const mapPublicUser = (user: PublicUser) => ({
     : {}),
   ...(user.experience && user.experience.length > 0
     ? {
-        experienceHighlights: user.experience.slice(0, 3).map((item) => ({
+        experienceHighlights: sliceWithOptionalLimit(user.experience, options.experienceLimit).map((item) => ({
           title: item.title,
           company: item.company,
           type: item.type,
@@ -294,7 +319,7 @@ const mapPublicUser = (user: PublicUser) => ({
     : {}),
   ...(user.education && user.education.length > 0
     ? {
-        educationHighlights: user.education.slice(0, 2).map((item) => ({
+        educationHighlights: sliceWithOptionalLimit(user.education, options.educationLimit).map((item) => ({
           institution: item.institution,
           ...(compactString(item.degree) ? { degree: compactString(item.degree) } : {}),
           ...(compactString(item.fieldOfStudy) ? { fieldOfStudy: compactString(item.fieldOfStudy) } : {}),
@@ -307,7 +332,7 @@ const mapPublicUser = (user: PublicUser) => ({
     : {}),
   ...(user.portfolioProjects && user.portfolioProjects.length > 0
     ? {
-        portfolioHighlights: user.portfolioProjects.slice(0, 3).map((project) => ({
+        portfolioHighlights: sliceWithOptionalLimit(user.portfolioProjects, options.portfolioLimit).map((project) => ({
           title: project.title,
           ...(compactString(project.description) ? { description: compactString(project.description) } : {}),
           techStack: project.techStack.slice(0, 6),
@@ -501,9 +526,10 @@ const buildStartupView = (
 const attachUserCardMetadata = (
   user: PublicUser,
   relatedCounts: MarketplaceUserRelatedCounts,
+  options?: PublicUserMapOptions,
 ) => ({
   entityType: user.role as Extract<MarketplaceEntityType, UserRole>,
-  ...mapPublicUser(user),
+  ...mapPublicUser(user, options),
   relatedCounts,
 });
 
@@ -591,7 +617,7 @@ export const listMarketplaceUsers = async (
     attachUserCardMetadata(user as PublicUser, {
       jobs: jobCountMap.get(String(user._id)) ?? 0,
       startups: startupCountMap.get(String(user._id)) ?? 0,
-    }),
+    }, MARKETPLACE_CARD_LIMITS),
   );
 };
 
@@ -710,7 +736,7 @@ const getMarketplaceUserDetail = async (
     ...attachUserCardMetadata(user as PublicUser, {
       jobs: jobs.length,
       startups: startups.length,
-    }),
+    }, MARKETPLACE_DETAIL_LIMITS),
     relatedJobs: jobs.map((job) => {
       const hasApplied = getStudentHasAppliedToJob(job, viewerStudentId);
       return mapJob(job, typeof hasApplied === 'boolean' ? { hasApplied } : undefined);

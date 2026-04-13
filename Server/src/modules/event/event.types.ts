@@ -26,6 +26,7 @@ export interface IEvent {
   _id: Types.ObjectId;
   institutionId: Types.ObjectId;
   createdBy: Types.ObjectId;
+  sourceRequestId?: Types.ObjectId;
   title: string;
   type: EventType;
   category: EventCategory;

@@ -216,6 +216,15 @@ const institutionVerificationDocumentSchema = new Schema<
       ref: 'User',
       required: true,
     },
+    storageProvider: {
+      type: String,
+      enum: ['cloudinary', 's3'],
+      default: undefined,
+    },
+    storageKey: {
+      type: String,
+      default: undefined,
+    },
     cloudinaryPublicId: {
       type: String,
       default: undefined,
@@ -576,6 +585,131 @@ const portfolioProjectSchema = new Schema<IUser['portfolioProjects'][number]>(
     },
   },
   { _id: true },
+);
+
+const portfolioServiceSchema = new Schema<IUser['portfolioServices'][number]>(
+  {
+    icon: {
+      type: String,
+      trim: true,
+      maxlength: 16,
+      default: '',
+    },
+    title: {
+      type: String,
+      required: true,
+      trim: true,
+      maxlength: 120,
+    },
+    description: {
+      type: String,
+      maxlength: 400,
+      default: '',
+    },
+  },
+  { _id: true },
+);
+
+const portfolioTestimonialSchema = new Schema<IUser['portfolioTestimonials'][number]>(
+  {
+    name: {
+      type: String,
+      required: true,
+      trim: true,
+      maxlength: 120,
+    },
+    role: {
+      type: String,
+      trim: true,
+      maxlength: 160,
+      default: '',
+    },
+    text: {
+      type: String,
+      trim: true,
+      maxlength: 500,
+      default: '',
+    },
+  },
+  { _id: true },
+);
+
+const portfolioBlogPostSchema = new Schema<IUser['portfolioBlogPosts'][number]>(
+  {
+    tag: {
+      type: String,
+      required: true,
+      trim: true,
+      maxlength: 40,
+    },
+    title: {
+      type: String,
+      required: true,
+      trim: true,
+      maxlength: 160,
+    },
+    excerpt: {
+      type: String,
+      trim: true,
+      maxlength: 500,
+      default: '',
+    },
+    tagColor: {
+      type: String,
+      trim: true,
+      maxlength: 32,
+      default: '#7c3aed',
+    },
+    url: {
+      type: String,
+      default: null,
+    },
+    publishedAt: {
+      type: Date,
+      default: null,
+    },
+  },
+  { _id: true },
+);
+
+const portfolioContentSchema = new Schema<NonNullable<IUser['portfolioContent']>>(
+  {
+    heroEyebrow: { type: String, default: '', maxlength: 80 },
+    heroTitle: { type: String, default: '', maxlength: 160 },
+    heroDescription: { type: String, default: '', maxlength: 500 },
+    primaryButtonLabel: { type: String, default: '', maxlength: 60 },
+    secondaryButtonLabel: { type: String, default: '', maxlength: 60 },
+    statOneLabel: { type: String, default: '', maxlength: 60 },
+    statTwoLabel: { type: String, default: '', maxlength: 60 },
+    statThreeLabel: { type: String, default: '', maxlength: 60 },
+    statFourLabel: { type: String, default: '', maxlength: 60 },
+    aboutTitle: { type: String, default: '', maxlength: 80 },
+    aboutEmpty: { type: String, default: '', maxlength: 200 },
+    experienceTitle: { type: String, default: '', maxlength: 80 },
+    experienceEmpty: { type: String, default: '', maxlength: 200 },
+    skillsTitle: { type: String, default: '', maxlength: 80 },
+    skillsEmpty: { type: String, default: '', maxlength: 200 },
+    projectsTitle: { type: String, default: '', maxlength: 80 },
+    projectsEmpty: { type: String, default: '', maxlength: 200 },
+    educationTitle: { type: String, default: '', maxlength: 80 },
+    educationEmpty: { type: String, default: '', maxlength: 200 },
+    certificationsTitle: { type: String, default: '', maxlength: 80 },
+    certificationsEmpty: { type: String, default: '', maxlength: 200 },
+    startupsTitle: { type: String, default: '', maxlength: 80 },
+    startupsEmpty: { type: String, default: '', maxlength: 200 },
+    linksTitle: { type: String, default: '', maxlength: 80 },
+    linksEmpty: { type: String, default: '', maxlength: 200 },
+    institutionDetailsTitle: { type: String, default: '', maxlength: 80 },
+    institutionDetailsEmpty: { type: String, default: '', maxlength: 200 },
+    institutionSpecialtiesTitle: { type: String, default: '', maxlength: 80 },
+    institutionSpecialtiesEmpty: { type: String, default: '', maxlength: 200 },
+    institutionLocationsTitle: { type: String, default: '', maxlength: 80 },
+    institutionLocationsEmpty: { type: String, default: '', maxlength: 200 },
+    institutionOutcomesTitle: { type: String, default: '', maxlength: 80 },
+    institutionOutcomesEmpty: { type: String, default: '', maxlength: 200 },
+    footerNote: { type: String, default: '', maxlength: 200 },
+  },
+  { _id: false },
 );
 
 const resumeSchema = new Schema<IUser['resume']>(
@@ -1170,6 +1304,22 @@ const userSchema = new Schema<IUser>(
     portfolioProjects: {
       type: [portfolioProjectSchema],
       default: [],
+    },
+    portfolioServices: {
+      type: [portfolioServiceSchema],
+      default: [],
+    },
+    portfolioTestimonials: {
+      type: [portfolioTestimonialSchema],
+      default: [],
+    },
+    portfolioBlogPosts: {
+      type: [portfolioBlogPostSchema],
+      default: [],
+    },
+    portfolioContent: {
+      type: portfolioContentSchema,
+      default: undefined,
     },
     resume: {
       type: resumeSchema,

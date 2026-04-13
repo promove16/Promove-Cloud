@@ -1,7 +1,4 @@
 import PDFDocument from 'pdfkit';
-import { v2 as cloudinary } from 'cloudinary';
-import { Readable } from 'stream';
-import { env } from '../config/env';
 import { ApiError } from '../utils/ApiError';
 import { Patent } from '../modules/patent/patent.model';
 import { ScoreEvent } from '../modules/innovationScore/score.model';
@@ -18,12 +15,7 @@ import { getStudentLeaderboard } from '../modules/school/school.service';
 import { UserRole } from '../types/roles.types';
 import { Workspace } from '../modules/workspace/workspace.model';
 import { MAX_INNOVATION_SCORE } from '../modules/innovationScore/score.utils';
-
-cloudinary.config({
-  cloud_name: env.CLOUDINARY_CLOUD_NAME,
-  api_key: env.CLOUDINARY_API_KEY,
-  api_secret: env.CLOUDINARY_API_SECRET,
-});
+import { uploadFile } from './fileStorageService';
 
 type PolicyStatus = 'Active' | 'On Track' | 'Pending' | 'Inactive';
 
@@ -256,32 +248,16 @@ const finalizeDocument = async (doc: PDFKit.PDFDocument): Promise<Buffer> =>
     doc.end();
   });
 
-const uploadPdfToCloudinary = async (doc: PDFKit.PDFDocument, filename: string): Promise<string> => {
+const uploadPdfToStorage = async (doc: PDFKit.PDFDocument, filename: string): Promise<string> => {
   const buffer = await finalizeDocument(doc);
-
-  return new Promise<string>((resolve, reject) => {
-    const uploadStream = cloudinary.uploader.upload_stream(
-      {
-        resource_type: 'raw',
-        folder: 'compliance-reports',
-        public_id: filename,
-        format: 'pdf',
-      },
-      (
-        error: Error | undefined,
-        result: { secure_url?: string } | undefined,
-      ) => {
-        if (error || !result?.secure_url) {
-          reject(error ?? new Error('Failed to upload compliance report'));
-          return;
-        }
-
-        resolve(result.secure_url);
-      },
-    );
-
-    Readable.from(buffer).pipe(uploadStream);
+  const uploaded = await uploadFile({
+    buffer,
+    folder: 'compliance-reports',
+    fileName: `${filename}.pdf`,
+    contentType: 'application/pdf',
   });
+
+  return uploaded.url;
 };
 
 const addFooter = (doc: PDFKit.PDFDocument) => {
@@ -399,7 +375,7 @@ const persistComplianceReport = async (
 export const generateSchoolReport = async (institutionId: string): Promise<string> => {
   const metrics = await loadReportMetrics(institutionId, 'school');
   const doc = buildSchoolDocument(metrics);
-  const pdfUrl = await uploadPdfToCloudinary(doc, `school-report-${institutionId}-${Date.now()}`);
+  const pdfUrl = await uploadPdfToStorage(doc, `school-report-${institutionId}-${Date.now()}`);
   await persistComplianceReport(institutionId, metrics, pdfUrl);
   return pdfUrl;
 };
@@ -407,7 +383,7 @@ export const generateSchoolReport = async (institutionId: string): Promise<strin
 export const generateCollegeReport = async (institutionId: string): Promise<string> => {
   const metrics = await loadReportMetrics(institutionId, 'college');
   const doc = buildCollegeDocument(metrics);
-  const pdfUrl = await uploadPdfToCloudinary(doc, `college-report-${institutionId}-${Date.now()}`);
+  const pdfUrl = await uploadPdfToStorage(doc, `college-report-${institutionId}-${Date.now()}`);
   await persistComplianceReport(institutionId, metrics, pdfUrl);
   return pdfUrl;
 };

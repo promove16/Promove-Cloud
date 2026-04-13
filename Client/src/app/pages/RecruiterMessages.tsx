@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useRef, useState, useCallback } from 'react';
-import { useParams, useNavigate } from 'react-router-dom';
+import { Link, useParams, useNavigate } from 'react-router-dom';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import {
   MessageCircle,
@@ -21,6 +21,8 @@ import { dmApi, DMConversation, DMMessage } from '../../api/dm.api';
 import { getConversationPreviewText } from '../../components/messaging/conversationPreview';
 import { useDM } from '../../hooks/useDM';
 import { useAuthStore } from '../../store/authStore';
+import { getUserPortfolioViewPath } from '../../features/marketplace/navigation';
+import { UserRole } from '../../types/roles.types';
 
 type DMHookState = ReturnType<typeof useDM>;
 
@@ -49,6 +51,30 @@ const initials = (name: string) =>
     .join('')
     .slice(0, 2)
     .toUpperCase();
+
+const getConversationPartnerProfilePath = (
+  partnerId?: string,
+  partnerRole?: string | null,
+) => {
+  if (!partnerId) return null;
+
+  switch (partnerRole) {
+    case UserRole.STUDENT:
+      return getUserPortfolioViewPath('student', partnerId);
+    case UserRole.SCHOOL:
+      return getUserPortfolioViewPath('school', partnerId);
+    case UserRole.COLLEGE:
+      return getUserPortfolioViewPath('college', partnerId);
+    case UserRole.MENTOR:
+      return getUserPortfolioViewPath('mentor', partnerId);
+    case UserRole.INVESTOR:
+      return getUserPortfolioViewPath('investor', partnerId);
+    case UserRole.RECRUITER:
+      return getUserPortfolioViewPath('recruiter', partnerId);
+    default:
+      return null;
+  }
+};
 
 function OnlineDot({ className = '' }: { className?: string }) {
   return (
@@ -647,6 +673,7 @@ export function RecruiterMessagesPage() {
   const partnerRole = activeConvo?.partner?.role ?? dmHook.partner?.role ?? 'candidate';
   const partnerAvatar = activeConvo?.partner?.avatar ?? dmHook.partner?.avatar;
   const partnerOnline = activeConvo?.isOnline || dmHook.isPartnerOnline;
+  const partnerProfilePath = getConversationPartnerProfilePath(partnerId ?? undefined, partnerRole);
 
   const handleSelect = (pid: string) => {
     navigate(`/dashboard/recruiter/messages/${pid}`);
@@ -827,9 +854,18 @@ export function RecruiterMessagesPage() {
                 )}
               </div>
               <div className="flex-1">
-                <div className="text-sm font-semibold text-white">
-                  {partnerName}
-                </div>
+                {partnerProfilePath ? (
+                  <Link
+                    to={partnerProfilePath}
+                    className="text-sm font-semibold text-white transition hover:text-cyan-300"
+                  >
+                    {partnerName}
+                  </Link>
+                ) : (
+                  <div className="text-sm font-semibold text-white">
+                    {partnerName}
+                  </div>
+                )}
                 <div className="flex items-center gap-1.5 text-xs">
                   <span className={partnerOnline ? 'text-emerald-400' : 'text-slate-500'}>
                     {partnerOnline ? 'Online' : 'Offline'}

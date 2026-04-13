@@ -3,7 +3,7 @@ import { Types } from 'mongoose';
 import { DirectMessage } from './dm.model';
 import { User } from '../user/user.model';
 import { ApiError } from '../../utils/ApiError';
-import { uploadToCloudinary } from '../../services/cloudinaryService';
+import { uploadFile } from '../../services/fileStorageService';
 import { ensureDmAccess, ensureDmThreadAccess } from './dm.permissions';
 import { createRequest } from '../request/request.service';
 const allowedMimeTypes = new Set(['image/jpeg', 'image/png', 'image/gif', 'image/webp', 'application/pdf']);
@@ -52,18 +52,18 @@ export const uploadAttachment = async (req: Request, res: Response) => {
   const fileType = req.file.mimetype === 'application/pdf' || isPdfByName ? 'pdf' : 'image';
   const resourceType = fileType === 'pdf' ? 'raw' : 'image';
 
-  const upload = await uploadToCloudinary(
-    req.file.buffer,
-    `dm/${userId}`,
-    resourceType,
-    fileType === 'pdf' ? { format: 'pdf' } : undefined,
-  );
+  const upload = await uploadFile({
+    buffer: req.file.buffer,
+    folder: `dm/${userId}`,
+    fileName: req.file.originalname,
+    contentType: req.file.mimetype || (fileType === 'pdf' ? 'application/pdf' : 'image/jpeg'),
+  });
 
   res.json({
     success: true,
     data: {
-      url: upload.secure_url,
-      publicId: upload.public_id,
+      url: upload.url,
+      publicId: upload.key,
       fileType,
       fileName: req.file.originalname,
       fileSize: req.file.size,

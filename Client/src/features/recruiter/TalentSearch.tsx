@@ -104,7 +104,7 @@ export default function TalentSearch() {
           <Button
             data-testid="message-btn"
             variant="secondary"
-            onClick={() => navigate(`/dashboard/recruiter/messages/${student._id}`)}
+            onClick={() => navigate(`/dashboard/messages/${student._id}`)}
           >
             <Mail className="mr-2 h-4 w-4" />
             Message

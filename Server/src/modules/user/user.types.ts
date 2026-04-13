@@ -118,6 +118,8 @@ export interface InstitutionVerificationDocument {
   fileSizeBytes: number;
   uploadedAt: Date;
   uploadedBy: Types.ObjectId;
+  storageProvider?: 'cloudinary' | 's3';
+  storageKey?: string;
   cloudinaryPublicId?: string;
 }
 
@@ -253,6 +255,30 @@ export interface PortfolioProjectEntry {
   languages: string[];
 }
 
+export interface PortfolioServiceEntry {
+  _id: Types.ObjectId;
+  icon?: string;
+  title: string;
+  description: string;
+}
+
+export interface PortfolioTestimonialEntry {
+  _id: Types.ObjectId;
+  name: string;
+  role: string;
+  text: string;
+}
+
+export interface PortfolioBlogPostEntry {
+  _id: Types.ObjectId;
+  tag: string;
+  title: string;
+  excerpt: string;
+  tagColor: string;
+  url: string | null;
+  publishedAt: Date | null;
+}
+
 export interface ResumeInfo {
   fileUrl: string | null;
   fileName: string | null;
@@ -332,6 +358,43 @@ export interface TermsAcceptance {
   sector: UserRole;
 }
 
+export interface PortfolioContent {
+  heroEyebrow: string;
+  heroTitle: string;
+  heroDescription: string;
+  primaryButtonLabel: string;
+  secondaryButtonLabel: string;
+  statOneLabel: string;
+  statTwoLabel: string;
+  statThreeLabel: string;
+  statFourLabel: string;
+  aboutTitle: string;
+  aboutEmpty: string;
+  experienceTitle: string;
+  experienceEmpty: string;
+  skillsTitle: string;
+  skillsEmpty: string;
+  projectsTitle: string;
+  projectsEmpty: string;
+  educationTitle: string;
+  educationEmpty: string;
+  certificationsTitle: string;
+  certificationsEmpty: string;
+  startupsTitle: string;
+  startupsEmpty: string;
+  linksTitle: string;
+  linksEmpty: string;
+  institutionDetailsTitle: string;
+  institutionDetailsEmpty: string;
+  institutionSpecialtiesTitle: string;
+  institutionSpecialtiesEmpty: string;
+  institutionLocationsTitle: string;
+  institutionLocationsEmpty: string;
+  institutionOutcomesTitle: string;
+  institutionOutcomesEmpty: string;
+  footerNote: string;
+}
+
 export interface IUser {
   _id: Types.ObjectId;
   email: string;
@@ -390,6 +453,10 @@ export interface IUser {
   education: EducationEntry[];
   certifications: CertificationEntry[];
   portfolioProjects: PortfolioProjectEntry[];
+  portfolioServices: PortfolioServiceEntry[];
+  portfolioTestimonials: PortfolioTestimonialEntry[];
+  portfolioBlogPosts: PortfolioBlogPostEntry[];
+  portfolioContent?: PortfolioContent;
   resume: ResumeInfo;
   githubStats: GithubStats;
   githubProof: GithubProof;
@@ -459,6 +526,10 @@ export interface SanitizedUser {
   education: EducationEntry[];
   certifications: CertificationEntry[];
   portfolioProjects: PortfolioProjectEntry[];
+  portfolioServices: PortfolioServiceEntry[];
+  portfolioTestimonials: PortfolioTestimonialEntry[];
+  portfolioBlogPosts: PortfolioBlogPostEntry[];
+  portfolioContent?: PortfolioContent;
   resume: ResumeInfo;
   githubStats: GithubStats;
   githubProof: GithubProof;
@@ -523,6 +594,10 @@ export interface PublicStudentProfile {
   education: EducationEntry[];
   certifications: CertificationEntry[];
   portfolioProjects: PortfolioProjectEntry[];
+  portfolioServices: PortfolioServiceEntry[];
+  portfolioTestimonials: PortfolioTestimonialEntry[];
+  portfolioBlogPosts: PortfolioBlogPostEntry[];
+  portfolioContent?: PortfolioContent;
   githubStats: GithubStats;
   githubProof: {
     importedRepos: GithubImportedRepo[];

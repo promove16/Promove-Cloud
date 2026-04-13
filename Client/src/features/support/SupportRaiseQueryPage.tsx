@@ -287,7 +287,7 @@ export default function SupportRaiseQueryPage() {
                 <Input
                   value={newAttachmentUrl}
                   onChange={(event) => setNewAttachmentUrl(event.target.value)}
-                  placeholder="Cloudinary / upload URL"
+                  placeholder="Public upload URL"
                   className="border-slate-800 bg-slate-950 text-white placeholder:text-slate-500 focus:border-cyan-500"
                 />
                 <Button type="button" variant="secondary" onClick={addAttachment}>
@@ -295,7 +295,7 @@ export default function SupportRaiseQueryPage() {
                 </Button>
               </div>
               <div className="text-xs text-slate-500">
-                Upload files to your Cloudinary bucket or any supported uploader, then paste the URL here.
+                Upload files using the built-in uploader or any public HTTPS file URL, then paste the link here.
               </div>
             </div>
           </div>

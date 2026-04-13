@@ -1,14 +1,68 @@
 import { UserRole } from '../../types/roles.types';
 import { ApiError } from '../../utils/ApiError';
+import { normalizeInnovationScore } from '../innovationScore/score.utils';
 import { CampusDrive } from './campusDrive.model';
 import { PlacementRecord } from '../college/placementRecord.model';
 import { RequestRecord } from '../request/request.model';
 import { createRequestRecord } from '../request/request.service';
 import { User } from '../user/user.model';
-import { createBridge, getStudentCollegeId, mapCollege, mapDrive, mapPlacement, notifyUser } from './recruiter.mappers';
+import { createBridge, getStudentCollegeId, mapCollege, mapDrive, notifyUser } from './recruiter.mappers';
 import { RecruiterCollegeCard, RecruiterDriveView, RecruiterPlacementRow } from './recruiter.types';
 import { driveCreateSchema } from './recruiter.schemas';
 import { z } from 'zod';
+import { JobPost, type JobApplicationStage } from './jobPost.model';
+
+type OnboardingRecordLike = {
+  _id: string;
+  studentId: string;
+  collegeId?: string;
+  companyName?: string;
+  status: RecruiterPlacementRow['status'];
+  innovationScoreAtTime: number;
+  updatedAt: Date;
+  createdAt: Date;
+};
+
+const APPLICATION_STAGE_TO_ONBOARDING_STATUS: Partial<
+  Record<JobApplicationStage, RecruiterPlacementRow['status'] | null>
+> = {
+  'Invited Pending': null,
+  'Invite Accepted': 'In Progress',
+  'Invite Declined': null,
+  Applied: 'In Progress',
+  Screening: 'In Progress',
+  Shortlisted: 'Shortlisted',
+  Interview: 'In Progress',
+  Offered: 'In Progress',
+  Hired: 'Hired',
+  Rejected: 'Rejected',
+};
+
+const ONBOARDING_STATUS_PRIORITY: Record<RecruiterPlacementRow['status'], number> = {
+  Hired: 5,
+  Shortlisted: 4,
+  'In Progress': 3,
+  Discovered: 2,
+  Rejected: 1,
+};
+
+const shouldReplaceOnboardingRecord = (
+  current: OnboardingRecordLike | undefined,
+  next: OnboardingRecordLike,
+) => {
+  if (!current) {
+    return true;
+  }
+
+  const currentPriority = ONBOARDING_STATUS_PRIORITY[current.status] ?? 0;
+  const nextPriority = ONBOARDING_STATUS_PRIORITY[next.status] ?? 0;
+
+  if (nextPriority !== currentPriority) {
+    return nextPriority > currentPriority;
+  }
+
+  return next.updatedAt.getTime() > current.updatedAt.getTime();
+};
 
 export const getLinkedCollegeIdsForRecruiter = async (recruiterId: string): Promise<string[]> => {
   const requests = await RequestRecord.find({
@@ -167,28 +221,132 @@ export const getRecruiterLinkedColleges = async (recruiterId: string): Promise<R
 };
 
 export const getRecruiterOnboarding = async (recruiterId: string): Promise<RecruiterPlacementRow[]> => {
-  const placements = await PlacementRecord.find({ recruiterId }).sort({ updatedAt: -1 }).lean();
-  if (placements.length === 0) {
+  const [placements, jobs] = await Promise.all([
+    PlacementRecord.find({ recruiterId }).sort({ updatedAt: -1 }).lean(),
+    JobPost.find({ recruiterId })
+      .select('company createdAt applicantIds shortlistedIds applicationRecords')
+      .sort({ createdAt: -1 })
+      .lean(),
+  ]);
+
+  const derivedRecords = new Map<string, OnboardingRecordLike>();
+
+  jobs.forEach((job) => {
+    const shortlistedIds = new Set(job.shortlistedIds.map((id) => String(id)));
+    const seenStudentIds = new Set<string>();
+
+    (job.applicationRecords ?? []).forEach((record) => {
+      const studentId = String(record.studentId);
+      seenStudentIds.add(studentId);
+
+      const baseStatus = APPLICATION_STAGE_TO_ONBOARDING_STATUS[record.stage];
+      const status =
+        shortlistedIds.has(studentId) && baseStatus !== 'Hired' && baseStatus !== 'Rejected'
+          ? 'Shortlisted'
+          : baseStatus;
+
+      if (!status) {
+        return;
+      }
+
+      const nextRecord: OnboardingRecordLike = {
+        _id: `job-${String(job._id)}-${studentId}`,
+        studentId,
+        companyName: job.company,
+        status,
+        innovationScoreAtTime: 0,
+        updatedAt: record.updatedAt,
+        createdAt: record.appliedAt,
+      };
+
+      if (shouldReplaceOnboardingRecord(derivedRecords.get(studentId), nextRecord)) {
+        derivedRecords.set(studentId, nextRecord);
+      }
+    });
+
+    job.shortlistedIds.forEach((studentObjectId) => {
+      const studentId = String(studentObjectId);
+      if (seenStudentIds.has(studentId)) {
+        return;
+      }
+
+      const nextRecord: OnboardingRecordLike = {
+        _id: `job-${String(job._id)}-${studentId}`,
+        studentId,
+        companyName: job.company,
+        status: 'Shortlisted',
+        innovationScoreAtTime: 0,
+        updatedAt: job.createdAt,
+        createdAt: job.createdAt,
+      };
+
+      if (shouldReplaceOnboardingRecord(derivedRecords.get(studentId), nextRecord)) {
+        derivedRecords.set(studentId, nextRecord);
+      }
+    });
+  });
+
+  const persistedRecords = placements.map<OnboardingRecordLike>((placement) => ({
+    _id: String(placement._id),
+    studentId: String(placement.studentId),
+    collegeId: String(placement.collegeId),
+    ...(placement.companyName ? { companyName: placement.companyName } : {}),
+    status: placement.status,
+    innovationScoreAtTime: placement.innovationScoreAtTime ?? 0,
+    updatedAt: placement.updatedAt,
+    createdAt: placement.createdAt,
+  }));
+
+  const combinedRecords = new Map<string, OnboardingRecordLike>(derivedRecords);
+  persistedRecords.forEach((record) => {
+    combinedRecords.set(record.studentId, record);
+  });
+
+  if (combinedRecords.size === 0) {
     return [];
   }
 
-  const students = await User.find({ _id: { $in: placements.map((placement) => placement.studentId) } })
-    .select('_id displayName avatar innovationScore')
+  const records = Array.from(combinedRecords.values()).sort(
+    (left, right) => right.updatedAt.getTime() - left.updatedAt.getTime(),
+  );
+  const studentIds = records.map((record) => record.studentId);
+
+  const students = await User.find({ _id: { $in: studentIds } })
+    .select('_id displayName avatar innovationScore institutionId')
     .lean();
   const studentMap = new Map(students.map((student) => [String(student._id), student]));
 
-  const colleges = await User.find({ _id: { $in: placements.map((placement) => placement.collegeId) } })
+  const collegeIds = Array.from(
+    new Set(
+      records
+        .map((record) => record.collegeId ?? String(studentMap.get(record.studentId)?.institutionId ?? ''))
+        .filter((collegeId) => Boolean(collegeId && collegeId !== 'undefined')),
+    ),
+  );
+
+  const colleges = await User.find({ _id: { $in: collegeIds }, role: UserRole.COLLEGE })
     .select('_id displayName')
     .lean();
   const collegeMap = new Map(colleges.map((college) => [String(college._id), college.displayName]));
 
-  return placements.map((placement) =>
-    mapPlacement(
-      placement,
-      studentMap.get(String(placement.studentId)),
-      collegeMap.get(String(placement.collegeId)),
-    ),
-  );
+  return records.map((record) => {
+    const student = studentMap.get(record.studentId);
+    const collegeId = record.collegeId ?? String(student?.institutionId ?? '');
+
+    return {
+      _id: record._id,
+      studentId: record.studentId,
+      studentName: student?.displayName ?? 'Student',
+      ...(student?.avatar ? { avatar: student.avatar } : {}),
+      ...(collegeMap.get(collegeId) ? { collegeName: collegeMap.get(collegeId) } : {}),
+      status: record.status,
+      ...(record.companyName ? { companyName: record.companyName } : {}),
+      innovationScore: normalizeInnovationScore(
+        student?.innovationScore ?? record.innovationScoreAtTime ?? 0,
+      ),
+      updatedAt: record.updatedAt.toISOString(),
+    } satisfies RecruiterPlacementRow;
+  });
 };
 
 export const sendOnboardingReminder = async (

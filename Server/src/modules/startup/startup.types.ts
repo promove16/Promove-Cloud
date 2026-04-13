@@ -66,6 +66,8 @@ export interface StartupDocument {
   uploadedAt: Date;
   uploadedBy: Types.ObjectId;
   note?: string;
+  storageProvider?: 'cloudinary' | 's3';
+  storageKey?: string;
   cloudinaryPublicId?: string;
 }
 
@@ -108,6 +110,9 @@ export interface IStartup {
   phase: 'creation' | 'building' | 'launched';
   pitchDeckUrl?: string;
   pitchDeckName?: string;
+  pitchDeckStorageProvider?: 'cloudinary' | 's3';
+  pitchDeckStorageKey?: string;
+  pitchDeckCloudinaryPublicId?: string;
   teamSize: number;
   fundingNeeded?: number;
   activeProducts: number;

@@ -1,22 +1,32 @@
 import { isAxiosError } from 'axios';
-import { useDeferredValue, useEffect, useMemo, useRef, useState, startTransition } from 'react';
+import { useDeferredValue, useEffect, useMemo, useState, startTransition } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import {
   BriefcaseBusiness,
-  CheckCircle2,
   MapPin,
   MessageSquare,
+  Plus,
   Search,
   Sparkles,
   Users,
+  ChevronDown,
+  Clock,
+  CheckCircle2,
+  FileText,
+  XCircle,
 } from 'lucide-react';
 import { recruiterApi } from '../../api/recruiter.api';
 import { getMarketplaceDetailPath } from '../../features/marketplace/navigation';
-import { Button } from '../../components/ui/Button';
 import { Input } from '../../components/ui/Input';
+import { Button } from '../../components/ui/Button';
 import { Spinner } from '../../components/ui/Spinner';
-import { APPLICATION_STAGE_BADGE, APPLICATION_STAGE_ORDER } from '../../utils/applicationStages';
+import {
+  RECRUITER_PAGE_CONTENT_CLASS,
+  RecruiterSectionNav,
+  recruiterMarketplaceSectionItems,
+} from './RecruiterSectionNav';
+import { APPLICATION_STAGE_ORDER } from '../../utils/applicationStages';
 import type {
   RecruiterJobApplicantView,
   RecruiterJobApplicationStage,
@@ -24,8 +34,21 @@ import type {
 } from '../../types/recruiter.types';
 import { UserRole } from '../../types/roles.types';
 
-const compactActionClass =
-  'inline-flex items-center justify-center gap-2 rounded-lg border border-slate-800 px-3 py-2 text-xs font-medium text-slate-200 transition hover:border-slate-700 hover:bg-slate-900';
+const STAGE_CONFIG: Record<RecruiterJobApplicationStage, { label: string; icon: React.ElementType; color: string }> = {
+  'Invited Pending': { label: 'Invited', icon: Clock, color: 'text-amber-400 bg-amber-500/10 border-amber-500/20' },
+  'Invite Accepted': { label: 'Accepted', icon: CheckCircle2, color: 'text-emerald-400 bg-emerald-500/10 border-emerald-500/20' },
+  'Invite Declined': { label: 'Declined', icon: XCircle, color: 'text-rose-400 bg-rose-500/10 border-rose-500/20' },
+  Applied: { label: 'Applied', icon: Clock, color: 'text-blue-400 bg-blue-500/10 border-blue-500/20' },
+  Screening: { label: 'Screening', icon: FileText, color: 'text-yellow-400 bg-yellow-500/10 border-yellow-500/20' },
+  Shortlisted: { label: 'Shortlisted', icon: Users, color: 'text-cyan-400 bg-cyan-500/10 border-cyan-500/20' },
+  Interview: { label: 'Interview', icon: Users, color: 'text-purple-400 bg-purple-500/10 border-purple-500/20' },
+  Offered: { label: 'Offer', icon: ChevronDown, color: 'text-orange-400 bg-orange-500/10 border-orange-500/20' },
+  Hired: { label: 'Hired', icon: CheckCircle2, color: 'text-green-400 bg-green-500/10 border-green-500/20' },
+  Rejected: { label: 'Rejected', icon: XCircle, color: 'text-red-400 bg-red-500/10 border-red-500/20' },
+};
+
+const cardActionClass =
+  'flex items-center justify-center gap-1.5 rounded-lg border border-slate-700 bg-slate-800/50 px-3 py-1.5 text-xs font-medium text-slate-300 transition hover:border-slate-600 hover:bg-slate-800';
 
 const metricLabelClass = 'text-[11px] uppercase tracking-[0.22em] text-slate-500';
 
@@ -80,18 +103,127 @@ const countByStage = (applications: RecruiterJobApplicantView[]) =>
     return acc;
   }, {} as Record<RecruiterJobApplicationStage, number>);
 
-const getDefaultStage = (
-  stageCounts: Record<RecruiterJobApplicationStage, number>,
-): RecruiterJobApplicationStage =>
-  APPLICATION_STAGE_ORDER.find((stage) => stageCounts[stage] > 0) ?? 'Applied';
-
-const formatCandidateCount = (count: number) => `${count} candidate${count === 1 ? '' : 's'}`;
-
 function InlineMetric({ value, label }: { value: string | number; label: string }) {
   return (
     <div className="border-l border-slate-800 pl-4 first:border-l-0 first:pl-0">
       <div className="text-lg font-semibold text-white">{value}</div>
       <div className={metricLabelClass}>{label}</div>
+    </div>
+  );
+}
+
+const STAGES_WITH_ICONS: { stage: RecruiterJobApplicationStage; label: string; color: string }[] = [
+  { stage: 'Applied', label: 'Applied', color: 'bg-blue-500/20 text-blue-300 border-blue-500/30' },
+  { stage: 'Screening', label: 'Screen', color: 'bg-yellow-500/20 text-yellow-300 border-yellow-500/30' },
+  { stage: 'Shortlisted', label: 'Shortlist', color: 'bg-cyan-500/20 text-cyan-300 border-cyan-500/30' },
+  { stage: 'Interview', label: 'Interview', color: 'bg-purple-500/20 text-purple-300 border-purple-500/30' },
+  { stage: 'Offered', label: 'Offer', color: 'bg-orange-500/20 text-orange-300 border-orange-500/30' },
+  { stage: 'Hired', label: 'Hired', color: 'bg-green-500/20 text-green-300 border-green-500/30' },
+  { stage: 'Rejected', label: 'Reject', color: 'bg-red-500/20 text-red-300 border-red-500/30' },
+];
+
+const STAGE_MOVE_OPTIONS = STAGES_WITH_ICONS.filter(s => s.stage !== 'Invited Pending' && s.stage !== 'Invite Accepted' && s.stage !== 'Invite Declined');
+
+function ApplicantCard({
+  applicant,
+  onMove,
+  isUpdating,
+  jobId,
+}: {
+  applicant: RecruiterJobApplicantView;
+  onMove: (stage: RecruiterJobApplicationStage) => void;
+  isUpdating: boolean;
+  jobId: string;
+}) {
+  const config = STAGE_CONFIG[applicant.stage];
+  const navigate = useNavigate();
+  const [showStageMenu, setShowStageMenu] = useState(false);
+  
+  return (
+    <div className="group relative flex flex-col rounded-xl border border-slate-800 bg-slate-900/60 p-4 transition hover:border-slate-700 hover:bg-slate-800/40">
+      <div className="flex items-start gap-3">
+        <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-xl bg-gradient-to-br from-cyan-500 to-blue-600 text-sm font-semibold text-white">
+          {applicant.avatar ? (
+            <img src={applicant.avatar} alt={applicant.displayName} className="h-11 w-11 rounded-xl object-cover" />
+          ) : (
+            initialsFor(applicant.displayName)
+          )}
+        </div>
+        <div className="min-w-0 flex-1">
+          <div className="truncate text-sm font-semibold text-white">{applicant.displayName}</div>
+          <div className="mt-0.5 truncate text-xs text-slate-400">
+            {applicant.institution?.name ?? 'Independent'} · {SOURCE_LABELS[applicant.source]}
+          </div>
+          {applicant.activeProject && (
+            <div className="mt-1 truncate text-xs text-slate-500">
+              {applicant.activeProject.title}
+            </div>
+          )}
+        </div>
+      </div>
+      
+      <div className="mt-3 flex items-center gap-3">
+        <div className="flex-1">
+          <div className="text-lg font-bold text-white">{applicant.innovationScore}</div>
+          <div className="text-[10px] uppercase tracking-wider text-slate-500">Score</div>
+        </div>
+        {applicant.skills.slice(0, 2).map((skill) => (
+          <span key={skill} className="rounded-full border border-slate-700 bg-slate-800/50 px-2 py-0.5 text-[10px] text-slate-400">
+            {skill}
+          </span>
+        ))}
+      </div>
+      
+      <div className="mt-3 flex items-center gap-2">
+        <span className="text-[10px] text-slate-500">{relativeLabel(applicant.appliedAt)}</span>
+      </div>
+      
+      <div className="mt-auto pt-3">
+        <div className="relative">
+          <button
+            type="button"
+            onClick={() => setShowStageMenu(!showStageMenu)}
+            className={`w-full flex items-center justify-between gap-2 rounded-lg border px-3 py-2 text-sm font-medium transition ${
+              config.color.replace('text-', 'border-').replace(' bg-', 'bg-').replace('border-', 'border-')
+            }`}
+          >
+            <span className="flex items-center gap-2">
+              {config.label}
+            </span>
+            <svg className={`h-4 w-4 transition-transform ${showStageMenu ? 'rotate-180' : ''}`} fill="none" viewBox="0 0 24 24" stroke="currentColor">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
+            </svg>
+          </button>
+          
+          {showStageMenu && (
+            <div className="absolute bottom-full left-0 right-0 mb-1 z-20 max-h-48 overflow-y-auto rounded-lg border border-slate-700 bg-slate-900 p-1 shadow-xl">
+              {STAGE_MOVE_OPTIONS.map((option) => (
+                <button
+                  key={option.stage}
+                  type="button"
+                  onClick={() => {
+                    onMove(option.stage as RecruiterJobApplicationStage);
+                    setShowStageMenu(false);
+                  }}
+                  disabled={isUpdating || applicant.stage === option.stage}
+                  className={`w-full flex items-center justify-between gap-2 rounded-md px-3 py-2 text-sm transition ${
+                    applicant.stage === option.stage
+                      ? `${option.color} font-semibold`
+                      : 'text-slate-300 hover:bg-slate-800'
+                  }`}
+                >
+                  <span>{option.label}</span>
+                  {applicant.stage === option.stage && (
+                    <svg className="h-4 w-4" fill="currentColor" viewBox="0 0 20 20">
+                      <path fillRule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clipRule="evenodd" />
+                    </svg>
+                  )}
+                </button>
+              ))}
+            </div>
+          )}
+        </div>
+      </div>
     </div>
   );
 }
@@ -102,8 +234,6 @@ export default function ApplicationsPipeline() {
   const [selectedJobId, setSelectedJobId] = useState<string | null>(null);
   const [search, setSearch] = useState('');
   const deferredSearch = useDeferredValue(search.trim().toLowerCase());
-  const [activeStage, setActiveStage] = useState<RecruiterJobApplicationStage>('Applied');
-  const initializedStageJobRef = useRef<string | null>(null);
 
   const jobsQuery = useQuery({
     queryKey: ['recruiter', 'jobs'],
@@ -179,34 +309,15 @@ export default function ApplicationsPipeline() {
 
   const applications = pipelineQuery.data?.applications ?? fallbackApplications;
   const stageCounts = useMemo(() => countByStage(applications), [applications]);
-  const stageDataReady =
-    Boolean(selectedJobId) && !pipelineQuery.isLoading && (!pipelineUnavailable || !fallbackApplicantsQuery.isLoading);
-
-  useEffect(() => {
-    if (!selectedJobId) {
-      initializedStageJobRef.current = null;
-      setActiveStage('Applied');
-      return;
-    }
-
-    if (!stageDataReady || initializedStageJobRef.current === selectedJobId) {
-      return;
-    }
-
-    initializedStageJobRef.current = selectedJobId;
-    setActiveStage(applications.length ? getDefaultStage(stageCounts) : 'Applied');
-  }, [applications.length, selectedJobId, stageCounts, stageDataReady]);
-
-  const visibleApplicants = useMemo(
+  const filteredApplications = useMemo(
     () =>
       applications.filter((application) => {
-        const matchesStage = application.stage === activeStage;
         const matchesSearch = deferredSearch
           ? getApplicantSearchText(application).includes(deferredSearch)
           : true;
-        return matchesStage && matchesSearch;
+        return matchesSearch;
       }),
-    [activeStage, applications, deferredSearch],
+    [applications, deferredSearch],
   );
 
   const totalApplicants = useMemo(
@@ -250,63 +361,53 @@ export default function ApplicationsPipeline() {
   });
 
   return (
-    <div className="space-y-5">
-      <header className="border-b border-slate-800 pb-4">
-        <div className="flex flex-col gap-4 lg:flex-row lg:items-end lg:justify-between">
-          <div>
-            <div className="mb-2 flex items-center gap-2 text-xs uppercase tracking-[0.3em] text-cyan-300">
-              <Sparkles className="h-4 w-4" />
-              Applications
+    <div className={`${RECRUITER_PAGE_CONTENT_CLASS} space-y-5`}>
+      <section className="space-y-4 rounded-3xl border border-slate-800/80 bg-slate-950/45 px-5 py-5 sm:px-6">
+        <div className="flex flex-col gap-4 xl:flex-row xl:items-start xl:justify-between">
+          <div className="space-y-3">
+            <RecruiterSectionNav items={recruiterMarketplaceSectionItems} />
+            <div className="space-y-2">
+              <div className="flex items-center gap-2 text-xs uppercase tracking-[0.3em] text-cyan-300">
+                <Sparkles className="h-4 w-4" />
+                Applications Pipeline
+              </div>
+              <h1 className="text-3xl font-semibold tracking-tight text-white">Hiring Pipeline</h1>
+              <p className="max-w-2xl text-sm leading-6 text-slate-400">
+                Track, manage, and move candidates through your hiring stages
+              </p>
             </div>
-            <h1 className="text-2xl font-semibold text-white">Application pipeline</h1>
-            <p className="mt-1 text-sm text-slate-400">
-              Select a job, pick a stage, and act on applicants without switching screens.
-            </p>
           </div>
-          <div className="flex flex-wrap gap-3">
-            <Button variant="secondary" onClick={() => navigate('/dashboard/recruiter')}>
-              <BriefcaseBusiness className="mr-2 h-4 w-4" />
-              Dashboard
-            </Button>
-            <Button variant="secondary" onClick={() => navigate('/dashboard/recruiter/talent')}>
-              <Users className="mr-2 h-4 w-4" />
-              Talent Search
-            </Button>
-          </div>
-        </div>
-      </header>
 
-      <section className="flex flex-wrap items-center gap-4 border-b border-slate-800 pb-4 text-sm text-slate-300">
-        <div className="flex items-center gap-2">
-          <Users className="h-4 w-4 text-cyan-300" />
-          <span className="font-medium text-white">{totalApplicants}</span>
-          total applications
-        </div>
-        <div className="flex items-center gap-2">
-          <BriefcaseBusiness className="h-4 w-4 text-blue-300" />
-          <span className="font-medium text-white">{activeJobs}</span>
-          active jobs
-        </div>
-        <div className="flex items-center gap-2">
-          <CheckCircle2 className="h-4 w-4 text-emerald-300" />
-          <span className="font-medium text-white">{stageCounts.Hired}</span>
-          hired
+          <div className="flex flex-wrap gap-3">
+            <div className="rounded-2xl border border-slate-800 bg-slate-900/80 px-5 py-3">
+              <div className="text-xs uppercase tracking-[0.22em] text-slate-500">Total Applications</div>
+              <div className="mt-1 text-2xl font-bold text-white">{totalApplicants}</div>
+            </div>
+            <div className="rounded-2xl border border-slate-800 bg-slate-900/80 px-5 py-3">
+              <div className="text-xs uppercase tracking-[0.22em] text-slate-500">Active Jobs</div>
+              <div className="mt-1 text-2xl font-bold text-white">{activeJobs}</div>
+            </div>
+            <div className="rounded-2xl border border-green-900/30 bg-green-900/20 px-5 py-3">
+              <div className="text-xs uppercase tracking-[0.22em] text-green-400">Hired</div>
+              <div className="mt-1 text-2xl font-bold text-green-400">{stageCounts.Hired}</div>
+            </div>
+          </div>
         </div>
       </section>
 
-      <div className="grid gap-6 xl:grid-cols-[300px,minmax(0,1fr)]">
-        <aside className="border-r border-slate-800 pr-5">
-          <div className="flex items-center justify-between gap-3 pb-3">
+      <div className="grid gap-6 xl:grid-cols-[320px,minmax(0,1fr)]">
+        <aside className="space-y-4 rounded-3xl border border-slate-800 bg-slate-950/45 p-4">
+          <div className="flex items-center justify-between px-1 pb-2">
             <div>
               <div className="text-xs uppercase tracking-[0.3em] text-cyan-300">Jobs</div>
-              <h2 className="mt-2 text-lg font-semibold text-white">Hiring pipelines</h2>
+              <h2 className="mt-1 text-lg font-semibold text-white">Open Positions</h2>
             </div>
-            <div className="rounded-full border border-slate-800 px-3 py-1 text-xs text-slate-300">
+            <div className="flex h-8 w-8 items-center justify-center rounded-full bg-cyan-500/10 text-sm font-semibold text-cyan-300">
               {jobsQuery.data?.length ?? 0}
             </div>
           </div>
 
-          <div className="space-y-1">
+          <div className="space-y-2">
             {jobsQuery.isLoading ? (
               <div className="flex items-center justify-center py-10">
                 <Spinner />
@@ -314,303 +415,174 @@ export default function ApplicationsPipeline() {
             ) : jobsQuery.data?.length ? (
               jobsQuery.data.map((job) => {
                 const isSelected = job._id === selectedJobId;
+                const isActive = job.isActive;
 
                 return (
                   <button
                     key={job._id}
                     type="button"
                     onClick={() => setSelectedJobId(job._id)}
-                    className={`w-full border-b border-slate-800 px-0 py-3 text-left transition ${
-                      isSelected ? 'bg-cyan-500/5' : 'hover:bg-slate-950/50'
+                    className={`w-full rounded-xl border px-4 py-3 text-left transition ${
+                      isSelected
+                        ? 'border-cyan-500/50 bg-cyan-500/5'
+                        : 'border-slate-800 hover:border-slate-700 hover:bg-slate-900/40'
                     }`}
                   >
-                    <div className="flex items-start justify-between gap-3">
-                      <div>
-                        <div className="text-sm font-semibold text-white">{job.title}</div>
-                        <div className="mt-1 text-xs text-slate-400">{job.company}</div>
+                    <div className="flex items-start justify-between gap-2">
+                      <div className="min-w-0 flex-1">
+                        <div className="truncate text-sm font-semibold text-white">{job.title}</div>
+                        <div className="mt-1 flex items-center gap-2 text-xs text-slate-400">
+                          <span>{job.company}</span>
+                          <span className="text-slate-600">·</span>
+                          <span className="inline-flex items-center gap-1">
+                            <MapPin className="h-3 w-3" />
+                            {job.location}
+                          </span>
+                        </div>
                       </div>
                       <span
-                        className={`rounded-full border px-2 py-0.5 text-[11px] uppercase tracking-[0.18em] ${
-                          job.isActive
-                            ? 'border-cyan-500/20 text-cyan-300'
+                        className={`shrink-0 rounded-full border px-2 py-0.5 text-[10px] uppercase tracking-wider ${
+                          isActive
+                            ? 'border-green-500/30 bg-green-500/10 text-green-400'
                             : 'border-slate-700 text-slate-500'
                         }`}
                       >
-                        {job.isActive ? 'Active' : 'Closed'}
+                        {isActive ? 'Active' : 'Closed'}
                       </span>
                     </div>
-                    <div className="mt-2 flex flex-wrap gap-3 text-[11px] text-slate-500">
-                      <span className="inline-flex items-center gap-1">
-                        <MapPin className="h-3.5 w-3.5" />
-                        {job.location}
+                    <div className="mt-3 flex items-center gap-4 text-xs text-slate-500">
+                      <span className="flex items-center gap-1">
+                        <Users className="h-3 w-3" />
+                        {job.applicantCount}
                       </span>
                       <span>{job.type}</span>
-                    </div>
-                    <div className="mt-3 flex gap-4">
-                      <InlineMetric value={job.applicantCount} label="Applied" />
-                      <InlineMetric value={job.shortlistedCount} label="Progressed" />
-                      <InlineMetric value={job.minimumInnovationScore} label="Cutoff" />
                     </div>
                   </button>
                 );
               })
             ) : (
-              <div className="border border-dashed border-slate-800 px-4 py-6 text-sm text-slate-400">
-                Post a job first. Applications appear here once students apply.
+              <div className="rounded-xl border border-dashed border-slate-800 p-6 text-center">
+                <BriefcaseBusiness className="mx-auto h-10 w-10 text-slate-600" />
+                <div className="mt-3 text-sm font-medium text-slate-400">No jobs posted yet</div>
+                <div className="mt-1 text-xs text-slate-500">
+                  Post a job to start receiving applications
+                </div>
               </div>
             )}
           </div>
         </aside>
 
-        <main className="space-y-4">
+        <main className="space-y-4 rounded-3xl border border-slate-800 bg-slate-950/45 p-5">
           {selectedJob ? (
             <>
-              <section className="space-y-4 border-b border-slate-800 pb-4">
-                <div className="flex flex-col gap-4 xl:flex-row xl:items-end xl:justify-between">
+              <div className="space-y-4 border-b border-slate-800 pb-4">
+                <div className="flex flex-col gap-3 xl:flex-row xl:items-end xl:justify-between">
                   <div>
-                    <div className="mb-2 flex items-center gap-2 text-xs uppercase tracking-[0.3em] text-cyan-300">
+                    <div className="mb-1 flex items-center gap-2 text-xs uppercase tracking-[0.3em] text-cyan-300">
                       <BriefcaseBusiness className="h-4 w-4" />
-                      Selected Job
+                      {selectedJob.company}
                     </div>
                     <h2 className="text-2xl font-semibold text-white">{selectedJob.title}</h2>
-                    <div className="mt-1 flex flex-wrap gap-3 text-sm text-slate-400">
-                      <span>{selectedJob.company}</span>
+                    <div className="mt-2 flex flex-wrap items-center gap-3 text-sm text-slate-400">
                       <span className="inline-flex items-center gap-1">
                         <MapPin className="h-4 w-4" />
                         {selectedJob.location}
                       </span>
+                      <span className="text-slate-600">·</span>
                       <span>{selectedJob.type}</span>
-                      {selectedJob.workMode ? <span>{selectedJob.workMode}</span> : null}
+                      {selectedJob.workMode && (
+                        <>
+                          <span className="text-slate-600">·</span>
+                          <span>{selectedJob.workMode}</span>
+                        </>
+                      )}
                     </div>
-                    <p className="mt-3 max-w-4xl text-sm leading-6 text-slate-400">{selectedJob.description}</p>
                   </div>
-                  <div className="flex gap-5">
-                    <InlineMetric value={applications.length} label="Applicants" />
-                    <InlineMetric value={latestMovement} label="Latest" />
-                  </div>
-                </div>
-
-                <div className="flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
-                  <div className="relative max-w-xl flex-1">
-                    <Search className="pointer-events-none absolute left-4 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-500" />
-                    <Input
-                      value={search}
-                      onChange={(event) =>
-                        startTransition(() => {
-                          setSearch(event.target.value);
-                        })
-                      }
-                      placeholder="Search applicants by name, college, skill, or project"
-                      className="pl-11"
-                    />
-                  </div>
-                  <div className="text-sm text-slate-400">
-                    {formatCandidateCount(stageCounts[activeStage])} in {activeStage.toLowerCase()}
+                  <div className="flex items-center gap-6">
+                    <div>
+                      <div className="text-3xl font-bold text-white">{applications.length}</div>
+                      <div className="text-xs uppercase tracking-wider text-slate-500">Applicants</div>
+                    </div>
+                    <div>
+                      <div className="text-lg font-medium text-slate-400">{latestMovement}</div>
+                      <div className="text-xs uppercase tracking-wider text-slate-500">Last Activity</div>
+                    </div>
                   </div>
                 </div>
 
-                <div className="flex flex-wrap gap-2">
-                  {APPLICATION_STAGE_ORDER.map((stage) => {
-                    const isActive = activeStage === stage;
-                    return (
-                      <button
-                        key={stage}
-                        type="button"
-                        onClick={() => setActiveStage(stage)}
-                        aria-pressed={isActive}
-                        className={`inline-flex cursor-pointer items-center gap-2 rounded-full border px-3 py-2 text-sm transition ${
-                          isActive
-                            ? 'border-cyan-400/30 bg-cyan-400/10 text-white'
-                            : 'border-slate-800 text-slate-300 hover:border-slate-700 hover:bg-slate-900'
-                        }`}
-                      >
-                        <span>{stage}</span>
-                        <span
-                          className={`rounded-full border px-2 py-0.5 text-[11px] ${APPLICATION_STAGE_BADGE[stage]}`}
-                        >
-                          {stageCounts[stage]}
-                        </span>
-                      </button>
-                    );
-                  })}
+                <div className="relative max-w-md">
+                  <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-500" />
+                  <Input
+                    value={search}
+                    onChange={(event) =>
+                      startTransition(() => {
+                        setSearch(event.target.value);
+                      })
+                    }
+                    placeholder="Search by name, skill, project..."
+                    className="pl-10"
+                  />
                 </div>
-              </section>
+              </div>
 
-              {pipelineQuery.isLoading ? (
-                <div className="border border-slate-800 p-12">
-                  <div className="flex items-center justify-center">
+              <div className="min-h-[300px]">
+                {pipelineQuery.isLoading ? (
+                  <div className="flex items-center justify-center py-20">
                     <Spinner />
                   </div>
-                </div>
-              ) : (
-                <div className="space-y-4">
-                  {pipelineUnavailable ? (
-                    <div className="border border-amber-500/20 bg-amber-500/10 p-4 text-sm text-amber-100">
-                      The running server does not expose the advanced job-stage API yet. Fallback applicant data is
-                      being shown from the recruiter pipeline.
-                    </div>
-                  ) : null}
-
-                  {!pipelineUnavailable && pipelineQuery.isError ? (
-                    <div className="border border-rose-500/20 bg-rose-500/10 p-4 text-sm text-rose-100">
-                      Unable to load this job&apos;s application pipeline right now.
-                    </div>
-                  ) : null}
-
-                  <section className="border border-slate-800">
-                    <div className="flex items-center justify-between border-b border-slate-800 px-4 py-3">
-                      <div>
-                        <div className="text-sm font-semibold text-white">{activeStage}</div>
-                        <div className="mt-1 text-xs text-slate-500">
-                          {formatCandidateCount(stageCounts[activeStage])} available in this stage.
-                        </div>
-                      </div>
-                      <div
-                        className={`rounded-full border px-2 py-0.5 text-[11px] ${APPLICATION_STAGE_BADGE[activeStage]}`}
-                      >
-                        {stageCounts[activeStage]}
-                      </div>
-                    </div>
-
-                    {visibleApplicants.length ? (
-                      <div className="divide-y divide-slate-800">
-                        {visibleApplicants.map((applicant) => {
-                          const isUpdating =
-                            stageMutation.isPending &&
-                            stageMutation.variables?.jobId === selectedJob._id &&
-                            stageMutation.variables?.studentId === applicant._id;
-
-                          return (
-                            <article
-                              key={applicant._id}
-                              className="grid gap-4 px-4 py-4 xl:grid-cols-[minmax(0,1.3fr),150px,220px,220px]"
-                            >
-                              <div className="flex items-start gap-3">
-                                <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-gradient-to-br from-cyan-500 to-blue-500 text-sm font-semibold text-white">
-                                  {applicant.avatar ? (
-                                    <img
-                                      src={applicant.avatar}
-                                      alt={applicant.displayName}
-                                      className="h-10 w-10 rounded-xl object-cover"
-                                    />
-                                  ) : (
-                                    initialsFor(applicant.displayName)
-                                  )}
-                                </div>
-                                <div className="min-w-0">
-                                  <div className="truncate text-sm font-semibold text-white">{applicant.displayName}</div>
-                                  <div className="mt-0.5 truncate text-xs text-slate-400">
-                                    {applicant.institution?.name ?? 'Independent'}
-                                  </div>
-                                  <div className="mt-1">
-                                    <span className="rounded-full border border-slate-800 px-2 py-0.5 text-[11px] text-slate-300">
-                                      {SOURCE_LABELS[applicant.source]}
-                                    </span>
-                                  </div>
-                                  {applicant.activeProject ? (
-                                    <div className="mt-1 truncate text-xs text-slate-500">
-                                      {applicant.activeProject.title} · {applicant.activeProject.stage}
-                                    </div>
-                                  ) : null}
-                                  {applicant.skills.length ? (
-                                    <div className="mt-2 flex flex-wrap gap-1.5">
-                                      {applicant.skills.slice(0, 3).map((skill) => (
-                                        <span
-                                          key={skill}
-                                          className="rounded-full border border-slate-800 px-2 py-0.5 text-[11px] text-slate-300"
-                                        >
-                                          {skill}
-                                        </span>
-                                      ))}
-                                    </div>
-                                  ) : null}
-                                </div>
-                              </div>
-
-                              <div className="space-y-2">
-                                <div>
-                                  <div className={metricLabelClass}>Score</div>
-                                  <div className="text-2xl font-semibold text-white">{applicant.innovationScore}</div>
-                                </div>
-                              </div>
-
-                              <div className="space-y-2 text-xs text-slate-400">
-                                <div>
-                                  <span className="text-slate-500">Applied:</span>{' '}
-                                  <span className="text-slate-300">{formatDateTime(applicant.appliedAt)}</span>
-                                </div>
-                                <div>
-                                  <span className="text-slate-500">Updated:</span>{' '}
-                                  <span className="text-slate-300">{relativeLabel(applicant.updatedAt)}</span>
-                                </div>
-                              </div>
-
-                              <div className="space-y-2">
-                                <select
-                                  value={applicant.stage}
-                                  onChange={(event) =>
-                                    stageMutation.mutate({
-                                      jobId: selectedJob._id,
-                                      studentId: applicant._id,
-                                      stage: event.target.value as RecruiterJobApplicationStage,
-                                    })
-                                  }
-                                  disabled={isUpdating || pipelineUnavailable}
-                                  className="w-full rounded-lg border border-slate-800 bg-slate-900 px-3 py-2 text-sm text-white focus:outline-none focus:ring-2 focus:ring-blue-500 disabled:opacity-60"
-                                >
-                                  {APPLICATION_STAGE_ORDER.map((option) => (
-                                    <option key={option} value={option}>
-                                      {option}
-                                    </option>
-                                  ))}
-                                </select>
-
-                                <div className="grid grid-cols-2 gap-2">
-                                  <button
-                                    type="button"
-                                    className={compactActionClass}
-                                    onClick={() =>
-                                      navigate(getMarketplaceDetailPath(UserRole.RECRUITER, 'student', applicant._id))
-                                    }
-                                  >
-                                    <Users className="h-3.5 w-3.5" />
-                                    Profile
-                                  </button>
-                                  <button
-                                    type="button"
-                                    className={`${compactActionClass} ${
-                                      applicant.canContact ? '' : 'cursor-not-allowed opacity-60'
-                                    }`}
-                                    onClick={() => {
-                                      if (!applicant.canContact) return;
-                                      navigate(`/dashboard/recruiter/messages/${applicant._id}`);
-                                    }}
-                                    disabled={!applicant.canContact}
-                                  >
-                                    <MessageSquare className="h-3.5 w-3.5" />
-                                    Message
-                                  </button>
-                                </div>
-                              </div>
-                            </article>
-                          );
-                        })}
-                      </div>
-                    ) : (
-                      <div className="px-4 py-8 text-sm text-slate-500">
-                        No applicants in <span className="text-slate-300">{activeStage}</span> for the current search.
+                ) : (
+                  <>
+                    {pipelineUnavailable && (
+                      <div className="mb-4 rounded-xl border border-amber-500/20 bg-amber-500/10 px-4 py-3 text-sm text-amber-200">
+                        Showing fallback pipeline data. Advanced stages available when server API is enabled.
                       </div>
                     )}
-                  </section>
-                </div>
-              )}
+
+                    {filteredApplications.length ? (
+                      <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-3">
+                        {filteredApplications.map((applicant) => (
+                          <ApplicantCard
+                            key={applicant._id}
+                            applicant={applicant}
+                            onMove={(stage) =>
+                              stageMutation.mutate({
+                                jobId: selectedJob._id,
+                                studentId: applicant._id,
+                                stage,
+                              })
+                            }
+                            isUpdating={
+                              stageMutation.isPending &&
+                              stageMutation.variables?.jobId === selectedJob._id &&
+                              stageMutation.variables?.studentId === applicant._id
+                            }
+                            jobId={selectedJob._id}
+                          />
+                        ))}
+                      </div>
+                    ) : (
+                      <div className="flex flex-col items-center justify-center py-16 text-center">
+                        <div className="rounded-full bg-slate-900 p-4">
+                          <Users className="h-8 w-8 text-slate-600" />
+                        </div>
+                        <div className="mt-4 text-lg font-medium text-slate-400">
+                          No candidates yet
+                        </div>
+                        <div className="mt-1 text-sm text-slate-500">
+                          {search ? 'Try a different search term' : 'Applicants will appear here once they apply'}
+                        </div>
+                      </div>
+                    )}
+                  </>
+                )}
+              </div>
             </>
           ) : (
-            <div className="border border-slate-800 p-12 text-center">
-              <BriefcaseBusiness className="mx-auto h-14 w-14 text-slate-600" />
-              <h2 className="mt-4 text-2xl font-semibold text-white">No recruiter jobs yet</h2>
-              <p className="mt-2 text-slate-400">
-                Create a job from the recruiter dashboard. Once students apply, this page becomes your live pipeline.
+            <div className="flex flex-col items-center justify-center py-20 text-center">
+              <BriefcaseBusiness className="h-16 w-16 text-slate-700" />
+              <h2 className="mt-5 text-2xl font-semibold text-white">Select a job to view</h2>
+              <p className="mt-2 max-w-md text-slate-400">
+                Choose a job posting from the sidebar to see its application pipeline
               </p>
             </div>
           )}

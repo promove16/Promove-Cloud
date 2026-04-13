@@ -60,6 +60,11 @@ const eventSchema = new Schema<IEvent>(
       type: Schema.Types.ObjectId,
       required: true,
     },
+    sourceRequestId: {
+      type: Schema.Types.ObjectId,
+      ref: 'Request',
+      default: undefined,
+    },
     title: {
       type: String,
       required: true,
@@ -126,5 +131,6 @@ const eventSchema = new Schema<IEvent>(
 
 eventSchema.index({ institutionId: 1, scheduledAt: -1 });
 eventSchema.index({ recruiterId: 1, category: 1 });
+eventSchema.index({ sourceRequestId: 1 }, { unique: true, sparse: true });
 
 export const Event = model<IEvent>('Event', eventSchema);

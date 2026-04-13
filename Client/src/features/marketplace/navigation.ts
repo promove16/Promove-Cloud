@@ -29,4 +29,6 @@ export const getMarketplaceDetailPath = (
   entityType: MarketplaceEntityType,
   entityId: string,
 ) =>
-  `${getMarketplaceBasePath(role)}/view/${entityType}/${entityId}`;
+  entityType === "student"
+    ? getStudentPortfolioViewPath(entityId)
+    : `${getMarketplaceBasePath(role)}/view/${entityType}/${entityId}`;

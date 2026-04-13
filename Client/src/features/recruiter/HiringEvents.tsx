@@ -1,12 +1,18 @@
-import { useMemo, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
+import { useNavigate, useSearchParams } from 'react-router-dom';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
-import { Building2, CalendarDays, BriefcaseBusiness, Sparkles, Trophy, Users } from 'lucide-react';
+import { BriefcaseBusiness, Building2, CalendarDays, Link2, Trophy, Users } from 'lucide-react';
 import { eventApi } from '../../api/event.api';
 import { recruiterApi } from '../../api/recruiter.api';
 import { Badge } from '../../components/ui/Badge';
 import { Button } from '../../components/ui/Button';
 import { Card } from '../../components/ui/Card';
 import { Input } from '../../components/ui/Input';
+import {
+  RECRUITER_PAGE_CONTENT_CLASS,
+  RecruiterSectionHeader,
+  recruiterDriveSectionItems,
+} from './RecruiterSectionNav';
 
 const eventTypes = [
   'Industry Connect Session',
@@ -35,7 +41,22 @@ const createInitialForm = (): HiringEventFormState => ({
   minimumInnovationScore: '0',
 });
 
-export default function HiringEvents() {
+const formatEventDate = (value: string) =>
+  new Date(value).toLocaleString('en-IN', {
+    day: '2-digit',
+    month: 'short',
+    year: 'numeric',
+    hour: '2-digit',
+    minute: '2-digit',
+  });
+
+type HiringEventsProps = {
+  embedded?: boolean;
+};
+
+export default function HiringEvents({ embedded = false }: HiringEventsProps) {
+  const navigate = useNavigate();
+  const [searchParams, setSearchParams] = useSearchParams();
   const queryClient = useQueryClient();
   const [selectedEventId, setSelectedEventId] = useState<string | null>(null);
   const [scoreDraft, setScoreDraft] = useState({ studentId: '', score: '' });
@@ -54,11 +75,44 @@ export default function HiringEvents() {
     queryKey: ['recruiter', 'jobs'],
     queryFn: recruiterApi.getJobs,
   });
+
   const availableColleges = collegesQuery.data ?? [];
+  const events = hiringEventsQuery.data ?? [];
+  const requestedEventId = searchParams.get('eventId');
+
+  useEffect(() => {
+    if (events.length === 0) {
+      setSelectedEventId(null);
+      return;
+    }
+
+    if (requestedEventId && events.some((event) => event._id === requestedEventId)) {
+      setSelectedEventId(requestedEventId);
+      return;
+    }
+
+    if (!selectedEventId || !events.some((event) => event._id === selectedEventId)) {
+      setSelectedEventId(events[0]._id);
+    }
+  }, [events, requestedEventId, selectedEventId]);
 
   const selectedEvent = useMemo(
-    () => hiringEventsQuery.data?.find((event) => event._id === selectedEventId) ?? null,
-    [hiringEventsQuery.data, selectedEventId],
+    () => events.find((event) => event._id === selectedEventId) ?? null,
+    [events, selectedEventId],
+  );
+
+  const activeJobs = useMemo(
+    () => (jobsQuery.data ?? []).filter((job) => job.isActive),
+    [jobsQuery.data],
+  );
+
+  const eventMetrics = useMemo(
+    () => ({
+      events: events.length,
+      registrations: events.reduce((sum, event) => sum + event.participantsCount, 0),
+      ranked: events.filter((event) => event.rankingsComputedAt).length,
+    }),
+    [events],
   );
 
   const refreshData = async () => {
@@ -67,6 +121,7 @@ export default function HiringEvents() {
       queryClient.invalidateQueries({ queryKey: ['recruiter', 'linked-colleges'] }),
       queryClient.invalidateQueries({ queryKey: ['recruiter', 'jobs'] }),
       queryClient.invalidateQueries({ queryKey: ['recruiter', 'job-applications'] }),
+      queryClient.invalidateQueries({ queryKey: ['recruiter', 'onboarding'] }),
       queryClient.invalidateQueries({ queryKey: ['student', 'applications'] }),
     ]);
   };
@@ -76,6 +131,11 @@ export default function HiringEvents() {
     onSuccess: async (createdEvent) => {
       setForm(createInitialForm());
       setSelectedEventId(createdEvent._id);
+      setSearchParams((current) => {
+        const next = new URLSearchParams(current);
+        next.set('eventId', createdEvent._id);
+        return next;
+      });
       await refreshData();
     },
   });
@@ -95,41 +155,54 @@ export default function HiringEvents() {
   });
 
   const pipelineMutation = useMutation({
-    mutationFn: ({ eventId, studentId, jobId, note }: { eventId: string; studentId: string; jobId: string; note?: string }) =>
-      recruiterApi.selectStudentFromEvent(eventId, studentId, { jobId, note }),
-    onSuccess: async () => {
+    mutationFn: ({
+      eventId,
+      studentId,
+      jobId,
+      note,
+    }: {
+      eventId: string;
+      studentId: string;
+      jobId: string;
+      note?: string;
+    }) => recruiterApi.selectStudentFromEvent(eventId, studentId, { jobId, note }),
+    onSuccess: async (_, variables) => {
       setSelectionDraft({ studentId: '', jobId: '', note: '' });
       await refreshData();
+      navigate(`/dashboard/recruiter/applications/${variables.studentId}?jobId=${variables.jobId}`);
     },
   });
-
-  const activeJobs = useMemo(
-    () => (jobsQuery.data ?? []).filter((job) => job.isActive),
-    [jobsQuery.data],
-  );
 
   const selectedParticipant =
     selectedEvent?.participants.find((participant) => participant.studentId === selectionDraft.studentId) ?? null;
 
-  return (
-    <div className="space-y-6">
-      <header className="border-b border-slate-800 pb-4">
-        <div className="mb-2 flex items-center gap-2 text-xs uppercase tracking-[0.3em] text-cyan-300">
-          <Sparkles className="h-4 w-4" />
-          Hiring Events
-        </div>
-        <h1 className="text-2xl font-semibold text-white">Recruiter hiring events</h1>
-        <p className="mt-1 text-sm text-slate-400">
-          Create college-specific hiring events, review registrations, score submissions, and move students into your pipeline.
-        </p>
-      </header>
+  const canCreateEvent =
+    Boolean(form.title.trim()) &&
+    Boolean(form.collegeId) &&
+    Boolean(form.date) &&
+    Boolean(form.description.trim()) &&
+    availableColleges.length > 0;
 
-      <section className="grid gap-4 xl:grid-cols-[minmax(0,420px),minmax(0,1fr)]">
+  return (
+    <div className={`${RECRUITER_PAGE_CONTENT_CLASS} space-y-6`}>
+      {!embedded ? (
+        <RecruiterSectionHeader
+          eyebrow="Drive Workspace"
+          title="Run recruiter hiring events"
+          description="Create college-linked hiring events, review participants, and push selected students into your hiring pipeline."
+          navItems={recruiterDriveSectionItems}
+        />
+      ) : null}
+
+      <section className="grid gap-6 xl:grid-cols-[420px,minmax(0,1fr)]">
         <Card className="p-6">
-          <div className="mb-4 flex items-center justify-between gap-3">
+          <div className="flex items-start justify-between gap-3">
             <div>
               <div className="text-xs uppercase tracking-[0.3em] text-cyan-300">Create Event</div>
-              <h2 className="mt-2 text-xl font-semibold text-white">Launch a hiring event</h2>
+              <h2 className="mt-2 text-2xl font-semibold text-white">Launch a hiring event</h2>
+              <p className="mt-2 text-sm leading-6 text-slate-400">
+                Events work best once a college partnership is active and at least one job is open.
+              </p>
             </div>
             <Badge className="border-slate-700 bg-slate-950 text-slate-300">
               {availableColleges.length} colleges
@@ -137,12 +210,12 @@ export default function HiringEvents() {
           </div>
 
           {availableColleges.length === 0 ? (
-            <div className="mb-4 rounded-2xl border border-amber-500/20 bg-amber-500/10 px-4 py-3 text-sm text-amber-100">
+            <div className="mt-5 rounded-2xl border border-amber-500/20 bg-amber-500/10 px-4 py-3 text-sm text-amber-100">
               No linked colleges yet. Ask a college to accept your partnership request before creating hiring events.
             </div>
           ) : null}
 
-          <div className="grid gap-4">
+          <div className="mt-5 grid gap-4">
             <Input
               value={form.title}
               onChange={(event) => setForm((current) => ({ ...current, title: event.target.value }))}
@@ -220,14 +293,7 @@ export default function HiringEvents() {
                   ...(form.linkedJobId ? { linkedJobId: form.linkedJobId } : {}),
                 })
               }
-              disabled={
-                createMutation.isPending ||
-                availableColleges.length === 0 ||
-                !form.title ||
-                !form.collegeId ||
-                !form.date ||
-                !form.description
-              }
+              disabled={createMutation.isPending || !canCreateEvent}
             >
               {createMutation.isPending ? 'Creating...' : 'Create Hiring Event'}
             </Button>
@@ -240,7 +306,7 @@ export default function HiringEvents() {
               <div className="flex items-center gap-3">
                 <CalendarDays className="h-5 w-5 text-cyan-300" />
                 <div>
-                  <div className="text-2xl font-semibold text-white">{hiringEventsQuery.data?.length ?? 0}</div>
+                  <div className="text-2xl font-semibold text-white">{eventMetrics.events}</div>
                   <div className="text-sm text-slate-400">Events</div>
                 </div>
               </div>
@@ -249,9 +315,7 @@ export default function HiringEvents() {
               <div className="flex items-center gap-3">
                 <Users className="h-5 w-5 text-emerald-300" />
                 <div>
-                  <div className="text-2xl font-semibold text-white">
-                    {(hiringEventsQuery.data ?? []).reduce((sum, event) => sum + event.participantsCount, 0)}
-                  </div>
+                  <div className="text-2xl font-semibold text-white">{eventMetrics.registrations}</div>
                   <div className="text-sm text-slate-400">Registrations</div>
                 </div>
               </div>
@@ -260,43 +324,87 @@ export default function HiringEvents() {
               <div className="flex items-center gap-3">
                 <Trophy className="h-5 w-5 text-amber-300" />
                 <div>
-                  <div className="text-2xl font-semibold text-white">
-                    {(hiringEventsQuery.data ?? []).filter((event) => event.rankingsComputedAt).length}
-                  </div>
+                  <div className="text-2xl font-semibold text-white">{eventMetrics.ranked}</div>
                   <div className="text-sm text-slate-400">Ranked events</div>
                 </div>
               </div>
             </Card>
           </div>
 
-          {hiringEventsQuery.isLoading ? <Card className="p-6 text-sm text-slate-400">Loading hiring events...</Card> : null}
+          <Card className="p-6">
+            <div className="flex items-start justify-between gap-3">
+              <div>
+                <div className="text-xs uppercase tracking-[0.3em] text-cyan-300">Event Workspace</div>
+                <h2 className="mt-2 text-xl font-semibold text-white">Current hiring events</h2>
+                <p className="mt-2 text-sm leading-6 text-slate-400">
+                  Select an event to review participants, compute rankings, and push students into the recruiter pipeline.
+                </p>
+              </div>
+              <Badge className="border-slate-700 bg-slate-950 text-slate-300">{events.length} total</Badge>
+            </div>
 
-          <div className="grid gap-4 md:grid-cols-2">
-            {(hiringEventsQuery.data ?? []).map((event) => (
-              <Card key={event._id} className="p-5">
-                <div className="flex items-start justify-between gap-3">
-                  <div>
-                    <div className="text-lg font-semibold text-white">{event.title}</div>
-                    <div className="mt-1 text-sm text-slate-400">{event.collegeName}</div>
-                    <div className="mt-3 flex flex-wrap gap-2">
-                      <Badge className="border-amber-500/30 bg-amber-500/10 text-amber-300">Hiring Event</Badge>
-                      <Badge className="border-slate-700 bg-slate-950 text-slate-300">{event.type}</Badge>
-                      <Badge className="border-slate-700 bg-slate-950 text-slate-300">
-                        {event.minimumInnovationScore}+ score
-                      </Badge>
-                    </div>
-                  </div>
-                  <Button variant="secondary" onClick={() => setSelectedEventId(event._id)}>
-                    View
-                  </Button>
-                </div>
-                <div className="mt-4 flex flex-wrap gap-3 text-sm text-slate-500">
-                  <span>{new Date(event.scheduledAt).toLocaleString('en-IN')}</span>
-                  <span>{event.participantsCount} participants</span>
-                </div>
-              </Card>
-            ))}
-          </div>
+            {hiringEventsQuery.isLoading ? (
+              <div className="mt-5 text-sm text-slate-400">Loading hiring events...</div>
+            ) : events.length ? (
+              <div className="mt-5 grid gap-4 md:grid-cols-2">
+                {events.map((event) => {
+                  const isSelected = event._id === selectedEventId;
+
+                  return (
+                    <Card
+                      key={event._id}
+                      className={`p-5 transition ${
+                        isSelected ? 'border-cyan-400/40 bg-cyan-400/5' : ''
+                      }`}
+                    >
+                      <div className="flex items-start justify-between gap-3">
+                        <div>
+                          <div className="text-lg font-semibold text-white">{event.title}</div>
+                          <div className="mt-1 text-sm text-slate-400">{event.collegeName}</div>
+                          <div className="mt-3 flex flex-wrap gap-2">
+                            <Badge className="border-amber-500/30 bg-amber-500/10 text-amber-300">
+                              Hiring Event
+                            </Badge>
+                            <Badge className="border-slate-700 bg-slate-950 text-slate-300">
+                              {event.type}
+                            </Badge>
+                            <Badge className="border-slate-700 bg-slate-950 text-slate-300">
+                              {event.minimumInnovationScore}+ score
+                            </Badge>
+                          </div>
+                        </div>
+                        <Button
+                          variant="secondary"
+                          onClick={() => {
+                            setSelectedEventId(event._id);
+                            setSearchParams((current) => {
+                              const next = new URLSearchParams(current);
+                              next.set('eventId', event._id);
+                              return next;
+                            });
+                          }}
+                        >
+                          {isSelected ? 'Viewing' : 'View'}
+                        </Button>
+                      </div>
+                      <div className="mt-4 flex flex-wrap gap-3 text-sm text-slate-500">
+                        <span>{formatEventDate(event.scheduledAt)}</span>
+                        <span>{event.participantsCount} participants</span>
+                      </div>
+                    </Card>
+                  );
+                })}
+              </div>
+            ) : (
+              <div className="mt-5 rounded-2xl border border-dashed border-slate-800 px-5 py-10">
+                <div className="text-lg font-semibold text-white">No hiring events yet</div>
+                <p className="mt-2 max-w-2xl text-sm leading-6 text-slate-400">
+                  Create your first event from the form on the left. Once colleges are linked, this workspace will show
+                  event cards, participant counts, and ranking status here instead of an empty panel.
+                </p>
+              </div>
+            )}
+          </Card>
         </div>
       </section>
 
@@ -313,25 +421,28 @@ export default function HiringEvents() {
             </div>
             <div className="flex flex-wrap gap-3">
               <Button variant="secondary" onClick={() => computeMutation.mutate(selectedEvent._id)}>
-                {computeMutation.isPending && computeMutation.variables === selectedEvent._id ? 'Computing...' : 'Compute Rankings'}
-              </Button>
-              <Button variant="secondary" onClick={() => setSelectedEventId(null)}>
-                Close
+                {computeMutation.isPending && computeMutation.variables === selectedEvent._id
+                  ? 'Computing...'
+                  : 'Compute Rankings'}
               </Button>
             </div>
           </div>
 
-          <div className="mt-6 grid gap-4 md:grid-cols-3">
+          <div className="mt-6 grid gap-4 md:grid-cols-4">
             <Card className="p-4">
-              <div className="text-2xl font-semibold text-white">{selectedEvent.participantsCount}</div>
+              <div className="text-lg font-semibold text-white">{formatEventDate(selectedEvent.scheduledAt)}</div>
+              <div className="mt-1 text-sm text-slate-400">Scheduled</div>
+            </Card>
+            <Card className="p-4">
+              <div className="text-lg font-semibold text-white">{selectedEvent.participantsCount}</div>
               <div className="mt-1 text-sm text-slate-400">Registered students</div>
             </Card>
             <Card className="p-4">
-              <div className="text-2xl font-semibold text-white">{selectedEvent.minimumInnovationScore}</div>
+              <div className="text-lg font-semibold text-white">{selectedEvent.minimumInnovationScore}</div>
               <div className="mt-1 text-sm text-slate-400">Minimum score</div>
             </Card>
             <Card className="p-4">
-              <div className="text-2xl font-semibold text-white">{selectedEvent.rankings.length}</div>
+              <div className="text-lg font-semibold text-white">{selectedEvent.rankings.length}</div>
               <div className="mt-1 text-sm text-slate-400">Ranked students</div>
             </Card>
           </div>
@@ -464,7 +575,12 @@ export default function HiringEvents() {
                     Selecting <span className="font-semibold text-white">{selectedParticipant.studentName}</span> for a recruiter job.
                   </div>
                 ) : null}
-                <div className="grid gap-3">
+                {!activeJobs.length ? (
+                  <div className="rounded-xl border border-dashed border-slate-800 px-4 py-4 text-sm text-slate-500">
+                    No active jobs available. Open a recruiter job before pushing event participants into the pipeline.
+                  </div>
+                ) : null}
+                <div className="mt-3 grid gap-3">
                   <select
                     value={selectionDraft.jobId}
                     onChange={(event) => setSelectionDraft((current) => ({ ...current, jobId: event.target.value }))}
@@ -493,6 +609,7 @@ export default function HiringEvents() {
                     }
                     disabled={pipelineMutation.isPending || !selectionDraft.studentId || !selectionDraft.jobId}
                   >
+                    <Link2 className="mr-2 h-4 w-4" />
                     {pipelineMutation.isPending ? 'Adding...' : 'Add Student to Pipeline'}
                   </Button>
                 </div>

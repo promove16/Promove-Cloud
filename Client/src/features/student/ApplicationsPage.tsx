@@ -302,10 +302,10 @@ export default function ApplicationsPage() {
                 <div className="space-y-2">
                   <button
                     type="button"
-                    onClick={() => navigate(`/marketplace/jobs/${application.job._id}`)}
+                    onClick={() => navigate(`/dashboard/student/applications/${application.job._id}-${application.recruiter._id}`)}
                     className="inline-flex w-full items-center justify-center gap-2 rounded-xl bg-cyan-400 px-4 py-3 text-sm font-semibold text-slate-950 transition hover:bg-cyan-300"
                   >
-                    View job
+                    View Details
                     <ArrowRight className="h-4 w-4" />
                   </button>
                   <button

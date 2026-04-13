@@ -16,12 +16,13 @@ import { UserRole } from '../../src/types/roles.types';
 
 const PASSWORD = 'Password123!';
 
-jest.mock('../../src/services/cloudinaryService', () => ({
-  uploadToCloudinary: jest.fn(async (_buffer: Buffer, folder: string) => ({
-    secure_url: `https://cloudinary.test/${folder}/${randomUUID()}`,
-    public_id: `mock-${randomUUID()}`,
+jest.mock('../../src/services/fileStorageService', () => ({
+  uploadFile: jest.fn(async ({ folder, fileName }: { folder: string; fileName: string }) => ({
+    url: `https://s3.test/${folder}/${fileName}-${randomUUID()}`,
+    key: `mock-${randomUUID()}`,
+    provider: 's3',
   })),
-  deleteFromCloudinary: jest.fn(async () => undefined),
+  deleteStoredAsset: jest.fn(async () => undefined),
 }));
 
 jest.mock('../../src/services/emailService', () => ({

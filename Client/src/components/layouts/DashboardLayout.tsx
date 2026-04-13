@@ -20,7 +20,6 @@ import { useNotifications } from '../../hooks/useNotifications';
 import { trackNavigationClick } from '../../lib/activityTracker';
 import { NotificationItem } from '../../types/notification.types';
 import { roleRedirect } from '../../utils/roleRedirect';
-import { SupportFloatingWidget } from '../../features/support/SupportFloatingWidget';
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -59,6 +58,13 @@ const SIDEBAR_PARENT_PATH_ALIASES: Partial<Record<UserRole, Record<string, strin
       '/dashboard/college/projects',
       '/dashboard/college/investors',
       '/dashboard/college/recruiters',
+    ],
+  },
+  [UserRole.RECRUITER]: {
+    '/dashboard/recruiter/marketplace': ['/dashboard/recruiter/applications'],
+    '/dashboard/recruiter/drives': [
+      '/dashboard/recruiter/hiring-events',
+      '/dashboard/recruiter/onboarding',
     ],
   },
 };
@@ -372,7 +378,15 @@ export function DashboardLayout({ children, role }: PropsWithChildren<DashboardL
 
   const resolvedRole = user?.role ?? role;
   const navItems = resolvedRole ? SIDEBAR_CONFIG[resolvedRole] : [];
-  const isMarketplaceRoute = location.pathname.includes('/marketplace');
+  const normalizedPathname = location.pathname.replace(/\/+$/, '') || '/';
+  const isMarketplaceRoute = normalizedPathname.includes('/marketplace');
+  const isRecruiterMarketplaceRoute =
+    resolvedRole === UserRole.RECRUITER &&
+    normalizedPathname.startsWith('/dashboard/recruiter/marketplace');
+  const isPortfolioRoute =
+    normalizedPathname === '/portfolio' ||
+    normalizedPathname.startsWith('/portfolio/');
+  const shouldUseFullBleedMain = isPortfolioRoute || (isMarketplaceRoute && !isRecruiterMarketplaceRoute);
   const dashboardHomePath = resolvedRole ? roleRedirect(resolvedRole) : '/dashboard';
   const hasMessagesItem = navItems.some(
     (item) => item.kind === 'link' && item.label === 'Messages',
@@ -497,7 +511,15 @@ export function DashboardLayout({ children, role }: PropsWithChildren<DashboardL
       return unreadSidebarNotificationState.applications;
     }
 
+    if (label === 'Marketplace' && resolvedRole === UserRole.RECRUITER) {
+      return unreadSidebarNotificationState.applications;
+    }
+
     if (label === 'Events' || label === 'Hiring Events') {
+      return unreadSidebarNotificationState.events;
+    }
+
+    if (label === 'Drive' && resolvedRole === UserRole.RECRUITER) {
       return unreadSidebarNotificationState.events;
     }
 
@@ -643,40 +665,42 @@ export function DashboardLayout({ children, role }: PropsWithChildren<DashboardL
         </aside>
 
         <div className="flex min-h-0 flex-1 flex-col">
-          <header className="dashboard-theme-border dashboard-theme-header sticky top-0 z-30 border-b backdrop-blur-xl">
-            <div className="flex items-center justify-between px-4 py-4 lg:px-8">
-              <div className="flex items-center gap-3">
-                <Button variant="ghost" className="lg:hidden" onClick={() => setSidebarOpen(true)}>
-                  <Menu className="h-5 w-5" />
-                </Button>
-                <div>
-                  <div className="dashboard-theme-faint text-xs uppercase tracking-[0.3em]">Workspace</div>
-                  <div className="dashboard-theme-text mt-1 text-xl font-semibold">{currentLabel}</div>
+          {!isPortfolioRoute ? (
+            <header className="dashboard-theme-border dashboard-theme-header sticky top-0 z-30 border-b backdrop-blur-xl">
+              <div className="flex items-center justify-between px-4 py-4 lg:px-8">
+                <div className="flex items-center gap-3">
+                  <Button variant="ghost" className="lg:hidden" onClick={() => setSidebarOpen(true)}>
+                    <Menu className="h-5 w-5" />
+                  </Button>
+                  <div>
+                    <div className="dashboard-theme-faint text-xs uppercase tracking-[0.3em]">Workspace</div>
+                    <div className="dashboard-theme-text mt-1 text-xl font-semibold">{currentLabel}</div>
+                  </div>
+                </div>
+
+                <div className="flex items-center gap-3">
+                  <GlobalWorkspaceInviteDialog />
+                  <NotificationBell notifications={notifications} unreadCount={unreadNotificationsCount} />
+                  <NavLink
+                    to="/portfolio"
+                    className="dashboard-theme-border dashboard-theme-surface dashboard-theme-hover flex items-center gap-3 rounded-2xl border px-4 py-2 transition hover:border-cyan-500/40"
+                  >
+                    <div className="flex h-11 w-11 items-center justify-center rounded-full bg-gradient-to-br from-cyan-500 to-emerald-500 text-sm font-bold text-slate-50">
+                      {initials}
+                    </div>
+                    <div>
+                      <div className="dashboard-theme-text text-sm font-semibold">{user.displayName}</div>
+                      <Badge>{user.role}</Badge>
+                    </div>
+                  </NavLink>
                 </div>
               </div>
-
-              <div className="flex items-center gap-3">
-                <GlobalWorkspaceInviteDialog />
-                <NotificationBell notifications={notifications} unreadCount={unreadNotificationsCount} />
-                <NavLink
-                  to="/portfolio"
-                  className="dashboard-theme-border dashboard-theme-surface dashboard-theme-hover flex items-center gap-3 rounded-2xl border px-4 py-2 transition hover:border-cyan-500/40"
-                >
-                  <div className="flex h-11 w-11 items-center justify-center rounded-full bg-gradient-to-br from-cyan-500 to-emerald-500 text-sm font-bold text-slate-50">
-                    {initials}
-                  </div>
-                  <div>
-                    <div className="dashboard-theme-text text-sm font-semibold">{user.displayName}</div>
-                    <Badge>{user.role}</Badge>
-                  </div>
-                </NavLink>
-              </div>
-            </div>
-          </header>
+            </header>
+          ) : null}
 
           <main
             className={`flex min-h-0 flex-1 flex-col overflow-y-auto ${
-              isMarketplaceRoute ? 'p-0' : 'px-4 py-6 lg:px-8'
+              shouldUseFullBleedMain ? 'p-0' : 'px-4 py-6 lg:px-8'
             }`}
           >
             {children ?? <Outlet />}
@@ -693,7 +717,6 @@ export function DashboardLayout({ children, role }: PropsWithChildren<DashboardL
         />
       ) : null}
 
-      <SupportFloatingWidget />
     </div>
   );
 }

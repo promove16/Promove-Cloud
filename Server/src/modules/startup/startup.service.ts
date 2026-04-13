@@ -1,8 +1,8 @@
 import { Types } from 'mongoose';
 import { z } from 'zod';
 import { notificationQueue } from '../../config/bullmq';
-import { deleteFromCloudinary, uploadToCloudinary } from '../../services/cloudinaryService';
 import { applyScoreAsync } from '../../services/scoreEngine';
+import { deleteStoredAsset, uploadFile } from '../../services/fileStorageService';
 import { User } from '../user/user.model';
 import { Startup } from './startup.model';
 import { ApiError } from '../../utils/ApiError';
@@ -959,9 +959,26 @@ export const uploadPitchDeck = async (startupId: string, userId: string, file: E
   }
   const startup = await getStartupForFounder(startupId, userId);
   prepareStartupForEditableMutation(startup);
-  const uploaded = await uploadToCloudinary(file.buffer, 'promove/startups', 'raw', { format: 'pdf' });
-  startup.pitchDeckUrl = uploaded.secure_url;
+
+  await deleteStoredAsset({
+    storageProvider: startup.pitchDeckStorageProvider,
+    storageKey: startup.pitchDeckStorageKey,
+    cloudinaryPublicId: startup.pitchDeckCloudinaryPublicId,
+    legacyCloudinaryResourceType: 'raw',
+  });
+
+  const uploaded = await uploadFile({
+    buffer: file.buffer,
+    folder: 'promove/startups',
+    fileName: file.originalname,
+    contentType: file.mimetype || 'application/pdf',
+  });
+
+  startup.pitchDeckUrl = uploaded.url;
   startup.pitchDeckName = file.originalname;
+  startup.pitchDeckStorageProvider = uploaded.provider;
+  startup.pitchDeckStorageKey = uploaded.key;
+  startup.pitchDeckCloudinaryPublicId = undefined;
 
   await startup.save();
 return serializeStartup(startup);
@@ -1012,33 +1029,35 @@ export const uploadStartupDocument = async (
   const startup = await getStartupForFounder(startupId, userId);
   prepareStartupForEditableMutation(startup);
   const fileType = file.mimetype === 'application/pdf' ? 'pdf' : 'image';
-  const uploaded = await uploadToCloudinary(
-    file.buffer,
-    'promove/startup-documents',
-    fileType === 'pdf' ? 'raw' : 'image',
-    fileType === 'pdf' ? { format: 'pdf' } : undefined,
-  );
+  const uploaded = await uploadFile({
+    buffer: file.buffer,
+    folder: 'promove/startup-documents',
+    fileName: file.originalname,
+    contentType: file.mimetype || (fileType === 'pdf' ? 'application/pdf' : 'image/jpeg'),
+  });
 
   const existingDocument = startup.documents.find((document) => document.category === payload.category);
-  if (existingDocument?.cloudinaryPublicId) {
-    await deleteFromCloudinary(
-      existingDocument.cloudinaryPublicId,
-      existingDocument.fileType === 'pdf' ? 'raw' : 'image',
-    );
-  }
+  await deleteStoredAsset({
+    storageProvider: existingDocument?.storageProvider,
+    storageKey: existingDocument?.storageKey,
+    cloudinaryPublicId: existingDocument?.cloudinaryPublicId,
+    legacyCloudinaryResourceType:
+      existingDocument?.fileType === 'pdf' ? 'raw' : existingDocument?.fileType === 'image' ? 'image' : undefined,
+  });
 
   startup.documents = startup.documents.filter((document) => document.category !== payload.category);
   startup.documents.push({
     _id: new Types.ObjectId(),
     category: payload.category,
-    fileUrl: uploaded.secure_url,
+    fileUrl: uploaded.url,
     fileType,
     fileName: file.originalname,
     fileSizeBytes: file.size,
     uploadedAt: new Date(),
     uploadedBy: new Types.ObjectId(userId),
     ...(payload.note?.trim() ? { note: payload.note.trim() } : {}),
-    cloudinaryPublicId: uploaded.public_id,
+    storageProvider: uploaded.provider,
+    storageKey: uploaded.key,
   });
 
   await startup.save();
@@ -1055,12 +1074,12 @@ export const deleteStartupDocument = async (startupId: string, userId: string, d
     throw new ApiError(404, 'STARTUP_DOCUMENT_NOT_FOUND', 'Startup document not found.');
   }
 
-  if (document.cloudinaryPublicId) {
-    await deleteFromCloudinary(
-      document.cloudinaryPublicId,
-      document.fileType === 'pdf' ? 'raw' : 'image',
-    );
-  }
+  await deleteStoredAsset({
+    storageProvider: document.storageProvider,
+    storageKey: document.storageKey,
+    cloudinaryPublicId: document.cloudinaryPublicId,
+    legacyCloudinaryResourceType: document.fileType === 'pdf' ? 'raw' : 'image',
+  });
 
   startup.documents = startup.documents.filter((item) => String(item._id) !== documentId);
 

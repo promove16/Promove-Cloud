@@ -1,6 +1,7 @@
-import { useMemo, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { CalendarDays } from 'lucide-react';
+import { useSearchParams } from 'react-router-dom';
 import { collegeApi } from '../../api/college.api';
 import { eventApi } from '../../api/event.api';
 import { schoolApi } from '../../api/school.api';
@@ -88,9 +89,12 @@ export default function EventManager({
 }: {
   mode?: InstitutionEventManagerMode;
 }) {
+  const [searchParams] = useSearchParams();
   const queryClient = useQueryClient();
   const config = EVENT_MANAGER_CONFIG[mode];
-  const [activeTab, setActiveTab] = useState<CollegeEventTab>('internal');
+  const [activeTab, setActiveTab] = useState<CollegeEventTab>(
+    mode === 'college' && searchParams.get('tab') === 'hiring' ? 'hiring' : 'internal',
+  );
   const [showCreate, setShowCreate] = useState(false);
   const [scoringEventId, setScoringEventId] = useState<string | null>(null);
   const [scoreDraft, setScoreDraft] = useState<{ studentId: string; score: string }>({
@@ -98,6 +102,7 @@ export default function EventManager({
     score: '',
   });
   const [form, setForm] = useState<EventFormState>(createInitialForm);
+  const focusedEventId = searchParams.get('eventId');
 
   const eventsQuery = useQuery({
     queryKey: [config.queryKey],
@@ -153,6 +158,14 @@ export default function EventManager({
   }, [activeTab, eventsQuery.data, hiringEventsQuery.data, mode]);
 
   const canCreateInternalEvent = mode === 'school' || activeTab === 'internal';
+
+  useEffect(() => {
+    if (mode !== 'college') {
+      return;
+    }
+
+    setActiveTab(searchParams.get('tab') === 'hiring' ? 'hiring' : 'internal');
+  }, [mode, searchParams]);
 
   return (
     <div className="space-y-6">
@@ -278,7 +291,10 @@ export default function EventManager({
 
       <div className="space-y-4">
         {visibleEvents.map((event) => (
-          <Card key={event._id} className="p-6">
+          <Card
+            key={event._id}
+            className={`p-6 ${focusedEventId === event._id ? 'border-cyan-400/40 bg-cyan-400/5' : ''}`}
+          >
             <div className="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
               <div>
                 <div className="mb-2 flex flex-wrap items-center gap-2 text-xs uppercase tracking-[0.3em] text-cyan-300">

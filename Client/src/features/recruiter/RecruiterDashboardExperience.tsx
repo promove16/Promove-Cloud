@@ -3,6 +3,7 @@ import { useNavigate } from "react-router-dom";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { recruiterApi } from "../../api/recruiter.api";
 import { getStudentPortfolioViewPath } from "../marketplace/navigation";
+import { RECRUITER_PAGE_CONTENT_CLASS } from "./RecruiterSectionNav";
 import type {
   RecruiterCollegeCard,
   RecruiterDriveView,
@@ -25,8 +26,8 @@ type SearchMode = "person" | "problem";
 
 const recruiterViewPaths: Record<ViewType, string> = {
   home: "/dashboard/recruiter",
-  "talent-search": "/dashboard/recruiter/talent",
-  "college-connect": "/dashboard/recruiter/colleges",
+  "talent-search": "/dashboard/recruiter/marketplace?role=students",
+  "college-connect": "/dashboard/recruiter/marketplace?role=colleges",
   "active-drives": "/dashboard/recruiter/drives",
   onboarding: "/dashboard/recruiter/onboarding",
 };
@@ -1283,7 +1284,7 @@ export function RecruiterDashboardExperience({ initialView = "home" }: Recruiter
               {isShortlisted ? "Shortlisted" : isShortlistingThisStudent ? "Shortlisting..." : "Shortlist"}
             </button>
             <button
-              onClick={() => navigate(`/dashboard/recruiter/messages/${student.id}`)}
+              onClick={() => navigate(`/dashboard/messages/${student.id}`)}
               disabled={!canMessageStudent}
               className="px-6 py-2 bg-gradient-to-r from-blue-600 to-purple-600 hover:from-blue-700 hover:to-purple-700 text-white rounded-lg font-semibold transition-all flex items-center gap-2 shadow-lg shadow-blue-500/30 disabled:opacity-60 disabled:cursor-not-allowed"
               title={canMessageStudent ? "Message student" : "Shortlist this student before messaging"}
@@ -2075,7 +2076,7 @@ export function RecruiterDashboardExperience({ initialView = "home" }: Recruiter
   };
 
   return (
-    <div className="space-y-8">
+    <div className={`${RECRUITER_PAGE_CONTENT_CLASS} space-y-8`}>
       {/* Content */}
       {selectedStudent ? (
         renderStudentProfile()

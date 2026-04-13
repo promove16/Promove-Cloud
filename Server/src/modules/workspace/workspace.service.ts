@@ -1,7 +1,7 @@
 import { Types } from 'mongoose';
 import { z } from 'zod';
-import { deleteFromCloudinary, uploadToCloudinary } from '../../services/cloudinaryService';
 import { sendTeamInviteEmail } from '../../services/emailService';
+import { deleteStoredAsset, uploadFile } from '../../services/fileStorageService';
 import { applyScoreAsync } from '../../services/scoreEngine';
 import { User } from '../user/user.model';
 import { ChatMessage } from '../chat/chat.model';
@@ -400,19 +400,19 @@ export const uploadWorkspaceFile = async (
 ) => {
   const workspace = await getWorkspaceForMember(workspaceId, userId);
   const fileType = file.mimetype === 'application/pdf' ? 'pdf' : 'image';
-  const upload = await uploadToCloudinary(
-    file.buffer,
-    'promove/workspaces',
-    fileType === 'pdf' ? 'raw' : 'image',
-    fileType === 'pdf' ? { format: 'pdf' } : undefined,
-  );
+  const upload = await uploadFile({
+    buffer: file.buffer,
+    folder: 'promove/workspaces',
+    fileName: file.originalname,
+    contentType: file.mimetype || (fileType === 'pdf' ? 'application/pdf' : 'image/jpeg'),
+  });
 
   const allowedCategories = ['bug_report', 'error_log', 'screenshot', 'test_result', 'design_mockup', 'other'];
   const safeCategory = category && allowedCategories.includes(category) ? category : 'other';
 
   workspace.uploads.push({
     _id: new Types.ObjectId(),
-    fileUrl: upload.secure_url,
+    fileUrl: upload.url,
     fileType,
     fileName: file.originalname,
     fileSizeBytes: file.size,
@@ -420,7 +420,8 @@ export const uploadWorkspaceFile = async (
     uploadedAt: new Date(),
     note,
     category: safeCategory,
-    cloudinaryPublicId: upload.public_id,
+    storageProvider: upload.provider,
+    storageKey: upload.key,
   });
   await workspace.save();
   return workspace.uploads;
@@ -433,12 +434,12 @@ export const deleteWorkspaceUpload = async (workspaceId: string, uploadId: strin
     throw new ApiError(404, 'UPLOAD_NOT_FOUND', 'Upload not found');
   }
 
-  if (upload.cloudinaryPublicId) {
-    await deleteFromCloudinary(
-      upload.cloudinaryPublicId,
-      upload.fileType === 'pdf' ? 'raw' : 'image',
-    );
-  }
+  await deleteStoredAsset({
+    storageProvider: upload.storageProvider,
+    storageKey: upload.storageKey,
+    cloudinaryPublicId: upload.cloudinaryPublicId,
+    legacyCloudinaryResourceType: upload.fileType === 'pdf' ? 'raw' : 'image',
+  });
 
   workspace.uploads = workspace.uploads.filter((item) => String(item._id) !== uploadId);
   await workspace.save();

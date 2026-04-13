@@ -1,7 +1,7 @@
 import { Types } from 'mongoose';
 import { z } from 'zod';
 import { logError } from '../../config/logger';
-import { deleteFromCloudinary, uploadToCloudinary } from '../../services/cloudinaryService';
+import { deleteStoredAsset, uploadFile } from '../../services/fileStorageService';
 import { UserRole } from '../../types/roles.types';
 import { ApiError } from '../../utils/ApiError';
 import {
@@ -123,23 +123,24 @@ const uploadInstitutionDocument = async (
   category: (typeof INSTITUTION_DOCUMENT_CATEGORIES)[number],
 ): Promise<InstitutionVerificationDocument> => {
   const fileType = getFileType(file);
-  const uploaded = await uploadToCloudinary(
-    file.buffer,
-    `promove/institution-verification/${userId}`,
-    fileType === 'pdf' ? 'raw' : 'image',
-    fileType === 'pdf' ? { format: 'pdf' } : undefined,
-  );
+  const uploaded = await uploadFile({
+    buffer: file.buffer,
+    folder: `promove/institution-verification/${userId}`,
+    fileName: file.originalname,
+    contentType: file.mimetype || (fileType === 'pdf' ? 'application/pdf' : 'image/jpeg'),
+  });
 
   return {
     _id: new Types.ObjectId(),
     category,
-    fileUrl: uploaded.secure_url,
+    fileUrl: uploaded.url,
     fileType,
     fileName: file.originalname,
     fileSizeBytes: file.size,
     uploadedAt: new Date(),
     uploadedBy: new Types.ObjectId(userId),
-    cloudinaryPublicId: uploaded.public_id,
+    storageProvider: uploaded.provider,
+    storageKey: uploaded.key,
   };
 };
 
@@ -223,20 +224,19 @@ export const assertInstitutionVerificationReadyForApproval = (
   }
 };
 
-export const cleanupInstitutionVerificationDocuments = async (
-  documents?: InstitutionVerificationDocument[],
-) => {
-  const cleanupTargets = documents?.filter((document) => document.cloudinaryPublicId) ?? [];
-
+export const cleanupInstitutionVerificationDocuments = async (documents?: InstitutionVerificationDocument[]) => {
+  const cleanupTargets = documents ?? [];
   await Promise.all(
     cleanupTargets.map(async (document) => {
       try {
-        await deleteFromCloudinary(
-          document.cloudinaryPublicId!,
-          document.fileType === 'pdf' ? 'raw' : 'image',
-        );
+        await deleteStoredAsset({
+          storageProvider: document.storageProvider,
+          storageKey: document.storageKey,
+          cloudinaryPublicId: document.cloudinaryPublicId,
+          legacyCloudinaryResourceType: document.fileType === 'pdf' ? 'raw' : 'image',
+        });
       } catch (error) {
-        logError('Failed to delete institution verification document from Cloudinary', error);
+        logError('Failed to delete institution verification document from storage', error);
       }
     }),
   );

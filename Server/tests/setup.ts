@@ -33,6 +33,8 @@ process.env.GITHUB_OAUTH_CALLBACK_URL = 'http://localhost:5000/api/users/github/
 process.env.AWS_REGION = 'ap-south-1';
 process.env.AWS_ACCESS_KEY_ID = 'test-access-key';
 process.env.AWS_SECRET_ACCESS_KEY = 'test-secret-key';
+process.env.AWS_S3_BUCKET_NAME = 'promove-test-bucket';
+process.env.AWS_S3_PUBLIC_BASE_URL = 'https://promove-test-bucket.s3.ap-south-1.amazonaws.com';
 process.env.FROM_EMAIL = 'noreply@promovecyc.com';
 
 type SetOptions = { ex?: number };
