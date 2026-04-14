@@ -296,76 +296,121 @@ const emptyPortfolioService = (): PortfolioService => ({
 });
 
 function Field({
+  id,
   label,
   value,
   onChange,
   placeholder,
   type = "text",
+  required = false,
+  helperText,
 }: {
+  id?: string;
   label: string;
   value: string;
   onChange: (value: string) => void;
   placeholder?: string;
   type?: string;
+  required?: boolean;
+  helperText?: string;
 }) {
   return (
     <label className="block space-y-1.5">
-      <span className="text-xs font-semibold uppercase tracking-[0.16em] text-slate-500">
-        {label}
+      <span className="flex items-center gap-2 text-xs font-semibold uppercase tracking-[0.16em] text-slate-500">
+        <span>
+          {label}
+          {required ? <span className="ml-1 text-rose-500">*</span> : null}
+        </span>
+        {!required ? (
+          <span className="text-[10px] font-medium normal-case tracking-normal text-slate-400">
+            Optional
+          </span>
+        ) : null}
       </span>
       <input
+        id={id}
         type={type}
         value={value}
         onChange={(event) => onChange(event.target.value)}
         placeholder={placeholder}
         className="w-full rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm text-slate-950 outline-none transition focus:border-[#0a66c2] focus:ring-2 focus:ring-[#0a66c2]/15 dark:border-slate-700 dark:bg-slate-950 dark:text-white"
       />
+      {helperText ? (
+        <span className="text-xs text-slate-500 dark:text-slate-400">
+          {helperText}
+        </span>
+      ) : null}
     </label>
   );
 }
 
 function TextArea({
+  id,
   label,
   value,
   onChange,
   placeholder,
   rows = 4,
+  required = false,
+  helperText,
 }: {
+  id?: string;
   label: string;
   value: string;
   onChange: (value: string) => void;
   placeholder?: string;
   rows?: number;
+  required?: boolean;
+  helperText?: string;
 }) {
   return (
     <label className="block space-y-1.5">
-      <span className="text-xs font-semibold uppercase tracking-[0.16em] text-slate-500">
-        {label}
+      <span className="flex items-center gap-2 text-xs font-semibold uppercase tracking-[0.16em] text-slate-500">
+        <span>
+          {label}
+          {required ? <span className="ml-1 text-rose-500">*</span> : null}
+        </span>
+        {!required ? (
+          <span className="text-[10px] font-medium normal-case tracking-normal text-slate-400">
+            Optional
+          </span>
+        ) : null}
       </span>
       <textarea
+        id={id}
         value={value}
         onChange={(event) => onChange(event.target.value)}
         placeholder={placeholder}
         rows={rows}
         className="w-full rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm text-slate-950 outline-none transition focus:border-[#0a66c2] focus:ring-2 focus:ring-[#0a66c2]/15 dark:border-slate-700 dark:bg-slate-950 dark:text-white"
       />
+      {helperText ? (
+        <span className="text-xs text-slate-500 dark:text-slate-400">
+          {helperText}
+        </span>
+      ) : null}
     </label>
   );
 }
 
 function EditorSection({
+  id,
   title,
   icon,
   action,
   children,
 }: {
+  id?: string;
   title: string;
   icon: ReactNode;
   action?: ReactNode;
   children: ReactNode;
 }) {
   return (
-    <section className="rounded-lg border border-slate-200 bg-white p-5 shadow-sm dark:border-slate-800 dark:bg-slate-900">
+    <section
+      id={id}
+      className="scroll-mt-28 rounded-lg border border-slate-200 bg-white p-5 shadow-sm dark:border-slate-800 dark:bg-slate-900"
+    >
       <div className="mb-5 flex items-center justify-between gap-3">
         <div className="flex items-center gap-3">
           <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-[#eef3f8] text-[#0a66c2]">
@@ -694,10 +739,12 @@ export function UserProfilePage() {
             {
               label: "Specialties",
               value: form.institutionProfile.specialties.filter(Boolean).length,
+              sectionId: "institution-details",
             },
             {
               label: "Locations",
               value: form.institutionProfile.locations.filter(Boolean).length,
+              sectionId: "institution-details",
             },
             {
               label: "Metrics",
@@ -707,32 +754,42 @@ export function UserProfilePage() {
                 form.institutionProfile.stats.startupsLaunched,
                 form.institutionProfile.stats.industryCollaborations,
               ].filter((item) => item.trim()).length,
+              sectionId: "institution-details",
             },
-            { label: "Startups", value: startupsQuery.data?.length ?? 0 },
+            {
+              label: "Startups",
+              value: startupsQuery.data?.length ?? 0,
+              sectionId: "portfolio-access",
+            },
           ]
         : [
             {
               label: "Skills",
               value: form.skills.filter((skill) => skill.name.trim()).length,
+              sectionId: "skills-section",
             },
             {
               label: "Experience",
               value: form.experience.filter((item) => item.title.trim()).length,
+              sectionId: "experience-section",
             },
             {
               label: "Education",
               value: form.education.filter((item) => item.institution.trim())
                 .length,
+              sectionId: "education-section",
             },
             {
               label: "Projects",
               value: form.portfolioProjects.filter((item) => item.title.trim())
                 .length,
+              sectionId: "projects-section",
             },
             {
               label: "Services",
               value: form.portfolioServices.filter((item) => item.title.trim())
                 .length,
+              sectionId: "services-section",
             },
           ],
     [
@@ -962,37 +1019,49 @@ export function UserProfilePage() {
         onSubmit={saveProfile}
       >
         <div className="space-y-5">
-          <EditorSection title="Intro" icon={<Linkedin className="h-5 w-5" />}>
+          <EditorSection
+            id="intro-section"
+            title="Intro"
+            icon={<Linkedin className="h-5 w-5" />}
+          >
             <div className="grid gap-4 md:grid-cols-2">
               <Field
+                id="profile-display-name"
                 label={isInstitutionRole ? "Page name" : "Name"}
+                required
                 value={form.displayName}
                 onChange={(value) =>
                   setForm((current) => ({ ...current, displayName: value }))
                 }
               />
               <Field
+                id="profile-avatar"
                 label="Avatar URL"
                 type="url"
                 value={form.avatar}
                 onChange={(value) =>
                   setForm((current) => ({ ...current, avatar: value }))
                 }
+                helperText="Optional, but a recognisable image improves profile trust."
               />
               {!isInstitutionRole ? null : (
                 <Field
+                  id="profile-avatar-wallpaper"
                   label="Avatar wallpaper URL"
                   type="url"
                   value={form.avatarWallpaper}
                   onChange={(value) =>
                     setForm((current) => ({ ...current, avatarWallpaper: value }))
                   }
+                  helperText="Optional cover image for school and college pages."
                 />
               )}
               <Field
+                id="profile-domain"
                 label={
                   isInstitutionRole ? "Industry / focus" : "Headline / domain"
                 }
+                required
                 value={form.domain}
                 onChange={(value) =>
                   setForm((current) => ({ ...current, domain: value }))
@@ -1004,7 +1073,9 @@ export function UserProfilePage() {
                 }
               />
               <Field
+                id="profile-headline"
                 label={isInstitutionRole ? "Tagline" : "Headline"}
+                required
                 value={form.headline}
                 onChange={(value) =>
                   setForm((current) => ({ ...current, headline: value }))
@@ -1016,6 +1087,7 @@ export function UserProfilePage() {
                 }
               />
               <Field
+                id="profile-linkedin"
                 label="LinkedIn URL"
                 type="url"
                 value={form.linkedinUrl}
@@ -1023,16 +1095,20 @@ export function UserProfilePage() {
                   setForm((current) => ({ ...current, linkedinUrl: value }))
                 }
                 placeholder="https://linkedin.com/in/..."
+                helperText="Optional, but useful for recruiter and investor validation."
               />
             </div>
             <div className="mt-4">
               <TextArea
+                id="profile-bio"
                 label="About"
+                required
                 value={form.bio}
                 onChange={(value) =>
                   setForm((current) => ({ ...current, bio: value }))
                 }
                 rows={5}
+                helperText="Required for discoverability. Explain what you build, study, or ship."
               />
             </div>
           </EditorSection>
@@ -1040,12 +1116,15 @@ export function UserProfilePage() {
           {isInstitutionRole ? (
             <>
               <EditorSection
+                id="institution-details"
                 title="Institution details"
                 icon={<GraduationCap className="h-5 w-5" />}
               >
                 <div className="grid gap-4 md:grid-cols-2">
                   <Field
+                    id="institution-name"
                     label="Institution name"
+                    required
                     value={form.institutionProfile.institutionName}
                     onChange={(value) =>
                       setForm((current) => ({
@@ -1058,7 +1137,9 @@ export function UserProfilePage() {
                     }
                   />
                   <Field
+                    id="institution-location"
                     label="Headquarters / primary campus"
+                    required
                     value={form.institutionProfile.location}
                     onChange={(value) =>
                       setForm((current) => ({
@@ -1072,7 +1153,9 @@ export function UserProfilePage() {
                     }
                   />
                   <Field
+                    id="institution-type"
                     label="Organization type"
+                    required
                     value={form.institutionProfile.organizationType}
                     onChange={(value) =>
                       setForm((current) => ({
@@ -1713,6 +1796,7 @@ export function UserProfilePage() {
 
           {!isInstitutionRole ? (
             <EditorSection
+              id="skills-section"
               title="Skills"
               icon={<Award className="h-5 w-5" />}
               action={
@@ -1836,6 +1920,7 @@ export function UserProfilePage() {
 
           {!isInstitutionRole ? (
             <EditorSection
+              id="experience-section"
               title="Experience"
               icon={<Briefcase className="h-5 w-5" />}
               action={
@@ -2032,6 +2117,7 @@ export function UserProfilePage() {
 
           {!isInstitutionRole ? (
             <EditorSection
+              id="education-section"
               title="Education"
               icon={<GraduationCap className="h-5 w-5" />}
               action={
@@ -2407,6 +2493,7 @@ export function UserProfilePage() {
 
           {!isInstitutionRole ? (
             <EditorSection
+              id="projects-section"
               title="Projects"
               icon={<Rocket className="h-5 w-5" />}
               action={
@@ -2545,6 +2632,7 @@ export function UserProfilePage() {
 
           {!isInstitutionRole ? (
             <EditorSection
+              id="services-section"
               title="Quality services"
               icon={<Briefcase className="h-5 w-5" />}
               action={
@@ -2642,6 +2730,7 @@ export function UserProfilePage() {
 
         <aside className="space-y-5">
           <EditorSection
+            id="portfolio-access"
             title="Portfolio access"
             icon={<Link2 className="h-5 w-5" />}
           >
@@ -2683,17 +2772,23 @@ export function UserProfilePage() {
           >
             <div className="space-y-3">
               {completionStats.map((stat) => (
-                <div
+                <a
                   key={stat.label}
-                  className="flex items-center justify-between text-sm"
+                  href={`#${stat.sectionId}`}
+                  className="flex items-center justify-between rounded-lg px-3 py-2 text-sm transition hover:bg-slate-100 dark:hover:bg-slate-950"
                 >
-                  <span className="text-slate-600 dark:text-slate-400">
-                    {stat.label}
-                  </span>
+                  <div>
+                    <span className="text-slate-600 dark:text-slate-400">
+                      {stat.label}
+                    </span>
+                    <div className="text-xs text-slate-400">
+                      {stat.value > 0 ? "Review section" : "Jump to missing section"}
+                    </div>
+                  </div>
                   <span className="font-semibold text-slate-950 dark:text-white">
                     {stat.value}
                   </span>
-                </div>
+                </a>
               ))}
             </div>
           </EditorSection>

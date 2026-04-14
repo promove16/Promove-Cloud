@@ -1,5 +1,5 @@
-import { type FormEvent, useEffect, useState } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { type FormEvent, useEffect, useMemo, useRef, useState } from 'react';
+import { useSearchParams } from 'react-router-dom';
 import { useForm } from 'react-hook-form';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { User, Bell, Shield, Palette, Settings2, Save, Loader2, Check, Lock, Globe, Monitor, Moon, Sun } from 'lucide-react';
@@ -11,6 +11,7 @@ import { useAuthStore } from '../../store/authStore';
 import { applyTheme } from '../../hooks/useTheme';
 import { UserRole } from '../../types/roles.types';
 import { OptionTabs } from '../../components/ui/OptionTabs';
+import { toast } from '../../app/components/ui/sonner';
 import { AuthPasswordField } from '../auth/AuthPasswordField';
 import { SupportFloatingWidget } from '../support/SupportFloatingWidget';
 
@@ -73,6 +74,17 @@ const TABS = [
 ] as const;
 
 type TabId = (typeof TABS)[number]['id'];
+const TAB_ID_SET = new Set<TabId>(TABS.map((tab) => tab.id));
+const TAB_LABELS: Record<TabId, string> = {
+  account: 'Account',
+  notifications: 'Notifications',
+  privacy: 'Privacy & Security',
+  appearance: 'Appearance',
+  role: 'Role Settings',
+};
+const normalizeSettingsTab = (value: string | null): TabId =>
+  value && TAB_ID_SET.has(value as TabId) ? (value as TabId) : 'account';
+const serializeState = (value: unknown) => JSON.stringify(value);
 
 // ─── State types ──────────────────────────────────────────────────────────────
 
@@ -90,6 +102,13 @@ type RoleState = {
 };
 type AccountValues = { displayName: string; bio: string; timezone: string; language: string };
 type PasswordValues = { currentPassword: string; newPassword: string; confirmPassword: string };
+type SettingsSnapshot = {
+  account: AccountValues;
+  notifications: NotifMatrix;
+  privacy: PrivacyState;
+  appearance: AppearanceState;
+  role: RoleState;
+};
 
 const splitCsv = (value: string) =>
   value
@@ -117,6 +136,21 @@ const defaultPasswordValues: PasswordValues = {
   newPassword: '',
   confirmPassword: '',
 };
+const cloneSettingsSnapshot = (snapshot: SettingsSnapshot): SettingsSnapshot =>
+  JSON.parse(JSON.stringify(snapshot)) as SettingsSnapshot;
+const createSettingsSnapshot = (
+  account: AccountValues,
+  notifications: NotifMatrix,
+  privacy: PrivacyState,
+  appearance: AppearanceState,
+  role: RoleState,
+): SettingsSnapshot => ({
+  account,
+  notifications,
+  privacy,
+  appearance,
+  role,
+});
 
 const clearBrowserTemporaryMemory = () => {
   const clearStorage = (storage: Storage) => {
@@ -133,6 +167,38 @@ const clearBrowserTemporaryMemory = () => {
 
   clearStorage(localStorage);
   clearStorage(sessionStorage);
+};
+
+const deriveRoleState = (
+  role: UserRole,
+  settings: UserSettings | undefined,
+  authUser: ReturnType<typeof useAuthStore.getState>['user'],
+): RoleState => {
+  const persistedRoleSettings = settings?.roleSettings ?? {};
+  const nextRoleState: RoleState = {
+    ...defaultRole,
+    ...persistedRoleSettings,
+    minInvestment: persistedRoleSettings.minInvestmentSize ?? defaultRole.minInvestment,
+    maxInvestment: persistedRoleSettings.maxInvestmentSize ?? defaultRole.maxInvestment,
+    preferredSectors: persistedRoleSettings.preferredSectors?.join(', ') ?? defaultRole.preferredSectors,
+    sessionTypes: {
+      video: persistedRoleSettings.sessionTypes?.includes('video') ?? defaultRole.sessionTypes.video,
+      text: persistedRoleSettings.sessionTypes?.includes('text') ?? defaultRole.sessionTypes.text,
+      inPerson: persistedRoleSettings.sessionTypes?.includes('in-person') ?? defaultRole.sessionTypes.inPerson,
+    },
+    maxConcurrentStudents: persistedRoleSettings.maxStudents ?? defaultRole.maxConcurrentStudents,
+    preferredRoles: persistedRoleSettings.preferredRoles?.join(', ') ?? defaultRole.preferredRoles,
+  };
+
+  if (role === UserRole.STUDENT && authUser?.discoverableToRecruiters !== undefined) {
+    nextRoleState.jobSeeking = authUser.discoverableToRecruiters;
+  }
+
+  if ((role === UserRole.SCHOOL || role === UserRole.COLLEGE) && authUser?.isProfilePublic !== undefined) {
+    nextRoleState.publicProfile = authUser.isProfilePublic;
+  }
+
+  return nextRoleState;
 };
 
 const buildRoleSettingsPayload = (role: UserRole, roleState: RoleState): UserSettings['roleSettings'] => {
@@ -195,12 +261,12 @@ function SettingsSkeleton() {
 
 export function SettingsPage() {
   const { settings, isLoading, updateSettingsAsync, isSaving } = useSettings();
-  const navigate = useNavigate();
+  const [searchParams, setSearchParams] = useSearchParams();
   const queryClient = useQueryClient();
   const authUser = useAuthStore((s) => s.user);
   const setAuthUser = useAuthStore((s) => s.setUser);
-  const clearAuth = useAuthStore((s) => s.clearAuth);
-  const [activeTab, setActiveTab] = useState<TabId>('account');
+  const logout = useAuthStore((s) => s.logout);
+  const activeTab = normalizeSettingsTab(searchParams.get('tab'));
   const [savedTab, setSavedTab] = useState<TabId | null>(null);
   const [savingTab, setSavingTab] = useState<TabId | null>(null);
   const [isClearingCache, setIsClearingCache] = useState(false);
@@ -226,7 +292,54 @@ export function SettingsPage() {
   const { register, handleSubmit, watch, reset, formState: { errors } } = useForm<AccountValues>({
     defaultValues: { displayName: '', bio: '', timezone: 'UTC', language: 'en' },
   });
-  const bioLen = (watch('bio') ?? '').length;
+  const accountValues = watch();
+  const bioLen = (accountValues.bio ?? '').length;
+  const savedRoleState = useMemo(
+    () => deriveRoleState(role, settings, authUser),
+    [authUser, role, settings],
+  );
+  const initialSnapshotRef = useRef<SettingsSnapshot | null>(null);
+  const currentAccountSnapshot = useMemo<AccountValues>(
+    () => ({
+      displayName: accountValues.displayName ?? '',
+      bio: accountValues.bio ?? '',
+      timezone: accountValues.timezone ?? 'UTC',
+      language: accountValues.language ?? 'en',
+    }),
+    [accountValues.bio, accountValues.displayName, accountValues.language, accountValues.timezone],
+  );
+  const dirtyTabs = useMemo(() => {
+    const baseline = initialSnapshotRef.current;
+    if (!baseline) {
+      return {
+        account: false,
+        notifications: false,
+        privacy: false,
+        appearance: false,
+        role: false,
+      } satisfies Record<TabId, boolean>;
+    }
+
+    return {
+      account: serializeState(currentAccountSnapshot) !== serializeState(baseline.account),
+      notifications: serializeState(notif) !== serializeState(baseline.notifications),
+      privacy: serializeState(privacy) !== serializeState(baseline.privacy),
+      appearance: serializeState(appearance) !== serializeState(baseline.appearance),
+      role: serializeState(roleState) !== serializeState(baseline.role),
+    } satisfies Record<TabId, boolean>;
+  }, [appearance, currentAccountSnapshot, notif, privacy, roleState]);
+  const activeTabDirty = dirtyTabs[activeTab];
+
+  useEffect(() => {
+    const currentTab = searchParams.get('tab');
+    const normalizedTab = normalizeSettingsTab(currentTab);
+
+    if (currentTab !== normalizedTab) {
+      const nextParams = new URLSearchParams(searchParams);
+      nextParams.set('tab', normalizedTab);
+      setSearchParams(nextParams, { replace: true });
+    }
+  }, [searchParams, setSearchParams]);
 
   useEffect(() => {
     if (!settings) return;
@@ -277,38 +390,64 @@ export function SettingsPage() {
     if (settings.appearance) {
       setAppearance(settings.appearance);
     }
-    const persistedRoleSettings = settings.roleSettings ?? {};
-    const nextRoleState: RoleState = {
-      ...defaultRole,
-      ...persistedRoleSettings,
-      minInvestment: persistedRoleSettings.minInvestmentSize ?? defaultRole.minInvestment,
-      maxInvestment: persistedRoleSettings.maxInvestmentSize ?? defaultRole.maxInvestment,
-      preferredSectors: persistedRoleSettings.preferredSectors?.join(', ') ?? defaultRole.preferredSectors,
-      sessionTypes: {
-        video: persistedRoleSettings.sessionTypes?.includes('video') ?? defaultRole.sessionTypes.video,
-        text: persistedRoleSettings.sessionTypes?.includes('text') ?? defaultRole.sessionTypes.text,
-        inPerson: persistedRoleSettings.sessionTypes?.includes('in-person') ?? defaultRole.sessionTypes.inPerson,
-      },
-      maxConcurrentStudents: persistedRoleSettings.maxStudents ?? defaultRole.maxConcurrentStudents,
-      preferredRoles: persistedRoleSettings.preferredRoles?.join(', ') ?? defaultRole.preferredRoles,
-    };
-
-    if (role === UserRole.STUDENT && authUser?.discoverableToRecruiters !== undefined) {
-      nextRoleState.jobSeeking = authUser.discoverableToRecruiters;
-    }
-
-    if ((role === UserRole.SCHOOL || role === UserRole.COLLEGE) && authUser?.isProfilePublic !== undefined) {
-      nextRoleState.publicProfile = authUser.isProfilePublic;
-    }
-
-    setRoleState(nextRoleState);
+    setRoleState(savedRoleState);
+    initialSnapshotRef.current = cloneSettingsSnapshot(
+      createSettingsSnapshot(
+        {
+          displayName: authUser?.displayName ?? settings.displayName ?? '',
+          bio: authUser?.bio ?? settings.bio ?? '',
+          timezone: settings.timezone ?? 'UTC',
+          language: settings.language ?? 'en',
+        },
+        settings.notifications
+          ? {
+              messages: {
+                email: settings.notifications.email.messages,
+                inApp: settings.notifications.inApp.messages,
+              },
+              deals: {
+                email: settings.notifications.email.deals,
+                inApp: settings.notifications.inApp.deals,
+              },
+              sessions: {
+                email: settings.notifications.email.sessions,
+                inApp: settings.notifications.inApp.sessions,
+              },
+              patents: {
+                email: settings.notifications.email.patents,
+                inApp: settings.notifications.inApp.patents,
+              },
+              platform: {
+                email: settings.notifications.email.platform,
+                inApp: settings.notifications.inApp.platform,
+              },
+            }
+          : defaultNotif,
+        settings.privacy
+          ? {
+              profileVisibility: settings.privacy.profileVisibility,
+              dmPermissions:
+                settings.privacy.allowDMs === 'all'
+                  ? 'everyone'
+                  : settings.privacy.allowDMs === 'none'
+                    ? 'nobody'
+                    : 'connections',
+              showEmail: settings.privacy.showEmail,
+              showPhone: settings.privacy.showPhone,
+              showOnlineStatus: settings.privacy.showOnlineStatus,
+            }
+          : defaultPrivacy,
+        settings.appearance ?? defaultAppearance,
+        savedRoleState,
+      ),
+    );
   }, [
     authUser?.bio,
     authUser?.displayName,
     authUser?.discoverableToRecruiters,
     authUser?.isProfilePublic,
     reset,
-    role,
+    savedRoleState,
     settings,
   ]);
 
@@ -316,12 +455,29 @@ export function SettingsPage() {
     setInstitutionToken(authUser?.institutionToken ?? '');
   }, [authUser?.institutionToken]);
 
+  const getSettingsErrorMessage = (error: unknown, fallback: string) =>
+    (error as { response?: { data?: { error?: { message?: string } } } })?.response?.data?.error?.message ??
+    (error instanceof Error ? error.message : fallback);
+
   const markSaved = (tab: TabId) => { setSavedTab(tab); setTimeout(() => setSavedTab(null), 2000); };
   const withSaveState = async (tab: TabId, action: () => Promise<void>) => {
     setSavingTab(tab);
     try {
       await action();
+      initialSnapshotRef.current = cloneSettingsSnapshot(
+        createSettingsSnapshot(
+          currentAccountSnapshot,
+          notif,
+          privacy,
+          appearance,
+          roleState,
+        ),
+      );
       markSaved(tab);
+      toast.success(`${TAB_LABELS[tab]} saved.`);
+    } catch (error) {
+      toast.error(getSettingsErrorMessage(error, `Unable to save ${TAB_LABELS[tab].toLowerCase()} right now.`));
+      throw error;
     } finally {
       setSavingTab((current) => (current === tab ? null : current));
     }
@@ -443,6 +599,7 @@ export function SettingsPage() {
       const result = await authApi.changePassword({ currentPassword, newPassword });
       setPasswordValues(defaultPasswordValues);
       setPasswordNotice(result.message || 'Password changed successfully.');
+      toast.success(result.message || 'Password changed successfully.');
 
       if (authUser?.mustChangePasswordOnNextLogin) {
         setAuthUser({ ...authUser, mustChangePasswordOnNextLogin: false });
@@ -450,7 +607,9 @@ export function SettingsPage() {
     } catch (error) {
       const apiError = (error as { response?: { data?: { error?: { message?: string } } } })
         ?.response?.data?.error;
-      setPasswordError(apiError?.message ?? 'Unable to change password right now.');
+      const message = apiError?.message ?? 'Unable to change password right now.';
+      setPasswordError(message);
+      toast.error(message);
     } finally {
       setIsChangingPassword(false);
     }
@@ -474,9 +633,7 @@ export function SettingsPage() {
     try {
       queryClient.clear();
       clearBrowserTemporaryMemory();
-      clearAuth();
-      navigate('/login', { replace: true });
-      window.location.replace('/login');
+      logout();
     } finally {
       setIsClearingCache(false);
     }
@@ -505,15 +662,40 @@ export function SettingsPage() {
 
       const refreshedProfile = await userApi.getMe();
       queryClient.setQueryData(['profile', 'me'], refreshedProfile);
-      setInstitutionTokenNotice(result.message || 'Institution token saved.');
+      const message = result.message || 'Institution token saved.';
+      setInstitutionTokenNotice(message);
+      toast.success(message);
     } catch (error) {
       const apiError = (error as { response?: { data?: { error?: { message?: string } } } })
         ?.response?.data?.error;
-      setInstitutionTokenError(apiError?.message ?? 'Unable to save institution token right now.');
+      const message = apiError?.message ?? 'Unable to save institution token right now.';
+      setInstitutionTokenError(message);
+      toast.error(message);
     } finally {
       setIsSavingInstitutionToken(false);
     }
   };
+
+  const getSaveActionForTab = (tab: TabId) =>
+    tab === 'account'
+      ? onSaveAccount
+      : tab === 'notifications'
+        ? onSaveNotif
+        : tab === 'privacy'
+          ? onSavePrivacy
+          : tab === 'appearance'
+            ? onSaveAppearance
+            : role !== UserRole.ADMIN
+              ? onSaveRole
+              : null;
+  const dirtyTabList = TABS.map((tab) => tab.id).filter((tab) => dirtyTabs[tab]);
+  const stickyTargetTab = activeTabDirty ? activeTab : dirtyTabList[0] ?? null;
+  const stickySaveAction = stickyTargetTab ? getSaveActionForTab(stickyTargetTab) : null;
+  const isActiveTabSaving = savingTab === activeTab || isSaving;
+  const isStickyTargetActive = stickyTargetTab === activeTab;
+  const isStickyTabSaving =
+    stickyTargetTab !== null && (savingTab === stickyTargetTab || isSaving);
+  const showStickySaveBar = Boolean(stickyTargetTab && stickySaveAction);
 
   function SaveBtn({ tab, onSave }: { tab: TabId; onSave: () => void }) {
     const saved = savedTab === tab;
@@ -528,7 +710,7 @@ export function SettingsPage() {
 
   if (isLoading) {
     return (
-      <div className="mx-auto w-full max-w-4xl p-6">
+      <div className="mx-auto w-full max-w-4xl p-6 pb-32">
         <SettingsSkeleton />
       </div>
     );
@@ -547,7 +729,17 @@ export function SettingsPage() {
         </div>
 
         {/* Tab bar */}
-        <OptionTabs items={TABS} activeId={activeTab} onChange={setActiveTab} className="mb-8" aria-label="Settings sections" />
+        <OptionTabs
+          items={TABS}
+          activeId={activeTab}
+          onChange={(nextTab) => {
+            const nextParams = new URLSearchParams(searchParams);
+            nextParams.set('tab', nextTab);
+            setSearchParams(nextParams, { replace: true });
+          }}
+          className="mb-8"
+          aria-label="Settings sections"
+        />
 
         {/* ── Account ─────────────────────────────────────────────────────── */}
         {activeTab === 'account' && (
@@ -984,6 +1176,32 @@ export function SettingsPage() {
             {role !== UserRole.ADMIN && <div className="flex justify-end"><SaveBtn tab="role" onSave={onSaveRole} /></div>}
           </div>
         )}
+
+        {showStickySaveBar ? (
+          <div className="pointer-events-none fixed inset-x-0 bottom-0 z-40 px-4 pb-4">
+            <div className="mx-auto flex max-w-4xl items-center justify-between gap-4 rounded-2xl border border-cyan-400/20 bg-slate-950/95 px-5 py-4 shadow-[0_-12px_40px_rgba(2,6,23,0.55)] backdrop-blur pointer-events-auto">
+              <div>
+                <div className="text-sm font-semibold text-white">Unsaved changes in {TAB_LABELS[activeTab]}</div>
+                <p className="mt-1 text-sm text-slate-400">
+                  {isStickyTargetActive
+                    ? 'Save this tab to keep your changes after refresh or sign-out.'
+                    : `You still have unsaved changes in ${TAB_LABELS[stickyTargetTab!]}. Save them before leaving settings.`}
+                </p>
+              </div>
+              <button
+                type="button"
+                onClick={() => {
+                  void stickySaveAction?.();
+                }}
+                disabled={isStickyTabSaving}
+                className={saveBtnCls}
+              >
+                {isStickyTabSaving ? <Loader2 className="w-4 h-4 animate-spin" /> : <Save className="w-4 h-4" />}
+                {isStickyTabSaving ? 'Saving...' : 'Save Changes'}
+              </button>
+            </div>
+          </div>
+        ) : null}
       </div>
       <SupportFloatingWidget />
     </>

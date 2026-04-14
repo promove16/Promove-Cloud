@@ -1,13 +1,17 @@
-import { FormEvent, useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { isAxiosError } from "axios";
+import { Controller, useForm } from "react-hook-form";
+import { zodResolver } from "@hookform/resolvers/zod";
 import {
   GraduationCap,
+  Info,
   Mail,
   NotebookPen,
   Ticket,
   UserCircle,
 } from "lucide-react";
 import { Link, useNavigate, useSearchParams } from "react-router-dom";
+import { z } from "zod";
 import { BusinessLogo } from "../../components/branding/BusinessLogo";
 import { AuthPasswordField } from "./AuthPasswordField";
 import { useSignupMutation } from "./useAuth";
@@ -26,6 +30,7 @@ type SignupFormState = {
   institutionToken: string;
   domain: string;
   bio: string;
+  termsAccepted: boolean;
 };
 
 const initialFormState: SignupFormState = {
@@ -36,15 +41,56 @@ const initialFormState: SignupFormState = {
   institutionToken: "",
   domain: "",
   bio: "",
+  termsAccepted: false,
 };
+
+const signupSchema = z
+  .object({
+    displayName: z.string().trim().min(1, "Student name is required."),
+    email: z
+      .string()
+      .trim()
+      .min(1, "Email is required.")
+      .email("Enter a valid email address."),
+    password: z
+      .string()
+      .min(8, "Password must be at least 8 characters long."),
+    confirmPassword: z.string().min(1, "Confirm your password."),
+    institutionToken: z
+      .string()
+      .trim()
+      .min(1, "Enter the invitation token shared by your school or college."),
+    domain: z.string(),
+    bio: z.string(),
+    termsAccepted: z.literal(true, {
+      errorMap: () => ({
+        message: "You must agree to the Terms of Service and Privacy Policy.",
+      }),
+    }),
+  })
+  .refine((values) => values.password === values.confirmPassword, {
+    message: "Passwords do not match.",
+    path: ["confirmPassword"],
+  });
 
 export function SignupPage() {
   const navigate = useNavigate();
   const [searchParams] = useSearchParams();
   const signupMutation = useSignupMutation();
-  const [formData, setFormData] = useState<SignupFormState>(initialFormState);
   const [error, setError] = useState("");
   const [notice, setNotice] = useState("");
+  const {
+    register,
+    control,
+    handleSubmit,
+    setValue,
+    reset,
+    watch,
+    formState: { errors },
+  } = useForm<SignupFormState>({
+    resolver: zodResolver(signupSchema),
+    defaultValues: initialFormState,
+  });
   const invitedRole = normalizeInvitationRole(searchParams.get("inviteRole"));
   const invitedEmail = searchParams.get("inviteeEmail")?.trim() ?? "";
   const invitedInstitutionToken =
@@ -58,59 +104,41 @@ export function SignupPage() {
     const next = new URLSearchParams(searchParams);
     return `/request-access${next.toString() ? `?${next.toString()}` : ""}`;
   }, [searchParams]);
+  const formData = watch();
 
   useEffect(() => {
-    if (!invitedEmail && !invitedInstitutionToken) {
-      return;
+    if (invitedEmail) {
+      setValue("email", invitedEmail, { shouldDirty: false });
     }
 
-    setFormData((current) => ({
-      ...current,
-      ...(invitedEmail && current.email !== invitedEmail ? { email: invitedEmail } : {}),
-      ...(invitedInstitutionToken && current.institutionToken !== invitedInstitutionToken
-        ? { institutionToken: invitedInstitutionToken }
-        : {}),
-    }));
-  }, [invitedEmail, invitedInstitutionToken]);
+    if (invitedInstitutionToken) {
+      setValue("institutionToken", invitedInstitutionToken, {
+        shouldDirty: false,
+      });
+    }
+  }, [invitedEmail, invitedInstitutionToken, setValue]);
 
-  const updateField = <K extends keyof SignupFormState>(
-    key: K,
-    value: SignupFormState[K],
-  ) => {
-    setFormData((current) => ({ ...current, [key]: value }));
-  };
-
-  const handleSubmit = async (event: FormEvent<HTMLFormElement>) => {
-    event.preventDefault();
+  const onSubmit = async (values: SignupFormState) => {
     setError("");
     setNotice("");
 
-    if (formData.password !== formData.confirmPassword) {
-      setError("Passwords do not match");
-      return;
-    }
-
-    if (!formData.institutionToken.trim()) {
-      setError("Enter the invitation token shared by your school or college.");
-      return;
-    }
-
     try {
       const payload = await signupMutation.mutateAsync({
-        displayName: formData.displayName.trim(),
-        email: formData.email.trim(),
-        password: formData.password,
+        displayName: values.displayName.trim(),
+        email: values.email.trim(),
+        password: values.password,
         role: UserRole.STUDENT,
-        institutionToken: formData.institutionToken.trim(),
-        ...(formData.domain.trim() ? { domain: formData.domain.trim() } : {}),
-        ...(formData.bio.trim() ? { bio: formData.bio.trim() } : {}),
+        institutionToken: values.institutionToken.trim(),
+        ...(values.domain.trim() ? { domain: values.domain.trim() } : {}),
+        ...(values.bio.trim() ? { bio: values.bio.trim() } : {}),
       });
 
       if ("pendingApproval" in payload) {
         setNotice(payload.message);
-        setFormData({
+        reset({
           ...initialFormState,
-          email: formData.email,
+          email: values.email,
+          institutionToken: values.institutionToken,
         });
         return;
       }
@@ -125,18 +153,19 @@ export function SignupPage() {
 
         setError(
           apiError?.code === "INSTITUTION_TOKEN_EXPIRED"
-              ? "That institution token has expired. Please ask your school or college for a fresh one."
-              : apiError?.code === "INSTITUTION_APPROVAL_PENDING"
-                  ? "Your institution has not approved your account yet. Please contact your school or college."
-                  : apiError?.code === "VALIDATION_ERROR" && detailMessage?.includes("institutionToken")
-                    ? "Enter the invitation token shared by your school or college."
-                  : apiError?.code === "INSTITUTION_TOKEN_MISMATCH"
-                    ? "This email is already linked to a different institution. Use the correct token or contact your institution."
-                    : apiError?.code === "INVALID_INSTITUTION_TOKEN"
-                      ? "That institution token is invalid. Please check with your school or college."
-                      : (detailMessage ??
-                        apiError?.message ??
-                        "Unable to create your account right now."),
+            ? "That institution token has expired. Please ask your school or college for a fresh one."
+            : apiError?.code === "INSTITUTION_APPROVAL_PENDING"
+              ? "Your institution has not approved your account yet. Please contact your school or college."
+              : apiError?.code === "VALIDATION_ERROR" &&
+                  detailMessage?.includes("institutionToken")
+                ? "Enter the invitation token shared by your school or college."
+                : apiError?.code === "INSTITUTION_TOKEN_MISMATCH"
+                  ? "This email is already linked to a different institution. Use the correct token or contact your institution."
+                  : apiError?.code === "INVALID_INSTITUTION_TOKEN"
+                    ? "That institution token is invalid. Please check with your school or college."
+                    : detailMessage ??
+                      apiError?.message ??
+                      "Unable to create your account right now.",
         );
         return;
       }
@@ -199,7 +228,8 @@ export function SignupPage() {
         ) : null}
 
         <form
-          onSubmit={handleSubmit}
+          onSubmit={handleSubmit(onSubmit)}
+          noValidate
           className="rounded-2xl border border-slate-800 bg-slate-900 p-8"
         >
           <div className="mb-6">
@@ -220,39 +250,50 @@ export function SignupPage() {
             </h2>
             <div className="grid gap-4 md:grid-cols-2">
               <div>
-                <label className="mb-2 block text-sm font-semibold text-white">
+                <label
+                  htmlFor="signup-display-name"
+                  className="mb-2 block text-sm font-semibold text-white"
+                >
                   Student Name <span className="text-red-400">*</span>
                 </label>
                 <div className="relative">
                   <UserCircle className="absolute left-4 top-1/2 h-5 w-5 -translate-y-1/2 text-slate-400" />
                   <input
+                    id="signup-display-name"
                     type="text"
-                    value={formData.displayName}
-                    onChange={(event) =>
-                      updateField("displayName", event.target.value)
-                    }
+                    {...register("displayName")}
                     placeholder="Sarah Chen"
-                    className="w-full rounded-lg border border-slate-800 bg-slate-950 py-3 pl-12 pr-4 text-white placeholder-slate-500 focus:border-blue-500 focus:outline-none"
-                    required
+                    className={`w-full rounded-lg border bg-slate-950 py-3 pl-12 pr-4 text-white placeholder-slate-500 focus:border-blue-500 focus:outline-none ${
+                      errors.displayName ? "border-red-500/70" : "border-slate-800"
+                    }`}
                   />
                 </div>
+                {errors.displayName ? (
+                  <p className="mt-2 text-sm text-red-500">
+                    {errors.displayName.message}
+                  </p>
+                ) : null}
               </div>
 
               <div>
-                <label className="mb-2 block text-sm font-semibold text-white">
+                <label
+                  htmlFor="signup-email"
+                  className="mb-2 block text-sm font-semibold text-white"
+                >
                   Email Address <span className="text-red-400">*</span>
                 </label>
                 <div className="relative">
                   <Mail className="absolute left-4 top-1/2 h-5 w-5 -translate-y-1/2 text-slate-400" />
                   <input
+                    id="signup-email"
                     type="email"
-                    value={formData.email}
-                    onChange={(event) =>
-                      updateField("email", event.target.value)
-                    }
+                    autoComplete="email"
+                    spellCheck={false}
+                    {...register("email")}
                     placeholder="name@example.com"
-                    className="w-full rounded-lg border border-slate-800 bg-slate-950 py-3 pl-12 pr-4 text-white placeholder-slate-500 focus:border-blue-500 focus:outline-none"
-                    required
+                    className={`w-full rounded-lg border bg-slate-950 py-3 pl-12 pr-4 text-white placeholder-slate-500 focus:border-blue-500 focus:outline-none ${
+                      errors.email ? "border-red-500/70" : "border-slate-800"
+                    }`}
                     disabled={Boolean(invitedEmail)}
                   />
                 </div>
@@ -261,33 +302,70 @@ export function SignupPage() {
                     This email is locked to your invitation.
                   </p>
                 ) : null}
+                {errors.email ? (
+                  <p className="mt-2 text-sm text-red-500">
+                    {errors.email.message}
+                  </p>
+                ) : null}
               </div>
 
               <div>
-                <AuthPasswordField
-                  label="Password *"
-                  value={formData.password}
-                  onChange={(event) => updateField("password", event.target.value)}
-                  placeholder="********"
-                  labelClassName="mb-2 block text-sm font-semibold text-white"
-                  inputClassName="w-full rounded-lg border border-slate-800 bg-slate-950 py-3 pl-4 pr-12 text-white placeholder-slate-500 focus:border-blue-500 focus:outline-none"
-                  required
-                  minLength={8}
-                  autoComplete="new-password"
+                <Controller
+                  name="password"
+                  control={control}
+                  render={({ field }) => (
+                    <>
+                      <AuthPasswordField
+                        id="signup-password"
+                        label="Password *"
+                        value={field.value}
+                        onChange={field.onChange}
+                        onBlur={field.onBlur}
+                        name={field.name}
+                        placeholder="Create a strong password"
+                        labelClassName="mb-2 block text-sm font-semibold text-white"
+                        inputClassName={`w-full rounded-lg border bg-slate-950 py-3 pl-4 pr-12 text-white placeholder-slate-500 focus:border-blue-500 focus:outline-none ${
+                          errors.password ? "border-red-500/70" : "border-slate-800"
+                        }`}
+                        autoComplete="new-password"
+                      />
+                      {errors.password ? (
+                        <p className="mt-2 text-sm text-red-500">
+                          {errors.password.message}
+                        </p>
+                      ) : null}
+                    </>
+                  )}
                 />
               </div>
 
               <div>
-                <AuthPasswordField
-                  label="Confirm Password *"
-                  value={formData.confirmPassword}
-                  onChange={(event) => updateField("confirmPassword", event.target.value)}
-                  placeholder="********"
-                  labelClassName="mb-2 block text-sm font-semibold text-white"
-                  inputClassName="w-full rounded-lg border border-slate-800 bg-slate-950 py-3 pl-4 pr-12 text-white placeholder-slate-500 focus:border-blue-500 focus:outline-none"
-                  required
-                  minLength={8}
-                  autoComplete="new-password"
+                <Controller
+                  name="confirmPassword"
+                  control={control}
+                  render={({ field }) => (
+                    <>
+                      <AuthPasswordField
+                        id="signup-confirm-password"
+                        label="Confirm Password *"
+                        value={field.value}
+                        onChange={field.onChange}
+                        onBlur={field.onBlur}
+                        name={field.name}
+                        placeholder="Repeat your password"
+                        labelClassName="mb-2 block text-sm font-semibold text-white"
+                        inputClassName={`w-full rounded-lg border bg-slate-950 py-3 pl-4 pr-12 text-white placeholder-slate-500 focus:border-blue-500 focus:outline-none ${
+                          errors.confirmPassword ? "border-red-500/70" : "border-slate-800"
+                        }`}
+                        autoComplete="new-password"
+                      />
+                      {errors.confirmPassword ? (
+                        <p className="mt-2 text-sm text-red-500">
+                          {errors.confirmPassword.message}
+                        </p>
+                      ) : null}
+                    </>
+                  )}
                 />
               </div>
             </div>
@@ -302,17 +380,18 @@ export function SignupPage() {
             </h2>
             <div className="grid gap-4 md:grid-cols-2">
               <div>
-                <label className="mb-2 block text-sm font-semibold text-white">
+                <label
+                  htmlFor="signup-domain"
+                  className="mb-2 block text-sm font-semibold text-white"
+                >
                   Innovation Domain
                 </label>
                 <div className="relative">
                   <GraduationCap className="absolute left-4 top-1/2 h-5 w-5 -translate-y-1/2 text-slate-400" />
                   <input
+                    id="signup-domain"
                     type="text"
-                    value={formData.domain}
-                    onChange={(event) =>
-                      updateField("domain", event.target.value)
-                    }
+                    {...register("domain")}
                     placeholder="AgriTech, AI, HealthTech"
                     className="w-full rounded-lg border border-slate-800 bg-slate-950 py-3 pl-12 pr-4 text-white placeholder-slate-500 focus:border-blue-500 focus:outline-none"
                   />
@@ -320,14 +399,17 @@ export function SignupPage() {
               </div>
 
               <div>
-                <label className="mb-2 block text-sm font-semibold text-white">
+                <label
+                  htmlFor="signup-bio"
+                  className="mb-2 block text-sm font-semibold text-white"
+                >
                   Short Bio
                 </label>
                 <div className="relative">
                   <NotebookPen className="absolute left-4 top-4 h-5 w-5 text-slate-400" />
                   <textarea
-                    value={formData.bio}
-                    onChange={(event) => updateField("bio", event.target.value)}
+                    id="signup-bio"
+                    {...register("bio")}
                     placeholder="Tell us what you are building or exploring"
                     className="min-h-[108px] w-full rounded-lg border border-slate-800 bg-slate-950 py-3 pl-12 pr-4 text-white placeholder-slate-500 focus:border-blue-500 focus:outline-none"
                   />
@@ -337,7 +419,10 @@ export function SignupPage() {
           </div>
 
           <div className="mb-6">
-            <label className="mb-2 block text-sm font-semibold text-white">
+            <label
+              htmlFor="signup-token"
+              className="mb-2 block text-sm font-semibold text-white"
+            >
               Institution Token <span className="text-red-400">*</span>
             </label>
             {isInviteFlow ? (
@@ -352,24 +437,41 @@ export function SignupPage() {
                 <div className="relative">
                   <Ticket className="absolute left-4 top-1/2 h-5 w-5 -translate-y-1/2 text-slate-400" />
                   <input
+                    id="signup-token"
                     type="text"
-                    value={formData.institutionToken}
-                    onChange={(event) =>
-                      updateField("institutionToken", event.target.value)
-                    }
+                    spellCheck={false}
+                    {...register("institutionToken")}
                     placeholder="SCH-AB12CD34"
-                    className="w-full rounded-lg border border-slate-800 bg-slate-950 py-3 pl-12 pr-4 text-white placeholder-slate-500 focus:border-blue-500 focus:outline-none"
-                    required
+                    className={`w-full rounded-lg border bg-slate-950 py-3 pl-12 pr-4 text-white placeholder-slate-500 focus:border-blue-500 focus:outline-none ${
+                      errors.institutionToken ? "border-red-500/70" : "border-slate-800"
+                    }`}
                   />
                 </div>
                 <p className="mt-2 text-xs text-slate-500">
                   Use the token issued from your school or college dashboard.
                 </p>
+                {errors.institutionToken ? (
+                  <p className="mt-2 text-sm text-red-500">
+                    {errors.institutionToken.message}
+                  </p>
+                ) : null}
               </>
             )}
-            <div className="mt-3 rounded-2xl border border-slate-800 bg-slate-950/70 p-4 text-sm text-slate-400">
-              Matching roster invites activate immediately. Students who only
-              have a token still move into the institution review queue.
+            <div
+              role="alert"
+              className="mt-3 grid grid-cols-[auto_1fr] gap-x-3 rounded-2xl border border-cyan-500/30 bg-cyan-500/10 px-4 py-3 text-cyan-50"
+            >
+              <Info className="mt-0.5 h-4 w-4" />
+              <div>
+                <div className="font-semibold text-cyan-50">
+                  How activation works
+                </div>
+                <p className="mt-1 text-sm text-cyan-100/90">
+                  Matching roster invites activate immediately. Students who
+                  only have a token still move into the institution review
+                  queue.
+                </p>
+              </div>
             </div>
           </div>
 
@@ -377,7 +479,7 @@ export function SignupPage() {
             <label className="flex cursor-pointer items-start gap-3">
               <input
                 type="checkbox"
-                required
+                {...register("termsAccepted")}
                 className="mt-1 h-4 w-4 rounded border-slate-700 bg-slate-950 text-blue-600 focus:ring-blue-500"
               />
               <span className="text-sm text-slate-400">
@@ -391,6 +493,11 @@ export function SignupPage() {
                 </span>
               </span>
             </label>
+            {errors.termsAccepted ? (
+              <p className="mt-2 text-sm text-red-500">
+                {errors.termsAccepted.message}
+              </p>
+            ) : null}
           </div>
 
           {error ? (

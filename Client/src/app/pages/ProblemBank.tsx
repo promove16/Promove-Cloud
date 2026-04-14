@@ -21,6 +21,7 @@ import {
 import { DashboardLayout } from "../components/DashboardLayout";
 import { problemBankApi } from "../../api/problemBank.api";
 import { workspaceApi } from "../../api/workspace.api";
+import { toast } from "../components/ui/sonner";
 import {
   PROBLEM_CATEGORIES,
   Problem,
@@ -220,6 +221,7 @@ export function ProblemBank() {
         );
 
         if (claimedWorkspace) {
+          toast.success("Workspace created successfully!");
           navigate(`/product-workspace/${claimedWorkspace._id}`);
           return;
         }
@@ -231,9 +233,12 @@ export function ProblemBank() {
       void queryClient.invalidateQueries({ queryKey: ["problems"] });
       void queryClient.invalidateQueries({ queryKey: ["workspaces"] });
       setFeedback("Problem started. Your team workspace is ready.");
+      toast.success("Workspace created successfully!");
       navigate(`/product-workspace/${workspace._id}`);
     } catch (error) {
-      setFeedback(getApiErrorMessage(error, "Unable to start this problem right now."));
+      const message = getApiErrorMessage(error, "Unable to start this problem right now.");
+      setFeedback(message);
+      toast.error(message);
     } finally {
       setStartingProblemId(null);
     }
@@ -308,7 +313,7 @@ export function ProblemBank() {
         <div className="flex flex-col gap-4 md:flex-row md:items-center md:justify-between">
           <div>
             <h1 className="mb-2 text-3xl font-bold text-white">Problem Bank</h1>
-            <p className="text-slate-400">
+            <p className="text-slate-100">
               Admin-curated challenges with leaderboard ranking and
               workspace-linked review.
             </p>
@@ -344,6 +349,16 @@ export function ProblemBank() {
                 onChange={(event) => setSearchValue(event.target.value)}
                 className="w-full rounded-lg border border-slate-800 bg-slate-950 py-3 pl-12 pr-4 text-white placeholder-slate-500 focus:border-blue-500 focus:outline-none"
               />
+              {searchValue ? (
+                <button
+                  type="button"
+                  onClick={() => setSearchValue("")}
+                  aria-label="Clear problem search"
+                  className="absolute right-3 top-1/2 inline-flex h-8 w-8 -translate-y-1/2 items-center justify-center rounded-full text-slate-400 transition hover:bg-slate-800 hover:text-white"
+                >
+                  <X className="h-4 w-4" />
+                </button>
+              ) : null}
             </div>
           </div>
         </div>

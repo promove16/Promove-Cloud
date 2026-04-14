@@ -1,8 +1,11 @@
 import { useAuthStore } from '../store/authStore';
 import { UserRole } from '../types/roles.types';
 import { roleRedirect } from '../utils/roleRedirect';
+import { useLocation } from 'react-router-dom';
+import { buildLoginRedirectPath } from '../utils/authRedirect';
 
 export const useProtectedRoute = (allowedRoles?: UserRole[]) => {
+  const location = useLocation();
   const { user, isAuthenticated, isLoading } = useAuthStore();
 
   if (isLoading) {
@@ -10,7 +13,15 @@ export const useProtectedRoute = (allowedRoles?: UserRole[]) => {
   }
 
   if (!isAuthenticated || !user) {
-    return { status: 'unauthorized' as const, redirectTo: '/login' };
+    const nextPath = `${location.pathname}${location.search}${location.hash}`;
+
+    return {
+      status: 'unauthorized' as const,
+      redirectTo: buildLoginRedirectPath({
+        next: nextPath,
+        intent: 'access_protected_page',
+      }),
+    };
   }
 
   if (allowedRoles && !allowedRoles.includes(user.role)) {

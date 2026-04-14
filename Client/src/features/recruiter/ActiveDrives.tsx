@@ -211,13 +211,20 @@ export default function ActiveDrives({ embedded = false }: ActiveDrivesProps) {
               placeholder="Drive description"
               className="min-h-32 rounded-lg border border-slate-800 bg-slate-950 px-4 py-3 text-white"
             />
-            <Button
-              onClick={() => createDriveMutation.mutate()}
-              disabled={createDriveMutation.isPending || !canCreateDrive}
-            >
-              <Plus className="mr-2 h-4 w-4" />
-              {createDriveMutation.isPending ? 'Creating...' : 'Create Drive'}
-            </Button>
+          </div>
+          <div className="sticky bottom-0 -mx-6 mt-6 border-t border-slate-800 bg-slate-900/95 px-6 py-4 backdrop-blur">
+            <div className="flex items-center justify-between gap-3">
+              <p className="text-sm text-slate-400">
+                Review the schedule and threshold, then create the drive.
+              </p>
+              <Button
+                onClick={() => createDriveMutation.mutate()}
+                disabled={createDriveMutation.isPending || !canCreateDrive}
+              >
+                <Plus className="mr-2 h-4 w-4" />
+                {createDriveMutation.isPending ? 'Creating...' : 'Create Drive'}
+              </Button>
+            </div>
           </div>
         </Card>
 

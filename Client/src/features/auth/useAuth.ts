@@ -92,7 +92,7 @@ export const useRegisterRequestMutation = () => {
 
 export const useLogoutMutation = () => {
   const accessToken = useAuthStore((state) => state.accessToken);
-  const clearAuth = useAuthStore((state) => state.clearAuth);
+  const logout = useAuthStore((state) => state.logout);
 
   return useMutation({
     mutationFn: async () => {
@@ -111,7 +111,7 @@ export const useLogoutMutation = () => {
       }
     },
     onSettled: () => {
-      clearAuth();
+      logout();
     },
   });
 };

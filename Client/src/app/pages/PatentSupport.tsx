@@ -739,6 +739,7 @@ export function PatentSupport() {
   const [answers, setAnswers] = useState<Record<QuestionKey, string>>(DEFAULT_ANSWERS);
   const [filing, setFiling] = useState<PatentFilingDocuments>(DEFAULT_FILING);
   const [viewPatent, setViewPatent] = useState<PatentSubmission | null>(null);
+  const [showFilingReadiness, setShowFilingReadiness] = useState(false);
 
   const fileInputRefs = useRef<Record<string, HTMLInputElement | null>>({});
   const categorySlotsRef = useRef(categorySlots);
@@ -1126,7 +1127,7 @@ export function PatentSupport() {
                 onClick={() => navigate(isStartupScoped && startupId ? getStartupSectionPath(startupId, 'overview') : '/product-workspace')}
                 className="rounded-lg bg-slate-800 px-4 py-2.5 text-sm font-semibold text-white transition hover:bg-slate-700"
               >
-                {isStartupScoped ? 'Open Startup Launch' : 'Open Product Workspace'}
+                {isStartupScoped ? 'Open Startup Launch' : 'Create Workspace'}
               </button>
             </div>
           </div>
@@ -1353,9 +1354,25 @@ export function PatentSupport() {
                 </div>
               </section>
 
-              <div className="hidden rounded-3xl border border-slate-800 bg-slate-900/90 p-5">
-                <div className="mb-4 text-xs uppercase tracking-[0.3em] text-cyan-300">Filing Readiness</div>
-                <div className="space-y-4">
+              <div className="rounded-3xl border border-slate-800 bg-slate-900/90 p-5">
+                <div className="mb-4 flex items-center justify-between gap-4">
+                  <div>
+                    <div className="text-xs uppercase tracking-[0.3em] text-cyan-300">Filing Readiness</div>
+                    <p className="mt-2 text-sm text-slate-400">
+                      Expand this only when you want to prepare the deeper filing notes beyond the intake questionnaire.
+                    </p>
+                  </div>
+                  <button
+                    type="button"
+                    onClick={() => setShowFilingReadiness((current) => !current)}
+                    className="inline-flex items-center gap-2 rounded-lg border border-slate-700 px-3 py-2 text-sm font-semibold text-slate-200 transition hover:border-cyan-400/40 hover:text-white"
+                  >
+                    {showFilingReadiness ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
+                    {showFilingReadiness ? 'Hide' : 'Show'}
+                  </button>
+                </div>
+                {showFilingReadiness ? (
+                  <div className="space-y-4">
                   <div>
                     <label className="mb-2 block text-sm font-semibold text-white">Invention category</label>
                     <select
@@ -1535,7 +1552,12 @@ export function PatentSupport() {
                       />
                     )}
                   </div>
-                </div>
+                  </div>
+                ) : (
+                  <div className="rounded-2xl border border-dashed border-slate-800 bg-slate-950/50 px-4 py-5 text-sm text-slate-400">
+                    Filing readiness details stay collapsed until you need them. The main intake form above is enough to submit a patent request.
+                  </div>
+                )}
               </div>
             </div>
 

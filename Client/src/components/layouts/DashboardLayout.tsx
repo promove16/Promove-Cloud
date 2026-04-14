@@ -84,8 +84,32 @@ const SIDEBAR_NOTIFICATION_PATHS: Record<SidebarNotificationSection, string[]> =
   messages: ['/dashboard/messages', '/dashboard/recruiter/messages'],
 };
 
-const matchesPath = (pathname: string, path: string, exact = false) =>
-  pathname === path || (!exact && pathname.startsWith(`${path}/`));
+const splitPathSegments = (value: string) =>
+  value
+    .replace(/\/+$/, '')
+    .split('/')
+    .filter(Boolean);
+
+const matchesPath = (pathname: string, path: string, exact = false) => {
+  const currentSegments = splitPathSegments(pathname);
+  const targetSegments = splitPathSegments(path);
+
+  if (targetSegments.length === 0) {
+    return currentSegments.length === 0;
+  }
+
+  if (exact) {
+    return (
+      currentSegments.length === targetSegments.length &&
+      targetSegments.every((segment, index) => currentSegments[index] === segment)
+    );
+  }
+
+  return (
+    currentSegments.length >= targetSegments.length &&
+    targetSegments.every((segment, index) => currentSegments[index] === segment)
+  );
+};
 
 const isSidebarPathActive = (
   pathname: string,
@@ -495,7 +519,6 @@ export function DashboardLayout({ children, role }: PropsWithChildren<DashboardL
 
   const handleLogout = async () => {
     await logoutMutation.mutateAsync();
-    navigate('/login', { replace: true });
   };
 
   const getNavNotificationText = (label: string) => {
@@ -657,9 +680,6 @@ export function DashboardLayout({ children, role }: PropsWithChildren<DashboardL
             <div className="dashboard-theme-border dashboard-theme-surface mt-8 rounded-3xl border p-5">
               <div className="text-xs uppercase tracking-[0.3em] text-cyan-700 dark:text-cyan-300">Active Role</div>
               <div className="dashboard-theme-text mt-3 text-xl font-semibold capitalize">{user.role}</div>
-              <p className="dashboard-theme-subtle mt-2 text-sm leading-6">
-                Role-aware access is controlled from a single sidebar config so navigation stays auditable.
-              </p>
             </div>
           </div>
         </aside>

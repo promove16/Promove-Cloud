@@ -5,6 +5,7 @@ import axios, {
 } from "axios";
 import { useAuthStore } from "../store/authStore";
 import { ApiSuccessResponse, AuthPayload } from "../types/auth.types";
+import { buildLoginRedirectPath } from "../utils/authRedirect";
 
 interface RetriableRequestConfig extends InternalAxiosRequestConfig {
   _retry?: boolean;
@@ -28,7 +29,14 @@ const normalizeApiUrl = (base: string | undefined, url: string | undefined) => {
 
 const redirectToLogin = () => {
   if (window.location.pathname !== "/login") {
-    window.location.assign("/login");
+    const nextPath = `${window.location.pathname}${window.location.search}${window.location.hash}`;
+    window.location.assign(
+      buildLoginRedirectPath({
+        message: "session_expired",
+        next: nextPath,
+        intent: "session_restore",
+      }),
+    );
   }
 };
 

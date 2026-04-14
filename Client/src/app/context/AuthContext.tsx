@@ -57,7 +57,7 @@ const roleHome: Record<string, string> = {
 
 export function AuthProvider({ children }: { children: ReactNode }) {
   useBootstrapAuth();
-  const { user: authUser, accessToken, isAuthenticated, isLoading, setAuth, clearAuth } =
+  const { user: authUser, accessToken, isAuthenticated, isLoading, setAuth, clearAuth, logout: logoutAndRedirect } =
     useAuthStore();
 
   const user = authUser
@@ -189,7 +189,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       // Clearing local state is enough for logout UX even if the token is already stale.
     } finally {
       disconnectAll();
-      clearAuth();
+      logoutAndRedirect();
     }
   };
 

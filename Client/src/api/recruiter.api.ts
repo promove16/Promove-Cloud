@@ -18,6 +18,137 @@ import {
   RecruiterTalentSummary,
 } from '../types/recruiter.types';
 
+const normalizeTalentSummary = (student: Partial<RecruiterTalentSummary>): RecruiterTalentSummary => ({
+  _id: student._id ?? '',
+  displayName: student.displayName ?? 'Student',
+  ...(student.avatar ? { avatar: student.avatar } : {}),
+  innovationScore: student.innovationScore ?? 0,
+  scoreBreakdown: {
+    problemsClaimed: student.scoreBreakdown?.problemsClaimed ?? 0,
+    skillsCompleted: student.scoreBreakdown?.skillsCompleted ?? 0,
+    progressUploads: student.scoreBreakdown?.progressUploads ?? 0,
+    patentsSubmitted: student.scoreBreakdown?.patentsSubmitted ?? 0,
+    patentsApproved: student.scoreBreakdown?.patentsApproved ?? 0,
+    mvpsVerified: student.scoreBreakdown?.mvpsVerified ?? 0,
+    marketReadyVerified: student.scoreBreakdown?.marketReadyVerified ?? 0,
+    startupsLaunched: student.scoreBreakdown?.startupsLaunched ?? 0,
+    awardsApproved: student.scoreBreakdown?.awardsApproved ?? 0,
+  },
+  skills: student.skills ?? [],
+  ...(student.institution
+    ? {
+        institution: {
+          _id: student.institution._id ?? '',
+          name: student.institution.name ?? 'Institution',
+          location: student.institution.location ?? '',
+          ...(student.institution.academicYear ? { academicYear: student.institution.academicYear } : {}),
+          ...(typeof student.institution.iicStarRating === 'number'
+            ? { iicStarRating: student.institution.iicStarRating }
+            : {}),
+        },
+      }
+    : {}),
+  ...(student.activeProject
+    ? {
+        activeProject: {
+          title: student.activeProject.title ?? 'Active project',
+          category: student.activeProject.category ?? 'General',
+          stage: student.activeProject.stage ?? 'In progress',
+          progressPercent: student.activeProject.progressPercent ?? 0,
+        },
+      }
+    : {}),
+  canContact: student.canContact ?? false,
+  ...(student.bridgeType ? { bridgeType: student.bridgeType } : {}),
+  ...(student.contactEmail ? { contactEmail: student.contactEmail } : {}),
+  createdAt: student.createdAt ?? new Date(0).toISOString(),
+});
+
+const normalizeListResponse = <T>(response: Partial<RecruiterListResponse<T>> | undefined, mapItem: (item: T) => T) => ({
+  items: (response?.items ?? []).map((item) => mapItem(item)),
+  page: response?.page ?? 1,
+  limit: response?.limit ?? ((response?.items?.length ?? 0) || 20),
+  total: response?.total ?? response?.items?.length ?? 0,
+  nextPage: response?.nextPage ?? null,
+});
+
+const normalizeJobDetail = (job: Partial<RecruiterJobDetail>): RecruiterJobDetail => ({
+  _id: job._id ?? '',
+  recruiterId: job.recruiterId ?? '',
+  title: job.title ?? 'Untitled role',
+  company: job.company ?? 'Recruiter',
+  description: job.description ?? '',
+  domain: job.domain ?? 'General',
+  minimumInnovationScore: job.minimumInnovationScore ?? 0,
+  type: job.type ?? 'Full-time',
+  location: job.location ?? 'Remote',
+  ...(job.workMode ? { workMode: job.workMode } : {}),
+  ...(job.salaryExpectation ? { salaryExpectation: job.salaryExpectation } : {}),
+  ...(job.experienceLevel ? { experienceLevel: job.experienceLevel } : {}),
+  ...(typeof job.openings === 'number' ? { openings: job.openings } : {}),
+  ...(job.companyOverview ? { companyOverview: job.companyOverview } : {}),
+  ...(job.roleSummary ? { roleSummary: job.roleSummary } : {}),
+  keyResponsibilities: job.keyResponsibilities ?? [],
+  requirements: job.requirements ?? [],
+  benefits: job.benefits ?? [],
+  applicationSteps: job.applicationSteps ?? [],
+  isActive: job.isActive ?? false,
+  applicantCount: job.applicantCount ?? job.applicantIds?.length ?? 0,
+  shortlistedCount: job.shortlistedCount ?? job.shortlistedIds?.length ?? 0,
+  ...(typeof job.hasApplied === 'boolean' ? { hasApplied: job.hasApplied } : {}),
+  ...(job.applicationStage ? { applicationStage: job.applicationStage } : {}),
+  ...(job.applicationSource ? { applicationSource: job.applicationSource } : {}),
+  ...(job.applicationUpdatedAt ? { applicationUpdatedAt: job.applicationUpdatedAt } : {}),
+  createdAt: job.createdAt ?? new Date(0).toISOString(),
+  ...(job.expiresAt ? { expiresAt: job.expiresAt } : {}),
+  applicantIds: job.applicantIds ?? [],
+  shortlistedIds: job.shortlistedIds ?? [],
+});
+
+const normalizeDriveView = (drive: Partial<RecruiterDriveView>): RecruiterDriveView => ({
+  _id: drive._id ?? '',
+  recruiterId: drive.recruiterId ?? '',
+  collegeId: drive.collegeId ?? '',
+  collegeName: drive.collegeName ?? 'College',
+  title: drive.title ?? 'Recruitment drive',
+  description: drive.description ?? '',
+  type: drive.type ?? 'Placement Drive',
+  scheduledAt: drive.scheduledAt ?? new Date(0).toISOString(),
+  minimumInnovationScore: drive.minimumInnovationScore ?? 0,
+  registeredStudents: drive.registeredStudents ?? [],
+  isActive: drive.isActive ?? false,
+  createdAt: drive.createdAt ?? new Date(0).toISOString(),
+});
+
+const normalizeHiringEventView = (event: Partial<RecruiterHiringEventView>): RecruiterHiringEventView => ({
+  _id: event._id ?? '',
+  title: event.title ?? 'Hiring event',
+  type: event.type ?? 'Hiring event',
+  category: 'hiring',
+  description: event.description ?? '',
+  scheduledAt: event.scheduledAt ?? new Date(0).toISOString(),
+  isActive: event.isActive ?? false,
+  institutionId: event.institutionId ?? '',
+  collegeName: event.collegeName ?? 'College',
+  recruiterId: event.recruiterId ?? '',
+  ...(event.linkedJobId ? { linkedJobId: event.linkedJobId } : {}),
+  minimumInnovationScore: event.minimumInnovationScore ?? 0,
+  participantsCount: event.participantsCount ?? event.participants?.length ?? 0,
+  participants: event.participants ?? [],
+  ...(event.rankingsComputedAt ? { rankingsComputedAt: event.rankingsComputedAt } : {}),
+  rankings: event.rankings ?? [],
+});
+
+const normalizeCollegeCard = (college: Partial<RecruiterCollegeCard>): RecruiterCollegeCard => ({
+  _id: college._id ?? '',
+  displayName: college.displayName ?? 'College',
+  location: college.location ?? '',
+  studentCount: college.studentCount ?? 0,
+  placementVelocity: college.placementVelocity ?? 0,
+  iicStarRating: college.iicStarRating ?? 0,
+  focusLabel: college.focusLabel ?? 'Innovation',
+});
+
 export const recruiterApi = {
   async getDashboard() {
     const response = await api.get<ApiSuccessResponse<RecruiterDashboardData>>('/api/recruiter/dashboard');
@@ -36,7 +167,7 @@ export const recruiterApi = {
       '/api/recruiter/talent',
       { params },
     );
-    return response.data.data;
+    return normalizeListResponse(response.data.data, normalizeTalentSummary);
   },
   async discoverTalent(params?: {
     minScore?: number;
@@ -51,7 +182,7 @@ export const recruiterApi = {
       '/api/recruiter/talent/search',
       { params },
     );
-    return response.data.data;
+    return normalizeListResponse(response.data.data, normalizeTalentSummary);
   },
   async getTalentProfile(studentId: string) {
     const response = await api.get<ApiSuccessResponse<RecruiterTalentProfile>>(
@@ -73,7 +204,7 @@ export const recruiterApi = {
   },
   async getJobs() {
     const response = await api.get<ApiSuccessResponse<RecruiterJobDetail[]>>('/api/recruiter/jobs');
-    return response.data.data;
+    return (response.data.data ?? []).map((job) => normalizeJobDetail(job));
   },
   async getPublicJobs(recruiterId: string) {
     const response = await api.get<ApiSuccessResponse<RecruiterJobView[]>>(
@@ -181,11 +312,11 @@ export const recruiterApi = {
   },
   async getDrives() {
     const response = await api.get<ApiSuccessResponse<RecruiterDriveView[]>>('/api/recruiter/drives');
-    return response.data.data;
+    return (response.data.data ?? []).map((drive) => normalizeDriveView(drive));
   },
   async getHiringEvents() {
     const response = await api.get<ApiSuccessResponse<RecruiterHiringEventView[]>>('/api/events/hiring');
-    return response.data.data;
+    return (response.data.data ?? []).map((event) => normalizeHiringEventView(event));
   },
   async createHiringEvent(payload: {
     title: string;
@@ -245,11 +376,11 @@ export const recruiterApi = {
   },
   async getColleges() {
     const response = await api.get<ApiSuccessResponse<RecruiterCollegeCard[]>>('/api/recruiter/colleges');
-    return response.data.data;
+    return (response.data.data ?? []).map((college) => normalizeCollegeCard(college));
   },
   async getLinkedColleges() {
     const response = await api.get<ApiSuccessResponse<RecruiterCollegeCard[]>>('/api/recruiter/colleges/linked');
-    return response.data.data;
+    return (response.data.data ?? []).map((college) => normalizeCollegeCard(college));
   },
   async getOnboarding() {
     const response = await api.get<ApiSuccessResponse<RecruiterPlacementRow[]>>('/api/recruiter/onboarding');

@@ -489,7 +489,7 @@ export const router = createBrowserRouter([
     children: [
       {
         path: "/students/:profileSlug",
-        element: <LazyPage component={Portfolio} />,
+        element: <LazyPage component={PublicStudentProfilePage} />,
       },
       {
         element: <PublicOnlyRoute />,

@@ -1,4 +1,5 @@
 import { useDeferredValue, useMemo, useState } from "react";
+import { isAxiosError } from "axios";
 import { useNavigate, useSearchParams } from "react-router-dom";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import {
@@ -7,12 +8,14 @@ import {
   Building2,
   CalendarDays,
   Eye,
+  Loader2,
   Mail,
   Search,
   ShieldCheck,
   Users,
   X,
 } from "lucide-react";
+import { toast as appToast } from "../../app/components/ui/sonner";
 import { recruiterApi } from "../../api/recruiter.api";
 import { requestApi } from "../../api/request.api";
 import { getStudentPortfolioViewPath } from "../marketplace/navigation";
@@ -170,7 +173,7 @@ const getStudentTags = (student: RecruiterTalentSummary) => [
 const surfaceClass =
   "border border-slate-800/80 bg-slate-900/55 shadow-[0_18px_40px_rgba(2,6,23,0.35)]";
 const secondaryButtonClass =
-  "inline-flex items-center gap-2 rounded-full border border-slate-700 bg-slate-900/80 px-4 py-2 text-sm font-medium text-slate-100 transition hover:border-cyan-400/50 hover:bg-slate-800/90 hover:text-white";
+  "inline-flex items-center gap-2 rounded-full border border-slate-700 bg-slate-900/80 px-4 py-2 text-sm font-medium text-slate-100 transition hover:border-cyan-400/50 hover:bg-slate-800/90 hover:text-white disabled:cursor-not-allowed disabled:border-slate-800 disabled:bg-slate-900/30 disabled:text-slate-500";
 const primaryButtonClass =
   "inline-flex items-center gap-2 rounded-full bg-cyan-400 px-4 py-2 text-sm font-semibold text-slate-950 transition hover:bg-cyan-300 disabled:cursor-wait disabled:opacity-60";
 const subtleTagClass =
@@ -236,6 +239,13 @@ function RecruiterStudentCard({
   onViewProfile: (studentId: string) => void;
 }) {
   const tags = getStudentTags(student).filter(Boolean).slice(0, 4);
+  const skillCount = student.skills?.length ?? 0;
+  const visibleSkills = (student.skills ?? []).slice(0, 6);
+  const remainingSkillCount = Math.max(skillCount - visibleSkills.length, 0);
+  const inviteTitle =
+    activeJobCount > 0
+      ? undefined
+      : "No active jobs yet. Open the invite flow to create or reopen one.";
   const projectSummary = student.activeProject
     ? `${student.activeProject.stage} / ${student.activeProject.progressPercent}% progress`
     : "Profile available for discovery";
@@ -288,10 +298,26 @@ function RecruiterStudentCard({
             </div>
           ) : null}
 
+          {visibleSkills.length > 0 ? (
+            <div className="space-y-2">
+              <div className="text-xs uppercase tracking-[0.2em] text-slate-500">Skill snapshot</div>
+              <div className="flex flex-wrap gap-2">
+                {visibleSkills.map((skill) => (
+                  <span key={`${student._id}-skill-${skill}`} className={subtleTagClass}>
+                    {skill}
+                  </span>
+                ))}
+                {remainingSkillCount > 0 ? (
+                  <span className={subtleTagClass}>+{remainingSkillCount} more</span>
+                ) : null}
+              </div>
+            </div>
+          ) : null}
+
           <dl className="flex flex-wrap gap-x-6 gap-y-2 text-sm">
             <div className="flex items-baseline gap-2">
               <dt className="text-slate-400">Skills</dt>
-              <dd className="font-medium text-white">{student.skills.length}</dd>
+              <dd className="font-medium text-white">{skillCount}</dd>
             </div>
             <div className="flex items-baseline gap-2">
               <dt className="text-slate-400">Institution</dt>
@@ -318,32 +344,29 @@ function RecruiterStudentCard({
             onClick={() => onInvite(student._id)}
             disabled={invitingStudentId === student._id}
             className={primaryButtonClass}
+            title={inviteTitle}
           >
             <BriefcaseBusiness className="h-4 w-4" />
-            {invitingStudentId === student._id
-              ? "Inviting..."
-              : activeJobCount > 0
-              ? "Invite to Job"
-              : "Create job to invite"}
+            {invitingStudentId === student._id ? "Inviting..." : "Invite to Job"}
           </button>
-          {student.canContact ? (
-            <button
-              onClick={() => onMessage(student._id)}
-              className={secondaryButtonClass}
-            >
-              <Mail className="h-4 w-4" />
-              Message
-            </button>
-          ) : (
-            <button
-              onClick={() => onShortlist(student._id)}
-              disabled={shortlistingId === student._id}
-              className={primaryButtonClass}
-            >
-              <ShieldCheck className="h-4 w-4" />
-              {shortlistingId === student._id ? "Shortlisting..." : "Shortlist"}
-            </button>
-          )}
+          <button
+            onClick={() => onMessage(student._id)}
+            disabled={!student.canContact}
+            className={secondaryButtonClass}
+            title={!student.canContact ? "Shortlist this student to unlock messaging." : undefined}
+          >
+            <Mail className="h-4 w-4" />
+            Message
+          </button>
+          <button
+            onClick={() => onShortlist(student._id)}
+            disabled={student.canContact || shortlistingId === student._id}
+            className={secondaryButtonClass}
+            title={student.canContact ? "Messaging is already unlocked for this student." : undefined}
+          >
+            <ShieldCheck className="h-4 w-4" />
+            {shortlistingId === student._id ? "Shortlisting..." : "Shortlist"}
+          </button>
         </div>
       </div>
     </article>
@@ -353,20 +376,24 @@ function RecruiterStudentCard({
 function InviteStudentModal({
   activeJobs,
   inviteNote,
+  isLoadingJobs,
   isSubmitting,
   onClose,
   onNoteChange,
   onInvite,
   onGoToRecruiterHome,
 }: {
-  activeJobs: RecruiterJobDetail[];
+  activeJobs?: RecruiterJobDetail[];
   inviteNote: string;
+  isLoadingJobs: boolean;
   isSubmitting: boolean;
   onClose: () => void;
   onNoteChange: (value: string) => void;
   onInvite: (jobId: string) => void;
   onGoToRecruiterHome: () => void;
 }) {
+  const safeActiveJobs = activeJobs ?? [];
+
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-950/75 px-4 backdrop-blur-sm">
       <div className="w-full max-w-3xl rounded-3xl border border-slate-800 bg-slate-950 shadow-2xl shadow-black/40">
@@ -401,9 +428,14 @@ function InviteStudentModal({
             />
           </div>
 
-          {activeJobs.length > 0 ? (
+          {isLoadingJobs ? (
+            <div className="flex items-center gap-3 rounded-2xl border border-slate-800 bg-slate-900/60 px-4 py-5 text-sm text-slate-300">
+              <Loader2 className="h-4 w-4 animate-spin text-cyan-300" />
+              Loading active jobs...
+            </div>
+          ) : safeActiveJobs.length > 0 ? (
             <div className="space-y-3">
-              {activeJobs.map((job) => (
+              {safeActiveJobs.map((job) => (
                 <div
                   key={job._id}
                   className="flex flex-col gap-4 rounded-2xl border border-slate-800 bg-slate-900/60 p-4 lg:flex-row lg:items-center lg:justify-between"
@@ -469,6 +501,7 @@ function PlanHiringEventModal({
   onClose: () => void;
   onSubmit: () => void;
 }) {
+  const safeActiveJobs = activeJobs ?? [];
   const canSubmit =
     Boolean(form.collegeId) &&
     Boolean(form.title.trim()) &&
@@ -542,7 +575,7 @@ function PlanHiringEventModal({
               className="w-full rounded-2xl border border-slate-800 bg-slate-900 px-4 py-3 text-sm text-white outline-none transition focus:border-cyan-400/50"
             >
               <option value="">Link later</option>
-              {activeJobs.map((job) => (
+              {safeActiveJobs.map((job) => (
                 <option key={job._id} value={job._id}>
                   {job.title} / {job.company}
                 </option>
@@ -798,14 +831,16 @@ export function RecruiterMarketplace({ dashboardRole: _dashboardRole }: { dashbo
         inviteNote.trim() ? { note: inviteNote.trim() } : undefined,
       ),
     onSuccess: async (result, jobId) => {
+      const message = result.alreadyInvited
+        ? "This student is already in that hiring pipeline."
+        : result.alreadyApplied
+          ? "The student already applied. The hiring bridge is now ready for follow-up."
+          : "Invite sent. The student now has an application entry in their hiring flow.";
       setInviteFeedback({
         tone: "success",
-        message: result.alreadyInvited
-          ? "This student is already in that hiring pipeline."
-          : result.alreadyApplied
-          ? "The student already applied. The hiring bridge is now ready for follow-up."
-          : "Invite sent. The student now has an application entry in their hiring flow.",
+        message,
       });
+      appToast.success(message);
       const studentId = inviteStudentId;
       setInviteStudentId(null);
       setInviteNote("");
@@ -820,10 +855,16 @@ export function RecruiterMarketplace({ dashboardRole: _dashboardRole }: { dashbo
       }
     },
     onError: (error) => {
+      const message = isAxiosError<{ error?: { message?: string } }>(error)
+        ? error.response?.data?.error?.message ?? "Unable to invite this student right now."
+        : error instanceof Error
+          ? error.message
+          : "Unable to invite this student right now.";
       setInviteFeedback({
         tone: "error",
-        message: error instanceof Error ? error.message : "Unable to invite this student right now.",
+        message,
       });
+      appToast.error(message);
     },
   });
   const planEventMutation = useMutation({
@@ -854,10 +895,12 @@ export function RecruiterMarketplace({ dashboardRole: _dashboardRole }: { dashbo
         declineRedirect: "/dashboard/invitations",
       }),
     onSuccess: async (request) => {
+      const message = `Approval request sent to ${eventPlanForm.collegeName}. The event workspace will open once the college accepts.`;
       setEventPlanFeedback({
         tone: "success",
-        message: `Approval request sent to ${eventPlanForm.collegeName}. The event workspace will open once the college accepts.`,
+        message,
       });
+      appToast.success(message);
       setEventPlanForm(createInitialHiringEventPlan());
       await Promise.all([
         queryClient.invalidateQueries({ queryKey: ["requests", "outgoing"] }),
@@ -866,10 +909,12 @@ export function RecruiterMarketplace({ dashboardRole: _dashboardRole }: { dashbo
       navigate(`/dashboard/invitations?requestId=${request._id}`);
     },
     onError: (error) => {
+      const message = error instanceof Error ? error.message : "Unable to send the hiring event request right now.";
       setEventPlanFeedback({
         tone: "error",
-        message: error instanceof Error ? error.message : "Unable to send the hiring event request right now.",
+        message,
       });
+      appToast.error(message);
     },
   });
 
@@ -896,6 +941,9 @@ export function RecruiterMarketplace({ dashboardRole: _dashboardRole }: { dashbo
     try {
       await recruiterApi.shortlistStudent(studentId);
       await studentsQuery.refetch();
+      appToast.success("Student shortlisted.");
+    } catch (error) {
+      appToast.error(error instanceof Error ? error.message : "Unable to shortlist this student right now.");
     } finally {
       setShortlistingId(null);
     }
@@ -907,6 +955,11 @@ export function RecruiterMarketplace({ dashboardRole: _dashboardRole }: { dashbo
     );
 
   const openInviteModal = (studentId: string) => {
+    if (jobsQuery.isError) {
+      appToast.error("Recruiter jobs could not be loaded. Refresh and try again.");
+      return;
+    }
+
     setInviteFeedback(null);
     setInviteStudentId(studentId);
   };
@@ -1103,8 +1156,32 @@ export function RecruiterMarketplace({ dashboardRole: _dashboardRole }: { dashbo
 
           {!isLoading && !isError && totalCount === 0 ? (
             <div className="px-4 py-10 sm:px-6">
-              <div className="text-sm font-medium text-white">No matches found</div>
-              <p className="mt-1 text-sm text-slate-300">Try another search or switch directory.</p>
+              <div className="rounded-2xl border border-dashed border-slate-800 bg-slate-950/60 px-5 py-6">
+                <div className="text-sm font-medium text-white">
+                  {lane === "students" ? "No talent found" : "No colleges found"}
+                </div>
+                <p className="mt-2 text-sm leading-6 text-slate-300">
+                  {lane === "students"
+                    ? "Try another student, domain, or institution search. You can also reset the current filters and review the full talent pool again."
+                    : "Try another college or location search, or switch back to the student directory."}
+                </p>
+                <div className="mt-4 flex flex-wrap gap-3">
+                  <button
+                    type="button"
+                    onClick={() => setSearchParams(buildSearchParams({ lane }))}
+                    className="rounded-full border border-slate-700 bg-slate-900/80 px-4 py-2 text-sm font-medium text-slate-100 transition hover:border-cyan-400/50 hover:bg-slate-800/90 hover:text-white"
+                  >
+                    Reset search
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => handleLaneChange(lane === "students" ? "colleges" : "students")}
+                    className="rounded-full border border-cyan-400/30 bg-cyan-400/10 px-4 py-2 text-sm font-medium text-cyan-100 transition hover:border-cyan-300/50 hover:bg-cyan-400/15"
+                  >
+                    Switch directory
+                  </button>
+                </div>
+              </div>
             </div>
           ) : null}
 
@@ -1145,6 +1222,7 @@ export function RecruiterMarketplace({ dashboardRole: _dashboardRole }: { dashbo
         <InviteStudentModal
           activeJobs={activeJobs}
           inviteNote={inviteNote}
+          isLoadingJobs={jobsQuery.isLoading}
           isSubmitting={inviteMutation.isPending}
           onClose={() => {
             if (inviteMutation.isPending) return;

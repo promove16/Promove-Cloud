@@ -166,6 +166,23 @@ const workflowStatusLabel: Record<WorkflowStepStatus, string> = {
   optional: "Optional",
 };
 
+const getStartupStageFromWorkspaceStage = (
+  stage: string | undefined,
+): StartupPayload["stage"] => {
+  switch (stage) {
+    case "Launch":
+      return "Launched";
+    case "Patent":
+      return "Pre-Launch";
+    case "Build":
+      return "MVP";
+    case "Problem":
+    case "Ideation":
+    default:
+      return "Ideation";
+  }
+};
+
 export function StartupLaunch() {
   const maxPitchDeckSizeBytes = 10 * 1024 * 1024;
   const maxIprUploadSizeBytes = STARTUP_IPR_UPLOAD_MAX_BYTES;
@@ -233,6 +250,10 @@ export function StartupLaunch() {
   });
   const startup = startupQuery.data;
   const workspaces = workspaceQuery.data ?? [];
+  const problemWorkspaces = useMemo(
+    () => workspaces.filter((workspace) => Boolean(workspace.claimedProblemId)),
+    [workspaces],
+  );
   const selectedWorkspaceId = startup?.projectId ?? form.projectId ?? "";
   const activeWorkspace =
     workspaces.find((workspace) => workspace._id === selectedWorkspaceId) ??
@@ -517,6 +538,40 @@ export function StartupLaunch() {
         [key]: value,
       },
     }));
+  };
+  const importSelectedWorkspace = () => {
+    const workspace = problemWorkspaces.find(
+      (item) => item._id === selectedWorkspaceId,
+    );
+
+    if (!workspace) {
+      setToast("Select a problem workspace to import first.");
+      return;
+    }
+
+    setForm((current) => ({
+      ...current,
+      projectId: workspace._id,
+      name: current.name.trim() ? current.name : workspace.title,
+      category: current.category.trim() ? current.category : workspace.category,
+      stage:
+        current.stage !== "Pre-Idea"
+          ? current.stage
+          : getStartupStageFromWorkspaceStage(workspace.stage),
+      teamSize:
+        workspace.teamMembers?.length ??
+        workspace.teamMemberIds?.length ??
+        current.teamSize,
+      businessProfile: {
+        ...current.businessProfile,
+        problemStatement:
+          current.businessProfile.problemStatement.trim() ||
+          `Promoted from the problem workspace "${workspace.title}". Refine this into a startup-grade problem statement before submitting for review.`,
+      },
+    }));
+    setToast(
+      `Imported ${workspace.title}. Review the startup story before saving.`,
+    );
   };
 
   // Re-validate on change once user has tried submitting
@@ -1037,6 +1092,95 @@ export function StartupLaunch() {
         >
           {toast}
         </div>
+      ) : null}
+
+      {isNew ? (
+        <section className={sectionClassName}>
+          <div className="flex flex-col gap-4 lg:flex-row lg:items-end lg:justify-between">
+            <div>
+              <div className="text-xs font-semibold uppercase tracking-[0.24em] text-cyan-300">
+                Promote from Problem Workspace
+              </div>
+              <h2 className="mt-2 text-xl font-semibold text-white">
+                Bring an existing problem solution into startup launch
+              </h2>
+              <p className="mt-2 max-w-3xl text-sm text-slate-400">
+                Optional. Pick a problem workspace if this startup should build on a solved challenge instead of starting from scratch.
+              </p>
+            </div>
+            {problemWorkspaces.length > 0 ? (
+              <button
+                type="button"
+                onClick={importSelectedWorkspace}
+                disabled={!selectedWorkspaceId}
+                className="inline-flex items-center gap-2 border border-cyan-500/30 bg-cyan-500/10 px-4 py-3 text-sm font-semibold text-cyan-50 transition hover:border-cyan-400/50 hover:bg-cyan-500/15 disabled:cursor-not-allowed disabled:opacity-50"
+              >
+                <FolderKanban className="h-4 w-4" />
+                Import from Workspace
+              </button>
+            ) : null}
+          </div>
+
+          {problemWorkspaces.length > 0 ? (
+            <div className="mt-5 grid gap-4 lg:grid-cols-[minmax(0,1fr)_320px]">
+              <label className="block">
+                <span className="mb-2 block text-sm font-semibold text-white">
+                  Problem workspace
+                </span>
+                <select
+                  value={selectedWorkspaceId}
+                  onChange={(event) =>
+                    setForm((current) => ({
+                      ...current,
+                      projectId: event.target.value || undefined,
+                    }))
+                  }
+                  className={fieldOkClassName}
+                >
+                  <option value="">Select a solved problem workspace</option>
+                  {problemWorkspaces.map((workspace) => (
+                    <option key={workspace._id} value={workspace._id}>
+                      {workspace.title} · {workspace.category} · {workspace.progressPercent}% complete
+                    </option>
+                  ))}
+                </select>
+                <span className="mt-2 block text-xs text-slate-500">
+                  This links the startup draft to the workspace and syncs the team size on save.
+                </span>
+              </label>
+
+              <div className="border border-slate-800/70 bg-slate-950/50 px-4 py-4">
+                <div className="text-xs font-semibold uppercase tracking-[0.22em] text-slate-500">
+                  Imported context
+                </div>
+                <div className="mt-3 text-sm text-slate-300">
+                  {activeWorkspace ? (
+                    <>
+                      <div className="font-semibold text-white">
+                        {activeWorkspace.title}
+                      </div>
+                      <div className="mt-1">
+                        {activeWorkspace.category} · {activeWorkspace.stage}
+                      </div>
+                      <div className="mt-1 text-slate-400">
+                        {(activeWorkspace.teamMembers?.length ??
+                          activeWorkspace.teamMemberIds?.length ??
+                          0)}{" "}
+                        team members available to sync
+                      </div>
+                    </>
+                  ) : (
+                    "Choose a problem workspace to preview the linked startup context."
+                  )}
+                </div>
+              </div>
+            </div>
+          ) : (
+            <div className="mt-5 rounded-2xl border border-dashed border-slate-800 px-4 py-5 text-sm text-slate-400">
+              No problem workspaces are ready to promote yet. You can still create the startup draft manually.
+            </div>
+          )}
+        </section>
       ) : null}
 
       {!isNew ? (

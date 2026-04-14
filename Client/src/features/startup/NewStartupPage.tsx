@@ -18,6 +18,10 @@ export function NewStartupPage() {
           All Startups
         </button>
 
+        <div className="rounded-2xl border border-cyan-500/20 bg-cyan-500/10 px-5 py-4 text-sm text-cyan-50">
+          Promote a claimed Problem Bank workspace into this startup draft from the intake below, or leave it blank and start a fresh launch profile.
+        </div>
+
         <StartupLaunch />
       </div>
     </DashboardLayout>

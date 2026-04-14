@@ -111,6 +111,7 @@ export const SIDEBAR_CONFIG: Record<UserRole, DashboardNavItem[]> = {
     { kind: 'link', label: 'Marketplace', icon: Globe, path: getMarketplaceBasePath(UserRole.RECRUITER) },
     { kind: 'link', label: 'Drive', icon: BarChart3, path: '/dashboard/recruiter/drives' },
     { kind: 'link', label: 'Messages', icon: MessageCircle, path: '/dashboard/messages' },
+    { kind: 'link', label: 'Profile', icon: User, path: '/dashboard/profile' },
     { kind: 'action', label: 'Logout', icon: LogOut, action: 'logout' },
   ],
   [UserRole.ADMIN]: [

@@ -48,6 +48,11 @@ export function StudentProfileDrawer({
   }
 
   const profile = profileQuery.data;
+  const profileSkills = profile?.skills ?? [];
+  const scoreTimeline = profile?.scoreTimeline ?? [];
+  const workspaces = profile?.workspaces ?? [];
+  const patents = profile?.patents ?? [];
+  const startups = profile?.startups ?? [];
 
   const handleMessage = () => {
     if (!studentId) return;
@@ -94,7 +99,7 @@ export function StudentProfileDrawer({
                     {profile.canContact ? <Badge>Can contact</Badge> : <Badge className="border-slate-700 bg-slate-800 text-slate-300">Locked</Badge>}
                   </div>
                   <p className="mt-1 text-slate-400">
-                    {profile.institution?.name ?? 'Independent'} - {profile.skills.join(' - ') || 'General innovation'}
+                    {profile.institution?.name ?? 'Independent'} - {profileSkills.join(' - ') || 'General innovation'}
                   </p>
                 </div>
               </div>
@@ -124,8 +129,8 @@ export function StudentProfileDrawer({
               <Card className="p-5">
                 <div className="mb-3 text-sm uppercase tracking-[0.25em] text-slate-500">Journey</div>
                 <div className="space-y-3">
-                  {profile.scoreTimeline.length > 0 ? (
-                    profile.scoreTimeline.map((event) => (
+                  {scoreTimeline.length > 0 ? (
+                    scoreTimeline.map((event) => (
                       <div key={event._id} className="rounded-2xl border border-slate-800 bg-slate-950 p-4">
                         <div className="flex items-center justify-between gap-3">
                           <div className="font-semibold text-white">{event.trigger.replace(/_/g, ' ')}</div>
@@ -168,8 +173,8 @@ export function StudentProfileDrawer({
               <Card className="p-5">
                 <div className="mb-3 text-sm uppercase tracking-[0.25em] text-slate-500">Workspaces</div>
                 <div className="space-y-3">
-                  {profile.workspaces.length > 0 ? (
-                    profile.workspaces.map((workspace) => (
+                  {workspaces.length > 0 ? (
+                    workspaces.map((workspace) => (
                       <div key={workspace._id} className="rounded-2xl border border-slate-800 bg-slate-950 p-4">
                         <div className="font-semibold text-white">{workspace.title}</div>
                         <div className="mt-1 text-sm text-slate-400">
@@ -189,8 +194,8 @@ export function StudentProfileDrawer({
                   <div>
                     <div className="mb-2 text-xs uppercase tracking-[0.25em] text-slate-500">Patents</div>
                     <div className="space-y-2">
-                      {profile.patents.length > 0 ? (
-                        profile.patents.map((patent) => (
+                      {patents.length > 0 ? (
+                        patents.map((patent) => (
                           <div key={patent._id} className="rounded-2xl border border-slate-800 bg-slate-950 p-4">
                             <div className="font-semibold text-white">{patent.projectTitle}</div>
                             <div className="mt-1 text-sm text-slate-400">{patent.status}</div>
@@ -204,8 +209,8 @@ export function StudentProfileDrawer({
                   <div>
                     <div className="mb-2 text-xs uppercase tracking-[0.25em] text-slate-500">Startups</div>
                     <div className="space-y-2">
-                      {profile.startups.length > 0 ? (
-                        profile.startups.map((startup) => (
+                      {startups.length > 0 ? (
+                        startups.map((startup) => (
                           <div key={startup._id} className="rounded-2xl border border-slate-800 bg-slate-950 p-4">
                             <div className="font-semibold text-white">{startup.name}</div>
                             <div className="mt-1 text-sm text-slate-400">
@@ -224,22 +229,37 @@ export function StudentProfileDrawer({
 
             <div className="flex flex-wrap items-center justify-end gap-3 border-t border-slate-800 pt-4">
               {onInviteToJob ? (
-                <Button data-testid="invite-job-btn" onClick={handleInvite}>
+                <Button
+                  data-testid="invite-job-btn"
+                  onClick={handleInvite}
+                  title={
+                    activeJobCount > 0
+                      ? undefined
+                      : 'No active jobs yet. Open the invite flow to create or reopen one.'
+                  }
+                >
                   <BriefcaseBusiness className="mr-2 h-4 w-4" />
-                  {activeJobCount > 0 ? 'Invite to Job' : 'Create job to invite'}
+                  Invite to Job
                 </Button>
               ) : null}
-              {profile.canContact ? (
-                <Button data-testid="message-btn" onClick={handleMessage} variant={onInviteToJob ? 'secondary' : 'primary'}>
-                  <Mail className="mr-2 h-4 w-4" />
-                  Message
-                </Button>
-              ) : (
-                <Button data-testid="shortlist-btn" onClick={handleShortlist} variant={onInviteToJob ? 'secondary' : 'primary'}>
-                  <ShieldCheck className="mr-2 h-4 w-4" />
-                  Shortlist to Connect
-                </Button>
-              )}
+              <Button
+                data-testid="message-btn"
+                onClick={handleMessage}
+                disabled={!profile.canContact}
+                variant={onInviteToJob ? 'secondary' : 'primary'}
+              >
+                <Mail className="mr-2 h-4 w-4" />
+                Message
+              </Button>
+              <Button
+                data-testid="shortlist-btn"
+                onClick={handleShortlist}
+                disabled={profile.canContact}
+                variant={onInviteToJob ? 'secondary' : 'primary'}
+              >
+                <ShieldCheck className="mr-2 h-4 w-4" />
+                Shortlist to Connect
+              </Button>
               <Button variant="secondary" onClick={onClose}>
                 Close
               </Button>

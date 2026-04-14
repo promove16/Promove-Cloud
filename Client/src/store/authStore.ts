@@ -11,6 +11,7 @@ interface AuthState {
   setAuth: (user: AuthUser, token: string) => void;
   setUser: (user: AuthUser) => void;
   clearAuth: () => void;
+  logout: (redirectPath?: string) => void;
   setLoading: (value: boolean) => void;
 }
 
@@ -21,6 +22,13 @@ const normalizeUser = (user: AuthUser): AuthUser => ({
       ? UserRole.RECRUITER
       : user.role,
 });
+
+const resetAuthState = {
+  user: null,
+  accessToken: null,
+  isAuthenticated: false,
+  isLoading: false,
+} satisfies Pick<AuthState, "user" | "accessToken" | "isAuthenticated" | "isLoading">;
 
 export const useAuthStore = create<AuthState>()(
   persist(
@@ -38,18 +46,26 @@ export const useAuthStore = create<AuthState>()(
         }),
       setUser: (user) =>
         set((state) => ({
-          user,
+          user: normalizeUser(user),
           accessToken: state.accessToken,
           isAuthenticated: state.isAuthenticated,
           isLoading: state.isLoading,
         })),
-      clearAuth: () =>
-        set({
-          user: null,
-          accessToken: null,
-          isAuthenticated: false,
-          isLoading: false,
-        }),
+      clearAuth: () => set(resetAuthState),
+      logout: (redirectPath = "/login") => {
+        set(resetAuthState);
+
+        if (typeof window !== "undefined") {
+          window.setTimeout(() => {
+            if (window.location.pathname !== redirectPath) {
+              window.location.replace(redirectPath);
+              return;
+            }
+
+            window.location.reload();
+          }, 0);
+        }
+      },
       setLoading: (value) => set({ isLoading: value }),
     }),
     {
