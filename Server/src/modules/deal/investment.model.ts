@@ -128,7 +128,7 @@ const investmentSchema = new Schema<IInvestment>(
     royalty: {
       promovePercentage: {
         type: Number,
-        default: 2.5,
+        default: 5,
         min: 0,
         max: 100,
       },
@@ -195,9 +195,39 @@ const investmentSchema = new Schema<IInvestment>(
     },
     stage: {
       type: Number,
-      enum: [1, 2, 3, 4],
-      default: 1,
+      enum: [0, 1, 2, 3, 4],
+      default: 0,
       required: true,
+    },
+    negotiation: {
+      status: {
+        type: String,
+        enum: ['initial', 'terms_proposed', 'counter_offer', 'terms_agreed', 'stalled', 'cancelled'],
+        default: 'initial',
+      },
+      investorProposedAmount: { type: Number, default: undefined },
+      investorProposedEquity: { type: Number, default: undefined },
+      studentCounterAmount: { type: Number, default: undefined },
+      studentCounterEquity: { type: Number, default: undefined },
+      finalAgreedAmount: { type: Number, default: undefined },
+      finalAgreedEquity: { type: Number, default: undefined },
+      messages: {
+        type: [
+          new Schema(
+            {
+              senderId: { type: Schema.Types.ObjectId, ref: 'User', required: true },
+              senderRole: { type: String, enum: ['investor', 'student'], required: true },
+              message: { type: String, required: true },
+              attachments: { type: [String], default: [] },
+            },
+            { _id: true, timestamps: true },
+          ),
+        ],
+        default: [],
+      },
+      lastUpdatedAt: { type: Date, default: undefined },
+      termsAgreedAt: { type: Date, default: undefined },
+      notes: { type: String, default: undefined },
     },
     fundTransferInitiatedAt: {
       type: Date,
@@ -218,6 +248,11 @@ const investmentSchema = new Schema<IInvestment>(
     },
     closedAt: {
       type: Date,
+      default: undefined,
+    },
+    linkedWorkspaceId: {
+      type: Schema.Types.ObjectId,
+      ref: 'Workspace',
       default: undefined,
     },
     innovationScoreSnapshot: {

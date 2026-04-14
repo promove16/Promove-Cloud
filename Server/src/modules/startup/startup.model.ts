@@ -50,6 +50,11 @@ const startupSchema = new Schema<IStartup>(
     pitchDeckStorageKey: { type: String, default: undefined },
     pitchDeckCloudinaryPublicId: { type: String, default: undefined },
     teamSize: { type: Number, default: 1 },
+    teamMemberTypes: {
+      type: Map,
+      of: { type: String, enum: ['founder', 'coFounder', 'mentor', 'advisor'] },
+      default: {},
+    },
     fundingNeeded: { type: Number, default: undefined },
     activeProducts: { type: Number, default: 1 },
     businessProfile: {
@@ -137,6 +142,8 @@ const startupSchema = new Schema<IStartup>(
       mvpBuilt: { type: Boolean, default: false },
       revenueGenerating: { type: Boolean, default: false },
       usersCount: { type: Number, default: undefined },
+      patentType: { type: String, enum: ['self_filed', 'promove_assisted'], default: undefined },
+      patentApplicationId: { type: String, default: undefined },
     },
     reviewStatus: {
       type: String,
@@ -151,6 +158,25 @@ const startupSchema = new Schema<IStartup>(
     adminEditUnlockApprovedAt: { type: Date, default: undefined },
     adminEditUnlockApprovedBy: { type: Schema.Types.ObjectId, ref: 'User', default: null },
     adminEditUnlockReason: { type: String, default: undefined },
+    pitchRequests: {
+      type: [
+        new Schema(
+          {
+            investorId: { type: Schema.Types.ObjectId, ref: 'User', required: true },
+            status: {
+              type: String,
+              enum: ['pending', 'accepted', 'rejected', 'withdrawn'],
+              default: 'pending',
+            },
+            requestedAt: { type: Date, default: () => new Date() },
+            respondedAt: { type: Date, default: undefined },
+            responseNote: { type: String, trim: true, default: undefined },
+          },
+          { _id: true },
+        ),
+      ],
+      default: [],
+    },
     isActive: { type: Boolean, default: true },
   },
   { timestamps: true },

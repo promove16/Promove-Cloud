@@ -3,6 +3,7 @@ import { z } from 'zod';
 import { notificationQueue } from '../../config/bullmq';
 import { applyScoreAsync } from '../../services/scoreEngine';
 import { deleteStoredAsset, uploadFile } from '../../services/fileStorageService';
+import { generateSignedCloudinaryUrl } from '../../services/cloudinaryService';
 import { User } from '../user/user.model';
 import { Startup } from './startup.model';
 import { ApiError } from '../../utils/ApiError';
@@ -10,6 +11,8 @@ import { PlacementRecord } from '../college/placementRecord.model';
 import { UserRole } from '../../types/roles.types';
 import { normalizeInnovationScore } from '../innovationScore/score.utils';
 import { Workspace } from '../workspace/workspace.model';
+import { ensureDirectWorkspaceChatAccess } from '../workspace/workspace.service';
+import { Deal } from '../deal/deal.model';
 import { AdminAuditLog } from '../admin/adminAuditLog.model';
 import type { StartupDocumentCategory, StartupEditAccess, StartupReadiness } from './startup.types';
 
@@ -467,6 +470,27 @@ const getAccessibleWorkspaceIds = async (userId: string) => {
   return workspaces.map((workspace) => workspace._id);
 };
 
+const syncAcceptedInvestorWorkspaceAccess = async (startupId: string, workspaceId?: string) => {
+  if (!workspaceId) {
+    return;
+  }
+
+  const acceptedDeals = await Deal.find({
+    startupId,
+    status: { $ne: 'cancelled' },
+    $or: [{ 'founderDecision.status': 'accepted' }, { stage: { $gte: 2 } }],
+  })
+    .select('investorId')
+    .lean<Array<{ investorId: Types.ObjectId }>>();
+
+  const investorIds = [...new Set(acceptedDeals.map((deal) => String(deal.investorId)))];
+  await Promise.all(
+    investorIds.map((investorId) =>
+      ensureDirectWorkspaceChatAccess(workspaceId, investorId, 'investor'),
+    ),
+  );
+};
+
 const buildAccessibleStartupQuery = (userId: string, workspaceIds: Types.ObjectId[]) => ({
   isActive: true,
   $or: [
@@ -671,8 +695,23 @@ const calculateStartupInnovationScore = (startup: Record<string, any>) => {
 const sanitizeStartupForClient = (startup: Record<string, any>) => {
   const editAccess = buildStartupEditAccess(startup);
 
+  let pitchDeckUrl = startup.pitchDeckUrl;
+  if (pitchDeckUrl) {
+    try {
+      if (startup.pitchDeckStorageProvider === 'cloudinary') {
+        const storageKey = startup.pitchDeckStorageKey || extractCloudinaryPublicId(pitchDeckUrl);
+        if (storageKey) {
+          pitchDeckUrl = generateSignedCloudinaryUrl(storageKey, 'raw');
+        }
+      }
+    } catch (error) {
+      console.error('Error generating signed URL for pitch deck:', error);
+    }
+  }
+
   return {
     ...startup,
+    pitchDeckUrl,
     reviewStatus: startup.reviewStatus ?? 'draft',
     documents: (startup.documents ?? []).map((document: Record<string, any>) => ({
       _id: document._id,
@@ -691,6 +730,12 @@ const sanitizeStartupForClient = (startup: Record<string, any>) => {
     },
     readiness: buildStartupReadiness(startup as never),
   };
+};
+
+const extractCloudinaryPublicId = (url: string): string | null => {
+  if (!url || !url.includes('cloudinary.com')) return null;
+  const match = url.match(/upload\/v\d+\/(.+)$/);
+  return match ? match[1].replace(/\.[^.]+$/, '') : null;
 };
 
 const serializeStartup = (startup: { toObject?: () => Record<string, any> } | Record<string, any>) => {
@@ -727,10 +772,24 @@ export const getMyStartups = async (userId: string) => {
 
 export const getStartupById = async (startupId: string, userId: string) => {
   const workspaceIds = await getAccessibleWorkspaceIds(userId);
-  const startup = await Startup.findOne({
+  let startup = await Startup.findOne({
     _id: startupId,
     ...buildAccessibleStartupQuery(userId, workspaceIds),
   }).lean();
+
+  if (!startup) {
+    const hasInvestorAccess = await Deal.exists({
+      startupId,
+      investorId: userId,
+      status: { $ne: 'cancelled' },
+      $or: [{ 'founderDecision.status': 'accepted' }, { stage: { $gte: 2 } }],
+    });
+
+    if (hasInvestorAccess) {
+      startup = await Startup.findOne({ _id: startupId, isActive: true }).lean();
+    }
+  }
+
   if (!startup) {
     throw new ApiError(404, 'STARTUP_NOT_FOUND', 'Startup not found.');
   }
@@ -796,6 +855,10 @@ export const updateStartupProfile = async (
   Object.assign(startup, startupPayload);
 
   await startup.save();
+  await syncAcceptedInvestorWorkspaceAccess(
+    String(startup._id),
+    startup.projectId ? String(startup.projectId) : undefined,
+  );
   return serializeStartup(startup);
 };
 
@@ -981,7 +1044,130 @@ export const uploadPitchDeck = async (startupId: string, userId: string, file: E
   startup.pitchDeckCloudinaryPublicId = undefined;
 
   await startup.save();
-return serializeStartup(startup);
+  return serializeStartup(startup);
+};
+
+export const sendPitchRequest = async (
+  startupId: string,
+  studentId: string | Types.ObjectId,
+  investorId: string | Types.ObjectId,
+) => {
+  const startup = await Startup.findById(startupId);
+  if (!startup || !startup.isActive) {
+    throw new ApiError(404, 'STARTUP_NOT_FOUND', 'Startup not found');
+  }
+
+  const studentObjectId = new Types.ObjectId(studentId);
+  const investorObjectId = new Types.ObjectId(investorId);
+
+  if (!startup.founderIds.some(id => id.equals(studentObjectId))) {
+    throw new ApiError(403, 'NOT_AUTHORIZED', 'Only founders can send pitch requests');
+  }
+
+  const existingRequest = startup.pitchRequests?.find(
+    req => req.investorId.equals(investorObjectId) && req.status === 'pending',
+  );
+
+  if (existingRequest) {
+    throw new ApiError(409, 'PITCH_REQUEST_EXISTS', 'A pending pitch request already exists for this investor');
+  }
+
+  if (!startup.pitchRequests) {
+    startup.pitchRequests = [];
+  }
+
+  startup.pitchRequests.push({
+    investorId: investorObjectId,
+    status: 'pending',
+    requestedAt: new Date(),
+  });
+
+  await startup.save();
+
+  await notificationQueue.add('send-pitch-request-notification', {
+    recipientId: investorObjectId.toString(),
+    startupId: startup._id.toString(),
+    startupName: startup.name,
+    founderName: startup.founderIds[0]?.toString(),
+    type: 'pitch_request',
+  });
+
+  return serializeStartup(startup);
+};
+
+export const respondToPitchRequest = async (
+  startupId: string,
+  studentId: string | Types.ObjectId,
+  requestId: string,
+  decision: 'accepted' | 'rejected',
+  note?: string,
+) => {
+  const startup = await Startup.findById(startupId);
+  if (!startup || !startup.isActive) {
+    throw new ApiError(404, 'STARTUP_NOT_FOUND', 'Startup not found');
+  }
+
+  const studentObjectId = new Types.ObjectId(studentId);
+
+  if (!startup.founderIds.some(id => id.equals(studentObjectId))) {
+    throw new ApiError(403, 'NOT_AUTHORIZED', 'Only founders can respond to pitch requests');
+  }
+
+  const request = startup.pitchRequests?.find((pitchRequest) => String(pitchRequest._id) === requestId);
+  if (!request) {
+    throw new ApiError(404, 'REQUEST_NOT_FOUND', 'Pitch request not found');
+  }
+
+  if (request.status !== 'pending') {
+    throw new ApiError(409, 'REQUEST_ALREADY_HANDLED', 'Pitch request has already been handled');
+  }
+
+  request.status = decision;
+  request.respondedAt = new Date();
+  if (note) {
+    request.responseNote = note;
+  }
+
+  await startup.save();
+
+  await notificationQueue.add('pitch-request-response-notification', {
+    recipientId: request.investorId.toString(),
+    startupId: startup._id.toString(),
+    startupName: startup.name,
+    decision,
+    note,
+    type: 'pitch_request_response',
+  });
+
+  return serializeStartup(startup);
+};
+
+export const getInvestorPitchRequests = async (investorId: string | Types.ObjectId) => {
+  const investorObjectId = new Types.ObjectId(investorId);
+
+  const startups = await Startup.find({
+    'pitchRequests.investorId': investorObjectId,
+    isActive: true,
+  }).lean();
+
+  const pitchRequests = startups.flatMap(startup =>
+    (startup.pitchRequests || [])
+      .filter(req => req.investorId.equals(investorObjectId))
+      .map(req => ({
+        _id: req._id,
+        startupId: startup._id,
+        startupName: startup.name,
+        startupTagline: startup.tagline,
+        startupCategory: startup.category,
+        startupStage: startup.stage,
+        status: req.status,
+        requestedAt: req.requestedAt,
+        respondedAt: req.respondedAt,
+        responseNote: req.responseNote,
+      })),
+  );
+
+  return pitchRequests;
 };
 
 export const approveLaunchFormUnlock = async (

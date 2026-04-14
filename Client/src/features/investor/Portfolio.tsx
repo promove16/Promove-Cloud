@@ -63,7 +63,7 @@ export default function Portfolio() {
                     <div className="mt-4 flex flex-wrap gap-2">
                       <Badge>Stage 4</Badge>
                       <Badge className={item.investorType === 'sole' ? 'border-amber-500/30 bg-amber-500/10 text-amber-300' : 'border-cyan-500/30 bg-cyan-500/10 text-cyan-300'}>
-                        {item.investorType.toUpperCase()}
+                        {item.investorType === 'penny' ? 'Penny Investor' : 'Sole Investor'}
                       </Badge>
                       <Badge className="border-emerald-500/30 bg-emerald-500/10 text-emerald-300">
                         {formatRoleLabel(item.investorRole)}

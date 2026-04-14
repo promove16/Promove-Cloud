@@ -115,13 +115,12 @@ export const uploadFile = async (input: {
     }
 
     return new Promise<UploadedFileResult>((resolve, reject) => {
-      const resourceType = input.contentType.startsWith('image/') ? 'image' : 'raw';
+      const resourceType = input.contentType.startsWith('image/') ? 'image' : 'auto';
       const uploadStream = cloudinary.uploader.upload_stream(
         {
           folder: sanitizeFolder(input.folder),
           resource_type: resourceType,
           timeout: 60000,
-          ...(input.contentType === 'application/pdf' ? { format: 'pdf' } : {}),
         },
         (error, result) => {
           if (error || !result?.secure_url || !result.public_id) {

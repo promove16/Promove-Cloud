@@ -15,6 +15,9 @@ import {
   updateStartupProfile,
   uploadPitchDeck,
   uploadStartupDocument,
+  sendPitchRequest,
+  respondToPitchRequest,
+  getInvestorPitchRequests,
 } from './startup.service';
 import { ApiError } from '../../utils/ApiError';
 
@@ -121,4 +124,30 @@ export const removeStartupDocumentController = async (req: Request, res: Respons
   );
   const startup = await deleteStartupDocument(startupId, req.user!._id, documentId);
   res.json(new ApiResponse(startup));
+};
+
+export const sendPitchRequestController = async (req: Request, res: Response) => {
+  const startupId = getRequiredObjectIdParam(req.params.id, 'STARTUP_REQUIRED', 'Startup id is required');
+  const { investorId } = req.body;
+  if (!investorId) {
+    throw new ApiError(400, 'INVESTOR_REQUIRED', 'Investor ID is required');
+  }
+  const startup = await sendPitchRequest(startupId, req.user!._id, investorId);
+  res.json(new ApiResponse(startup));
+};
+
+export const respondToPitchRequestController = async (req: Request, res: Response) => {
+  const startupId = getRequiredObjectIdParam(req.params.id, 'STARTUP_REQUIRED', 'Startup id is required');
+  const requestId = getRequiredObjectIdParam(req.params.requestId, 'REQUEST_REQUIRED', 'Pitch request id is required');
+  const { decision, note } = req.body;
+  if (!decision || !['accepted', 'rejected'].includes(decision)) {
+    throw new ApiError(400, 'INVALID_DECISION', 'Decision must be accepted or rejected');
+  }
+  const startup = await respondToPitchRequest(startupId, req.user!._id, requestId, decision, note);
+  res.json(new ApiResponse(startup));
+};
+
+export const getPitchRequestsController = async (req: Request, res: Response) => {
+  const pitchRequests = await getInvestorPitchRequests(req.user!._id);
+  res.json(new ApiResponse(pitchRequests));
 };

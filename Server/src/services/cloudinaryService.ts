@@ -11,7 +11,7 @@ cloudinary.config({
 export const uploadToCloudinary = async (
   buffer: Buffer,
   folder: string,
-  resourceType: 'image' | 'raw',
+  resourceType: 'image' | 'raw' | 'auto',
   options?: {
     format?: string;
   },
@@ -41,6 +41,20 @@ export const uploadToCloudinary = async (
     readable.push(null);
     readable.pipe(uploadStream);
   });
+};
+
+export const generateSignedCloudinaryUrl = (publicId: string, resourceType: 'image' | 'raw' = 'image'): string => {
+  const timestamp = Math.floor(Date.now() / 1000);
+  const signature = cloudinary.utils.api_sign_request(
+    {
+      public_id: publicId,
+      timestamp,
+    },
+    env.CLOUDINARY_API_SECRET!,
+  );
+
+  const resourcePrefix = resourceType === 'raw' ? 'raw' : 'image';
+  return `https://res.cloudinary.com/${env.CLOUDINARY_CLOUD_NAME}/${resourcePrefix}/upload/v${timestamp}/${publicId}?api_key=${env.CLOUDINARY_API_KEY}&signature=${signature}&timestamp=${timestamp}`;
 };
 
 export const deleteFromCloudinary = async (publicId: string, resourceType: 'image' | 'raw') => {

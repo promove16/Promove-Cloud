@@ -7,8 +7,30 @@ const chatMessageSchema = new Schema<IChatMessage>(
     senderId: { type: Schema.Types.ObjectId, required: true },
     message: { type: String, default: '', trim: true },
     attachmentUrl: { type: String, default: undefined },
-    attachmentType: { type: String, enum: ['pdf', 'image'], default: undefined },
+    attachmentType: {
+      type: String,
+      enum: ['pdf', 'image', 'doc', 'ppt', 'xls', 'video', 'audio', 'other'],
+      default: undefined,
+    },
+    attachmentName: { type: String, default: undefined, trim: true },
+    attachmentSizeBytes: { type: Number, default: undefined },
+    attachmentMimeType: { type: String, default: undefined, trim: true },
+    codeSnippet: {
+      type: new Schema(
+        {
+          title: { type: String, required: true, trim: true, maxlength: 120 },
+          language: { type: String, required: true, trim: true, maxlength: 60 },
+          code: { type: String, required: true, maxlength: 8000 },
+          lineCount: { type: Number, required: true, min: 1, max: 500 },
+        },
+        { _id: false },
+      ),
+      default: undefined,
+    },
     sentAt: { type: Date, default: () => new Date() },
+    deliveredAt: { type: Date, default: undefined },
+    seenAt: { type: Date, default: undefined },
+    seenBy: { type: [Schema.Types.ObjectId], default: [] },
   },
   { timestamps: false },
 );

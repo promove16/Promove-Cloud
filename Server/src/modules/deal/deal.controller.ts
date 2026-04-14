@@ -8,11 +8,17 @@ import {
   getInvestorAuthorityPortfolio,
   getStartupCapTable,
   getStartupInvestors,
+  linkWorkshopSchema,
   listDealsForParticipant,
   recordFounderDecision,
   recordFundTransfer,
   updateInvestorRoleSchema,
   updateInvestmentRole,
+  linkWorkshopToDeal,
+  unlinkWorkshopFromDeal,
+  addNegotiationMessage,
+  proposeNegotiationTerms,
+  agreeNegotiationTerms,
 } from './deal.service';
 
 const objectIdSchema = /^[0-9a-fA-F]{24}$/;
@@ -106,4 +112,71 @@ export const updateInvestorRoleController = async (req: Request, res: Response) 
   const payload = updateInvestorRoleSchema.parse(req.body);
   const deal = await updateInvestmentRole(dealId, payload.investorRole);
   res.status(200).json(new ApiResponse(deal));
+};
+
+export const linkWorkshopController = async (req: Request, res: Response) => {
+  if (!req.user) {
+    throw new ApiError(401, 'UNAUTHORIZED', 'Invalid or expired token');
+  }
+
+  const dealId = assertObjectId(String(req.params.id), 'Deal id');
+  const payload = linkWorkshopSchema.parse(req.body);
+  const result = await linkWorkshopToDeal(dealId, payload.workspaceId, String(req.user._id));
+  res.status(200).json(new ApiResponse(result));
+};
+
+export const unlinkWorkshopController = async (req: Request, res: Response) => {
+  if (!req.user) {
+    throw new ApiError(401, 'UNAUTHORIZED', 'Invalid or expired token');
+  }
+
+  const dealId = assertObjectId(String(req.params.id), 'Deal id');
+  const result = await unlinkWorkshopFromDeal(dealId, String(req.user._id));
+  res.status(200).json(new ApiResponse(result));
+};
+
+export const addNegotiationMessageController = async (req: Request, res: Response) => {
+  if (!req.user) {
+    throw new ApiError(401, 'UNAUTHORIZED', 'Invalid or expired token');
+  }
+
+  const dealId = assertObjectId(String(req.params.id), 'Deal id');
+  const { message } = req.body;
+  
+  if (!message || typeof message !== 'string') {
+    throw new ApiError(400, 'INVALID_MESSAGE', 'Message is required');
+  }
+
+  const senderRole = req.user.role === 'investor' ? 'investor' : 'student';
+  const result = await addNegotiationMessage(dealId, String(req.user._id), message, senderRole);
+  res.status(200).json(new ApiResponse(result));
+};
+
+export const proposeNegotiationTermsController = async (req: Request, res: Response) => {
+  if (!req.user) {
+    throw new ApiError(401, 'UNAUTHORIZED', 'Invalid or expired token');
+  }
+
+  const dealId = assertObjectId(String(req.params.id), 'Deal id');
+  const { amountINR, equityPercent } = req.body;
+  
+  if (!amountINR || !equityPercent) {
+    throw new ApiError(400, 'INVALID_TERMS', 'Amount and equity are required');
+  }
+
+  const senderRole = req.user.role === 'investor' ? 'investor' : 'student';
+  const result = await proposeNegotiationTerms(dealId, String(req.user._id), amountINR, equityPercent, senderRole);
+  res.status(200).json(new ApiResponse(result));
+};
+
+export const agreeNegotiationTermsController = async (req: Request, res: Response) => {
+  if (!req.user) {
+    throw new ApiError(401, 'UNAUTHORIZED', 'Invalid or expired token');
+  }
+
+  const dealId = assertObjectId(String(req.params.id), 'Deal id');
+  
+  const senderRole = req.user.role === 'investor' ? 'investor' : 'student';
+  const result = await agreeNegotiationTerms(dealId, String(req.user._id), senderRole);
+  res.status(200).json(new ApiResponse(result));
 };

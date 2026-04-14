@@ -105,8 +105,10 @@ const RecruiterCollegeStudentsPage = lazy(() => import("../features/recruiter/Co
 const InvestorDashboard = lazy(() => import("../features/investor/Dashboard"));
 const InvestorStartupMarketplace = lazy(() => import("../features/investor/StartupMarketplace"));
 const InvestorInstitutions = lazy(() => import("../features/investor/Institutions"));
-const InvestorPortfolio = lazy(() => import("../features/investor/Portfolio"));
+const InvestorProductWorkshop = lazy(() => import("../features/investor/ProductWorkshop"));
 const InvestorPaymentPage = lazy(() => import("../features/investor/InvestorPaymentPage"));
+const InvestorPitchRequests = lazy(() => import("../features/investor/PitchRequests"));
+const InvestmentPipeline = lazy(() => import("../features/investor/InvestmentPipeline"));
 
 const StartupCapTable = lazy(() => import("../features/startup/CapTable"));
 const MyStartups = lazy(() =>
@@ -711,10 +713,14 @@ export const router = createBrowserRouter([
             children: [
               { index: true, element: <LazyPage component={InvestorDashboard} /> },
               { path: "startups", element: <LazyPage component={InvestorStartupMarketplace} /> },
+              { path: "pipeline", element: <LazyPage component={InvestmentPipeline} /> },
+              { path: "pitch-requests", element: <LazyPage component={InvestorPitchRequests} /> },
               { path: "institutions", element: <LazyPage component={InvestorInstitutions} /> },
-              { path: "portfolio", element: <LazyPage component={InvestorPortfolio} /> },
+              { path: "product-workshop", element: <LazyPage component={InvestorProductWorkshop} /> },
+              { path: "product-workshop/:startupId", element: <LazyPage component={StartupWorkspace} /> },
+              { path: "portfolio", element: <Navigate to="/dashboard/investor/product-workshop" replace /> },
               { path: "deals/:dealId/payment", element: <LazyPage component={InvestorPaymentPage} /> },
-              { path: "marketplace", element: <LazyPage component={Marketplace} /> },
+              { path: "marketplace", element: <Navigate to="/dashboard/investor/startups" replace /> },
               { path: "marketplace/view/:entityType/:entityId", element: <LazyPage component={MarketplaceDetail} /> },
               {
                 path: "settings",

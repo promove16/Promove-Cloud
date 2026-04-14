@@ -3,6 +3,8 @@ export interface StartupTraction {
   mvpBuilt: boolean;
   revenueGenerating: boolean;
   usersCount?: number;
+  patentType?: StartupPatentType;
+  patentApplicationId?: string;
 }
 
 export type StartupReviewStatus = 'draft' | 'review_requested' | 'changes_requested' | 'approved';
@@ -10,6 +12,9 @@ export type StartupInnovationStage = 'idea' | 'prototype' | 'mvp' | 'market_read
 export type StartupInventorOwnership = 'individual' | 'team' | 'organization';
 export type StartupCommercializationStrategy = 'build_startup' | 'license' | 'sell' | 'partnership';
 export type StartupIpProtectionType = 'patent' | 'copyright' | 'trademark' | 'design';
+export type StartupTeamMemberType = 'founder' | 'coFounder' | 'mentor' | 'advisor';
+export type StartupPitchRequestStatus = 'pending' | 'accepted' | 'rejected' | 'withdrawn';
+export type StartupPatentType = 'self_filed' | 'promove_assisted';
 export type StartupDocumentCategory =
   | 'business_plan'
   | 'incorporation_certificate'
@@ -33,6 +38,19 @@ export type StartupDocumentCategory =
   | 'drawings_diagrams'
   | 'design_plan_sketch'
   | 'prior_art_search';
+
+export interface StartupPitchRequest {
+  _id: string;
+  startupId: string;
+  startupName: string;
+  startupTagline?: string;
+  startupCategory?: string;
+  startupStage?: string;
+  status: StartupPitchRequestStatus;
+  requestedAt: string;
+  respondedAt?: string;
+  responseNote?: string;
+}
 
 export interface StartupBusinessProfile {
   problemStatement: string;
@@ -103,6 +121,7 @@ export interface Startup {
   _id: string;
   founderIds: string[];
   teamMemberIds: string[];
+  teamMemberTypes?: { [key: string]: StartupTeamMemberType };
   projectId?: string;
   name: string;
   tagline: string;
@@ -140,4 +159,5 @@ export interface Startup {
   isActive: boolean;
   createdAt: string;
   updatedAt: string;
+  pitchRequests?: StartupPitchRequest[];
 }

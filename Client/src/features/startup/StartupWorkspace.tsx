@@ -1,24 +1,34 @@
 import { useEffect, useMemo, useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { FolderKanban, Link2, Plus, Users } from "lucide-react";
-import { useNavigate, useOutletContext, useParams } from "react-router-dom";
+import { Navigate, useNavigate, useOutletContext, useParams } from "react-router-dom";
+import { dealApi } from "../../api/deal.api";
 import { startupApi } from "../../api/startup.api";
 import { workspaceApi } from "../../api/workspace.api";
 import { Card } from "../../components/ui/Card";
 import { Input } from "../../components/ui/Input";
 import { Spinner } from "../../components/ui/Spinner";
+import { useAuthStore } from "../../store/authStore";
+import type { Workspace } from "../../types/workspace.types";
 import { getStartupSectionPath, normalizeStartupRouteId } from "./navigation";
 
 const getErrorMessage = (error: unknown, fallback: string) =>
   (error as { response?: { data?: { error?: { message?: string } } } })?.response?.data?.error?.message ??
   (error instanceof Error ? error.message : fallback);
 
+type WorkspacePreview = Pick<Workspace, "_id" | "title" | "category" | "stage" | "progressPercent"> & {
+  teamMembers?: Workspace["teamMembers"];
+  teamMemberIds?: Workspace["teamMemberIds"];
+};
+
 export function StartupWorkspace() {
   const navigate = useNavigate();
   const queryClient = useQueryClient();
   const { startupId: paramId } = useParams<{ startupId: string }>();
   const context = useOutletContext<{ startupId?: string }>();
+  const currentUser = useAuthStore((state) => state.user);
   const startupId = context?.startupId ?? normalizeStartupRouteId(paramId);
+  const isReadOnlyViewer = currentUser?.role === "investor";
   const [selectedWorkspaceId, setSelectedWorkspaceId] = useState("");
   const [feedback, setFeedback] = useState("");
   const [showCreateForm, setShowCreateForm] = useState(false);
@@ -29,22 +39,65 @@ export function StartupWorkspace() {
     queryFn: () => startupApi.getById(startupId!),
     enabled: Boolean(startupId),
   });
-  const workspaceQuery = useQuery({
+  const startup = startupQuery.data;
+  const workspaceListQuery = useQuery({
     queryKey: ["workspaces"],
     queryFn: workspaceApi.list,
+    enabled: !isReadOnlyViewer,
+  });
+  const directWorkspaceQuery = useQuery({
+    queryKey: ["workspace", startup?.projectId, "startup-readonly"],
+    queryFn: () => workspaceApi.getById(startup!.projectId!),
+    enabled: isReadOnlyViewer && Boolean(startup?.projectId),
+    retry: false,
+  });
+  const investorDealsQuery = useQuery({
+    queryKey: ["investor-deals", "startup-workshop", startupId],
+    queryFn: dealApi.getInvestorDeals,
+    enabled: isReadOnlyViewer && Boolean(startupId),
+    staleTime: 60_000,
   });
 
-  const startup = startupQuery.data;
   const isEditingLocked = Boolean(startup?.editAccess?.isLocked);
-  const workspaces = workspaceQuery.data ?? [];
+  const isWorkspaceSelectionDisabled = isEditingLocked || isReadOnlyViewer;
+  const workspaces = workspaceListQuery.data ?? [];
   const availableWorkspaces = useMemo(
     () => workspaces.filter((workspace) => !workspace.claimedProblemId),
     [workspaces],
   );
-  const activeWorkspace = useMemo(
-    () => workspaces.find((workspace) => workspace._id === selectedWorkspaceId) ?? null,
-    [selectedWorkspaceId, workspaces],
-  );
+  const investorWorkshopSummary = useMemo(() => {
+    if (!isReadOnlyViewer || !startupId) {
+      return null;
+    }
+
+    const deals = (investorDealsQuery.data ?? []).flatMap((group) => group.deals);
+    return deals.find((deal) => deal.startupId === startupId)?.productWorkshop ?? null;
+  }, [investorDealsQuery.data, isReadOnlyViewer, startupId]);
+  const activeWorkspace = useMemo<WorkspacePreview | null>(() => {
+    if (isReadOnlyViewer) {
+      if (directWorkspaceQuery.data) {
+        return directWorkspaceQuery.data;
+      }
+
+      if (investorWorkshopSummary) {
+        return {
+          _id: investorWorkshopSummary.workspaceId,
+          title: investorWorkshopSummary.title,
+          category: investorWorkshopSummary.category,
+          stage: investorWorkshopSummary.stage as Workspace["stage"],
+          progressPercent: investorWorkshopSummary.progressPercent,
+          teamMembers: [],
+          teamMemberIds: [],
+        };
+      }
+
+      return null;
+    }
+
+    return workspaces.find((workspace) => workspace._id === selectedWorkspaceId) ?? null;
+  }, [directWorkspaceQuery.data, investorWorkshopSummary, isReadOnlyViewer, selectedWorkspaceId, workspaces]);
+  const isInvestorSummaryFallback =
+    isReadOnlyViewer && !directWorkspaceQuery.data && Boolean(investorWorkshopSummary);
 
   useEffect(() => {
     setSelectedWorkspaceId(startup?.projectId ?? "");
@@ -133,7 +186,11 @@ export function StartupWorkspace() {
     );
   }
 
-  if (startupQuery.isLoading || workspaceQuery.isLoading) {
+  const isWorkspaceLoading = isReadOnlyViewer
+    ? investorDealsQuery.isLoading || (Boolean(startup?.projectId) && directWorkspaceQuery.isLoading)
+    : workspaceListQuery.isLoading;
+
+  if (startupQuery.isLoading || isWorkspaceLoading) {
     return (
       <div className="flex min-h-[40vh] items-center justify-center">
         <Spinner />
@@ -149,7 +206,16 @@ export function StartupWorkspace() {
     );
   }
 
+  if (isReadOnlyViewer && directWorkspaceQuery.data && activeWorkspace?._id) {
+    return <Navigate to={`/product-workspace/${activeWorkspace._id}`} replace />;
+  }
+
   const founderMembers = activeWorkspace?.teamMembers ?? [];
+  const backPath = startupId
+    ? isReadOnlyViewer
+      ? "/dashboard/investor/product-workshop"
+      : getStartupSectionPath(startupId, "overview")
+    : "/dashboard";
 
   return (
     <div className="space-y-6">
@@ -157,29 +223,42 @@ export function StartupWorkspace() {
         <div className="flex flex-col gap-3 lg:flex-row lg:items-start lg:justify-between">
           <div>
             <div className="text-xs font-semibold uppercase tracking-[0.24em] text-cyan-300">
-              Product Workspace
+              {isReadOnlyViewer ? "Product Workshop" : "Product Workspace"}
             </div>
             <h1 className="mt-2 text-2xl font-semibold text-white">
               Dedicated workspace for {startup?.name ?? "this startup"}
             </h1>
             <p className="mt-2 max-w-3xl text-sm leading-6 text-slate-400">
-              Keep startup execution separate from Problem Bank work. Link one independent product
-              workspace here so founder access, patent support, and startup progress stay attached
-              to the same operating space.
+              {isReadOnlyViewer
+                ? "This is the same startup product workspace section used by the founder team. Investor access is read-only and limited to reviewing the linked workspace, team, and progress."
+                : "Keep startup execution separate from Problem Bank work. Link one independent product workspace here so founder access, patent support, and startup progress stay attached to the same operating space."}
             </p>
           </div>
           {activeWorkspace ? (
-            <button
-              type="button"
-              onClick={() => navigate(`/product-workspace/${activeWorkspace._id}`)}
-              className="inline-flex items-center gap-2 rounded-xl border border-cyan-500/30 bg-cyan-500/10 px-4 py-2.5 text-sm font-semibold text-cyan-100 transition hover:border-cyan-400/50 hover:bg-cyan-500/15"
-            >
-              <FolderKanban className="h-4 w-4" />
-              Open Workspace
-            </button>
+            isReadOnlyViewer ? (
+              <div className="inline-flex items-center gap-2 rounded-xl border border-cyan-500/30 bg-cyan-500/10 px-4 py-2.5 text-sm font-semibold text-cyan-100">
+                <FolderKanban className="h-4 w-4" />
+                Read-Only Workshop View
+              </div>
+            ) : (
+              <button
+                type="button"
+                onClick={() => navigate(`/product-workspace/${activeWorkspace._id}`)}
+                className="inline-flex items-center gap-2 rounded-xl border border-cyan-500/30 bg-cyan-500/10 px-4 py-2.5 text-sm font-semibold text-cyan-100 transition hover:border-cyan-400/50 hover:bg-cyan-500/15"
+              >
+                <FolderKanban className="h-4 w-4" />
+                Open Workspace
+              </button>
+            )
           ) : null}
         </div>
       </div>
+
+      {isInvestorSummaryFallback ? (
+        <div className="rounded-xl border border-amber-500/20 bg-amber-500/10 px-4 py-3 text-sm text-amber-100">
+          Detailed workspace access has not synced to this investor account yet. Showing the linked workshop summary from the deal record.
+        </div>
+      ) : null}
 
       {feedback ? (
         <div className="rounded-xl border border-cyan-500/20 bg-cyan-500/10 px-4 py-3 text-sm text-cyan-100">
@@ -187,7 +266,7 @@ export function StartupWorkspace() {
         </div>
       ) : null}
 
-      {isEditingLocked ? (
+      {isEditingLocked && !isReadOnlyViewer ? (
         <div className="rounded-xl border border-amber-500/20 bg-amber-500/10 px-4 py-3 text-sm text-amber-100">
           {startup?.editAccess.reason}
           <button
@@ -207,29 +286,34 @@ export function StartupWorkspace() {
               <Link2 className="h-4 w-4" />
               Workspace Link
             </div>
-            <button
-              type="button"
-              onClick={() => {
-                setFeedback("");
-                setShowCreateForm((current) => !current);
-              }}
-              disabled={isEditingLocked || createWorkspace.isPending}
-              className="inline-flex items-center gap-2 rounded-xl border border-slate-700 px-3 py-2 text-sm font-semibold text-slate-300 transition hover:border-slate-500 hover:text-white disabled:opacity-60"
-            >
-              <Plus className="h-4 w-4" />
-              {showCreateForm ? "Close" : "Create Workspace"}
-            </button>
+            {!isReadOnlyViewer ? (
+              <button
+                type="button"
+                onClick={() => {
+                  setFeedback("");
+                  setShowCreateForm((current) => !current);
+                }}
+                disabled={isEditingLocked || createWorkspace.isPending}
+                className="inline-flex items-center gap-2 rounded-xl border border-slate-700 px-3 py-2 text-sm font-semibold text-slate-300 transition hover:border-slate-500 hover:text-white disabled:opacity-60"
+              >
+                <Plus className="h-4 w-4" />
+                {showCreateForm ? "Close" : "Create Workspace"}
+              </button>
+            ) : null}
           </div>
           <label className="mb-2 block text-sm font-semibold text-white">
-            Select independent product workspace
+            {isReadOnlyViewer ? "Linked independent product workspace" : "Select independent product workspace"}
           </label>
           <select
             value={selectedWorkspaceId}
             onChange={(event) => setSelectedWorkspaceId(event.target.value)}
-            disabled={isEditingLocked}
+            disabled={isWorkspaceSelectionDisabled}
             className="w-full rounded-xl border border-slate-800 bg-slate-950 px-4 py-3 text-white outline-none transition focus:border-cyan-400/50"
           >
             <option value="">No linked workspace</option>
+            {isReadOnlyViewer && activeWorkspace ? (
+              <option value={activeWorkspace._id}>{activeWorkspace.title}</option>
+            ) : null}
             {availableWorkspaces.map((workspace) => (
               <option key={workspace._id} value={workspace._id}>
                 {workspace.title}
@@ -237,18 +321,20 @@ export function StartupWorkspace() {
             ))}
           </select>
           <p className="mt-3 text-sm leading-6 text-slate-400">
-            The linked workspace becomes the operational home for this startup. Founder team size
-            syncs from the selected independent workspace when you save.
+            {isReadOnlyViewer
+              ? "The founder team links one independent workspace to this startup. Investor access here is limited to reviewing that linked workspace setup."
+              : "The linked workspace becomes the operational home for this startup. Founder team size syncs from the selected independent workspace when you save."}
           </p>
 
-          {availableWorkspaces.length === 0 ? (
+          {availableWorkspaces.length === 0 && (!isReadOnlyViewer || !activeWorkspace) ? (
             <div className="mt-4 rounded-xl border border-dashed border-slate-800 bg-slate-950/60 px-4 py-4 text-sm text-slate-400">
-              No independent workspace exists yet for this account. Create one here, then save the
-              link to attach it to this startup.
+              {isReadOnlyViewer
+                ? "No linked independent workspace is available for investor review yet."
+                : "No independent workspace exists yet for this account. Create one here, then save the link to attach it to this startup."}
             </div>
           ) : null}
 
-          {showCreateForm ? (
+          {showCreateForm && !isReadOnlyViewer ? (
             <div className="mt-5 rounded-2xl border border-slate-800 bg-slate-950/60 p-4">
               <div className="text-sm font-semibold text-white">Create independent workspace</div>
               <div className="mt-1 text-sm leading-6 text-slate-400">
@@ -326,21 +412,27 @@ export function StartupWorkspace() {
           </div>
 
           <div className="mt-5 flex flex-wrap gap-3">
-            <button
-              type="button"
-              onClick={() => saveWorkspaceLink.mutate()}
-              disabled={saveWorkspaceLink.isPending || isEditingLocked}
-              className="rounded-xl bg-gradient-to-r from-blue-600 to-cyan-600 px-5 py-3 text-sm font-semibold text-white transition hover:from-blue-500 hover:to-cyan-500 disabled:opacity-60"
-            >
-              {saveWorkspaceLink.isPending ? "Saving..." : isEditingLocked ? "Workspace Locked" : "Save Workspace Link"}
-            </button>
+            {!isReadOnlyViewer ? (
+              <button
+                type="button"
+                onClick={() => saveWorkspaceLink.mutate()}
+                disabled={saveWorkspaceLink.isPending || isEditingLocked}
+                className="rounded-xl bg-gradient-to-r from-blue-600 to-cyan-600 px-5 py-3 text-sm font-semibold text-white transition hover:from-blue-500 hover:to-cyan-500 disabled:opacity-60"
+              >
+                {saveWorkspaceLink.isPending ? "Saving..." : isEditingLocked ? "Workspace Locked" : "Save Workspace Link"}
+              </button>
+            ) : (
+              <div className="rounded-xl border border-slate-800 bg-slate-950/70 px-4 py-3 text-sm text-slate-400">
+                Investor access is read-only in this startup workspace.
+              </div>
+            )}
             {startupId ? (
               <button
                 type="button"
-                onClick={() => navigate(getStartupSectionPath(startupId, "overview"))}
+                onClick={() => navigate(backPath)}
                 className="rounded-xl border border-slate-700 px-5 py-3 text-sm font-semibold text-slate-300 transition hover:border-slate-500 hover:text-white"
               >
-                Back to Launch
+                {isReadOnlyViewer ? "Back to Product Workshop" : "Back to Launch"}
               </button>
             ) : null}
           </div>
@@ -382,7 +474,9 @@ export function StartupWorkspace() {
             ) : (
               <div className="rounded-xl border border-dashed border-slate-800 bg-slate-950/60 px-4 py-5 text-sm text-slate-400">
                 {activeWorkspace
-                  ? "No workspace members were returned for this startup yet."
+                  ? isInvestorSummaryFallback
+                    ? "Founder roster will appear here once workspace access finishes syncing for this investor."
+                    : "No workspace members were returned for this startup yet."
                   : "Link a workspace to sync founders and startup team access."}
               </div>
             )}

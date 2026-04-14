@@ -1,5 +1,5 @@
-import { ChangeEvent, useEffect, useMemo, useState } from "react";
-import { useNavigate, useOutletContext, useParams } from "react-router-dom";
+import { ChangeEvent, useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { useNavigate, useOutletContext, useParams, useBlocker } from "react-router-dom";
 import { isAxiosError } from "axios";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import {
@@ -50,6 +50,8 @@ const createEmptyPayload = (): StartupPayload => ({
     patentFiled: false,
     mvpBuilt: false,
     revenueGenerating: false,
+    patentType: undefined,
+    patentApplicationId: undefined,
   },
   businessProfile: {
     problemStatement: "",
@@ -61,6 +63,59 @@ const createEmptyPayload = (): StartupPayload => ({
   },
   registrationProfile: { ...DEFAULT_STARTUP_IPR_PROFILE },
 });
+
+/* ── field limits (mirrors server Zod schema) ── */
+const FIELD_LIMITS = {
+  name: 120,
+  tagline: 200,
+  category: 100,
+  // registration profile
+  problemStatement: 2500,
+  solutionDifferentiation: 2500,
+  coreInnovation: 2000,
+  priorArtStatus: 2000,
+  workingMechanism: 2500,
+  keyComponents: 2000,
+  documentationReadiness: 1500,
+  developmentContext: 2000,
+  targetMarkets: 2000,
+  publicDisclosureStatus: 1500,
+  legalAgreements: 1500,
+} as const;
+
+type FieldErrors = Record<string, string>;
+
+const validateStartupForm = (form: StartupPayload): FieldErrors => {
+  const errors: FieldErrors = {};
+
+  if (!form.name.trim()) {
+    errors.name = "Startup name is required.";
+  } else if (form.name.length > FIELD_LIMITS.name) {
+    errors.name = `Name must be ${FIELD_LIMITS.name} characters or fewer.`;
+  }
+
+  if (!form.tagline.trim()) {
+    errors.tagline = "Tagline is required.";
+  } else if (form.tagline.length > FIELD_LIMITS.tagline) {
+    errors.tagline = `Tagline must be ${FIELD_LIMITS.tagline} characters or fewer.`;
+  }
+
+  if (!form.category.trim()) {
+    errors.category = "Category is required.";
+  } else if (form.category.length > FIELD_LIMITS.category) {
+    errors.category = `Category must be ${FIELD_LIMITS.category} characters or fewer.`;
+  }
+
+  if (form.fundingNeeded !== undefined && form.fundingNeeded < 0) {
+    errors.fundingNeeded = "Funding amount cannot be negative.";
+  }
+
+  if (form.activeProducts < 0) {
+    errors.activeProducts = "Active offerings cannot be negative.";
+  }
+
+  return errors;
+};
 
 const shortDateFormatter = new Intl.DateTimeFormat("en-IN", {
   day: "2-digit",
@@ -130,10 +185,36 @@ export function StartupLaunch() {
   const [pendingPitchDeckName, setPendingPitchDeckName] = useState("");
   const [pendingDocumentCategory, setPendingDocumentCategory] =
     useState<StartupDocumentCategory | null>(null);
-  const [form, setForm] = useState<StartupPayload>(() => createEmptyPayload());
+  const [form, setForm] = useState<StartupPayload>(createEmptyPayload);
   const [isIprIntakeOpen, setIsIprIntakeOpen] = useState(true);
   const [activeIprSectionTitle, setActiveIprSectionTitle] = useState(
     STARTUP_IPR_QUESTION_SECTIONS[0]?.title ?? "",
+  );
+  const [fieldErrors, setFieldErrors] = useState<FieldErrors>({});
+  const [hasAttemptedSubmit, setHasAttemptedSubmit] = useState(false);
+
+  /* ── dirty tracking & unsaved changes guard ── */
+  const savedFormSnapshot = useRef<string>(JSON.stringify(createEmptyPayload()));
+  const formIsDirty = useMemo(() => {
+    if (!savedFormSnapshot.current) return false;
+    return JSON.stringify(form) !== savedFormSnapshot.current;
+  }, [form]);
+
+  useEffect(() => {
+    if (!formIsDirty) return;
+    const handler = (e: BeforeUnloadEvent) => {
+      e.preventDefault();
+    };
+    window.addEventListener("beforeunload", handler);
+    return () => window.removeEventListener("beforeunload", handler);
+  }, [formIsDirty]);
+
+  const blocker = useBlocker(
+    useCallback(
+      ({ currentLocation, nextLocation }: { currentLocation: { pathname: string }; nextLocation: { pathname: string } }) =>
+        formIsDirty && currentLocation.pathname !== nextLocation.pathname,
+      [formIsDirty],
+    ),
   );
 
   const workspaceQuery = useQuery({
@@ -168,7 +249,7 @@ export function StartupLaunch() {
 
     const defaultPayload = createEmptyPayload();
 
-    setForm({
+    const loaded = {
       ...defaultPayload,
       projectId: startup.projectId,
       name: startup.name ?? defaultPayload.name,
@@ -190,11 +271,24 @@ export function StartupLaunch() {
         ...defaultPayload.registrationProfile,
         ...(startup.registrationProfile ?? {}),
       },
-    });
+    };
+    setForm(loaded);
+    savedFormSnapshot.current = JSON.stringify(loaded);
   }, [startup]);
 
   const persistStartup = useMutation({
     mutationFn: async () => {
+      const errors = validateStartupForm(form);
+      if (Object.keys(errors).length > 0) {
+        setFieldErrors(errors);
+        setHasAttemptedSubmit(true);
+        const firstErrorField = Object.keys(errors)[0];
+        const el = document.getElementById(`startup-${firstErrorField}`) ?? document.querySelector(`[name="${firstErrorField}"]`);
+        el?.scrollIntoView({ behavior: "smooth", block: "center" });
+        throw new Error(Object.values(errors)[0]);
+      }
+      setFieldErrors({});
+
       const payload = {
         ...form,
         projectId: selectedWorkspaceId || undefined,
@@ -208,6 +302,7 @@ export function StartupLaunch() {
     },
     onSuccess: async (saved) => {
       queryClient.setQueryData(["startup", saved._id], saved);
+      savedFormSnapshot.current = JSON.stringify(form);
       setToast("Startup draft saved. Submit it for admin review when ready.");
       await queryClient.invalidateQueries({ queryKey: ["startup"] });
       if (isNew && saved._id) {
@@ -423,6 +518,13 @@ export function StartupLaunch() {
       },
     }));
   };
+
+  // Re-validate on change once user has tried submitting
+  useEffect(() => {
+    if (hasAttemptedSubmit) {
+      setFieldErrors(validateStartupForm(form));
+    }
+  }, [form, hasAttemptedSubmit]);
 
   const currentStartupId = startup?._id ?? startupId;
   const activeDeals = (dealsQuery.data?.items ?? []).filter((deal) =>
@@ -699,8 +801,13 @@ export function StartupLaunch() {
     ? "border-b border-slate-800/70 pb-8"
     : "border-t border-slate-800/70 pt-7";
   const fieldClassName =
-    "w-full border border-slate-800 bg-slate-950/30 px-3 py-3 text-sm text-white placeholder:text-slate-500 outline-none transition-colors focus:border-cyan-400";
-  const textareaClassName = `${fieldClassName} min-h-28 resize-y`;
+    "w-full border bg-slate-950/30 px-3 py-3 text-sm text-white placeholder:text-slate-500 outline-none transition-colors focus:border-cyan-400";
+  const fieldErrorClassName =
+    "w-full border border-red-500/60 bg-slate-950/30 px-3 py-3 text-sm text-white placeholder:text-slate-500 outline-none transition-colors focus:border-red-400";
+  const fieldOkClassName = `${fieldClassName} border-slate-800`;
+  const textareaClassName = `${fieldClassName} border-slate-800 min-h-28 resize-y`;
+  const getFieldClass = (name: string) =>
+    fieldErrors[name] ? fieldErrorClassName : fieldOkClassName;
   const isRequestReviewBusy =
     requestReview.isPending || persistStartup.isPending;
   const isRequestReviewBlocked = Boolean(
@@ -1102,12 +1209,13 @@ export function StartupLaunch() {
                   htmlFor="startup-name"
                   className="mb-2 block text-sm font-semibold text-white"
                 >
-                  Startup name
+                  Startup name <span className="text-red-400">*</span>
                 </label>
                 <input
                   id="startup-name"
-                  name="startupName"
+                  name="name"
                   autoComplete="organization"
+                  maxLength={FIELD_LIMITS.name}
                   value={form.name}
                   onChange={(event) =>
                     setForm((current) => ({
@@ -1115,20 +1223,30 @@ export function StartupLaunch() {
                       name: event.target.value,
                     }))
                   }
-                  className={fieldClassName}
+                  placeholder="Your startup name"
+                  className={getFieldClass("name")}
                 />
+                <div className="mt-1 flex items-center justify-between">
+                  {fieldErrors.name ? (
+                    <span className="text-xs text-red-400">{fieldErrors.name}</span>
+                  ) : <span />}
+                  <span className="text-xs text-slate-600">
+                    {form.name.length}/{FIELD_LIMITS.name}
+                  </span>
+                </div>
               </div>
               <div>
                 <label
                   htmlFor="startup-tagline"
                   className="mb-2 block text-sm font-semibold text-white"
                 >
-                  Tagline
+                  Tagline <span className="text-red-400">*</span>
                 </label>
                 <input
                   id="startup-tagline"
-                  name="startupTagline"
+                  name="tagline"
                   autoComplete="off"
+                  maxLength={FIELD_LIMITS.tagline}
                   value={form.tagline}
                   onChange={(event) =>
                     setForm((current) => ({
@@ -1136,20 +1254,30 @@ export function StartupLaunch() {
                       tagline: event.target.value,
                     }))
                   }
-                  className={fieldClassName}
+                  placeholder="A short description of your startup"
+                  className={getFieldClass("tagline")}
                 />
+                <div className="mt-1 flex items-center justify-between">
+                  {fieldErrors.tagline ? (
+                    <span className="text-xs text-red-400">{fieldErrors.tagline}</span>
+                  ) : <span />}
+                  <span className="text-xs text-slate-600">
+                    {form.tagline.length}/{FIELD_LIMITS.tagline}
+                  </span>
+                </div>
               </div>
               <div>
                 <label
                   htmlFor="startup-category"
                   className="mb-2 block text-sm font-semibold text-white"
                 >
-                  Category
+                  Category <span className="text-red-400">*</span>
                 </label>
                 <input
                   id="startup-category"
-                  name="startupCategory"
+                  name="category"
                   autoComplete="off"
+                  maxLength={FIELD_LIMITS.category}
                   value={form.category}
                   onChange={(event) =>
                     setForm((current) => ({
@@ -1158,8 +1286,16 @@ export function StartupLaunch() {
                     }))
                   }
                   placeholder="e.g. FinTech, Healthcare, EdTech, Climate…"
-                  className={fieldClassName}
+                  className={getFieldClass("category")}
                 />
+                <div className="mt-1 flex items-center justify-between">
+                  {fieldErrors.category ? (
+                    <span className="text-xs text-red-400">{fieldErrors.category}</span>
+                  ) : <span />}
+                  <span className="text-xs text-slate-600">
+                    {form.category.length}/{FIELD_LIMITS.category}
+                  </span>
+                </div>
               </div>
               <div>
                 <label
@@ -1178,7 +1314,7 @@ export function StartupLaunch() {
                       stage: event.target.value as StartupPayload["stage"],
                     }))
                   }
-                  className={fieldClassName}
+                  className={fieldOkClassName}
                 >
                   <option>Pre-Idea</option>
                   <option>Ideation</option>
@@ -1200,17 +1336,20 @@ export function StartupLaunch() {
                   autoComplete="off"
                   inputMode="numeric"
                   type="number"
+                  min={0}
                   value={form.fundingNeeded ?? ""}
-                  onChange={(event) =>
+                  onChange={(event) => {
+                    const raw = event.target.value.replace(/[^0-9]/g, "");
                     setForm((current) => ({
                       ...current,
-                      fundingNeeded: event.target.value
-                        ? Number(event.target.value)
-                        : undefined,
-                    }))
-                  }
-                  className={fieldClassName}
+                      fundingNeeded: raw ? Number(raw) : undefined,
+                    }));
+                  }}
+                  className={getFieldClass("fundingNeeded")}
                 />
+                {fieldErrors.fundingNeeded ? (
+                  <span className="mt-1 block text-xs text-red-400">{fieldErrors.fundingNeeded}</span>
+                ) : null}
               </div>
               <div>
                 <label
@@ -1225,15 +1364,20 @@ export function StartupLaunch() {
                   autoComplete="off"
                   inputMode="numeric"
                   type="number"
+                  min={0}
                   value={form.activeProducts}
-                  onChange={(event) =>
+                  onChange={(event) => {
+                    const raw = event.target.value.replace(/[^0-9]/g, "");
                     setForm((current) => ({
                       ...current,
-                      activeProducts: Number(event.target.value) || 1,
-                    }))
-                  }
-                  className={fieldClassName}
+                      activeProducts: raw ? Number(raw) : 1,
+                    }));
+                  }}
+                  className={getFieldClass("activeProducts")}
                 />
+                {fieldErrors.activeProducts ? (
+                  <span className="mt-1 block text-xs text-red-400">{fieldErrors.activeProducts}</span>
+                ) : null}
               </div>
             </div>
 
@@ -1417,7 +1561,7 @@ export function StartupLaunch() {
                                     )
                                   }
                                   disabled={isEditingLocked}
-                                  className={fieldClassName}
+                                  className={fieldOkClassName}
                                 >
                                   {question.options.map((option) => (
                                     <option
@@ -1432,6 +1576,7 @@ export function StartupLaunch() {
                                 <textarea
                                   id={`ipr-${String(question.key)}`}
                                   name={String(question.key)}
+                                  maxLength={FIELD_LIMITS[question.key as keyof typeof FIELD_LIMITS] ?? undefined}
                                   value={String(
                                     form.registrationProfile[question.key] ??
                                       "",
@@ -1448,12 +1593,26 @@ export function StartupLaunch() {
                                   placeholder="Add a concrete answer with enough technical detail for review…"
                                 />
                               )}
-                              {"minLength" in question ? (
-                                <div className="mt-2 text-xs text-slate-500">
-                                  Recommended minimum: {question.minLength}{" "}
-                                  characters
-                                </div>
-                              ) : null}
+                              <div className="mt-1.5 flex items-center justify-between gap-2">
+                                {"minLength" in question ? (
+                                  <span className={`text-xs ${
+                                    String(form.registrationProfile[question.key] ?? "").trim().length >= (question.minLength ?? 0)
+                                      ? "text-emerald-500"
+                                      : "text-slate-500"
+                                  }`}>
+                                    Min {question.minLength} chars
+                                    {String(form.registrationProfile[question.key] ?? "").trim().length >= (question.minLength ?? 0)
+                                      ? " \u2713"
+                                      : ""}
+                                  </span>
+                                ) : <span />}
+                                {FIELD_LIMITS[question.key as keyof typeof FIELD_LIMITS] ? (
+                                  <span className="text-xs text-slate-600">
+                                    {String(form.registrationProfile[question.key] ?? "").length}
+                                    /{FIELD_LIMITS[question.key as keyof typeof FIELD_LIMITS]}
+                                  </span>
+                                ) : null}
+                              </div>
                             </div>
                           ))}
                         </div>
@@ -1465,11 +1624,10 @@ export function StartupLaunch() {
                 <div className="flex flex-col gap-3 border-t border-cyan-500/20 bg-cyan-500/5 px-4 py-4 sm:flex-row sm:items-center sm:justify-between">
                   <div>
                     <div className="text-sm font-semibold text-white">
-                      Save IPR intake
+                      Save all changes
                     </div>
                     <div className="mt-1 text-xs text-cyan-100/80">
-                      Saved answers are stored with this startup profile and
-                      will load again after relogin.
+                      Saves the full startup profile including all IPR answers above.
                     </div>
                   </div>
                   <button
@@ -1481,8 +1639,8 @@ export function StartupLaunch() {
                     {persistStartup.isPending
                       ? "Saving…"
                       : isNew
-                        ? "Create & Save Intake"
-                        : "Save IPR Intake"}
+                        ? "Create Startup Draft"
+                        : "Save All Changes"}
                   </button>
                 </div>
               </>
@@ -1672,6 +1830,66 @@ export function StartupLaunch() {
                     </label>
                   ))}
                 </div>
+
+                {form.traction.patentFiled && (
+                  <div className="mt-4 space-y-3">
+                    <label className="block text-sm font-medium text-slate-300">
+                      Patent Type
+                    </label>
+                    <div className="grid gap-3 md:grid-cols-2">
+                      <label className="flex cursor-pointer items-center gap-3 border border-slate-800 bg-slate-950/20 px-4 py-3 text-white">
+                        <input
+                          type="radio"
+                          name="patentType"
+                          checked={form.traction.patentType === 'self_filed'}
+                          onChange={() =>
+                            setForm((current) => ({
+                              ...current,
+                              traction: {
+                                ...current.traction,
+                                patentType: 'self_filed',
+                              },
+                            }))
+                          }
+                        />
+                        <div>
+                          <div className="font-medium">Self-Filed</div>
+                          <div className="text-xs text-slate-400">I will complete the patent myself</div>
+                        </div>
+                      </label>
+                      <label className="flex cursor-pointer items-center gap-3 border border-slate-800 bg-slate-950/20 px-4 py-3 text-white">
+                        <input
+                          type="radio"
+                          name="patentType"
+                          checked={form.traction.patentType === 'promove_assisted'}
+                          onChange={() =>
+                            setForm((current) => ({
+                              ...current,
+                              traction: {
+                                ...current.traction,
+                                patentType: 'promove_assisted',
+                              },
+                            }))
+                          }
+                        />
+                        <div>
+                          <div className="font-medium">ProMove Assisted</div>
+                          <div className="text-xs text-slate-400">Get help from ProMove to file patent</div>
+                        </div>
+                      </label>
+                    </div>
+                    {form.traction.patentType === 'self_filed' && (
+                      <p className="text-xs text-slate-400">
+                        You will complete the patent application yourself. ProMove will review and approve it.
+                      </p>
+                    )}
+                    {form.traction.patentType === 'promove_assisted' && (
+                      <p className="text-xs text-cyan-400">
+                        ProMove will help you file the patent through their portal. You'll receive tracking updates at each stage.
+                      </p>
+                    )}
+                  </div>
+                )}
               </div>
             ) : null}
           </fieldset>
@@ -1781,11 +1999,11 @@ export function StartupLaunch() {
       <div className="flex flex-col gap-4 border-t border-slate-800/70 pt-6 sm:flex-row sm:items-center sm:justify-between">
         <div>
           <p className="text-sm font-semibold text-white">
-            Save and submit at the end of the page.
+            {isNew ? "Create your startup draft" : "Save or submit your startup"}
           </p>
           <p className="mt-1 text-sm text-slate-400">
             {isNew
-              ? "Create the startup first, then return here to submit it for review."
+              ? "Fill in at least the name, tagline, and category, then save. Documents and IPR answers can be added later."
               : isEditingLocked
                 ? `${editLockReason} Raise a Smart Help request if you need admin-approved edits.`
                 : launchBlockedReason ||
@@ -1862,6 +2080,36 @@ export function StartupLaunch() {
           </button>
         </div>
       </div>
+
+      {blocker.state === "blocked" ? (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-950/80 p-6 backdrop-blur-sm">
+          <div className="w-full max-w-md border border-slate-800 bg-slate-900 p-6">
+            <h2 className="text-lg font-bold text-white">
+              You have unsaved changes
+            </h2>
+            <p className="mt-2 text-sm text-slate-300">
+              If you leave this page, your changes will be lost. Do you want to
+              save before leaving?
+            </p>
+            <div className="mt-5 flex justify-end gap-3">
+              <button
+                type="button"
+                onClick={() => blocker.reset?.()}
+                className="border border-slate-700 px-4 py-2.5 text-sm font-semibold text-white transition hover:border-slate-500"
+              >
+                Stay on page
+              </button>
+              <button
+                type="button"
+                onClick={() => blocker.proceed?.()}
+                className="border border-red-500/30 bg-red-500/10 px-4 py-2.5 text-sm font-semibold text-red-200 transition hover:bg-red-500/20"
+              >
+                Discard & leave
+              </button>
+            </div>
+          </div>
+        </div>
+      ) : null}
 
       {showLaunchModal ? (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-950/80 p-6 backdrop-blur-sm">

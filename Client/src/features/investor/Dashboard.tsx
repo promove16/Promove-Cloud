@@ -10,10 +10,13 @@ import { investorApi } from '../../api/investor.api';
 import { DealDetail } from './DealDetail';
 import { PatentShowcase } from '../shared/PatentShowcase';
 
+const formatInvestorTypeLabel = (type: string) =>
+  type === 'penny' ? 'Penny Investor' : type === 'sole' ? 'Sole Investor' : type;
+
 const quickLinks = [
-  { label: 'Startups', path: '/dashboard/investor/startups' },
+  { label: 'Marketplace', path: '/dashboard/investor/startups' },
   { label: 'Institutions', path: '/dashboard/investor/institutions' },
-  { label: 'My Portfolio', path: '/dashboard/investor/portfolio' },
+  { label: 'Product Workshop', path: '/dashboard/investor/product-workshop' },
 ];
 
 export default function InvestorDashboard() {
@@ -34,6 +37,7 @@ export default function InvestorDashboard() {
 
   const stageGroups = useMemo(() => dealsQuery.data ?? [], [dealsQuery.data]);
   const stageLabels: Record<number, string> = {
+    0: 'Negotiation',
     1: 'Due Diligence',
     2: 'Payment Placeholder',
     3: 'Equity Transfer',
@@ -76,6 +80,20 @@ export default function InvestorDashboard() {
         </div>
       )}
 
+      <Card className="border border-cyan-500/30 bg-gradient-to-r from-cyan-950/40 to-slate-950 p-6">
+        <div className="flex flex-col gap-4 md:flex-row md:items-center md:justify-between">
+          <div>
+            <h2 className="text-xl font-bold text-white">Find Startups to Invest In</h2>
+            <p className="mt-1 text-sm text-slate-400">
+              Browse vetted startups, review founder scores, and express your interest to start a deal.
+            </p>
+          </div>
+          <Button size="lg" onClick={() => navigate('/dashboard/investor/startups')}>
+            Browse Marketplace
+          </Button>
+        </div>
+      </Card>
+
       <div className="grid gap-4 xl:grid-cols-4">
         {stageGroups.map((group) => (
           <Card key={group.stage} className="min-h-[280px] p-5">
@@ -102,7 +120,7 @@ export default function InvestorDashboard() {
                     </div>
                     <div className="flex flex-col items-end gap-2">
                       <Badge className={deal.investorType === 'sole' ? 'border-amber-500/30 bg-amber-500/10 text-amber-300' : 'border-cyan-500/30 bg-cyan-500/10 text-cyan-300'}>
-                        {deal.investorType.toUpperCase()}
+                        {formatInvestorTypeLabel(deal.investorType)}
                       </Badge>
                       {deal.adminApprovalRequired ? (
                         <Badge className="border-amber-500/30 bg-amber-500/10 text-amber-300">
@@ -121,7 +139,7 @@ export default function InvestorDashboard() {
                       <span>{stageLabels[deal.currentStage]}</span>
                     </div>
                     <div className="grid grid-cols-4 gap-1">
-                      {[1, 2, 3, 4].map((stage) => (
+                      {[0, 1, 2, 3, 4].map((stage) => (
                         <div
                           key={stage}
                           className={`h-2 rounded-full ${

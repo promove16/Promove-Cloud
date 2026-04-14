@@ -1,7 +1,7 @@
 import api from './axiosInstance';
 import { ApiSuccessResponse } from '../types/auth.types';
 import { CapTableResponse } from '../types/deal.types';
-import { Startup, StartupBusinessProfile, StartupDocumentCategory, StartupRegistrationProfile } from '../types/startup.types';
+import { Startup, StartupBusinessProfile, StartupDocumentCategory, StartupPitchRequest, StartupRegistrationProfile } from '../types/startup.types';
 
 export interface StartupPayload {
   projectId?: string;
@@ -12,7 +12,14 @@ export interface StartupPayload {
   fundingNeeded?: number;
   activeProducts: number;
   teamSize: number;
-  traction: Startup['traction'];
+  traction: {
+    patentFiled: boolean;
+    mvpBuilt: boolean;
+    revenueGenerating: boolean;
+    usersCount?: number;
+    patentType?: 'self_filed' | 'promove_assisted';
+    patentApplicationId?: string;
+  };
   businessProfile: StartupBusinessProfile;
   registrationProfile: StartupRegistrationProfile;
 }
@@ -68,6 +75,18 @@ export const startupApi = {
   },
   async demoteFromCoFounder(startupId: string, memberId: string) {
     const response = await api.post<ApiSuccessResponse<Startup>>(`/api/startup/${startupId}/members/${memberId}/demote`);
+    return response.data.data;
+  },
+  async sendPitchRequest(startupId: string, investorId: string) {
+    const response = await api.post<ApiSuccessResponse<Startup>>(`/api/startup/${startupId}/pitch-request`, { investorId });
+    return response.data.data;
+  },
+  async respondToPitchRequest(startupId: string, requestId: string, decision: 'accepted' | 'rejected', note?: string) {
+    const response = await api.patch<ApiSuccessResponse<Startup>>(`/api/startup/${startupId}/pitch-request/${requestId}`, { decision, note });
+    return response.data.data;
+  },
+  async getPitchRequests() {
+    const response = await api.get<ApiSuccessResponse<StartupPitchRequest[]>>('/api/startup/pitch-requests');
     return response.data.data;
   },
   async getCapTable(startupId: string) {

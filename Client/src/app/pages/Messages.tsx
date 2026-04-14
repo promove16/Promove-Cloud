@@ -243,6 +243,15 @@ const investorPitchFieldLabels = new Set([
   "Pitch Deck",
 ]);
 
+const investorPitchAcceptReply =
+  "Hi! I've reviewed your startup and I'm interested in learning more. Let's schedule a call to discuss the investment opportunity.";
+const investorPitchDeclineReply =
+  "Thank you for reaching out. After careful consideration, I'll pass on this opportunity for now. Best of luck with your venture!";
+const investorPitchQuickReplies = new Set([
+  investorPitchAcceptReply,
+  investorPitchDeclineReply,
+]);
+
 const stripLeadingDecorators = (value: string) =>
   value.replace(/^[^A-Za-z0-9]+/, "").trim();
 
@@ -326,6 +335,46 @@ const parseInvestorPitch = (message: string): InvestorPitchDetails | null => {
   }
 
   return details;
+};
+
+const getResolvedInvestorPitchMessageIds = (
+  messages: DMMessage[],
+  currentUserId?: string,
+) => {
+  if (!currentUserId) {
+    return new Set<string>();
+  }
+
+  const pendingPitchMessageIds: string[] = [];
+  const resolvedPitchMessageIds = new Set<string>();
+
+  for (const message of messages) {
+    const isIncomingInvestorPitch =
+      message.senderId !== currentUserId &&
+      message.queryType === "investor" &&
+      Boolean(parseInvestorPitch(message.message));
+
+    if (isIncomingInvestorPitch) {
+      pendingPitchMessageIds.push(message._id);
+      continue;
+    }
+
+    const isQuickReplyResponse =
+      message.senderId === currentUserId &&
+      message.messageType === "text" &&
+      investorPitchQuickReplies.has(message.message.trim());
+
+    if (!isQuickReplyResponse) {
+      continue;
+    }
+
+    const resolvedPitchMessageId = pendingPitchMessageIds.pop();
+    if (resolvedPitchMessageId) {
+      resolvedPitchMessageIds.add(resolvedPitchMessageId);
+    }
+  }
+
+  return resolvedPitchMessageIds;
 };
 
 function EmphasizedMessageText({
@@ -1104,6 +1153,7 @@ function MessageBubble({
   onRemoveAttachment,
   disableAttachmentOpen = false,
   onQuickReply,
+  showInvestorPitchReplyActions = false,
 }: {
   msg: DMMessage;
   isMine: boolean;
@@ -1114,6 +1164,7 @@ function MessageBubble({
   onRemoveAttachment?: () => void;
   disableAttachmentOpen?: boolean;
   onQuickReply?: (message: string) => void;
+  showInvestorPitchReplyActions?: boolean;
 }) {
   const isImage = msg.attachmentType === "image";
   const isPdf = msg.attachmentType === "pdf";
@@ -1303,19 +1354,11 @@ function MessageBubble({
         </div>
 
         {/* Investor proposal quick-reply — shown only to the recipient */}
-        {!isMine && msg.queryType === "investor" && onQuickReply && (
+        {showInvestorPitchReplyActions && onQuickReply && investorPitch && (
           <InvestorProposalReplyActions
             senderName={partnerName}
-            onAccept={() =>
-              onQuickReply(
-                `Hi! I've reviewed your startup and I'm interested in learning more. Let's schedule a call to discuss the investment opportunity.`,
-              )
-            }
-            onDecline={() =>
-              onQuickReply(
-                `Thank you for reaching out. After careful consideration, I'll pass on this opportunity for now. Best of luck with your venture!`,
-              )
-            }
+            onAccept={() => onQuickReply(investorPitchAcceptReply)}
+            onDecline={() => onQuickReply(investorPitchDeclineReply)}
           />
         )}
       </div>
@@ -1755,6 +1798,10 @@ function ChatPanel({
     conversationRequest.status !== "accepted" &&
     conversationRequestDirection,
   );
+  const resolvedInvestorPitchMessageIds = useMemo(
+    () => getResolvedInvestorPitchMessageIds(messages, currentUser?._id),
+    [currentUser?._id, messages],
+  );
 
   return (
     <div className="flex min-h-0 flex-1 flex-col">
@@ -1815,6 +1862,11 @@ function ChatPanel({
                   partnerName={partnerName}
                   currentUserName={currentUser?.displayName ?? "Me"}
                   showAvatar={showAvatar}
+                  showInvestorPitchReplyActions={
+                    !isMine &&
+                    msg.queryType === "investor" &&
+                    !resolvedInvestorPitchMessageIds.has(msg._id)
+                  }
                   onQuickReply={(reply) =>
                     sendMessage({
                       message: reply,

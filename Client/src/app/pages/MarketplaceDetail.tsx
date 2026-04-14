@@ -11,6 +11,7 @@ import {
   FolderKanban,
   Globe,
   GraduationCap,
+  Handshake,
   MapPin,
   MessageCircle,
   Send,
@@ -34,6 +35,7 @@ import {
   StartupInviteTarget,
 } from "../../features/marketplace/StartupInviteModal";
 import { recruiterApi } from "../../api/recruiter.api";
+import { investorApi } from "../../api/investor.api";
 import { useAuthStore } from "../../store/authStore";
 import { UserRole } from "../../types/roles.types";
 import {
@@ -203,6 +205,15 @@ function StartupDetailView({
   entity: MarketplaceStartupDetail;
   onMessage: (targetId: string) => void;
 }) {
+  const navigate = useNavigate();
+  const currentUser = useAuthStore((state) => state.user);
+  const isInvestorView = currentUser?.role === UserRole.INVESTOR;
+  const canShowInvestorButton = isInvestorView && (entity.acceptsPennyInvestors || entity.acceptsSoleInvestor);
+
+  const handleExpressInterest = () => {
+    navigate('/dashboard/investor/startups', { state: { highlightStartupId: entity._id } });
+  };
+
   return (
     <div className="space-y-6">
       <section className="relative overflow-hidden rounded-[32px] border border-white/10 bg-[#090d1b] px-6 py-6 shadow-[0_30px_120px_rgba(15,23,42,0.32)] sm:px-8 sm:py-7 lg:px-10">
@@ -226,6 +237,15 @@ function StartupDetailView({
           </div>
 
           <div className="flex flex-wrap items-center gap-2">
+            {canShowInvestorButton && (
+              <button
+                onClick={handleExpressInterest}
+                className="inline-flex items-center gap-2 rounded-full border border-cyan-400/30 bg-cyan-400/10 px-3.5 py-2 text-sm font-semibold text-cyan-300 transition hover:border-cyan-400/50 hover:bg-cyan-400/20"
+              >
+                <Handshake className="h-4 w-4" />
+                Express Interest
+              </button>
+            )}
             {entity.primaryFounderId ? (
               <button
                 onClick={() => onMessage(entity.primaryFounderId!)}

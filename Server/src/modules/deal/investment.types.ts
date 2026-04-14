@@ -1,7 +1,7 @@
 import { Types } from 'mongoose';
 import { UserRole } from '../../types/roles.types';
 
-export type DealStage = 1 | 2 | 3 | 4;
+export type DealStage = 0 | 1 | 2 | 3 | 4;
 export type DealStatus = 'active' | 'closed' | 'cancelled';
 export type InvestorType = 'penny' | 'sole';
 export type InvestorRole = 'shareholder' | 'director' | 'observer';
@@ -10,6 +10,31 @@ export type DealMediationStatus = 'intake' | 'under_review' | 'approved' | 'reje
 export type StockTransferStatus = 'not_started' | 'pending_review' | 'under_review' | 'approved' | 'rejected';
 export type RoyaltyStatus = 'pending' | 'invoiced' | 'received';
 export type FounderDecisionStatus = 'pending' | 'accepted' | 'rejected';
+export type NegotiationStatus = 'initial' | 'terms_proposed' | 'counter_offer' | 'terms_agreed' | 'stalled' | 'cancelled';
+
+export interface DealNegotiation {
+  status: NegotiationStatus;
+  investorProposedAmount?: number;
+  investorProposedEquity?: number;
+  studentCounterAmount?: number;
+  studentCounterEquity?: number;
+  finalAgreedAmount?: number;
+  finalAgreedEquity?: number;
+  messages: Array<{
+    _id?: Types.ObjectId;
+    id?: string;
+    senderId: Types.ObjectId;
+    senderRole: 'investor' | 'student';
+    message: string;
+    timestamp?: Date;
+    createdAt?: Date;
+    updatedAt?: Date;
+    attachments?: string[];
+  }>;
+  lastUpdatedAt?: Date;
+  termsAgreedAt?: Date;
+  notes?: string;
+}
 
 export interface DealStockDetails {
   shareClassLabel: string;
@@ -60,6 +85,7 @@ export interface IInvestment extends InvestmentAuthority {
   mediationStatus: DealMediationStatus;
   investorType: InvestorType;
   stage: DealStage;
+  negotiation: DealNegotiation;
   amountINR: number;
   proposedAmountINR?: number;
   equityPercent: number;
@@ -74,6 +100,7 @@ export interface IInvestment extends InvestmentAuthority {
   adminApprovedAt?: Date;
   adminApprovedBy?: Types.ObjectId;
   closedAt?: Date;
+  linkedWorkspaceId?: Types.ObjectId;
   innovationScoreSnapshot: number;
   status: DealStatus;
   createdAt: Date;
@@ -86,6 +113,14 @@ export interface DealParticipantSummary {
   avatar?: string;
   role: UserRole;
   innovationScore: number;
+}
+
+export interface DealProductWorkshopSummary {
+  workspaceId: string;
+  title: string;
+  category: string;
+  stage: string;
+  progressPercent: number;
 }
 
 export interface DealStartupSummary {
@@ -144,6 +179,26 @@ export interface DealSummaryView extends InvestmentAuthority {
     respondedBy?: string;
     note?: string;
   };
+  negotiation?: {
+    status: NegotiationStatus;
+    investorProposedAmount?: number;
+    investorProposedEquity?: number;
+    studentCounterAmount?: number;
+    studentCounterEquity?: number;
+    finalAgreedAmount?: number;
+    finalAgreedEquity?: number;
+    messages: Array<{
+      _id: string;
+      senderId: string;
+      senderRole: 'investor' | 'student';
+      message: string;
+      timestamp: string;
+      attachments?: string[];
+    }>;
+    lastUpdatedAt?: string;
+    termsAgreedAt?: string;
+    notes?: string;
+  };
   innovationScoreSnapshot: number;
   nextActionLabel: string;
   createdAt: string;
@@ -154,6 +209,7 @@ export interface DealDetailView extends DealSummaryView {
   startup: DealStartupSummary;
   student: DealParticipantSummary;
   investor: DealParticipantSummary;
+  productWorkshop?: DealProductWorkshopSummary;
   fundTransferInitiatedAt?: string;
   closedAt?: string;
 }
@@ -177,6 +233,7 @@ export interface DealPortfolioItem extends InvestmentAuthority {
   innovationScoreSnapshot: number;
   liveInnovationScore: number;
   scoreTrend: number;
+  productWorkshop?: DealProductWorkshopSummary;
   closedAt?: string;
   studentDisplayName: string;
   studentAvatar?: string;

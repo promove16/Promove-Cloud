@@ -781,7 +781,7 @@ const getMarketplaceStartupDetail = async (requesterRole: UserRole, startupId: s
       : Promise.resolve(null),
   ]);
 
-  return {
+return {
     ...buildStartupView(requesterRole, startup, founders, workspace),
     ...(requesterRole === UserRole.INVESTOR
       ? {
@@ -793,6 +793,8 @@ const getMarketplaceStartupDetail = async (requesterRole: UserRole, startupId: s
             maxPennyInvestors: startup.maxPennyInvestors,
             hasSoleInvestor: startup.hasSoleInvestor,
           },
+          acceptsPennyInvestors: startup.currentPennyCount < startup.maxPennyInvestors,
+          acceptsSoleInvestor: !startup.hasSoleInvestor,
         }
       : {}),
   };

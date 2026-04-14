@@ -91,6 +91,21 @@ const patentSchema = new Schema<IPatent>(
     adminNotes: { type: String, default: undefined },
     scoreAwarded: { type: Boolean, default: false },
     showcasedInMarketplace: { type: Boolean, default: false },
+    trackingTimeline: {
+      type: [
+        new Schema(
+          {
+            status: { type: String, required: true },
+            note: { type: String, default: undefined },
+            updatedAt: { type: Date, default: () => new Date() },
+            updatedBy: { type: Schema.Types.ObjectId, default: undefined },
+          },
+          { _id: true },
+        ),
+      ],
+      default: [],
+    },
+    nextActionRequired: { type: String, default: undefined },
   },
   { timestamps: true },
 );

@@ -9,6 +9,7 @@ import { Input } from '../../components/ui/Input';
 import { Spinner } from '../../components/ui/Spinner';
 import { dealApi } from '../../api/deal.api';
 import { DealDetailView } from '../../types/deal.types';
+import { NegotiationPanel } from './NegotiationPanel';
 
 type Props = {
   dealId: string | null;
@@ -18,7 +19,16 @@ type Props = {
 
 const investorRoles = ['shareholder', 'director', 'observer'] as const;
 const formatRoleLabel = (role: (typeof investorRoles)[number]) => role.charAt(0).toUpperCase() + role.slice(1);
+const formatInvestorTypeLabel = (type: string) =>
+  type === 'penny' ? 'Penny Investor' : type === 'sole' ? 'Sole Investor' : type;
 const formatInr = (amount: number) => `INR ${amount.toLocaleString()}`;
+const stageLabels: Record<number, string> = {
+  0: 'Negotiation',
+  1: 'Due Diligence',
+  2: 'Payment',
+  3: 'Admin Review',
+  4: 'Portfolio',
+};
 const getDealWorkflowErrorMessage = (error: unknown) => {
   if (isAxiosError<{ error?: { message?: string } }>(error)) {
     return error.response?.data?.error?.message ?? 'Unable to update this deal right now.';
@@ -64,7 +74,7 @@ export function DealDetail({ dealId, open, onOpenChange }: Props) {
 
   const advanceMutation = useMutation({
     mutationFn: (payload: {
-      newStage: 2 | 3 | 4;
+      newStage: 1 | 2 | 3 | 4;
       stageData?: {
         amountINR?: number;
         equityPercent?: number;
@@ -90,6 +100,7 @@ export function DealDetail({ dealId, open, onOpenChange }: Props) {
   });
 
   const deal = dealQuery.data as DealDetailView | undefined;
+  const canAdvanceFromNegotiation = Boolean(deal?.negotiation?.termsAgreedAt);
 
   const handleAdvance = () => {
     if (!deal) {
@@ -97,6 +108,16 @@ export function DealDetail({ dealId, open, onOpenChange }: Props) {
     }
 
     setError('');
+    if (deal.currentStage === 0) {
+      if (!deal.negotiation?.termsAgreedAt) {
+        setError('Both parties must agree on terms before due diligence can begin.');
+        return;
+      }
+
+      advanceMutation.mutate({ newStage: 1 });
+      return;
+    }
+
     if (deal.currentStage === 1) {
       if (deal.founderDecision.status !== 'accepted') {
         setError('Founder acceptance is required before opening the payment placeholder.');
@@ -120,6 +141,11 @@ export function DealDetail({ dealId, open, onOpenChange }: Props) {
 
     if (deal.currentStage === 3 && deal.adminApprovedAt) {
       advanceMutation.mutate({ newStage: 4 });
+      return;
+    }
+
+    if (deal.currentStage === 4) {
+      setNotice('This deal is already in your portfolio.');
     }
   };
 
@@ -183,7 +209,7 @@ export function DealDetail({ dealId, open, onOpenChange }: Props) {
                 <div className="flex flex-wrap gap-2">
                   <Badge>Stage {deal.currentStage}</Badge>
                   <Badge className={deal.investorType === 'sole' ? 'border-amber-500/30 bg-amber-500/10 text-amber-300' : 'border-cyan-500/30 bg-cyan-500/10 text-cyan-300'}>
-                    {deal.investorType.toUpperCase()}
+                    {formatInvestorTypeLabel(deal.investorType)}
                   </Badge>
                   {deal.adminApprovalRequired ? (
                     <Badge className="border-amber-500/30 bg-amber-500/10 text-amber-300">
@@ -202,6 +228,10 @@ export function DealDetail({ dealId, open, onOpenChange }: Props) {
                 {notice}
               </div>
             ) : null}
+
+            {deal.currentStage === 0 && (
+              <NegotiationPanel deal={deal} isInvestor={true} />
+            )}
 
             {deal.currentStage === 1 ? (
               <Card className="space-y-4 p-5">
@@ -353,31 +383,76 @@ export function DealDetail({ dealId, open, onOpenChange }: Props) {
               </Card>
             ) : null}
 
-            <div className="flex justify-end">
-              <Button
-                onClick={handleAdvance}
-                disabled={
-                  advanceMutation.isPending ||
-                  (deal.currentStage === 1 && deal.founderDecision.status !== 'accepted') ||
-                  (awaitingAdminApproval && deal.stockTransfer.status !== 'rejected') ||
-                  (deal.currentStage === 3 && deal.stockTransfer.status !== 'rejected' && !deal.adminApprovedAt)
-                }
-              >
-                {advanceMutation.isPending
-                  ? 'Updating...'
-                  : deal.currentStage === 1
-                    ? deal.founderDecision.status === 'accepted'
-                      ? 'View Payment Placeholder'
-                      : 'Awaiting Founder Acceptance'
-                    : deal.currentStage === 2
-                      ? awaitingAdminApproval
-                        ? 'Awaiting Admin Verification'
-                        : 'Submit for Admin Approval'
-                      : deal.stockTransfer.status === 'rejected'
-                        ? 'Resubmit for Admin Approval'
-                        : 'Move to Portfolio'}
-              </Button>
-            </div>
+            <Card className="p-4">
+              <div className="mb-3 text-xs font-semibold uppercase tracking-[0.2em] text-slate-400">
+                Deal Progress
+              </div>
+              <div className="flex items-center gap-1">
+                {[0, 1, 2, 3, 4].map((stage) => (
+                  <div key={stage} className="flex flex-1 items-center gap-1">
+                    <div className="flex flex-1 flex-col items-center gap-1">
+                      <div
+                        className={`h-2 w-full rounded-full ${
+                          stage < deal.currentStage
+                            ? 'bg-emerald-400'
+                            : stage === deal.currentStage
+                              ? 'bg-cyan-400'
+                              : 'bg-slate-800'
+                        }`}
+                      />
+                      <span
+                        className={`text-[10px] ${
+                          stage === deal.currentStage
+                            ? 'font-semibold text-cyan-300'
+                            : stage < deal.currentStage
+                              ? 'text-emerald-400'
+                              : 'text-slate-600'
+                        }`}
+                      >
+                        {stageLabels[stage]}
+                      </span>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </Card>
+
+            {deal.currentStage === 0 && !canAdvanceFromNegotiation ? (
+              <div className="rounded-xl border border-slate-800 bg-slate-900/60 px-4 py-3 text-sm text-slate-400">
+                Complete the negotiation above and agree on terms before advancing to Due Diligence.
+              </div>
+            ) : deal.currentStage === 4 ? null : (
+              <div className="flex items-center justify-between gap-4">
+                {error ? <div className="text-sm text-red-300">{error}</div> : <div />}
+                <Button
+                  onClick={handleAdvance}
+                  disabled={
+                    advanceMutation.isPending ||
+                    (deal.currentStage === 1 && deal.founderDecision.status !== 'accepted') ||
+                    (awaitingAdminApproval && deal.stockTransfer.status !== 'rejected') ||
+                    (deal.currentStage === 3 && deal.stockTransfer.status !== 'rejected' && !deal.adminApprovedAt)
+                  }
+                >
+                  {advanceMutation.isPending
+                    ? 'Updating...'
+                    : deal.currentStage === 0
+                      ? 'Advance to Due Diligence'
+                      : deal.currentStage === 1
+                        ? deal.founderDecision.status === 'accepted'
+                          ? 'View Payment Placeholder'
+                          : 'Awaiting Founder Acceptance'
+                        : deal.currentStage === 2
+                          ? awaitingAdminApproval
+                            ? 'Awaiting Admin Verification'
+                            : 'Submit for Admin Approval'
+                          : deal.currentStage === 3
+                            ? deal.stockTransfer.status === 'rejected'
+                              ? 'Resubmit for Admin Approval'
+                              : 'Move to Portfolio'
+                            : 'Already in Portfolio'}
+                </Button>
+              </div>
+            )}
           </div>
         ) : null}
       </div>

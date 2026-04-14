@@ -57,6 +57,33 @@ const createStartup = async (
     ...overrides,
   });
 
+const agreeToCurrentTerms = async ({
+  dealId,
+  participant,
+}: {
+  dealId: string;
+  participant: { _id: { toString(): string }; email: string; role: UserRole };
+}) => {
+  const response = await request(app)
+    .post(`/api/deals/${dealId}/negotiation-agree`)
+    .set(authHeader(participant));
+  expect(response.status).toBe(200);
+};
+
+const moveToDueDiligence = async ({
+  dealId,
+  investor,
+}: {
+  dealId: string;
+  investor: { _id: { toString(): string }; email: string; role: UserRole };
+}) => {
+  const response = await request(app)
+    .patch(`/api/investor/deals/${dealId}/stage`)
+    .set(authHeader(investor))
+    .send({ newStage: 1 });
+  expect(response.status).toBe(200);
+};
+
 const approveDealThroughAdmin = async ({
   founder,
   investor,
@@ -74,6 +101,9 @@ const approveDealThroughAdmin = async ({
   equityPercent: number;
   investorRole: 'shareholder' | 'director' | 'observer';
 }) => {
+  await agreeToCurrentTerms({ dealId, participant: founder });
+  await moveToDueDiligence({ dealId, investor });
+
   const founderAcceptResponse = await request(app)
     .patch(`/api/deals/${dealId}/founder-decision`)
     .set(authHeader(founder))
@@ -373,6 +403,9 @@ describe('investment workflow integration', () => {
       [soleResponse.body.data._id, soleInvestor, 300000, 60, 'director'],
       [pennyResponse.body.data._id, pennyInvestor, 20000, 2, 'shareholder'],
     ] as const) {
+      await agreeToCurrentTerms({ dealId, participant: founder });
+      await moveToDueDiligence({ dealId, investor });
+
       const founderAcceptResponse = await request(app)
         .patch(`/api/deals/${dealId}/founder-decision`)
         .set(authHeader(founder))
@@ -564,6 +597,9 @@ describe('investment workflow integration', () => {
     expect(expressResponse.status).toBe(201);
     const dealId = expressResponse.body.data._id;
 
+    await agreeToCurrentTerms({ dealId, participant: founder });
+    await moveToDueDiligence({ dealId, investor });
+
     const founderAcceptResponse = await request(app)
       .patch(`/api/deals/${dealId}/founder-decision`)
       .set(authHeader(founder))
@@ -674,6 +710,9 @@ describe('investment workflow integration', () => {
 
     expect(expressResponse.status).toBe(201);
 
+    await agreeToCurrentTerms({ dealId: expressResponse.body.data._id, participant: founder });
+    await moveToDueDiligence({ dealId: expressResponse.body.data._id, investor });
+
     const blockedResponse = await request(app)
       .patch(`/api/investor/deals/${expressResponse.body.data._id}/stage`)
       .set(authHeader(investor))
@@ -702,6 +741,9 @@ describe('investment workflow integration', () => {
       });
 
     expect(expressResponse.status).toBe(201);
+
+    await agreeToCurrentTerms({ dealId: expressResponse.body.data._id, participant: founder });
+    await moveToDueDiligence({ dealId: expressResponse.body.data._id, investor });
 
     const rejectResponse = await request(app)
       .patch(`/api/deals/${expressResponse.body.data._id}/founder-decision`)
@@ -738,6 +780,9 @@ describe('investment workflow integration', () => {
 
     expect(expressResponse.status).toBe(201);
     expect(expressResponse.body.data.founderDecision.status).toBe('pending');
+
+    await agreeToCurrentTerms({ dealId: expressResponse.body.data._id, participant: founder });
+    await moveToDueDiligence({ dealId: expressResponse.body.data._id, investor });
 
     const blockedAdvanceResponse = await request(app)
       .patch(`/api/investor/deals/${expressResponse.body.data._id}/stage`)
@@ -784,6 +829,9 @@ describe('investment workflow integration', () => {
 
     expect(resubmittedResponse.status).toBe(201);
 
+    await agreeToCurrentTerms({ dealId: resubmittedResponse.body.data._id, participant: founder });
+    await moveToDueDiligence({ dealId: resubmittedResponse.body.data._id, investor });
+
     const acceptanceResponse = await request(app)
       .patch(`/api/deals/${resubmittedResponse.body.data._id}/founder-decision`)
       .set(authHeader(founder))
@@ -809,5 +857,90 @@ describe('investment workflow integration', () => {
 
     expect(advanceResponse.status).toBe(200);
     expect(advanceResponse.body.data.deal.currentStage).toBe(2);
+  });
+
+  it('persists negotiation messages and exposes them in investor deal detail', async () => {
+    const founder = await createUser(UserRole.STUDENT, { displayName: 'Negotiation Founder' });
+    const investor = await createUser(UserRole.INVESTOR, { displayName: 'Negotiation Investor' });
+    const startup = await createStartup(founder._id.toString());
+
+    const expressResponse = await request(app)
+      .post(`/api/investor/express-interest/${startup._id}`)
+      .set(authHeader(investor))
+      .send({
+        investorType: 'penny',
+        proposedAmountINR: 25000,
+        proposedEquityPercent: 2,
+        chosenRole: 'shareholder',
+      });
+
+    expect(expressResponse.status).toBe(201);
+
+    const messageResponse = await request(app)
+      .post(`/api/deals/${expressResponse.body.data._id}/negotiation-message`)
+      .set(authHeader(investor))
+      .send({ message: 'Let us settle on these terms.' });
+
+    expect(messageResponse.status).toBe(200);
+    expect(messageResponse.body.data.messages).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({
+          senderRole: 'investor',
+          message: 'Let us settle on these terms.',
+        }),
+      ]),
+    );
+
+    const detailResponse = await request(app)
+      .get(`/api/investor/deals/${expressResponse.body.data._id}`)
+      .set(authHeader(investor));
+
+    expect(detailResponse.status).toBe(200);
+    expect(detailResponse.body.data.negotiation).toEqual(
+      expect.objectContaining({
+        status: 'initial',
+        messages: expect.arrayContaining([
+          expect.objectContaining({
+            senderRole: 'investor',
+            message: 'Let us settle on these terms.',
+          }),
+        ]),
+      }),
+    );
+  });
+
+  it('moves a deal from negotiation to due diligence after terms are agreed', async () => {
+    const founder = await createUser(UserRole.STUDENT, { displayName: 'Stage Zero Founder' });
+    const investor = await createUser(UserRole.INVESTOR, { displayName: 'Stage Zero Investor' });
+    const startup = await createStartup(founder._id.toString());
+
+    const expressResponse = await request(app)
+      .post(`/api/investor/express-interest/${startup._id}`)
+      .set(authHeader(investor))
+      .send({
+        investorType: 'penny',
+        proposedAmountINR: 26000,
+        proposedEquityPercent: 2,
+        chosenRole: 'shareholder',
+      });
+
+    expect(expressResponse.status).toBe(201);
+
+    await agreeToCurrentTerms({ dealId: expressResponse.body.data._id, participant: founder });
+
+    const stageOneResponse = await request(app)
+      .patch(`/api/investor/deals/${expressResponse.body.data._id}/stage`)
+      .set(authHeader(investor))
+      .send({ newStage: 1 });
+
+    expect(stageOneResponse.status).toBe(200);
+    expect(stageOneResponse.body.data.deal).toEqual(
+      expect.objectContaining({
+        currentStage: 1,
+        negotiation: expect.objectContaining({
+          status: 'terms_agreed',
+        }),
+      }),
+    );
   });
 });

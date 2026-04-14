@@ -64,7 +64,7 @@ const workspaceSchema = new Schema(
         new Schema(
           {
             fileUrl: { type: String, required: true },
-            fileType: { type: String, enum: ['pdf', 'image'], required: true },
+            fileType: { type: String, enum: ['pdf', 'image', 'doc', 'docx', 'ppt', 'pptx', 'xls', 'xlsx', 'video', 'audio', 'other'], required: true },
             fileName: { type: String, required: true },
             fileSizeBytes: { type: Number, required: true },
             uploadedBy: { type: Schema.Types.ObjectId, required: true },
@@ -74,6 +74,7 @@ const workspaceSchema = new Schema(
             storageProvider: { type: String, enum: ['cloudinary', 's3'], default: undefined },
             storageKey: { type: String, default: undefined },
             cloudinaryPublicId: { type: String, default: undefined },
+            mimeType: { type: String, default: undefined },
           },
           { _id: true },
         ),

@@ -26,16 +26,19 @@ export interface WorkspaceTask {
 
 export type WorkspaceUploadCategory = 'bug_report' | 'error_log' | 'screenshot' | 'test_result' | 'design_mockup' | 'other';
 
+export type WorkspaceUploadFileType = 'pdf' | 'image' | 'doc' | 'ppt' | 'xls' | 'video' | 'audio' | 'other';
+
 export interface WorkspaceUpload {
   _id: string;
   fileUrl: string;
-  fileType: 'pdf' | 'image';
+  fileType: WorkspaceUploadFileType;
   fileName: string;
   fileSizeBytes: number;
   uploadedBy: string;
   uploadedAt: string;
   note?: string;
   category?: WorkspaceUploadCategory;
+  mimeType?: string;
 }
 
 export interface WorkspaceRepoSubmission {
@@ -77,6 +80,22 @@ export interface WorkspaceChatParticipant {
   addedAt: string;
   displayName: string | null;
   avatar: string | null;
+  profileSlug?: string | null;
+}
+
+export interface ChatMessageAttachment {
+  fileUrl: string;
+  fileType: WorkspaceUploadFileType;
+  fileName: string;
+  fileSizeBytes: number;
+  mimeType?: string;
+}
+
+export interface ChatMessageCodeSnippet {
+  title: string;
+  language: string;
+  code: string;
+  lineCount: number;
 }
 
 export interface Workspace {
@@ -99,6 +118,7 @@ export interface Workspace {
     displayName: string;
     role: string;
     avatar?: string;
+    profileSlug?: string;
   }>;
   pendingInvites?: Array<{
     _id: string;
@@ -124,6 +144,14 @@ export interface ChatMessage {
   senderId: string;
   message: string;
   attachmentUrl?: string;
-  attachmentType?: 'pdf' | 'image';
+  attachmentType?: WorkspaceUploadFileType;
+  attachmentName?: string;
+  attachmentSizeBytes?: number;
+  attachmentMimeType?: string;
+  attachment?: ChatMessageAttachment;
+  codeSnippet?: ChatMessageCodeSnippet;
   sentAt: string;
+  deliveredAt?: string;
+  seenAt?: string;
+  seenBy?: string[];
 }

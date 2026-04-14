@@ -90,6 +90,13 @@ export interface IPatent {
   adminNotes?: string;
   scoreAwarded: boolean;
   showcasedInMarketplace: boolean;
+  trackingTimeline?: Array<{
+    status: string;
+    note?: string;
+    updatedAt: Date;
+    updatedBy?: Types.ObjectId;
+  }>;
+  nextActionRequired?: string;
   createdAt: Date;
   updatedAt: Date;
 }
@@ -207,6 +214,14 @@ export interface IPatentRequest {
   adminAssignedTo?: Types.ObjectId;
   adminNotes?: string;
   scoreAwarded: boolean;
+  trackingTimeline?: Array<{
+    status: string;
+    note?: string;
+    updatedAt: Date;
+    updatedBy?: Types.ObjectId;
+  }>;
+  nextActionRequired?: string;
+  lastStatusUpdate?: Date;
 
   createdAt: Date;
   updatedAt: Date;

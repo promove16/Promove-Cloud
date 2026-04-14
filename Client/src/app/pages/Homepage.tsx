@@ -44,8 +44,12 @@ const platformModules = [
   { title: "Instant Internship", desc: "Work on Problem Bank challenges", icon: Building2, link: "/problem-bank" },
   { title: "Innovation Marketplace", desc: "License and sell innovations", icon: TrendingUp, link: "/marketplace" },
   { title: "Product Workspace", desc: "Execute claimed Problem Bank solutions", icon: Lightbulb, link: "/product-workspace" },
-  { title: "Patent Support", desc: "File patents with ease", icon: Award, link: "/startup-launch" },
-  { title: "Startup Launch", desc: "Launch your startup", icon: Rocket, link: "/startup-launch" },
+  {
+    title: "Startup Launch",
+    desc: "Build the startup profile, request patent support, and launch to investors",
+    icon: Rocket,
+    link: "/startup-launch",
+  },
   { title: "Portfolio", desc: "Showcase your innovation journey", icon: Users, link: "/portfolio" },
 ];
 

@@ -185,6 +185,8 @@ export interface MarketplaceStartupDetail extends MarketplaceStartupItem {
     maxPennyInvestors: number;
     hasSoleInvestor: boolean;
   };
+  acceptsPennyInvestors?: boolean;
+  acceptsSoleInvestor?: boolean;
 }
 
 export interface MarketplaceJobSummary {

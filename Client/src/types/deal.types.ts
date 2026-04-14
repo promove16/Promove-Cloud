@@ -1,4 +1,4 @@
-export type DealStage = 1 | 2 | 3 | 4;
+export type DealStage = 0 | 1 | 2 | 3 | 4;
 export type DealStatus = 'active' | 'closed' | 'cancelled';
 export type InvestorType = 'penny' | 'sole';
 export type InvestorRole = 'shareholder' | 'director' | 'observer';
@@ -7,6 +7,28 @@ export type DealMediationStatus = 'intake' | 'under_review' | 'approved' | 'reje
 export type StockTransferStatus = 'not_started' | 'pending_review' | 'under_review' | 'approved' | 'rejected';
 export type RoyaltyStatus = 'pending' | 'invoiced' | 'received';
 export type FounderDecisionStatus = 'pending' | 'accepted' | 'rejected';
+export type NegotiationStatus = 'initial' | 'terms_proposed' | 'counter_offer' | 'terms_agreed' | 'stalled' | 'cancelled';
+
+export interface DealNegotiation {
+  status: NegotiationStatus;
+  investorProposedAmount?: number;
+  investorProposedEquity?: number;
+  studentCounterAmount?: number;
+  studentCounterEquity?: number;
+  finalAgreedAmount?: number;
+  finalAgreedEquity?: number;
+  messages: Array<{
+    _id: string;
+    senderId: string;
+    senderRole: 'investor' | 'student';
+    message: string;
+    timestamp: string;
+    attachments?: string[];
+  }>;
+  lastUpdatedAt?: string;
+  termsAgreedAt?: string;
+  notes?: string;
+}
 
 export interface DealStockDetails {
   shareClassLabel: string;
@@ -32,11 +54,21 @@ export interface DealRoyalty {
   settledAt?: string;
 }
 
+export const DEFAULT_PROMOVE_ROYALTY_PERCENTAGE = 5;
+
 export interface DealFounderDecision {
   status: FounderDecisionStatus;
   respondedAt?: string;
   respondedBy?: string;
   note?: string;
+}
+
+export interface DealProductWorkshopSummary {
+  workspaceId: string;
+  title: string;
+  category: string;
+  stage: string;
+  progressPercent: number;
 }
 
 export interface DealSummaryView {
@@ -68,6 +100,8 @@ export interface DealSummaryView {
   stockTransfer: DealStockTransfer;
   royalty: DealRoyalty;
   founderDecision: DealFounderDecision;
+  productWorkshop?: DealProductWorkshopSummary;
+  negotiation?: DealNegotiation;
   innovationScoreSnapshot: number;
   nextActionLabel: string;
   createdAt: string;
@@ -97,6 +131,7 @@ export interface DealDetailView extends DealSummaryView {
     role: string;
     innovationScore: number;
   };
+  productWorkshop?: DealProductWorkshopSummary;
   fundTransferInitiatedAt?: string;
   closedAt?: string;
 }
@@ -118,7 +153,7 @@ export interface DealCollectionResponse {
 }
 
 export interface DealUpdateStagePayload {
-  newStage: 2 | 3 | 4;
+  newStage: 1 | 2 | 3 | 4;
   stageData?: {
     amountINR?: number;
     equityPercent?: number;

@@ -58,4 +58,44 @@ export const dealApi = {
     const response = await api.get<ApiSuccessResponse<CapTableResponse>>(`/api/startups/${startupId}/cap-table`);
     return response.data.data;
   },
+  async linkWorkshopToDeal(dealId: string, workspaceId: string) {
+    const response = await api.patch<ApiSuccessResponse<{ message: string; workspaceId: string; workspaceTitle: string }>>(
+      `/api/deals/${dealId}/link-workshop`,
+      { workspaceId },
+    );
+    return response.data.data;
+  },
+  async unlinkWorkshopFromDeal(dealId: string) {
+    const response = await api.patch<ApiSuccessResponse<{ message: string }>>(
+      `/api/deals/${dealId}/unlink-workshop`,
+    );
+    return response.data.data;
+  },
+  async sendNegotiationMessage(dealId: string, message: string) {
+    const response = await api.post<ApiSuccessResponse<any>>(
+      `/api/deals/${dealId}/negotiation-message`,
+      { message },
+    );
+    return response.data.data;
+  },
+  async proposeNegotiationTerms(dealId: string, payload: { amountINR: number; equityPercent: number }) {
+    const response = await api.post<ApiSuccessResponse<any>>(
+      `/api/deals/${dealId}/negotiation-propose`,
+      payload,
+    );
+    return response.data.data;
+  },
+  async agreeNegotiationTerms(dealId: string) {
+    const response = await api.post<ApiSuccessResponse<any>>(
+      `/api/deals/${dealId}/negotiation-agree`,
+    );
+    return response.data.data;
+  },
+  async counterOfferNegotiationTerms(dealId: string, payload: { amountINR: number; equityPercent: number }) {
+    const response = await api.post<ApiSuccessResponse<any>>(
+      `/api/deals/${dealId}/negotiation-propose`,
+      payload,
+    );
+    return response.data.data;
+  },
 };

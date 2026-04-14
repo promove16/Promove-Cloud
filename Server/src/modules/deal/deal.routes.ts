@@ -13,6 +13,11 @@ import {
   getStartupInvestorsController,
   updateDealStageController,
   updateInvestorRoleController,
+  linkWorkshopController,
+  unlinkWorkshopController,
+  addNegotiationMessageController,
+  proposeNegotiationTermsController,
+  agreeNegotiationTermsController,
 } from './deal.controller';
 import { expressSoleInterestController } from '../investor/investor.controller';
 
@@ -28,6 +33,11 @@ dealsRouter.patch('/:id/founder-decision', authorize(UserRole.STUDENT), asyncHan
 dealsRouter.post('/:id/fund-transfer', authorize(UserRole.INVESTOR), asyncHandler(fundTransferController));
 dealsRouter.patch('/:id/stage', authorize(UserRole.INVESTOR), asyncHandler(updateDealStageController));
 dealsRouter.patch('/:id/investor-role', authorize(UserRole.ADMIN), asyncHandler(updateInvestorRoleController));
+dealsRouter.patch('/:id/link-workshop', authorize(UserRole.STUDENT), asyncHandler(linkWorkshopController));
+dealsRouter.patch('/:id/unlink-workshop', authorize(UserRole.STUDENT), asyncHandler(unlinkWorkshopController));
+dealsRouter.post('/:id/negotiation-message', authorize(UserRole.STUDENT, UserRole.INVESTOR), asyncHandler(addNegotiationMessageController));
+dealsRouter.post('/:id/negotiation-propose', authorize(UserRole.STUDENT, UserRole.INVESTOR), asyncHandler(proposeNegotiationTermsController));
+dealsRouter.post('/:id/negotiation-agree', authorize(UserRole.STUDENT, UserRole.INVESTOR), asyncHandler(agreeNegotiationTermsController));
 dealsRouter.get('/portfolio/authority', authorize(UserRole.INVESTOR), asyncHandler(getInvestorAuthorityController));
 
 startupsInvestmentRouter.get('/:id/investors', asyncHandler(getStartupInvestorsController));

@@ -57,7 +57,7 @@ export default function InvestorPaymentPage() {
         <div className="flex flex-wrap items-center gap-2">
           <Badge>Deal Stage {deal.currentStage}</Badge>
           <Badge className="border-cyan-500/30 bg-cyan-500/10 text-cyan-300">
-            {deal.investorType.toUpperCase()}
+            {deal.investorType === 'penny' ? 'Penny Investor' : 'Sole Investor'}
           </Badge>
           <Badge
             className={

@@ -170,7 +170,7 @@ const roleLaneIds: Partial<Record<UserRole, MarketplaceEntityType[]>> = {
   [UserRole.SCHOOL]: ["student", "mentor", "investor", "startup"],
   [UserRole.COLLEGE]: ["investor", "recruiter"],
   [UserRole.MENTOR]: ["student", "college", "school"],
-  [UserRole.INVESTOR]: ["startup", "college", "school", "student"],
+  [UserRole.INVESTOR]: ["startup", "college", "student"],
 };
 
 const currency = new Intl.NumberFormat("en-IN", {

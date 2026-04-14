@@ -10,6 +10,7 @@ import { ScoreEvent } from '../innovationScore/score.model';
 import { Startup } from '../startup/startup.model';
 import { User } from '../user/user.model';
 import { Workspace } from '../workspace/workspace.model';
+import { ensureDirectWorkspaceChatAccess } from '../workspace/workspace.service';
 import { Deal } from './deal.model';
 import {
   CapTableResponse,
@@ -29,16 +30,17 @@ import {
 } from './deal.types';
 
 const STAGE_LABELS: Record<DealStage, string> = {
+  0: 'Negotiation',
   1: 'Due Diligence',
   2: 'Fund Transfer',
   3: 'Equity Transfer',
   4: 'Portfolio',
 };
 
-const STAGE_ORDER: DealStage[] = [1, 2, 3, 4];
+const STAGE_ORDER: DealStage[] = [0, 1, 2, 3, 4];
 const MAX_PENNY_EQUITY = 49;
 const MAX_PENNY_EQUITY_PER_INVESTOR = 5;
-const DEFAULT_PROMOVE_ROYALTY_PERCENTAGE = 2.5;
+const DEFAULT_PROMOVE_ROYALTY_PERCENTAGE = 5;
 const DEFAULT_SHARE_CLASS_LABEL = 'Common Equity';
 
 export const ExpressInterestSchema = z.object({
@@ -58,7 +60,7 @@ export const founderDecisionSchema = z.object({
 });
 
 const transitionSchema = z.object({
-  newStage: z.union([z.literal(2), z.literal(3), z.literal(4)]),
+  newStage: z.union([z.literal(0), z.literal(1), z.literal(2), z.literal(3), z.literal(4)]),
   stageData: z
     .object({
       amountINR: z.number().min(20000).optional(),
@@ -70,6 +72,10 @@ const transitionSchema = z.object({
 
 export const updateInvestorRoleSchema = z.object({
   investorRole: z.enum(['shareholder', 'director', 'observer']),
+});
+
+export const linkWorkshopSchema = z.object({
+  workspaceId: z.string().regex(/^[0-9a-fA-F]{24}$/, 'Invalid workspace ID'),
 });
 
 type DealDocumentLike = IDeal & { _id: Types.ObjectId };
@@ -91,6 +97,7 @@ type LeanStartup = {
   tagline: string;
   category: string;
   stage: string;
+  projectId?: Types.ObjectId;
   pitchDeckUrl?: string;
   launchedToInvestors?: boolean;
   launchedAt?: Date;
@@ -110,6 +117,14 @@ type LeanStartup = {
   };
 };
 
+type LeanProductWorkshop = {
+  _id: Types.ObjectId;
+  title: string;
+  category: string;
+  stage: string;
+  progressPercent?: number;
+};
+
 type ExpressInterestInput = z.infer<typeof ExpressInterestSchema>;
 
 const capTableCacheKey = (startupId: string) => `cap-table:${startupId}`;
@@ -121,6 +136,9 @@ const computeShares = (equityPercent: number, totalShares: number) =>
 const currentStage = (deal: DealDocumentLike): DealStage => deal.stage;
 
 const nextActionLabel = (deal: DealDocumentLike): string => {
+  if (deal.stage === 0) {
+    return deal.negotiation?.termsAgreedAt ? 'Advance to Due Diligence' : 'Continue negotiation';
+  }
   if (deal.stage === 1) {
     const founderDecisionStatus = deal.founderDecision?.status ?? 'pending';
     return founderDecisionStatus === 'accepted' ? 'Advance to Fund Transfer' : 'Awaiting founder acceptance';
@@ -178,6 +196,50 @@ const getFounderDecisionView = (deal: DealDocumentLike) => {
     ...(deal.founderDecision?.respondedAt ? { respondedAt: deal.founderDecision.respondedAt.toISOString() } : {}),
     ...(deal.founderDecision?.respondedBy ? { respondedBy: String(deal.founderDecision.respondedBy) } : {}),
     ...(deal.founderDecision?.note ? { note: deal.founderDecision.note } : {}),
+  };
+};
+
+const getNegotiationView = (deal: DealDocumentLike) => {
+  const negotiation = deal.negotiation;
+  if (!negotiation) {
+    return undefined;
+  }
+
+  return {
+    status: negotiation.status ?? 'initial',
+    ...(typeof negotiation.investorProposedAmount === 'number'
+      ? { investorProposedAmount: negotiation.investorProposedAmount }
+      : {}),
+    ...(typeof negotiation.investorProposedEquity === 'number'
+      ? { investorProposedEquity: negotiation.investorProposedEquity }
+      : {}),
+    ...(typeof negotiation.studentCounterAmount === 'number'
+      ? { studentCounterAmount: negotiation.studentCounterAmount }
+      : {}),
+    ...(typeof negotiation.studentCounterEquity === 'number'
+      ? { studentCounterEquity: negotiation.studentCounterEquity }
+      : {}),
+    ...(typeof negotiation.finalAgreedAmount === 'number'
+      ? { finalAgreedAmount: negotiation.finalAgreedAmount }
+      : {}),
+    ...(typeof negotiation.finalAgreedEquity === 'number'
+      ? { finalAgreedEquity: negotiation.finalAgreedEquity }
+      : {}),
+    messages: (negotiation.messages ?? []).map((message: any) => ({
+      _id: String(message?._id ?? ''),
+      senderId: String(message?.senderId ?? ''),
+      senderRole: (message?.senderRole === 'student' ? 'student' : 'investor') as 'student' | 'investor',
+      message: String(message?.message ?? ''),
+      timestamp: new Date(
+        message?.timestamp ?? message?.createdAt ?? message?.updatedAt ?? deal.updatedAt,
+      ).toISOString(),
+      ...(Array.isArray(message?.attachments) && message.attachments.length > 0
+        ? { attachments: message.attachments as string[] }
+        : {}),
+    })),
+    ...(negotiation.lastUpdatedAt ? { lastUpdatedAt: negotiation.lastUpdatedAt.toISOString() } : {}),
+    ...(negotiation.termsAgreedAt ? { termsAgreedAt: negotiation.termsAgreedAt.toISOString() } : {}),
+    ...(negotiation.notes ? { notes: negotiation.notes } : {}),
   };
 };
 
@@ -248,46 +310,64 @@ const getParticipantSummary = (user: LeanUser | undefined) => {
   };
 };
 
+const mapProductWorkshop = (workspace?: LeanProductWorkshop | null) =>
+  workspace
+    ? {
+        workspaceId: String(workspace._id),
+        title: workspace.title,
+        category: workspace.category,
+        stage: workspace.stage,
+        progressPercent: workspace.progressPercent ?? 0,
+      }
+    : undefined;
+
 const buildSummary = (
   deal: DealDocumentLike,
   startup: LeanStartup,
   student: LeanUser,
   investor: LeanUser,
   investorDisplayName: string,
-): DealSummaryView => ({
-  _id: String(deal._id),
-  startupId: String(deal.startupId),
-  studentId: String(deal.studentId),
-  investorId: String(deal.investorId),
-  mediatorLabel: deal.mediatorLabel ?? 'ProMove',
-  requestOrigin: deal.requestOrigin ?? 'investor',
-  mediationStatus: deal.mediationStatus ?? (deal.stage >= 3 ? 'under_review' : 'intake'),
-  startupName: startup.name,
-  startupCategory: startup.category,
-  studentDisplayName: student.displayName,
-  investorDisplayName,
-  investorType: deal.investorType,
-  currentStage: currentStage(deal),
-  status: deal.status,
-  amountINR: deal.amountINR,
-  equityPercent: deal.equityPercent,
-  sharesAllocated: deal.sharesAllocated,
-  investorRole: deal.investorRole,
-  votingWeight: deal.votingWeight,
-  canVeto: deal.canVeto,
-  canAccessFinancials: deal.canAccessFinancials,
-  canRequestUpdates: deal.canRequestUpdates,
-  adminApprovalRequired: deal.adminApprovalRequired,
-  ...(deal.adminApprovedAt ? { adminApprovedAt: deal.adminApprovedAt.toISOString() } : {}),
-  stockDetails: getStockDetailsView(deal),
-  stockTransfer: getStockTransferView(deal),
-  royalty: getRoyaltyView(deal),
-  founderDecision: getFounderDecisionView(deal),
-  innovationScoreSnapshot: deal.innovationScoreSnapshot,
-  nextActionLabel: nextActionLabel(deal),
-  createdAt: deal.createdAt.toISOString(),
-  updatedAt: deal.updatedAt.toISOString(),
-});
+  productWorkshop?: LeanProductWorkshop | null,
+): DealSummaryView => {
+  const mappedProductWorkshop = mapProductWorkshop(productWorkshop);
+
+  return {
+    _id: String(deal._id),
+    startupId: String(deal.startupId),
+    studentId: String(deal.studentId),
+    investorId: String(deal.investorId),
+    mediatorLabel: deal.mediatorLabel ?? 'ProMove',
+    requestOrigin: deal.requestOrigin ?? 'investor',
+    mediationStatus: deal.mediationStatus ?? (deal.stage >= 3 ? 'under_review' : 'intake'),
+    startupName: startup.name,
+    startupCategory: startup.category,
+    studentDisplayName: student.displayName,
+    investorDisplayName,
+    investorType: deal.investorType,
+    currentStage: currentStage(deal),
+    status: deal.status,
+    amountINR: deal.amountINR,
+    equityPercent: deal.equityPercent,
+    sharesAllocated: deal.sharesAllocated,
+    investorRole: deal.investorRole,
+    votingWeight: deal.votingWeight,
+    canVeto: deal.canVeto,
+    canAccessFinancials: deal.canAccessFinancials,
+    canRequestUpdates: deal.canRequestUpdates,
+    adminApprovalRequired: deal.adminApprovalRequired,
+    ...(deal.adminApprovedAt ? { adminApprovedAt: deal.adminApprovedAt.toISOString() } : {}),
+    stockDetails: getStockDetailsView(deal),
+    stockTransfer: getStockTransferView(deal),
+    royalty: getRoyaltyView(deal),
+    founderDecision: getFounderDecisionView(deal),
+    ...(getNegotiationView(deal) ? { negotiation: getNegotiationView(deal) } : {}),
+    innovationScoreSnapshot: deal.innovationScoreSnapshot,
+    nextActionLabel: nextActionLabel(deal),
+    ...(mappedProductWorkshop ? { productWorkshop: mappedProductWorkshop } : {}),
+    createdAt: deal.createdAt.toISOString(),
+    updatedAt: deal.updatedAt.toISOString(),
+  };
+};
 
 const buildDetail = (
   deal: DealDocumentLike,
@@ -295,8 +375,9 @@ const buildDetail = (
   student: LeanUser,
   investor: LeanUser,
   investorDisplayName: string,
+  productWorkshop?: LeanProductWorkshop | null,
 ): DealDetailView => ({
-  ...buildSummary(deal, startup, student, investor, investorDisplayName),
+  ...buildSummary(deal, startup, student, investor, investorDisplayName, productWorkshop),
   startup: {
     _id: String(startup._id),
     name: startup.name,
@@ -314,7 +395,7 @@ const buildDetail = (
 const fetchDealContext = async (deal: DealDocumentLike) => {
   const [startup, student, investor] = await Promise.all([
     Startup.findById(deal.startupId)
-      .select('_id name tagline category stage pitchDeckUrl founderIds launchedToInvestors launchedAt innovationScoreAtLaunch traction totalShares availableShares reservedForSole maxPennyInvestors currentPennyCount hasSoleInvestor soleInvestorId')
+      .select('_id name tagline category stage projectId pitchDeckUrl founderIds launchedToInvestors launchedAt innovationScoreAtLaunch traction totalShares availableShares reservedForSole maxPennyInvestors currentPennyCount hasSoleInvestor soleInvestorId')
       .lean<LeanStartup>(),
     User.findById(deal.studentId)
       .select('_id displayName avatar role innovationScore scoreBreakdown')
@@ -328,7 +409,14 @@ const fetchDealContext = async (deal: DealDocumentLike) => {
     throw new ApiError(404, 'DEAL_CONTEXT_NOT_FOUND', 'Deal context could not be loaded');
   }
 
-  return { startup, student, investor };
+  const productWorkshopWorkspaceId = deal.linkedWorkspaceId || startup.projectId;
+  const productWorkshop = productWorkshopWorkspaceId
+    ? await Workspace.findOne({ _id: productWorkshopWorkspaceId, isActive: true })
+        .select('_id title category stage progressPercent')
+        .lean<LeanProductWorkshop | null>()
+    : null;
+
+  return { startup, student, investor, productWorkshop };
 };
 
 const ensureInvestor = async (investorId: string) => {
@@ -461,8 +549,10 @@ const dealToPortfolioItem = (
   deal: DealDocumentLike,
   student: LeanUser,
   startup: LeanStartup | undefined,
+  productWorkshop?: LeanProductWorkshop | null,
 ): DealPortfolioItem => {
   const liveInnovationScore = student.innovationScore ?? 0;
+  const mappedProductWorkshop = mapProductWorkshop(productWorkshop);
 
   return {
     _id: String(deal._id),
@@ -482,6 +572,7 @@ const dealToPortfolioItem = (
     innovationScoreSnapshot: deal.innovationScoreSnapshot,
     liveInnovationScore,
     scoreTrend: liveInnovationScore - deal.innovationScoreSnapshot,
+    ...(mappedProductWorkshop ? { productWorkshop: mappedProductWorkshop } : {}),
     ...(deal.closedAt ? { closedAt: deal.closedAt.toISOString() } : {}),
     studentDisplayName: student.displayName,
     ...(student.avatar ? { studentAvatar: student.avatar } : {}),
@@ -649,7 +740,13 @@ export const createInvestorDealFromInterest = async (
     deal.requestOrigin = 'investor';
     deal.mediationStatus = 'intake';
     deal.investorType = parsed.investorType;
-    deal.stage = 1;
+    deal.stage = 0;
+    deal.negotiation = {
+      status: 'initial',
+      investorProposedAmount: parsed.proposedAmountINR,
+      investorProposedEquity: parsed.proposedEquityPercent,
+      messages: [],
+    };
     deal.amountINR = parsed.proposedAmountINR;
     deal.proposedAmountINR = parsed.proposedAmountINR;
     deal.equityPercent = parsed.proposedEquityPercent;
@@ -702,7 +799,14 @@ export const createInvestorDealFromInterest = async (
     }
 
     const context = await fetchDealContext(existingDeal);
-    return buildDetail(existingDeal, context.startup, context.student, context.investor, context.investor.displayName);
+    return buildDetail(
+      existingDeal,
+      context.startup,
+      context.student,
+      context.investor,
+      context.investor.displayName,
+      context.productWorkshop,
+    );
   }
 
   if (parsed.investorType === 'sole') {
@@ -725,7 +829,14 @@ export const createInvestorDealFromInterest = async (
   }
 
   const context = await fetchDealContext(createdDeal);
-  return buildDetail(createdDeal, context.startup, context.student, context.investor, context.investor.displayName);
+  return buildDetail(
+    createdDeal,
+    context.startup,
+    context.student,
+    context.investor,
+    context.investor.displayName,
+    context.productWorkshop,
+  );
 };
 
 export const createInvestment = createInvestorDealFromInterest;
@@ -742,8 +853,8 @@ export const listDealsForInvestor = async (investorId: string): Promise<DealGrou
   }
 
   const contexts = await Promise.all(deals.map(async (deal) => ({ deal, ...(await fetchDealContext(deal)) })));
-  const summaries = contexts.map(({ deal, startup, student, investor }) =>
-    buildSummary(deal, startup, student, investor, investor.displayName),
+  const summaries = contexts.map(({ deal, startup, student, investor, productWorkshop }) =>
+    buildSummary(deal, startup, student, investor, investor.displayName, productWorkshop),
   );
 
   return STAGE_ORDER.map((stage) => ({
@@ -776,13 +887,14 @@ export const listDealsForParticipant = async (userId: string, role: UserRole): P
 
   const contexts = await Promise.all(deals.map(async (deal) => ({ deal, ...(await fetchDealContext(deal)) })));
 
-  return contexts.map(({ deal, startup, student, investor }) =>
+  return contexts.map(({ deal, startup, student, investor, productWorkshop }) =>
     buildSummary(
       deal,
       startup,
       student,
       investor,
       investor.displayName,
+      productWorkshop,
     ),
   );
 };
@@ -813,6 +925,7 @@ export const getDealForParticipant = async (userId: string, role: UserRole, deal
     context.student,
     context.investor,
     context.investor.displayName,
+    context.productWorkshop,
   );
 };
 
@@ -905,12 +1018,21 @@ export const recordFounderDecision = async (
     link: '/dashboard/investor/deals',
   });
 
+  if (transactionResult.decision === 'accepted' && context.startup.projectId) {
+    await ensureDirectWorkspaceChatAccess(
+      String(context.startup.projectId),
+      transactionResult.investorId,
+      'investor',
+    );
+  }
+
   return buildDetail(
     deal,
     context.startup,
     context.student,
     context.investor,
     context.investor.displayName,
+    context.productWorkshop,
   );
 };
 
@@ -949,6 +1071,30 @@ export const advanceDealStage = async (
       activeStage === 3 &&
       deal.stockTransfer?.status === 'rejected' &&
       !deal.adminApprovedAt;
+
+    if (parsed.newStage === 1) {
+      if (activeStage !== 0) {
+        throw new ApiError(400, 'INVALID_STAGE_TRANSITION', 'Stages must advance sequentially');
+      }
+
+      if (!deal.negotiation?.termsAgreedAt) {
+        throw new ApiError(
+          400,
+          'TERMS_AGREEMENT_REQUIRED',
+          'Both parties must agree on terms before proceeding',
+        );
+      }
+
+      deal.stage = 1;
+      deal.mediationStatus = 'under_review';
+      
+      await deal.save({ session });
+
+      return {
+        dealId: String(deal._id),
+        startupId: String(deal.startupId),
+      };
+    }
 
     if (parsed.newStage === 2) {
       if (activeStage !== 1) {
@@ -1117,6 +1263,7 @@ export const advanceDealStage = async (
       context.student,
       context.investor,
       context.investor.displayName,
+      context.productWorkshop,
     ),
   };
 };
@@ -1391,9 +1538,19 @@ export const getInvestorPortfolio = async (investorId: string) => {
   const startupIds = [...new Set(deals.map((deal) => String(deal.startupId)))];
   const startups =
     startupIds.length > 0
-      ? await Startup.find({ _id: { $in: startupIds } }).select('_id name category').lean<LeanStartup[]>()
+      ? await Startup.find({ _id: { $in: startupIds } }).select('_id name category projectId').lean<LeanStartup[]>()
       : [];
   const startupMap = new Map(startups.map((startup) => [String(startup._id), startup]));
+  const productWorkshopIds = [...new Set(startups.map((startup) => String(startup.projectId ?? '')).filter(Boolean))];
+  const productWorkshops =
+    productWorkshopIds.length > 0
+      ? await Workspace.find({ _id: { $in: productWorkshopIds }, isActive: true })
+          .select('_id title category stage progressPercent')
+          .lean<LeanProductWorkshop[]>()
+      : [];
+  const productWorkshopMap = new Map(
+    productWorkshops.map((workspace) => [String(workspace._id), workspace]),
+  );
 
   const studentIds = [...new Set(deals.map((deal) => String(deal.studentId)))];
   const students =
@@ -1412,7 +1569,12 @@ export const getInvestorPortfolio = async (investorId: string) => {
       throw new ApiError(404, 'STUDENT_NOT_FOUND', 'Student not found');
     }
 
-    return dealToPortfolioItem(deal, student, startup);
+    return dealToPortfolioItem(
+      deal,
+      student,
+      startup,
+      startup?.projectId ? productWorkshopMap.get(String(startup.projectId)) : undefined,
+    );
   });
 
   const averageLiveInnovationScore =
@@ -1649,6 +1811,7 @@ export const updateInvestmentRole = async (dealId: string, investorRole: Investo
     context.student,
     context.investor,
     context.investor.displayName,
+    context.productWorkshop,
   );
 };
 
@@ -1694,4 +1857,178 @@ export const resetSoleInvestorForStartup = async (startupId: string) => {
   startup.soleInvestorId = null;
   await startup.save();
   await invalidateInvestmentCaches(startupId);
+};
+
+export const linkWorkshopToDeal = async (dealId: string, workspaceId: string, userId: string) => {
+  const deal = await Deal.findById(dealId);
+  if (!deal) {
+    throw new ApiError(404, 'DEAL_NOT_FOUND', 'Deal not found');
+  }
+
+  if (String(deal.studentId) !== userId) {
+    throw new ApiError(403, 'FORBIDDEN', 'Only the founder can link a workshop to this deal');
+  }
+
+  const workspace = await Workspace.findById(workspaceId);
+  if (!workspace) {
+    throw new ApiError(404, 'WORKSPACE_NOT_FOUND', 'Workspace not found');
+  }
+
+  const isOwner = String(workspace.ownerId) === userId;
+  const isTeamMember = workspace.teamMemberIds?.some((id) => String(id) === userId);
+  if (!isOwner && !isTeamMember) {
+    throw new ApiError(403, 'FORBIDDEN', 'You do not have access to this workspace');
+  }
+
+  deal.linkedWorkspaceId = new Types.ObjectId(workspaceId);
+  await deal.save();
+  await invalidateInvestmentCaches(String(deal.startupId));
+
+  return {
+    message: 'Workshop linked to deal',
+    workspaceId,
+    workspaceTitle: workspace.title,
+  };
+};
+
+export const unlinkWorkshopFromDeal = async (dealId: string, userId: string) => {
+  const deal = await Deal.findById(dealId);
+  if (!deal) {
+    throw new ApiError(404, 'DEAL_NOT_FOUND', 'Deal not found');
+  }
+
+  if (String(deal.studentId) !== userId) {
+    throw new ApiError(403, 'FORBIDDEN', 'Only the founder can unlink a workshop from this deal');
+  }
+
+  deal.linkedWorkspaceId = undefined;
+  await deal.save();
+  await invalidateInvestmentCaches(String(deal.startupId));
+
+  return { message: 'Workshop unlinked from deal' };
+};
+
+export const addNegotiationMessage = async (
+  dealId: string,
+  userId: string,
+  message: string,
+  senderRole: 'investor' | 'student',
+) => {
+  const deal = await Deal.findById(dealId);
+  if (!deal || deal.status === 'cancelled') {
+    throw new ApiError(404, 'DEAL_NOT_FOUND', 'Deal not found');
+  }
+
+  if (deal.stage !== 0) {
+    throw new ApiError(400, 'INVALID_STAGE', 'Negotiation is only allowed at Stage 0');
+  }
+
+  if (
+    (senderRole === 'investor' && String(deal.investorId) !== userId) ||
+    (senderRole === 'student' && String(deal.studentId) !== userId)
+  ) {
+    throw new ApiError(403, 'FORBIDDEN', 'You cannot participate in this negotiation');
+  }
+
+  if (!deal.negotiation) {
+    deal.negotiation = {
+      status: 'initial',
+      messages: [],
+    };
+  }
+
+  deal.negotiation.messages.push({
+    _id: new Types.ObjectId(),
+    senderId: new Types.ObjectId(userId),
+    senderRole,
+    message,
+    timestamp: new Date(),
+  });
+  deal.negotiation.lastUpdatedAt = new Date();
+
+  await deal.save();
+  return deal.negotiation;
+};
+
+export const proposeNegotiationTerms = async (
+  dealId: string,
+  userId: string,
+  amountINR: number,
+  equityPercent: number,
+  senderRole: 'investor' | 'student',
+) => {
+  const deal = await Deal.findById(dealId);
+  if (!deal || deal.status === 'cancelled') {
+    throw new ApiError(404, 'DEAL_NOT_FOUND', 'Deal not found');
+  }
+
+  if (deal.stage !== 0) {
+    throw new ApiError(400, 'INVALID_STAGE', 'Negotiation is only allowed at Stage 0');
+  }
+
+  if (senderRole === 'investor') {
+    if (String(deal.investorId) !== userId) {
+      throw new ApiError(403, 'FORBIDDEN', 'Only the investor can propose terms');
+    }
+    deal.negotiation = deal.negotiation || { status: 'initial', messages: [] };
+    deal.negotiation.investorProposedAmount = amountINR;
+    deal.negotiation.investorProposedEquity = equityPercent;
+    deal.negotiation.status = 'terms_proposed';
+  } else {
+    if (String(deal.studentId) !== userId) {
+      throw new ApiError(403, 'FORBIDDEN', 'Only the student can counter-offer');
+    }
+    deal.negotiation = deal.negotiation || { status: 'initial', messages: [] };
+    deal.negotiation.studentCounterAmount = amountINR;
+    deal.negotiation.studentCounterEquity = equityPercent;
+    deal.negotiation.status = 'counter_offer';
+  }
+
+  deal.negotiation.lastUpdatedAt = new Date();
+  await deal.save();
+  return deal.negotiation;
+};
+
+export const agreeNegotiationTerms = async (
+  dealId: string,
+  userId: string,
+  senderRole: 'investor' | 'student',
+) => {
+  const deal = await Deal.findById(dealId);
+  if (!deal || deal.status === 'cancelled') {
+    throw new ApiError(404, 'DEAL_NOT_FOUND', 'Deal not found');
+  }
+
+  if (deal.stage !== 0) {
+    throw new ApiError(400, 'INVALID_STAGE', 'Negotiation is only allowed at Stage 0');
+  }
+
+  if (!deal.negotiation?.investorProposedAmount) {
+    throw new ApiError(400, 'NO_TERMS', 'No terms have been proposed yet');
+  }
+
+  const currentAgreed = deal.negotiation.status === 'terms_agreed';
+  
+  if (currentAgreed) {
+    return deal.negotiation;
+  }
+
+  deal.negotiation = deal.negotiation || { status: 'initial', messages: [] };
+  if (
+    senderRole === 'investor' &&
+    typeof deal.negotiation.studentCounterAmount === 'number' &&
+    typeof deal.negotiation.studentCounterEquity === 'number'
+  ) {
+    deal.negotiation.finalAgreedAmount = deal.negotiation.studentCounterAmount;
+    deal.negotiation.finalAgreedEquity = deal.negotiation.studentCounterEquity;
+  } else {
+    deal.negotiation.finalAgreedAmount = deal.negotiation.investorProposedAmount;
+    deal.negotiation.finalAgreedEquity = deal.negotiation.investorProposedEquity;
+  }
+  deal.negotiation.status = 'terms_agreed';
+  deal.negotiation.termsAgreedAt = new Date();
+  deal.negotiation.lastUpdatedAt = new Date();
+
+  await deal.save();
+  return deal.negotiation;
 };

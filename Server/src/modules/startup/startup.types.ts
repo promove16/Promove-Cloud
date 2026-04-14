@@ -5,6 +5,9 @@ export type StartupInnovationStage = 'idea' | 'prototype' | 'mvp' | 'market_read
 export type StartupInventorOwnership = 'individual' | 'team' | 'organization';
 export type StartupCommercializationStrategy = 'build_startup' | 'license' | 'sell' | 'partnership';
 export type StartupIpProtectionType = 'patent' | 'copyright' | 'trademark' | 'design';
+export type StartupTeamMemberType = 'founder' | 'coFounder' | 'mentor' | 'advisor';
+export type StartupPitchRequestStatus = 'pending' | 'accepted' | 'rejected' | 'withdrawn';
+export type StartupPatentType = 'self_filed' | 'promove_assisted';
 export type StartupDocumentCategory =
   | 'business_plan'
   | 'incorporation_certificate'
@@ -98,10 +101,21 @@ export interface StartupEditAccess {
   launchFormUnlockReason?: string;
 }
 
+export interface StartupPitchRequest {
+  _id?: Types.ObjectId;
+  investorId: Types.ObjectId;
+  startupId?: Types.ObjectId;
+  status: StartupPitchRequestStatus;
+  requestedAt: Date;
+  respondedAt?: Date;
+  responseNote?: string;
+}
+
 export interface IStartup {
   _id: Types.ObjectId;
   founderIds: Types.ObjectId[];
   teamMemberIds: Types.ObjectId[];
+  teamMemberTypes: { [key: string]: StartupTeamMemberType };
   projectId?: Types.ObjectId;
   name: string;
   tagline: string;
@@ -142,6 +156,8 @@ export interface IStartup {
     mvpBuilt: boolean;
     revenueGenerating: boolean;
     usersCount?: number;
+    patentType?: StartupPatentType;
+    patentApplicationId?: string;
   };
   reviewStatus: StartupReviewStatus;
   reviewRequestedAt?: Date;
@@ -152,6 +168,7 @@ export interface IStartup {
   adminEditUnlockApprovedAt?: Date;
   adminEditUnlockApprovedBy?: Types.ObjectId | null;
   adminEditUnlockReason?: string;
+  pitchRequests?: StartupPitchRequest[];
   editAccess?: StartupEditAccess;
   readiness?: StartupReadiness;
   isActive: boolean;

@@ -2,6 +2,7 @@ import { Types } from 'mongoose';
 import { z } from 'zod';
 import { sendTeamInviteEmail } from '../../services/emailService';
 import { deleteStoredAsset, uploadFile } from '../../services/fileStorageService';
+import { generateSignedCloudinaryUrl } from '../../services/cloudinaryService';
 import { applyScoreAsync } from '../../services/scoreEngine';
 import { User } from '../user/user.model';
 import { ChatMessage } from '../chat/chat.model';
@@ -146,6 +147,43 @@ const recalcProgressPercent = (workspace: { milestones: Array<{ completionPercen
   return Math.round(total / workspace.milestones.length);
 };
 
+const serializeChatMessageRecord = (message: any) => ({
+  _id: String(message._id),
+  workspaceId: String(message.workspaceId),
+  senderId: String(message.senderId),
+  message: typeof message.message === 'string' ? message.message : '',
+  ...(message.attachmentUrl
+    ? {
+        attachmentUrl: message.attachmentUrl,
+        attachmentType: message.attachmentType,
+        attachmentName: message.attachmentName,
+        attachmentSizeBytes: message.attachmentSizeBytes,
+        attachmentMimeType: message.attachmentMimeType,
+        attachment: {
+          fileUrl: message.attachmentUrl,
+          fileType: message.attachmentType,
+          fileName: message.attachmentName ?? 'Attachment',
+          fileSizeBytes: message.attachmentSizeBytes ?? 0,
+          ...(message.attachmentMimeType ? { mimeType: message.attachmentMimeType } : {}),
+        },
+      }
+    : {}),
+  ...(message.codeSnippet
+    ? {
+        codeSnippet: {
+          title: message.codeSnippet.title,
+          language: message.codeSnippet.language,
+          code: message.codeSnippet.code,
+          lineCount: message.codeSnippet.lineCount,
+        },
+      }
+    : {}),
+  sentAt: message.sentAt instanceof Date ? message.sentAt.toISOString() : message.sentAt,
+  deliveredAt: message.deliveredAt instanceof Date ? message.deliveredAt.toISOString() : message.deliveredAt,
+  seenAt: message.seenAt instanceof Date ? message.seenAt.toISOString() : message.seenAt,
+  seenBy: Array.isArray(message.seenBy) ? message.seenBy.map((entry: unknown) => String(entry)) : [],
+});
+
 type WorkspaceSnapshot = {
   toObject?: () => any;
   _id?: unknown;
@@ -164,7 +202,7 @@ export const serializeWorkspace = async (workspace: WorkspaceSnapshot) => {
     ]),
   );
   const teamMembers = await User.find({ _id: { $in: memberIds } })
-    .select('_id displayName role avatar')
+    .select('_id displayName role avatar profileSlug')
     .lean();
 
   const chatParticipantUserIds = (baseWorkspace.chatParticipants || []).map(
@@ -173,7 +211,7 @@ export const serializeWorkspace = async (workspace: WorkspaceSnapshot) => {
   const chatParticipantUsers =
     chatParticipantUserIds.length > 0
       ? await User.find({ _id: { $in: chatParticipantUserIds } })
-          .select('_id displayName role avatar')
+          .select('_id displayName role avatar profileSlug')
           .lean()
       : [];
   const chatParticipantUserMap = new Map(
@@ -197,7 +235,21 @@ export const serializeWorkspace = async (workspace: WorkspaceSnapshot) => {
   return {
     ...baseWorkspace,
     tasks: baseWorkspace.tasks || [],
-    uploads: baseWorkspace.uploads || [],
+    uploads: (baseWorkspace.uploads || []).map((upload: any) => {
+      let signedUrl = upload.fileUrl;
+      if (upload.storageProvider === 'cloudinary' && upload.storageKey) {
+        try {
+          const resourceType = upload.fileType === 'image' ? 'image' : 'raw';
+          signedUrl = generateSignedCloudinaryUrl(upload.storageKey, resourceType);
+        } catch (error) {
+          console.error('Error generating signed URL for workspace upload:', error);
+        }
+      }
+      return {
+        ...upload,
+        fileUrl: signedUrl,
+      };
+    }),
     repoSubmissions: baseWorkspace.repoSubmissions || [],
     codeSubmissions: baseWorkspace.codeSubmissions || [],
     progressUpdates: baseWorkspace.progressUpdates || [],
@@ -207,6 +259,7 @@ export const serializeWorkspace = async (workspace: WorkspaceSnapshot) => {
       displayName: member.displayName,
       role: member.role,
       ...(member.avatar ? { avatar: member.avatar } : {}),
+      ...(member.profileSlug ? { profileSlug: member.profileSlug } : {}),
     })),
     chatParticipants: (baseWorkspace.chatParticipants || []).map((p: any) => {
       const user = chatParticipantUserMap.get(String(p.userId));
@@ -218,6 +271,7 @@ export const serializeWorkspace = async (workspace: WorkspaceSnapshot) => {
         addedAt: p.addedAt,
         displayName: user?.displayName ?? null,
         avatar: user?.avatar ?? null,
+        ...(user?.profileSlug ? { profileSlug: user.profileSlug } : {}),
       };
     }),
     pendingInvites: pendingInvites.map((invite) => {
@@ -248,6 +302,43 @@ export const getAccessibleWorkspaces = async (userId: string) => {
     .lean();
 
   return Promise.all(workspaces.map((workspace) => serializeWorkspace(workspace)));
+};
+
+export const ensureDirectWorkspaceChatAccess = async (
+  workspaceId: string,
+  participantUserId: string,
+  role: 'mentor' | 'investor',
+) => {
+  const [workspace, user] = await Promise.all([
+    Workspace.findById(workspaceId),
+    User.findById(participantUserId).select('_id role').lean(),
+  ]);
+
+  if (!workspace || !workspace.isActive || !user || user.role !== role) {
+    return false;
+  }
+
+  const normalizedUserId = String(user._id);
+  const isOwner = String(workspace.ownerId) === normalizedUserId;
+  const alreadyMember = workspace.teamMemberIds.some((id) => String(id) === normalizedUserId);
+  const alreadyParticipant = workspace.chatParticipants.some(
+    (participant) => String(participant.userId) === normalizedUserId,
+  );
+
+  if (isOwner || alreadyMember || alreadyParticipant) {
+    return false;
+  }
+
+  workspace.chatParticipants.push({
+    _id: new Types.ObjectId(),
+    userId: new Types.ObjectId(normalizedUserId),
+    role,
+    addedBy: new Types.ObjectId(String(workspace.ownerId)),
+    addedAt: new Date(),
+  });
+  await workspace.save();
+
+  return true;
 };
 
 export const getWorkspaceForMember = async (workspaceId: string, userId: string) => {
@@ -399,12 +490,27 @@ export const uploadWorkspaceFile = async (
   category?: string,
 ) => {
   const workspace = await getWorkspaceForMember(workspaceId, userId);
-  const fileType = file.mimetype === 'application/pdf' ? 'pdf' : 'image';
+
+  const getFileType = (mimeType: string, fileName: string): string => {
+    if (mimeType === 'application/pdf' || fileName.toLowerCase().endsWith('.pdf')) return 'pdf';
+    if (mimeType.startsWith('image/') || /\.(jpg|jpeg|png|gif|webp|svg|bmp)$/i.test(fileName)) return 'image';
+    if (mimeType === 'application/msword' || mimeType === 'application/vnd.openxmlformats-officedocument.wordprocessingml.document' || /\.(doc|docx)$/i.test(fileName)) return 'doc';
+    if (mimeType === 'application/vnd.ms-powerpoint' || mimeType === 'application/vnd.openxmlformats-officedocument.presentationml.presentation' || /\.(ppt|pptx)$/i.test(fileName)) return 'ppt';
+    if (mimeType === 'application/vnd.ms-excel' || mimeType === 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' || /\.(xls|xlsx)$/i.test(fileName)) return 'xls';
+    if (mimeType.startsWith('video/') || /\.(mp4|mov|avi|webm|mkv)$/i.test(fileName)) return 'video';
+    if (mimeType.startsWith('audio/') || /\.(mp3|wav|ogg|m4a)$/i.test(fileName)) return 'audio';
+    return 'other';
+  };
+
+  const fileType = getFileType(
+    file.mimetype,
+    file.originalname,
+  ) as 'pdf' | 'image' | 'doc' | 'ppt' | 'xls' | 'video' | 'audio' | 'other';
   const upload = await uploadFile({
     buffer: file.buffer,
     folder: 'promove/workspaces',
     fileName: file.originalname,
-    contentType: file.mimetype || (fileType === 'pdf' ? 'application/pdf' : 'image/jpeg'),
+    contentType: file.mimetype || 'application/octet-stream',
   });
 
   const allowedCategories = ['bug_report', 'error_log', 'screenshot', 'test_result', 'design_mockup', 'other'];
@@ -422,7 +528,8 @@ export const uploadWorkspaceFile = async (
     category: safeCategory,
     storageProvider: upload.provider,
     storageKey: upload.key,
-  });
+    mimeType: file.mimetype,
+  } as any);
   await workspace.save();
   return workspace.uploads;
 };
@@ -809,7 +916,8 @@ export const getWorkspaceChatHistory = async (workspaceId: string, userId: strin
   if (before) {
     filter._id = { $lt: before };
   }
-  return ChatMessage.find(filter).sort({ sentAt: -1 }).limit(limit).lean();
+  const messages = await ChatMessage.find(filter).sort({ sentAt: -1 }).limit(limit).lean();
+  return messages.map(serializeChatMessageRecord);
 };
 
 export const addChatParticipant = async (

@@ -31,11 +31,38 @@ import {
 } from './workspace.controller';
 
 const allowedMimeTypes = [
+  // PDFs
   'application/pdf',
+  // Images
   'image/jpeg',
   'image/png',
   'image/webp',
   'image/gif',
+  'image/svg+xml',
+  'image/bmp',
+  // Word documents
+  'application/msword',
+  'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
+  // PowerPoint
+  'application/vnd.ms-powerpoint',
+  'application/vnd.openxmlformats-officedocument.presentationml.presentation',
+  // Excel
+  'application/vnd.ms-excel',
+  'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+  // Video
+  'video/mp4',
+  'video/webm',
+  'video/quicktime',
+  'video/x-msvideo',
+  // Audio
+  'audio/mpeg',
+  'audio/wav',
+  'audio/ogg',
+  'audio/mp4',
+  // Other
+  'text/plain',
+  'application/zip',
+  'application/x-rar-compressed',
 ];
 
 const upload = multer({
@@ -43,7 +70,7 @@ const upload = multer({
   limits: { fileSize: 10 * 1024 * 1024 },
   fileFilter: (_req, file, cb) => {
     if (!allowedMimeTypes.includes(file.mimetype)) {
-      cb(new ApiError(400, 'INVALID_FILE_TYPE', 'Only PDF and image files are allowed'));
+      cb(new ApiError(400, 'INVALID_FILE_TYPE', 'File type not allowed'));
       return;
     }
     cb(null, true);
