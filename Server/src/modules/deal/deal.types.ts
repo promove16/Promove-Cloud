@@ -1,4 +1,6 @@
 export type {
+  BidBoardContributor,
+  BidBoardSoleBid,
   CapTableInvestorRow,
   CapTableResponse,
   DealDetailView,
@@ -22,5 +24,6 @@ export type {
   RoyaltyStatus,
   DealRoyalty,
   StockTransferStatus,
+  StartupBidBoardResponse,
   StartupInvestorView,
 } from './investment.types';

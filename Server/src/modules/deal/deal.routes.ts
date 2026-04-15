@@ -8,6 +8,8 @@ import {
   getInvestorAuthorityController,
   getMyDealController,
   getMyDealsController,
+  getStartupBidBoardController,
+  placeBidController,
   respondToDealController,
   getStartupCapTableController,
   getStartupInvestorsController,
@@ -42,6 +44,8 @@ dealsRouter.get('/portfolio/authority', authorize(UserRole.INVESTOR), asyncHandl
 
 startupsInvestmentRouter.get('/:id/investors', asyncHandler(getStartupInvestorsController));
 startupsInvestmentRouter.get('/:id/cap-table', asyncHandler(getStartupCapTableController));
+startupsInvestmentRouter.get('/:id/bids', asyncHandler(getStartupBidBoardController));
+startupsInvestmentRouter.post('/:id/bid', authorize(UserRole.STUDENT, UserRole.INVESTOR), asyncHandler(placeBidController));
 startupsInvestmentRouter.post('/:id/sole-investor', authorize(UserRole.INVESTOR), asyncHandler(expressSoleInterestController));
 
 export { dealsRouter, startupsInvestmentRouter };

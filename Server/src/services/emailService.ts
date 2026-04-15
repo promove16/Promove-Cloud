@@ -1,5 +1,6 @@
 import nodemailer from 'nodemailer';
 import { env } from '../config/env';
+import { logger } from '../config/logger';
 
 export interface TeamInviteEmailParams {
   toEmail: string;
@@ -60,11 +61,23 @@ const transporter = smtpHost
     })
   : nodemailer.createTransport({ jsonTransport: true });
 
+// In development, set DEV_EMAIL_REDIRECT in .env to a real inbox you control.
+// All outgoing emails are then delivered there instead of the (possibly dummy)
+// recipient address, so you can verify templates without needing real user emails.
+const devRedirect =
+  env.NODE_ENV === 'development' ? (env.DEV_EMAIL_REDIRECT ?? null) : null;
+
 export const sendEmail = async ({ toEmail, subject, html }: SendEmailParams): Promise<void> => {
+  const recipient = devRedirect ?? toEmail;
+
+  if (devRedirect) {
+    logger.info(`[EMAIL DEV] Redirecting email originally for <${toEmail}> → <${devRedirect}> | Subject: ${subject}`);
+  }
+
   await transporter.sendMail({
     from: env.FROM_EMAIL || smtpUser,
-    to: toEmail,
-    subject,
+    to: recipient,
+    subject: devRedirect ? `[DEV → ${toEmail}] ${subject}` : subject,
     html,
   });
 };

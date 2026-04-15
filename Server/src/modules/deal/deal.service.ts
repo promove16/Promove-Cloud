@@ -26,6 +26,7 @@ import {
   InvestorAuthorityView,
   InvestorRole,
   InvestorType,
+  StartupBidBoardResponse,
   StartupInvestorView,
 } from './deal.types';
 
@@ -48,6 +49,7 @@ export const ExpressInterestSchema = z.object({
   proposedAmountINR: z.number().min(20000),
   proposedEquityPercent: z.number().min(0.01).max(100),
   chosenRole: z.enum(['shareholder', 'director', 'observer']).optional(),
+  coverLetter: z.string().trim().max(1000).optional(),
 });
 
 export const FundTransferSchema = z.object({
@@ -781,6 +783,9 @@ export const createInvestorDealFromInterest = async (
     deal.adminApprovedBy = undefined;
     deal.closedAt = undefined;
     deal.fundTransferInitiatedAt = undefined;
+    if (parsed.coverLetter) {
+      deal.coverLetter = parsed.coverLetter;
+    }
 
     await deal.save({ session });
 
@@ -2031,4 +2036,278 @@ export const agreeNegotiationTerms = async (
 
   await deal.save();
   return deal.negotiation;
+};
+
+// ─── Marketplace Bid Board ──────────────────────────────────────────────────
+
+type LeanBidder = {
+  _id: Types.ObjectId;
+  displayName: string;
+  avatar?: string;
+  innovationScore: number;
+};
+
+type LeanStartupBidInfo = {
+  _id: Types.ObjectId;
+  name: string;
+  tagline: string;
+  fundingNeeded?: number;
+  maxPennyInvestors: number;
+  currentPennyCount: number;
+  hasSoleInvestor: boolean;
+  founderIds: Types.ObjectId[];
+};
+
+export const getStartupBidBoard = async (
+  startupId: string,
+  viewerId?: string,
+): Promise<StartupBidBoardResponse> => {
+  const startup = await Startup.findOne({
+    _id: startupId,
+    launchedToInvestors: true,
+    reviewStatus: 'approved',
+  })
+    .select('_id name tagline fundingNeeded maxPennyInvestors currentPennyCount hasSoleInvestor founderIds')
+    .lean<LeanStartupBidInfo | null>();
+
+  if (!startup) {
+    throw new ApiError(404, 'STARTUP_NOT_FOUND', 'Startup not found or not open for bids');
+  }
+
+  const [pennyDeals, soleDeals] = await Promise.all([
+    Deal.find({ startupId, investorType: 'penny', status: 'active' })
+      .select('_id investorId amountINR equityPercent coverLetter createdAt founderDecision investorRole')
+      .populate<{ investorId: LeanBidder }>('investorId', '_id displayName avatar innovationScore')
+      .sort({ createdAt: 1 })
+      .lean<Array<DealDocumentLike & { investorId: LeanBidder }>>(),
+    Deal.find({ startupId, investorType: 'sole', status: 'active' })
+      .select('_id investorId amountINR equityPercent coverLetter createdAt founderDecision investorRole')
+      .populate<{ investorId: LeanBidder }>('investorId', '_id displayName avatar innovationScore')
+      .sort({ amountINR: -1, createdAt: 1 })
+      .lean<Array<DealDocumentLike & { investorId: LeanBidder }>>(),
+  ]);
+
+  const pennyTotal = pennyDeals.reduce((sum, d) => sum + (d.amountINR ?? 0), 0);
+
+  const contributors = pennyDeals.map((d) => ({
+    bidId: String(d._id),
+    investorId: String(d.investorId._id),
+    name: d.investorId.displayName ?? 'Investor',
+    ...(d.investorId.avatar ? { avatar: d.investorId.avatar } : {}),
+    innovationScore: d.investorId.innovationScore ?? 0,
+    amountINR: d.amountINR,
+    equityPercent: d.equityPercent,
+    placedAt: d.createdAt.toISOString(),
+    isCurrentUser: viewerId ? String(d.investorId._id) === viewerId : false,
+  }));
+
+  const soleBidsList = soleDeals.map((d) => ({
+    bidId: String(d._id),
+    investorId: String(d.investorId._id),
+    name: d.investorId.displayName ?? 'Investor',
+    ...(d.investorId.avatar ? { avatar: d.investorId.avatar } : {}),
+    innovationScore: d.investorId.innovationScore ?? 0,
+    amountINR: d.amountINR,
+    equityPercent: d.equityPercent,
+    ...(d.coverLetter ? { coverLetter: d.coverLetter } : {}),
+    role: d.investorRole,
+    founderDecisionStatus: (d.founderDecision?.status as 'pending' | 'accepted' | 'rejected') ?? 'pending',
+    isCurrentUser: viewerId ? String(d.investorId._id) === viewerId : false,
+    placedAt: d.createdAt.toISOString(),
+  }));
+
+  const allDeals = [...pennyDeals, ...soleDeals];
+  const currentUserDeal = viewerId
+    ? allDeals.find((d) => String(d.investorId._id) === viewerId)
+    : undefined;
+
+  return {
+    startupId,
+    startupName: startup.name,
+    startupTagline: startup.tagline,
+    ...(typeof startup.fundingNeeded === 'number' ? { fundingTarget: startup.fundingNeeded } : {}),
+    acceptsPennyInvestors: startup.currentPennyCount < startup.maxPennyInvestors,
+    acceptsSoleInvestor: !startup.hasSoleInvestor,
+    pennyPool: {
+      totalRaised: pennyTotal,
+      investorCount: pennyDeals.length,
+      maxInvestors: startup.maxPennyInvestors,
+      contributors,
+    },
+    soleBids: soleBidsList,
+    hasSoleInvestorAccepted: startup.hasSoleInvestor,
+    ...(currentUserDeal
+      ? {
+          currentUserBid: {
+            bidId: String(currentUserDeal._id),
+            investorType: currentUserDeal.investorType,
+            status: (currentUserDeal.founderDecision?.status as 'pending' | 'accepted' | 'rejected') ?? 'pending',
+          },
+        }
+      : {}),
+  };
+};
+
+export const PlaceBidSchema = ExpressInterestSchema;
+
+export const placeBidFromUser = async (
+  userId: string,
+  startupId: string,
+  payload: z.infer<typeof PlaceBidSchema>,
+): Promise<DealDetailView> => {
+  const parsed = PlaceBidSchema.parse(payload);
+
+  const user = await User.findById(userId)
+    .select('_id displayName role isActive innovationScore')
+    .lean<(LeanUser & { isActive?: boolean }) | null>();
+
+  if (!user || !user.isActive) {
+    throw new ApiError(403, 'FORBIDDEN', 'User not found or inactive');
+  }
+
+  if (user.role !== UserRole.STUDENT && user.role !== UserRole.INVESTOR) {
+    throw new ApiError(403, 'FORBIDDEN', 'Only students and investors can place bids');
+  }
+
+  const transactionResult = await runMongoTransaction(async (session) => {
+    const startup = await Startup.findOne({
+      _id: startupId,
+      launchedToInvestors: true,
+      reviewStatus: 'approved',
+    })
+      .session(session)
+      .select(
+        '_id name tagline category stage pitchDeckUrl founderIds launchedToInvestors launchedAt innovationScoreAtLaunch traction totalShares availableShares reservedForSole maxPennyInvestors currentPennyCount hasSoleInvestor soleInvestorId',
+      )
+      .lean<LeanStartup | null>();
+
+    if (!startup) {
+      throw new ApiError(404, 'STARTUP_NOT_FOUND', 'Startup not found or not open for bids');
+    }
+
+    if (startup.founderIds.some((id) => String(id) === userId)) {
+      throw new ApiError(400, 'SELF_BID', 'Founders cannot bid on their own startup');
+    }
+
+    const studentId = startup.founderIds[0];
+    if (!studentId) {
+      throw new ApiError(400, 'STARTUP_NO_FOUNDERS', 'Startup does not have a founder linked');
+    }
+
+    const founder = await User.findById(studentId)
+      .session(session)
+      .select('_id innovationScore role isActive')
+      .lean<(LeanUser & { isActive?: boolean }) | null>();
+    if (!founder || founder.role !== UserRole.STUDENT || !founder.isActive) {
+      throw new ApiError(404, 'STUDENT_NOT_FOUND', 'Student not found');
+    }
+
+    const existing = await Deal.findOne({ investorId: userId, startupId, studentId }).session(session);
+    if (existing && existing.status !== 'cancelled') {
+      return { existingDealId: String(existing._id), founderIds: startup.founderIds };
+    }
+
+    if (parsed.investorType === 'sole' && startup.hasSoleInvestor) {
+      throw new ApiError(409, 'SOLE_INVESTOR_EXISTS', 'This startup already has a sole investor');
+    }
+
+    if (parsed.investorType === 'penny' && startup.currentPennyCount >= startup.maxPennyInvestors) {
+      throw new ApiError(409, 'PENNY_SLOTS_FULL', 'Penny investor slots are full for this startup');
+    }
+
+    const sharesToAllocate = await validateInvestmentTerms({
+      startup,
+      investorType: parsed.investorType,
+      equityPercent: parsed.proposedEquityPercent,
+      chosenRole: parsed.chosenRole,
+      excludeId: existing ? String(existing._id) : undefined,
+      session,
+    });
+
+    const authority = resolveInvestorAuthority(parsed.investorType, parsed.proposedEquityPercent, parsed.chosenRole);
+
+    const deal =
+      existing ??
+      new Deal({
+        investorId: userId,
+        startupId,
+        studentId,
+      });
+
+    deal.mediatorLabel = 'ProMove';
+    deal.requestOrigin = user.role === UserRole.INVESTOR ? 'investor' : 'student';
+    deal.mediationStatus = 'intake';
+    deal.investorType = parsed.investorType;
+    deal.stage = 0;
+    deal.negotiation = {
+      status: 'initial',
+      investorProposedAmount: parsed.proposedAmountINR,
+      investorProposedEquity: parsed.proposedEquityPercent,
+      messages: [],
+    };
+    deal.amountINR = parsed.proposedAmountINR;
+    deal.proposedAmountINR = parsed.proposedAmountINR;
+    deal.equityPercent = parsed.proposedEquityPercent;
+    deal.proposedEquityPercent = parsed.proposedEquityPercent;
+    deal.sharesAllocated = sharesToAllocate;
+    deal.stockDetails = {
+      shareClassLabel: DEFAULT_SHARE_CLASS_LABEL,
+      sharePriceInr: sharesToAllocate > 0 ? round(parsed.proposedAmountINR / sharesToAllocate) : 0,
+      transferValueInr: parsed.proposedAmountINR,
+      totalSharesConsidered: sharesToAllocate,
+    };
+    deal.stockTransfer = { status: 'not_started' };
+    deal.royalty = {
+      promovePercentage: DEFAULT_PROMOVE_ROYALTY_PERCENTAGE,
+      promoveAmountINR: calculateRoyaltyAmount(parsed.proposedAmountINR, DEFAULT_PROMOVE_ROYALTY_PERCENTAGE),
+      status: 'pending',
+    };
+    deal.founderDecision = { status: 'pending' };
+    deal.investorRole = authority.investorRole;
+    deal.votingWeight = authority.votingWeight;
+    deal.canVeto = authority.canVeto;
+    deal.canAccessFinancials = authority.canAccessFinancials;
+    deal.canRequestUpdates = authority.canRequestUpdates;
+    deal.innovationScoreSnapshot = founder.innovationScore ?? 0;
+    deal.status = 'active';
+    deal.adminApprovalRequired = false;
+    deal.adminApprovedAt = undefined;
+    deal.adminApprovedBy = undefined;
+    deal.closedAt = undefined;
+    deal.fundTransferInitiatedAt = undefined;
+    if (parsed.coverLetter) {
+      deal.coverLetter = parsed.coverLetter;
+    }
+
+    await deal.save({ session });
+
+    return { dealId: String(deal._id), founderIds: startup.founderIds };
+  });
+
+  await invalidateInvestmentCaches(startupId, userId);
+
+  if ('existingDealId' in transactionResult) {
+    const existingDeal = await Deal.findById(transactionResult.existingDealId).lean<DealDocumentLike | null>();
+    if (!existingDeal) {
+      throw new ApiError(404, 'DEAL_NOT_FOUND', 'Deal not found');
+    }
+    const context = await fetchDealContext(existingDeal);
+    return buildDetail(existingDeal, context.startup, context.student, context.investor, context.investor.displayName, context.productWorkshop);
+  }
+
+  await pushFounderNotification(
+    transactionResult.founderIds,
+    `New ${parsed.investorType} investor bid on your startup`,
+    parsed.investorType === 'sole'
+      ? 'A sole investor placed a bid on your startup. Review it in your deal board.'
+      : `A penny investor bid ₹${parsed.proposedAmountINR.toLocaleString()} for ${round(parsed.proposedEquityPercent)}% equity.`,
+  );
+
+  const createdDeal = await Deal.findById(transactionResult.dealId).lean<DealDocumentLike | null>();
+  if (!createdDeal) {
+    throw new ApiError(404, 'DEAL_NOT_FOUND', 'Deal not found');
+  }
+
+  const context = await fetchDealContext(createdDeal);
+  return buildDetail(createdDeal, context.startup, context.student, context.investor, context.investor.displayName, context.productWorkshop);
 };

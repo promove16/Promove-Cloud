@@ -6,10 +6,13 @@ import {
   founderDecisionSchema,
   getDealForParticipant,
   getInvestorAuthorityPortfolio,
+  getStartupBidBoard,
   getStartupCapTable,
   getStartupInvestors,
   linkWorkshopSchema,
   listDealsForParticipant,
+  placeBidFromUser,
+  PlaceBidSchema,
   recordFounderDecision,
   recordFundTransfer,
   updateInvestorRoleSchema,
@@ -175,8 +178,26 @@ export const agreeNegotiationTermsController = async (req: Request, res: Respons
   }
 
   const dealId = assertObjectId(String(req.params.id), 'Deal id');
-  
+
   const senderRole = req.user.role === 'investor' ? 'investor' : 'student';
   const result = await agreeNegotiationTerms(dealId, String(req.user._id), senderRole);
   res.status(200).json(new ApiResponse(result));
+};
+
+export const getStartupBidBoardController = async (req: Request, res: Response) => {
+  const startupId = assertObjectId(String(req.params.id), 'Startup id');
+  const viewerId = req.user ? String(req.user._id) : undefined;
+  const board = await getStartupBidBoard(startupId, viewerId);
+  res.status(200).json(new ApiResponse(board));
+};
+
+export const placeBidController = async (req: Request, res: Response) => {
+  if (!req.user) {
+    throw new ApiError(401, 'UNAUTHORIZED', 'Invalid or expired token');
+  }
+
+  const startupId = assertObjectId(String(req.params.id), 'Startup id');
+  const payload = PlaceBidSchema.parse(req.body);
+  const deal = await placeBidFromUser(String(req.user._id), startupId, payload);
+  res.status(201).json(new ApiResponse(deal));
 };

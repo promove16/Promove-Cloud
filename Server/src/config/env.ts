@@ -63,6 +63,7 @@ const envSchema = z.object({
   SMTP_USER: z.string().min(1).optional(),
   SMTP_PASS: z.string().min(1).optional(),
   FROM_EMAIL: z.string().min(1),
+  DEV_EMAIL_REDIRECT: z.string().email().optional(),
 });
 
 const parsed = envSchema.safeParse(process.env);

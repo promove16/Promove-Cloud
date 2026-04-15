@@ -225,3 +225,60 @@ export interface CapTableResponse {
   };
   totalInvestorEquity: number;
 }
+
+export interface BidBoardContributor {
+  bidId: string;
+  investorId: string;
+  name: string;
+  avatar?: string;
+  innovationScore: number;
+  amountINR: number;
+  equityPercent: number;
+  placedAt: string;
+  isCurrentUser: boolean;
+}
+
+export interface BidBoardSoleBid {
+  bidId: string;
+  investorId: string;
+  name: string;
+  avatar?: string;
+  innovationScore: number;
+  amountINR: number;
+  equityPercent: number;
+  coverLetter?: string;
+  role: InvestorRole;
+  founderDecisionStatus: FounderDecisionStatus;
+  isCurrentUser: boolean;
+  placedAt: string;
+}
+
+export interface StartupBidBoardResponse {
+  startupId: string;
+  startupName: string;
+  startupTagline: string;
+  fundingTarget?: number;
+  acceptsPennyInvestors: boolean;
+  acceptsSoleInvestor: boolean;
+  pennyPool: {
+    totalRaised: number;
+    investorCount: number;
+    maxInvestors: number;
+    contributors: BidBoardContributor[];
+  };
+  soleBids: BidBoardSoleBid[];
+  hasSoleInvestorAccepted: boolean;
+  currentUserBid?: {
+    bidId: string;
+    investorType: InvestorType;
+    status: FounderDecisionStatus;
+  };
+}
+
+export interface PlaceBidPayload {
+  investorType: InvestorType;
+  proposedAmountINR: number;
+  proposedEquityPercent: number;
+  chosenRole?: InvestorRole;
+  coverLetter?: string;
+}

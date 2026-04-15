@@ -8,6 +8,8 @@ import {
   DealGroupView,
   DealTransitionResponse,
   DealUpdateStagePayload,
+  PlaceBidPayload,
+  StartupBidBoardResponse,
   StartupInvestorItem,
 } from '../types/deal.types';
 
@@ -94,6 +96,19 @@ export const dealApi = {
   async counterOfferNegotiationTerms(dealId: string, payload: { amountINR: number; equityPercent: number }) {
     const response = await api.post<ApiSuccessResponse<any>>(
       `/api/deals/${dealId}/negotiation-propose`,
+      payload,
+    );
+    return response.data.data;
+  },
+  async getStartupBidBoard(startupId: string) {
+    const response = await api.get<ApiSuccessResponse<StartupBidBoardResponse>>(
+      `/api/startups/${startupId}/bids`,
+    );
+    return response.data.data;
+  },
+  async placeBid(startupId: string, payload: PlaceBidPayload) {
+    const response = await api.post<ApiSuccessResponse<DealDetailView>>(
+      `/api/startups/${startupId}/bid`,
       payload,
     );
     return response.data.data;

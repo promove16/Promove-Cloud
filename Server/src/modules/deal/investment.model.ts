@@ -50,6 +50,12 @@ const investmentSchema = new Schema<IInvestment>(
       default: undefined,
       min: 20000,
     },
+    coverLetter: {
+      type: String,
+      trim: true,
+      maxlength: 1000,
+      default: undefined,
+    },
     equityPercent: {
       type: Number,
       required: true,

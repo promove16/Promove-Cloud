@@ -91,6 +91,7 @@ export interface IInvestment extends InvestmentAuthority {
   equityPercent: number;
   proposedEquityPercent?: number;
   sharesAllocated: number;
+  coverLetter?: string;
   stockDetails: DealStockDetails;
   stockTransfer: DealStockTransfer;
   royalty: DealRoyalty;
@@ -295,4 +296,53 @@ export interface InvestmentTypeAnalytics {
   soleCount: number;
   pennyCapitalDeployed: number;
   soleCapitalDeployed: number;
+}
+
+export interface BidBoardContributor {
+  bidId: string;
+  investorId: string;
+  name: string;
+  avatar?: string;
+  innovationScore: number;
+  amountINR: number;
+  equityPercent: number;
+  placedAt: string;
+  isCurrentUser: boolean;
+}
+
+export interface BidBoardSoleBid {
+  bidId: string;
+  investorId: string;
+  name: string;
+  avatar?: string;
+  innovationScore: number;
+  amountINR: number;
+  equityPercent: number;
+  coverLetter?: string;
+  role: InvestorRole;
+  founderDecisionStatus: FounderDecisionStatus;
+  isCurrentUser: boolean;
+  placedAt: string;
+}
+
+export interface StartupBidBoardResponse {
+  startupId: string;
+  startupName: string;
+  startupTagline: string;
+  fundingTarget?: number;
+  acceptsPennyInvestors: boolean;
+  acceptsSoleInvestor: boolean;
+  pennyPool: {
+    totalRaised: number;
+    investorCount: number;
+    maxInvestors: number;
+    contributors: BidBoardContributor[];
+  };
+  soleBids: BidBoardSoleBid[];
+  hasSoleInvestorAccepted: boolean;
+  currentUserBid?: {
+    bidId: string;
+    investorType: InvestorType;
+    status: FounderDecisionStatus;
+  };
 }

@@ -29,6 +29,7 @@ import {
   StartupInviteModal,
   StartupInviteTarget,
 } from "../../features/marketplace/StartupInviteModal";
+import { StartupBidDrawer } from "../../features/marketplace/StartupBidDrawer";
 import {
   MarketplaceDirectoryItem,
   MarketplaceEntityType,
@@ -413,8 +414,10 @@ const getDetailChips = (item: MarketplaceDirectoryItem) =>
     ? [
         item.category,
         item.stage,
-        ...item.launchTargets,
-        item.project?.title ?? "",
+        item.traction.mvpBuilt ? "MVP Ready" : "",
+        item.traction.revenueGenerating ? "Revenue Generating" : "",
+        item.traction.patentFiled ? "Patent Filed" : "",
+        item.launchTargets.includes("Investors") ? "Open for Investment" : "",
         ...item.founders.map((founder) => founder.displayName),
       ]
     : item.entityType === "school" || item.entityType === "college"
@@ -1205,6 +1208,7 @@ function GeneralMarketplace({ dashboardRole }: { dashboardRole: UserRole }) {
     null,
   );
   const [inviteFeedback, setInviteFeedback] = useState<string | null>(null);
+  const [bidDrawerStartupId, setBidDrawerStartupId] = useState<string | null>(null);
   const availableTabs = useMemo(
     () => getTabsForRole(dashboardRole),
     [dashboardRole],
@@ -1983,6 +1987,10 @@ function GeneralMarketplace({ dashboardRole }: { dashboardRole: UserRole }) {
 
   const renderActions = (item: MarketplaceDirectoryItem) => {
     if (isStartupItem(item)) {
+      const canBid =
+        (dashboardRole === UserRole.STUDENT || dashboardRole === UserRole.INVESTOR) &&
+        item.launchTargets.includes('Investors');
+
       return (
         <div className="flex flex-wrap items-center gap-2">
           {item.primaryFounderId ? (
@@ -1994,6 +2002,14 @@ function GeneralMarketplace({ dashboardRole }: { dashboardRole: UserRole }) {
               Message founder
             </button>
           ) : null}
+          {canBid && (
+            <button
+              onClick={() => setBidDrawerStartupId(item._id)}
+              className={secondaryActionClassName}
+            >
+              Bid / Invest
+            </button>
+          )}
           <button
             onClick={() =>
               navigate(
@@ -2512,6 +2528,12 @@ function GeneralMarketplace({ dashboardRole }: { dashboardRole: UserRole }) {
         onClose={() => setInviteTarget(null)}
         target={inviteTarget}
         onSent={setInviteFeedback}
+      />
+
+      <StartupBidDrawer
+        startupId={bidDrawerStartupId}
+        open={Boolean(bidDrawerStartupId)}
+        onClose={() => setBidDrawerStartupId(null)}
       />
     </div>
   );
