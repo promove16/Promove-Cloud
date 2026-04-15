@@ -40,7 +40,12 @@ const STAGE_COLORS: Record<number, string> = {
   4: 'border-emerald-500/30 bg-emerald-500/10 text-emerald-300',
 };
 
-const formatInr = (amount: number) => `₹${amount.toLocaleString()}`;
+const formatInr = (amount: number) =>
+  new Intl.NumberFormat('en-IN', {
+    style: 'currency',
+    currency: 'INR',
+    maximumFractionDigits: 0,
+  }).format(amount);
 
 export default function InvestmentPipeline() {
   const navigate = useNavigate();
