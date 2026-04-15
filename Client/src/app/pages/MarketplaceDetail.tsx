@@ -207,6 +207,11 @@ function StartupDetailView({
 }) {
   const navigate = useNavigate();
   const currentUser = useAuthStore((state) => state.user);
+  const isOwnStartup = currentUser
+    ? entity.founders.some((founder) => founder._id === currentUser._id) || entity.primaryFounderId === currentUser._id
+    : false;
+  const messageFounderId =
+    !isOwnStartup && entity.primaryFounderId ? entity.primaryFounderId : null;
   const isInvestorView = currentUser?.role === UserRole.INVESTOR;
   const canShowInvestorButton = isInvestorView && (entity.acceptsPennyInvestors || entity.acceptsSoleInvestor);
 
@@ -246,9 +251,9 @@ function StartupDetailView({
                 Express Interest
               </button>
             )}
-            {entity.primaryFounderId ? (
+            {messageFounderId ? (
               <button
-                onClick={() => onMessage(entity.primaryFounderId!)}
+                onClick={() => onMessage(messageFounderId)}
                 className="inline-flex items-center gap-2 rounded-full border border-white/10 px-3.5 py-2 text-sm font-medium text-white transition hover:border-white/20 hover:bg-white/5"
               >
                 <MessageCircle className="h-4 w-4" />
@@ -305,13 +310,15 @@ function StartupDetailView({
                       {founder.bio ? <p className="mt-2 text-sm leading-6 text-slate-300">{founder.bio}</p> : null}
                     </div>
                     <div className="flex items-center gap-2">
-                      <button
-                        onClick={() => onMessage(founder._id)}
-                        className="inline-flex items-center gap-1.5 rounded-full border border-white/10 px-3 py-1 text-xs font-medium text-slate-300 transition hover:border-white/20 hover:bg-white/5"
-                      >
-                        <MessageCircle className="h-3.5 w-3.5" />
-                        Message
-                      </button>
+                      {founder._id !== currentUser?._id ? (
+                        <button
+                          onClick={() => onMessage(founder._id)}
+                          className="inline-flex items-center gap-1.5 rounded-full border border-white/10 px-3 py-1 text-xs font-medium text-slate-300 transition hover:border-white/20 hover:bg-white/5"
+                        >
+                          <MessageCircle className="h-3.5 w-3.5" />
+                          Message
+                        </button>
+                      ) : null}
                       <div className="rounded-full border border-cyan-400/20 bg-cyan-400/10 px-3 py-1 text-xs font-semibold text-cyan-100">
                         Score {founder.innovationScore}
                       </div>

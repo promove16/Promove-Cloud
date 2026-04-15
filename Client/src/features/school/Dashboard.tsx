@@ -74,6 +74,7 @@ export default function Dashboard() {
       announcementAction={{ label: 'Open Operations', to: '/dashboard/school/operations' }}
       showcaseTitle="School Showcase"
       showcaseDescription="Highlight the institution's innovation credibility through rating, mentorship, and startup delivery signals."
+      showcasePlacement="after-hero"
       showcaseCards={[
         {
           title: 'IIC Rating',

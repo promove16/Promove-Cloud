@@ -19,7 +19,8 @@ import {
   SupportPriority,
   SupportRelatedEntityType,
 } from '../../types/support.types';
-import { FAQ_ENTRIES, SUPPORT_USER_BASE_PATH, buildUserTicketPath } from './supportShared';
+import { useAuthStore } from '../../store/authStore';
+import { SUPPORT_USER_BASE_PATH, buildUserTicketPath, getFaqsForRole, getRoleHelpConfig } from './supportShared';
 
 type AttachmentDraft = {
   id: string;
@@ -34,7 +35,15 @@ export default function SupportRaiseQueryPage() {
   const navigate = useNavigate();
   const queryClient = useQueryClient();
 
-  const initialCategory = (searchParams.get('category') as SupportCategory | null) ?? 'other';
+  const user = useAuthStore((state) => state.user);
+  const role = user?.role ?? null;
+  const roleConfig = getRoleHelpConfig(role);
+  const roleFaqs = getFaqsForRole(role);
+
+  // Only show categories relevant to this role; fall back to all if none configured
+  const visibleCategories = roleConfig.categories.length > 0 ? roleConfig.categories : [...SUPPORT_CATEGORIES];
+
+  const initialCategory = (searchParams.get('category') as SupportCategory | null) ?? visibleCategories[0] ?? 'other';
   const initialTitle = searchParams.get('title') ?? '';
   const initialDescription = searchParams.get('description') ?? '';
   const initialPriority = (searchParams.get('priority') as SupportPriority | null) ?? 'medium';
@@ -56,13 +65,13 @@ export default function SupportRaiseQueryPage() {
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
 
   const suggestedFaqs = useMemo(() => {
-    const categoryMatches = FAQ_ENTRIES.filter((faq) => faq.category === category);
+    const categoryMatches = roleFaqs.filter((faq) => faq.category === category);
     if (!description.trim()) {
       return categoryMatches.slice(0, 3);
     }
 
     const needle = description.trim().toLowerCase();
-    const keywordMatches = FAQ_ENTRIES.filter((faq) =>
+    const keywordMatches = roleFaqs.filter((faq) =>
       `${faq.question} ${faq.answer}`.toLowerCase().includes(needle.slice(0, 40)),
     );
 
@@ -70,7 +79,7 @@ export default function SupportRaiseQueryPage() {
       0,
       3,
     );
-  }, [category, description]);
+  }, [category, description, roleFaqs]);
 
   const createMutation = useMutation({
     mutationFn: async () => {
@@ -136,13 +145,19 @@ export default function SupportRaiseQueryPage() {
               Help Desk
             </Link>
             <span>/</span>
-            <span>New Query</span>
+            <span>New Ticket</span>
           </div>
           <h1 className="text-3xl font-semibold tracking-tight text-white">Raise a support ticket</h1>
           <p className="max-w-3xl text-sm leading-6 text-slate-400">
             Describe the issue clearly and attach any reference material. A support team member will pick it up
             and respond through this ticket.
           </p>
+          {role && (
+            <div className="mt-1 inline-flex items-center gap-2 rounded-xl border border-slate-700 bg-slate-900 px-3 py-1.5 text-xs text-slate-400">
+              Showing categories for your role:
+              <span className={`font-semibold capitalize ${roleConfig.color}`}>{role}</span>
+            </div>
+          )}
         </div>
       </section>
 
@@ -162,7 +177,7 @@ export default function SupportRaiseQueryPage() {
           <div>
             <label className="text-sm font-semibold text-slate-200">Category</label>
             <div className="mt-2 grid gap-3 md:grid-cols-2 xl:grid-cols-3">
-              {SUPPORT_CATEGORIES.map((option) => {
+              {visibleCategories.map((option) => {
                 const active = option === category;
                 return (
                   <button

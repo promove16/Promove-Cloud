@@ -1987,15 +1987,21 @@ function GeneralMarketplace({ dashboardRole }: { dashboardRole: UserRole }) {
 
   const renderActions = (item: MarketplaceDirectoryItem) => {
     if (isStartupItem(item)) {
+      const isOwnStartup = authUser
+        ? item.founders.some((f) => f._id === authUser._id) || item.primaryFounderId === authUser._id
+        : false;
+      const messageFounderId =
+        !isOwnStartup && item.primaryFounderId ? item.primaryFounderId : null;
       const canBid =
+        !isOwnStartup &&
         (dashboardRole === UserRole.STUDENT || dashboardRole === UserRole.INVESTOR) &&
         item.launchTargets.includes('Investors');
 
-      return (
-        <div className="flex flex-wrap items-center gap-2">
-          {item.primaryFounderId ? (
+        return (
+          <div className="flex flex-wrap items-center gap-2">
+          {messageFounderId ? (
             <button
-              onClick={() => handleMessage(item.primaryFounderId!)}
+              onClick={() => handleMessage(messageFounderId)}
               className={secondaryActionClassName}
             >
               <MessageCircle className="h-4 w-4" />

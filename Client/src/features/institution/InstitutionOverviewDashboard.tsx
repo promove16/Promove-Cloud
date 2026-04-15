@@ -60,6 +60,7 @@ type InstitutionOverviewDashboardProps = {
   showcaseTitle?: string;
   showcaseDescription?: string;
   showcaseCards?: OverviewShowcaseCard[];
+  showcasePlacement?: 'default' | 'after-hero';
   topStudents: StudentLeaderboardItem[];
   upcomingEvents: DashboardEvent[];
   recentProjects: RecentProject[];
@@ -137,6 +138,7 @@ export function InstitutionOverviewDashboard({
   showcaseTitle,
   showcaseDescription,
   showcaseCards = [],
+  showcasePlacement = 'default',
   topStudents,
   upcomingEvents,
   recentProjects,
@@ -146,6 +148,39 @@ export function InstitutionOverviewDashboard({
   headerAction,
   isLoading = false,
 }: InstitutionOverviewDashboardProps) {
+  const showcaseSection =
+    showcaseCards.length > 0 ? (
+      <section className="rounded-2xl border border-slate-800 bg-slate-900/85 p-6">
+        <div className="mb-6">
+          <h2 className="text-xl font-bold text-white">{showcaseTitle ?? 'Institution Showcase'}</h2>
+          {showcaseDescription ? (
+            <p className="mt-2 max-w-3xl text-sm text-slate-400">{showcaseDescription}</p>
+          ) : null}
+        </div>
+
+        <div className={`grid gap-4 ${showcaseCards.length >= 4 ? 'xl:grid-cols-4 md:grid-cols-2' : 'md:grid-cols-3'}`}>
+          {showcaseCards.map((card) => (
+            <Link
+              key={card.title}
+              to={card.to ?? '#'}
+              className={`rounded-2xl border border-slate-800 bg-slate-950/80 p-5 transition hover:border-slate-700 ${
+                card.to ? 'block cursor-pointer' : 'pointer-events-none block'
+              }`}
+            >
+              <div className="flex items-start justify-between gap-4">
+                <div className={`flex h-12 w-12 items-center justify-center rounded-xl bg-gradient-to-br ${card.color}`}>
+                  <card.icon className="h-6 w-6 text-white" />
+                </div>
+                <div className="text-right text-2xl font-bold text-white">{card.value}</div>
+              </div>
+              <div className="mt-4 text-base font-semibold text-white">{card.title}</div>
+              <p className="mt-2 text-sm leading-6 text-slate-400">{card.description}</p>
+            </Link>
+          ))}
+        </div>
+      </section>
+    ) : null;
+
   return (
     <div className="space-y-8">
       <section className="flex flex-col gap-4 lg:flex-row lg:items-end lg:justify-between">
@@ -156,6 +191,8 @@ export function InstitutionOverviewDashboard({
         </div>
         {headerAction ? <div className="flex items-center">{headerAction}</div> : null}
       </section>
+
+      {showcasePlacement === 'after-hero' ? showcaseSection : null}
 
       <section className="grid gap-6 md:grid-cols-2 xl:grid-cols-4">
         {statCards.map((stat) => (
@@ -356,37 +393,7 @@ export function InstitutionOverviewDashboard({
         </div>
       </section>
 
-      {showcaseCards.length > 0 ? (
-        <section className="rounded-2xl border border-slate-800 bg-slate-900/85 p-6">
-          <div className="mb-6">
-            <h2 className="text-xl font-bold text-white">{showcaseTitle ?? 'Institution Showcase'}</h2>
-            {showcaseDescription ? (
-              <p className="mt-2 max-w-3xl text-sm text-slate-400">{showcaseDescription}</p>
-            ) : null}
-          </div>
-
-          <div className={`grid gap-4 ${showcaseCards.length >= 4 ? 'xl:grid-cols-4 md:grid-cols-2' : 'md:grid-cols-3'}`}>
-            {showcaseCards.map((card) => (
-              <Link
-                key={card.title}
-                to={card.to ?? '#'}
-                className={`rounded-2xl border border-slate-800 bg-slate-950/80 p-5 transition hover:border-slate-700 ${
-                  card.to ? 'block' : 'pointer-events-none block'
-                }`}
-              >
-                <div className="flex items-start justify-between gap-4">
-                  <div className={`flex h-12 w-12 items-center justify-center rounded-xl bg-gradient-to-br ${card.color}`}>
-                    <card.icon className="h-6 w-6 text-white" />
-                  </div>
-                  <div className="text-right text-2xl font-bold text-white">{card.value}</div>
-                </div>
-                <div className="mt-4 text-base font-semibold text-white">{card.title}</div>
-                <p className="mt-2 text-sm leading-6 text-slate-400">{card.description}</p>
-              </Link>
-            ))}
-          </div>
-        </section>
-      ) : null}
+      {showcasePlacement !== 'after-hero' ? showcaseSection : null}
 
       <section className="grid gap-6 md:grid-cols-3">
         {quickStats.map((stat) => (
