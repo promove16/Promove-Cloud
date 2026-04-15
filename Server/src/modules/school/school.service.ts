@@ -44,6 +44,7 @@ import {
 } from '../institution/studentRoster.service';
 import { sendStudentRosterInvite } from '../institution/studentInvite.service';
 import {
+  InnovationScoreDistributionBucket,
   DashboardEventView,
   InstitutionPatentView,
   InstitutionStartupView,
@@ -76,6 +77,12 @@ const STATS_TTL_SECONDS = 60 * 10;
 const INVESTORS_TTL_SECONDS = 60 * 15;
 const MAX_TIEBREAKER_EPOCH = 9999999999999;
 const TREND_RANGE_DAYS = 30;
+const INNOVATION_SCORE_BUCKETS: Array<{ label: string; min: number; max: number }> = [
+  { label: '0-250', min: 0, max: 250 },
+  { label: '251-500', min: 251, max: 500 },
+  { label: '501-750', min: 501, max: 750 },
+  { label: '751-1000', min: 751, max: 1000 },
+];
 
 type StudentLeaderboardCacheUser = {
   _id: Types.ObjectId;
@@ -395,6 +402,37 @@ export const getInstitutionUpcomingEvents = async (institutionId: string): Promi
     scheduledAt: event.scheduledAt.toISOString(),
     participantsCount: event.participants.length,
   }));
+};
+
+export const getInnovationScoreDistribution = async (
+  institutionId: string,
+  studentIdsInput?: Types.ObjectId[],
+): Promise<InnovationScoreDistributionBucket[]> => {
+  const studentIds = studentIdsInput ?? (await getStudentIdsForInstitution(institutionId));
+
+  if (studentIds.length === 0) {
+    return INNOVATION_SCORE_BUCKETS.map((bucket) => ({ ...bucket, count: 0 }));
+  }
+
+  const students = await User.find({
+    _id: { $in: studentIds },
+    role: UserRole.STUDENT,
+    isActive: true,
+  })
+    .select('innovationScore')
+    .lean();
+
+  const counts = INNOVATION_SCORE_BUCKETS.map((bucket) => ({ ...bucket, count: 0 }));
+
+  for (const student of students) {
+    const score = normalizeInnovationScore(student.innovationScore);
+    const matchingBucket = counts.find((bucket) => score >= bucket.min && score <= bucket.max);
+    if (matchingBucket) {
+      matchingBucket.count += 1;
+    }
+  }
+
+  return counts;
 };
 
 export const createSchoolEvent = (
@@ -749,7 +787,7 @@ export const getStudentJourney = async (
 };
 
 export const getSchoolDashboard = async (institutionId: string): Promise<SchoolDashboardPayload> => {
-  const cacheKey = `school:dashboard:v2:${institutionId}`;
+  const cacheKey = `school:dashboard:v3:${institutionId}`;
   const cached = await redis.get<string>(cacheKey);
 
   const cachedDashboard = readRedisJson<SchoolDashboardPayload>(cached);
@@ -766,7 +804,16 @@ export const getSchoolDashboard = async (institutionId: string): Promise<SchoolD
   }
 
   const studentIds = await getStudentIdsForInstitution(institutionId);
-  const [stats, topStudentsPage, upcomingEvents, recentActivityCounts, recentProjects, trendGraph, iicTelemetry] =
+  const [
+    stats,
+    topStudentsPage,
+    upcomingEvents,
+    recentActivityCounts,
+    recentProjects,
+    trendGraph,
+    innovationScoreDistribution,
+    iicTelemetry,
+  ] =
     await Promise.all([
       getDashboardStats(institutionId, studentIds),
       getStudentLeaderboard(institutionId, undefined, 5),
@@ -774,6 +821,7 @@ export const getSchoolDashboard = async (institutionId: string): Promise<SchoolD
       getRecentActivityCounts(studentIds),
       getRecentInstitutionProjects(studentIds),
       getInstitutionTrendGraph(studentIds),
+      getInnovationScoreDistribution(institutionId, studentIds),
       getInstitutionIicTelemetry(institutionId, 'school'),
     ]);
 
@@ -809,6 +857,7 @@ export const getSchoolDashboard = async (institutionId: string): Promise<SchoolD
     stats,
     recentActivityCounts,
     trendGraph,
+    innovationScoreDistribution,
     upcomingEvents,
     topStudents: topStudentsPage.items,
     recentProjects,

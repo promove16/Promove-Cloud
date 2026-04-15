@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from 'react';
+import { ReactNode, useEffect, useMemo, useState } from 'react';
 import { useInfiniteQuery, useQuery, useQueryClient } from '@tanstack/react-query';
 import { Medal, Search, Sparkles } from 'lucide-react';
 import { useNavigate, useParams } from 'react-router-dom';
@@ -20,6 +20,8 @@ type Props = {
   basePath: string;
   fetchPage: (cursor?: string) => Promise<LeaderboardPage>;
   fetchJourney: (studentId: string) => Promise<StudentJourney>;
+  headerAction?: ReactNode;
+  prelude?: ReactNode;
 };
 
 const medalColorMap: Record<number, string> = {
@@ -35,6 +37,8 @@ export function LeaderboardPageBase({
   basePath,
   fetchPage,
   fetchJourney,
+  headerAction,
+  prelude,
 }: Props) {
   const navigate = useNavigate();
   const queryClient = useQueryClient();
@@ -98,11 +102,14 @@ export function LeaderboardPageBase({
   return (
     <>
       <div className="space-y-6">
+        {prelude}
+
         <InstitutionWorkspaceHeader
           mode={mode}
           eyebrow="Ranked by Innovation Score"
           title={title}
           description={subtitle}
+          headerAction={headerAction}
           tabsAction={
             <div className="relative w-full lg:max-w-md">
               <Search className="pointer-events-none absolute left-4 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-500" />

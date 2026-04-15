@@ -1,4 +1,5 @@
 import { collegeApi } from '../../api/college.api';
+import { CollegeStudentOnboardingPanel } from './CollegeStudentOnboardingPanel';
 import { LeaderboardPageBase } from '../institution/LeaderboardPageBase';
 
 export default function StudentLeaderboard() {
@@ -10,6 +11,7 @@ export default function StudentLeaderboard() {
       basePath="/dashboard/college"
       fetchPage={(cursor) => collegeApi.getStudents(cursor)}
       fetchJourney={collegeApi.getStudentJourney}
+      prelude={<CollegeStudentOnboardingPanel />}
     />
   );
 }

@@ -39,6 +39,7 @@ export default function ActiveDrives({ embedded = false }: ActiveDrivesProps) {
     minimumInnovationScore: 0,
   });
   const [submission, setSubmission] = useState({ studentId: '', submissionScore: 0 });
+  const [submitAttempted, setSubmitAttempted] = useState(false);
 
   const drivesQuery = useQuery({
     queryKey: ['recruiter', 'drives'],
@@ -93,6 +94,7 @@ export default function ActiveDrives({ embedded = false }: ActiveDrivesProps) {
         description: '',
         minimumInnovationScore: 0,
       });
+      setSubmitAttempted(false);
       setSelectedDriveId(createdDrive._id);
       await queryClient.invalidateQueries({ queryKey: ['recruiter', 'drives'] });
     },
@@ -160,23 +162,38 @@ export default function ActiveDrives({ embedded = false }: ActiveDrivesProps) {
           </div>
 
           <div className="mt-5 grid gap-4">
-            <Input
-              value={form.title}
-              onChange={(event) => setForm((current) => ({ ...current, title: event.target.value }))}
-              placeholder="Drive title"
-            />
-            <select
-              value={form.collegeId}
-              onChange={(event) => setForm((current) => ({ ...current, collegeId: event.target.value }))}
-              className="w-full rounded-lg border border-slate-800 bg-slate-950 px-4 py-3 text-white"
-            >
-              <option value="">Select college</option>
-              {(collegesQuery.data ?? []).map((college) => (
-                <option key={college._id} value={college._id}>
-                  {college.displayName}
-                </option>
-              ))}
-            </select>
+            <div className="grid gap-1">
+              <Input
+                value={form.title}
+                onChange={(event) => setForm((current) => ({ ...current, title: event.target.value }))}
+                placeholder="Drive title"
+                className={submitAttempted && !form.title.trim() ? 'border-red-500 focus:border-red-500' : ''}
+              />
+              {submitAttempted && !form.title.trim() && (
+                <p className="text-xs text-red-400">Drive title is required.</p>
+              )}
+            </div>
+
+            <div className="grid gap-1">
+              <select
+                value={form.collegeId}
+                onChange={(event) => setForm((current) => ({ ...current, collegeId: event.target.value }))}
+                className={`w-full rounded-lg border bg-slate-950 px-4 py-3 text-white ${
+                  submitAttempted && !form.collegeId ? 'border-red-500' : 'border-slate-800'
+                }`}
+              >
+                <option value="">Select college</option>
+                {(collegesQuery.data ?? []).map((college) => (
+                  <option key={college._id} value={college._id}>
+                    {college.displayName}
+                  </option>
+                ))}
+              </select>
+              {submitAttempted && !form.collegeId && (
+                <p className="text-xs text-red-400">College selection is required.</p>
+              )}
+            </div>
+
             <select
               value={form.type}
               onChange={(event) =>
@@ -188,11 +205,19 @@ export default function ActiveDrives({ embedded = false }: ActiveDrivesProps) {
               <option value="Internship Drive">Internship Drive</option>
               <option value="Hackathon">Hackathon</option>
             </select>
-            <Input
-              type="datetime-local"
-              value={form.scheduledAt}
-              onChange={(event) => setForm((current) => ({ ...current, scheduledAt: event.target.value }))}
-            />
+
+            <div className="grid gap-1">
+              <Input
+                type="datetime-local"
+                value={form.scheduledAt}
+                onChange={(event) => setForm((current) => ({ ...current, scheduledAt: event.target.value }))}
+                className={submitAttempted && !form.scheduledAt ? 'border-red-500 focus:border-red-500' : ''}
+              />
+              {submitAttempted && !form.scheduledAt && (
+                <p className="text-xs text-red-400">Scheduled date and time is required.</p>
+              )}
+            </div>
+
             <Input
               type="number"
               min={0}
@@ -205,12 +230,20 @@ export default function ActiveDrives({ embedded = false }: ActiveDrivesProps) {
               }
               placeholder="Minimum score"
             />
-            <textarea
-              value={form.description}
-              onChange={(event) => setForm((current) => ({ ...current, description: event.target.value }))}
-              placeholder="Drive description"
-              className="min-h-32 rounded-lg border border-slate-800 bg-slate-950 px-4 py-3 text-white"
-            />
+
+            <div className="grid gap-1">
+              <textarea
+                value={form.description}
+                onChange={(event) => setForm((current) => ({ ...current, description: event.target.value }))}
+                placeholder="Drive description"
+                className={`min-h-32 rounded-lg border bg-slate-950 px-4 py-3 text-white ${
+                  submitAttempted && !form.description.trim() ? 'border-red-500' : 'border-slate-800'
+                }`}
+              />
+              {submitAttempted && !form.description.trim() && (
+                <p className="text-xs text-red-400">Drive description is required.</p>
+              )}
+            </div>
           </div>
           <div className="sticky bottom-0 -mx-6 mt-6 border-t border-slate-800 bg-slate-900/95 px-6 py-4 backdrop-blur">
             <div className="flex items-center justify-between gap-3">
@@ -218,8 +251,13 @@ export default function ActiveDrives({ embedded = false }: ActiveDrivesProps) {
                 Review the schedule and threshold, then create the drive.
               </p>
               <Button
-                onClick={() => createDriveMutation.mutate()}
-                disabled={createDriveMutation.isPending || !canCreateDrive}
+                onClick={() => {
+                  setSubmitAttempted(true);
+                  if (canCreateDrive) {
+                    createDriveMutation.mutate();
+                  }
+                }}
+                disabled={createDriveMutation.isPending}
               >
                 <Plus className="mr-2 h-4 w-4" />
                 {createDriveMutation.isPending ? 'Creating...' : 'Create Drive'}

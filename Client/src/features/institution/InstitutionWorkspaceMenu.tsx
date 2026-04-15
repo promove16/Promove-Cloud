@@ -47,7 +47,7 @@ const INSTITUTION_WORKSPACE_ITEMS: Record<
       icon: GraduationCap,
     },
     {
-      label: "Student Tokens",
+      label: "Operations",
       path: "/dashboard/college/operations",
       icon: Settings2,
     },

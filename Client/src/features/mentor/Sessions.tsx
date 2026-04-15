@@ -137,6 +137,8 @@ export default function Sessions() {
     durationMinutes: 45,
     meetLink: '',
   });
+  const [formErrors, setFormErrors] = useState<{ studentId?: string; title?: string; scheduledAt?: string }>({});
+  const [submitAttempted, setSubmitAttempted] = useState(false);
 
   const sessionsQuery = useQuery({
     queryKey: ['mentor-sessions'],
@@ -155,10 +157,20 @@ export default function Sessions() {
     onSuccess: async () => {
       setShowCreate(false);
       setForm({ studentId: '', workspaceId: '', title: '', scheduledAt: '', durationMinutes: 45, meetLink: '' });
+      setFormErrors({});
+      setSubmitAttempted(false);
       setMessage('Session scheduled successfully.');
       await queryClient.invalidateQueries({ queryKey: ['mentor-sessions'] });
     },
   });
+
+  const validateSessionForm = () => {
+    const errors: typeof formErrors = {};
+    if (!form.studentId) errors.studentId = 'Please select a student.';
+    if (!form.title.trim()) errors.title = 'Session title is required.';
+    if (!form.scheduledAt) errors.scheduledAt = 'Please pick a date and time.';
+    return errors;
+  };
 
   const updateMutation = useMutation({
     mutationFn: ({ id, payload }: { id: string; payload: { status?: MentorSessionItem['status']; mentorNotes?: string; meetLink?: string } }) =>
@@ -268,25 +280,59 @@ export default function Sessions() {
                 <div className="text-xs uppercase tracking-[0.3em] text-cyan-300">Schedule Session</div>
                 <h2 className="mt-2 text-2xl font-bold text-white">Create a new session</h2>
               </div>
-              <Button variant="ghost" onClick={() => setShowCreate(false)}>
+              <Button variant="ghost" onClick={() => { setShowCreate(false); setFormErrors({}); setSubmitAttempted(false); }}>
                 <X className="h-4 w-4" />
               </Button>
             </div>
             <div className="mt-6 grid gap-4 md:grid-cols-2">
-              <select
-                className="rounded-lg border border-slate-800 bg-slate-950 px-4 py-3 text-white"
-                value={form.studentId}
-                onChange={(event) => setForm((current) => ({ ...current, studentId: event.target.value }))}
-              >
-                <option value="">Select student</option>
-                {studentsQuery.data?.map((student) => (
-                  <option key={student.studentId} value={student.studentId}>
-                    {student.displayName} - {student.startupName}
-                  </option>
-                ))}
-              </select>
-              <Input value={form.title} onChange={(event) => setForm((current) => ({ ...current, title: event.target.value }))} placeholder="Session title" />
-              <Input type="datetime-local" value={form.scheduledAt} onChange={(event) => setForm((current) => ({ ...current, scheduledAt: event.target.value }))} />
+              <div className="flex flex-col gap-1">
+                <select
+                  className={`rounded-lg border bg-slate-950 px-4 py-3 text-white ${submitAttempted && formErrors.studentId ? 'border-red-500' : 'border-slate-800'}`}
+                  value={form.studentId}
+                  onChange={(event) => {
+                    setForm((current) => ({ ...current, studentId: event.target.value }));
+                    if (submitAttempted) setFormErrors((e) => ({ ...e, studentId: event.target.value ? undefined : 'Please select a student.' }));
+                  }}
+                >
+                  <option value="">Select student *</option>
+                  {studentsQuery.data?.map((student) => (
+                    <option key={student.studentId} value={student.studentId}>
+                      {student.displayName} - {student.startupName}
+                    </option>
+                  ))}
+                </select>
+                {submitAttempted && formErrors.studentId && (
+                  <span className="text-xs text-red-400">{formErrors.studentId}</span>
+                )}
+              </div>
+              <div className="flex flex-col gap-1">
+                <Input
+                  value={form.title}
+                  onChange={(event) => {
+                    setForm((current) => ({ ...current, title: event.target.value }));
+                    if (submitAttempted) setFormErrors((e) => ({ ...e, title: event.target.value.trim() ? undefined : 'Session title is required.' }));
+                  }}
+                  placeholder="Session title *"
+                  className={submitAttempted && formErrors.title ? 'border-red-500' : ''}
+                />
+                {submitAttempted && formErrors.title && (
+                  <span className="text-xs text-red-400">{formErrors.title}</span>
+                )}
+              </div>
+              <div className="flex flex-col gap-1">
+                <Input
+                  type="datetime-local"
+                  value={form.scheduledAt}
+                  onChange={(event) => {
+                    setForm((current) => ({ ...current, scheduledAt: event.target.value }));
+                    if (submitAttempted) setFormErrors((e) => ({ ...e, scheduledAt: event.target.value ? undefined : 'Please pick a date and time.' }));
+                  }}
+                  className={submitAttempted && formErrors.scheduledAt ? 'border-red-500' : ''}
+                />
+                {submitAttempted && formErrors.scheduledAt && (
+                  <span className="text-xs text-red-400">{formErrors.scheduledAt}</span>
+                )}
+              </div>
               <select
                 className="rounded-lg border border-slate-800 bg-slate-950 px-4 py-3 text-white"
                 value={form.durationMinutes}
@@ -303,7 +349,13 @@ export default function Sessions() {
             </div>
             <div className="mt-6 flex justify-end">
               <Button
-                onClick={() =>
+                onClick={() => {
+                  setSubmitAttempted(true);
+                  const errors = validateSessionForm();
+                  if (Object.keys(errors).length > 0) {
+                    setFormErrors(errors);
+                    return;
+                  }
                   createMutation.mutate({
                     studentId: form.studentId,
                     workspaceId: form.workspaceId || undefined,
@@ -311,9 +363,9 @@ export default function Sessions() {
                     scheduledAt: new Date(form.scheduledAt).toISOString(),
                     durationMinutes: form.durationMinutes,
                     meetLink: form.meetLink || undefined,
-                  })
-                }
-                disabled={!form.studentId || !form.title || !form.scheduledAt || createMutation.isPending}
+                  });
+                }}
+                disabled={createMutation.isPending}
               >
                 {createMutation.isPending ? 'Scheduling...' : 'Schedule Session'}
               </Button>

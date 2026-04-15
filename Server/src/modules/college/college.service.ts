@@ -38,6 +38,7 @@ import {
   getInvestorDirectory,
   getInstitutionTrendGraph,
   getInstitutionUpcomingEvents,
+  getInnovationScoreDistribution,
   getLatestComplianceReport,
   getRecentActivityCounts,
   getRecentInstitutionProjects,
@@ -319,7 +320,7 @@ const getCollegePlacementTrendSeries = async (
 };
 
 export const getCollegeDashboard = async (institutionId: string): Promise<CollegeDashboardPayload> => {
-  const cacheKey = `college:dashboard:v2:${institutionId}`;
+  const cacheKey = `college:dashboard:v3:${institutionId}`;
   const cached = await redis.get<string>(cacheKey);
 
   const cachedDashboard = readRedisJson<CollegeDashboardPayload>(cached);
@@ -345,6 +346,7 @@ export const getCollegeDashboard = async (institutionId: string): Promise<Colleg
     recentActivityCounts,
     recentProjects,
     schoolTrendGraph,
+    innovationScoreDistribution,
     iicTelemetry,
   ] = await Promise.all([
     getDashboardStats(institutionId, studentIds),
@@ -354,6 +356,7 @@ export const getCollegeDashboard = async (institutionId: string): Promise<Colleg
     getRecentActivityCounts(studentIds),
     getRecentInstitutionProjects(studentIds),
     getInstitutionTrendGraph(studentIds),
+    getInnovationScoreDistribution(institutionId, studentIds),
     getInstitutionIicTelemetry(institutionId, 'college'),
   ]);
 
@@ -426,6 +429,7 @@ export const getCollegeDashboard = async (institutionId: string): Promise<Colleg
     stats,
     recentActivityCounts,
     trendGraph,
+    innovationScoreDistribution,
     upcomingEvents,
     topStudents: topStudentsPage.items,
     recentProjects,

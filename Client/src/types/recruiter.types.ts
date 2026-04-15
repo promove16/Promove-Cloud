@@ -236,6 +236,14 @@ export interface RecruiterCollegeCard {
   placementVelocity: number;
   iicStarRating: number;
   focusLabel: string;
+  /** Number of active startups from this college in the ProMove ecosystem */
+  activeStartups?: number;
+  /** Number of students who have been placed (hired) via the platform */
+  placedStudents?: number;
+  /** Average CTC / package for placed students, e.g. "8.4 LPA" */
+  avgPackage?: string;
+  /** Top hiring domains, e.g. ["SDE", "Product", "Data Science"] */
+  topDomains?: string[];
 }
 
 export interface RecruiterPlacementRow {

@@ -1,294 +1,192 @@
-import { FormEvent, useState } from "react";
-import { isAxiosError } from "axios";
-import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { KeyRound, ShieldCheck, Sparkles, Users } from "lucide-react";
-import { Button } from "../../components/ui/Button";
-import { collegeApi } from "../../api/college.api";
-import { InstitutionWorkspaceHeader } from "../institution/InstitutionWorkspaceHeader";
-import { StudentIntakePanel } from "../institution/StudentIntakePanel";
-import { StudentAccessWorkspace } from "../institution/StudentAccessWorkspace";
-import { PatentShowcase } from "../shared/PatentShowcase";
-import { ApiErrorResponse } from "../../types/auth.types";
-import { TemporaryStudentCredentials } from "../../types/college.types";
-import { BulkCredentialImportResult } from "../../types/school.types";
-import { useAuthStore } from "../../store/authStore";
-import { DashboardSection } from "../institution/dashboardSurface";
+import { useQuery } from '@tanstack/react-query';
+import {
+  ArrowRight,
+  BriefcaseBusiness,
+  Building2,
+  CalendarDays,
+  FolderKanban,
+  GraduationCap,
+  Users,
+} from 'lucide-react';
+import { Link } from 'react-router-dom';
+import { collegeApi } from '../../api/college.api';
+import { Button } from '../../components/ui/Button';
+import { Card } from '../../components/ui/Card';
+import { InstitutionWorkspaceHeader } from '../institution/InstitutionWorkspaceHeader';
 
 type OperationsPageProps = {
   onBackToOverview?: () => void;
 };
 
+type HubCard = {
+  title: string;
+  description: string;
+  to: string;
+  icon: typeof Users;
+  tone: string;
+  metric: string;
+  metricLabel: string;
+};
+
 export default function OperationsPage({
   onBackToOverview,
 }: OperationsPageProps) {
-  const queryClient = useQueryClient();
-  const authUser = useAuthStore((state) => state.user);
-  const [tokenLabel, setTokenLabel] = useState("");
-  const [latestTemporaryCredential, setLatestTemporaryCredential] =
-    useState<TemporaryStudentCredentials | null>(null);
-  const [bulkCredentialResult, setBulkCredentialResult] =
-    useState<BulkCredentialImportResult | null>(null);
-  const [rosterNotice, setRosterNotice] = useState("");
-
-  const tokenQuery = useQuery({
-    queryKey: ["college-student-access-tokens"],
-    queryFn: collegeApi.getStudentAccessTokens,
+  const dashboardQuery = useQuery({
+    queryKey: ['college-dashboard'],
+    queryFn: collegeApi.getDashboard,
   });
-  const pendingStudentsQuery = useQuery({
-    queryKey: ["college-student-verifications"],
-    queryFn: collegeApi.getPendingStudentVerifications,
+  const investorsQuery = useQuery({
+    queryKey: ['college-investors'],
+    queryFn: collegeApi.getInvestors,
   });
-  const rosterQuery = useQuery({
-    queryKey: ["college-student-roster"],
-    queryFn: () => collegeApi.getStudentRoster(),
+  const recruitersQuery = useQuery({
+    queryKey: ['college-recruiters'],
+    queryFn: collegeApi.getRecruiters,
+  });
+  const mentorshipQuery = useQuery({
+    queryKey: ['college-mentorship-programs'],
+    queryFn: collegeApi.getMentorshipPrograms,
   });
 
-  const createTokenMutation = useMutation({
-    mutationFn: collegeApi.createStudentAccessToken,
-    onSuccess: () => {
-      setTokenLabel("");
-      void queryClient.invalidateQueries({
-        queryKey: ["college-student-access-tokens"],
-      });
+  const dashboardData = dashboardQuery.data;
+  const hubCards: HubCard[] = [
+    {
+      title: 'Student Innovators',
+      description:
+        'Manage the student roster, issue access tokens, review verification requests, and inspect innovation leaders.',
+      to: '/dashboard/college/students',
+      icon: Users,
+      tone: 'from-cyan-500 to-blue-500',
+      metric: String(dashboardData?.stats.totalStudents ?? 0),
+      metricLabel: 'students tracked',
     },
-  });
-  const createRosterEntryMutation = useMutation({
-    mutationFn: collegeApi.createStudentRosterEntry,
-    onSuccess: () => {
-      void Promise.all([
-        queryClient.invalidateQueries({ queryKey: ["college-student-roster"] }),
-        queryClient.invalidateQueries({ queryKey: ["college-dashboard"] }),
-      ]);
+    {
+      title: 'Projects',
+      description:
+        'Track student workspaces, project stages, and the latest execution updates across the college.',
+      to: '/dashboard/college/projects',
+      icon: FolderKanban,
+      tone: 'from-violet-500 to-fuchsia-500',
+      metric: String(dashboardData?.stats.activeProjects ?? 0),
+      metricLabel: 'active projects',
     },
-  });
-  const cancelInviteMutation = useMutation({
-    mutationFn: collegeApi.cancelStudentInvite,
-    onSuccess: () => {
-      setRosterNotice("Student invite cancelled.");
-      void queryClient.invalidateQueries({
-        queryKey: ["college-student-roster"],
-      });
+    {
+      title: 'Investors',
+      description:
+        'Review investor relationships connected to your institution and route startup outreach where it fits.',
+      to: '/dashboard/college/investors',
+      icon: Building2,
+      tone: 'from-emerald-500 to-teal-500',
+      metric: String(investorsQuery.data?.length ?? 0),
+      metricLabel: 'investor profiles',
     },
-    onError: (error) => {
-      const message =
-        isAxiosError<ApiErrorResponse>(error) &&
-        error.response?.data?.error?.message
-          ? error.response.data.error.message
-          : "Unable to cancel this invite.";
-      setRosterNotice(message);
-      void queryClient.invalidateQueries({
-        queryKey: ["college-student-roster"],
-      });
+    {
+      title: 'Recruiters',
+      description:
+        'Open the recruiter directory, inspect active campus hiring activity, and monitor recruiting coverage.',
+      to: '/dashboard/college/recruiters',
+      icon: BriefcaseBusiness,
+      tone: 'from-amber-500 to-orange-500',
+      metric: String(recruitersQuery.data?.length ?? 0),
+      metricLabel: 'recruiter partners',
     },
-  });
-  const createTemporaryCredentialMutation = useMutation({
-    mutationFn: collegeApi.createTemporaryStudentCredentials,
-    onSuccess: (credential) => {
-      setLatestTemporaryCredential(credential);
-      void Promise.all([
-        queryClient.invalidateQueries({ queryKey: ["college-student-roster"] }),
-        queryClient.invalidateQueries({ queryKey: ["college-dashboard"] }),
-        queryClient.invalidateQueries({
-          queryKey: ["college-student-verifications"],
-        }),
-      ]);
+    {
+      title: 'Mentorship',
+      description:
+        'Create mentorship requests, track program approvals, and keep mentor coordination in one workspace.',
+      to: '/dashboard/college/mentors',
+      icon: GraduationCap,
+      tone: 'from-sky-500 to-cyan-500',
+      metric: String(mentorshipQuery.data?.stats.total ?? 0),
+      metricLabel: 'programs tracked',
     },
-  });
-  const importRosterMutation = useMutation({
-    mutationFn: collegeApi.importStudentRoster,
-    onSuccess: () => {
-      void Promise.all([
-        queryClient.invalidateQueries({ queryKey: ["college-student-roster"] }),
-        queryClient.invalidateQueries({ queryKey: ["college-dashboard"] }),
-      ]);
+    {
+      title: 'Events',
+      description:
+        'Create internal campus events, review recruiter-hosted hiring events, and keep participation visible.',
+      to: '/dashboard/college/events',
+      icon: CalendarDays,
+      tone: 'from-rose-500 to-pink-500',
+      metric: String(dashboardData?.upcomingEvents.length ?? 0),
+      metricLabel: 'upcoming events',
     },
-  });
-  const importRosterWithCredentialsMutation = useMutation({
-    mutationFn: collegeApi.importStudentRosterWithCredentials,
-    onSuccess: (result) => {
-      setBulkCredentialResult(result);
-      void Promise.all([
-        queryClient.invalidateQueries({ queryKey: ["college-student-roster"] }),
-        queryClient.invalidateQueries({ queryKey: ["college-dashboard"] }),
-      ]);
-    },
-  });
-  const reviewMutation = useMutation({
-    mutationFn: ({
-      studentId,
-      decision,
-      reason,
-    }: {
-      studentId: string;
-      decision: "approved" | "rejected";
-      reason?: string;
-    }) => collegeApi.reviewStudentVerification(studentId, { decision, reason }),
-    onSuccess: () => {
-      void Promise.all([
-        queryClient.invalidateQueries({
-          queryKey: ["college-student-verifications"],
-        }),
-        queryClient.invalidateQueries({ queryKey: ["college-dashboard"] }),
-        queryClient.invalidateQueries({ queryKey: ["college-students"] }),
-      ]);
-    },
-  });
+  ];
 
-  const institutionDomainHint = authUser?.email?.split("@")[1];
-  const pendingTokens = tokenQuery.data ?? [];
-  const pendingStudents = pendingStudentsQuery.data ?? [];
-
-  const handleCreateToken = (event: FormEvent<HTMLFormElement>) => {
-    event.preventDefault();
-    createTokenMutation.mutate({
-      ...(tokenLabel.trim() ? { label: tokenLabel.trim() } : {}),
-    });
-  };
-
-  const handleReject = (studentId: string) => {
-    const reason = window
-      .prompt("Add a short reason for rejection (optional):")
-      ?.trim();
-    reviewMutation.mutate({
-      studentId,
-      decision: "rejected",
-      ...(reason ? { reason } : {}),
-    });
-  };
+  const institutionName =
+    dashboardData?.institutionProfile?.institutionName ?? 'College Operations Hub';
 
   return (
-    <section className="mx-2 my-2 flex min-h-[calc(100vh-5rem)] flex-1 flex-col lg:mx-2">
-      <div className="px-0 py-0">
-        <InstitutionWorkspaceHeader
-          mode="college"
-          eyebrow="Other Workspace"
-          title="College other workspace"
-          description="Token desk, approval queue, and student intake live here so student innovators can stay as the default landing view."
-          tabsAction={
-            onBackToOverview ? (
-              <Button variant="secondary" onClick={onBackToOverview}>
-                Back to overview
-              </Button>
-            ) : undefined
-          }
-        />
-      </div>
+    <div className="space-y-8 pb-8">
+      <InstitutionWorkspaceHeader
+        mode="college"
+        eyebrow="Operations Hub"
+        title={institutionName}
+        description="Use Operations as the college command center for students, projects, investors, recruiters, mentorship, and events."
+        tabsAction={
+          onBackToOverview ? (
+            <Button variant="secondary" onClick={onBackToOverview}>
+              Back to overview
+            </Button>
+          ) : undefined
+        }
+      />
 
-      <div className="min-h-0 flex-1 overflow-y-auto px-0 py-6">
-        <div className="grid gap-3 border-b border-slate-800/70 pb-6 md:grid-cols-3">
-          {[
-            {
-              icon: Users,
-              label: "Student intake",
-              value:
-                "Manual and bulk roster entries now email invites, while temporary credentials remain available.",
-            },
-            {
-              icon: KeyRound,
-              label: "Token desk",
-              value:
-                "Generate and monitor student verification tokens from one place.",
-            },
-            {
-              icon: Sparkles,
-              label: "Approval queue",
-              value:
-                "Review token-only registrations here when they were not pre-invited on the roster.",
-            },
-          ].map((item) => (
-            <div
-              key={item.label}
-              className="rounded-3xl border border-slate-800/70 bg-slate-900/30 p-4"
-            >
-              <item.icon className="h-4 w-4 text-cyan-300" />
-              <div className="mt-3 text-sm font-medium text-white">
-                {item.label}
-              </div>
-              <div className="mt-1 text-sm leading-6 text-slate-400">
-                {item.value}
-              </div>
-            </div>
-          ))}
-        </div>
-
-        <div className="mt-6 grid gap-6">
-          <div className="space-y-6">
-            <StudentAccessWorkspace
-              tokenLabel={tokenLabel}
-              tokenPlaceholder="2026 incubator cohort"
-              tokenFallbackLabel="General college onboarding token"
-              tokens={pendingTokens}
-              pendingStudents={pendingStudents}
-              isCreatingToken={createTokenMutation.isPending}
-              isReviewingStudents={reviewMutation.isPending}
-              onTokenLabelChange={setTokenLabel}
-              onCreateToken={handleCreateToken}
-              onApproveStudent={(studentId) =>
-                reviewMutation.mutate({ studentId, decision: "approved" })
-              }
-              onRejectStudent={handleReject}
-            />
-
-            <DashboardSection
-              eyebrow="Student Onboarding"
-              title="Student onboarding"
-              description="Email roster invites, import student lists, and issue temporary credentials from one shared onboarding flow."
-            >
-              <div className="space-y-4">
-                <StudentIntakePanel
-                  heading="Feed student intake data for your college"
-                  description="Build a managed roster and email invites automatically. Students who register with the same invited email get direct dashboard access, while token-only signups still wait for approval."
-                  secondaryFieldLabel="Program / Year"
-                  secondaryFieldPlaceholder="B.Tech CSE - 3rd Year"
-                  roster={rosterQuery.data ?? []}
-                  institutionDomainHint={institutionDomainHint}
-                  isRosterLoading={rosterQuery.isLoading}
-                  isManualSubmitting={createRosterEntryMutation.isPending}
-                  isImportSubmitting={importRosterMutation.isPending}
-                  isImportWithCredentialsSubmitting={
-                    importRosterWithCredentialsMutation.isPending
-                  }
-                  isTemporaryCredentialSubmitting={
-                    createTemporaryCredentialMutation.isPending
-                  }
-                  temporaryCredential={latestTemporaryCredential}
-                  bulkCredentialResult={bulkCredentialResult}
-                  onCreateManualEntry={(payload) =>
-                    createRosterEntryMutation.mutate(payload)
-                  }
-                  onCancelInvite={(rosterEntryId) => {
-                    if (window.confirm("Cancel this student invite?")) {
-                      cancelInviteMutation.mutate(rosterEntryId);
-                    }
-                  }}
-                  cancellingInviteId={
-                    cancelInviteMutation.isPending
-                      ? cancelInviteMutation.variables
-                      : null
-                  }
-                  onImportFile={(file) => importRosterMutation.mutate(file)}
-                  onImportFileWithCredentials={(file) =>
-                    importRosterWithCredentialsMutation.mutate(file)
-                  }
-                  onCreateTemporaryCredentials={(payload) =>
-                    createTemporaryCredentialMutation.mutate(payload)
-                  }
-                />
-
-                {rosterNotice ? (
-                  <div className="rounded-2xl border border-cyan-500/30 bg-cyan-500/10 px-4 py-3 text-sm text-cyan-200">
-                    {rosterNotice}
+      <div className="grid gap-5 md:grid-cols-2 xl:grid-cols-3">
+        {hubCards.map((card) => (
+          <Link key={card.title} to={card.to} className="block">
+            <Card className="h-full border-slate-800 bg-slate-900/85 p-6 transition hover:border-slate-700">
+              <div className="flex items-start justify-between gap-4">
+                <div
+                  className={`flex h-12 w-12 items-center justify-center rounded-2xl bg-gradient-to-br ${card.tone}`}
+                >
+                  <card.icon className="h-6 w-6 text-white" />
+                </div>
+                <div className="text-right">
+                  <div className="text-2xl font-bold text-white">{card.metric}</div>
+                  <div className="text-xs uppercase tracking-[0.2em] text-slate-500">
+                    {card.metricLabel}
                   </div>
-                ) : null}
+                </div>
               </div>
-            </DashboardSection>
-          </div>
-        </div>
 
-        <div className="mt-6">
-          <PatentShowcase />
-        </div>
+              <h2 className="mt-5 text-xl font-semibold text-white">{card.title}</h2>
+              <p className="mt-3 text-sm leading-6 text-slate-400">
+                {card.description}
+              </p>
+
+              <div className="mt-6 inline-flex items-center gap-2 text-sm font-semibold text-cyan-300">
+                Open workspace
+                <ArrowRight className="h-4 w-4" />
+              </div>
+            </Card>
+          </Link>
+        ))}
       </div>
-    </section>
+
+      <Card className="border-cyan-900/40 bg-gradient-to-r from-cyan-950/25 via-slate-900/90 to-slate-950 p-6">
+        <div className="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
+          <div>
+            <div className="text-xs uppercase tracking-[0.3em] text-cyan-300">
+              Student Onboarding
+            </div>
+            <h2 className="mt-2 text-xl font-semibold text-white">
+              Access tokens now live under Student Innovators
+            </h2>
+            <p className="mt-2 max-w-3xl text-sm leading-6 text-slate-400">
+              The student workspace now carries issue-access-token, verification,
+              roster import, and temporary-login flows so onboarding stays attached
+              to the student record system described in the college manual.
+            </p>
+          </div>
+
+          <Link to="/dashboard/college/students" className="shrink-0">
+            <Button>
+              Open Student Innovators
+              <ArrowRight className="ml-2 h-4 w-4" />
+            </Button>
+          </Link>
+        </div>
+      </Card>
+    </div>
   );
 }

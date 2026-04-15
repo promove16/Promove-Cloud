@@ -5,6 +5,7 @@ import {
   ComplianceOverviewData,
   ComplianceReportRecord,
   DashboardEvent,
+  InnovationScoreDistributionBucket,
   InstitutionPatent,
   InstitutionProfile,
   InstitutionStartup,
@@ -52,6 +53,7 @@ export interface CollegeDashboardData {
     startupsLast30Days: number;
   };
   trendGraph: InstitutionTrendGraph;
+  innovationScoreDistribution: InnovationScoreDistributionBucket[];
   upcomingEvents: DashboardEvent[];
   topStudents: StudentLeaderboardItem[];
   recentProjects: RecentProject[];

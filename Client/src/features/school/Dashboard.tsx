@@ -65,6 +65,7 @@ export default function Dashboard() {
       topInnovatorsAction={{ label: 'View Students', to: '/dashboard/school/students' }}
       topInnovatorsEmptyMessage="No ranked student activity is available yet."
       eventsTitle="Upcoming Events"
+      eventsAction={{ label: 'Open Events', to: '/dashboard/school/events' }}
       eventsEmptyMessage="No upcoming events are scheduled yet."
       recentProjectsTitle="Recent Projects"
       recentProjectsAction={{ label: 'Open Operations', to: '/dashboard/school/operations' }}

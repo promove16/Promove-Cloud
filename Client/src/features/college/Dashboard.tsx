@@ -1,8 +1,8 @@
 import { useQuery } from '@tanstack/react-query';
 import {
   BarChart3,
-  BriefcaseBusiness,
   Building2,
+  Rocket,
   Target,
   TrendingUp,
   Users,
@@ -52,32 +52,33 @@ export default function Dashboard() {
           to: '/dashboard/college/projects',
         },
         {
-          label: 'Students Placed',
-          value: stats?.studentsPlaced ?? 0,
-          badge: `${stats?.placementVelocity ?? 0}% velocity`,
-          icon: BriefcaseBusiness,
+          label: 'Placement Rate',
+          value: `${stats?.placementVelocity ?? 0}%`,
+          badge: `${stats?.studentsPlaced ?? 0} placed`,
+          icon: TrendingUp,
           color: 'from-emerald-500 to-teal-500',
           to: '/dashboard/college/placement',
         },
         {
-          label: 'Active HR Partners',
-          value: stats?.activeHRPartners ?? 0,
-          badge: `${stats?.industryCollaborations ?? 0} collaborations`,
-          icon: BarChart3,
+          label: 'Active Startups',
+          value: stats?.startupsLaunched ?? 0,
+          badge: `+${recentActivity?.startupsLast30Days ?? 0} in 30d`,
+          icon: Rocket,
           color: 'from-amber-500 to-orange-500',
-          to: '/dashboard/college/recruiters',
+          to: '/dashboard/college/analytics',
         },
       ]}
       topInnovatorsTitle="Top Student Innovators"
       topInnovatorsAction={{ label: 'View Students', to: '/dashboard/college/students' }}
       topInnovatorsEmptyMessage="No ranked student activity is available yet."
       eventsTitle="Upcoming Events"
+      eventsAction={{ label: 'Open Events', to: '/dashboard/college/events' }}
       eventsEmptyMessage="No upcoming events are scheduled yet."
       recentProjectsTitle="Recent Projects"
-      recentProjectsAction={{ label: 'Open Operations', to: '/dashboard/college/students' }}
+      recentProjectsAction={{ label: 'Open Operations', to: '/dashboard/college/operations' }}
       recentProjectsEmptyMessage="No active student projects are available yet."
       announcementTitle="Placement pipeline is live"
-      announcementBody={`${stats?.studentsPlaced ?? 0} students are already marked as placed, with ${stats?.activeHRPartners ?? 0} active hiring partners and ${recentActivity?.startupsLast30Days ?? 0} startup launches recorded in the last 30 days. Use the placement tracker for recruiter outcomes and the operations workspace for intake management.`}
+      announcementBody={`${stats?.studentsPlaced ?? 0} students are already marked as placed, the current placement rate is ${stats?.placementVelocity ?? 0}%, and ${stats?.startupsLaunched ?? 0} startups are active in the college pipeline. Use the placement tracker for recruiter outcomes and the operations hub for students, projects, investors, recruiters, mentorship, and events.`}
       announcementAction={{ label: 'Open Placement Tracker', to: '/dashboard/college/placement' }}
       showcaseTitle="College Showcase"
       showcaseDescription="Showcase the college's innovation standing across rating, mentorship, startup momentum, and investor access."

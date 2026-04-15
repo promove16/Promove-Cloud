@@ -12,8 +12,13 @@ export interface MentorDashboardActivity {
 }
 
 export interface MentorDashboardData {
+  /** @deprecated use upcomingSessions */
   sessionsToday: number;
+  /** @deprecated use pendingBids */
   pendingReviews: number;
+  upcomingSessions: number;
+  pendingBids: number;
+  innovationScore: number;
   activeStudentCount: number;
   assignedProjectsCount: number;
   assignedProgramsCount: number;
@@ -207,6 +212,49 @@ export interface CreateMentorFeedbackInput {
   rating: 1 | 2 | 3 | 4 | 5;
 }
 
+export type MentorBidOpportunityKind = 'startup' | 'problem_bank';
+export type MentorBidStatus = 'pending' | 'accepted' | 'rejected' | 'withdrawn';
+
+export interface MentorBidOpportunity {
+  _id: string;
+  kind: MentorBidOpportunityKind;
+  title: string;
+  description: string;
+  domain: string;
+  stage?: string;
+  /** For startup kind */
+  startupName?: string;
+  /** For problem_bank kind */
+  problemCode?: string;
+  institution?: string;
+  preferredExpertise?: string[];
+  sessionsRequested?: number;
+  postedAt: string;
+  hasBid: boolean;
+}
+
+export interface MentorBid {
+  _id: string;
+  opportunityId: string;
+  opportunityTitle: string;
+  kind: MentorBidOpportunityKind;
+  expertise: string;
+  hoursPerWeek: number;
+  proposedDurationWeeks: number;
+  coverNote: string;
+  status: MentorBidStatus;
+  createdAt: string;
+}
+
+export interface SubmitMentorBidPayload {
+  opportunityId: string;
+  kind: MentorBidOpportunityKind;
+  expertise: string;
+  hoursPerWeek: number;
+  proposedDurationWeeks: number;
+  coverNote: string;
+}
+
 export const mentorApi = {
   async getDashboard() {
     const response = await api.get<ApiSuccessResponse<MentorDashboardData>>('/api/mentor/dashboard');
@@ -254,6 +302,22 @@ export const mentorApi = {
       `/api/mentor/feedback/${studentId}`,
       payload,
     );
+    return response.data.data;
+  },
+  async getBidOpportunities() {
+    const response = await api.get<ApiSuccessResponse<MentorBidOpportunity[]>>('/api/mentor/bid-opportunities');
+    return response.data.data;
+  },
+  async getMyBids() {
+    const response = await api.get<ApiSuccessResponse<MentorBid[]>>('/api/mentor/bids');
+    return response.data.data;
+  },
+  async submitBid(payload: SubmitMentorBidPayload) {
+    const response = await api.post<ApiSuccessResponse<MentorBid>>('/api/mentor/bids', payload);
+    return response.data.data;
+  },
+  async withdrawBid(bidId: string) {
+    const response = await api.delete<ApiSuccessResponse<{ updated: true }>>(`/api/mentor/bids/${bidId}`);
     return response.data.data;
   },
 };

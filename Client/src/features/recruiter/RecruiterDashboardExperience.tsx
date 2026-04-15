@@ -725,7 +725,7 @@ export function RecruiterDashboardExperience({ initialView = "home" }: Recruiter
   const renderHome = () => (
     <div className="space-y-6">
       {/* Quick Actions */}
-      <div className="flex justify-end gap-3">
+      <div className="flex flex-wrap justify-end gap-3">
         <button
           onClick={() => navigate('/dashboard/recruiter/applications')}
           className="px-6 py-3 bg-cyan-600 hover:bg-cyan-700 text-white rounded-lg font-semibold transition-all flex items-center gap-2 shadow-lg shadow-cyan-500/20"
@@ -753,6 +753,13 @@ export function RecruiterDashboardExperience({ initialView = "home" }: Recruiter
         >
           <Building2 className="w-5 h-5" />
           Start a Campus Drive
+        </button>
+        <button
+          onClick={() => goToView("onboarding")}
+          className="px-6 py-3 bg-gradient-to-r from-emerald-600 to-teal-600 hover:from-emerald-700 hover:to-teal-700 text-white rounded-lg font-semibold transition-all flex items-center gap-2 shadow-lg shadow-emerald-500/20"
+        >
+          <CheckCircle className="w-5 h-5" />
+          Onboarding Tracker
         </button>
       </div>
 

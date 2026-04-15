@@ -1094,6 +1094,81 @@ describe('auth integration', () => {
       }
     });
 
+    it('skips Redis rotation and session persistence after a refresh read timeout when fallback is enabled', async () => {
+      const originalFallback = env.AUTH_ALLOW_REDIS_AUTH_FALLBACK;
+      env.AUTH_ALLOW_REDIS_AUTH_FALLBACK = true;
+
+      const { email } = await createApprovedUser({
+        role: UserRole.STUDENT,
+        email: `student-${randomUUID()}@example.com`,
+        displayName: 'Read Timeout Student',
+      });
+
+      const login = await loginAs(email);
+      const redisGetSpy = jest
+        .spyOn(redis, 'get')
+        .mockRejectedValueOnce(new Error('The operation was aborted due to timeout'));
+      const redisDelSpy = jest.spyOn(redis, 'del');
+      const redisSetSpy = jest.spyOn(redis, 'set');
+      const redisSaddSpy = jest.spyOn(redis, 'sadd');
+      const redisExpireSpy = jest.spyOn(redis, 'expire');
+
+      try {
+        const response = await request(app)
+          .post('/api/auth/refresh')
+          .set('Cookie', login.cookie!);
+
+        expect(response.status).toBe(200);
+        expect(redisDelSpy).not.toHaveBeenCalled();
+        expect(redisSetSpy).not.toHaveBeenCalled();
+        expect(redisSaddSpy).not.toHaveBeenCalled();
+        expect(redisExpireSpy).not.toHaveBeenCalled();
+      } finally {
+        env.AUTH_ALLOW_REDIS_AUTH_FALLBACK = originalFallback;
+        redisGetSpy.mockRestore();
+        redisDelSpy.mockRestore();
+        redisSetSpy.mockRestore();
+        redisSaddSpy.mockRestore();
+        redisExpireSpy.mockRestore();
+      }
+    });
+
+    it('skips new Redis session persistence after a refresh rotation timeout when fallback is enabled', async () => {
+      const originalFallback = env.AUTH_ALLOW_REDIS_AUTH_FALLBACK;
+      env.AUTH_ALLOW_REDIS_AUTH_FALLBACK = true;
+
+      const { email } = await createApprovedUser({
+        role: UserRole.STUDENT,
+        email: `student-${randomUUID()}@example.com`,
+        displayName: 'Rotate Timeout Student',
+      });
+
+      const login = await loginAs(email);
+      const redisDelSpy = jest
+        .spyOn(redis, 'del')
+        .mockRejectedValueOnce(new Error('The operation was aborted due to timeout'));
+      const redisSetSpy = jest.spyOn(redis, 'set');
+      const redisSaddSpy = jest.spyOn(redis, 'sadd');
+      const redisExpireSpy = jest.spyOn(redis, 'expire');
+
+      try {
+        const response = await request(app)
+          .post('/api/auth/refresh')
+          .set('Cookie', login.cookie!);
+
+        expect(response.status).toBe(200);
+        expect(redisSetSpy).not.toHaveBeenCalled();
+        expect(redisSaddSpy).not.toHaveBeenCalled();
+        expect(redisExpireSpy).not.toHaveBeenCalled();
+      } finally {
+        env.AUTH_ALLOW_REDIS_AUTH_FALLBACK = originalFallback;
+        redisDelSpy.mockRestore();
+        redisSetSpy.mockRestore();
+        redisSaddSpy.mockRestore();
+        redisExpireSpy.mockRestore();
+      }
+    });
+
     it('returns 503 when Redis session reads time out and fallback is disabled', async () => {
       const originalFallback = env.AUTH_ALLOW_REDIS_AUTH_FALLBACK;
       env.AUTH_ALLOW_REDIS_AUTH_FALLBACK = false;

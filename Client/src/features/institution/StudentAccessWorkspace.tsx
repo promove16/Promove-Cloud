@@ -46,16 +46,16 @@ export function StudentAccessWorkspace({
 }: StudentAccessWorkspaceProps) {
   return (
     <DashboardSection
-      eyebrow="Student Access"
-      title="Student access"
-      description="Generate required onboarding tokens and review student verification requests without wasting vertical space."
+      eyebrow="Issue Access Tokens"
+      title="Issue access tokens and review approvals"
+      description="Issue onboarding tokens and review student verification requests from one place."
     >
       <div className="grid gap-8 xl:grid-cols-[minmax(0,1.2fr),minmax(320px,0.8fr)]">
         <div className="space-y-6 xl:border-r xl:border-slate-800/70 xl:pr-8">
           <div className="flex flex-wrap items-start justify-between gap-4">
             <div>
-              <div className="text-[11px] uppercase tracking-[0.26em] text-slate-500">Token Desk</div>
-              <h3 className="mt-2 text-xl font-semibold text-white">Generate and track access tokens</h3>
+              <div className="text-[11px] uppercase tracking-[0.26em] text-slate-500">Issue Access Tokens</div>
+              <h3 className="mt-2 text-xl font-semibold text-white">Issue and track access tokens</h3>
               <p className="mt-2 max-w-2xl text-sm leading-6 text-slate-400">
                 Create cohort-specific signup tokens students must use before they enter your approval queue.
               </p>
@@ -77,17 +77,17 @@ export function StudentAccessWorkspace({
               />
             </div>
             <Button type="submit" disabled={isCreatingToken}>
-              {isCreatingToken ? 'Generating...' : 'Generate Token'}
+              {isCreatingToken ? 'Issuing...' : 'Issue Access Token'}
             </Button>
           </form>
 
           <div className="rounded-3xl border border-slate-800/70 bg-slate-950/25 px-5 py-4">
             <div className="mb-1 flex items-center justify-between gap-3">
-              <div className="text-[11px] uppercase tracking-[0.26em] text-slate-500">Issued Tokens</div>
+              <div className="text-[11px] uppercase tracking-[0.26em] text-slate-500">Issued Access Tokens</div>
               <div className="text-xs text-slate-500">Latest 4</div>
             </div>
             {tokens.length === 0 ? (
-              <DashboardEmpty message="No student tokens issued yet." />
+              <DashboardEmpty message="No access tokens issued yet." />
             ) : (
               <div className="space-y-0">
                 {tokens.slice(0, 4).map((token) => (

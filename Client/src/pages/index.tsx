@@ -71,6 +71,7 @@ const CollegeAnalyticsPage = lazy(() => import("../features/college/AnalyticsPag
 const MentorDashboard = lazy(() => import("../features/mentor/Dashboard"));
 const MentorStudentFeed = lazy(() => import("../features/mentor/StudentFeed"));
 const MentorSessions = lazy(() => import("../features/mentor/Sessions"));
+const MentorMarketplace = lazy(() => import("../features/mentor/MentorMarketplace"));
 
 const AdminDashboard = lazy(() => import("../features/admin/Dashboard"));
 const AdminUserManagement = lazy(() => import("../features/admin/UserManagement"));
@@ -703,7 +704,7 @@ export const router = createBrowserRouter([
               { path: "students", element: <LazyPage component={MentorStudentFeed} /> },
               { path: "students/:id", element: <StudentPortfolioRedirect /> },
               { path: "sessions", element: <LazyPage component={MentorSessions} /> },
-              { path: "marketplace", element: <LazyPage component={Marketplace} /> },
+              { path: "marketplace", element: <LazyPage component={MentorMarketplace} /> },
               { path: "marketplace/view/:entityType/:entityId", element: <LazyPage component={MarketplaceDetail} /> },
             ],
           },

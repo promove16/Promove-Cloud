@@ -686,13 +686,41 @@ function RecruiterCollegeCardView({
           <dl className="flex flex-wrap gap-x-6 gap-y-2 text-sm">
             <div className="flex items-baseline gap-2">
               <dt className="text-slate-400">IIC</dt>
-              <dd className="font-medium text-white">{college.iicStarRating.toFixed(1)}</dd>
+              <dd className="font-medium text-white">{college.iicStarRating.toFixed(1)} ★</dd>
             </div>
             <div className="flex items-baseline gap-2">
-              <dt className="text-slate-400">Focus</dt>
-              <dd className="font-medium text-white">Hiring</dd>
+              <dt className="text-slate-400">Placement Rate</dt>
+              <dd className="font-medium text-white">{college.placementVelocity}%</dd>
             </div>
+            {college.placedStudents != null && (
+              <div className="flex items-baseline gap-2">
+                <dt className="text-slate-400">Placed</dt>
+                <dd className="font-medium text-white">{college.placedStudents}</dd>
+              </div>
+            )}
+            {college.activeStartups != null && (
+              <div className="flex items-baseline gap-2">
+                <dt className="text-slate-400">Active Startups</dt>
+                <dd className="font-medium text-white">{college.activeStartups}</dd>
+              </div>
+            )}
+            {college.avgPackage && (
+              <div className="flex items-baseline gap-2">
+                <dt className="text-slate-400">Avg Package</dt>
+                <dd className="font-medium text-white">{college.avgPackage}</dd>
+              </div>
+            )}
           </dl>
+
+          {college.topDomains && college.topDomains.length > 0 && (
+            <div className="flex flex-wrap gap-2">
+              {college.topDomains.map((domain) => (
+                <span key={domain} className={subtleTagClass}>
+                  {domain}
+                </span>
+              ))}
+            </div>
+          )}
         </div>
 
         <div className="flex shrink-0 flex-wrap gap-2 xl:justify-end">

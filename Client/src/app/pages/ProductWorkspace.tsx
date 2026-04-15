@@ -75,6 +75,49 @@ const formatFileSize = (bytes?: number) => {
   return `${(bytes / (1024 * 1024)).toFixed(1)} MB`;
 };
 
+type ProgressFormState = {
+  note: string;
+  milestoneRef: string;
+  completionPercent: string;
+  file: File | null;
+};
+
+type ProgressFormErrors = Partial<Record<"note" | "completionPercent", string>>;
+
+const createEmptyProgressForm = (): ProgressFormState => ({
+  note: "",
+  milestoneRef: "",
+  completionPercent: "",
+  file: null,
+});
+
+const validateProgressForm = (
+  progressForm: ProgressFormState,
+): ProgressFormErrors => {
+  const errors: ProgressFormErrors = {};
+  const trimmedNote = progressForm.note.trim();
+
+  if (!trimmedNote) {
+    errors.note = "Add a short progress summary before submitting.";
+  } else if (trimmedNote.length < 5) {
+    errors.note = "Progress notes must be at least 5 characters.";
+  }
+
+  if (progressForm.completionPercent.trim()) {
+    const completionPercent = Number(progressForm.completionPercent);
+
+    if (
+      Number.isNaN(completionPercent) ||
+      completionPercent < 0 ||
+      completionPercent > 100
+    ) {
+      errors.completionPercent = "Completion must stay between 0 and 100.";
+    }
+  }
+
+  return errors;
+};
+
 const getChatAttachment = (
   message: ChatMessage,
 ): ChatMessageAttachment | undefined => {
@@ -161,12 +204,11 @@ export function ProductWorkspace() {
     code: "",
   });
   const [isSendingChat, setIsSendingChat] = useState(false);
-  const [progressForm, setProgressForm] = useState({
-    note: "",
-    milestoneRef: "",
-    completionPercent: "",
-    file: null as File | null,
-  });
+  const [progressForm, setProgressForm] = useState<ProgressFormState>(
+    createEmptyProgressForm,
+  );
+  const [hasAttemptedProgressSubmit, setHasAttemptedProgressSubmit] =
+    useState(false);
   const [showNegotiationPanel, setShowNegotiationPanel] = useState(false);
   const [participantForm, setParticipantForm] = useState({
     email: "",
@@ -185,6 +227,12 @@ export function ProductWorkspace() {
     queryKey: ["workspaces"],
     queryFn: () => workspaceApi.list(),
   });
+  const progressFormErrors = useMemo(
+    () => validateProgressForm(progressForm),
+    [progressForm],
+  );
+  const isProgressFormValid = Object.keys(progressFormErrors).length === 0;
+  const showProgressValidation = hasAttemptedProgressSubmit;
   const problemBankWorkspaceOptions = useMemo(
     () =>
       (listQuery.data ?? []).filter((item) => Boolean(item.claimedProblemId)),
@@ -235,6 +283,11 @@ export function ProductWorkspace() {
       queryClient.invalidateQueries({ queryKey: ["workspace", workspaceId] }),
       queryClient.invalidateQueries({ queryKey: ["score", "me"] }),
     ]);
+  };
+
+  const resetProgressForm = () => {
+    setProgressForm(createEmptyProgressForm());
+    setHasAttemptedProgressSubmit(false);
   };
 
   const addTask = useMutation({
@@ -417,16 +470,17 @@ export function ProductWorkspace() {
       });
     },
     onSuccess: async () => {
-      setProgressForm({
-        note: "",
-        milestoneRef: "",
-        completionPercent: "",
-        file: null,
-      });
+      resetProgressForm();
       setShowProgressModal(false);
       setToast("Progress uploaded! Your Innovation Score is being updated...");
       await refresh();
     },
+    onError: (error) =>
+      setToast(
+        (error as { response?: { data?: { error?: { message?: string } } } })
+          ?.response?.data?.error?.message ??
+          "Unable to upload progress right now.",
+      ),
   });
 
   const onFile = async (file: File | null) => {
@@ -716,7 +770,10 @@ export function ProductWorkspace() {
               <div className="flex flex-wrap gap-3 lg:max-w-sm lg:justify-end">
                 {canManageWorkspace ? (
                   <button
-                    onClick={() => setShowProgressModal(true)}
+                    onClick={() => {
+                      setHasAttemptedProgressSubmit(false);
+                      setShowProgressModal(true);
+                    }}
                     disabled={!workspace}
                     className="inline-flex items-center gap-2 rounded-xl bg-gradient-to-r from-blue-600 to-fuchsia-600 px-5 py-3 text-sm font-semibold text-white transition hover:brightness-110 disabled:cursor-not-allowed disabled:opacity-50"
                   >
@@ -2056,7 +2113,10 @@ export function ProductWorkspace() {
                   Upload Progress
                 </h2>
                 <button
-                  onClick={() => setShowProgressModal(false)}
+                  onClick={() => {
+                    resetProgressForm();
+                    setShowProgressModal(false);
+                  }}
                   className="text-slate-400 hover:text-white"
                 >
                   <X className="h-5 w-5" />
@@ -2072,8 +2132,23 @@ export function ProductWorkspace() {
                     }))
                   }
                   placeholder="What progress did your team make today?"
-                  className="min-h-32 w-full rounded-lg border border-slate-800 bg-slate-950 px-4 py-3 text-white"
+                  className={`min-h-32 w-full rounded-lg border px-4 py-3 text-white ${
+                    showProgressValidation && progressFormErrors.note
+                      ? "border-rose-500/70 bg-rose-500/5"
+                      : "border-slate-800 bg-slate-950"
+                  }`}
                 />
+                <div
+                  className={`text-xs ${
+                    showProgressValidation && progressFormErrors.note
+                      ? "text-rose-300"
+                      : "text-slate-500"
+                  }`}
+                >
+                  {showProgressValidation && progressFormErrors.note
+                    ? progressFormErrors.note
+                    : "Required. Summarize the milestone reached, blocker solved, or evidence uploaded."}
+                </div>
                 <div className="grid gap-3 md:grid-cols-2">
                   <select
                     value={progressForm.milestoneRef}
@@ -2104,8 +2179,26 @@ export function ProductWorkspace() {
                       }))
                     }
                     placeholder="Completion %"
-                    className="rounded-lg border border-slate-800 bg-slate-950 px-4 py-3 text-white"
+                    className={`rounded-lg border px-4 py-3 text-white ${
+                      showProgressValidation &&
+                      progressFormErrors.completionPercent
+                        ? "border-rose-500/70 bg-rose-500/5"
+                        : "border-slate-800 bg-slate-950"
+                    }`}
                   />
+                </div>
+                <div
+                  className={`text-xs ${
+                    showProgressValidation &&
+                    progressFormErrors.completionPercent
+                      ? "text-rose-300"
+                      : "text-slate-500"
+                  }`}
+                >
+                  {showProgressValidation &&
+                  progressFormErrors.completionPercent
+                    ? progressFormErrors.completionPercent
+                    : "Optional. Add completion only when this update should move a milestone forward."}
                 </div>
                 <label className="block cursor-pointer rounded-lg border border-slate-800 bg-slate-950 px-4 py-3 text-white">
                   Attach optional PDF/image
@@ -2128,14 +2221,27 @@ export function ProductWorkspace() {
                 ) : null}
                 <div className="flex justify-end gap-3">
                   <button
-                    onClick={() => setShowProgressModal(false)}
+                    onClick={() => {
+                      resetProgressForm();
+                      setShowProgressModal(false);
+                    }}
                     className="rounded-lg bg-slate-800 px-5 py-3 font-semibold text-white"
                   >
                     Cancel
                   </button>
                   <button
-                    onClick={() => progress.mutate()}
-                    disabled={!progressForm.note.trim() || progress.isPending}
+                    onClick={() => {
+                      setHasAttemptedProgressSubmit(true);
+                      if (!isProgressFormValid) {
+                        setToast(
+                          Object.values(progressFormErrors)[0] ??
+                            "Complete the required progress details first.",
+                        );
+                        return;
+                      }
+                      progress.mutate();
+                    }}
+                    disabled={!isProgressFormValid || progress.isPending}
                     className="rounded-lg bg-gradient-to-r from-blue-600 to-purple-600 px-5 py-3 font-semibold text-white disabled:opacity-60"
                   >
                     {progress.isPending ? "Submitting..." : "Submit Progress"}

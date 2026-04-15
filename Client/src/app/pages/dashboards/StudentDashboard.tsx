@@ -2,9 +2,11 @@ import { useMemo } from "react";
 import { Link } from "react-router-dom";
 import { useQuery } from "@tanstack/react-query";
 import {
+  ArrowRight,
   Award,
   BookOpen,
   Briefcase,
+  CalendarClock,
   CheckCircle2,
   Clock,
   Lightbulb,
@@ -17,6 +19,7 @@ import { OnboardingChecklist } from "../../../components/onboarding/OnboardingCh
 import { StudentGithubProofPrompt } from "../../../components/onboarding/StudentGithubProofPrompt";
 import { dealApi } from "../../../api/deal.api";
 import { startupApi } from "../../../api/startup.api";
+import { studentApi } from "../../../api/student.api";
 import { workspaceApi } from "../../../api/workspace.api";
 import {
   getStartupOverviewPath,
@@ -36,6 +39,14 @@ const formatDate = (value?: string) =>
         year: "numeric",
       })
     : "Not scheduled";
+
+const formatTime = (value?: string) =>
+  value
+    ? new Date(value).toLocaleTimeString("en-IN", {
+        hour: "2-digit",
+        minute: "2-digit",
+      })
+    : "";
 
 const getStageStatus = (
   stage: Workspace["stage"] | undefined,
@@ -213,6 +224,11 @@ export function StudentDashboard() {
     queryKey: ["startup", "mine"],
     queryFn: startupApi.mine,
   });
+  const mentorSessionsQuery = useQuery({
+    queryKey: ["student", "mentor-sessions"],
+    queryFn: studentApi.getMentorSessions,
+    refetchInterval: 60_000,
+  });
 
   const workspaceItems = workspaceQuery.data ?? [];
   const problemWorkspaces = useMemo(
@@ -237,6 +253,30 @@ export function StudentDashboard() {
   );
   const activeWorkspace = problemWorkspaces[0];
   const activeDeals = activeDealsQuery.data?.items ?? [];
+  const mentorSessions = mentorSessionsQuery.data ?? [];
+  const upcomingMentorSessions = useMemo(
+    () =>
+      [...mentorSessions]
+        .filter((session) => session.status === "Scheduled")
+        .sort(
+          (left, right) =>
+            new Date(left.scheduledAt).getTime() -
+            new Date(right.scheduledAt).getTime(),
+        ),
+    [mentorSessions],
+  );
+  const completedMentorSessions = useMemo(
+    () =>
+      mentorSessions.filter((session) => session.status === "Completed"),
+    [mentorSessions],
+  );
+  const cancelledMentorSessions = useMemo(
+    () =>
+      mentorSessions.filter((session) => session.status === "Cancelled"),
+    [mentorSessions],
+  );
+  const nextMentorSession = upcomingMentorSessions[0];
+  const activeStartup = startups[0];
   const activeDealCountByStartupId = useMemo(() => {
     const counts = new Map<string, number>();
 
@@ -246,6 +286,16 @@ export function StudentDashboard() {
 
     return counts;
   }, [activeDeals]);
+  const activeStartupWorkflow = useMemo(
+    () =>
+      activeStartup
+        ? getStartupWorkflowSummary(
+            activeStartup,
+            activeDealCountByStartupId.get(activeStartup._id) ?? 0,
+          )
+        : null,
+    [activeDealCountByStartupId, activeStartup],
+  );
   const innovationScore = Math.min(
     Math.max(scoreQuery.data?.score ?? authUser?.innovationScore ?? 0, 0),
     MAX_INNOVATION_SCORE,
@@ -529,6 +579,130 @@ export function StudentDashboard() {
             </div>
           )}
         </div>
+      </div>
+
+      <div className="grid gap-6 lg:grid-cols-2">
+        <Link
+          to={
+            activeStartup
+              ? getStartupOverviewPath(activeStartup._id)
+              : STARTUP_LAUNCH_NEW_PATH
+          }
+          className="block rounded-2xl border border-slate-800 bg-slate-900 p-6 transition hover:border-cyan-400/40 hover:shadow-2xl hover:shadow-cyan-950/20"
+        >
+          <div className="flex items-start justify-between gap-4">
+            <div>
+              <div className="text-xs uppercase tracking-[0.28em] text-cyan-300">
+                Active Startup
+              </div>
+              <h3 className="mt-3 text-2xl font-bold text-white">
+                {activeStartup?.name || "Create your first startup"}
+              </h3>
+              <p className="mt-2 text-sm leading-6 text-slate-400">
+                {activeStartup
+                  ? activeStartupWorkflow?.nextActionDetail ??
+                    "Open your startup workspace and continue the launch flow."
+                  : "Jump straight into Startup Launch and create a draft from the dashboard."}
+              </p>
+            </div>
+            <Rocket className="h-8 w-8 text-cyan-300" />
+          </div>
+
+          {activeStartup && activeStartupWorkflow ? (
+            <>
+              <div className="mt-5 flex flex-wrap items-center gap-3 text-sm text-slate-300">
+                <span className="rounded-full border border-slate-700 bg-slate-950 px-3 py-1">
+                  {activeStartup.category} / {activeStartup.stage}
+                </span>
+                <span className="rounded-full border border-slate-700 bg-slate-950 px-3 py-1">
+                  {activeStartup.readiness.isReviewReady
+                    ? "Review ready"
+                    : activeStartupWorkflow.readinessText}
+                </span>
+              </div>
+              <div className="mt-5">
+                <div className="mb-2 flex items-center justify-between text-xs uppercase tracking-[0.22em] text-slate-500">
+                  <span>Launch progress</span>
+                  <span>{activeStartupWorkflow.progressPercent}%</span>
+                </div>
+                <div className="h-2 w-full overflow-hidden rounded-full bg-slate-800">
+                  <div
+                    className="h-full rounded-full bg-gradient-to-r from-cyan-400 to-blue-500 transition-all"
+                    style={{ width: `${activeStartupWorkflow.progressPercent}%` }}
+                  />
+                </div>
+              </div>
+            </>
+          ) : null}
+
+          <div className="mt-6 inline-flex items-center gap-2 text-sm font-semibold text-cyan-200">
+            {activeStartup ? "Open startup" : "Create startup"}
+            <ArrowRight className="h-4 w-4" />
+          </div>
+        </Link>
+
+        <Link
+          to="/dashboard/student/mentor-sessions"
+          className="block rounded-2xl border border-slate-800 bg-slate-900 p-6 transition hover:border-purple-400/40 hover:shadow-2xl hover:shadow-purple-950/20"
+        >
+          <div className="flex items-start justify-between gap-4">
+            <div>
+              <div className="text-xs uppercase tracking-[0.28em] text-purple-300">
+                Mentor Sessions
+              </div>
+              <h3 className="mt-3 text-2xl font-bold text-white">
+                {mentorSessionsQuery.isLoading
+                  ? "Loading sessions..."
+                  : nextMentorSession
+                    ? nextMentorSession.title
+                    : "No mentor sessions yet"}
+              </h3>
+              <p className="mt-2 text-sm leading-6 text-slate-400">
+                {nextMentorSession
+                  ? `${nextMentorSession.mentor.displayName} · ${formatDate(nextMentorSession.scheduledAt)} · ${formatTime(nextMentorSession.scheduledAt)}`
+                  : "Upcoming, completed, and cancelled mentor calls will surface here as soon as they are scheduled."}
+              </p>
+            </div>
+            <CalendarClock className="h-8 w-8 text-purple-300" />
+          </div>
+
+          <div className="mt-5 grid gap-3 sm:grid-cols-3">
+            {[
+              {
+                label: "Upcoming",
+                value: upcomingMentorSessions.length,
+                tone: "text-blue-300",
+              },
+              {
+                label: "Completed",
+                value: completedMentorSessions.length,
+                tone: "text-emerald-300",
+              },
+              {
+                label: "Cancelled",
+                value: cancelledMentorSessions.length,
+                tone: "text-rose-300",
+              },
+            ].map((stat) => (
+              <div
+                key={stat.label}
+                className="rounded-xl border border-slate-800 bg-slate-950 px-4 py-4"
+              >
+                <div className={`text-2xl font-bold ${stat.tone}`}>
+                  {stat.value}
+                </div>
+                <div className="mt-1 text-xs uppercase tracking-[0.22em] text-slate-500">
+                  {stat.label}
+                </div>
+              </div>
+            ))}
+          </div>
+
+          <div className="mt-6 inline-flex items-center gap-2 text-sm font-semibold text-purple-200">
+            Open mentor sessions
+            <ArrowRight className="h-4 w-4" />
+          </div>
+        </Link>
       </div>
 
       <div className="rounded-2xl border border-slate-800 bg-slate-900 p-6">

@@ -4,12 +4,20 @@ import { Link } from 'react-router-dom';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import {
   ArrowLeft,
+  ArrowRight,
+  BriefcaseBusiness,
+  CalendarDays,
+  FileText,
+  FolderKanban,
+  GraduationCap,
   KeyRound,
+  Rocket,
   ShieldCheck,
   Users,
 } from 'lucide-react';
 import { schoolApi } from '../../api/school.api';
 import { Button } from '../../components/ui/Button';
+import { Card } from '../../components/ui/Card';
 import { ApiErrorResponse } from '../../types/auth.types';
 import {
   BulkCredentialImportResult,
@@ -199,6 +207,58 @@ export default function OperationsPage() {
       icon: Users,
     },
   ];
+  const operationsHubItems = [
+    {
+      title: 'Student Innovators',
+      description: 'Open the ranked student roster, review portfolios, and issue onboarding access tokens.',
+      to: '/dashboard/school/students',
+      icon: Users,
+      stat: `${data?.stats.totalStudents ?? 0} students`,
+      secondaryAction: { label: 'Issue Access Token', to: '/dashboard/school/students?issueToken=1' },
+    },
+    {
+      title: 'Projects',
+      description: 'Track active student workspaces, current stages, and recent execution updates.',
+      to: '/dashboard/school/projects',
+      icon: FolderKanban,
+      stat: `${data?.stats.activeProjects ?? 0} active`,
+    },
+    {
+      title: 'Patents',
+      description: 'Review student patent filings, progress, and approval status.',
+      to: '/dashboard/school/patents',
+      icon: FileText,
+      stat: `${data?.stats.patentsFiled ?? 0} filed`,
+    },
+    {
+      title: 'Startups',
+      description: 'See which student ventures have launched and how the pipeline is progressing.',
+      to: '/dashboard/school/startups',
+      icon: Rocket,
+      stat: `${data?.stats.startupsLaunched ?? 0} launched`,
+    },
+    {
+      title: 'Events',
+      description: 'Create school events, manage registrations, and monitor participation.',
+      to: '/dashboard/school/events',
+      icon: CalendarDays,
+      stat: `${data?.upcomingEvents?.length ?? 0} upcoming`,
+    },
+    {
+      title: 'Investor Directory',
+      description: 'Browse available investors connected to the institution ecosystem.',
+      to: '/dashboard/school/investors',
+      icon: BriefcaseBusiness,
+      stat: 'Outreach ready',
+    },
+    {
+      title: 'Mentorship',
+      description: 'Manage mentor programs, assignments, and institution support coverage.',
+      to: '/dashboard/school/mentors',
+      icon: GraduationCap,
+      stat: `${data?.stats.totalMentoringHours ?? 0} hrs logged`,
+    },
+  ];
 
   return (
     <div className="space-y-8 pb-8">
@@ -206,7 +266,8 @@ export default function OperationsPage() {
         mode="school"
         eyebrow="School Operations"
         title={institutionName}
-        description="This page carries the heavier school workflows: approvals, access tokens, roster intake, and other supporting tasks that no longer belong on the main overview."
+        description="Use this command center to launch every school management workspace, then handle approvals, access tokens, and roster intake from one place."
+        showMenu={false}
         tabsAction={
           <Link to="/dashboard/school">
             <Button variant="secondary">
@@ -218,6 +279,44 @@ export default function OperationsPage() {
       />
 
       <DashboardMetricRail columnsClassName="md:grid-cols-4" items={statusHintItems} />
+
+      <DashboardSection
+        eyebrow="Operations Hub"
+        title="Launch every school workspace"
+        description="The hub mirrors the school manual: students, projects, patents, startups, events, investors, and mentors are all reachable from here."
+      >
+        <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-3">
+          {operationsHubItems.map((item) => (
+            <Card key={item.title} className="flex h-full flex-col justify-between border-slate-800 bg-slate-900/85 p-5 shadow-none">
+              <div>
+                <div className="flex items-start justify-between gap-4">
+                  <div className="flex h-12 w-12 items-center justify-center rounded-2xl bg-cyan-500/10 text-cyan-300">
+                    <item.icon className="h-6 w-6" />
+                  </div>
+                  <div className="rounded-full border border-slate-800 bg-slate-950/80 px-3 py-1 text-xs font-medium text-slate-300">
+                    {item.stat}
+                  </div>
+                </div>
+                <h3 className="mt-5 text-xl font-semibold text-white">{item.title}</h3>
+                <p className="mt-2 text-sm leading-6 text-slate-400">{item.description}</p>
+              </div>
+              <div className="mt-6 flex flex-wrap gap-3">
+                <Link to={item.to}>
+                  <Button>
+                    Open workspace
+                    <ArrowRight className="ml-2 h-4 w-4" />
+                  </Button>
+                </Link>
+                {item.secondaryAction ? (
+                  <Link to={item.secondaryAction.to}>
+                    <Button variant="secondary">{item.secondaryAction.label}</Button>
+                  </Link>
+                ) : null}
+              </div>
+            </Card>
+          ))}
+        </div>
+      </DashboardSection>
 
       {opsNotice ? (
         <div className="rounded-2xl border border-cyan-500/30 bg-cyan-500/10 px-4 py-3 text-sm text-cyan-200">

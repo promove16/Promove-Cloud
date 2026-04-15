@@ -1,6 +1,6 @@
-import { useMemo } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { Link, useNavigate, useParams } from 'react-router-dom';
-import { useQuery } from '@tanstack/react-query';
+import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import {
   ArrowLeft,
   ArrowRight,
@@ -18,6 +18,7 @@ import { recruiterApi } from '../../api/recruiter.api';
 import { marketplaceApi } from '../../api/marketplace.api';
 import { Spinner } from '../../components/ui/Spinner';
 import { Button } from '../../components/ui/Button';
+import { RecruiterJobView } from '../../types/recruiter.types';
 
 const dateFormatter = new Intl.DateTimeFormat('en-IN', {
   day: 'numeric',
@@ -127,7 +128,10 @@ function InfoTile({ label, value }: { label: string; value: string }) {
 
 export function MarketplaceJobDetail() {
   const navigate = useNavigate();
+  const queryClient = useQueryClient();
   const { jobId } = useParams();
+  const [hasApplied, setHasApplied] = useState(false);
+  const [applyError, setApplyError] = useState<string | null>(null);
 
   const jobQuery = useQuery({
     queryKey: ['marketplace', 'job-detail', jobId],
@@ -149,6 +153,7 @@ export function MarketplaceJobDetail() {
 
   const job = jobQuery.data;
   const recruiter = recruiterQuery.data;
+  const isApplyLocked = hasApplied || !job?.isActive;
   const relatedJobs = useMemo(
     () => (relatedJobsQuery.data ?? []).filter((relatedJob) => relatedJob._id !== job?._id).slice(0, 4),
     [job?._id, relatedJobsQuery.data],
@@ -159,8 +164,70 @@ export function MarketplaceJobDetail() {
   const benefitList = buildDetailList(job?.benefits ?? [], job?.companyOverview);
   const applicationSteps = buildDetailList(
     job?.applicationSteps ?? [],
-    'Apply from the marketplace jobs feed. The recruiter reviews profiles and contacts shortlisted students directly.',
+    'Review the JD here, apply from this page, and track recruiter updates in My Applications.',
   );
+
+  useEffect(() => {
+    setHasApplied(Boolean(job?.hasApplied));
+  }, [job?.hasApplied]);
+
+  const markJobAsApplied = () => {
+    if (!job) {
+      return;
+    }
+
+    const applicationUpdatedAt = new Date().toISOString();
+
+    const applyPatch = <T extends RecruiterJobView>(current: T): T => ({
+      ...current,
+      hasApplied: true,
+      applicationStage: current.applicationStage ?? 'Applied',
+      applicationSource: current.applicationSource ?? 'student_apply',
+      applicationUpdatedAt,
+    });
+
+    setHasApplied(true);
+
+    queryClient.setQueriesData<RecruiterJobView[]>(
+      { queryKey: ['marketplace', 'student-recruiter-jobs'] },
+      (current) =>
+        current?.map((currentJob) =>
+          currentJob._id === job._id ? applyPatch(currentJob) : currentJob,
+        ) ?? current,
+    );
+
+    queryClient.setQueryData<RecruiterJobView>(
+      ['marketplace', 'job-detail', job._id],
+      (current) => (current ? applyPatch(current) : current),
+    );
+
+    queryClient.setQueriesData<RecruiterJobView[]>(
+      { queryKey: ['marketplace', 'job-detail', 'related'] },
+      (current) =>
+        Array.isArray(current)
+          ? current.map((currentJob) =>
+              currentJob._id === job._id ? applyPatch(currentJob) : currentJob,
+            )
+          : current,
+    );
+
+    void queryClient.invalidateQueries({ queryKey: ['student', 'applications'] });
+  };
+
+  const applyToJob = useMutation({
+    mutationFn: async () => recruiterApi.applyToJob(jobId!),
+    onMutate: () => {
+      setApplyError(null);
+    },
+    onSuccess: (response) => {
+      if (response.applied || response.alreadyApplied) {
+        markJobAsApplied();
+      }
+    },
+    onError: () => {
+      setApplyError('Unable to apply to this job right now.');
+    },
+  });
 
   const handleMessage = () => {
     if (!job) {
@@ -172,6 +239,14 @@ export function MarketplaceJobDetail() {
       localStorage.setItem(storageKey, 'true');
     }
     navigate(`/dashboard/messages/${job.recruiterId}`);
+  };
+
+  const handleApply = () => {
+    if (!job || hasApplied || applyToJob.isPending || !job.isActive) {
+      return;
+    }
+
+    applyToJob.mutate();
   };
 
   return (
@@ -186,13 +261,33 @@ export function MarketplaceJobDetail() {
               <ArrowLeft className="h-4 w-4" />
               Back to marketplace
             </Link>
-            <Link
-              to="/dashboard/student/applications"
-              className="inline-flex items-center gap-2 rounded-full border border-slate-700 bg-slate-950/60 px-4 py-2 text-sm font-medium text-slate-200 transition hover:border-cyan-400/50 hover:text-white"
-            >
-              <BriefcaseBusiness className="h-4 w-4" />
-              My applications
-            </Link>
+            <div className="flex flex-wrap items-center gap-3">
+              {job ? (
+                <Button
+                  className="rounded-full px-5"
+                  onClick={handleApply}
+                  disabled={isApplyLocked || applyToJob.isPending}
+                >
+                  <ArrowRight className="mr-2 h-4 w-4" />
+                  {applyToJob.isPending
+                    ? 'Applying...'
+                    : hasApplied
+                      ? job.applicationSource === 'recruiter_invite'
+                        ? 'Invited'
+                        : 'Applied'
+                      : job.isActive
+                        ? 'Apply now'
+                        : 'Applications closed'}
+                </Button>
+              ) : null}
+              <Link
+                to="/dashboard/student/applications"
+                className="inline-flex items-center gap-2 rounded-full border border-slate-700 bg-slate-950/60 px-4 py-2 text-sm font-medium text-slate-200 transition hover:border-cyan-400/50 hover:text-white"
+              >
+                <BriefcaseBusiness className="h-4 w-4" />
+                My applications
+              </Link>
+            </div>
           </div>
 
           <div className="marketplace-scroll min-h-0 flex-1 overflow-y-auto rounded-[30px] border border-slate-800/80 bg-[linear-gradient(180deg,#101624_0%,#0c1220_100%)] shadow-[0_24px_80px_rgba(0,0,0,0.28)]">
@@ -356,6 +451,22 @@ export function MarketplaceJobDetail() {
 
                     <div className="mt-5 space-y-3">
                       <Button
+                        className="h-11 w-full rounded-full"
+                        onClick={handleApply}
+                        disabled={isApplyLocked || applyToJob.isPending}
+                      >
+                        <ArrowRight className="mr-2 h-4 w-4" />
+                        {applyToJob.isPending
+                          ? 'Applying...'
+                          : hasApplied
+                            ? job.applicationSource === 'recruiter_invite'
+                              ? 'Invited'
+                              : 'Applied'
+                            : job.isActive
+                              ? 'Apply now'
+                              : 'Applications closed'}
+                      </Button>
+                      <Button
                         variant="secondary"
                         className="h-11 w-full rounded-full border-slate-700 bg-transparent text-slate-200 hover:border-slate-500 hover:bg-slate-900/40"
                         onClick={handleMessage}
@@ -363,6 +474,13 @@ export function MarketplaceJobDetail() {
                         <MessageCircle className="mr-2 h-4 w-4" />
                         Message recruiter
                       </Button>
+                      {applyError ? (
+                        <div className="text-sm text-rose-300">{applyError}</div>
+                      ) : hasApplied ? (
+                        <div className="text-sm text-emerald-200">
+                          Application recorded. Track updates in My Applications.
+                        </div>
+                      ) : null}
                     </div>
                   </section>
 

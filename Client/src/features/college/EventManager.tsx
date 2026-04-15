@@ -1,7 +1,11 @@
 import { useEffect, useMemo, useState } from 'react';
+import { isAxiosError } from 'axios';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
+import { zodResolver } from '@hookform/resolvers/zod';
 import { CalendarDays } from 'lucide-react';
+import { useForm } from 'react-hook-form';
 import { useSearchParams } from 'react-router-dom';
+import { z } from 'zod';
 import { collegeApi } from '../../api/college.api';
 import { eventApi } from '../../api/event.api';
 import { schoolApi } from '../../api/school.api';
@@ -9,6 +13,7 @@ import { Badge } from '../../components/ui/Badge';
 import { Button } from '../../components/ui/Button';
 import { Card } from '../../components/ui/Card';
 import { Input } from '../../components/ui/Input';
+import { ApiErrorResponse } from '../../types/auth.types';
 import type { CollegeEvent } from '../../types/college.types';
 import { InstitutionWorkspaceHeader } from '../institution/InstitutionWorkspaceHeader';
 
@@ -22,13 +27,6 @@ const eventTypes = [
 type InstitutionEventManagerMode = 'college' | 'school';
 type CollegeEventTab = 'internal' | 'hiring';
 
-type EventFormState = {
-  title: string;
-  type: (typeof eventTypes)[number];
-  date: string;
-  description: string;
-};
-
 type CreateEventPayload = {
   title: string;
   type: (typeof eventTypes)[number];
@@ -37,7 +35,9 @@ type CreateEventPayload = {
   targetRoles?: Array<'student' | 'all'>;
 };
 
-type ManagedInstitutionEvent = Awaited<ReturnType<typeof collegeApi.listEvents>>[number];
+type ManagedInstitutionEvent = Awaited<
+  ReturnType<typeof collegeApi.listEvents>
+>[number];
 
 const EVENT_MANAGER_CONFIG: Record<
   InstitutionEventManagerMode,
@@ -45,7 +45,9 @@ const EVENT_MANAGER_CONFIG: Record<
     headerMode: 'college' | 'school';
     queryKey: string;
     listEvents: () => Promise<ManagedInstitutionEvent[]>;
-    createEvent: (payload: CreateEventPayload) => Promise<ManagedInstitutionEvent>;
+    createEvent: (
+      payload: CreateEventPayload,
+    ) => Promise<ManagedInstitutionEvent>;
   }
 > = {
   college: {
@@ -62,14 +64,41 @@ const EVENT_MANAGER_CONFIG: Record<
   },
 };
 
-const createInitialForm = (): EventFormState => ({
+const eventFormSchema = z.object({
+  title: z.string().trim().min(2, 'Event title is required.').max(160),
+  type: z.enum(eventTypes),
+  date: z
+    .string()
+    .trim()
+    .min(1, 'Event date and time are required.')
+    .refine((value) => !Number.isNaN(new Date(value).getTime()), {
+      message: 'Enter a valid event date and time.',
+    }),
+  description: z
+    .string()
+    .trim()
+    .min(10, 'Description must be at least 10 characters.')
+    .max(2000),
+});
+
+type EventFormValues = z.infer<typeof eventFormSchema>;
+
+const defaultEventFormValues: EventFormValues = {
   title: '',
   type: eventTypes[0],
   date: '',
   description: '',
-});
+};
 
-const getDescription = (mode: InstitutionEventManagerMode, tab: CollegeEventTab) => {
+const fieldLabelClassName = 'mb-2 block text-sm font-medium text-slate-300';
+const fieldErrorClassName = 'mt-2 text-xs text-rose-300';
+const inputErrorClassName =
+  'border-rose-500/70 focus:border-rose-400';
+
+const getDescription = (
+  mode: InstitutionEventManagerMode,
+  tab: CollegeEventTab,
+) => {
   if (mode === 'school') {
     return 'Create and track internal school events, submissions, and rankings.';
   }
@@ -84,6 +113,13 @@ const getCategoryBadgeClass = (event: CollegeEvent) =>
     ? 'border-amber-500/30 bg-amber-500/10 text-amber-300'
     : 'border-cyan-500/30 bg-cyan-500/10 text-cyan-300';
 
+function getErrorMessage(error: unknown, fallback: string) {
+  return isAxiosError<ApiErrorResponse>(error) &&
+    error.response?.data?.error?.message
+    ? error.response.data.error.message
+    : fallback;
+}
+
 export default function EventManager({
   mode = 'college',
 }: {
@@ -93,16 +129,30 @@ export default function EventManager({
   const queryClient = useQueryClient();
   const config = EVENT_MANAGER_CONFIG[mode];
   const [activeTab, setActiveTab] = useState<CollegeEventTab>(
-    mode === 'college' && searchParams.get('tab') === 'hiring' ? 'hiring' : 'internal',
+    mode === 'college' && searchParams.get('tab') === 'hiring'
+      ? 'hiring'
+      : 'internal',
   );
   const [showCreate, setShowCreate] = useState(false);
+  const [createError, setCreateError] = useState('');
   const [scoringEventId, setScoringEventId] = useState<string | null>(null);
-  const [scoreDraft, setScoreDraft] = useState<{ studentId: string; score: string }>({
+  const [scoreDraft, setScoreDraft] = useState<{
+    studentId: string;
+    score: string;
+  }>({
     studentId: '',
     score: '',
   });
-  const [form, setForm] = useState<EventFormState>(createInitialForm);
   const focusedEventId = searchParams.get('eventId');
+  const {
+    register,
+    handleSubmit,
+    reset,
+    formState: { errors },
+  } = useForm<EventFormValues>({
+    resolver: zodResolver(eventFormSchema),
+    defaultValues: defaultEventFormValues,
+  });
 
   const eventsQuery = useQuery({
     queryKey: [config.queryKey],
@@ -118,16 +168,24 @@ export default function EventManager({
   const refreshEventQueries = async () => {
     await queryClient.invalidateQueries({ queryKey: [config.queryKey] });
     if (mode === 'college') {
-      await queryClient.invalidateQueries({ queryKey: [config.queryKey, 'hiring'] });
+      await queryClient.invalidateQueries({
+        queryKey: [config.queryKey, 'hiring'],
+      });
     }
   };
 
   const createMutation = useMutation({
     mutationFn: config.createEvent,
     onSuccess: async () => {
-      setForm(createInitialForm());
+      reset(defaultEventFormValues);
+      setCreateError('');
       setShowCreate(false);
       await refreshEventQueries();
+    },
+    onError: (error) => {
+      setCreateError(
+        getErrorMessage(error, 'Unable to create this event right now.'),
+      );
     },
   });
 
@@ -137,8 +195,15 @@ export default function EventManager({
   });
 
   const submissionMutation = useMutation({
-    mutationFn: ({ eventId, studentId, score }: { eventId: string; studentId: string; score: number }) =>
-      eventApi.addSubmissionScore(eventId, studentId, score),
+    mutationFn: ({
+      eventId,
+      studentId,
+      score,
+    }: {
+      eventId: string;
+      studentId: string;
+      score: number;
+    }) => eventApi.addSubmissionScore(eventId, studentId, score),
     onSuccess: async () => {
       setScoreDraft({ studentId: '', score: '' });
       await refreshEventQueries();
@@ -154,7 +219,9 @@ export default function EventManager({
       return hiringEventsQuery.data ?? [];
     }
 
-    return (eventsQuery.data ?? []).filter((event) => event.category !== 'hiring');
+    return (eventsQuery.data ?? []).filter(
+      (event) => event.category !== 'hiring',
+    );
   }, [activeTab, eventsQuery.data, hiringEventsQuery.data, mode]);
 
   const canCreateInternalEvent = mode === 'school' || activeTab === 'internal';
@@ -166,6 +233,31 @@ export default function EventManager({
 
     setActiveTab(searchParams.get('tab') === 'hiring' ? 'hiring' : 'internal');
   }, [mode, searchParams]);
+
+  const toggleCreateForm = () => {
+    setShowCreate((current) => {
+      const nextValue = !current;
+      if (!nextValue) {
+        reset(defaultEventFormValues);
+        setCreateError('');
+      }
+      return nextValue;
+    });
+  };
+
+  const onSubmit = handleSubmit(
+    (values) => {
+      setCreateError('');
+      createMutation.mutate({
+        ...values,
+        date: new Date(values.date).toISOString(),
+        targetRoles: ['student'],
+      });
+    },
+    () => {
+      setCreateError('Fill the highlighted fields before creating the event.');
+    },
+  );
 
   return (
     <div className="space-y-6">
@@ -183,6 +275,8 @@ export default function EventManager({
                   onClick={() => {
                     setActiveTab('internal');
                     setShowCreate(false);
+                    setCreateError('');
+                    reset(defaultEventFormValues);
                   }}
                   className={`rounded-lg px-4 py-2 text-sm font-medium transition ${
                     activeTab === 'internal'
@@ -197,6 +291,8 @@ export default function EventManager({
                   onClick={() => {
                     setActiveTab('hiring');
                     setShowCreate(false);
+                    setCreateError('');
+                    reset(defaultEventFormValues);
                   }}
                   className={`rounded-lg px-4 py-2 text-sm font-medium transition ${
                     activeTab === 'hiring'
@@ -210,7 +306,7 @@ export default function EventManager({
             ) : null}
 
             {canCreateInternalEvent ? (
-              <Button onClick={() => setShowCreate((value) => !value)}>
+              <Button onClick={toggleCreateForm}>
                 {showCreate ? 'Close Form' : '+ Create Event'}
               </Button>
             ) : null}
@@ -220,66 +316,129 @@ export default function EventManager({
 
       {showCreate && canCreateInternalEvent ? (
         <Card className="p-6">
-          <div className="grid gap-4 md:grid-cols-2">
-            <Input
-              value={form.title}
-              onChange={(event) => setForm((current) => ({ ...current, title: event.target.value }))}
-              placeholder="Event title"
-            />
-            <select
-              value={form.type}
-              onChange={(event) =>
-                setForm((current) => ({
-                  ...current,
-                  type: event.target.value as (typeof eventTypes)[number],
-                }))
-              }
-              className="rounded-lg border border-slate-800 bg-slate-950 px-4 py-3 text-white"
-            >
-              {eventTypes.map((type) => (
-                <option key={type} value={type}>
-                  {type}
-                </option>
-              ))}
-            </select>
-            <Input
-              type="datetime-local"
-              value={form.date}
-              onChange={(event) => setForm((current) => ({ ...current, date: event.target.value }))}
-            />
-            <div />
-            <textarea
-              value={form.description}
-              onChange={(event) => setForm((current) => ({ ...current, description: event.target.value }))}
-              placeholder="Describe the event"
-              className="min-h-32 rounded-lg border border-slate-800 bg-slate-950 px-4 py-3 text-white md:col-span-2"
-            />
-          </div>
-          <div className="mt-4 flex justify-end">
-            <Button
-              onClick={() =>
-                createMutation.mutate({
-                  ...form,
-                  date: new Date(form.date).toISOString(),
-                  targetRoles: ['student'],
-                })
-              }
-              disabled={createMutation.isPending || !form.title || !form.date || !form.description}
-            >
-              {createMutation.isPending ? 'Creating...' : 'Create Event'}
-            </Button>
-          </div>
+          <form onSubmit={onSubmit} noValidate>
+            <div className="grid gap-4 md:grid-cols-2">
+              <div>
+                <label htmlFor="event-title" className={fieldLabelClassName}>
+                  Event Title *
+                </label>
+                <Input
+                  id="event-title"
+                  placeholder="Event title"
+                  aria-invalid={Boolean(errors.title)}
+                  className={errors.title ? inputErrorClassName : undefined}
+                  {...register('title')}
+                />
+                {errors.title ? (
+                  <p className={fieldErrorClassName}>{errors.title.message}</p>
+                ) : null}
+              </div>
+
+              <div>
+                <label htmlFor="event-type" className={fieldLabelClassName}>
+                  Event Type *
+                </label>
+                <select
+                  id="event-type"
+                  aria-invalid={Boolean(errors.type)}
+                  className={`w-full rounded-lg border bg-slate-950 px-4 py-3 text-white ${
+                    errors.type
+                      ? inputErrorClassName
+                      : 'border-slate-800'
+                  }`}
+                  {...register('type')}
+                >
+                  {eventTypes.map((type) => (
+                    <option key={type} value={type}>
+                      {type}
+                    </option>
+                  ))}
+                </select>
+                {errors.type ? (
+                  <p className={fieldErrorClassName}>{errors.type.message}</p>
+                ) : null}
+              </div>
+
+              <div>
+                <label htmlFor="event-date" className={fieldLabelClassName}>
+                  Date And Time *
+                </label>
+                <Input
+                  id="event-date"
+                  type="datetime-local"
+                  aria-invalid={Boolean(errors.date)}
+                  className={errors.date ? inputErrorClassName : undefined}
+                  {...register('date')}
+                />
+                {errors.date ? (
+                  <p className={fieldErrorClassName}>{errors.date.message}</p>
+                ) : null}
+              </div>
+
+              <div className="rounded-2xl border border-slate-800 bg-slate-950/60 px-4 py-4">
+                <div className="text-sm font-medium text-white">
+                  Required fields
+                </div>
+                <p className="mt-2 text-sm leading-6 text-slate-400">
+                  Title, event type, date and time, and a meaningful description
+                  are all required before the event can be created.
+                </p>
+              </div>
+
+              <div className="md:col-span-2">
+                <label
+                  htmlFor="event-description"
+                  className={fieldLabelClassName}
+                >
+                  Description *
+                </label>
+                <textarea
+                  id="event-description"
+                  placeholder="Describe the event"
+                  aria-invalid={Boolean(errors.description)}
+                  className={`min-h-32 w-full rounded-lg border bg-slate-950 px-4 py-3 text-white ${
+                    errors.description
+                      ? inputErrorClassName
+                      : 'border-slate-800'
+                  }`}
+                  {...register('description')}
+                />
+                {errors.description ? (
+                  <p className={fieldErrorClassName}>
+                    {errors.description.message}
+                  </p>
+                ) : null}
+              </div>
+            </div>
+
+            {createError ? (
+              <div className="mt-4 rounded-2xl border border-rose-500/30 bg-rose-500/10 px-4 py-3 text-sm text-rose-200">
+                {createError}
+              </div>
+            ) : null}
+
+            <div className="mt-4 flex justify-end">
+              <Button type="submit" disabled={createMutation.isPending}>
+                {createMutation.isPending ? 'Creating...' : 'Create Event'}
+              </Button>
+            </div>
+          </form>
         </Card>
       ) : null}
 
-      {(eventsQuery.isLoading || (mode === 'college' && activeTab === 'hiring' && hiringEventsQuery.isLoading)) ? (
+      {(eventsQuery.isLoading ||
+        (mode === 'college' &&
+          activeTab === 'hiring' &&
+          hiringEventsQuery.isLoading)) ? (
         <Card className="p-6 text-sm text-slate-400">Loading events...</Card>
       ) : null}
 
       {!eventsQuery.isLoading && visibleEvents.length === 0 ? (
         <Card className="p-8 text-center">
           <div className="text-lg font-semibold text-white">
-            {mode === 'college' && activeTab === 'hiring' ? 'No hiring events yet' : 'No events yet'}
+            {mode === 'college' && activeTab === 'hiring'
+              ? 'No hiring events yet'
+              : 'No events yet'}
           </div>
           <p className="mt-2 text-sm text-slate-400">
             {mode === 'college' && activeTab === 'hiring'
@@ -293,7 +452,11 @@ export default function EventManager({
         {visibleEvents.map((event) => (
           <Card
             key={event._id}
-            className={`p-6 ${focusedEventId === event._id ? 'border-cyan-400/40 bg-cyan-400/5' : ''}`}
+            className={`p-6 ${
+              focusedEventId === event._id
+                ? 'border-cyan-400/40 bg-cyan-400/5'
+                : ''
+            }`}
           >
             <div className="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
               <div>
@@ -301,22 +464,36 @@ export default function EventManager({
                   <CalendarDays className="h-4 w-4" />
                   <span>{event.type}</span>
                   <Badge className={getCategoryBadgeClass(event)}>
-                    {event.category === 'hiring' ? 'Hiring Event' : 'Internal Event'}
+                    {event.category === 'hiring'
+                      ? 'Hiring Event'
+                      : 'Internal Event'}
                   </Badge>
                 </div>
-                <h2 className="text-2xl font-semibold text-white">{event.title}</h2>
-                <p className="mt-3 max-w-3xl text-slate-400">{event.description}</p>
+                <h2 className="text-2xl font-semibold text-white">
+                  {event.title}
+                </h2>
+                <p className="mt-3 max-w-3xl text-slate-400">
+                  {event.description}
+                </p>
                 <div className="mt-4 flex flex-wrap gap-3 text-sm text-slate-500">
-                  <span>{new Date(event.scheduledAt).toLocaleString('en-IN')}</span>
+                  <span>
+                    {new Date(event.scheduledAt).toLocaleString('en-IN')}
+                  </span>
                   <span>{event.participantsCount} participants</span>
-                  {event.recruiterName ? <span>Hosted by {event.recruiterName}</span> : null}
-                  {typeof event.minimumInnovationScore === 'number' && event.category === 'hiring' ? (
+                  {event.recruiterName ? (
+                    <span>Hosted by {event.recruiterName}</span>
+                  ) : null}
+                  {typeof event.minimumInnovationScore === 'number' &&
+                  event.category === 'hiring' ? (
                     <span>Minimum score {event.minimumInnovationScore}</span>
                   ) : null}
                 </div>
               </div>
               <div className="flex flex-wrap gap-3">
-                <Button variant="secondary" onClick={() => computeMutation.mutate(event._id)}>
+                <Button
+                  variant="secondary"
+                  onClick={() => computeMutation.mutate(event._id)}
+                >
                   Compute Rankings
                 </Button>
                 <Button
@@ -326,7 +503,9 @@ export default function EventManager({
                     const isClosing = scoringEventId === event._id;
                     setScoringEventId(isClosing ? null : event._id);
                     setScoreDraft({
-                      studentId: isClosing ? '' : event.participants[0]?.studentId ?? '',
+                      studentId: isClosing
+                        ? ''
+                        : event.participants[0]?.studentId ?? '',
                       score: '',
                     });
                   }}
@@ -345,7 +524,9 @@ export default function EventManager({
                 Participants
               </div>
               {event.participants.length === 0 ? (
-                <div className="text-sm text-slate-500">No students have joined this event yet.</div>
+                <div className="text-sm text-slate-500">
+                  No students have joined this event yet.
+                </div>
               ) : (
                 <div className="space-y-3">
                   {event.participants.map((participant) => (
@@ -354,10 +535,14 @@ export default function EventManager({
                       className="flex flex-col gap-2 rounded-2xl border border-slate-800 bg-slate-950 px-4 py-4 md:flex-row md:items-center md:justify-between"
                     >
                       <div>
-                        <div className="font-semibold text-white">{participant.studentName}</div>
+                        <div className="font-semibold text-white">
+                          {participant.studentName}
+                        </div>
                         <div className="mt-1 text-sm text-slate-400">
                           Score {participant.innovationScore} | Joined{' '}
-                          {new Date(participant.registeredAt).toLocaleDateString('en-IN')}
+                          {new Date(
+                            participant.registeredAt,
+                          ).toLocaleDateString('en-IN')}
                         </div>
                       </div>
                       <div className="text-sm text-slate-400">
@@ -376,12 +561,18 @@ export default function EventManager({
                     <select
                       value={scoreDraft.studentId}
                       onChange={(currentEvent) =>
-                        setScoreDraft((current) => ({ ...current, studentId: currentEvent.target.value }))
+                        setScoreDraft((current) => ({
+                          ...current,
+                          studentId: currentEvent.target.value,
+                        }))
                       }
                       className="rounded-lg border border-slate-800 bg-slate-950 px-4 py-3 text-white"
                     >
                       {event.participants.map((participant) => (
-                        <option key={participant.studentId} value={participant.studentId}>
+                        <option
+                          key={participant.studentId}
+                          value={participant.studentId}
+                        >
                           {participant.studentName}
                         </option>
                       ))}
@@ -392,13 +583,17 @@ export default function EventManager({
                       max={100}
                       value={scoreDraft.score}
                       onChange={(currentEvent) =>
-                        setScoreDraft((current) => ({ ...current, score: currentEvent.target.value }))
+                        setScoreDraft((current) => ({
+                          ...current,
+                          score: currentEvent.target.value,
+                        }))
                       }
                       placeholder="Submission score"
                     />
                   </div>
                   <div className="mt-3 text-sm text-slate-400">
-                    Save the participant score first, then recompute rankings to refresh the leaderboard.
+                    Save the participant score first, then recompute rankings to
+                    refresh the leaderboard.
                   </div>
                   <div className="mt-4 flex justify-end">
                     <Button
@@ -417,7 +612,9 @@ export default function EventManager({
                         Number(scoreDraft.score) > 100
                       }
                     >
-                      {submissionMutation.isPending ? 'Saving...' : 'Save Submission Score'}
+                      {submissionMutation.isPending
+                        ? 'Saving...'
+                        : 'Save Submission Score'}
                     </Button>
                   </div>
                 </>
@@ -433,18 +630,30 @@ export default function EventManager({
               </div>
               <div className="space-y-3">
                 {event.rankings.length === 0 ? (
-                  <div className="text-sm text-slate-500">Rankings will appear here after computation.</div>
+                  <div className="text-sm text-slate-500">
+                    Rankings will appear here after computation.
+                  </div>
                 ) : (
                   event.rankings.map((ranking) => (
                     <div
                       key={`${event._id}-${ranking.studentId}`}
                       className="grid grid-cols-1 gap-3 rounded-2xl border border-slate-800 bg-slate-950 px-4 py-4 text-sm md:grid-cols-[80px,1fr,140px,140px,140px]"
                     >
-                      <div className="font-semibold text-white">#{ranking.rank}</div>
-                      <div className="font-semibold text-white">{ranking.studentName}</div>
-                      <div className="text-slate-300">Composite {ranking.compositeScore}</div>
-                      <div className="text-slate-400">Innovation {ranking.innovationScore}</div>
-                      <div className="text-slate-400">Submission {ranking.submissionScore}</div>
+                      <div className="font-semibold text-white">
+                        #{ranking.rank}
+                      </div>
+                      <div className="font-semibold text-white">
+                        {ranking.studentName}
+                      </div>
+                      <div className="text-slate-300">
+                        Composite {ranking.compositeScore}
+                      </div>
+                      <div className="text-slate-400">
+                        Innovation {ranking.innovationScore}
+                      </div>
+                      <div className="text-slate-400">
+                        Submission {ranking.submissionScore}
+                      </div>
                     </div>
                   ))
                 )}

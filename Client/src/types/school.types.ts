@@ -99,6 +99,13 @@ export interface InstitutionTrendGraph {
   rangeDays: number;
 }
 
+export interface InnovationScoreDistributionBucket {
+  label: string;
+  min: number;
+  max: number;
+  count: number;
+}
+
 export interface RecentProject {
   _id: string;
   studentId: string;
@@ -142,6 +149,7 @@ export interface SchoolDashboardData {
     startupsLast30Days: number;
   };
   trendGraph: InstitutionTrendGraph;
+  innovationScoreDistribution: InnovationScoreDistributionBucket[];
   upcomingEvents: DashboardEvent[];
   topStudents: StudentLeaderboardItem[];
   recentProjects: RecentProject[];

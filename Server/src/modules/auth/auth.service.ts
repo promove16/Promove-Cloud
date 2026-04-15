@@ -134,6 +134,10 @@ const createAuthSessionStoreError = () =>
 
 const shouldAllowRedisAuthFallback = () => env.AUTH_ALLOW_REDIS_AUTH_FALLBACK;
 
+interface CreateTokenPairOptions {
+  persistSession?: boolean;
+}
+
 const persistRefreshSession = async (
   refreshTokenId: string,
   user: SanitizedUser,
@@ -178,7 +182,10 @@ const resolveTenantInstitutionId = (user: SanitizedUser): string | null => {
   return null;
 };
 
-const createTokenPair = async (user: SanitizedUser) => {
+const createTokenPair = async (
+  user: SanitizedUser,
+  options: CreateTokenPairOptions = {},
+) => {
   const tokenBase: TokenBasePayload = {
     _id: user._id,
     email: user.email,
@@ -186,6 +193,7 @@ const createTokenPair = async (user: SanitizedUser) => {
     institutionId: resolveTenantInstitutionId(user),
   };
   const refreshTokenId = randomUUID();
+  const shouldPersistSession = options.persistSession ?? true;
 
   const accessToken = signToken(tokenBase, env.JWT_ACCESS_SECRET, env.JWT_ACCESS_EXPIRES, 'access');
   const refreshToken = signToken(
@@ -196,13 +204,15 @@ const createTokenPair = async (user: SanitizedUser) => {
     refreshTokenId,
   );
 
-  try {
-    await persistRefreshSession(refreshTokenId, user);
-  } catch (error) {
-    logError('Failed to persist refresh session in Redis', error);
+  if (shouldPersistSession) {
+    try {
+      await persistRefreshSession(refreshTokenId, user);
+    } catch (error) {
+      logError('Failed to persist refresh session in Redis', error);
 
-    if (!env.AUTH_ALLOW_REDIS_AUTH_FALLBACK) {
-      throw createAuthSessionStoreError();
+      if (!env.AUTH_ALLOW_REDIS_AUTH_FALLBACK) {
+        throw createAuthSessionStoreError();
+      }
     }
   }
 
@@ -964,6 +974,7 @@ export const refreshUserToken = async (refreshToken: string | undefined): Promis
 
   const key = refreshSessionKey(decoded.tokenId);
   let storedUserId: string | null;
+  let shouldUseRedisSessionStore = true;
 
   try {
     storedUserId = await redis.get<string>(key);
@@ -975,19 +986,24 @@ export const refreshUserToken = async (refreshToken: string | undefined): Promis
     }
 
     storedUserId = decoded._id;
+    shouldUseRedisSessionStore = false;
   }
 
   if (!storedUserId || storedUserId !== decoded._id) {
     throw new ApiError(401, 'UNAUTHORIZED', 'Invalid or expired token');
   }
 
-  try {
-    await deleteRefreshSession(decoded._id, decoded.tokenId);
-  } catch (error) {
-    logError('Failed to rotate refresh session in Redis', error);
+  if (shouldUseRedisSessionStore) {
+    try {
+      await deleteRefreshSession(decoded._id, decoded.tokenId);
+    } catch (error) {
+      logError('Failed to rotate refresh session in Redis', error);
 
-    if (!shouldAllowRedisAuthFallback()) {
-      throw createAuthSessionStoreError();
+      if (!shouldAllowRedisAuthFallback()) {
+        throw createAuthSessionStoreError();
+      }
+
+      shouldUseRedisSessionStore = false;
     }
   }
 
@@ -1002,7 +1018,9 @@ export const refreshUserToken = async (refreshToken: string | undefined): Promis
   }
 
   const sanitizedUser = toSanitizedUser(user.toObject());
-  const tokens = await createTokenPair(sanitizedUser);
+  const tokens = await createTokenPair(sanitizedUser, {
+    persistSession: shouldUseRedisSessionStore,
+  });
 
   return {
     ...tokens,

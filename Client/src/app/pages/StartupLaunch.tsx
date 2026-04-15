@@ -1,4 +1,4 @@
-import { ChangeEvent, useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { ChangeEvent, useCallback, useEffect, useMemo, useState } from "react";
 import { useNavigate, useOutletContext, useParams, useBlocker } from "react-router-dom";
 import { isAxiosError } from "axios";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
@@ -35,6 +35,7 @@ import {
 import { Card } from "../../components/ui/Card";
 import { Spinner } from "../../components/ui/Spinner";
 import type {
+  Startup,
   StartupDocumentCategory,
   StartupRegistrationProfile,
 } from "../../types/startup.types";
@@ -85,6 +86,14 @@ const FIELD_LIMITS = {
 
 type FieldErrors = Record<string, string>;
 
+const STARTUP_FIELD_ANCHORS: Record<string, { id: string; name?: string }> = {
+  name: { id: "startup-name", name: "name" },
+  tagline: { id: "startup-tagline", name: "tagline" },
+  category: { id: "startup-category", name: "category" },
+  fundingNeeded: { id: "startup-funding", name: "fundingNeeded" },
+  activeProducts: { id: "startup-offerings", name: "activeOfferings" },
+};
+
 const validateStartupForm = (form: StartupPayload): FieldErrors => {
   const errors: FieldErrors = {};
 
@@ -115,6 +124,23 @@ const validateStartupForm = (form: StartupPayload): FieldErrors => {
   }
 
   return errors;
+};
+
+const scrollToStartupField = (fieldName: string) => {
+  const anchor = STARTUP_FIELD_ANCHORS[fieldName];
+  const element =
+    (anchor?.id ? document.getElementById(anchor.id) : null) ??
+    (anchor?.name ? document.querySelector(`[name="${anchor.name}"]`) : null);
+
+  if (!(element instanceof HTMLElement)) {
+    window.scrollTo({ top: 0, behavior: "smooth" });
+    return;
+  }
+
+  window.requestAnimationFrame(() => {
+    element.scrollIntoView({ behavior: "smooth", block: "center" });
+    element.focus();
+  });
 };
 
 const shortDateFormatter = new Intl.DateTimeFormat("en-IN", {
@@ -183,6 +209,38 @@ const getStartupStageFromWorkspaceStage = (
   }
 };
 
+const mapStartupToForm = (startup?: Partial<Startup> | null): StartupPayload => {
+  const defaultPayload = createEmptyPayload();
+
+  if (!startup) {
+    return defaultPayload;
+  }
+
+  return {
+    ...defaultPayload,
+    projectId: startup.projectId,
+    name: startup.name ?? defaultPayload.name,
+    tagline: startup.tagline ?? defaultPayload.tagline,
+    category: startup.category ?? defaultPayload.category,
+    stage: startup.stage ?? defaultPayload.stage,
+    fundingNeeded: startup.fundingNeeded,
+    activeProducts: startup.activeProducts ?? defaultPayload.activeProducts,
+    teamSize: startup.teamSize ?? defaultPayload.teamSize,
+    traction: {
+      ...defaultPayload.traction,
+      ...(startup.traction ?? {}),
+    },
+    businessProfile: {
+      ...defaultPayload.businessProfile,
+      ...(startup.businessProfile ?? {}),
+    },
+    registrationProfile: {
+      ...defaultPayload.registrationProfile,
+      ...(startup.registrationProfile ?? {}),
+    },
+  };
+};
+
 export function StartupLaunch() {
   const maxPitchDeckSizeBytes = 10 * 1024 * 1024;
   const maxIprUploadSizeBytes = STARTUP_IPR_UPLOAD_MAX_BYTES;
@@ -209,13 +267,16 @@ export function StartupLaunch() {
   );
   const [fieldErrors, setFieldErrors] = useState<FieldErrors>({});
   const [hasAttemptedSubmit, setHasAttemptedSubmit] = useState(false);
+  const [savedFormSnapshot, setSavedFormSnapshot] = useState(() =>
+    JSON.stringify(createEmptyPayload()),
+  );
+  const [pendingRedirectStartupId, setPendingRedirectStartupId] = useState<
+    string | null
+  >(null);
 
   /* ── dirty tracking & unsaved changes guard ── */
-  const savedFormSnapshot = useRef<string>(JSON.stringify(createEmptyPayload()));
-  const formIsDirty = useMemo(() => {
-    if (!savedFormSnapshot.current) return false;
-    return JSON.stringify(form) !== savedFormSnapshot.current;
-  }, [form]);
+  const formSnapshot = useMemo(() => JSON.stringify(form), [form]);
+  const formIsDirty = formSnapshot !== savedFormSnapshot;
 
   useEffect(() => {
     if (!formIsDirty) return;
@@ -268,34 +329,21 @@ export function StartupLaunch() {
       return;
     }
 
-    const defaultPayload = createEmptyPayload();
-
-    const loaded = {
-      ...defaultPayload,
-      projectId: startup.projectId,
-      name: startup.name ?? defaultPayload.name,
-      tagline: startup.tagline ?? defaultPayload.tagline,
-      category: startup.category ?? defaultPayload.category,
-      stage: startup.stage ?? defaultPayload.stage,
-      fundingNeeded: startup.fundingNeeded,
-      activeProducts: startup.activeProducts ?? defaultPayload.activeProducts,
-      teamSize: startup.teamSize ?? defaultPayload.teamSize,
-      traction: {
-        ...defaultPayload.traction,
-        ...(startup.traction ?? {}),
-      },
-      businessProfile: {
-        ...defaultPayload.businessProfile,
-        ...(startup.businessProfile ?? {}),
-      },
-      registrationProfile: {
-        ...defaultPayload.registrationProfile,
-        ...(startup.registrationProfile ?? {}),
-      },
-    };
+    const loaded = mapStartupToForm(startup);
     setForm(loaded);
-    savedFormSnapshot.current = JSON.stringify(loaded);
+    setSavedFormSnapshot(JSON.stringify(loaded));
   }, [startup]);
+
+  useEffect(() => {
+    if (!pendingRedirectStartupId || formIsDirty) {
+      return;
+    }
+
+    navigate(`/startup-launch/${pendingRedirectStartupId}/overview`, {
+      replace: true,
+    });
+    setPendingRedirectStartupId(null);
+  }, [formIsDirty, navigate, pendingRedirectStartupId]);
 
   const persistStartup = useMutation({
     mutationFn: async () => {
@@ -304,8 +352,7 @@ export function StartupLaunch() {
         setFieldErrors(errors);
         setHasAttemptedSubmit(true);
         const firstErrorField = Object.keys(errors)[0];
-        const el = document.getElementById(`startup-${firstErrorField}`) ?? document.querySelector(`[name="${firstErrorField}"]`);
-        el?.scrollIntoView({ behavior: "smooth", block: "center" });
+        scrollToStartupField(firstErrorField);
         throw new Error(Object.values(errors)[0]);
       }
       setFieldErrors({});
@@ -322,12 +369,17 @@ export function StartupLaunch() {
       return startupApi.create(payload);
     },
     onSuccess: async (saved) => {
+      const normalizedSavedStartup = mapStartupToForm(saved);
       queryClient.setQueryData(["startup", saved._id], saved);
-      savedFormSnapshot.current = JSON.stringify(form);
+      setForm(normalizedSavedStartup);
+      setSavedFormSnapshot(JSON.stringify(normalizedSavedStartup));
+      setFieldErrors({});
+      setHasAttemptedSubmit(false);
+      blocker.reset?.();
       setToast("Startup draft saved. Submit it for admin review when ready.");
       await queryClient.invalidateQueries({ queryKey: ["startup"] });
       if (isNew && saved._id) {
-        navigate(`/startup-launch/${saved._id}/overview`, { replace: true });
+        setPendingRedirectStartupId(saved._id);
       }
     },
     onError: (error) => {

@@ -2,6 +2,12 @@ import { useMemo } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { BarChart3, BriefcaseBusiness, GraduationCap, Rocket, Target, TrendingUp, Users } from 'lucide-react';
 import { Link } from 'react-router-dom';
+import { Bar, BarChart, CartesianGrid, XAxis, YAxis } from 'recharts';
+import {
+  ChartContainer,
+  ChartTooltip,
+  ChartTooltipContent,
+} from '../../app/components/ui/chart';
 import { Card } from '../../components/ui/Card';
 import { Spinner } from '../../components/ui/Spinner';
 import type { CollegeDashboardData } from '../../types/college.types';
@@ -60,6 +66,7 @@ export function InstitutionAnalyticsPage({
   const recent = dashboardData?.recentActivityCounts;
   const startups = startupsQuery.data ?? [];
   const mentorship = mentorshipQuery.data;
+  const scoreDistribution = dashboardData?.innovationScoreDistribution ?? [];
   const studentsPlaced = hasCollegePlacementStats(stats) ? stats.studentsPlaced ?? 0 : 0;
   const activeHrPartners = hasCollegePlacementStats(stats) ? stats.activeHRPartners ?? 0 : 0;
 
@@ -71,6 +78,24 @@ export function InstitutionAnalyticsPage({
         .sort((a, b) => new Date(b.updatedAt).getTime() - new Date(a.updatedAt).getTime())
         .slice(0, 6),
     [mentorship?.items],
+  );
+  const totalDistributionStudents = useMemo(
+    () => scoreDistribution.reduce((sum, bucket) => sum + bucket.count, 0),
+    [scoreDistribution],
+  );
+  const topDistributionBucket = useMemo(
+    () =>
+      scoreDistribution.reduce<(typeof scoreDistribution)[number] | null>(
+        (highest, bucket) => {
+          if (!highest || bucket.count > highest.count) {
+            return bucket;
+          }
+
+          return highest;
+        },
+        null,
+      ),
+    [scoreDistribution],
   );
 
   if (dashboardQuery.isLoading && startupsQuery.isLoading && mentorshipQuery.isLoading) {
@@ -125,6 +150,57 @@ export function InstitutionAnalyticsPage({
           <div className="mt-1 text-sm text-slate-400">{mentorship?.stats.assigned ?? 0} assigned programs</div>
         </Card>
       </section>
+
+      <DashboardSection
+        eyebrow="Innovation Score"
+        title="Innovation Score Distribution"
+        description="See how the full institution roster is distributed across score bands, not just the top-ranked students."
+        action={<Link to={`${basePath}/students`} className="text-sm font-semibold text-cyan-300 hover:text-cyan-200">Open student roster</Link>}
+      >
+        {totalDistributionStudents === 0 ? (
+          <DashboardEmpty message="No student scores are available yet." />
+        ) : (
+          <div className="grid gap-4 xl:grid-cols-[minmax(0,1.4fr),minmax(280px,0.6fr)]">
+            <Card className="p-5">
+              <ChartContainer
+                config={{
+                  count: {
+                    label: 'Students',
+                    color: '#22d3ee',
+                  },
+                }}
+                className="h-80 w-full"
+              >
+                <BarChart data={scoreDistribution} margin={{ top: 12, right: 12, left: 0, bottom: 0 }}>
+                  <CartesianGrid vertical={false} strokeDasharray="3 3" />
+                  <XAxis dataKey="label" tickLine={false} axisLine={false} />
+                  <YAxis allowDecimals={false} tickLine={false} axisLine={false} />
+                  <ChartTooltip
+                    cursor={false}
+                    content={<ChartTooltipContent formatter={(value) => <>{value} students</>} labelFormatter={(label) => `Score band ${label}`} />}
+                  />
+                  <Bar dataKey="count" radius={[12, 12, 0, 0]} fill="var(--color-count)" />
+                </BarChart>
+              </ChartContainer>
+            </Card>
+
+            <div className="grid gap-4">
+              <Card className="p-5">
+                <div className="text-xs uppercase tracking-[0.22em] text-slate-500">Scored Students</div>
+                <div className="mt-2 text-3xl font-semibold text-white">{totalDistributionStudents}</div>
+                <div className="mt-2 text-sm text-slate-400">Students currently included in institution-wide innovation scoring.</div>
+              </Card>
+              <Card className="p-5">
+                <div className="text-xs uppercase tracking-[0.22em] text-slate-500">Largest Band</div>
+                <div className="mt-2 text-3xl font-semibold text-white">{topDistributionBucket?.label ?? 'N/A'}</div>
+                <div className="mt-2 text-sm text-slate-400">
+                  {topDistributionBucket ? `${topDistributionBucket.count} students currently sit in this score range.` : 'Score distribution will appear once students start generating activity.'}
+                </div>
+              </Card>
+            </div>
+          </div>
+        )}
+      </DashboardSection>
 
       <DashboardSection
         eyebrow="Student Activity"

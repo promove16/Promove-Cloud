@@ -1,6 +1,7 @@
 import { useMemo, useState } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { Search } from 'lucide-react';
+import { Link } from 'react-router-dom';
 import { collegeApi } from '../../api/college.api';
 import { Button } from '../../components/ui/Button';
 import { Card } from '../../components/ui/Card';
@@ -83,10 +84,17 @@ export default function RecruiterDirectory() {
                 </div>
               </div>
               <div className="mt-5 flex gap-3">
-                <Button className="flex-1">View Open Positions</Button>
-                <Button variant="secondary" className="flex-1" title="Coming soon">
-                  Connect
-                </Button>
+                <Link to="/dashboard/college/placement" className="flex-1">
+                  <Button className="w-full">Open Placement Tracker</Button>
+                </Link>
+                <Link
+                  to="/dashboard/college/events?tab=hiring"
+                  className="flex-1"
+                >
+                  <Button variant="secondary" className="w-full">
+                    View Hiring Events
+                  </Button>
+                </Link>
               </div>
             </Card>
           ))

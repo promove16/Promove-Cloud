@@ -48,6 +48,7 @@ type InstitutionOverviewDashboardProps = {
   topInnovatorsAction?: OverviewAction;
   topInnovatorsEmptyMessage: string;
   eventsTitle: string;
+  eventsAction?: OverviewAction;
   eventsEmptyMessage: string;
   recentProjectsTitle: string;
   recentProjectsAction?: OverviewAction;
@@ -126,6 +127,7 @@ export function InstitutionOverviewDashboard({
   topInnovatorsAction,
   topInnovatorsEmptyMessage,
   eventsTitle,
+  eventsAction,
   eventsEmptyMessage,
   recentProjectsTitle,
   recentProjectsAction,
@@ -278,8 +280,15 @@ export function InstitutionOverviewDashboard({
         <div className="rounded-2xl border border-slate-800 bg-slate-900/85 p-6">
           <div className="mb-6 flex items-center justify-between gap-4">
             <h2 className="text-xl font-bold text-white">{eventsTitle}</h2>
-            <div className="rounded-xl bg-cyan-500/10 p-2">
-              <Calendar className="h-5 w-5 text-cyan-300" />
+            <div className="flex items-center gap-3">
+              {eventsAction ? (
+                <Link to={eventsAction.to} className="text-sm font-semibold text-cyan-300 transition hover:text-cyan-200">
+                  {eventsAction.label}
+                </Link>
+              ) : null}
+              <div className="rounded-xl bg-cyan-500/10 p-2">
+                <Calendar className="h-5 w-5 text-cyan-300" />
+              </div>
             </div>
           </div>
 

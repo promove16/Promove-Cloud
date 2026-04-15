@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useState } from 'react';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
-import { Activity, ArrowRight, BriefcaseBusiness, CalendarDays, GraduationCap, Users } from 'lucide-react';
+import { ArrowRight, BriefcaseBusiness, CalendarDays, GraduationCap, Sparkles, Users, Gavel } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 import { mentorApi, MentorDashboardActivity } from '../../api/mentor.api';
 import { getMentorSocket } from '../../lib/socket';
@@ -48,8 +48,9 @@ export default function MentorDashboard() {
       { label: 'Assigned Students', value: dashboardQuery.data?.activeStudentCount ?? 0, icon: Users },
       { label: 'Assigned Projects', value: dashboardQuery.data?.assignedProjectsCount ?? 0, icon: BriefcaseBusiness },
       { label: 'Programs', value: dashboardQuery.data?.assignedProgramsCount ?? 0, icon: GraduationCap },
-      { label: 'Sessions Today', value: dashboardQuery.data?.sessionsToday ?? 0, icon: CalendarDays },
-      { label: 'Pending Reviews', value: dashboardQuery.data?.pendingReviews ?? 0, icon: Activity },
+      { label: 'Upcoming Sessions', value: dashboardQuery.data?.upcomingSessions ?? dashboardQuery.data?.sessionsToday ?? 0, icon: CalendarDays },
+      { label: 'Pending Bids', value: dashboardQuery.data?.pendingBids ?? dashboardQuery.data?.pendingReviews ?? 0, icon: Gavel },
+      { label: 'Innovation Score', value: dashboardQuery.data?.innovationScore ?? 0, icon: Sparkles },
     ],
     [dashboardQuery.data],
   );
@@ -62,13 +63,19 @@ export default function MentorDashboard() {
           <h1 className="mt-2 text-3xl font-bold text-white">Welcome back, Mentor</h1>
           <p className="mt-2 text-slate-400">Admin-routed projects and institution programs appear here, alongside student activity and sessions.</p>
         </div>
-        <Button onClick={() => navigate('/dashboard/mentor/students')}>
-          Open Student Feed
-          <ArrowRight className="ml-2 h-4 w-4" />
-        </Button>
+        <div className="flex flex-wrap gap-3">
+          <Button variant="secondary" onClick={() => navigate('/dashboard/mentor/marketplace')}>
+            Browse Opportunities
+            <ArrowRight className="ml-2 h-4 w-4" />
+          </Button>
+          <Button onClick={() => navigate('/dashboard/mentor/students')}>
+            Open Student Feed
+            <ArrowRight className="ml-2 h-4 w-4" />
+          </Button>
+        </div>
       </div>
 
-      <div className="grid gap-4 md:grid-cols-5">
+      <div className="grid gap-4 md:grid-cols-3 xl:grid-cols-6">
         {stats.map((stat) => (
           <Card key={stat.label} className="p-5">
             <div className="mb-4 flex h-11 w-11 items-center justify-center rounded-2xl bg-cyan-500/10 text-cyan-300">
