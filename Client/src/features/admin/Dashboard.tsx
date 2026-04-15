@@ -22,14 +22,20 @@ function MetricCard({
   value,
   detail,
   icon: Icon,
+  href,
 }: {
   label: string;
   value: number;
   detail: string;
   icon: LucideIcon;
+  href?: string;
 }) {
-  return (
-    <Card className="border-slate-800/90 bg-slate-950/85 p-5">
+  const content = (
+    <Card
+      className={`border-slate-800/90 bg-slate-950/85 p-5 ${
+        href ? 'transition hover:border-cyan-500/40 hover:bg-slate-950' : ''
+      }`}
+    >
       <div className="flex items-start justify-between gap-4">
         <div>
           <div className="text-xs uppercase tracking-[0.24em] text-slate-500">{label}</div>
@@ -41,6 +47,16 @@ function MetricCard({
         </div>
       </div>
     </Card>
+  );
+
+  if (!href) {
+    return content;
+  }
+
+  return (
+    <Link to={href} className="block">
+      {content}
+    </Link>
   );
 }
 
@@ -57,38 +73,86 @@ export default function Dashboard() {
     queryFn: () => adminApi.getMentorshipPrograms(),
     staleTime: 60_000,
   });
+  const registrationRequestsQuery = useQuery({
+    queryKey: ['admin-registration-requests', 'pending', 'dashboard'],
+    queryFn: () => adminApi.getRegistrationRequests({ status: 'pending' }),
+    staleTime: 60_000,
+  });
+  const dealsQuery = useQuery({
+    queryKey: ['admin-deals', 'dashboard'],
+    queryFn: adminApi.getDeals,
+    staleTime: 60_000,
+  });
+  const helpDeskQuery = useQuery({
+    queryKey: ['admin-helpdesk', 'dashboard'],
+    queryFn: () => adminApi.getHelpDeskTickets({ status: 'all' }),
+    staleTime: 60_000,
+  });
+  const problemReviewsQuery = useQuery({
+    queryKey: ['admin-problem-review-requests', 'dashboard'],
+    queryFn: () => adminApi.getProblemReviewRequests({ status: 'review_requested' }),
+    staleTime: 60_000,
+  });
 
   const analytics = analyticsQuery.data;
   const mentorshipStats = mentorshipProgramsQuery.data?.stats;
+  const activeDeals = dealsQuery.data?.filter((deal) => deal.status === 'active') ?? [];
+  const pendingDealReviews = activeDeals.filter((deal) => deal.adminApprovalRequired && !deal.adminApprovedAt).length;
+  const openTickets = helpDeskQuery.data?.filter((ticket) => ticket.status !== 'completed').length ?? 0;
+  const dashboardIsRefreshing =
+    analyticsQuery.isLoading ||
+    mentorshipProgramsQuery.isLoading ||
+    registrationRequestsQuery.isLoading ||
+    dealsQuery.isLoading ||
+    helpDeskQuery.isLoading ||
+    problemReviewsQuery.isLoading;
 
   const metrics = useMemo(
     () => [
       {
-        label: 'Platform Users',
-        value: analytics?.totalUsers ?? 0,
-        detail: `${analytics?.activeThisWeek ?? 0} active this week`,
-        icon: Users,
+        label: 'Pending Requests',
+        value: registrationRequestsQuery.data?.total ?? 0,
+        detail: 'Institution and operator registrations awaiting approval',
+        icon: ShieldCheck,
+        href: '/dashboard/admin/users/requests',
       },
       {
-        label: 'Patents Pending',
-        value: analytics?.patentsPending ?? 0,
-        detail: 'Needs admin review',
-        icon: FileText,
-      },
-      {
-        label: 'Deals in Flow',
-        value: analytics?.totalDeals ?? 0,
-        detail: `${analytics?.dealConversionRate ?? 0}% completed to stage 4`,
+        label: 'Active Deals',
+        value: activeDeals.length,
+        detail: pendingDealReviews > 0 ? `${pendingDealReviews} awaiting admin approval` : 'No deals blocked on admin review',
         icon: BriefcaseBusiness,
+        href: '/dashboard/admin/deals/overview',
       },
       {
-        label: 'Mentorship Queue',
-        value: mentorshipStats?.pending ?? 0,
-        detail: `${mentorshipStats?.assigned ?? 0} assigned sessions`,
-        icon: GraduationCap,
+        label: 'Open Tickets',
+        value: openTickets,
+        detail: 'Unresolved help desk requests need a response',
+        icon: LifeBuoy,
+        href: '/dashboard/admin/help-desk',
+      },
+      {
+        label: 'Problem Reviews',
+        value: problemReviewsQuery.data?.length ?? 0,
+        detail: 'Submitted workspaces queued for moderation',
+        icon: Sparkles,
+        href: '/dashboard/admin/problems/reviews',
+      },
+      {
+        label: 'Patent Reviews',
+        value: analytics?.patentsPending ?? 0,
+        detail: 'Patent filings waiting for admin action',
+        icon: FileText,
+        href: '/dashboard/admin/patents',
       },
     ],
-    [analytics, mentorshipStats],
+    [
+      activeDeals.length,
+      analytics?.patentsPending,
+      openTickets,
+      pendingDealReviews,
+      problemReviewsQuery.data?.length,
+      registrationRequestsQuery.data?.total,
+    ],
   );
 
   const adminSections = useMemo(
@@ -122,7 +186,7 @@ export default function Dashboard() {
         path: '/dashboard/admin/deals/overview',
         eyebrow: 'Mediation desk',
         description: 'Track stock-transfer reviews, investor approvals, and ProMove royalty flow.',
-        meta: `${analytics?.totalDeals ?? 0} active deal records`,
+        meta: `${activeDeals.length} active deal records`,
         icon: BriefcaseBusiness,
       },
       {
@@ -150,7 +214,7 @@ export default function Dashboard() {
         icon: BarChart3,
       },
     ],
-    [analytics, mentorshipStats],
+    [activeDeals.length, analytics, mentorshipStats],
   );
 
   return (
@@ -163,8 +227,8 @@ export default function Dashboard() {
               <div className="text-[11px] uppercase tracking-[0.35em] text-cyan-300">Admin Console</div>
               <h1 className="mt-3 text-3xl font-semibold tracking-tight text-white">Platform control center</h1>
               <p className="mt-3 text-sm leading-6 text-slate-400">
-                The home screen stays focused on current platform health and where to go next. Deep analytics, review
-                queues, and mentorship operations now live in their own sections.
+                Keep the top of the dashboard focused on approvals, unresolved tickets, and live moderation queues.
+                Deeper analytics and workflow detail still live inside their dedicated admin sections.
               </p>
             </div>
             <div className="flex flex-wrap gap-3">
@@ -183,7 +247,7 @@ export default function Dashboard() {
             </div>
           </div>
 
-          <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
+          <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-5">
             {metrics.map((metric) => (
               <MetricCard
                 key={metric.label}
@@ -191,6 +255,7 @@ export default function Dashboard() {
                 value={metric.value}
                 detail={metric.detail}
                 icon={metric.icon}
+                href={metric.href}
               />
             ))}
           </div>
@@ -204,7 +269,7 @@ export default function Dashboard() {
             <h2 className="mt-2 text-2xl font-semibold text-white">Open the right workspace</h2>
           </div>
           <div className="text-sm text-slate-500">
-            {analyticsQuery.isLoading || mentorshipProgramsQuery.isLoading ? 'Refreshing dashboard data...' : 'Live data is up to date.'}
+            {dashboardIsRefreshing ? 'Refreshing dashboard data...' : 'Live data is up to date.'}
           </div>
         </div>
 

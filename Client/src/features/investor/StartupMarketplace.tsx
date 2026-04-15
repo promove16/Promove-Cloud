@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useState } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { isAxiosError } from 'axios';
+import { Bookmark, BookmarkCheck } from 'lucide-react';
 import { useLocation, useNavigate } from 'react-router-dom';
 import { Badge } from '../../components/ui/Badge';
 import { Button } from '../../components/ui/Button';
@@ -11,6 +12,7 @@ import { investorApi } from '../../api/investor.api';
 import { MAX_INNOVATION_SCORE } from '../../constants/score';
 import { StartupDetailDrawer } from './StartupDetailDrawer';
 
+const SAVED_STARTUPS_STORAGE_KEY = 'investor-saved-startups';
 const categories = ['Agriculture', 'Health', 'Education', 'Energy', 'Software', 'Other'];
 const stages = ['Pre-Idea', 'Ideation', 'MVP', 'Pre-Launch', 'Launched'];
 const scoreRangeMin = 0;
@@ -36,6 +38,8 @@ export default function StartupMarketplace() {
   const [acceptingSole, setAcceptingSole] = useState(true);
   const [selectedStartupId, setSelectedStartupId] = useState<string | null>(null);
   const [viewedStartupIds, setViewedStartupIds] = useState<Set<string>>(new Set());
+  const [savedStartupIds, setSavedStartupIds] = useState<Set<string>>(new Set());
+  const [showSavedOnly, setShowSavedOnly] = useState(false);
   const [feedback, setFeedback] = useState<{ type: 'success' | 'error'; message: string } | null>(null);
 
   const startupsQuery = useQuery({
@@ -84,9 +88,29 @@ export default function StartupMarketplace() {
   });
 
   useEffect(() => {
+    if (typeof window === 'undefined') {
+      return;
+    }
+
+    const raw = window.localStorage.getItem(SAVED_STARTUPS_STORAGE_KEY);
+    if (!raw) {
+      return;
+    }
+
+    try {
+      const parsed = JSON.parse(raw);
+      if (Array.isArray(parsed)) {
+        setSavedStartupIds(new Set(parsed.filter((value): value is string => typeof value === 'string')));
+      }
+    } catch {
+      window.localStorage.removeItem(SAVED_STARTUPS_STORAGE_KEY);
+    }
+  }, []);
+
+  useEffect(() => {
     const highlightedStartupId =
       typeof (location.state as { highlightStartupId?: unknown } | null)?.highlightStartupId === 'string'
-        ? ((location.state as { highlightStartupId: string }).highlightStartupId)
+        ? (location.state as { highlightStartupId: string }).highlightStartupId
         : null;
 
     if (!highlightedStartupId) {
@@ -101,13 +125,39 @@ export default function StartupMarketplace() {
 
   const startups = useMemo(
     () =>
-      (startupsQuery.data?.items ?? []).filter((startup) =>
-        `${startup.name} ${startup.category} ${startup.founder?.displayName ?? ''}`
+      (startupsQuery.data?.items ?? []).filter((startup) => {
+        const matchesSearch = `${startup.name} ${startup.category} ${startup.founder?.displayName ?? ''}`
           .toLowerCase()
-          .includes(search.toLowerCase()),
-      ),
-    [search, startupsQuery.data?.items],
+          .includes(search.toLowerCase());
+        const matchesSavedFilter = !showSavedOnly || savedStartupIds.has(startup._id);
+
+        return matchesSearch && matchesSavedFilter;
+      }),
+    [savedStartupIds, search, showSavedOnly, startupsQuery.data?.items],
   );
+
+  const savedCount = savedStartupIds.size;
+
+  const updateSavedStartupIds = (next: Set<string>) => {
+    setSavedStartupIds(next);
+
+    if (typeof window !== 'undefined') {
+      window.localStorage.setItem(SAVED_STARTUPS_STORAGE_KEY, JSON.stringify([...next]));
+    }
+  };
+
+  const toggleSavedStartup = (startupId: string) => {
+    setFeedback(null);
+    const next = new Set(savedStartupIds);
+
+    if (next.has(startupId)) {
+      next.delete(startupId);
+    } else {
+      next.add(startupId);
+    }
+
+    updateSavedStartupIds(next);
+  };
 
   const openStartup = (startupId: string) => {
     setFeedback(null);
@@ -121,19 +171,26 @@ export default function StartupMarketplace() {
         <div>
           <h1 className="text-3xl font-bold text-white">Startup Marketplace</h1>
           <p className="mt-2 text-slate-400">
-            Ready to invest? Browse startups, review founder scores, and express your interest.
+            Ready to invest? Browse startups, review founder scores, save promising teams, and express your interest.
           </p>
         </div>
-        <div className="w-full max-w-md">
+        <div className="flex w-full max-w-xl flex-col gap-3 sm:flex-row">
           <Input
             value={search}
             onChange={(event) => setSearch(event.target.value)}
             placeholder="Search startups or founders"
           />
+          <Button
+            variant={showSavedOnly ? 'primary' : 'secondary'}
+            onClick={() => setShowSavedOnly((current) => !current)}
+            className="shrink-0"
+          >
+            {showSavedOnly ? 'Showing Saved' : 'Saved Only'} ({savedCount})
+          </Button>
         </div>
       </div>
 
-      <div className="flex items-center gap-2 rounded-xl border border-slate-800 bg-slate-900/60 px-4 py-3 text-sm text-slate-400">
+      <div className="flex flex-wrap items-center gap-2 rounded-xl border border-slate-800 bg-slate-900/60 px-4 py-3 text-sm text-slate-400">
         <span className="font-medium text-cyan-300">Express Interest</span>
         <span className="text-slate-600">&rarr;</span>
         <span>Start Negotiating</span>
@@ -254,13 +311,15 @@ export default function StartupMarketplace() {
         </Card>
       ) : startups.length === 0 ? (
         <Card className="p-6 text-sm text-slate-400">
-          No startups match the current investor filters.
+          {showSavedOnly
+            ? 'No saved startups match the current filters.'
+            : 'No startups match the current investor filters.'}
         </Card>
       ) : (
         <div className="grid gap-4 xl:grid-cols-2">
           {startups.map((startup) => {
-            const canExpressInterest = viewedStartupIds.has(startup._id);
             const liveScore = startup.founder?.innovationScore ?? startup.innovationScoreAtLaunch;
+            const isSaved = savedStartupIds.has(startup._id);
 
             return (
               <Card key={startup._id} className="p-5">
@@ -281,6 +340,9 @@ export default function StartupMarketplace() {
                     <div className="rounded-full border border-emerald-500/30 bg-emerald-500/10 px-3 py-1 text-xs font-semibold text-emerald-300">
                       Live score {liveScore}/{MAX_INNOVATION_SCORE}
                     </div>
+                    {isSaved ? (
+                      <Badge className="border-amber-500/30 bg-amber-500/10 text-amber-300">Saved</Badge>
+                    ) : null}
                   </div>
                 </div>
 
@@ -305,11 +367,20 @@ export default function StartupMarketplace() {
                   <Button variant="secondary" onClick={() => openStartup(startup._id)}>
                     View Pitch
                   </Button>
-                  <Button
-                    onClick={() => openStartup(startup._id)}
-                  >
-                    Express Interest
+                  <Button variant="secondary" onClick={() => toggleSavedStartup(startup._id)}>
+                    {isSaved ? (
+                      <>
+                        <BookmarkCheck className="mr-2 h-4 w-4" />
+                        Saved
+                      </>
+                    ) : (
+                      <>
+                        <Bookmark className="mr-2 h-4 w-4" />
+                        Save
+                      </>
+                    )}
                   </Button>
+                  <Button onClick={() => openStartup(startup._id)}>Express Interest</Button>
                 </div>
               </Card>
             );

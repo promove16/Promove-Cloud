@@ -104,7 +104,7 @@ const WorkshopCard = ({
           </div>
         </div>
         <div className="flex shrink-0">
-          <Button onClick={() => deal.productWorkshop && onOpen(deal.productWorkshop.workspaceId)}>Open Product Workshop</Button>
+          <Button onClick={() => onOpen(deal.startupId)}>Open Product Workshop</Button>
         </div>
       </div>
     </Card>
@@ -267,8 +267,8 @@ const PortfolioCompanyCard = ({
         
         <Button 
           onClick={() => {
-            if (workshopDeal?.productWorkshop) {
-              onOpen(workshopDeal.productWorkshop.workspaceId);
+            if (workshopDeal) {
+              onOpen(workshopDeal.startupId);
             }
           }}
           disabled={!workshopDeal?.productWorkshop}
@@ -417,7 +417,7 @@ export default function ProductWorkshop() {
                 <WorkshopCard
                   key={deal._id}
                   deal={deal}
-                  onOpen={(workspaceId) => navigate(`/product-workspace/${workspaceId}`)}
+                  onOpen={(startupId) => navigate(`/dashboard/investor/product-workshop/${startupId}`)}
                 />
               ))
             )}
@@ -517,7 +517,7 @@ export default function ProductWorkshop() {
                     key={item._id}
                     item={item}
                     workshopDeal={portfolioWorkshopsByStartupId.get(item.startupId)}
-                    onOpen={(workspaceId) => navigate(`/product-workspace/${workspaceId}`)}
+                    onOpen={(startupId) => navigate(`/dashboard/investor/product-workshop/${startupId}`)}
                   />
                 ))}
               </div>
