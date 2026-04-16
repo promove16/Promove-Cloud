@@ -63,7 +63,7 @@ const patentRequestSchema = new Schema<IPatentRequest>(
     // Simple support request fields (optional for basic requests)
     projectTitle: { type: String, default: undefined },
     description: { type: String, default: undefined },
-    patentType: { type: String, default: undefined },
+    patentType: { type: String, enum: ['invention', 'design', 'trademark'], default: undefined },
 
     // Form 1 — Application for grant of patent
     inventionTitle: { type: String, default: undefined },
@@ -97,8 +97,8 @@ const patentRequestSchema = new Schema<IPatentRequest>(
     // Form 5 — Declaration of inventorship
     inventorDeclarationConfirmed: { type: Boolean, required: true },
 
-    // Form 26 — Power of attorney
-    powerOfAttorneyGranted: { type: Boolean, required: true },
+    // Form 26 — Power of attorney (conditional on agent/attorney usage)
+    powerOfAttorneyGranted: { type: Boolean, default: false },
     attorneyDetails: { type: String, default: undefined },
 
     // Form 28 — Startup / small entity / institution status
@@ -129,7 +129,8 @@ const patentRequestSchema = new Schema<IPatentRequest>(
     // Status & tracking
     status: {
       type: String,
-      enum: ['draft', 'submitted', 'under_review', 'in_progress', 'filed', 'completed', 'cancelled', 'documents_review', 'filing_in_progress', 'filed_with_ipo', 'examination_requested', 'granted', 'rejected'],
+      enum: ['draft', 'submitted', 'documents_review', 'ready_for_filing', 'filed_with_ipo', 'published', 'examination_requested', 'fer_issued', 'fer_response_submitted', 'granted', 'rejected', 'abandoned',
+        /* legacy compat */ 'under_review', 'in_progress', 'filed', 'completed', 'cancelled', 'filing_in_progress'],
       default: 'submitted',
     },
     submittedAt: { type: Date, default: undefined },
@@ -155,10 +156,40 @@ const patentRequestSchema = new Schema<IPatentRequest>(
     },
     nextActionRequired: { type: String, default: undefined },
     lastStatusUpdate: { type: Date, default: undefined },
+
+    // Deadlines
+    completeSpecDeadline: { type: Date, default: undefined },
+    examRequestDeadline: { type: Date, default: undefined },
+    ferResponseDeadline: { type: Date, default: undefined },
+
+    // Legal metadata
+    publicationDate: { type: Date, default: undefined },
+    grantDate: { type: Date, default: undefined },
+    controllerOffice: { type: String, default: undefined },
+    examRequestForm: { type: String, enum: ['18', '18A'], default: undefined },
+    expeditedGround: { type: String, default: undefined },
+    section39Check: { type: Boolean, default: false },
+
+    // Internal notes (admin-only)
+    internalNotes: {
+      type: [
+        new Schema(
+          {
+            text: { type: String, required: true },
+            createdAt: { type: Date, default: () => new Date() },
+            createdBy: { type: Schema.Types.ObjectId, required: true },
+          },
+          { _id: true },
+        ),
+      ],
+      default: [],
+    },
   },
   { timestamps: true },
 );
 
 patentRequestSchema.index({ studentId: 1, status: 1 });
+patentRequestSchema.index({ status: 1, adminAssignedTo: 1 });
+patentRequestSchema.index({ completeSpecDeadline: 1 });
 
 export const PatentRequest = model<IPatentRequest>('PatentRequest', patentRequestSchema);

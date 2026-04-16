@@ -178,6 +178,12 @@ export interface AdminPatentItem {
     note?: string;
     documentCategory?: string;
   }>;
+  patentStage?: 'filed' | 'published' | 'granted';
+  ipoApplicationNumber?: string;
+  ipoFilingDate?: string;
+  publicationDate?: string;
+  grantNumber?: string;
+  grantDate?: string;
 }
 
 export interface AdminAwardItem {

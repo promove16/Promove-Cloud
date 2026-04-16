@@ -1,5 +1,6 @@
 import http from 'http';
 import app from './app';
+import { initializeBullMqRedisTransport } from './config/bullmq';
 import { startActivityWorker } from './jobs/activityWorker';
 import { startNotificationWorker } from './jobs/notificationWorker';
 import { scheduleWeeklyProgressSummaryJob, startRetentionEmailWorker } from './jobs/retentionEmailWorker';
@@ -18,6 +19,7 @@ const startServer = async () => {
   initSocket(httpServer);
 
   if (env.NODE_ENV !== 'test') {
+    await initializeBullMqRedisTransport();
     startActivityWorker();
     startScoreWorker();
     startNotificationWorker();

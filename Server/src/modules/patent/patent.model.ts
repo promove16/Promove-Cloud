@@ -106,6 +106,18 @@ const patentSchema = new Schema<IPatent>(
       default: [],
     },
     nextActionRequired: { type: String, default: undefined },
+
+    // Patent Verification (already-filed patents)
+    patentStage: {
+      type: String,
+      enum: ['filed', 'published', 'granted'],
+      default: undefined,
+    },
+    ipoApplicationNumber: { type: String, default: undefined },
+    ipoFilingDate: { type: Date, default: undefined },
+    publicationDate: { type: Date, default: undefined },
+    grantNumber: { type: String, default: undefined },
+    grantDate: { type: Date, default: undefined },
   },
   { timestamps: true },
 );

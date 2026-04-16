@@ -73,6 +73,7 @@ export const useAuthStore = create<AuthState>()(
       storage: createJSONStorage(() => sessionStorage),
       partialize: (state) => ({
         user: state.user,
+        isAuthenticated: state.isAuthenticated,
       }),
       merge: (persistedState, currentState) => {
         const persisted = persistedState as Partial<AuthState> | undefined;
@@ -80,7 +81,7 @@ export const useAuthStore = create<AuthState>()(
           ...currentState,
           user: persisted?.user ? normalizeUser(persisted.user) : null,
           accessToken: null,
-          isAuthenticated: false,
+          isAuthenticated: persisted?.isAuthenticated ?? false,
           isLoading: true,
         };
       },

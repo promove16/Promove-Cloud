@@ -1,6 +1,6 @@
 import { useMemo, useState } from 'react';
 import { useNavigate, useParams, useSearchParams } from 'react-router-dom';
-import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
+import { useMutation, useQueries, useQuery, useQueryClient } from '@tanstack/react-query';
 import {
   ArrowLeft,
   BriefcaseBusiness,
@@ -22,8 +22,7 @@ import { Card } from '../../components/ui/Card';
 import { Input } from '../../components/ui/Input';
 import { Badge } from '../../components/ui/Badge';
 import { Spinner } from '../../components/ui/Spinner';
-import { APPLICATION_STAGE_BADGE } from '../../utils/applicationStages';
-import type { RecruiterJobApplicationStage, RecruiterJobApplicantView, RecruiterStudentApplicationView, RecruiterJobDetail } from '../../types/recruiter.types';
+import type { RecruiterJobApplicationStage, RecruiterJobApplicantView } from '../../types/recruiter.types';
 import { getStudentPortfolioViewPath } from '../../features/marketplace/navigation';
 
 const STAGE_CONFIG: Record<RecruiterJobApplicationStage, { label: string; color: string }> = {
@@ -107,17 +106,28 @@ export default function HiringSessionPage() {
     enabled: isRecruiterView,
   });
 
-  const pipelineQueries = useMemo(() => {
-    if (!isRecruiterView || !jobsQuery.data) return [];
-    return jobsQuery.data.map((job) => ({
-      jobId: job._id,
-      query: useQuery({
-        queryKey: ['recruiter', 'job-applications', job._id],
-        queryFn: () => recruiterApi.getJobApplications(job._id),
-        enabled: true,
-      }),
-    }));
-  }, [isRecruiterView, jobsQuery.data]);
+  const recruiterJobs = jobsQuery.data ?? [];
+  const pipelineQueryResults = useQueries({
+    queries: isRecruiterView
+      ? recruiterJobs.map((job) => ({
+          queryKey: ['recruiter', 'job-applications', job._id],
+          queryFn: () => recruiterApi.getJobApplications(job._id),
+          enabled: true,
+        }))
+      : [],
+  });
+  const pipelineQueries = useMemo(
+    () =>
+      recruiterJobs.map((job, index) => ({
+        jobId: job._id,
+        query: pipelineQueryResults[index],
+      })),
+    [pipelineQueryResults, recruiterJobs],
+  );
+  const isRecruiterPipelineLoading =
+    isRecruiterView &&
+    jobsQuery.isSuccess &&
+    pipelineQueryResults.some((query) => query.isLoading);
 
   const application = useMemo((): ApplicationData | null => {
     if (!applicationId) return null;
@@ -208,7 +218,7 @@ export default function HiringSessionPage() {
     );
   }
 
-  if (isRecruiterView && jobsQuery.isLoading) {
+  if (isRecruiterView && (jobsQuery.isLoading || isRecruiterPipelineLoading)) {
     return (
       <div className="flex min-h-[400px] items-center justify-center">
         <Spinner />

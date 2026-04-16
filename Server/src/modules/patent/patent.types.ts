@@ -58,6 +58,8 @@ export interface PatentSupportingDocument {
   documentCategory?: PatentDocumentCategory;
 }
 
+export type PatentStage = 'filed' | 'published' | 'granted';
+
 export interface IPatent {
   _id: Types.ObjectId;
   studentId: Types.ObjectId;
@@ -97,6 +99,15 @@ export interface IPatent {
     updatedBy?: Types.ObjectId;
   }>;
   nextActionRequired?: string;
+
+  // ── Patent Verification (already-filed patents) ────────────────────────────
+  patentStage?: PatentStage;
+  ipoApplicationNumber?: string;
+  ipoFilingDate?: Date;
+  publicationDate?: Date;
+  grantNumber?: string;
+  grantDate?: Date;
+
   createdAt: Date;
   updatedAt: Date;
 }
@@ -106,17 +117,26 @@ export interface IPatent {
 export type PatentRequestStatus =
   | 'draft'
   | 'submitted'
-  | 'under_review'
-  | 'in_progress'
-  | 'filed'
-  | 'completed'
-  | 'cancelled'
   | 'documents_review'
-  | 'filing_in_progress'
+  | 'ready_for_filing'
   | 'filed_with_ipo'
+  | 'published'
   | 'examination_requested'
+  | 'fer_issued'
+  | 'fer_response_submitted'
   | 'granted'
-  | 'rejected';
+  | 'rejected'
+  | 'abandoned';
+
+// Legacy status values that may exist in the database — mapped at read time
+export const LEGACY_STATUS_MAP: Record<string, PatentRequestStatus> = {
+  under_review: 'documents_review',
+  in_progress: 'documents_review',
+  filed: 'filed_with_ipo',
+  completed: 'granted',
+  cancelled: 'abandoned',
+  filing_in_progress: 'ready_for_filing',
+};
 
 export type PatentRequestExaminationType = 'normal' | 'expedited';
 
@@ -168,7 +188,7 @@ export interface IPatentRequest {
   // Simple support request fields (optional)
   projectTitle?: string;
   description?: string;
-  patentType?: 'invention' | 'design' | 'trademark' | 'utility';
+  patentType?: 'invention' | 'design' | 'trademark';
 
   // ── Form 1 — Application for grant of patent ──────────────────────────────
   inventionTitle: string;
@@ -232,6 +252,26 @@ export interface IPatentRequest {
   }>;
   nextActionRequired?: string;
   lastStatusUpdate?: Date;
+
+  // ── Deadlines ──────────────────────────────────────────────────────────────
+  completeSpecDeadline?: Date;
+  examRequestDeadline?: Date;
+  ferResponseDeadline?: Date;
+
+  // ── Legal metadata ─────────────────────────────────────────────────────────
+  publicationDate?: Date;
+  grantDate?: Date;
+  controllerOffice?: string;
+  examRequestForm?: '18' | '18A';
+  expeditedGround?: string;
+  section39Check?: boolean;
+
+  // ── Internal notes (admin-only) ────────────────────────────────────────────
+  internalNotes?: Array<{
+    text: string;
+    createdAt: Date;
+    createdBy: Types.ObjectId;
+  }>;
 
   createdAt: Date;
   updatedAt: Date;

@@ -51,6 +51,15 @@ import {
   reviewProblemSubmissionController,
   updateAdminProblemController,
 } from '../problemBank/problem.controller';
+import {
+  listPatentRequestsController,
+  getPatentRequestDetailController,
+  updateStatusController,
+  assignCaseController,
+  updateIpoDetailsController,
+  addNoteController,
+  addTimelineController,
+} from '../patent/patentRequestAdmin.controller';
 
 const router = Router();
 
@@ -79,6 +88,15 @@ router.patch('/project-mentorships/:workspaceId', asyncHandler(reviewProjectMent
 router.get('/patents', asyncHandler(getPatentsController));
 router.patch('/patents/:id/approve', asyncHandler(approvePatentController));
 router.patch('/patents/:id/reject', asyncHandler(rejectPatentController));
+
+// ── Patent Request (Assisted Filing) Management ──────────────────────────────
+router.get('/patent-requests', asyncHandler(listPatentRequestsController));
+router.get('/patent-requests/:id', asyncHandler(getPatentRequestDetailController));
+router.patch('/patent-requests/:id/status', asyncHandler(updateStatusController));
+router.patch('/patent-requests/:id/assign', asyncHandler(assignCaseController));
+router.patch('/patent-requests/:id/ipo-details', asyncHandler(updateIpoDetailsController));
+router.post('/patent-requests/:id/notes', asyncHandler(addNoteController));
+router.post('/patent-requests/:id/timeline', asyncHandler(addTimelineController));
 router.get('/awards', asyncHandler(getAwardsController));
 router.patch('/awards/:id/approve', asyncHandler(approveAwardController));
 router.patch('/awards/:id/reject', asyncHandler(rejectAwardController));

@@ -335,11 +335,21 @@ const STATUS_STYLES: Record<string, string> = {
   under_review: 'bg-cyan-500/10 text-cyan-300',
   submitted: 'bg-yellow-500/10 text-yellow-300',
   documents_review: 'bg-cyan-500/10 text-cyan-300',
+  ready_for_filing: 'bg-blue-500/10 text-blue-300',
   filing_in_progress: 'bg-blue-500/10 text-blue-300',
   filed_with_ipo: 'bg-indigo-500/10 text-indigo-300',
+  published: 'bg-violet-500/10 text-violet-300',
   examination_requested: 'bg-purple-500/10 text-purple-300',
-  granted: 'bg-green-500/10 text-green-300',
+  fer_issued: 'bg-orange-500/10 text-orange-300',
+  fer_response_submitted: 'bg-amber-500/10 text-amber-300',
+  granted: 'bg-emerald-500/10 text-emerald-300',
+  abandoned: 'bg-slate-600/40 text-slate-400',
   draft: 'bg-slate-700/60 text-slate-300',
+  // Legacy
+  in_progress: 'bg-cyan-500/10 text-cyan-300',
+  filed: 'bg-indigo-500/10 text-indigo-300',
+  completed: 'bg-green-500/10 text-green-300',
+  cancelled: 'bg-slate-600/40 text-slate-400',
 };
 
 const DOCUMENT_CATEGORY_LABELS: Record<string, string> = {
@@ -933,7 +943,7 @@ function AdminAssistPatentForm({
 }: SelfUploadPatentFormProps) {
   const queryClient = useQueryClient();
   const [requestDescription, setRequestDescription] = useState('');
-  const [patentType, setPatentType] = useState<'invention' | 'design' | 'trademark' | 'utility'>('invention');
+  const [patentType, setPatentType] = useState<'invention' | 'design' | 'trademark'>('invention');
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [submitSuccess, setSubmitSuccess] = useState(false);
   const [submitError, setSubmitError] = useState('');

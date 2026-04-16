@@ -130,6 +130,45 @@ export interface AdminPatentItem {
   };
   filingDocuments?: PatentFilingDocuments;
   supportingDocuments: PatentSupportingDocument[];
+  patentStage?: 'filed' | 'published' | 'granted';
+  ipoApplicationNumber?: string;
+  ipoFilingDate?: string;
+  publicationDate?: string;
+  grantNumber?: string;
+  grantDate?: string;
+}
+
+export interface AdminPatentRequestListItem {
+  _id: string;
+  studentId: string;
+  inventionTitle: string;
+  patentType?: string;
+  status: string;
+  specificationType?: string;
+  applicantEntityType?: string;
+  submittedAt?: string;
+  ipoApplicationNumber?: string;
+  ipoFilingDate?: string;
+  adminAssignedTo?: string;
+  completeSpecDeadline?: string;
+  examRequestDeadline?: string;
+  ferResponseDeadline?: string;
+  nextActionRequired?: string;
+  createdAt: string;
+  student: {
+    _id: string;
+    displayName: string;
+    email: string;
+    avatar?: string;
+    innovationScore: number;
+  };
+}
+
+export interface AdminPatentRequestListResponse {
+  items: AdminPatentRequestListItem[];
+  total: number;
+  page: number;
+  limit: number;
 }
 
 export interface AdminDealItem {
@@ -758,6 +797,59 @@ export const adminApi = {
   },
   async createMentorProfile(payload: CreateMentorProfileInput) {
     const response = await api.post<ApiSuccessResponse<CreatedMentorProfileResult>>('/api/admin/mentors', payload);
+    return response.data.data;
+  },
+
+  // ── Patent Request (Assisted Filing) Management ─────────────────────────────
+  async getPatentRequests(params?: { status?: string; assignedTo?: string; page?: number; limit?: number }) {
+    const response = await api.get<ApiSuccessResponse<AdminPatentRequestListResponse>>(
+      '/api/admin/patent-requests',
+      { params },
+    );
+    return response.data.data;
+  },
+  async getPatentRequestDetail(id: string) {
+    const response = await api.get<ApiSuccessResponse<Record<string, unknown>>>(
+      `/api/admin/patent-requests/${id}`,
+    );
+    return response.data.data;
+  },
+  async updatePatentRequestStatus(id: string, payload: { status: string; note?: string }) {
+    const response = await api.patch<ApiSuccessResponse<{ status: string }>>(
+      `/api/admin/patent-requests/${id}/status`,
+      payload,
+    );
+    return response.data.data;
+  },
+  async assignPatentRequest(id: string, assigneeId: string) {
+    const response = await api.patch<ApiSuccessResponse<{ assignedTo: string }>>(
+      `/api/admin/patent-requests/${id}/assign`,
+      { assigneeId },
+    );
+    return response.data.data;
+  },
+  async updatePatentRequestIpoDetails(
+    id: string,
+    payload: { applicationNumber: string; filingDate: string; priorityDate?: string; controllerOffice?: string },
+  ) {
+    const response = await api.patch<ApiSuccessResponse<{ applicationNumber: string }>>(
+      `/api/admin/patent-requests/${id}/ipo-details`,
+      payload,
+    );
+    return response.data.data;
+  },
+  async addPatentRequestNote(id: string, text: string) {
+    const response = await api.post<ApiSuccessResponse<{ added: true }>>(
+      `/api/admin/patent-requests/${id}/notes`,
+      { text },
+    );
+    return response.data.data;
+  },
+  async addPatentRequestTimeline(id: string, payload: { status: string; note?: string }) {
+    const response = await api.post<ApiSuccessResponse<{ added: true }>>(
+      `/api/admin/patent-requests/${id}/timeline`,
+      payload,
+    );
     return response.data.data;
   },
 };

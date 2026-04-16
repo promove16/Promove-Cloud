@@ -1,4 +1,4 @@
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, Link } from 'react-router-dom';
 import { useQuery } from '@tanstack/react-query';
 import {
   CheckCircle,
@@ -110,13 +110,13 @@ export function MyStartups() {
       <div className="space-y-6">
         <div className="flex flex-col gap-4 md:flex-row md:items-center md:justify-between">
           <h1 className="text-3xl font-bold text-white">Startup</h1>
-          <button
-            onClick={() => navigate(STARTUP_LAUNCH_NEW_PATH)}
+          <Link
+            to={STARTUP_LAUNCH_NEW_PATH}
             className="inline-flex items-center gap-2 rounded-xl bg-gradient-to-r from-blue-600 to-purple-600 px-6 py-3 font-semibold text-white transition hover:from-blue-500 hover:to-purple-500"
           >
             <Plus className="h-5 w-5" />
             New Startup
-          </button>
+          </Link>
         </div>
 
         {startupQuery.isLoading ? (
@@ -131,13 +131,13 @@ export function MyStartups() {
           <Card className="p-10 text-center">
             <Rocket className="mx-auto h-12 w-12 text-slate-600" />
             <h2 className="mt-4 text-xl font-bold text-white">No startups yet</h2>
-            <button
-              onClick={() => navigate(STARTUP_LAUNCH_NEW_PATH)}
+            <Link
+              to={STARTUP_LAUNCH_NEW_PATH}
               className="mt-6 inline-flex items-center gap-2 rounded-xl bg-gradient-to-r from-blue-600 to-purple-600 px-6 py-3 font-semibold text-white transition hover:from-blue-500 hover:to-purple-500"
             >
               <Plus className="h-5 w-5" />
               Create Startup
-            </button>
+            </Link>
           </Card>
         ) : (
           <div className="grid gap-4 lg:grid-cols-2">

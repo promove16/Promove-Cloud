@@ -80,6 +80,7 @@ const AdminUserManagement = lazy(() => import("../features/admin/UserManagement"
 const AdminUserRequests = lazy(() => import("../features/admin/UserRequests"));
 const AdminUserDirectory = lazy(() => import("../features/admin/UserDirectory"));
 const AdminPatents = lazy(() => import("../features/admin/Patents"));
+const AdminPatentRequests = lazy(() => import("../features/admin/PatentRequests"));
 const AdminStartups = lazy(() => import("../features/admin/Startups"));
 const AdminDeals = lazy(() => import("../features/admin/Deals"));
 const AdminDealsOverview = lazy(() => import("../features/admin/DealsOverview"));
@@ -785,6 +786,7 @@ export const router = createBrowserRouter([
                 ],
               },
               { path: "patents", element: <LazyPage component={AdminPatents} /> },
+              { path: "patent-requests", element: <LazyPage component={AdminPatentRequests} /> },
               { path: "startups", element: <LazyPage component={AdminStartups} /> },
               {
                 path: "deals",

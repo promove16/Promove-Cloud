@@ -4,12 +4,16 @@ import {
   Bell,
   ChevronDown,
   ChevronRight,
+  HeadphonesIcon,
+  LogOut,
   Menu,
+  Settings,
+  Trophy,
+  User,
   X,
   type LucideIcon,
 } from 'lucide-react';
 import { Button } from '../ui/Button';
-import { Badge } from '../ui/Badge';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { useAuthStore } from '../../store/authStore';
 import { UserRole } from '../../types/roles.types';
@@ -39,10 +43,24 @@ interface DashboardLayoutProps {
 
 type SidebarNotificationSection = 'applications' | 'events' | 'messages';
 type DashboardAccountMenuItem =
-  | Extract<DashboardNavItem, { kind: 'link' }>
-  | Extract<DashboardNavItem, { kind: 'action' }>;
+  | {
+      kind: 'link';
+      label: string;
+      icon: LucideIcon;
+      path: string;
+    }
+  | {
+      kind: 'action';
+      label: 'Logout';
+      icon: LucideIcon;
+      action: 'logout';
+    };
 
-const STUDENT_ACCOUNT_MENU_LABELS = new Set(['Portfolio', 'Settings', 'Help Desk']);
+const SHARED_ROUTE_LABELS = [
+  { path: '/dashboard/profile', label: 'Profile' },
+  { path: '/dashboard/settings', label: 'Settings' },
+  { path: '/dashboard/help-desk', label: 'Help Desk' },
+] as const;
 
 const SIDEBAR_PARENT_PATH_ALIASES: Partial<Record<UserRole, Record<string, string[]>>> = {
   [UserRole.SCHOOL]: {
@@ -90,9 +108,63 @@ const SIDEBAR_NOTIFICATION_PATHS: Record<SidebarNotificationSection, string[]> =
   messages: ['/dashboard/messages', '/dashboard/recruiter/messages'],
 };
 
-const isStudentAccountMenuItem = (item: DashboardNavItem) =>
-  (item.kind === 'link' && STUDENT_ACCOUNT_MENU_LABELS.has(item.label)) ||
-  (item.kind === 'action' && item.action === 'logout');
+const findNavLinkItem = (items: DashboardNavItem[], label: string) =>
+  items.find(
+    (item): item is Extract<DashboardNavItem, { kind: 'link' }> =>
+      item.kind === 'link' && item.label === label,
+  );
+
+const buildAccountMenuItems = (
+  items: DashboardNavItem[],
+  role?: UserRole,
+): DashboardAccountMenuItem[] => {
+  const primaryItem =
+    findNavLinkItem(items, 'Portfolio') ??
+    findNavLinkItem(items, 'Profile') ??
+    (role === UserRole.ADMIN
+      ? ({
+          kind: 'link',
+          label: 'Profile',
+          icon: User,
+          path: '/dashboard/profile',
+        } as const)
+      : ({
+          kind: 'link',
+          label: 'Portfolio',
+          icon: Trophy,
+          path: '/portfolio',
+        } as const));
+
+  const settingsItem =
+    findNavLinkItem(items, 'Settings') ??
+    ({
+      kind: 'link',
+      label: 'Settings',
+      icon: Settings,
+      path: '/dashboard/settings',
+    } as const);
+
+  const helpDeskItem =
+    findNavLinkItem(items, 'Help Desk') ??
+    ({
+      kind: 'link',
+      label: 'Help Desk',
+      icon: HeadphonesIcon,
+      path: '/dashboard/help-desk',
+    } as const);
+
+  return [
+    primaryItem,
+    settingsItem,
+    helpDeskItem,
+    {
+      kind: 'action',
+      label: 'Logout',
+      icon: LogOut,
+      action: 'logout',
+    },
+  ];
+};
 
 const splitPathSegments = (value: string) =>
   value
@@ -412,20 +484,29 @@ export function DashboardLayout({ children, role }: PropsWithChildren<DashboardL
 
   const resolvedRole = user?.role ?? role;
   const navItems = resolvedRole ? SIDEBAR_CONFIG[resolvedRole] : [];
-  const usesStudentAccountMenu = resolvedRole === UserRole.STUDENT;
+  const accountMenuItems = useMemo(
+    () => buildAccountMenuItems(navItems, resolvedRole),
+    [navItems, resolvedRole],
+  );
+  const accountMenuLabels = useMemo(
+    () =>
+      new Set(
+        accountMenuItems
+          .filter((item): item is Extract<DashboardAccountMenuItem, { kind: 'link' }> => item.kind === 'link')
+          .map((item) => item.label),
+      ),
+    [accountMenuItems],
+  );
   const sidebarNavItems = useMemo(
     () =>
-      usesStudentAccountMenu ? navItems.filter((item) => !isStudentAccountMenuItem(item)) : navItems,
-    [navItems, usesStudentAccountMenu],
-  );
-  const studentAccountMenuItems = useMemo(
-    () =>
-      usesStudentAccountMenu
-        ? navItems.filter(
-            (item): item is DashboardAccountMenuItem => isStudentAccountMenuItem(item),
-          )
-        : [],
-    [navItems, usesStudentAccountMenu],
+      navItems.filter((item) => {
+        if (item.kind === 'action') {
+          return item.action !== 'logout';
+        }
+
+        return true;
+      }),
+    [accountMenuLabels, navItems],
   );
   const normalizedPathname = location.pathname.replace(/\/+$/, '') || '/';
   const isMarketplaceRoute = normalizedPathname.includes('/marketplace');
@@ -528,6 +609,11 @@ export function DashboardLayout({ children, role }: PropsWithChildren<DashboardL
       return matchedRouteLabel.label;
     }
 
+    const matchedSharedRouteLabel = SHARED_ROUTE_LABELS.find((item) => isPathActive(item.path));
+    if (matchedSharedRouteLabel) {
+      return matchedSharedRouteLabel.label;
+    }
+
     return 'Dashboard';
   }, [location.pathname, navItems, exactMatchPaths, routeLabels]);
 
@@ -541,7 +627,6 @@ export function DashboardLayout({ children, role }: PropsWithChildren<DashboardL
     .join('')
     .slice(0, 2)
     .toUpperCase();
-
   const handleLogout = async () => {
     await logoutMutation.mutateAsync();
   };
@@ -679,11 +764,11 @@ export function DashboardLayout({ children, role }: PropsWithChildren<DashboardL
     );
   };
 
-  const renderStudentAccountMenu = ({
+  const renderAccountMenu = ({
     align = 'end' as 'start' | 'end',
     side = 'bottom' as 'top' | 'bottom',
   } = {}) => {
-    if (!usesStudentAccountMenu || studentAccountMenuItems.length === 0) {
+    if (accountMenuItems.length === 0) {
       return null;
     }
 
@@ -693,33 +778,35 @@ export function DashboardLayout({ children, role }: PropsWithChildren<DashboardL
           <button
             type="button"
             aria-label="Open account menu"
-            className="group flex items-center gap-3 px-1 py-1 text-left transition"
+            className="group flex items-center gap-3 rounded-2xl px-1 py-1 text-left transition hover:bg-white/5 data-[state=open]:bg-white/5"
           >
-            <div className="relative flex h-11 w-11 shrink-0 items-center justify-center bg-gradient-to-br from-cyan-400 via-teal-400 to-emerald-500 text-sm font-bold text-slate-950">
+            <div className="relative flex h-12 w-12 shrink-0 items-center justify-center rounded-[0.3rem] bg-gradient-to-br from-[#3fe0d0] via-[#34d399] to-[#22c55e] text-base font-black tracking-tight text-[#02131e]">
               {initials}
-              <span className="absolute -bottom-0.5 -right-0.5 h-3.5 w-3.5 border-2 border-slate-950 bg-emerald-400" />
+              <span className="absolute -bottom-0.5 -right-0.5 h-3.5 w-3.5 rounded-[2px] border-2 border-[#020817] bg-[#22c55e]" />
             </div>
             <div className="min-w-0">
-              <div className="dashboard-theme-faint text-[10px] uppercase tracking-[0.28em]">
+              <div className="text-[10px] uppercase tracking-[0.32em] text-slate-500">
                 Account
               </div>
-              <div className="dashboard-theme-text truncate text-sm font-semibold">
+              <div className="truncate text-base font-semibold text-slate-50">
                 {user.displayName}
               </div>
               <div className="mt-1 flex items-center">
-                <Badge>{user.role}</Badge>
+                <span className="inline-flex items-center rounded-full border border-[#2e4e77] bg-[#13284a] px-3 py-1 text-[10px] font-semibold uppercase tracking-[0.22em] text-[#93c5fd]">
+                  {user.role}
+                </span>
               </div>
             </div>
-            <ChevronDown className="dashboard-theme-faint h-4 w-4 shrink-0 transition group-data-[state=open]:rotate-180 group-hover:text-cyan-300" />
+            <ChevronDown className="h-4 w-4 shrink-0 text-slate-500 transition group-data-[state=open]:rotate-180 group-hover:text-cyan-300" />
           </button>
         </DropdownMenuTrigger>
         <DropdownMenuContent
           align={align}
           side={side}
           sideOffset={12}
-          className="dashboard-theme-border dashboard-theme-popover w-[17rem] border bg-slate-950/96 p-1.5"
+          className="w-[18.5rem] rounded-2xl border border-white/10 bg-[#020817] p-2 text-slate-50 shadow-[0_28px_52px_rgba(2,6,23,0.58)]"
         >
-          {studentAccountMenuItems.map((item) =>
+          {accountMenuItems.map((item) =>
             item.kind === 'link' ? (
               <DropdownMenuItem
                 key={item.label}
@@ -728,27 +815,31 @@ export function DashboardLayout({ children, role }: PropsWithChildren<DashboardL
                   navigate(item.path);
                   setSidebarOpen(false);
                 }}
-                className={`dashboard-theme-text dashboard-theme-hover px-3 py-2.5 focus:bg-cyan-500/10 ${
-                  isPathActive(item.path, shouldMatchExactly(item.path)) ? 'bg-cyan-500/10 text-cyan-100' : ''
+                className={`group flex min-h-12 items-center gap-3 rounded-xl px-3 py-3 text-sm text-slate-50 focus:bg-white/5 focus:text-slate-50 ${
+                  isPathActive(item.path, shouldMatchExactly(item.path))
+                    ? 'bg-white/5 text-cyan-100 ring-1 ring-cyan-400/20'
+                    : ''
                 }`}
               >
-                <item.icon className="h-4 w-4" />
+                <item.icon className="h-4 w-4 text-slate-200" />
                 <div className="flex min-w-0 flex-1 items-center justify-between gap-3">
                   <span className="truncate font-medium">{item.label}</span>
-                  <ChevronRight className="h-4 w-4 opacity-60" />
+                  <ChevronRight className="h-4 w-4 text-slate-500 transition group-hover:text-slate-300" />
                 </div>
               </DropdownMenuItem>
             ) : (
               <DropdownMenuItem
                 key={item.label}
-                variant="destructive"
                 onSelect={() => {
                   void handleLogout();
                 }}
-                className="px-3 py-2.5"
+                className="group flex min-h-12 items-center gap-3 rounded-xl px-3 py-3 text-sm text-slate-50 focus:bg-rose-500/10 focus:text-slate-50"
               >
-                <item.icon className="h-4 w-4" />
-                <span className="font-medium">{item.label}</span>
+                <item.icon className="h-4 w-4 text-slate-200" />
+                <div className="flex min-w-0 flex-1 items-center justify-between gap-3">
+                  <span className="truncate font-medium">{item.label}</span>
+                  <ChevronRight className="h-4 w-4 text-slate-500 transition group-hover:text-slate-300" />
+                </div>
               </DropdownMenuItem>
             ),
           )}
@@ -779,13 +870,6 @@ export function DashboardLayout({ children, role }: PropsWithChildren<DashboardL
 
           <div className="min-h-0 flex-1 overflow-y-auto pr-1">
             <div className="space-y-2">{sidebarNavItems.map(renderItem)}</div>
-
-            {!usesStudentAccountMenu ? (
-              <div className="dashboard-theme-border dashboard-theme-surface mt-8 rounded-3xl border p-5">
-                <div className="text-xs uppercase tracking-[0.3em] text-cyan-700 dark:text-cyan-300">Active Role</div>
-                <div className="dashboard-theme-text mt-3 text-xl font-semibold capitalize">{user.role}</div>
-              </div>
-            ) : null}
           </div>
         </aside>
 
@@ -806,22 +890,7 @@ export function DashboardLayout({ children, role }: PropsWithChildren<DashboardL
                 <div className="flex items-center gap-3">
                   <GlobalWorkspaceInviteDialog />
                   <NotificationBell notifications={notifications} unreadCount={unreadNotificationsCount} />
-                  {usesStudentAccountMenu ? (
-                    renderStudentAccountMenu()
-                  ) : (
-                    <NavLink
-                      to="/portfolio"
-                      className="dashboard-theme-border dashboard-theme-surface dashboard-theme-hover flex items-center gap-3 rounded-2xl border px-4 py-2 transition hover:border-cyan-500/40"
-                    >
-                      <div className="flex h-11 w-11 items-center justify-center rounded-full bg-gradient-to-br from-cyan-500 to-emerald-500 text-sm font-bold text-slate-50">
-                        {initials}
-                      </div>
-                      <div>
-                        <div className="dashboard-theme-text text-sm font-semibold">{user.displayName}</div>
-                        <Badge>{user.role}</Badge>
-                      </div>
-                    </NavLink>
-                  )}
+                  {renderAccountMenu()}
                 </div>
               </div>
             </header>

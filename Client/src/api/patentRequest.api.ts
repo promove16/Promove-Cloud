@@ -45,7 +45,7 @@ export interface PatentRequestCreatePayload {
   workspaceId: string;
   projectTitle: string;
   description: string;
-  patentType: 'invention' | 'design' | 'trademark' | 'utility';
+  patentType: 'invention' | 'design' | 'trademark';
 }
 
 export const patentRequestApi = {

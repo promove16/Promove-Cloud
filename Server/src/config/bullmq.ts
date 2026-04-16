@@ -1,4 +1,5 @@
 import { Job, JobsOptions, Queue, Worker, WorkerOptions } from 'bullmq';
+import IORedis from 'ioredis';
 import { env } from './env';
 import { logError, logger } from './logger';
 import { ApiRequestActivityPayload } from '../modules/analytics/activity.types';
@@ -18,6 +19,7 @@ const baseConnection = {
   lazyConnect: true,
   enableOfflineQueue: false,
   connectTimeout: env.BULLMQ_CONNECT_TIMEOUT_MS,
+  retryStrategy: () => null,
 };
 
 const connection = {
@@ -142,6 +144,22 @@ const closeRemoteBullMqResources = () => {
   });
 };
 
+const registerRemoteQueue = (queueName: string) => {
+  const queue = new Queue(queueName, { connection });
+
+  remoteQueues.add(queue);
+  queue.on('error', (error) => {
+    if (shouldDisableRemoteBullMq(error)) {
+      disableRemoteBullMq(error);
+      return;
+    }
+
+    logError(`BullMQ queue "${queueName}" connection error`, error);
+  });
+
+  return queue;
+};
+
 export const disableRemoteBullMq = (error: unknown) => {
   if (remoteBullMqDisabledReason) {
     return;
@@ -157,6 +175,31 @@ export const disableRemoteBullMq = (error: unknown) => {
 };
 
 export const shouldDisableBullMqRedis = (error: unknown) => shouldDisableRemoteBullMq(error);
+
+export const initializeBullMqRedisTransport = async () => {
+  if (env.NODE_ENV === 'test' || !isRemoteBullMqActive()) {
+    return isRemoteBullMqActive();
+  }
+
+  const probe = new IORedis({
+    ...connection,
+    connectionName: 'bullmq:startup-probe',
+  });
+
+  try {
+    await probe.connect();
+    return true;
+  } catch (error) {
+    if (!shouldDisableRemoteBullMq(error)) {
+      logError('BullMQ Redis startup probe failed', error);
+    }
+
+    disableRemoteBullMq(error);
+    return false;
+  } finally {
+    probe.disconnect();
+  }
+};
 
 const getBackoffDelay = (opts?: JobsOptions, attempt = 1) => {
   const backoff = opts?.backoff;
@@ -263,31 +306,31 @@ const createSafeQueue = <T>(queueName: string): QueueLike<T> => {
   if (env.NODE_ENV === 'test') {
     return createMockQueue<T>();
   }
+  let queue: Queue | null = null;
 
-  const queue = isRemoteBullMqActive() ? new Queue(queueName, { connection }) : null;
+  const getRemoteQueue = () => {
+    if (!isRemoteBullMqActive()) {
+      return null;
+    }
 
-  if (queue) {
-    remoteQueues.add(queue);
-    queue.on('error', (error) => {
-      if (shouldDisableRemoteBullMq(error)) {
-        disableRemoteBullMq(error);
-        return;
-      }
+    if (!queue) {
+      queue = registerRemoteQueue(queueName);
+    }
 
-      logError(`BullMQ queue "${queueName}" connection error`, error);
-    });
-  }
+    return queue;
+  };
 
   return {
     add: async (jobName: string, data: T, opts?: JobsOptions) => {
       const normalizedOpts = withDefaultJobOptions(opts);
+      const remoteQueue = getRemoteQueue();
 
-      if (!queue || !isRemoteBullMqActive()) {
+      if (!remoteQueue || !isRemoteBullMqActive()) {
         return addLocalJob(queueName, jobName, data, normalizedOpts);
       }
 
       try {
-        return await queue.add(jobName, data, normalizedOpts);
+        return await remoteQueue.add(jobName, data, normalizedOpts);
       } catch (error) {
         if (shouldDisableRemoteBullMq(error)) {
           disableRemoteBullMq(error);

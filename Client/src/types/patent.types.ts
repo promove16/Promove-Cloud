@@ -75,6 +75,8 @@ export interface PatentSupportingDocument {
   documentCategory?: PatentDocumentCategory;
 }
 
+export type PatentStage = 'filed' | 'published' | 'granted';
+
 export interface PatentSubmission {
   _id: string;
   studentId: string;
@@ -91,6 +93,12 @@ export interface PatentSubmission {
   adminNotes?: string;
   scoreAwarded: boolean;
   showcasedInMarketplace: boolean;
+  patentStage?: PatentStage;
+  ipoApplicationNumber?: string;
+  ipoFilingDate?: string;
+  publicationDate?: string;
+  grantNumber?: string;
+  grantDate?: string;
   createdAt: string;
   updatedAt: string;
 }
@@ -102,6 +110,8 @@ export interface ShowcasedPatent {
   inventionCategory?: string;
   specificationType?: string;
   abstract?: string;
+  patentStage?: PatentStage;
+  ipoApplicationNumber?: string;
   submittedAt: string;
   adminReviewedAt?: string;
   student: {

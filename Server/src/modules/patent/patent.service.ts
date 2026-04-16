@@ -94,6 +94,14 @@ export const patentSubmissionSchema = z.object({
     ipProtectionType: z.string().trim().min(1),
   }),
   filingDocuments: filingDocumentsSchema.optional(),
+
+  // Patent Verification — for already-filed patents
+  patentStage: z.enum(['filed', 'published', 'granted']).optional(),
+  ipoApplicationNumber: z.string().trim().max(50).optional(),
+  ipoFilingDate: z.string().datetime().optional(),
+  publicationDate: z.string().datetime().optional(),
+  grantNumber: z.string().trim().max(50).optional(),
+  grantDate: z.string().datetime().optional(),
 });
 
 export const submitPatent = async (userId: string, payload: z.infer<typeof patentSubmissionSchema>) => {
@@ -150,6 +158,12 @@ export const submitPatent = async (userId: string, payload: z.infer<typeof paten
     supportingDocuments,
     status: 'submitted',
     submittedAt: new Date(),
+    ...(payload.patentStage ? { patentStage: payload.patentStage } : {}),
+    ...(payload.ipoApplicationNumber ? { ipoApplicationNumber: payload.ipoApplicationNumber } : {}),
+    ...(payload.ipoFilingDate ? { ipoFilingDate: new Date(payload.ipoFilingDate) } : {}),
+    ...(payload.publicationDate ? { publicationDate: new Date(payload.publicationDate) } : {}),
+    ...(payload.grantNumber ? { grantNumber: payload.grantNumber } : {}),
+    ...(payload.grantDate ? { grantDate: new Date(payload.grantDate) } : {}),
   });
 
   await applyScoreAsync({
@@ -217,6 +231,8 @@ export const getShowcasedPatents = async () => {
       inventionCategory: p.filingDocuments?.inventionCategory,
       specificationType: p.filingDocuments?.specificationType,
       abstract: p.filingDocuments?.abstractDraft,
+      patentStage: p.patentStage,
+      ipoApplicationNumber: p.ipoApplicationNumber,
       submittedAt: p.submittedAt,
       adminReviewedAt: p.adminReviewedAt,
       student: {

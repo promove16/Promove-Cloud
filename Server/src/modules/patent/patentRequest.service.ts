@@ -71,8 +71,8 @@ export const patentRequestSubmissionSchema = z
     // Form 5 — Inventorship declaration
     inventorDeclarationConfirmed: z.literal(true),
 
-    // Form 26 — Power of attorney
-    powerOfAttorneyGranted: z.literal(true),
+    // Form 26 — Power of attorney (conditional on agent/attorney usage)
+    powerOfAttorneyGranted: z.boolean().default(false),
     attorneyDetails: z.string().trim().max(1000).optional(),
 
     // Form 28 — Fee reduction
@@ -113,6 +113,20 @@ export const patentRequestSubmissionSchema = z
         code: z.ZodIssueCode.custom,
         path: ['feeReductionEntityType'],
         message: 'Select entity type to claim fee reduction.',
+      });
+    }
+    if (val.claimingFeeReduction && val.feeReductionEntityType === 'startup' && !val.dpiitRecognitionNumber?.trim()) {
+      ctx.addIssue({
+        code: z.ZodIssueCode.custom,
+        path: ['dpiitRecognitionNumber'],
+        message: 'DPIIT recognition number is required for startup fee reduction claims.',
+      });
+    }
+    if (val.powerOfAttorneyGranted && !val.attorneyDetails?.trim()) {
+      ctx.addIssue({
+        code: z.ZodIssueCode.custom,
+        path: ['attorneyDetails'],
+        message: 'Provide attorney or agent details when granting power of attorney.',
       });
     }
   });
@@ -185,6 +199,9 @@ export const submitPatentRequest = async (userId: string, payload: z.infer<typeo
     documents,
     status: 'submitted',
     submittedAt: new Date(),
+    ...(payload.specificationType === 'provisional'
+      ? { completeSpecDeadline: new Date(Date.now() + 365 * 24 * 60 * 60 * 1000) }
+      : {}),
   });
 
   await notificationQueue.add('patent-request-submitted', {
@@ -228,7 +245,7 @@ export const patentSupportRequestSchema = z.object({
   workspaceId: z.string().min(1),
   projectTitle: z.string().trim().min(3).max(200),
   description: z.string().trim().min(20).max(5000),
-  patentType: z.enum(['invention', 'design', 'trademark', 'utility']),
+  patentType: z.enum(['invention', 'design', 'trademark']),
 });
 
 export const createPatentSupportRequest = async (
@@ -246,28 +263,9 @@ export const createPatentSupportRequest = async (
     projectTitle: payload.projectTitle,
     description: payload.description,
     patentType: payload.patentType,
-    status: 'submitted',
-    inventors: [],
-    applicantDetails: {
-      fullName: '',
-      address: '',
-      entityType: 'individual',
-    },
-    specificationType: 'provisional',
-    technicalField: '',
-    backgroundArt: '',
     inventionDescription: payload.description,
-    abstractText: '',
-    claimsText: '',
-    bestMode: '',
-    hasFiledAbroad: false,
-    inventorDeclarationConfirmed: false,
-    powerOfAttorneyGranted: false,
-    claimingFeeReduction: false,
-    priorArtSearchSummary: '',
-    noveltyStatement: '',
-    proposedExaminationType: 'normal',
-    publicDisclosureStatus: false,
+    status: 'submitted',
+    submittedAt: new Date(),
     documents: [],
   });
 

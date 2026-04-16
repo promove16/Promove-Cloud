@@ -95,7 +95,11 @@ type AuditAction =
   | 'MENTORSHIP_PROGRAM_CREATED'
   | 'MENTORSHIP_REQUEST_ASSIGNED'
   | 'MENTORSHIP_REQUEST_REJECTED'
-  | 'HELPDESK_TICKET_RESOLVED';
+  | 'HELPDESK_TICKET_RESOLVED'
+  | 'PATENT_REQUEST_STATUS_UPDATED'
+  | 'PATENT_REQUEST_ASSIGNED'
+  | 'PATENT_REQUEST_IPO_DETAILS_UPDATED'
+  | 'PATENT_REQUEST_NOTE_ADDED';
 
 const NON_STUDENT_REGISTRATION_ROLES = new Set<UserRole>([
   UserRole.SCHOOL,
@@ -1207,6 +1211,12 @@ export const listPatents = async (status?: string): Promise<AdminPatentItem[]> =
       questionnaire: patent.questionnaire,
       filingDocuments: patent.filingDocuments,
       supportingDocuments: patent.supportingDocuments ?? [],
+      ...(patent.patentStage ? { patentStage: patent.patentStage } : {}),
+      ...(patent.ipoApplicationNumber ? { ipoApplicationNumber: patent.ipoApplicationNumber } : {}),
+      ...(patent.ipoFilingDate ? { ipoFilingDate: toIso(patent.ipoFilingDate) } : {}),
+      ...(patent.publicationDate ? { publicationDate: toIso(patent.publicationDate) } : {}),
+      ...(patent.grantNumber ? { grantNumber: patent.grantNumber } : {}),
+      ...(patent.grantDate ? { grantDate: toIso(patent.grantDate) } : {}),
     };
   });
 };

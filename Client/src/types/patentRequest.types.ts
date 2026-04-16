@@ -1,23 +1,29 @@
 export type PatentRequestStatus =
   | 'draft'
   | 'submitted'
+  | 'documents_review'
+  | 'ready_for_filing'
+  | 'filed_with_ipo'
+  | 'published'
+  | 'examination_requested'
+  | 'fer_issued'
+  | 'fer_response_submitted'
+  | 'granted'
+  | 'rejected'
+  | 'abandoned'
+  // Legacy values (may exist in database)
   | 'under_review'
   | 'in_progress'
   | 'filed'
   | 'completed'
   | 'cancelled'
-  | 'documents_review'
-  | 'filing_in_progress'
-  | 'filed_with_ipo'
-  | 'examination_requested'
-  | 'granted'
-  | 'rejected';
+  | 'filing_in_progress';
 
 export type PatentRequestExaminationType = 'normal' | 'expedited';
 
 export type PatentApplicantEntityType = 'individual' | 'startup' | 'institution' | 'small_entity';
 
-export type PatentSupportRequestPatentType = 'invention' | 'design' | 'trademark' | 'utility';
+export type PatentSupportRequestPatentType = 'invention' | 'design' | 'trademark';
 
 export interface PatentSupportRequest {
   _id: string;
@@ -115,6 +121,20 @@ export interface PatentRequestSubmission {
   adminAssignedTo?: string;
   adminNotes?: string;
   scoreAwarded?: boolean;
+
+  // Deadlines
+  completeSpecDeadline?: string;
+  examRequestDeadline?: string;
+  ferResponseDeadline?: string;
+
+  // Legal metadata
+  publicationDate?: string;
+  grantDate?: string;
+  controllerOffice?: string;
+  examRequestForm?: '18' | '18A';
+  expeditedGround?: string;
+  section39Check?: boolean;
+
   createdAt: string;
   updatedAt: string;
 }
