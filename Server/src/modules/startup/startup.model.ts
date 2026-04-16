@@ -98,6 +98,53 @@ const startupSchema = new Schema<IStartup>(
         default: 'patent',
       },
     },
+    initializationProfile: {
+      vision: { type: String, trim: true, default: '' },
+      mission: { type: String, trim: true, default: '' },
+      foundingStory: { type: String, trim: true, default: '' },
+      teamComposition: { type: String, trim: true, default: '' },
+      productStage: {
+        type: String,
+        enum: ['idea', 'prototype', 'mvp', 'market_ready'],
+        default: 'idea',
+      },
+      productOverview: { type: String, trim: true, default: '' },
+      customerProfile: { type: String, trim: true, default: '' },
+      marketOpportunity: { type: String, trim: true, default: '' },
+      businessModel: {
+        type: String,
+        enum: [
+          'subscription',
+          'transactional',
+          'marketplace',
+          'freemium',
+          'advertising',
+          'services',
+          'hardware',
+          'hybrid',
+        ],
+        default: 'subscription',
+      },
+      pricingStrategy: { type: String, trim: true, default: '' },
+      competitiveLandscape: { type: String, trim: true, default: '' },
+      defensibleMoat: { type: String, trim: true, default: '' },
+      currentTraction: { type: String, trim: true, default: '' },
+      upcomingMilestones: { type: String, trim: true, default: '' },
+      fundingAsk: { type: String, trim: true, default: '' },
+      legalEntityType: {
+        type: String,
+        enum: [
+          'not_registered',
+          'sole_proprietorship',
+          'partnership',
+          'llp',
+          'private_limited',
+          'opc',
+        ],
+        default: 'not_registered',
+      },
+      risksAndMitigation: { type: String, trim: true, default: '' },
+    },
     documents: {
       type: [
         new Schema(

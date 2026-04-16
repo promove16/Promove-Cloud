@@ -11,6 +11,7 @@ import {
   getPublicStudentProfileBySlug,
   getStudentPortfolioForViewer,
   getCurrentUserMentorSessions,
+  getCurrentUserInstitutionMentorshipPrograms,
   importCurrentUserGithubRepositories,
   importGithubRepositoriesSchema,
   launchCurrentUserToRecruiters,
@@ -161,6 +162,15 @@ export const getMySessions = async (req: Request, res: Response) => {
 
   const sessions = await getCurrentUserMentorSessions(req.user._id);
   res.status(200).json(new ApiResponse(sessions));
+};
+
+export const getMyInstitutionMentorshipPrograms = async (req: Request, res: Response) => {
+  if (!req.user) {
+    throw new ApiError(401, 'UNAUTHORIZED', 'Invalid or expired token');
+  }
+
+  const programs = await getCurrentUserInstitutionMentorshipPrograms(req.user._id);
+  res.status(200).json(new ApiResponse(programs));
 };
 
 export const launchToRecruiters = async (req: Request, res: Response) => {

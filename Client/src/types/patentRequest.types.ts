@@ -1,6 +1,11 @@
 export type PatentRequestStatus =
   | 'draft'
   | 'submitted'
+  | 'under_review'
+  | 'in_progress'
+  | 'filed'
+  | 'completed'
+  | 'cancelled'
   | 'documents_review'
   | 'filing_in_progress'
   | 'filed_with_ipo'
@@ -11,6 +16,20 @@ export type PatentRequestStatus =
 export type PatentRequestExaminationType = 'normal' | 'expedited';
 
 export type PatentApplicantEntityType = 'individual' | 'startup' | 'institution' | 'small_entity';
+
+export type PatentSupportRequestPatentType = 'invention' | 'design' | 'trademark' | 'utility';
+
+export interface PatentSupportRequest {
+  _id: string;
+  studentId: string;
+  workspaceId?: string;
+  projectTitle?: string;
+  description?: string;
+  patentType?: PatentSupportRequestPatentType;
+  status: PatentRequestStatus;
+  createdAt: string;
+  updatedAt: string;
+}
 
 export interface PatentRequestInventor {
   fullName: string;
@@ -54,33 +73,40 @@ export interface PatentRequestSubmission {
   _id: string;
   studentId: string;
   workspaceId?: string;
-  inventionTitle: string;
-  inventionCategory: string;
-  applicantDetails: PatentRequestApplicant;
-  inventors: PatentRequestInventor[];
-  specificationType: 'provisional' | 'complete';
-  technicalField: string;
-  backgroundArt: string;
-  inventionDescription: string;
-  abstractText: string;
-  claimsText: string;
+  
+  // Simple support request fields (optional)
+  projectTitle?: string;
+  description?: string;
+  patentType?: PatentSupportRequestPatentType;
+  
+  // Full patent request fields
+  inventionTitle?: string;
+  inventionCategory?: string;
+  applicantDetails?: PatentRequestApplicant;
+  inventors?: PatentRequestInventor[];
+  specificationType?: 'provisional' | 'complete';
+  technicalField?: string;
+  backgroundArt?: string;
+  inventionDescription?: string;
+  abstractText?: string;
+  claimsText?: string;
   drawingsDescription?: string;
-  bestMode: string;
-  hasFiledAbroad: boolean;
+  bestMode?: string;
+  hasFiledAbroad?: boolean;
   foreignFilingCountries?: string;
   foreignApplicationNumbers?: string;
-  inventorDeclarationConfirmed: boolean;
-  powerOfAttorneyGranted: boolean;
+  inventorDeclarationConfirmed?: boolean;
+  powerOfAttorneyGranted?: boolean;
   attorneyDetails?: string;
-  claimingFeeReduction: boolean;
+  claimingFeeReduction?: boolean;
   feeReductionEntityType?: PatentApplicantEntityType;
   dpiitRecognitionNumber?: string;
-  priorArtSearchSummary: string;
+  priorArtSearchSummary?: string;
   priorArtReferences?: string;
-  noveltyStatement: string;
-  proposedExaminationType: PatentRequestExaminationType;
-  publicDisclosureStatus: boolean;
-  documents: PatentRequestDocument[];
+  noveltyStatement?: string;
+  proposedExaminationType?: PatentRequestExaminationType;
+  publicDisclosureStatus?: boolean;
+  documents?: PatentRequestDocument[];
   status: PatentRequestStatus;
   submittedAt?: string;
   ipoApplicationNumber?: string;
@@ -88,7 +114,7 @@ export interface PatentRequestSubmission {
   ipoPriorityDate?: string;
   adminAssignedTo?: string;
   adminNotes?: string;
-  scoreAwarded: boolean;
+  scoreAwarded?: boolean;
   createdAt: string;
   updatedAt: string;
 }

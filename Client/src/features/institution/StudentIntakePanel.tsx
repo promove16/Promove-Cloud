@@ -17,6 +17,28 @@ const sourceLabel: Record<StudentRosterEntry['source'], string> = {
   xlsx: 'Excel Import',
 };
 
+const rosterStatusLabel: Record<StudentRosterEntry['status'], string> = {
+  invited: 'Invite sent',
+  registered_pending: 'Registered, awaiting review',
+  verified: 'Verified',
+  rejected: 'Rejected',
+};
+
+const rosterStatusExplanation = (entry: StudentRosterEntry) => {
+  switch (entry.status) {
+    case 'invited':
+      return 'The roster entry exists, but the student has not completed registration yet.';
+    case 'registered_pending':
+      return 'The student has registered against this roster entry and still needs the institution workflow to finish.';
+    case 'verified':
+      return 'Institution review is complete and the student is active on the managed roster.';
+    case 'rejected':
+      return 'The institution rejected this linked registration.';
+    default:
+      return '';
+  }
+};
+
 type Tab = 'add' | 'import' | 'credentials' | 'roster';
 
 type StudentIntakePanelProps = {
@@ -222,7 +244,7 @@ export function StudentIntakePanel({
             </span>
             <span>
               <span className="font-semibold text-amber-300">{summary.registeredPending}</span>
-              <span className="ml-1.5 text-slate-500">pending</span>
+              <span className="ml-1.5 text-slate-500">awaiting review</span>
             </span>
             <span>
               <span className="font-semibold text-emerald-300">{summary.verified}</span>
@@ -234,6 +256,9 @@ export function StudentIntakePanel({
           <UserPlus className="mr-2 h-4 w-4" />
           Manage Students
         </Button>
+      </div>
+      <div className="rounded-xl border border-slate-800 bg-slate-950/40 px-5 py-3 text-sm text-slate-400">
+        The roster tracks invite and registration progress. Use the approval queue above for explicit approve or reject actions when they are required.
       </div>
 
       {/* Sidebar drawer */}
@@ -466,7 +491,7 @@ export function StudentIntakePanel({
 
                   {!bulkCredentialResult && !withCredentials ? (
                     <div className="rounded-lg border border-slate-800 bg-slate-950/70 px-4 py-3 text-xs text-slate-400">
-                      Roster imports send email invites automatically. Students who register with the same email go straight to verified access.
+                      Roster imports send email invites automatically. Students who register with the same email move into the institution onboarding flow and should be tracked here until verification is complete.
                     </div>
                   ) : null}
 
@@ -533,7 +558,7 @@ export function StudentIntakePanel({
                     <div className="grid grid-cols-3 gap-3">
                       {[
                         { label: 'Invited', value: summary.invited, color: 'text-cyan-300' },
-                        { label: 'Pending', value: summary.registeredPending, color: 'text-amber-300' },
+                        { label: 'Awaiting Review', value: summary.registeredPending, color: 'text-amber-300' },
                         { label: 'Verified', value: summary.verified, color: 'text-emerald-300' },
                       ].map((s) => (
                         <div key={s.label} className="rounded-lg border border-slate-800 bg-slate-900/70 p-3 text-center">
@@ -650,7 +675,7 @@ export function StudentIntakePanel({
                               <div className="mt-0.5 truncate text-xs text-slate-400">{entry.email}</div>
                               <div className="mt-2 flex flex-wrap gap-1.5">
                                 <span className={`rounded-full border px-2 py-0.5 text-xs ${rosterTone[entry.status]}`}>
-                                  {entry.status.replace(/_/g, ' ')}
+                                  {rosterStatusLabel[entry.status]}
                                 </span>
                                 <span className="rounded-full border border-slate-700 bg-slate-800 px-2 py-0.5 text-xs text-slate-400">
                                   {sourceLabel[entry.source]}
@@ -664,7 +689,13 @@ export function StudentIntakePanel({
                             </div>
                             <div className="shrink-0 text-right text-xs text-slate-500">
                               <div>{new Date(entry.createdAt).toLocaleDateString('en-IN')}</div>
-                              <div className="mt-0.5">{entry.linkedUserId ? 'Matched' : 'Pending'}</div>
+                              <div className="mt-0.5">{entry.linkedUserId ? 'Linked account' : 'No account yet'}</div>
+                              {entry.registeredAt ? (
+                                <div className="mt-0.5">Registered {new Date(entry.registeredAt).toLocaleDateString('en-IN')}</div>
+                              ) : null}
+                              {entry.reviewedAt ? (
+                                <div className="mt-0.5">Reviewed {new Date(entry.reviewedAt).toLocaleDateString('en-IN')}</div>
+                              ) : null}
                               {onCancelInvite && entry.status === 'invited' && !entry.linkedUserId ? (
                                 <button
                                   type="button"
@@ -680,6 +711,9 @@ export function StudentIntakePanel({
                           {entry.notes && (
                             <div className="mt-2 text-xs text-slate-500">{entry.notes}</div>
                           )}
+                          <div className="mt-2 text-xs text-slate-400">
+                            {rosterStatusExplanation(entry)}
+                          </div>
                         </div>
                       ))}
                     </div>

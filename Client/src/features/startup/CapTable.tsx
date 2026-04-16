@@ -55,9 +55,6 @@ export default function StartupCapTable() {
     return (
       <Card className="max-w-3xl p-8">
         <h1 className="text-3xl font-bold text-white">Cap Table</h1>
-        <p className="mt-3 text-slate-400">
-          Create your startup first to begin tracking investors and shares.
-        </p>
       </Card>
     );
   }
@@ -67,10 +64,6 @@ export default function StartupCapTable() {
       <div className="space-y-6">
         <div>
           <h1 className="text-3xl font-bold text-white">Cap Table</h1>
-          <p className="mt-2 max-w-3xl text-slate-400">
-            Cap table records are founder-managed because they define ownership,
-            investor rights, and share allocation for the company.
-          </p>
         </div>
         <Card className="max-w-3xl border border-amber-500/20 bg-amber-500/5 p-6">
           <div className="text-xs font-semibold uppercase tracking-[0.25em] text-amber-200">
@@ -79,11 +72,6 @@ export default function StartupCapTable() {
           <h2 className="mt-3 text-xl font-bold text-white">
             Ask a founder to manage this startup's cap table.
           </h2>
-          <p className="mt-3 text-sm leading-6 text-amber-100/90">
-            You can stay involved in the startup workspace, but equity
-            allocation and investor ownership records should be handled by the
-            startup creator or current founders.
-          </p>
         </Card>
       </div>
     );
@@ -96,10 +84,6 @@ export default function StartupCapTable() {
     <div className="space-y-6">
       <div>
         <h1 className="text-3xl font-bold text-white">Cap Table</h1>
-        <p className="mt-2 text-slate-400">
-          Founder-managed record for sole investors, penny investors, retained
-          equity, and share allocation.
-        </p>
       </div>
 
       {capTable ? (
@@ -141,13 +125,8 @@ export default function StartupCapTable() {
 
           <Card className="p-5">
             <div className="flex items-center justify-between gap-3">
-              <div>
-                <div className="text-sm font-semibold uppercase tracking-[0.2em] text-slate-400">
-                  Sole Investor
-                </div>
-                <div className="mt-1 text-sm text-slate-500">
-                  Primary owner or lead investor allocation.
-                </div>
+              <div className="text-sm font-semibold uppercase tracking-[0.2em] text-slate-400">
+                Sole Investor
               </div>
               {capTable.soleInvestor ? (
                 <Badge className="border-amber-500/30 bg-amber-500/10 text-amber-300">
@@ -199,14 +178,8 @@ export default function StartupCapTable() {
 
           <Card className="p-5">
             <div className="flex items-center justify-between gap-3">
-              <div>
-                <div className="text-sm font-semibold uppercase tracking-[0.2em] text-slate-400">
-                  Penny Investors
-                </div>
-                <div className="mt-1 text-sm text-slate-500">
-                  Crowd-style investors with minority authority and capped
-                  equity.
-                </div>
+              <div className="text-sm font-semibold uppercase tracking-[0.2em] text-slate-400">
+                Penny Investors
               </div>
               <Badge className="border-cyan-500/30 bg-cyan-500/10 text-cyan-300">
                 {pennyRows.length} investors

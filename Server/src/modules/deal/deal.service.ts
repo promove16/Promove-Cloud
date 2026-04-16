@@ -117,6 +117,7 @@ type LeanStartup = {
     mvpBuilt: boolean;
     revenueGenerating: boolean;
   };
+  adminReviewedAt?: Date;
 };
 
 type LeanProductWorkshop = {
@@ -1212,6 +1213,19 @@ export const advanceDealStage = async (
     deal.adminApprovalRequired = false;
     deal.mediationStatus = deal.mediationStatus ?? 'approved';
 
+    const needsStockDetailsRebuild =
+      !deal.stockDetails
+      || !deal.stockDetails.sharePriceInr
+      || !deal.stockDetails.transferValueInr
+      || !deal.stockDetails.totalSharesConsidered;
+    if (needsStockDetailsRebuild && deal.sharesAllocated > 0 && deal.amountINR > 0) {
+      const metadata = buildDealFinancialMetadata(deal.toObject() as DealDocumentLike);
+      deal.stockDetails = metadata.stockDetails;
+      if (!deal.royalty?.promoveAmountINR) {
+        deal.royalty = metadata.royalty;
+      }
+    }
+
     await deal.save({ session });
 
     return {
@@ -1412,6 +1426,9 @@ export const listInvestorStartups = async (
         totalShares: startup.totalShares,
         availableShares: startup.availableShares,
       },
+      ...(startup.adminReviewedAt
+        ? { adminApprovedAt: startup.adminReviewedAt.toISOString() }
+        : {}),
       ...(founder
         ? {
             founder: {
@@ -1638,11 +1655,13 @@ const getStartupAccess = async (startupId: string, userId: string, role: UserRol
     role === UserRole.ADMIN ||
     startup.founderIds.some((founderId) => String(founderId) === userId) ||
     (startup.soleInvestorId ? String(startup.soleInvestorId) === userId : false);
-  const ownInvestment = await Deal.findOne({
-    startupId,
-    investorId: userId,
-    ...buildOfficialDealQuery(),
-  }).lean<DealDocumentLike | null>();
+  const ownInvestment = Types.ObjectId.isValid(userId)
+    ? await Deal.findOne({
+        startupId,
+        investorId: userId,
+        ...buildOfficialDealQuery(),
+      }).lean<DealDocumentLike | null>()
+    : null;
 
   return { startup, hasFullAccess, ownInvestment };
 };

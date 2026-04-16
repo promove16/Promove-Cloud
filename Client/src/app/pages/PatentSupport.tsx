@@ -1,19 +1,17 @@
 import { useRef, useState, useMemo, useEffect } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
-import { useNavigate, useParams } from 'react-router-dom';
+import { useParams } from 'react-router-dom';
 import {
-  AlertCircle,
-  Award,
   CheckCircle,
   Clock,
   Eye,
   EyeOff,
   FileText,
   Files,
+  Handshake,
   ImageIcon,
   Loader2,
   Send,
-  ShieldCheck,
   Upload,
   X,
 } from 'lucide-react';
@@ -21,7 +19,7 @@ import { patentApi } from '../../api/patent.api';
 import { patentRequestApi } from '../../api/patentRequest.api';
 import { startupApi } from '../../api/startup.api';
 import { workspaceApi } from '../../api/workspace.api';
-import { getStartupSectionPath, normalizeStartupRouteId } from '../../features/startup/navigation';
+import { normalizeStartupRouteId } from '../../features/startup/navigation';
 import type {
   PatentDocumentCategory,
   PatentFilingDocuments,
@@ -649,7 +647,7 @@ function StartupPatentRequestOverview({
         </div>
         {latestRequest ? (
           <div className="mt-2 text-sm text-slate-400">
-            {formatKey(latestRequest.inventionCategory)} / {latestRequest.specificationType}
+            {formatKey(latestRequest.inventionCategory ?? '')} / {latestRequest.specificationType ?? ''}
           </div>
         ) : null}
       </div>
@@ -722,12 +720,413 @@ function StartupPatentRequestOverview({
   );
 }
 
+// ─── Self-Upload Patent Form ─────────────────────────────────────────────────
+
+interface SelfUploadPatentFormProps {
+  startupId?: string;
+  activeWorkspace?: { _id: string; title: string } | null;
+  isStartupScoped: boolean;
+  workspaceId: string;
+  setWorkspaceId: (id: string) => void;
+  projectTitle: string;
+  setProjectTitle: (title: string) => void;
+  patentEligibleWorkspaces: Array<{ _id: string; title: string; claimedProblemId?: string }>;
+  submitted: boolean;
+  setSubmitted: (submitted: boolean) => void;
+  setPatentOption: (option: 'self-upload' | 'admin-assist' | null) => void;
+}
+
+function SelfUploadPatentForm({
+  startupId,
+  activeWorkspace,
+  isStartupScoped,
+  workspaceId,
+  setWorkspaceId,
+  projectTitle,
+  setProjectTitle,
+  patentEligibleWorkspaces,
+  submitted,
+  setSubmitted,
+  setPatentOption,
+}: SelfUploadPatentFormProps) {
+  const queryClient = useQueryClient();
+  const [patentFile, setPatentFile] = useState<File | null>(null);
+  const [uploadPreview, setUploadPreview] = useState<{ name: string; size: number } | null>(null);
+  const [isUploading, setIsUploading] = useState(false);
+  const [uploadError, setUploadError] = useState('');
+  const [submitSuccess, setSubmitSuccess] = useState(false);
+
+  const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (file) {
+      if (file.size > 10 * 1024 * 1024) {
+        setUploadError('File must be 10MB or less');
+        return;
+      }
+      setPatentFile(file);
+      setUploadPreview({ name: file.name, size: file.size });
+      setUploadError('');
+    }
+  };
+
+  const clearFile = () => {
+    setPatentFile(null);
+    setUploadPreview(null);
+  };
+
+  const submitMutation = useMutation({
+    mutationFn: async () => {
+      if (!patentFile) throw new Error('No file selected');
+      if (!projectTitle.trim()) throw new Error('Project title is required');
+
+      const formData = new FormData();
+      formData.append('file', patentFile);
+      formData.append('projectTitle', projectTitle);
+      if (activeWorkspace?._id) {
+        formData.append('workspaceId', activeWorkspace._id);
+      }
+
+      return patentApi.submit({
+        projectTitle: projectTitle,
+        workspaceId: activeWorkspace?._id || '',
+        documentUploads: [],
+        questionnaire: {
+          problemStatement: '',
+          solutionDifferentiation: '',
+          coreInnovation: '',
+          priorArtStatus: '',
+          workingMechanism: '',
+          keyComponents: '',
+          developmentStage: '',
+          documentationReadiness: '',
+          inventorOwnership: '',
+          developmentContext: '',
+          targetMarkets: '',
+          commercializationStrategy: '',
+          publicDisclosureStatus: '',
+          legalAgreements: '',
+          ipProtectionType: '',
+        },
+      });
+    },
+    onSuccess: async () => {
+      setSubmitSuccess(true);
+      setPatentFile(null);
+      setUploadPreview(null);
+      await queryClient.invalidateQueries({ queryKey: ['patents', 'mine'] });
+    },
+    onError: (err) => {
+      type ApiErr = { response?: { data?: { error?: { message?: string } } } };
+      setUploadError((err as ApiErr)?.response?.data?.error?.message ?? 'Upload failed');
+    },
+  });
+
+  if (submitSuccess) {
+    return (
+      <div className="rounded-2xl border border-slate-800 bg-slate-900/60 p-8 text-center">
+        <div className="mx-auto mb-4 flex h-16 w-16 items-center justify-center rounded-full bg-green-500/10">
+          <CheckCircle className="h-8 w-8 text-green-500" />
+        </div>
+        <h2 className="mb-3 text-xl font-semibold text-white">Patent Document Submitted</h2>
+        <p className="mx-auto max-w-2xl text-sm leading-6 text-slate-300">
+          Your patent document has been uploaded and submitted for admin review. You can track the status in the patent overview below.
+        </p>
+        <button
+          type="button"
+          onClick={() => setSubmitSuccess(false)}
+          className="mt-6 text-sm text-cyan-300 hover:underline"
+        >
+          Upload another patent
+        </button>
+      </div>
+    );
+  }
+
+  return (
+    <div className="space-y-6">
+      <div className="rounded-2xl border border-cyan-500/20 bg-cyan-500/5 p-5">
+        <div className="flex items-start gap-4">
+          <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-lg bg-cyan-500/20">
+            <Upload className="h-5 w-5 text-cyan-400" />
+          </div>
+          <div>
+            <h3 className="text-lg font-semibold text-white">Upload Your Existing Patent</h3>
+            <p className="mt-1 text-sm text-slate-400">
+              If you already have a patent filed or granted, upload the documents here for admin verification and records.
+            </p>
+          </div>
+        </div>
+      </div>
+
+      <div className="grid gap-4 md:grid-cols-2">
+        <div>
+          <label className="mb-2 block text-sm font-semibold text-white">Project Title</label>
+          <input
+            value={projectTitle || activeWorkspace?.title || ''}
+            onChange={(e) => setProjectTitle(e.target.value)}
+            className={fieldCls}
+            placeholder="Patent name or title"
+          />
+        </div>
+        <div>
+          <label className="mb-2 block text-sm font-semibold text-white">Workspace</label>
+          <div className={fieldCls}>
+            {isStartupScoped ? activeWorkspace?.title ?? 'Linked startup workspace' : 
+              patentEligibleWorkspaces.find(w => w._id === workspaceId)?.title ?? 'Select workspace'}
+          </div>
+        </div>
+      </div>
+
+      <div>
+        <label className="mb-2 block text-sm font-semibold text-white">Patent Document (PDF)</label>
+        {uploadPreview ? (
+          <div className="flex items-center justify-between rounded-xl border border-cyan-500/30 bg-cyan-500/5 p-4">
+            <div className="flex items-center gap-3">
+              <FileText className="h-8 w-8 text-cyan-400" />
+              <div>
+                <div className="text-sm font-medium text-white">{uploadPreview.name}</div>
+                <div className="text-xs text-slate-400">{formatFileSize(uploadPreview.size)}</div>
+              </div>
+            </div>
+            <button type="button" onClick={clearFile} className="text-slate-400 hover:text-white">
+              <X className="h-5 w-5" />
+            </button>
+          </div>
+        ) : (
+          <label className="flex cursor-pointer flex-col items-center justify-center rounded-xl border border-dashed border-slate-700 p-8 transition hover:border-cyan-500/50">
+            <Upload className="mb-3 h-8 w-8 text-slate-500" />
+            <div className="text-sm text-slate-400">Click to upload PDF (max 10MB)</div>
+            <input type="file" accept=".pdf" className="hidden" onChange={handleFileChange} />
+          </label>
+        )}
+        {uploadError && <p className="mt-2 text-sm text-red-400">{uploadError}</p>}
+      </div>
+
+      {uploadError && <p className="text-sm text-red-400">{uploadError}</p>}
+
+      <button
+        type="button"
+        onClick={() => submitMutation.mutate()}
+        disabled={!patentFile || !projectTitle.trim() || submitMutation.isPending}
+        className="bg-cyan-500 px-6 py-3 text-sm font-semibold text-slate-950 transition hover:bg-cyan-400 disabled:cursor-not-allowed disabled:opacity-50"
+      >
+        {submitMutation.isPending ? 'Submitting...' : 'Submit for Review'}
+      </button>
+    </div>
+  );
+}
+
+// ─── Admin-Assist Patent Form ───────────────────────────────────────────────
+
+function AdminAssistPatentForm({
+  startupId,
+  activeWorkspace,
+  isStartupScoped,
+  workspaceId,
+  setWorkspaceId,
+  projectTitle,
+  setProjectTitle,
+  patentEligibleWorkspaces,
+  submitted,
+  setSubmitted,
+  setPatentOption,
+}: SelfUploadPatentFormProps) {
+  const queryClient = useQueryClient();
+  const [requestDescription, setRequestDescription] = useState('');
+  const [patentType, setPatentType] = useState<'invention' | 'design' | 'trademark' | 'utility'>('invention');
+  const [isSubmitting, setIsSubmitting] = useState(false);
+  const [submitSuccess, setSubmitSuccess] = useState(false);
+  const [submitError, setSubmitError] = useState('');
+
+  const patentRequestsQuery = useQuery({
+    queryKey: ['patent-requests', 'mine'],
+    queryFn: () => patentRequestApi.mine(),
+    enabled: isStartupScoped,
+  });
+
+  const submitMutation = useMutation({
+    mutationFn: async () => {
+      if (!projectTitle.trim()) throw new Error('Project title is required');
+      if (!requestDescription.trim()) throw new Error('Description is required');
+
+      return patentRequestApi.create({
+        workspaceId: activeWorkspace?._id || workspaceId || '',
+        projectTitle: projectTitle,
+        description: requestDescription,
+        patentType,
+      });
+    },
+    onSuccess: async () => {
+      setSubmitSuccess(true);
+      setProjectTitle('');
+      setRequestDescription('');
+      await queryClient.invalidateQueries({ queryKey: ['patent-requests', 'mine'] });
+    },
+    onError: (err) => {
+      type ApiErr = { response?: { data?: { error?: { message?: string } } } };
+      setSubmitError((err as ApiErr)?.response?.data?.error?.message ?? 'Request failed');
+    },
+  });
+
+  const visibleRequests = patentRequestsQuery.data ?? [];
+  const activeRequest = visibleRequests.find(r => r.status !== 'completed' && r.status !== 'cancelled');
+
+  if (submitSuccess && !activeRequest) {
+    return (
+      <div className="rounded-2xl border border-slate-800 bg-slate-900/60 p-8 text-center">
+        <div className="mx-auto mb-4 flex h-16 w-16 items-center justify-center rounded-full bg-green-500/10">
+          <CheckCircle className="h-8 w-8 text-green-500" />
+        </div>
+        <h2 className="mb-3 text-xl font-semibold text-white">Patent Support Request Submitted</h2>
+        <p className="mx-auto max-w-2xl text-sm leading-6 text-slate-300">
+          Your request for patent support has been submitted. The admin team will review your request and provide assistance. Track the progress below.
+        </p>
+        <button
+          type="button"
+          onClick={() => setSubmitSuccess(false)}
+          className="mt-6 text-sm text-cyan-300 hover:underline"
+        >
+          Submit another request
+        </button>
+      </div>
+    );
+  }
+
+  const trackingStages = [
+    { key: 'submitted', label: 'Request Submitted', description: 'Your request has been received' },
+    { key: 'under_review', label: 'Under Review', description: 'Admin is reviewing your request' },
+    { key: 'in_progress', label: 'In Progress', description: 'Patent filing is being processed' },
+    { key: 'filed', label: 'Filed with IPO', description: 'Patent application submitted' },
+    { key: 'completed', label: 'Completed', description: 'Patent support delivered' },
+  ];
+
+  const currentStageIndex = activeRequest ? trackingStages.findIndex(s => s.key === activeRequest.status) : 0;
+
+  return (
+    <div className="space-y-6">
+      <div className="rounded-2xl border border-amber-500/20 bg-amber-500/5 p-5">
+        <div className="flex items-start gap-4">
+          <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-lg bg-amber-500/20">
+            <Handshake className="h-5 w-5 text-amber-400" />
+          </div>
+          <div>
+            <h3 className="text-lg font-semibold text-white">Request Admin Patent Support</h3>
+            <p className="mt-1 text-sm text-slate-400">
+              Need help filing a patent? Submit a request and our admin team will assist you throughout the patent filing process.
+            </p>
+          </div>
+        </div>
+      </div>
+
+      {!activeRequest && !submitSuccess && (
+        <div className="space-y-4">
+          <div className="grid gap-4 md:grid-cols-2">
+            <div>
+              <label className="mb-2 block text-sm font-semibold text-white">Project Title</label>
+              <input
+                value={projectTitle || activeWorkspace?.title || ''}
+                onChange={(e) => setProjectTitle(e.target.value)}
+                className={fieldCls}
+                placeholder="What do you want to patent?"
+              />
+            </div>
+            <div>
+              <label className="mb-2 block text-sm font-semibold text-white">Patent Type</label>
+              <select
+                value={patentType}
+                onChange={(e) => setPatentType(e.target.value as typeof patentType)}
+                className={fieldCls}
+              >
+                <option value="invention">Invention Patent</option>
+                <option value="design">Design Patent</option>
+                <option value="trademark">Trademark</option>
+                <option value="utility">Utility Patent</option>
+              </select>
+            </div>
+          </div>
+
+          <div>
+            <label className="mb-2 block text-sm font-semibold text-white">Describe Your Innovation</label>
+            <textarea
+              value={requestDescription}
+              onChange={(e) => setRequestDescription(e.target.value)}
+              className={fieldCls + ' min-h-[120px]'}
+              placeholder="Describe what you want to patent, the problem it solves, and how it's unique..."
+            />
+          </div>
+
+          {submitError && <p className="text-sm text-red-400">{submitError}</p>}
+
+          <button
+            type="button"
+            onClick={() => submitMutation.mutate()}
+            disabled={!projectTitle.trim() || !requestDescription.trim() || submitMutation.isPending}
+            className="bg-amber-500 px-6 py-3 text-sm font-semibold text-slate-950 transition hover:bg-amber-400 disabled:cursor-not-allowed disabled:opacity-50"
+          >
+            {submitMutation.isPending ? 'Submitting...' : 'Submit Patent Support Request'}
+          </button>
+        </div>
+      )}
+
+      {activeRequest && (
+        <div className="space-y-4">
+          <div className="text-xs uppercase tracking-[0.28em] text-cyan-300">Your Patent Request</div>
+          
+          <div className="rounded-xl border border-slate-800 bg-slate-900/60 p-5">
+            <div className="mb-4 flex items-center justify-between">
+              <div>
+                <div className="text-lg font-semibold text-white">{activeRequest.projectTitle}</div>
+                <div className="mt-1 text-sm text-slate-400">{activeRequest.patentType} • {new Date(activeRequest.createdAt).toLocaleDateString('en-IN')}</div>
+              </div>
+              <span className={`rounded-full px-3 py-1 text-xs font-semibold ${STATUS_STYLES[activeRequest.status] || STATUS_STYLES.submitted}`}>
+                {activeRequest.status.replace(/_/g, ' ')}
+              </span>
+            </div>
+
+            <div className="mt-6 space-y-3">
+              {trackingStages.map((stage, index) => (
+                <div key={stage.key} className="flex items-center gap-4">
+                  <div className={`flex h-8 w-8 items-center justify-center rounded-full ${index <= currentStageIndex ? 'bg-cyan-500 text-slate-950' : 'bg-slate-800 text-slate-500'}`}>
+                    {index < currentStageIndex ? <CheckCircle className="h-5 w-5" /> : <Clock className="h-5 w-5" />}
+                  </div>
+                  <div className="flex-1">
+                    <div className={`text-sm font-medium ${index <= currentStageIndex ? 'text-white' : 'text-slate-500'}`}>
+                      {stage.label}
+                    </div>
+                    <div className="text-xs text-slate-500">{stage.description}</div>
+                  </div>
+                </div>
+              ))}
+            </div>
+          </div>
+        </div>
+      )}
+
+      {visibleRequests.length > 0 && (
+        <div className="mt-6">
+          <div className="text-xs uppercase tracking-[0.28em] text-cyan-300 mb-3">Previous Requests</div>
+          <div className="space-y-2">
+            {visibleRequests.filter(r => r.status === 'completed').map((request) => (
+              <div key={request._id} className="flex items-center justify-between rounded-lg border border-slate-800 bg-slate-900/40 p-3">
+                <div>
+                  <div className="text-sm font-medium text-white">{request.projectTitle}</div>
+                  <div className="text-xs text-slate-500">{new Date(request.createdAt).toLocaleDateString('en-IN')}</div>
+                </div>
+                <span className="rounded-full bg-green-500/10 px-2 py-1 text-xs font-semibold text-green-400">Completed</span>
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}
+
 export function PatentSupport() {
   const { innovationId, startupId: routeStartupId } = useParams<{
     innovationId?: string;
     startupId?: string;
   }>();
-  const navigate = useNavigate();
   const queryClient = useQueryClient();
   const startupId = normalizeStartupRouteId(routeStartupId);
   const isStartupScoped = Boolean(startupId);
@@ -740,6 +1139,7 @@ export function PatentSupport() {
   const [filing, setFiling] = useState<PatentFilingDocuments>(DEFAULT_FILING);
   const [viewPatent, setViewPatent] = useState<PatentSubmission | null>(null);
   const [showFilingReadiness, setShowFilingReadiness] = useState(false);
+  const [patentOption, setPatentOption] = useState<'self-upload' | 'admin-assist' | null>(null);
 
   const fileInputRefs = useRef<Record<string, HTMLInputElement | null>>({});
   const categorySlotsRef = useRef(categorySlots);
@@ -761,10 +1161,17 @@ export function PatentSupport() {
   });
   const startup = startupQuery.data;
   const startupWorkspaceId = startup?.projectId ?? '';
-  const patentEligibleWorkspaces = useMemo(
-    () => (workspacesQuery.data ?? []).filter((workspace) => !workspace.claimedProblemId),
-    [workspacesQuery.data],
-  );
+  const patentEligibleWorkspaces = useMemo(() => {
+    const allWorkspaces = workspacesQuery.data ?? [];
+    const base = allWorkspaces.filter((workspace) => !workspace.claimedProblemId);
+    if (isStartupScoped && startupWorkspaceId) {
+      const linked = allWorkspaces.find((workspace) => workspace._id === startupWorkspaceId);
+      if (linked && !base.some((workspace) => workspace._id === linked._id)) {
+        return [linked, ...base];
+      }
+    }
+    return base;
+  }, [workspacesQuery.data, isStartupScoped, startupWorkspaceId]);
 
   const showcaseMutation = useMutation({
     mutationFn: (patentId: string) => patentApi.toggleShowcase(patentId),
@@ -790,7 +1197,6 @@ export function PatentSupport() {
     [patentEligibleWorkspaces, selectedWorkspaceId],
   );
   const hasPatentEligibleWorkspaces = isStartupScoped ? Boolean(activeWorkspace) : patentEligibleWorkspaces.length > 0;
-  const scopedStartupTitle = startup?.name?.trim() || activeWorkspace?.title || 'this startup';
   const visiblePatents = useMemo(() => {
     const patents = patentsQuery.data ?? [];
     if (!isStartupScoped) {
@@ -1091,48 +1497,73 @@ export function PatentSupport() {
   const pageContent = (
     <>
       <div className="space-y-5">
-        {/* Page header */}
+{/* Page header */}
         <div className="border-b border-slate-800 pb-4">
           <div className="flex flex-col gap-3 md:flex-row md:items-end md:justify-between">
             <div className="max-w-4xl">
               <div className="mb-2 text-xs uppercase tracking-[0.28em] text-cyan-300">
                 {isStartupScoped ? 'Startup Patent Support' : 'Student Patent Support'}
               </div>
-              <h1 className="text-2xl font-semibold text-white">IPR / Patent Intake Request</h1>
-              <p className="mt-2 text-sm leading-6 text-slate-400">
-                {isStartupScoped
-                  ? `This patent request is attached to ${scopedStartupTitle}. Answer the admin intake questions and attach supporting files from the startup's linked workspace for IPR review.`
-                  : 'Choose your own product workspace, answer the admin intake questions, and attach light supporting files for IPR review. ProMove problem-bank workspaces are for leaderboard points and are not eligible for patent filing.'}
-              </p>
-            </div>
-            <div className="text-sm text-slate-400 md:max-w-sm md:text-right">
-              Self-created products only. Optional uploads can be up to {formatFileSize(PATENT_SUPPORT_UPLOAD_MAX_BYTES)} each.
+              <h1 className="text-2xl font-semibold text-white">Patent System</h1>
             </div>
           </div>
         </div>
 
-        {!hasPatentEligibleWorkspaces && !workspacesQuery.isLoading && !startupQuery.isLoading ? (
-          <div className="rounded-lg border border-dashed border-slate-800 bg-slate-900/60 p-8 text-center">
-            <FileText className="mx-auto mb-4 h-10 w-10 text-slate-500" />
-            <h2 className="mb-3 text-xl font-semibold text-white">
-              {isStartupScoped ? 'Link a product workspace to this startup first' : 'Create your own product workspace first'}
-            </h2>
-            <p className="mx-auto mb-5 max-w-2xl text-sm leading-6 text-slate-400">
-              {isStartupScoped
-                ? `Patent support for ${scopedStartupTitle} is locked to the startup's own linked product workspace. Open the Launch section and link a self-created workspace before requesting review.`
-                : 'Patent support is tied to your own product workspace so your filing documents, evidence, and review history stay attached to one innovation. Problem-bank workspaces remain available for leaderboard points only.'}
-            </p>
-            <div className="flex flex-wrap justify-center gap-3">
+        {/* Patent Option Selection */}
+        {hasPatentEligibleWorkspaces && !patentOption && !submitted ? (
+          <div className="space-y-4">
+            <div className="text-xs uppercase tracking-[0.28em] text-cyan-300">Choose Your Patent Approach</div>
+            <div className="grid gap-4 md:grid-cols-2">
               <button
-                onClick={() => navigate(isStartupScoped && startupId ? getStartupSectionPath(startupId, 'overview') : '/product-workspace')}
-                className="rounded-lg bg-slate-800 px-4 py-2.5 text-sm font-semibold text-white transition hover:bg-slate-700"
+                type="button"
+                onClick={() => setPatentOption('self-upload')}
+                className="flex flex-col items-start gap-4 rounded-2xl border border-slate-800 bg-slate-900/60 p-6 text-left transition hover:border-cyan-500/50 hover:bg-slate-900"
               >
-                {isStartupScoped ? 'Open Startup Launch' : 'Create Workspace'}
+                <div className="flex h-12 w-12 items-center justify-center rounded-xl bg-cyan-500/10">
+                  <Upload className="h-6 w-6 text-cyan-400" />
+                </div>
+                <div>
+                  <div className="text-lg font-semibold text-white">I Already Have a Patent</div>
+                  <div className="mt-2 text-sm text-slate-400">
+                    Upload your existing patent documents for admin review and verification.
+                  </div>
+                </div>
+                <div className="mt-2 text-xs text-cyan-300">Upload & Review →</div>
+              </button>
+              <button
+                type="button"
+                onClick={() => setPatentOption('admin-assist')}
+                className="flex flex-col items-start gap-4 rounded-2xl border border-slate-800 bg-slate-900/60 p-6 text-left transition hover:border-amber-500/50 hover:bg-slate-900"
+              >
+                <div className="flex h-12 w-12 items-center justify-center rounded-xl bg-amber-500/10">
+                  <Handshake className="h-6 w-6 text-amber-400" />
+                </div>
+                <div>
+                  <div className="text-lg font-semibold text-white">I Need Patent Support</div>
+                  <div className="mt-2 text-sm text-slate-400">
+                    Request admin assistance to file a new patent. Get tracking and support throughout the process.
+                  </div>
+                </div>
+                <div className="mt-2 text-xs text-amber-300">Request & Track →</div>
               </button>
             </div>
           </div>
         ) : null}
 
+        {/* Back button when option selected */}
+        {patentOption && (
+          <div className="mb-4">
+            <button
+              type="button"
+              onClick={() => setPatentOption(null)}
+              className="text-sm text-slate-400 transition hover:text-white"
+            >
+              ← Choose different approach
+            </button>
+          </div>
+)}
+
+        {/* Overview - show existing patents/requests */}
         {isStartupScoped && hasPatentEligibleWorkspaces ? (
           <StartupPatentRequestOverview
             requests={visiblePatentRequests}
@@ -1141,7 +1572,42 @@ export function PatentSupport() {
           />
         ) : null}
 
-        {hasPatentEligibleWorkspaces ? submitted ? (
+        {/* Self-Upload Path - when user has existing patent */}
+        {patentOption === 'self-upload' && hasPatentEligibleWorkspaces ? (
+          <SelfUploadPatentForm
+            startupId={startupId}
+            activeWorkspace={activeWorkspace}
+            isStartupScoped={isStartupScoped}
+            workspaceId={workspaceId}
+            setWorkspaceId={setWorkspaceId}
+            projectTitle={projectTitle}
+            setProjectTitle={setProjectTitle}
+            patentEligibleWorkspaces={patentEligibleWorkspaces}
+            submitted={submitted}
+            setSubmitted={setSubmitted}
+            setPatentOption={setPatentOption}
+          />
+        ) : null}
+
+        {/* Admin-Assist Path - when user needs patent support */}
+        {patentOption === 'admin-assist' && hasPatentEligibleWorkspaces ? (
+          <AdminAssistPatentForm
+            startupId={startupId}
+            activeWorkspace={activeWorkspace}
+            isStartupScoped={isStartupScoped}
+            workspaceId={workspaceId}
+            setWorkspaceId={setWorkspaceId}
+            projectTitle={projectTitle}
+            setProjectTitle={setProjectTitle}
+            patentEligibleWorkspaces={patentEligibleWorkspaces}
+            submitted={submitted}
+            setSubmitted={setSubmitted}
+            setPatentOption={setPatentOption}
+          />
+        ) : null}
+
+        {/* Original Patent Intake - only show when no option selected */}
+        {!patentOption && hasPatentEligibleWorkspaces ? submitted ? (
           <div className="rounded-lg border border-slate-800 bg-slate-900/60 p-8 text-center">
             <div className="mx-auto mb-4 flex h-16 w-16 items-center justify-center rounded-full bg-green-500/10">
               <CheckCircle className="h-8 w-8 text-green-500" />
@@ -1181,11 +1647,6 @@ export function PatentSupport() {
                       ))}
                     </select>
                   )}
-                  <p className="mt-2 text-xs text-slate-500">
-                    {isStartupScoped
-                      ? 'Patent support is locked to the product workspace linked from this startup.'
-                      : 'Pick the self-created workspace that represents the invention you want to file. Problem-bank workspaces are excluded from patent support.'}
-                  </p>
                 </div>
                 <div>
                   <label className="mb-2 block text-sm font-semibold text-white">Project title for filing</label>
@@ -1203,12 +1664,7 @@ export function PatentSupport() {
             <div className="grid gap-5 xl:grid-cols-[minmax(0,1fr),minmax(360px,0.8fr)]">
             <section className="order-2 border-t border-slate-800 pt-5 xl:border-l xl:border-t-0 xl:pl-5 xl:pt-0">
               <div className="flex flex-col gap-2 md:flex-row md:items-end md:justify-between">
-                <div>
-                  <div className="text-xs uppercase tracking-[0.28em] text-cyan-300">Supporting Files</div>
-                  <p className="mt-2 text-sm text-slate-400">
-                    Optional PDF or image evidence for faster review.
-                  </p>
-                </div>
+                <div className="text-xs uppercase tracking-[0.28em] text-cyan-300">Supporting Files</div>
                 <div className="text-sm text-slate-400">
                   {uploadedSupportCount} / {GOVT_DOCS.length} added - {formatFileSize(PATENT_SUPPORT_UPLOAD_MAX_BYTES)} max each
                 </div>
@@ -1570,13 +2026,7 @@ export function PatentSupport() {
               </div>
             )}
 
-            <div className="flex flex-col gap-4 border-t border-slate-800 pt-4 md:flex-row md:items-center md:justify-between">
-              <div className="flex items-start gap-3 text-sm text-slate-400">
-                <AlertCircle className="mt-0.5 h-4 w-4 shrink-0 text-cyan-300" />
-                <div>
-                  Patent intake requests are reviewed after the questionnaire is complete. Supporting uploads are optional but useful for faster admin review.
-                </div>
-              </div>
+            <div className="flex justify-end border-t border-slate-800 pt-4">
               <button
                 onClick={() => submitMutation.mutate()}
                 disabled={!canSubmit || submitMutation.isPending}
@@ -1594,7 +2044,7 @@ export function PatentSupport() {
         ) : null}
 
         {/* ── Existing submissions ───────────────────────────────────── */}
-        <section className="grid gap-5 border-t border-slate-800 pt-5 lg:grid-cols-[1fr,280px]">
+        <section className="border-t border-slate-800 pt-5">
           <div className="min-w-0">
             <h2 className="mb-3 text-lg font-semibold text-white">Existing submissions</h2>
             {visiblePatents.length === 0 ? (
@@ -1671,47 +2121,6 @@ export function PatentSupport() {
               </div>
             )}
           </div>
-
-          <aside className="space-y-5 border-t border-slate-800 pt-4 lg:border-l lg:border-t-0 lg:pl-5 lg:pt-0">
-            <div>
-              <div className="mb-2 flex items-center gap-2 text-sm font-semibold text-white">
-                <Award className="h-4 w-4 text-cyan-300" />
-                ProMove IPR Services
-              </div>
-              <p className="mb-3 text-sm text-slate-400">Professional patent filing support included</p>
-              <ul className="space-y-2 text-sm text-slate-300">
-                <li>Novelty and filing readiness review</li>
-                <li>Prior-art positioning support</li>
-                <li>Guidance for Forms 1, 3, 5, 18, and 26</li>
-              </ul>
-            </div>
-
-            <div className="border-t border-slate-800 pt-4">
-              <h3 className="mb-3 text-sm font-semibold text-white">Submission Flow</h3>
-              <div className="space-y-3 text-sm text-slate-300">
-                <div className="flex items-center gap-3">
-                  <Upload className="h-4 w-4 text-blue-400" />
-                  Supporting sketches, drafts, and diagrams uploaded by category
-                </div>
-                <div className="flex items-center gap-3">
-                  <FileText className="h-4 w-4 text-cyan-400" />
-                  Intake questionnaire completed with innovation, novelty, rights, and market context
-                </div>
-                <div className="flex items-center gap-3">
-                  <ShieldCheck className="h-4 w-4 text-cyan-400" />
-                  Disclosure and legal-agreement status captured for IPR review
-                </div>
-                <div className="flex items-center gap-3">
-                  <Clock className="h-4 w-4 text-yellow-400" />
-                  Admin and IPR review begins after submission
-                </div>
-                <div className="flex items-center gap-3">
-                  <CheckCircle className="h-4 w-4 text-green-400" />
-                  Status updates appear in submissions list
-                </div>
-              </div>
-            </div>
-          </aside>
         </section>
       </div>
 

@@ -6,6 +6,7 @@ import {
   FolderKanban,
   Globe,
   GraduationCap,
+  ShieldCheck,
   HeadphonesIcon,
   Home,
   LifeBuoy,
@@ -59,7 +60,6 @@ export const SIDEBAR_CONFIG: Record<UserRole, DashboardNavItem[]> = {
     { kind: 'link', label: 'Startup', icon: Rocket, path: STARTUP_LAUNCH_BASE_PATH },
     { kind: 'link', label: 'Portfolio', icon: Trophy, path: '/portfolio' },
     { kind: 'link', label: 'Marketplace', icon: Globe, path: getMarketplaceBasePath(UserRole.STUDENT) },
-    { kind: 'link', label: 'Applications', icon: BriefcaseBusiness, path: '/dashboard/student/applications' },
     { kind: 'link', label: 'Events', icon: CalendarDays, path: '/dashboard/student/events' },
     { kind: 'link', label: 'Messages', icon: MessageCircle, path: '/dashboard/messages' },
     { kind: 'link', label: 'Settings', icon: Settings, path: '/dashboard/settings' },
@@ -69,6 +69,7 @@ export const SIDEBAR_CONFIG: Record<UserRole, DashboardNavItem[]> = {
   [UserRole.SCHOOL]: [
     { kind: 'link', label: 'Dashboard', icon: Home, path: '/dashboard/school' },
     { kind: 'link', label: 'Operations', icon: Home, path: '/dashboard/school/operations' },
+    { kind: 'link', label: 'Compliance', icon: ShieldCheck, path: '/dashboard/school/compliance' },
     { kind: 'link', label: 'Analytics', icon: BarChart3, path: '/dashboard/school/analytics' },
     { kind: 'link', label: 'Portfolio', icon: Trophy, path: '/portfolio' },
     { kind: 'link', label: 'Messages', icon: MessageCircle, path: '/dashboard/messages' },
@@ -79,6 +80,7 @@ export const SIDEBAR_CONFIG: Record<UserRole, DashboardNavItem[]> = {
   [UserRole.COLLEGE]: [
     { kind: 'link', label: 'Dashboard', icon: Home, path: '/dashboard/college' },
     { kind: 'link', label: 'Operations', icon: Home, path: '/dashboard/college/operations' },
+    { kind: 'link', label: 'Compliance', icon: ShieldCheck, path: '/dashboard/college/compliance' },
     { kind: 'link', label: 'Marketplace', icon: Globe, path: getMarketplaceBasePath(UserRole.COLLEGE) },
     { kind: 'link', label: 'Placement Tracker', icon: BarChart3, path: '/dashboard/college/placement' },
     { kind: 'link', label: 'Analytics', icon: BarChart3, path: '/dashboard/college/analytics' },
@@ -139,6 +141,7 @@ export const SIDEBAR_CONFIG: Record<UserRole, DashboardNavItem[]> = {
 export const DASHBOARD_ROUTE_LABELS: Partial<Record<UserRole, DashboardRouteLabelItem[]>> = {
   [UserRole.SCHOOL]: [
     { path: '/dashboard/school/operations', label: 'Operations' },
+    { path: '/dashboard/school/compliance', label: 'Compliance' },
     { path: '/dashboard/school/students', label: 'Student Innovators' },
     { path: '/dashboard/school/mentors', label: 'Mentorship' },
     { path: '/dashboard/school/events', label: 'Events' },
@@ -149,6 +152,7 @@ export const DASHBOARD_ROUTE_LABELS: Partial<Record<UserRole, DashboardRouteLabe
   ],
   [UserRole.COLLEGE]: [
     { path: '/dashboard/college/operations', label: 'Operations' },
+    { path: '/dashboard/college/compliance', label: 'Compliance' },
     { path: '/dashboard/college/students', label: 'Student Innovators' },
     { path: '/dashboard/college/recruiters', label: 'Recruiters' },
     { path: '/dashboard/college/investors', label: 'Investors' },

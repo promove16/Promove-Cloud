@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { FolderKanban, Link2, Plus, Users } from "lucide-react";
+import { Link2, Plus, Users } from "lucide-react";
 import { Navigate, useNavigate, useOutletContext, useParams } from "react-router-dom";
 import { dealApi } from "../../api/deal.api";
 import { startupApi } from "../../api/startup.api";
@@ -10,7 +10,7 @@ import { Input } from "../../components/ui/Input";
 import { Spinner } from "../../components/ui/Spinner";
 import { useAuthStore } from "../../store/authStore";
 import type { Workspace } from "../../types/workspace.types";
-import { getStartupSectionPath, normalizeStartupRouteId } from "./navigation";
+import { normalizeStartupRouteId } from "./navigation";
 
 const getErrorMessage = (error: unknown, fallback: string) =>
   (error as { response?: { data?: { error?: { message?: string } } } })?.response?.data?.error?.message ??
@@ -61,10 +61,17 @@ export function StartupWorkspace() {
   const isEditingLocked = Boolean(startup?.editAccess?.isLocked);
   const isWorkspaceSelectionDisabled = isEditingLocked || isReadOnlyViewer;
   const workspaces = workspaceListQuery.data ?? [];
-  const availableWorkspaces = useMemo(
-    () => workspaces.filter((workspace) => !workspace.claimedProblemId),
-    [workspaces],
+  const linkedWorkspace = useMemo(
+    () => (startup?.projectId ? workspaces.find((workspace) => workspace._id === startup.projectId) ?? null : null),
+    [workspaces, startup?.projectId],
   );
+  const availableWorkspaces = useMemo(() => {
+    const base = workspaces.filter((workspace) => !workspace.claimedProblemId);
+    if (linkedWorkspace && !base.some((workspace) => workspace._id === linkedWorkspace._id)) {
+      return [linkedWorkspace, ...base];
+    }
+    return base;
+  }, [workspaces, linkedWorkspace]);
   const investorWorkshopSummary = useMemo(() => {
     if (!isReadOnlyViewer || !startupId) {
       return null;
@@ -211,49 +218,8 @@ export function StartupWorkspace() {
   }
 
   const founderMembers = activeWorkspace?.teamMembers ?? [];
-  const backPath = startupId
-    ? isReadOnlyViewer
-      ? "/dashboard/investor/product-workshop"
-      : getStartupSectionPath(startupId, "overview")
-    : "/dashboard";
-
   return (
     <div className="space-y-6">
-      <div className="rounded-2xl border border-slate-800/70 bg-slate-950/40 p-6">
-        <div className="flex flex-col gap-3 lg:flex-row lg:items-start lg:justify-between">
-          <div>
-            <div className="text-xs font-semibold uppercase tracking-[0.24em] text-cyan-300">
-              {isReadOnlyViewer ? "Product Workshop" : "Product Workspace"}
-            </div>
-            <h1 className="mt-2 text-2xl font-semibold text-white">
-              Dedicated workspace for {startup?.name ?? "this startup"}
-            </h1>
-            <p className="mt-2 max-w-3xl text-sm leading-6 text-slate-400">
-              {isReadOnlyViewer
-                ? "This is the same startup product workspace section used by the founder team. Investor access is read-only and limited to reviewing the linked workspace, team, and progress."
-                : "Keep startup execution separate from Problem Bank work. Link one independent product workspace here so founder access, patent support, and startup progress stay attached to the same operating space."}
-            </p>
-          </div>
-          {activeWorkspace ? (
-            isReadOnlyViewer ? (
-              <div className="inline-flex items-center gap-2 rounded-xl border border-cyan-500/30 bg-cyan-500/10 px-4 py-2.5 text-sm font-semibold text-cyan-100">
-                <FolderKanban className="h-4 w-4" />
-                Read-Only Workshop View
-              </div>
-            ) : (
-              <button
-                type="button"
-                onClick={() => navigate(`/product-workspace/${activeWorkspace._id}`)}
-                className="inline-flex items-center gap-2 rounded-xl border border-cyan-500/30 bg-cyan-500/10 px-4 py-2.5 text-sm font-semibold text-cyan-100 transition hover:border-cyan-400/50 hover:bg-cyan-500/15"
-              >
-                <FolderKanban className="h-4 w-4" />
-                Open Workspace
-              </button>
-            )
-          ) : null}
-        </div>
-      </div>
-
       {isInvestorSummaryFallback ? (
         <div className="rounded-xl border border-amber-500/20 bg-amber-500/10 px-4 py-3 text-sm text-amber-100">
           Detailed workspace access has not synced to this investor account yet. Showing the linked workshop summary from the deal record.
@@ -320,11 +286,6 @@ export function StartupWorkspace() {
               </option>
             ))}
           </select>
-          <p className="mt-3 text-sm leading-6 text-slate-400">
-            {isReadOnlyViewer
-              ? "The founder team links one independent workspace to this startup. Investor access here is limited to reviewing that linked workspace setup."
-              : "The linked workspace becomes the operational home for this startup. Founder team size syncs from the selected independent workspace when you save."}
-          </p>
 
           {availableWorkspaces.length === 0 && (!isReadOnlyViewer || !activeWorkspace) ? (
             <div className="mt-4 rounded-xl border border-dashed border-slate-800 bg-slate-950/60 px-4 py-4 text-sm text-slate-400">
@@ -337,9 +298,6 @@ export function StartupWorkspace() {
           {showCreateForm && !isReadOnlyViewer ? (
             <div className="mt-5 rounded-2xl border border-slate-800 bg-slate-950/60 p-4">
               <div className="text-sm font-semibold text-white">Create independent workspace</div>
-              <div className="mt-1 text-sm leading-6 text-slate-400">
-                This creates a startup-owned product workspace, separate from Problem Bank work.
-              </div>
               <div className="mt-4 grid gap-3 sm:grid-cols-2">
                 <div>
                   <label className="mb-2 block text-xs font-semibold uppercase tracking-[0.18em] text-slate-500">
@@ -426,15 +384,6 @@ export function StartupWorkspace() {
                 Investor access is read-only in this startup workspace.
               </div>
             )}
-            {startupId ? (
-              <button
-                type="button"
-                onClick={() => navigate(backPath)}
-                className="rounded-xl border border-slate-700 px-5 py-3 text-sm font-semibold text-slate-300 transition hover:border-slate-500 hover:text-white"
-              >
-                {isReadOnlyViewer ? "Back to Product Workshop" : "Back to Launch"}
-              </button>
-            ) : null}
           </div>
         </Card>
 
@@ -444,10 +393,6 @@ export function StartupWorkspace() {
             Founder Team
           </div>
           <h2 className="text-lg font-semibold text-white">Workspace members</h2>
-          <p className="mt-2 text-sm leading-6 text-slate-400">
-            These members are pulled from the linked product workspace and treated as the startup's
-            current operating team.
-          </p>
 
           <div className="mt-5 space-y-3">
             {founderMembers.length > 0 ? (

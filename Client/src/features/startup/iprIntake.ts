@@ -1,12 +1,302 @@
 import type {
+  StartupBusinessModelType,
   StartupCommercializationStrategy,
   StartupDocumentCategory,
+  StartupInitializationProfile,
   StartupInnovationStage,
   StartupIpProtectionType,
   StartupInventorOwnership,
+  StartupLegalEntityType,
   StartupRegistrationProfile,
   StartupReadiness,
 } from '../../types/startup.types';
+
+export const STARTUP_INIT_UPLOAD_MAX_BYTES = 3 * 1024 * 1024;
+
+type InitSelectOption<T extends string> = {
+  value: T;
+  label: string;
+};
+
+type InitQuestionConfig =
+  | {
+      key: keyof StartupInitializationProfile;
+      label: string;
+      minLength: number;
+      type?: 'textarea';
+      options?: never;
+    }
+  | {
+      key: keyof StartupInitializationProfile;
+      label: string;
+      type: 'select';
+      options: readonly InitSelectOption<string>[];
+      minLength?: never;
+    };
+
+type InitQuestionSection = {
+  title: string;
+  questions: readonly InitQuestionConfig[];
+};
+
+export const STARTUP_INIT_PRODUCT_STAGE_OPTIONS = [
+  { value: 'idea', label: 'Idea' },
+  { value: 'prototype', label: 'Prototype' },
+  { value: 'mvp', label: 'MVP' },
+  { value: 'market_ready', label: 'Market-ready' },
+] as const satisfies readonly InitSelectOption<StartupInnovationStage>[];
+
+export const STARTUP_INIT_LEGAL_ENTITY_OPTIONS = [
+  { value: 'not_registered', label: 'Not registered yet' },
+  { value: 'sole_proprietorship', label: 'Sole Proprietorship' },
+  { value: 'partnership', label: 'Partnership' },
+  { value: 'llp', label: 'LLP' },
+  { value: 'private_limited', label: 'Private Limited (Pvt Ltd)' },
+  { value: 'public_limited', label: 'Public Limited' },
+] as const satisfies readonly InitSelectOption<StartupLegalEntityType>[];
+
+export const STARTUP_INIT_BUSINESS_MODEL_OPTIONS = [
+  { value: 'subscription', label: 'Subscription' },
+  { value: 'transactional', label: 'Transactional' },
+  { value: 'marketplace', label: 'Marketplace' },
+  { value: 'freemium', label: 'Freemium' },
+  { value: 'advertising', label: 'Advertising' },
+  { value: 'services', label: 'Services' },
+  { value: 'hardware', label: 'Hardware' },
+  { value: 'hybrid', label: 'Hybrid' },
+] as const satisfies readonly InitSelectOption<StartupBusinessModelType>[];
+
+export const DEFAULT_STARTUP_INIT_PROFILE: StartupInitializationProfile = {
+  vision: '',
+  mission: '',
+  foundingStory: '',
+  teamComposition: '',
+  productStage: 'idea',
+  productOverview: '',
+  customerProfile: '',
+  marketOpportunity: '',
+  businessModel: 'transactional',
+  pricingStrategy: '',
+  competitiveLandscape: '',
+  defensibleMoat: '',
+  currentTraction: '',
+  upcomingMilestones: '',
+  fundingAsk: '',
+  legalEntityType: 'not_registered',
+  risksAndMitigation: '',
+};
+
+export const STARTUP_INIT_QUESTION_SECTIONS: readonly InitQuestionSection[] = [
+  {
+    title: 'Vision & Mission',
+    questions: [
+      {
+        key: 'vision',
+        label: 'What is the long-term vision for this startup?',
+        minLength: 30,
+      },
+      {
+        key: 'mission',
+        label: 'What is the mission that drives this startup?',
+        minLength: 20,
+      },
+    ],
+  },
+  {
+    title: 'Origins & Team',
+    questions: [
+      {
+        key: 'foundingStory',
+        label: 'Share the founding story - how and why did this startup begin?',
+        minLength: 40,
+      },
+      {
+        key: 'teamComposition',
+        label: 'Describe your team composition and key roles.',
+        minLength: 20,
+      },
+    ],
+  },
+  {
+    title: 'Product & Stage',
+    questions: [
+      {
+        key: 'productStage',
+        label: 'What is the current product stage?',
+        type: 'select',
+        options: STARTUP_INIT_PRODUCT_STAGE_OPTIONS,
+      },
+      {
+        key: 'productOverview',
+        label: 'Provide an overview of your product or service.',
+        minLength: 30,
+      },
+    ],
+  },
+  {
+    title: 'Customers & Market',
+    questions: [
+      {
+        key: 'customerProfile',
+        label: 'Describe your target customer profile.',
+        minLength: 20,
+      },
+      {
+        key: 'marketOpportunity',
+        label: 'What is the market opportunity and size?',
+        minLength: 20,
+      },
+    ],
+  },
+  {
+    title: 'Business Model',
+    questions: [
+      {
+        key: 'businessModel',
+        label: 'What is your business model?',
+        type: 'select',
+        options: STARTUP_INIT_BUSINESS_MODEL_OPTIONS,
+      },
+      {
+        key: 'pricingStrategy',
+        label: 'Describe your pricing strategy.',
+        minLength: 15,
+      },
+    ],
+  },
+  {
+    title: 'Competition & Moat',
+    questions: [
+      {
+        key: 'competitiveLandscape',
+        label: 'Describe the competitive landscape.',
+        minLength: 20,
+      },
+      {
+        key: 'defensibleMoat',
+        label: 'What is your defensible competitive advantage or moat?',
+        minLength: 20,
+      },
+    ],
+  },
+  {
+    title: 'Traction & Milestones',
+    questions: [
+      {
+        key: 'currentTraction',
+        label: 'What is your current traction (users, revenue, partnerships)?',
+        minLength: 15,
+      },
+      {
+        key: 'upcomingMilestones',
+        label: 'What are your upcoming milestones for the next 6 months?',
+        minLength: 20,
+      },
+    ],
+  },
+  {
+    title: 'Funding & Legal',
+    questions: [
+      {
+        key: 'fundingAsk',
+        label: 'What is your funding ask and how will you use it?',
+        minLength: 15,
+      },
+      {
+        key: 'legalEntityType',
+        label: 'What is your current legal entity status?',
+        type: 'select',
+        options: STARTUP_INIT_LEGAL_ENTITY_OPTIONS,
+      },
+      {
+        key: 'risksAndMitigation',
+        label: 'What are the key risks and your mitigation strategies?',
+        minLength: 20,
+      },
+    ],
+  },
+] as const;
+
+export const STARTUP_INIT_QUESTION_LABELS = Object.fromEntries(
+  STARTUP_INIT_QUESTION_SECTIONS.flatMap((section) =>
+    section.questions.map((question) => [question.key, question.label]),
+  ),
+) as Record<keyof StartupInitializationProfile, string>;
+
+export const STARTUP_INIT_VALUE_LABELS: Partial<Record<keyof StartupInitializationProfile, Record<string, string>>> = {
+  productStage: Object.fromEntries(
+    STARTUP_INIT_PRODUCT_STAGE_OPTIONS.map((option) => [option.value, option.label]),
+  ),
+  businessModel: Object.fromEntries(
+    STARTUP_INIT_BUSINESS_MODEL_OPTIONS.map((option) => [option.value, option.label]),
+  ),
+  legalEntityType: Object.fromEntries(
+    STARTUP_INIT_LEGAL_ENTITY_OPTIONS.map((option) => [option.value, option.label]),
+  ),
+};
+
+export const formatStartupInitValue = (
+  key: keyof StartupInitializationProfile,
+  value: string,
+) => STARTUP_INIT_VALUE_LABELS[key]?.[value] ?? value;
+
+export const buildStartupInitReadiness = (startup: {
+  name?: string;
+  tagline?: string;
+  category?: string;
+  founderIds?: readonly unknown[];
+  pitchDeckUrl?: string;
+  documents?: readonly { category?: StartupDocumentCategory }[];
+  initializationProfile?: StartupInitializationProfile;
+}): StartupReadiness => {
+  const missingItems: string[] = [];
+  const documents = startup.documents ?? [];
+  const uploadedDocumentCategories = Array.from(
+    new Set(
+      documents
+        .map((document) => document.category)
+        .filter((category): category is StartupDocumentCategory => Boolean(category)),
+    ),
+  );
+  const uploadedCategorySet = new Set(uploadedDocumentCategories);
+  const initProfile = startup.initializationProfile ?? DEFAULT_STARTUP_INIT_PROFILE;
+
+  const addMissing = (condition: boolean, label: string) => {
+    if (condition) {
+      missingItems.push(label);
+    }
+  };
+
+  addMissing(!startup.name?.trim(), 'startup name');
+  addMissing(!startup.tagline?.trim(), 'startup tagline');
+  addMissing(!startup.category?.trim(), 'startup category');
+  addMissing((startup.founderIds?.length ?? 0) === 0, 'at least one founder');
+  addMissing(initProfile.vision.trim().length < 30, 'vision');
+  addMissing(initProfile.mission.trim().length < 20, 'mission');
+  addMissing(initProfile.foundingStory.trim().length < 40, 'founding story');
+  addMissing(initProfile.teamComposition.trim().length < 20, 'team composition');
+  addMissing(!initProfile.productStage.trim(), 'product stage');
+  addMissing(initProfile.productOverview.trim().length < 30, 'product overview');
+  addMissing(initProfile.customerProfile.trim().length < 20, 'customer profile');
+  addMissing(initProfile.marketOpportunity.trim().length < 20, 'market opportunity');
+  addMissing(!initProfile.businessModel.trim(), 'business model');
+  addMissing(initProfile.pricingStrategy.trim().length < 15, 'pricing strategy');
+  addMissing(initProfile.competitiveLandscape.trim().length < 20, 'competitive landscape');
+  addMissing(initProfile.defensibleMoat.trim().length < 20, 'defensible moat');
+  addMissing(initProfile.currentTraction.trim().length < 15, 'current traction');
+  addMissing(initProfile.upcomingMilestones.trim().length < 20, 'upcoming milestones');
+  addMissing(initProfile.fundingAsk.trim().length < 15, 'funding ask');
+  addMissing(!initProfile.legalEntityType.trim(), 'legal entity type');
+  addMissing(initProfile.risksAndMitigation.trim().length < 20, 'risks and mitigation');
+  addMissing(!startup.pitchDeckUrl && !uploadedCategorySet.has('business_plan'), 'business plan or pitch deck upload');
+
+  return {
+    isReviewReady: missingItems.length === 0,
+    missingItems,
+    requiredDocumentCategories: [],
+    uploadedDocumentCategories,
+  };
+};
 
 export const STARTUP_IPR_UPLOAD_MAX_BYTES = 3 * 1024 * 1024;
 

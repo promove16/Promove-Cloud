@@ -41,7 +41,21 @@ export interface PatentRequestPayload {
   documentUploads: { uploadId: string; category: PatentRequestDocCategory }[];
 }
 
+export interface PatentRequestCreatePayload {
+  workspaceId: string;
+  projectTitle: string;
+  description: string;
+  patentType: 'invention' | 'design' | 'trademark' | 'utility';
+}
+
 export const patentRequestApi = {
+  async create(payload: PatentRequestCreatePayload) {
+    const response = await api.post<ApiSuccessResponse<PatentRequestSubmission>>(
+      '/api/patents/requests',
+      payload,
+    );
+    return response.data.data;
+  },
   async submit(payload: PatentRequestPayload) {
     const response = await api.post<ApiSuccessResponse<PatentRequestSubmission>>(
       '/api/patents/requests/submit',

@@ -297,6 +297,32 @@ export const notifyUser = async (
   return notification;
 };
 
+export type HiringUpdateAction =
+  | 'apply'
+  | 'invite'
+  | 'invite_accept'
+  | 'invite_decline'
+  | 'stage_update';
+
+export const emitHiringUpdate = (
+  userIds: Array<string | undefined | null>,
+  payload: {
+    action: HiringUpdateAction;
+    jobId?: string;
+    studentId?: string;
+    recruiterId?: string;
+    stage?: string;
+  },
+) => {
+  if (!io) return;
+  const unique = Array.from(
+    new Set(userIds.filter((id): id is string => Boolean(id))),
+  );
+  for (const userId of unique) {
+    io.of('/notifications').to(`user:${userId}`).emit('hiring:updated', payload);
+  }
+};
+
 export const createBridge = async (
   recruiterId: string,
   studentId: string,

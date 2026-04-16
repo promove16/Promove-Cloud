@@ -35,6 +35,7 @@ export interface InvestorStartupCard {
     mvpBuilt: boolean;
     revenueGenerating: boolean;
   };
+  adminApprovedAt?: string;
   founder?: InvestorStartupFounder;
 }
 

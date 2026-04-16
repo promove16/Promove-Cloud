@@ -5,6 +5,27 @@ import { getNotifSocket } from '../lib/socket';
 import { useAuthStore } from '../store/authStore';
 import { NotificationItem } from '../types/notification.types';
 
+type HiringUpdatePayload = {
+  action: 'apply' | 'invite' | 'invite_accept' | 'invite_decline' | 'stage_update';
+  jobId?: string;
+  studentId?: string;
+  recruiterId?: string;
+  stage?: string;
+};
+
+const HIRING_INVALIDATION_KEYS: ReadonlyArray<readonly unknown[]> = [
+  ['student', 'applications'],
+  ['requests'],
+  ['recruiter', 'jobs'],
+  ['recruiter', 'job-applications'],
+  ['recruiter', 'job-applications-fallback'],
+  ['recruiter', 'dashboard'],
+  ['recruiter', 'onboarding'],
+  ['recruiter', 'talent'],
+  ['recruiter', 'placements'],
+  ['college-placement'],
+];
+
 export const useNotifications = () => {
   const queryClient = useQueryClient();
   const isAuthenticated = useAuthStore((state) => state.isAuthenticated);
@@ -32,10 +53,18 @@ export const useNotifications = () => {
       ]);
     };
 
+    const handleHiringUpdate = (_payload: HiringUpdatePayload) => {
+      for (const queryKey of HIRING_INVALIDATION_KEYS) {
+        void queryClient.invalidateQueries({ queryKey: [...queryKey] });
+      }
+    };
+
     socket.on('notification:new', handleNotification);
+    socket.on('hiring:updated', handleHiringUpdate);
 
     return () => {
       socket.off('notification:new', handleNotification);
+      socket.off('hiring:updated', handleHiringUpdate);
       socket.disconnect();
     };
   }, [isAuthenticated, queryClient]);

@@ -10,6 +10,7 @@ type StudentAccessWorkspaceProps = {
   tokenFallbackLabel: string;
   tokens: StudentAccessToken[];
   pendingStudents: PendingStudentVerification[];
+  rosterPendingCount: number;
   isCreatingToken: boolean;
   isReviewingStudents: boolean;
   onTokenLabelChange: (value: string) => void;
@@ -37,6 +38,7 @@ export function StudentAccessWorkspace({
   tokenFallbackLabel,
   tokens,
   pendingStudents,
+  rosterPendingCount,
   isCreatingToken,
   isReviewingStudents,
   onTokenLabelChange,
@@ -112,6 +114,16 @@ export function StudentAccessWorkspace({
         </div>
 
         <div className="flex h-full flex-col space-y-5">
+          <div className="rounded-3xl border border-slate-800/70 bg-slate-950/25 px-5 py-4">
+            <div className="text-[11px] uppercase tracking-[0.26em] text-slate-500">Verification Ownership</div>
+            <p className="mt-2 text-sm leading-6 text-slate-300">
+              The approval queue below only lists student accounts that still need an explicit institution approve or reject decision.
+            </p>
+            <p className="mt-2 text-sm leading-6 text-slate-400">
+              The roster drawer can separately show <span className="font-semibold text-amber-300">{rosterPendingCount}</span> registered students still moving through onboarding. Student verification is handled here by the institution, while the admin queue is reserved for institution and operator sign-up approvals.
+            </p>
+          </div>
+
           <div className="flex flex-wrap items-start justify-between gap-4">
             <div>
               <div className="text-[11px] uppercase tracking-[0.26em] text-slate-500">Approval Queue</div>
@@ -129,7 +141,13 @@ export function StudentAccessWorkspace({
           <div className="flex flex-1 flex-col rounded-3xl border border-slate-800/70 bg-slate-950/25 px-5 py-4">
             {pendingStudents.length === 0 ? (
               <div className="flex min-h-[220px] flex-1 items-center">
-                <DashboardEmpty message="No student verifications are waiting right now." />
+                <DashboardEmpty
+                  message={
+                    rosterPendingCount > 0
+                      ? 'No direct approve or reject actions are waiting here. Check Student Onboarding for registered students still moving through the roster workflow.'
+                      : 'No student verifications are waiting right now.'
+                  }
+                />
               </div>
             ) : (
               <div className="space-y-0">

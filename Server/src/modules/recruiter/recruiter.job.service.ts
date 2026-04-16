@@ -15,6 +15,7 @@ import {
 } from './jobPost.model';
 import {
   createBridge,
+  emitHiringUpdate,
   getStartupCategories,
   getStudentCollegeId,
   getWorkspaceMap,
@@ -326,6 +327,13 @@ export const applyToRecruiterJob = async (studentId: string, jobId: string) => {
     '/dashboard/recruiter/applications',
   );
 
+  emitHiringUpdate([String(job.recruiterId), studentId], {
+    action: 'apply',
+    jobId: String(job._id),
+    studentId,
+    recruiterId: String(job.recruiterId),
+  });
+
   return { applied: true, alreadyApplied: false };
 };
 
@@ -423,6 +431,13 @@ export const inviteStudentToRecruiterJob = async (
       },
     });
   }
+
+  emitHiringUpdate([studentId, recruiterId], {
+    action: 'invite',
+    jobId,
+    studentId,
+    recruiterId,
+  });
 
   return {
     invited: true,
@@ -700,6 +715,15 @@ export const updateRecruiterJobApplicationStage = async (
     );
   }
 
+  const collegeId = await getStudentCollegeId(studentId);
+  emitHiringUpdate([studentId, recruiterId, collegeId], {
+    action: 'stage_update',
+    jobId,
+    studentId,
+    recruiterId,
+    stage: parsed.stage,
+  });
+
   const [workspaceMap, startupCategories] = await Promise.all([
     getWorkspaceMap([studentId]),
     getStartupCategories([studentId]),
@@ -795,6 +819,13 @@ registerRequestHandler('recruiter_job_invite', {
       'A student accepted your recruiter invite.',
       '/dashboard/recruiter/applications',
     );
+
+    emitHiringUpdate([String(request.fromUserId), actorUserId], {
+      action: 'invite_accept',
+      jobId: String(job._id),
+      studentId: actorUserId,
+      recruiterId: String(request.fromUserId),
+    });
   },
   onDecline: async (request, actorUserId) => {
     const job = await JobPost.findOne({
@@ -827,5 +858,12 @@ registerRequestHandler('recruiter_job_invite', {
     }
 
     await job.save();
+
+    emitHiringUpdate([String(request.fromUserId), actorUserId], {
+      action: 'invite_decline',
+      jobId: String(job._id),
+      studentId: actorUserId,
+      recruiterId: String(request.fromUserId),
+    });
   },
 });

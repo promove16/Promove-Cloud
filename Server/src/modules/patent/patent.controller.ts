@@ -7,12 +7,13 @@ import {
   getPatentRequestById,
   patentRequestSubmissionSchema,
   submitPatentRequest,
+  createPatentSupportRequest,
+  patentSupportRequestSchema,
 } from './patentRequest.service';
 
-// ─── Self-filing ──────────────────────────────────────────────────────────────
-
 export const createPatent = async (req: Request, res: Response) => {
-  const patent = await submitPatent(req.user!._id, patentSubmissionSchema.parse(req.body));
+  if (!req.user) throw new ApiError(401, 'UNAUTHORIZED', 'Invalid or expired token');
+  const patent = await submitPatent(req.user._id, patentSubmissionSchema.parse(req.body));
   res.status(201).json(new ApiResponse(patent));
 };
 
@@ -46,4 +47,11 @@ export const listMyPatentRequests = async (req: Request, res: Response) => {
 export const getPatentRequest = async (req: Request, res: Response) => {
   const request = await getPatentRequestById(req.user!._id, String(req.params.id));
   res.json(new ApiResponse(request));
+};
+
+// ─── Simple Patent Support Request ──────────────────────────────────────────
+
+export const createSimplePatentSupportRequest = async (req: Request, res: Response) => {
+  const request = await createPatentSupportRequest(req.user!._id, patentSupportRequestSchema.parse(req.body));
+  res.status(201).json(new ApiResponse(request));
 };

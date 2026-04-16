@@ -1408,14 +1408,21 @@ export const listDealsAwaitingApproval = async (): Promise<AdminDealItem[]> => {
   const startupMap = new Map(startups.map((startup) => [String(startup._id), startup]));
   const studentMap = new Map(students.map((student) => [String(student._id), student]));
 
-  return deals.map((deal) =>
-    buildAdminDealItem(
-      deal,
-      investorMap.get(String(deal.investorId))?.displayName ?? 'Investor',
-      startupMap.get(String(deal.startupId))?.name ?? 'Startup',
-      studentMap.get(String(deal.studentId))?.displayName ?? 'Student',
-    ),
-  );
+  return deals
+    .filter((deal) => {
+      const investor = investorMap.get(String(deal.investorId));
+      const startup = startupMap.get(String(deal.startupId));
+      const student = studentMap.get(String(deal.studentId));
+      return Boolean(investor && startup && student);
+    })
+    .map((deal) =>
+      buildAdminDealItem(
+        deal,
+        investorMap.get(String(deal.investorId))!.displayName,
+        startupMap.get(String(deal.startupId))!.name,
+        studentMap.get(String(deal.studentId))!.displayName,
+      ),
+    );
 };
 
 export const getDealAwaitingApproval = async (dealId: string): Promise<AdminDealReviewItem> => {

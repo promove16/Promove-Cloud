@@ -73,7 +73,7 @@ export default function MentorshipRequests() {
 
   return (
     <Card className="p-6">
-      <div className="text-xs uppercase tracking-[0.3em] text-cyan-300">Mentorship Requests</div>
+      <div className="text-xs uppercase tracking-[0.3em] text-cyan-300">Institution Mentorship Requests</div>
       <h2 className="mt-2 text-2xl font-bold text-white">Pending institution requests</h2>
       <div className="mt-6 grid gap-4 md:grid-cols-3">
         {[

@@ -2,6 +2,7 @@ import { useMemo, useState } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { isAxiosError } from 'axios';
 import { CheckCircle2, Clock3, FileText, Rocket, RotateCcw, ShieldCheck } from 'lucide-react';
+import { useSearchParams } from 'react-router-dom';
 import { adminApi, AdminStartupReviewItem } from '../../api/admin.api';
 import { Badge } from '../../components/ui/Badge';
 import { Button } from '../../components/ui/Button';
@@ -36,9 +37,33 @@ const getErrorMessage = (error: unknown) => {
   return error instanceof Error ? error.message : 'Unable to update startup review right now.';
 };
 
+const getReviewedLabel = (startup: Pick<AdminStartupReviewItem, 'reviewStatus' | 'adminReviewedAt'>) => {
+  if (startup.adminReviewedAt) {
+    return new Date(startup.adminReviewedAt).toLocaleString('en-IN');
+  }
+
+  if (startup.reviewStatus === 'review_requested') {
+    return 'Pending';
+  }
+
+  if (startup.reviewStatus === 'changes_requested') {
+    return 'Changes requested';
+  }
+
+  if (startup.reviewStatus === 'approved') {
+    return 'Approved';
+  }
+
+  return 'Not started';
+};
+
 export default function Startups() {
+  const [searchParams] = useSearchParams();
   const queryClient = useQueryClient();
-  const [status, setStatus] = useState<StartupReviewStatus | 'all'>('review_requested');
+  const focusedStartupId = searchParams.get('startupId')?.trim() ?? '';
+  const [status, setStatus] = useState<StartupReviewStatus | 'all'>(
+    focusedStartupId ? 'all' : 'review_requested',
+  );
   const [feedback, setFeedback] = useState<string | null>(null);
   const [notesByStartup, setNotesByStartup] = useState<Record<string, string>>({});
 
@@ -62,7 +87,19 @@ export default function Startups() {
     },
   });
 
-  const startups = startupsQuery.data ?? [];
+  const startups = useMemo(() => {
+    const items = startupsQuery.data ?? [];
+
+    if (!focusedStartupId) {
+      return items;
+    }
+
+    return [...items].sort((left, right) => {
+      const leftFocused = left._id === focusedStartupId ? 1 : 0;
+      const rightFocused = right._id === focusedStartupId ? 1 : 0;
+      return rightFocused - leftFocused;
+    });
+  }, [focusedStartupId, startupsQuery.data]);
   const pendingCount = useMemo(
     () => startups.filter((startup) => startup.reviewStatus === 'review_requested').length,
     [startups],
@@ -120,6 +157,12 @@ export default function Startups() {
         </div>
       ) : null}
 
+      {focusedStartupId ? (
+        <div className="rounded-2xl border border-cyan-500/20 bg-cyan-500/10 px-4 py-3 text-sm text-cyan-100">
+          Focused on the startup linked from Help Desk. Switch filters if you need the broader review queue.
+        </div>
+      ) : null}
+
       {startupsQuery.isLoading ? (
         <div className="flex items-center justify-center py-16">
           <Spinner />
@@ -129,7 +172,10 @@ export default function Startups() {
       ) : (
         <div className="space-y-4">
           {startups.map((startup) => (
-            <Card key={startup._id} className="p-6">
+            <Card
+              key={startup._id}
+              className={`p-6 ${startup._id === focusedStartupId ? 'border-cyan-500/40 shadow-[0_0_0_1px_rgba(34,211,238,0.18)]' : ''}`}
+            >
               <div className="flex flex-col gap-6 xl:flex-row xl:items-start xl:justify-between">
                 <div className="space-y-4">
                   <div className="flex flex-wrap gap-2">
@@ -170,7 +216,7 @@ export default function Startups() {
                         Submitted {startup.reviewRequestedAt ? new Date(startup.reviewRequestedAt).toLocaleString('en-IN') : 'Not submitted'}
                       </div>
                       <div className="mt-1 text-xs text-slate-400">
-                        Reviewed {startup.adminReviewedAt ? new Date(startup.adminReviewedAt).toLocaleString('en-IN') : 'Pending'}
+                        Reviewed {getReviewedLabel(startup)}
                       </div>
                     </div>
                   </div>

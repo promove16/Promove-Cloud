@@ -93,7 +93,9 @@ export function LoginPage() {
         }
 
         if (apiError?.code === 'INSTITUTION_APPROVAL_PENDING') {
-          setError('Your institution has not approved your student account yet.');
+          setError(
+            'Your school or college has not approved your student account yet. This step is handled by the institution, not the platform admin.',
+          );
           return;
         }
 

@@ -58,7 +58,7 @@ export default function UserRequests() {
           <p className="mt-2 text-slate-400">
             School and college requests now include legal verification
             documents. Admin approval stays blocked until the institution packet
-            is complete.
+            is complete. Student institution approvals do not appear in this queue because they are handled inside the linked school or college dashboard.
           </p>
         </div>
         <Badge>{pendingRequests.length} pending</Badge>
@@ -71,7 +71,7 @@ export default function UserRequests() {
           </div>
         ) : pendingRequests.length === 0 ? (
           <div className="rounded-2xl border border-dashed border-slate-800 px-5 py-10 text-sm text-slate-400">
-            No registration requests are waiting right now.
+            No institution or operator registration requests are waiting right now. Student roster approvals are institution-owned and stay outside this admin queue.
           </div>
         ) : (
           pendingRequests.map((request) => {

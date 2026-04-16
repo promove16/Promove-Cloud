@@ -195,9 +195,9 @@ export function CollegeStudentOnboardingPanel() {
             icon: Users,
           },
           {
-            label: 'Pending',
+            label: 'Approval Queue',
             value: pendingCount,
-            helper: 'Verification reviews waiting',
+            helper: 'Students needing direct institution review',
             icon: ShieldCheck,
           },
           {
@@ -227,6 +227,7 @@ export function CollegeStudentOnboardingPanel() {
         tokenFallbackLabel="General college onboarding token"
         tokens={tokenQuery.data ?? []}
         pendingStudents={pendingStudentsQuery.data ?? []}
+        rosterPendingCount={(rosterQuery.data ?? []).filter((entry) => entry.status === 'registered_pending').length}
         isCreatingToken={createTokenMutation.isPending}
         isReviewingStudents={reviewMutation.isPending}
         onTokenLabelChange={setTokenLabel}
@@ -244,7 +245,7 @@ export function CollegeStudentOnboardingPanel() {
       >
         <StudentIntakePanel
           heading="Feed student intake data for your college"
-          description="Build a managed roster and email invites automatically. Students who register with the same invited email get direct dashboard access, while token-only signups still wait for approval."
+          description="Build a managed roster and email invites automatically. Students who register with the same invited email move into the institution onboarding flow, while unmatched token signups wait for the institution review path."
           secondaryFieldLabel="Program / Year"
           secondaryFieldPlaceholder="B.Tech CSE - 3rd Year"
           roster={rosterQuery.data ?? []}

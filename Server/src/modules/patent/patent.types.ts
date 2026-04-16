@@ -106,6 +106,11 @@ export interface IPatent {
 export type PatentRequestStatus =
   | 'draft'
   | 'submitted'
+  | 'under_review'
+  | 'in_progress'
+  | 'filed'
+  | 'completed'
+  | 'cancelled'
   | 'documents_review'
   | 'filing_in_progress'
   | 'filed_with_ipo'
@@ -159,6 +164,11 @@ export interface IPatentRequest {
   _id: Types.ObjectId;
   studentId: Types.ObjectId;
   workspaceId?: Types.ObjectId;
+
+  // Simple support request fields (optional)
+  projectTitle?: string;
+  description?: string;
+  patentType?: 'invention' | 'design' | 'trademark' | 'utility';
 
   // ── Form 1 — Application for grant of patent ──────────────────────────────
   inventionTitle: string;

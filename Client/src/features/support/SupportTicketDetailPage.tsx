@@ -43,6 +43,26 @@ interface SupportTicketDetailPageProps {
   context: 'user' | 'admin';
 }
 
+const getAdminEntityPath = (ticket: SupportTicket): string | null => {
+  if (ticket.relatedStartup?._id) {
+    return `/dashboard/admin/startups?startupId=${encodeURIComponent(ticket.relatedStartup._id)}`;
+  }
+
+  if (ticket.relatedEntityType === 'startup' && ticket.relatedEntityId) {
+    return `/dashboard/admin/startups?startupId=${encodeURIComponent(ticket.relatedEntityId)}`;
+  }
+
+  if (ticket.relatedEntityType === 'deal' && ticket.relatedEntityId) {
+    return `/dashboard/admin/deals/${encodeURIComponent(ticket.relatedEntityId)}`;
+  }
+
+  if (ticket.relatedEntityType === 'patent') {
+    return '/dashboard/admin/patents';
+  }
+
+  return null;
+};
+
 export default function SupportTicketDetailPage({ context }: SupportTicketDetailPageProps) {
   const { ticketId } = useParams<{ ticketId?: string }>();
   const queryClient = useQueryClient();
@@ -210,6 +230,10 @@ export default function SupportTicketDetailPage({ context }: SupportTicketDetail
   }
 
   const isResolvedOrClosed = ticket.status === 'resolved' || ticket.status === 'closed';
+  const isRelatedStartupLocked = Boolean(ticket.relatedStartup?.editAccess?.isLocked);
+  const relatedStartupLockReason =
+    ticket.relatedStartup?.editAccess?.reason ?? 'Startup edit status is unavailable.';
+  const adminEntityPath = context === 'admin' ? getAdminEntityPath(ticket) : null;
 
   return (
     <div className="space-y-6">
@@ -276,14 +300,24 @@ export default function SupportTicketDetailPage({ context }: SupportTicketDetail
         {ticket.relatedEntityType || ticket.referenceText ? (
           <div className="mt-4 grid gap-3 text-xs text-slate-400 sm:grid-cols-2">
             {ticket.relatedEntityType ? (
+              <>
               <div className="rounded-xl border border-slate-800 bg-slate-900/60 px-3 py-2">
                 <div className="uppercase tracking-[0.22em] text-slate-500">Linked entity</div>
                 <div className="mt-1 text-slate-200">
                   {ticket.relatedEntityType}
                   {ticket.relatedEntityId ? ` · ${ticket.relatedEntityId}` : ''}
                 </div>
-              </div>
-            ) : null}
+                </div>
+                {adminEntityPath ? (
+                  <Link
+                    to={adminEntityPath}
+                    className="mt-2 inline-flex text-[11px] font-semibold uppercase tracking-[0.2em] text-cyan-300 hover:text-cyan-200"
+                  >
+                    Open linked record
+                  </Link>
+                ) : null}
+              </>
+              ) : null}
             {ticket.referenceText ? (
               <div className="rounded-xl border border-slate-800 bg-slate-900/60 px-3 py-2">
                 <div className="uppercase tracking-[0.22em] text-slate-500">Reference</div>
@@ -295,16 +329,16 @@ export default function SupportTicketDetailPage({ context }: SupportTicketDetail
 
         {ticket.relatedStartup ? (
           <div className="mt-4 rounded-2xl border border-slate-800 bg-slate-900/60 px-4 py-4">
-            {(() => {
-              const isRelatedStartupLocked = Boolean(ticket.relatedStartup?.editAccess?.isLocked);
-              const relatedStartupLockReason =
-                ticket.relatedStartup?.editAccess?.reason ?? 'Startup edit status is unavailable.';
-
-              return (
-                <>
+            <>
             <div className="text-xs uppercase tracking-[0.22em] text-slate-500">Linked startup</div>
             <div className="mt-2 flex flex-wrap items-center gap-2">
-              <div className="text-sm font-semibold text-white">{ticket.relatedStartup.name}</div>
+              {adminEntityPath ? (
+                <Link to={adminEntityPath} className="text-sm font-semibold text-cyan-200 hover:text-cyan-100">
+                  {ticket.relatedStartup.name}
+                </Link>
+              ) : (
+                <div className="text-sm font-semibold text-white">{ticket.relatedStartup.name}</div>
+              )}
               <Badge className="border-slate-700 bg-slate-950 text-slate-300">
                 {ticket.relatedStartup.reviewStatus.replace(/_/g, ' ')}
               </Badge>
@@ -321,9 +355,15 @@ export default function SupportTicketDetailPage({ context }: SupportTicketDetail
             <div className="mt-2 text-sm leading-6 text-slate-300">
               {relatedStartupLockReason}
             </div>
-                </>
-              );
-            })()}
+            {adminEntityPath ? (
+              <Link
+                to={adminEntityPath}
+                className="mt-3 inline-flex text-[11px] font-semibold uppercase tracking-[0.2em] text-cyan-300 hover:text-cyan-200"
+              >
+                Open startup review
+              </Link>
+            ) : null}
+            </>
           </div>
         ) : null}
 
@@ -544,13 +584,8 @@ export default function SupportTicketDetailPage({ context }: SupportTicketDetail
                   </div>
                 </div>
 
-                {ticket.relatedStartup ? (
+                {ticket.relatedStartup && isRelatedStartupLocked ? (
                   <div>
-                    {(() => {
-                      const isRelatedStartupLocked = Boolean(ticket.relatedStartup?.editAccess?.isLocked);
-
-                      return (
-                        <>
                     <div className="text-xs uppercase tracking-[0.22em] text-slate-500">
                       Startup edit unlock
                     </div>
@@ -568,18 +603,19 @@ export default function SupportTicketDetailPage({ context }: SupportTicketDetail
                       <div className="mt-3 flex justify-end">
                         <Button
                           onClick={() => startupUnlockMutation.mutate()}
-                          disabled={
-                            !isRelatedStartupLocked ||
-                            startupUnlockMutation.isPending
-                          }
+                          disabled={startupUnlockMutation.isPending}
                         >
                           Approve Unlock
                         </Button>
                       </div>
                     </div>
-                        </>
-                      );
-                    })()}
+                  </div>
+                ) : null}
+
+                {ticket.relatedStartup && !isRelatedStartupLocked ? (
+                  <div className="rounded-xl border border-emerald-500/20 bg-emerald-500/5 p-3 text-xs leading-5 text-emerald-200">
+                    Startup edit unlock is hidden because this startup is already editable. No admin unlock is required
+                    right now.
                   </div>
                 ) : null}
               </div>
