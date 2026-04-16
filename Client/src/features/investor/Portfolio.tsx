@@ -69,6 +69,11 @@ export default function Portfolio() {
                         {formatRoleLabel(item.investorRole)}
                       </Badge>
                       {item.canVeto ? <Badge className="border-red-500/30 bg-red-500/10 text-red-300">Veto</Badge> : null}
+                      {item.closedAt ? (
+                        <Badge className="border-emerald-500/30 bg-emerald-500/10 text-emerald-300">
+                          Transfer verified {new Date(item.closedAt).toLocaleDateString('en-IN')}
+                        </Badge>
+                      ) : null}
                     </div>
                   </div>
                   <div className="text-right">

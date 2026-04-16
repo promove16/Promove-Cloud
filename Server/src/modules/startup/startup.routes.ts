@@ -55,6 +55,7 @@ const router = Router();
 router.use(authenticate);
 router.post('/', authorize(UserRole.STUDENT), asyncHandler(createStartup));
 router.get('/mine', authorize(UserRole.STUDENT), asyncHandler(getMyStartupsController));
+router.get('/pitch-requests', authorize(UserRole.INVESTOR), asyncHandler(getPitchRequestsController));
 router.get('/:id', authorize(UserRole.STUDENT, UserRole.INVESTOR), asyncHandler(getStartupByIdController));
 router.patch('/:id', authorize(UserRole.STUDENT), asyncHandler(patchStartup));
 router.post('/:id/request-review', authorize(UserRole.STUDENT), asyncHandler(requestStartupReviewController));
@@ -67,6 +68,5 @@ router.delete('/:id/documents/:documentId', authorize(UserRole.STUDENT), asyncHa
 
 router.post('/:id/pitch-request', authorize(UserRole.STUDENT), asyncHandler(sendPitchRequestController));
 router.patch('/:id/pitch-request/:requestId', authorize(UserRole.STUDENT), asyncHandler(respondToPitchRequestController));
-router.get('/pitch-requests', authorize(UserRole.INVESTOR), asyncHandler(getPitchRequestsController));
 
 export default router;

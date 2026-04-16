@@ -72,6 +72,26 @@ const DEFAULT_REGISTRATION_PROFILE = {
   ipProtectionType: 'patent',
 } as const;
 
+const DEFAULT_INITIALIZATION_PROFILE = {
+  vision: '',
+  mission: '',
+  foundingStory: '',
+  teamComposition: '',
+  productStage: 'idea',
+  productOverview: '',
+  customerProfile: '',
+  marketOpportunity: '',
+  businessModel: 'subscription',
+  pricingStrategy: '',
+  competitiveLandscape: '',
+  defensibleMoat: '',
+  currentTraction: '',
+  upcomingMilestones: '',
+  fundingAsk: '',
+  legalEntityType: 'not_registered',
+  risksAndMitigation: '',
+} as const;
+
 const documentLabelMap: Record<StartupDocumentCategory, string> = {
   business_plan: 'business plan or financial model',
   incorporation_certificate: 'certificate of incorporation',
@@ -130,6 +150,48 @@ const startupRegistrationProfileSchema = z
   })
   .default(DEFAULT_REGISTRATION_PROFILE);
 
+const startupInitializationProfileSchema = z
+  .object({
+    vision: buildTextField(2000),
+    mission: buildTextField(1500),
+    foundingStory: buildTextField(2500),
+    teamComposition: buildTextField(2000),
+    productStage: z.enum(['idea', 'prototype', 'mvp', 'market_ready']).default('idea'),
+    productOverview: buildTextField(2500),
+    customerProfile: buildTextField(2000),
+    marketOpportunity: buildTextField(2500),
+    businessModel: z
+      .enum([
+        'subscription',
+        'transactional',
+        'marketplace',
+        'freemium',
+        'advertising',
+        'services',
+        'hardware',
+        'hybrid',
+      ])
+      .default('subscription'),
+    pricingStrategy: buildTextField(1500),
+    competitiveLandscape: buildTextField(2000),
+    defensibleMoat: buildTextField(2000),
+    currentTraction: buildTextField(2000),
+    upcomingMilestones: buildTextField(2000),
+    fundingAsk: buildTextField(1500),
+    legalEntityType: z
+      .enum([
+        'not_registered',
+        'sole_proprietorship',
+        'partnership',
+        'llp',
+        'private_limited',
+        'opc',
+      ])
+      .default('not_registered'),
+    risksAndMitigation: buildTextField(2000),
+  })
+  .default(DEFAULT_INITIALIZATION_PROFILE);
+
 export const startupSchema = z.object({
   projectId: z.string().optional(),
   name: z.string().trim().min(0).max(120).default(''),
@@ -154,6 +216,7 @@ export const startupSchema = z.object({
     }),
   businessProfile: startupBusinessProfileSchema,
   registrationProfile: startupRegistrationProfileSchema,
+  initializationProfile: startupInitializationProfileSchema,
 });
 
 export const launchSchema = z.object({
@@ -183,6 +246,7 @@ export const startupDocumentUploadSchema = z.object({
 type StartupSchemaInput = z.input<typeof startupSchema>;
 type StartupBusinessProfileInput = z.input<typeof startupBusinessProfileSchema>;
 type StartupRegistrationProfileInput = z.input<typeof startupRegistrationProfileSchema>;
+type StartupInitializationProfileInput = z.input<typeof startupInitializationProfileSchema>;
 
 type StartupLinkedWorkspace = {
   _id: Types.ObjectId;
@@ -332,9 +396,38 @@ const normalizeRegistrationProfile = (
   };
 };
 
+const normalizeInitializationProfile = (
+  initializationProfile: StartupInitializationProfileInput,
+) => {
+  const profile = startupInitializationProfileSchema.parse(
+    initializationProfile ?? DEFAULT_INITIALIZATION_PROFILE,
+  );
+
+  return {
+    vision: profile.vision.trim(),
+    mission: profile.mission.trim(),
+    foundingStory: profile.foundingStory.trim(),
+    teamComposition: profile.teamComposition.trim(),
+    productStage: profile.productStage,
+    productOverview: profile.productOverview.trim(),
+    customerProfile: profile.customerProfile.trim(),
+    marketOpportunity: profile.marketOpportunity.trim(),
+    businessModel: profile.businessModel,
+    pricingStrategy: profile.pricingStrategy.trim(),
+    competitiveLandscape: profile.competitiveLandscape.trim(),
+    defensibleMoat: profile.defensibleMoat.trim(),
+    currentTraction: profile.currentTraction.trim(),
+    upcomingMilestones: profile.upcomingMilestones.trim(),
+    fundingAsk: profile.fundingAsk.trim(),
+    legalEntityType: profile.legalEntityType,
+    risksAndMitigation: profile.risksAndMitigation.trim(),
+  };
+};
+
 const buildStartupInput = (source: Partial<Record<string, any>>): StartupSchemaInput => {
   const businessProfileSource = source.businessProfile ?? {};
   const registrationProfileSource = source.registrationProfile ?? {};
+  const initializationProfileSource = source.initializationProfile ?? {};
   const tractionSource = source.traction ?? {};
 
   const businessProfile: StartupBusinessProfileInput = {
@@ -345,6 +438,11 @@ const buildStartupInput = (source: Partial<Record<string, any>>): StartupSchemaI
   const registrationProfile: StartupRegistrationProfileInput = {
     ...DEFAULT_REGISTRATION_PROFILE,
     ...registrationProfileSource,
+  };
+
+  const initializationProfile: StartupInitializationProfileInput = {
+    ...DEFAULT_INITIALIZATION_PROFILE,
+    ...initializationProfileSource,
   };
 
   return {
@@ -364,6 +462,7 @@ const buildStartupInput = (source: Partial<Record<string, any>>): StartupSchemaI
     },
     businessProfile,
     registrationProfile,
+    initializationProfile,
   };
 };
 
@@ -371,6 +470,9 @@ const normalizeStartupPayload = (payload: StartupSchemaInput) => {
   const normalizedPayload = startupSchema.parse(payload);
   const registrationProfile = normalizeRegistrationProfile(
     normalizedPayload.registrationProfile ?? DEFAULT_REGISTRATION_PROFILE,
+  );
+  const initializationProfile = normalizeInitializationProfile(
+    normalizedPayload.initializationProfile ?? DEFAULT_INITIALIZATION_PROFILE,
   );
   const businessProfile = normalizedPayload.businessProfile ?? DEFAULT_BUSINESS_PROFILE;
 
@@ -388,6 +490,7 @@ const normalizeStartupPayload = (payload: StartupSchemaInput) => {
       goToMarketPlan: businessProfile.goToMarketPlan.trim(),
     },
     registrationProfile,
+    initializationProfile,
     traction: normalizedPayload.traction,
   };
 };
@@ -501,13 +604,16 @@ const buildAccessibleStartupQuery = (userId: string, workspaceIds: Types.ObjectI
 });
 
 const getRequiredStartupDocumentCategories = (startup: {
+  initializationProfile?: {
+    productStage?: string;
+  };
   registrationProfile?: {
     developmentStage?: string;
   };
 }): StartupDocumentCategory[] => {
-  return startup.registrationProfile?.developmentStage === 'idea'
-    ? ['design_plan_sketch']
-    : ['technical_documentation'];
+  const stage =
+    startup.initializationProfile?.productStage ?? startup.registrationProfile?.developmentStage;
+  return stage === 'idea' ? ['design_plan_sketch'] : ['technical_documentation'];
 };
 
 const toIsoString = (value: unknown) => {
@@ -550,6 +656,25 @@ const buildStartupReadiness = (startup: {
     legalAgreements?: string;
     ipProtectionType?: string;
   };
+  initializationProfile?: {
+    vision?: string;
+    mission?: string;
+    foundingStory?: string;
+    teamComposition?: string;
+    productStage?: string;
+    productOverview?: string;
+    customerProfile?: string;
+    marketOpportunity?: string;
+    businessModel?: string;
+    pricingStrategy?: string;
+    competitiveLandscape?: string;
+    defensibleMoat?: string;
+    currentTraction?: string;
+    upcomingMilestones?: string;
+    fundingAsk?: string;
+    legalEntityType?: string;
+    risksAndMitigation?: string;
+  };
 }): StartupReadiness => {
   const missingItems: string[] = [];
   const founderIds = Array.isArray(startup.founderIds) ? startup.founderIds : [];
@@ -572,24 +697,23 @@ const buildStartupReadiness = (startup: {
   addMissing(!startup.tagline?.trim(), 'startup tagline');
   addMissing(!startup.category?.trim(), 'startup category');
   addMissing(founderIds.length === 0, 'at least one founder');
-  addMissing((startup.registrationProfile?.problemStatement?.trim().length ?? 0) < 40, 'IPR problem statement');
-  addMissing(
-    (startup.registrationProfile?.solutionDifferentiation?.trim().length ?? 0) < 40,
-    'solution differentiation',
-  );
-  addMissing((startup.registrationProfile?.coreInnovation?.trim().length ?? 0) < 30, 'core innovation');
-  addMissing((startup.registrationProfile?.priorArtStatus?.trim().length ?? 0) < 20, 'prior art status');
-  addMissing((startup.registrationProfile?.workingMechanism?.trim().length ?? 0) < 40, 'working mechanism');
-  addMissing((startup.registrationProfile?.keyComponents?.trim().length ?? 0) < 20, 'key components');
-  addMissing(!startup.registrationProfile?.developmentStage?.trim(), 'innovation stage');
-  addMissing((startup.registrationProfile?.documentationReadiness?.trim().length ?? 0) < 10, 'documentation readiness');
-  addMissing(!startup.registrationProfile?.inventorOwnership?.trim(), 'inventor ownership');
-  addMissing((startup.registrationProfile?.developmentContext?.trim().length ?? 0) < 20, 'development context');
-  addMissing((startup.registrationProfile?.targetMarkets?.trim().length ?? 0) < 20, 'target markets');
-  addMissing(!startup.registrationProfile?.commercializationStrategy?.trim(), 'commercialization strategy');
-  addMissing((startup.registrationProfile?.publicDisclosureStatus?.trim().length ?? 0) < 10, 'public disclosure status');
-  addMissing((startup.registrationProfile?.legalAgreements?.trim().length ?? 0) < 10, 'legal agreements');
-  addMissing(!startup.registrationProfile?.ipProtectionType?.trim(), 'IP protection type');
+  addMissing((startup.initializationProfile?.vision?.trim().length ?? 0) < 40, 'startup vision');
+  addMissing((startup.initializationProfile?.mission?.trim().length ?? 0) < 40, 'startup mission');
+  addMissing((startup.initializationProfile?.foundingStory?.trim().length ?? 0) < 60, 'founding story');
+  addMissing((startup.initializationProfile?.teamComposition?.trim().length ?? 0) < 40, 'team composition');
+  addMissing(!startup.initializationProfile?.productStage?.trim(), 'product stage');
+  addMissing((startup.initializationProfile?.productOverview?.trim().length ?? 0) < 40, 'product overview');
+  addMissing((startup.initializationProfile?.customerProfile?.trim().length ?? 0) < 30, 'ideal customer profile');
+  addMissing((startup.initializationProfile?.marketOpportunity?.trim().length ?? 0) < 40, 'market opportunity');
+  addMissing(!startup.initializationProfile?.businessModel?.trim(), 'business model');
+  addMissing((startup.initializationProfile?.pricingStrategy?.trim().length ?? 0) < 30, 'pricing strategy');
+  addMissing((startup.initializationProfile?.competitiveLandscape?.trim().length ?? 0) < 30, 'competitive landscape');
+  addMissing((startup.initializationProfile?.defensibleMoat?.trim().length ?? 0) < 30, 'defensible moat');
+  addMissing((startup.initializationProfile?.currentTraction?.trim().length ?? 0) < 20, 'current traction');
+  addMissing((startup.initializationProfile?.upcomingMilestones?.trim().length ?? 0) < 30, 'upcoming milestones');
+  addMissing((startup.initializationProfile?.fundingAsk?.trim().length ?? 0) < 30, 'funding ask');
+  addMissing(!startup.initializationProfile?.legalEntityType?.trim(), 'legal entity type');
+  addMissing((startup.initializationProfile?.risksAndMitigation?.trim().length ?? 0) < 30, 'risks and mitigation');
   addMissing(!startup.pitchDeckUrl && !uploadedCategorySet.has('business_plan'), 'business plan or pitch deck upload');
 
   for (const category of requiredDocumentCategories) {
@@ -624,7 +748,7 @@ const completionScore = (checks: boolean[], maxScore: number) => {
 const calculateStartupInnovationScore = (startup: Record<string, any>) => {
   const readiness = buildStartupReadiness(startup as never);
   const businessProfile = startup.businessProfile ?? {};
-  const registrationProfile = startup.registrationProfile ?? {};
+  const initializationProfile = startup.initializationProfile ?? {};
   const traction = startup.traction ?? {};
   const requiredDocuments = readiness.requiredDocumentCategories ?? [];
   const uploadedDocuments = new Set(readiness.uploadedDocumentCategories ?? []);
@@ -652,18 +776,18 @@ const calculateStartupInnovationScore = (startup: Record<string, any>) => {
 
   const registrationScore = completionScore(
     [
-      Boolean(registrationProfile.problemStatement?.trim()),
-      Boolean(registrationProfile.solutionDifferentiation?.trim()),
-      Boolean(registrationProfile.coreInnovation?.trim()),
-      Boolean(registrationProfile.priorArtStatus?.trim()),
-      Boolean(registrationProfile.workingMechanism?.trim()),
-      Boolean(registrationProfile.keyComponents?.trim()),
-      Boolean(registrationProfile.developmentStage?.trim()),
-      Boolean(registrationProfile.documentationReadiness?.trim()),
-      Boolean(registrationProfile.developmentContext?.trim()),
-      Boolean(registrationProfile.targetMarkets?.trim()),
-      Boolean(registrationProfile.publicDisclosureStatus?.trim()),
-      Boolean(registrationProfile.legalAgreements?.trim()),
+      Boolean(initializationProfile.vision?.trim()),
+      Boolean(initializationProfile.mission?.trim()),
+      Boolean(initializationProfile.foundingStory?.trim()),
+      Boolean(initializationProfile.teamComposition?.trim()),
+      Boolean(initializationProfile.productOverview?.trim()),
+      Boolean(initializationProfile.customerProfile?.trim()),
+      Boolean(initializationProfile.marketOpportunity?.trim()),
+      Boolean(initializationProfile.pricingStrategy?.trim()),
+      Boolean(initializationProfile.competitiveLandscape?.trim()),
+      Boolean(initializationProfile.defensibleMoat?.trim()),
+      Boolean(initializationProfile.currentTraction?.trim()),
+      Boolean(initializationProfile.upcomingMilestones?.trim()),
     ],
     250,
   );

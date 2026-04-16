@@ -56,6 +56,7 @@ const SchoolStudentLeaderboard = lazy(() => import("../features/school/StudentLe
 const SchoolInvestorDirectory = lazy(() => import("../features/school/InvestorDirectory"));
 const SchoolMentorshipPage = lazy(() => import("../features/school/MentorshipPage"));
 const SchoolAnalyticsPage = lazy(() => import("../features/school/AnalyticsPage"));
+const SchoolComplianceReport = lazy(() => import("../features/school/ComplianceReport"));
 
 const CollegeDashboard = lazy(() => import("../features/college/Dashboard"));
 const CollegeOperationsPage = lazy(() => import("../features/college/OperationsPage"));
@@ -67,6 +68,7 @@ const RecruiterDirectory = lazy(() => import("../features/college/RecruiterDirec
 const PlacementTracker = lazy(() => import("../features/college/PlacementTracker"));
 const EventManager = lazy(() => import("../features/college/EventManager"));
 const CollegeAnalyticsPage = lazy(() => import("../features/college/AnalyticsPage"));
+const CollegeComplianceReport = lazy(() => import("../features/college/ComplianceReport"));
 
 const MentorDashboard = lazy(() => import("../features/mentor/Dashboard"));
 const MentorStudentFeed = lazy(() => import("../features/mentor/StudentFeed"));
@@ -83,7 +85,11 @@ const AdminDeals = lazy(() => import("../features/admin/Deals"));
 const AdminDealsOverview = lazy(() => import("../features/admin/DealsOverview"));
 const AdminDealsRegister = lazy(() => import("../features/admin/DealsRegister"));
 const AdminDealReview = lazy(() => import("../features/admin/DealReview"));
-const AdminAnalyticsTemporary = lazy(() => import("../features/admin/AnalyticsTemporary"));
+const AdminAnalytics = lazy(() => import("../features/admin/Analytics"));
+const AdminAnalyticsOverview = lazy(() => import("../features/admin/AnalyticsOverview"));
+const AdminAnalyticsUsage = lazy(() => import("../features/admin/AnalyticsUsage"));
+const AdminAnalyticsUsers = lazy(() => import("../features/admin/AnalyticsUsers"));
+const AdminAnalyticsLogs = lazy(() => import("../features/admin/AnalyticsLogs"));
 const AdminMentorshipPrograms = lazy(() => import("../features/admin/MentorshipPrograms"));
 const AdminMentorshipMentors = lazy(() => import("../features/admin/MentorshipMentors"));
 const AdminMentorshipProgramCreation = lazy(() => import("../features/admin/MentorshipProgramCreation"));
@@ -107,6 +113,7 @@ const InvestorDashboard = lazy(() => import("../features/investor/Dashboard"));
 const InvestorStartupMarketplace = lazy(() => import("../features/investor/StartupMarketplace"));
 const InvestorInstitutions = lazy(() => import("../features/investor/Institutions"));
 const InvestorProductWorkshop = lazy(() => import("../features/investor/ProductWorkshop"));
+const InvestorPortfolio = lazy(() => import("../features/investor/Portfolio"));
 const InvestorPaymentPage = lazy(() => import("../features/investor/InvestorPaymentPage"));
 const InvestorPitchRequests = lazy(() => import("../features/investor/PitchRequests"));
 const InvestmentPipeline = lazy(() => import("../features/investor/InvestmentPipeline"));
@@ -572,7 +579,7 @@ export const router = createBrowserRouter([
         path: "/patent-support/:innovationId?",
         element: (
           <ProtectedRoleRoute role={UserRole.STUDENT}>
-            <Navigate to="/startup-launch" replace />
+            <LazyPage component={PatentSupport} />
           </ProtectedRoleRoute>
         ),
       },
@@ -719,7 +726,7 @@ export const router = createBrowserRouter([
               { path: "institutions", element: <LazyPage component={InvestorInstitutions} /> },
               { path: "product-workshop", element: <LazyPage component={InvestorProductWorkshop} /> },
               { path: "product-workshop/:startupId", element: <LazyPage component={StartupWorkspace} /> },
-              { path: "portfolio", element: <LazyPage component={InvestorProductWorkshop} /> },
+              { path: "portfolio", element: <LazyPage component={InvestorPortfolio} /> },
               { path: "deals/:dealId/payment", element: <LazyPage component={InvestorPaymentPage} /> },
               { path: "marketplace", element: <Navigate to="/dashboard/investor/startups" replace /> },
               { path: "marketplace/view/:entityType/:entityId", element: <LazyPage component={MarketplaceDetail} /> },
@@ -807,8 +814,18 @@ export const router = createBrowserRouter([
                   { path: ":ticketId", element: <LazyPage component={SupportAdminTicketRoute} /> },
                 ],
               },
-              { path: "analytics", element: <LazyPage component={AdminAnalyticsTemporary} /> },
-              { path: "analytics/*", element: <LazyPage component={AdminAnalyticsTemporary} /> },
+              {
+                path: "analytics",
+                element: <LazyPage component={AdminAnalytics} />,
+                children: [
+                  { index: true, element: <Navigate to="overview" replace /> },
+                  { path: "overview", element: <LazyPage component={AdminAnalyticsOverview} /> },
+                  { path: "usage", element: <LazyPage component={AdminAnalyticsUsage} /> },
+                  { path: "users", element: <LazyPage component={AdminAnalyticsUsers} /> },
+                  { path: "logs", element: <LazyPage component={AdminAnalyticsLogs} /> },
+                  { path: "*", element: <Navigate to="overview" replace /> },
+                ],
+              },
             ],
           },
           {
@@ -862,7 +879,7 @@ export const router = createBrowserRouter([
               { path: "investors", element: <LazyPage component={SchoolInvestorDirectory} /> },
               { path: "mentors", element: <LazyPage component={SchoolMentorshipPage} /> },
               { path: "analytics", element: <LazyPage component={SchoolAnalyticsPage} /> },
-              { path: "compliance", element: <Navigate to="/dashboard/school/analytics" replace /> },
+              { path: "compliance", element: <LazyPage component={SchoolComplianceReport} /> },
             ],
           },
           {
@@ -883,7 +900,7 @@ export const router = createBrowserRouter([
               { path: "placement", element: <LazyPage component={PlacementTracker} /> },
               { path: "events", element: <LazyPage component={EventManager} /> },
               { path: "analytics", element: <LazyPage component={CollegeAnalyticsPage} /> },
-              { path: "compliance", element: <Navigate to="/dashboard/college/analytics" replace /> },
+              { path: "compliance", element: <LazyPage component={CollegeComplianceReport} /> },
             ],
           },
         ],

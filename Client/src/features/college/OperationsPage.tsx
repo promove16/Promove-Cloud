@@ -6,6 +6,7 @@ import {
   CalendarDays,
   FolderKanban,
   GraduationCap,
+  ShieldCheck,
   Users,
 } from 'lucide-react';
 import { Link } from 'react-router-dom';
@@ -110,6 +111,16 @@ export default function OperationsPage({
       metric: String(dashboardData?.upcomingEvents.length ?? 0),
       metricLabel: 'upcoming events',
     },
+    {
+      title: 'Compliance',
+      description:
+        'Open the college compliance workspace for alerts, incidents, actions, and downloadable audit reports.',
+      to: '/dashboard/college/compliance',
+      icon: ShieldCheck,
+      tone: 'from-cyan-500 to-sky-500',
+      metric: String(dashboardData?.institutionProfile?.policies.length ?? 0),
+      metricLabel: 'policy frameworks',
+    },
   ];
 
   const institutionName =
@@ -175,7 +186,9 @@ export default function OperationsPage({
             <p className="mt-2 max-w-3xl text-sm leading-6 text-slate-400">
               The student workspace now carries issue-access-token, verification,
               roster import, and temporary-login flows so onboarding stays attached
-              to the student record system described in the college manual.
+              to the student record system described in the college manual. Approval
+              ownership stays with the college here; the platform admin queue only
+              covers institution and operator registration requests.
             </p>
           </div>
 

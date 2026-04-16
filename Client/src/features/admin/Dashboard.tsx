@@ -209,8 +209,8 @@ export default function Dashboard() {
         label: 'Analytics',
         path: '/dashboard/admin/analytics',
         eyebrow: 'Platform insights',
-        description: 'Open the temporary analytics placeholder while the full reporting workspace is being updated.',
-        meta: 'Temporary holding page',
+        description: 'Inspect operational overview, usage activity, user intelligence, and admin logs in one workspace.',
+        meta: 'Live reporting workspace',
         icon: BarChart3,
       },
     ],
@@ -236,7 +236,7 @@ export default function Dashboard() {
                 Review Patents
               </Button>
               <Button variant="secondary" onClick={() => navigate('/dashboard/admin/mentorship/requests')}>
-                Open Mentorship
+                Institution Requests
               </Button>
               <Button variant="secondary" onClick={() => navigate('/dashboard/admin/help-desk')}>
                 Open Help Desk
@@ -302,15 +302,15 @@ export default function Dashboard() {
       <section className="overflow-hidden border border-slate-800 bg-slate-950">
         <div className="border-b border-slate-800 px-6 py-5 lg:px-8">
           <div className="text-[11px] uppercase tracking-[0.3em] text-cyan-300">Analytics Status</div>
-          <h2 className="mt-2 text-2xl font-semibold text-white">Analytics is temporarily parked</h2>
+          <h2 className="mt-2 text-2xl font-semibold text-white">Analytics workspace is live</h2>
           <p className="mt-3 max-w-3xl text-sm leading-6 text-slate-400">
-            The admin navigation still reserves an analytics entry, but it currently opens a temporary page while the
-            reporting workspace is being refreshed.
+            The admin analytics route now opens the reporting workspace directly, with dedicated views for platform
+            overview, usage trends, user activity, and logs.
           </p>
         </div>
         <div className="px-6 py-6 text-sm leading-6 text-slate-400 lg:px-8">
-          Use the temporary analytics page if you need the reserved route. Core admin monitoring remains visible on this
-          dashboard through the live summary cards above.
+          Use this dashboard for fast moderation triage, then jump into analytics when you need deeper reporting or
+          account-level investigation.
         </div>
       </section>
     </div>

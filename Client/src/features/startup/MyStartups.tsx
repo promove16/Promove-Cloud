@@ -109,12 +109,7 @@ export function MyStartups() {
     <DashboardLayout role="student">
       <div className="space-y-6">
         <div className="flex flex-col gap-4 md:flex-row md:items-center md:justify-between">
-          <div>
-            <h1 className="text-3xl font-bold text-white">Startup</h1>
-            <p className="mt-2 text-slate-400">
-              Create and manage student-owned startups independently from the Problem Bank learning module.
-            </p>
-          </div>
+          <h1 className="text-3xl font-bold text-white">Startup</h1>
           <button
             onClick={() => navigate(STARTUP_LAUNCH_NEW_PATH)}
             className="inline-flex items-center gap-2 rounded-xl bg-gradient-to-r from-blue-600 to-purple-600 px-6 py-3 font-semibold text-white transition hover:from-blue-500 hover:to-purple-500"
@@ -136,9 +131,6 @@ export function MyStartups() {
           <Card className="p-10 text-center">
             <Rocket className="mx-auto h-12 w-12 text-slate-600" />
             <h2 className="mt-4 text-xl font-bold text-white">No startups yet</h2>
-            <p className="mt-2 text-sm text-slate-400">
-              Create your first startup, add its business and IPR details, then submit it for admin review.
-            </p>
             <button
               onClick={() => navigate(STARTUP_LAUNCH_NEW_PATH)}
               className="mt-6 inline-flex items-center gap-2 rounded-xl bg-gradient-to-r from-blue-600 to-purple-600 px-6 py-3 font-semibold text-white transition hover:from-blue-500 hover:to-purple-500"

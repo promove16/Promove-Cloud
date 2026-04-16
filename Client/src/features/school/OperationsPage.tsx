@@ -189,9 +189,9 @@ export default function OperationsPage() {
       icon: Users,
     },
     {
-      label: 'Pending',
+      label: 'Approval Queue',
       value: pendingCount,
-      helper: 'Verification reviews waiting',
+      helper: 'Students needing direct institution review',
       icon: ShieldCheck,
     },
     {
@@ -257,6 +257,13 @@ export default function OperationsPage() {
       to: '/dashboard/school/mentors',
       icon: GraduationCap,
       stat: `${data?.stats.totalMentoringHours ?? 0} hrs logged`,
+    },
+    {
+      title: 'Compliance',
+      description: 'Open alerts, incidents, actions, and report downloads from the school compliance workspace.',
+      to: '/dashboard/school/compliance',
+      icon: ShieldCheck,
+      stat: `${data?.institutionProfile?.policies.length ?? 0} frameworks`,
     },
   ];
 
@@ -331,6 +338,9 @@ export default function OperationsPage() {
           tokenFallbackLabel="General student onboarding token"
           tokens={tokenQuery.data ?? []}
           pendingStudents={pendingStudentsQuery.data ?? []}
+          rosterPendingCount={
+            (rosterQuery.data ?? []).filter((entry) => entry.status === 'registered_pending').length
+          }
           isCreatingToken={createTokenMutation.isPending}
           isReviewingStudents={reviewMutation.isPending}
           onTokenLabelChange={setTokenLabel}
@@ -346,7 +356,7 @@ export default function OperationsPage() {
         >
           <StudentIntakePanel
             heading="Feed student data manually or from Excel"
-            description="Create a school-managed roster and email invites automatically. Students who register with the same invited email get direct dashboard access, while token-only signups still wait for approval."
+            description="Create a school-managed roster and email invites automatically. Students who register with the same invited email move into the institution onboarding flow, while unmatched token signups wait for the institution review path."
             secondaryFieldLabel="Class / Section"
             secondaryFieldPlaceholder="Grade 12 - A"
             roster={rosterQuery.data ?? []}

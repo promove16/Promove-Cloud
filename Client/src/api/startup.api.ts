@@ -1,7 +1,14 @@
 import api from './axiosInstance';
 import { ApiSuccessResponse } from '../types/auth.types';
 import { CapTableResponse } from '../types/deal.types';
-import { Startup, StartupBusinessProfile, StartupDocumentCategory, StartupPitchRequest, StartupRegistrationProfile } from '../types/startup.types';
+import {
+  Startup,
+  StartupBusinessProfile,
+  StartupDocumentCategory,
+  StartupInitializationProfile,
+  StartupPitchRequest,
+  StartupRegistrationProfile,
+} from '../types/startup.types';
 
 export interface StartupPayload {
   projectId?: string;
@@ -22,6 +29,7 @@ export interface StartupPayload {
   };
   businessProfile: StartupBusinessProfile;
   registrationProfile: StartupRegistrationProfile;
+  initializationProfile: StartupInitializationProfile;
 }
 
 export const startupApi = {

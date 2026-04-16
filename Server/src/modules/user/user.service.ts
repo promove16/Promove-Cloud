@@ -7,12 +7,14 @@ import {
   LaunchToRecruitersResult,
   PublicStudentProfile,
   SanitizedUser,
+  StudentInstitutionMentorshipProgramView,
   StudentMentorSessionView,
 } from './user.types';
 import { buildTermsAcceptance, CURRENT_TERMS_VERSION, hasAcceptedCurrentTerms } from './user.terms';
 import { ApiError } from '../../utils/ApiError';
 import { recordClientActivity, recordClientActivitySchema } from '../analytics/activity.service';
 import { MentorSession } from '../mentor/mentorSession.model';
+import { InstitutionMentorshipProgram } from '../mentor/mentorshipProgram.model';
 import { UserRole } from '../../types/roles.types';
 import { RelevanceBridge } from '../recruiter/relevanceBridge.model';
 import { PlacementRecord } from '../college/placementRecord.model';
@@ -1280,6 +1282,88 @@ export const getCurrentUserMentorSessions = async (
       ...(session.mentorNotes ? { mentorNotes: session.mentorNotes } : {}),
       ...(session.studentFeedback ? { studentFeedback: session.studentFeedback } : {}),
       createdAt: session.createdAt,
+    };
+  });
+};
+
+export const getCurrentUserInstitutionMentorshipPrograms = async (
+  studentId: string,
+): Promise<StudentInstitutionMentorshipProgramView[]> => {
+  const student = await User.findById(studentId).select('institutionId role').lean();
+  if (!student || student.role !== UserRole.STUDENT || !student.institutionId) {
+    return [];
+  }
+
+  const institution = await User.findById(student.institutionId)
+    .select('_id displayName role institutionProfile')
+    .lean();
+
+  if (!institution || (institution.role !== UserRole.SCHOOL && institution.role !== UserRole.COLLEGE)) {
+    return [];
+  }
+
+  const institutionType: 'school' | 'college' =
+    institution.role === UserRole.COLLEGE ? 'college' : 'school';
+
+  const programs = await InstitutionMentorshipProgram.find({
+    institutionId: institution._id,
+    status: { $in: ['Pending', 'Assigned'] },
+  })
+    .sort({ scheduledAt: 1, preferredDate: 1, createdAt: -1 })
+    .lean();
+
+  if (programs.length === 0) {
+    return [];
+  }
+
+  const mentorIds = programs
+    .map((program) => program.mentorId)
+    .filter((mentorId): mentorId is Types.ObjectId => Boolean(mentorId));
+
+  const mentors =
+    mentorIds.length > 0
+      ? await User.find({ _id: { $in: mentorIds } })
+          .select('_id displayName avatar domain')
+          .lean()
+      : [];
+  const mentorMap = new Map(mentors.map((mentor) => [String(mentor._id), mentor]));
+
+  const institutionDisplayName =
+    institution.institutionProfile?.institutionName ?? institution.displayName;
+
+  return programs.map((program) => {
+    const mentor = program.mentorId ? mentorMap.get(String(program.mentorId)) : undefined;
+
+    return {
+      _id: String(program._id),
+      institution: {
+        _id: String(institution._id),
+        displayName: institutionDisplayName,
+        type: institutionType,
+      },
+      ...(mentor
+        ? {
+            mentor: {
+              _id: String(mentor._id),
+              displayName: mentor.displayName,
+              ...(mentor.avatar ? { avatar: mentor.avatar } : {}),
+              ...(mentor.domain ? { domain: mentor.domain } : {}),
+            },
+          }
+        : {}),
+      title: program.title,
+      objective: program.objective,
+      preferredDate: new Date(program.preferredDate).toISOString(),
+      ...(program.scheduledAt ? { scheduledAt: new Date(program.scheduledAt).toISOString() } : {}),
+      durationMinutes: program.durationMinutes,
+      expectedParticipants: program.expectedParticipants,
+      deliveryMode: program.deliveryMode,
+      platform: program.platform,
+      ...(program.meetingLink ? { meetingLink: program.meetingLink } : {}),
+      ...(program.venue ? { venue: program.venue } : {}),
+      ...(program.preferredExpertise ? { preferredExpertise: program.preferredExpertise } : {}),
+      status: program.status,
+      createdAt: new Date(program.createdAt).toISOString(),
     };
   });
 };

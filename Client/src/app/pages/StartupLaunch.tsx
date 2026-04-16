@@ -8,7 +8,6 @@ import {
   FileText,
   FolderKanban,
   Rocket,
-  Send,
   ShieldCheck,
   Target,
   TrendingUp,
@@ -20,12 +19,15 @@ import { dealApi } from "../../api/deal.api";
 import { startupApi, StartupPayload } from "../../api/startup.api";
 import { workspaceApi } from "../../api/workspace.api";
 import {
+  DEFAULT_STARTUP_INIT_PROFILE,
   DEFAULT_STARTUP_IPR_PROFILE,
+  STARTUP_INIT_QUESTION_SECTIONS,
   STARTUP_IPR_QUESTION_SECTIONS,
   STARTUP_IPR_UPLOAD_MAX_BYTES,
   STARTUP_IPR_DOCUMENT_SPECS,
   buildStartupReviewReadiness,
   formatStartupIprValue,
+  formatStartupInitValue,
   getRequiredStartupDocumentCategories,
 } from "../../features/startup/iprIntake";
 import {
@@ -37,6 +39,7 @@ import { Spinner } from "../../components/ui/Spinner";
 import type {
   Startup,
   StartupDocumentCategory,
+  StartupInitializationProfile,
   StartupRegistrationProfile,
 } from "../../types/startup.types";
 
@@ -63,6 +66,7 @@ const createEmptyPayload = (): StartupPayload => ({
     goToMarketPlan: "",
   },
   registrationProfile: { ...DEFAULT_STARTUP_IPR_PROFILE },
+  initializationProfile: { ...DEFAULT_STARTUP_INIT_PROFILE },
 });
 
 /* ── field limits (mirrors server Zod schema) ── */
@@ -82,6 +86,21 @@ const FIELD_LIMITS = {
   targetMarkets: 2000,
   publicDisclosureStatus: 1500,
   legalAgreements: 1500,
+  // initialization profile
+  vision: 2500,
+  mission: 2500,
+  foundingStory: 4000,
+  teamComposition: 2000,
+  productOverview: 2500,
+  customerProfile: 2000,
+  marketOpportunity: 2000,
+  pricingStrategy: 1500,
+  competitiveLandscape: 2000,
+  defensibleMoat: 2000,
+  currentTraction: 1500,
+  upcomingMilestones: 2000,
+  fundingAsk: 2000,
+  risksAndMitigation: 2000,
 } as const;
 
 type FieldErrors = Record<string, string>;
@@ -238,6 +257,10 @@ const mapStartupToForm = (startup?: Partial<Startup> | null): StartupPayload => 
       ...defaultPayload.registrationProfile,
       ...(startup.registrationProfile ?? {}),
     },
+    initializationProfile: {
+      ...defaultPayload.initializationProfile,
+      ...(startup.initializationProfile ?? {}),
+    },
   };
 };
 
@@ -263,7 +286,7 @@ export function StartupLaunch() {
   const [form, setForm] = useState<StartupPayload>(createEmptyPayload);
   const [isIprIntakeOpen, setIsIprIntakeOpen] = useState(true);
   const [activeIprSectionTitle, setActiveIprSectionTitle] = useState(
-    STARTUP_IPR_QUESTION_SECTIONS[0]?.title ?? "",
+    STARTUP_INIT_QUESTION_SECTIONS[0]?.title ?? "",
   );
   const [fieldErrors, setFieldErrors] = useState<FieldErrors>({});
   const [hasAttemptedSubmit, setHasAttemptedSubmit] = useState(false);
@@ -591,6 +614,20 @@ export function StartupLaunch() {
       },
     }));
   };
+
+  const updateInitializationField = <K extends keyof StartupInitializationProfile>(
+    key: K,
+    value: StartupInitializationProfile[K],
+  ) => {
+    setForm((current) => ({
+      ...current,
+      initializationProfile: {
+        ...current.initializationProfile,
+        [key]: value,
+      },
+    }));
+  };
+
   const importSelectedWorkspace = () => {
     const workspace = problemWorkspaces.find(
       (item) => item._id === selectedWorkspaceId,
@@ -643,7 +680,7 @@ export function StartupLaunch() {
     form.registrationProfile,
   );
   const currentDocuments = startup?.documents ?? [];
-  const currentReadiness = useMemo(
+  const currentReviewReadiness = useMemo(
     () =>
       startup
         ? buildStartupReviewReadiness({
@@ -710,6 +747,48 @@ export function StartupLaunch() {
       value: String(form.registrationProfile[question.key] ?? "").trim(),
     })),
   ).filter((item) => item.value.length > 0);
+  const initQuestionCount = STARTUP_INIT_QUESTION_SECTIONS.reduce(
+    (total, section) => total + section.questions.length,
+    0,
+  );
+  const initAnsweredQuestionCount = STARTUP_INIT_QUESTION_SECTIONS.reduce(
+    (total, section) =>
+      total +
+      section.questions.filter(
+        (question) =>
+          String(form.initializationProfile[question.key] ?? "").trim().length >
+          0,
+      ).length,
+    0,
+  );
+  const initSectionSummaries = STARTUP_INIT_QUESTION_SECTIONS.map((section) => ({
+    title: section.title,
+    answered: section.questions.filter(
+      (question) =>
+        String(form.initializationProfile[question.key] ?? "").trim().length > 0,
+    ).length,
+    total: section.questions.length,
+  }));
+  const initSections = STARTUP_INIT_QUESTION_SECTIONS.map((section) => {
+    const answered = section.questions.filter(
+      (question) =>
+        String(form.initializationProfile[question.key] ?? "").trim().length > 0,
+    ).length;
+
+    return {
+      ...section,
+      answered,
+      total: section.questions.length,
+      isComplete: answered === section.questions.length,
+    };
+  });
+  const initPreviewAnswers = STARTUP_INIT_QUESTION_SECTIONS.flatMap((section) =>
+    section.questions.map((question) => ({
+      key: question.key,
+      label: question.label,
+      value: String(form.initializationProfile[question.key] ?? "").trim(),
+    })),
+  ).filter((item) => item.value.length > 0);
   const requiredDocumentSpecs = STARTUP_IPR_DOCUMENT_SPECS.filter((spec) =>
     requiredDocumentCategories.includes(spec.category),
   );
@@ -730,7 +809,7 @@ export function StartupLaunch() {
   const editAccess = startup?.editAccess;
   const isEditingLocked = Boolean(!isNew && editAccess?.isLocked);
   const editLockReason = editAccess?.reason ?? "";
-  const readiness = currentReadiness ?? startup?.readiness;
+  const readiness = currentReviewReadiness ?? startup?.readiness;
   const reviewTone =
     reviewStatus === "approved"
       ? "bg-emerald-500/10 border-emerald-500/20 text-emerald-200"
@@ -755,6 +834,15 @@ export function StartupLaunch() {
         : reviewStatus === "changes_requested"
           ? "Update the startup profile based on admin notes and submit it again for review."
           : "Complete the business plan, the IPR intake questionnaire, and the required supporting files before submitting for admin review.";
+  const reviewedStateLabel = startup?.adminReviewedAt
+    ? shortDateTimeFormatter.format(new Date(startup.adminReviewedAt))
+    : reviewStatus === "review_requested"
+      ? "Pending"
+      : reviewStatus === "changes_requested"
+        ? "Changes requested"
+        : reviewStatus === "approved"
+          ? "Approved"
+          : "Not started";
   const profileStatusLabel = startup?.launchedAt
     ? "Live"
     : isApproved
@@ -899,10 +987,16 @@ export function StartupLaunch() {
   const completedWorkflowCount = workflowSteps.filter(
     (step) => step.status === "complete",
   ).length;
-  const currentWorkflowStep =
-    workflowSteps.find((step) => step.status === "current") ??
-    workflowSteps.find((step) => step.status === "blocked") ??
-    workflowSteps[workflowSteps.length - 1];
+  const allWorkflowStepsComplete =
+    workflowSteps.length > 0 &&
+    workflowSteps.every(
+      (step) => step.status === "complete" || step.status === "optional",
+    );
+  const currentWorkflowStep = allWorkflowStepsComplete
+    ? null
+    : workflowSteps.find((step) => step.status === "current") ??
+      workflowSteps.find((step) => step.status === "blocked") ??
+      workflowSteps[workflowSteps.length - 1];
   const visibleChecklistItems = checklistItems.slice(0, 4);
   const sectionClassName = isNew
     ? "border-b border-slate-800/70 pb-8"
@@ -961,17 +1055,17 @@ export function StartupLaunch() {
     }
 
     const nextSection =
-      iprSections.find((section) => !section.isComplete)?.title ??
-      iprSections[0]?.title ??
+      initSections.find((section) => !section.isComplete)?.title ??
+      initSections[0]?.title ??
       "";
 
     if (
       !activeIprSectionTitle ||
-      !iprSections.some((section) => section.title === activeIprSectionTitle)
+      !initSections.some((section) => section.title === activeIprSectionTitle)
     ) {
       setActiveIprSectionTitle(nextSection);
     }
-  }, [activeIprSectionTitle, iprSections, isIprIntakeOpen]);
+  }, [activeIprSectionTitle, initSections, isIprIntakeOpen]);
 
   const handleRequestReviewClick = () => {
     if (isRequestReviewBusy) {
@@ -1100,41 +1194,7 @@ export function StartupLaunch() {
           <h1 className="text-2xl font-semibold text-white">
             {isNew ? "Create startup" : "Launch profile"}
           </h1>
-          <p className="max-w-3xl text-sm text-slate-400">
-            {isNew
-              ? "Fill in the startup details, answer the IPR questions, and upload the required startup documents."
-              : "Keep the overview lean, complete only what is missing, and move supporting work into the dedicated startup tabs."}
-          </p>
         </div>
-
-        {!isNew ? (
-          <div className="flex flex-wrap gap-3">
-            <button
-              type="button"
-              onClick={() =>
-                navigate(
-                  getStartupSectionPath(currentStartupId!, "investor-outreach"),
-                )
-              }
-              className="inline-flex items-center gap-2 border border-slate-700 px-4 py-3 text-sm font-semibold text-white transition hover:border-slate-500"
-            >
-              <Send className="h-4 w-4" />
-              Investor Outreach
-            </button>
-            <button
-              type="button"
-              onClick={() =>
-                navigate(
-                  getStartupSectionPath(currentStartupId!, "investor-deals"),
-                )
-              }
-              className="inline-flex items-center gap-2 border border-slate-700 px-4 py-3 text-sm font-semibold text-white transition hover:border-slate-500"
-            >
-              <FileText className="h-4 w-4" />
-              Investor Deals
-            </button>
-          </div>
-        ) : null}
       </div>
 
       {toast ? (
@@ -1338,10 +1398,18 @@ export function StartupLaunch() {
                     </div>
                   </div>
                   <div className="text-sm text-slate-400">
-                    Next:{" "}
-                    <span className="text-white">
-                      {currentWorkflowStep?.label ?? "Launch"}
-                    </span>
+                    {currentWorkflowStep ? (
+                      <>
+                        Next:{" "}
+                        <span className="text-white">
+                          {currentWorkflowStep.label}
+                        </span>
+                      </>
+                    ) : (
+                      <span className="text-emerald-300">
+                        All launch steps complete
+                      </span>
+                    )}
                   </div>
                 </div>
 
@@ -1377,11 +1445,7 @@ export function StartupLaunch() {
                   </div>
                   <div>
                     Reviewed:{" "}
-                    {startup?.adminReviewedAt
-                      ? shortDateTimeFormatter.format(
-                          new Date(startup.adminReviewedAt),
-                        )
-                      : "Pending"}
+                    {reviewedStateLabel}
                   </div>
                 </div>
               </div>
@@ -1585,26 +1649,9 @@ export function StartupLaunch() {
                       Linked Product Workspace
                     </div>
                     <h2 className="mt-2 text-xl font-semibold text-white">
-                      Keep workspace management in its own tab
+                      Linked Product Workspace
                     </h2>
-                    <p className="mt-2 max-w-3xl text-sm text-slate-400">
-                      The overview only shows linked status. Open the dedicated
-                      workspace tab when you need to change the linked workspace
-                      or review team sync details.
-                    </p>
                   </div>
-                  <button
-                    type="button"
-                    onClick={() =>
-                      navigate(
-                        getStartupSectionPath(startupId!, "product-workspace"),
-                      )
-                    }
-                    className="inline-flex items-center gap-2 border border-cyan-500/30 px-4 py-2.5 text-sm font-semibold text-cyan-100 transition hover:border-cyan-400/50 hover:bg-cyan-500/10"
-                  >
-                    <FolderKanban className="h-4 w-4" />
-                    Open Workspace Tab
-                  </button>
                 </div>
                 <div className="mt-5 grid gap-4 border-t border-slate-800/70 pt-4 md:grid-cols-3">
                   <div className="border-l border-slate-800/70 pl-4">
@@ -1642,19 +1689,19 @@ export function StartupLaunch() {
             <div className="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
               <div>
                 <div className="text-xs uppercase tracking-[0.24em] text-cyan-300">
-                  IPR Intake
+                  Initialization
                 </div>
                 <h2 className="mt-2 text-xl font-semibold text-white">
-                  Startup innovation disclosure questionnaire
+                  Startup initialization questionnaire
                 </h2>
                 <p className="mt-2 max-w-3xl text-sm text-slate-400">
-                  Answer the required questions only. Keep the responses clear
-                  and specific enough for startup IPR review.
+                  Answer the required questions to define your startup's core
+                  identity, business model, and growth plan.
                 </p>
               </div>
               <div className="flex flex-wrap items-center gap-2">
                 <div className="border border-cyan-500/20 bg-cyan-500/10 px-3 py-1.5 text-xs font-semibold text-cyan-100">
-                  {iprAnsweredQuestionCount}/{iprQuestionCount} answered
+                  {initAnsweredQuestionCount}/{initQuestionCount} answered
                 </div>
                 {isIprIntakeOpen ? (
                   <button
@@ -1669,9 +1716,9 @@ export function StartupLaunch() {
                     type="button"
                     onClick={() => {
                       setActiveIprSectionTitle(
-                        iprSections.find((section) => !section.isComplete)
+                        initSections.find((section) => !section.isComplete)
                           ?.title ??
-                          iprSections[0]?.title ??
+                          initSections[0]?.title ??
                           "",
                       );
                       setIsIprIntakeOpen(true);
@@ -1686,7 +1733,7 @@ export function StartupLaunch() {
 
             {isIprIntakeOpen ? (
               <>
-                {iprSections.map((section) => {
+                {initSections.map((section) => {
                   const isActive = activeIprSectionTitle === section.title;
 
                   return (
@@ -1737,23 +1784,23 @@ export function StartupLaunch() {
                               }
                             >
                               <label
-                                htmlFor={`ipr-${String(question.key)}`}
+                                htmlFor={`init-${String(question.key)}`}
                                 className="mb-2 block text-sm font-semibold text-white"
                               >
                                 {question.label}
                               </label>
                               {question.type === "select" ? (
                                 <select
-                                  id={`ipr-${String(question.key)}`}
+                                  id={`init-${String(question.key)}`}
                                   name={String(question.key)}
                                   value={String(
-                                    form.registrationProfile[question.key],
+                                    form.initializationProfile[question.key],
                                   )}
                                   onChange={(event) =>
-                                    updateRegistrationField(
+                                    updateInitializationField(
                                       question.key,
                                       event.target
-                                        .value as StartupRegistrationProfile[typeof question.key],
+                                        .value as StartupInitializationProfile[typeof question.key],
                                     )
                                   }
                                   disabled={isEditingLocked}
@@ -1770,41 +1817,41 @@ export function StartupLaunch() {
                                 </select>
                               ) : (
                                 <textarea
-                                  id={`ipr-${String(question.key)}`}
+                                  id={`init-${String(question.key)}`}
                                   name={String(question.key)}
                                   maxLength={FIELD_LIMITS[question.key as keyof typeof FIELD_LIMITS] ?? undefined}
                                   value={String(
-                                    form.registrationProfile[question.key] ??
+                                    form.initializationProfile[question.key] ??
                                       "",
                                   )}
                                   onChange={(event) =>
-                                    updateRegistrationField(
+                                    updateInitializationField(
                                       question.key,
                                       event.target
-                                        .value as StartupRegistrationProfile[typeof question.key],
+                                        .value as StartupInitializationProfile[typeof question.key],
                                     )
                                   }
                                   disabled={isEditingLocked}
                                   className={textareaClassName}
-                                  placeholder="Add a concrete answer with enough technical detail for review…"
+                                  placeholder="Add your response here…"
                                 />
                               )}
                               <div className="mt-1.5 flex items-center justify-between gap-2">
                                 {"minLength" in question ? (
                                   <span className={`text-xs ${
-                                    String(form.registrationProfile[question.key] ?? "").trim().length >= (question.minLength ?? 0)
+                                    String(form.initializationProfile[question.key] ?? "").trim().length >= (question.minLength ?? 0)
                                       ? "text-emerald-500"
                                       : "text-slate-500"
                                   }`}>
                                     Min {question.minLength} chars
-                                    {String(form.registrationProfile[question.key] ?? "").trim().length >= (question.minLength ?? 0)
+                                    {String(form.initializationProfile[question.key] ?? "").trim().length >= (question.minLength ?? 0)
                                       ? " \u2713"
                                       : ""}
                                   </span>
                                 ) : <span />}
                                 {FIELD_LIMITS[question.key as keyof typeof FIELD_LIMITS] ? (
                                   <span className="text-xs text-slate-600">
-                                    {String(form.registrationProfile[question.key] ?? "").length}
+                                    {String(form.initializationProfile[question.key] ?? "").length}
                                     /{FIELD_LIMITS[question.key as keyof typeof FIELD_LIMITS]}
                                   </span>
                                 ) : null}
@@ -1843,7 +1890,7 @@ export function StartupLaunch() {
             ) : (
               <div className="border-t border-slate-800/70 pt-5">
                 <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-4">
-                  {iprSectionSummaries.map((section) => (
+                  {initSectionSummaries.map((section) => (
                     <div
                       key={section.title}
                       className="border-l border-slate-800/70 px-4 py-3"
@@ -1858,8 +1905,8 @@ export function StartupLaunch() {
                   ))}
                 </div>
                 <div className="mt-4 space-y-3">
-                  {iprPreviewAnswers.length > 0 ? (
-                    iprPreviewAnswers.slice(0, 4).map((item) => (
+                  {initPreviewAnswers.length > 0 ? (
+                    initPreviewAnswers.slice(0, 4).map((item) => (
                       <div
                         key={item.key}
                         className="border-l border-slate-800/70 px-4 py-3"
@@ -1868,13 +1915,13 @@ export function StartupLaunch() {
                           {item.label}
                         </div>
                         <div className="mt-2 line-clamp-2 text-sm leading-6 text-slate-200">
-                          {formatStartupIprValue(item.key, item.value)}
+                          {formatStartupInitValue(item.key, item.value)}
                         </div>
                       </div>
                     ))
                   ) : (
                     <div className="border border-dashed border-slate-800 px-4 py-5 text-sm text-slate-400">
-                      No written intake answers have been saved yet. Use Edit to
+                      No initialization answers have been saved yet. Use Edit to
                       complete the questionnaire.
                     </div>
                   )}
@@ -2143,8 +2190,7 @@ export function StartupLaunch() {
                   </div>
                 ) : activeDeals.length === 0 ? (
                   <div className="border border-dashed border-slate-700 px-4 py-5 text-sm text-slate-400">
-                    No investor deals yet. Launch to investors first, then
-                    manage live conversations from the Investor Deals tab.
+                    No investor deals yet.
                   </div>
                 ) : (
                   <div className="space-y-3">
@@ -2170,20 +2216,6 @@ export function StartupLaunch() {
                         </div>
                       </div>
                     ))}
-                    <button
-                      type="button"
-                      onClick={() =>
-                        navigate(
-                          getStartupSectionPath(
-                            currentStartupId!,
-                            "investor-deals",
-                          ),
-                        )
-                      }
-                      className="border border-slate-700 px-4 py-2 text-sm font-semibold text-white transition hover:border-slate-500"
-                    >
-                      Open Investor Deals
-                    </button>
                   </div>
                 )}
               </div>
@@ -2197,14 +2229,13 @@ export function StartupLaunch() {
           <p className="text-sm font-semibold text-white">
             {isNew ? "Create your startup draft" : "Save or submit your startup"}
           </p>
-          <p className="mt-1 text-sm text-slate-400">
-            {isNew
-              ? "Fill in at least the name, tagline, and category, then save. Documents and IPR answers can be added later."
-              : isEditingLocked
+          {isEditingLocked || launchBlockedReason ? (
+            <p className="mt-1 text-sm text-slate-400">
+              {isEditingLocked
                 ? `${editLockReason} Raise a Smart Help request if you need admin-approved edits.`
-                : launchBlockedReason ||
-                  "Save changes after reviewing the full profile, then launch to the marketplace from here."}
-          </p>
+                : launchBlockedReason}
+            </p>
+          ) : null}
         </div>
         <div className="flex flex-wrap items-center gap-3 sm:justify-end">
           {!isNew ? (

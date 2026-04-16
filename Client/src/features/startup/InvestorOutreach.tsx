@@ -2,16 +2,12 @@ import { useDeferredValue, useMemo, useState } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import {
-  BriefcaseBusiness,
   ExternalLink,
   Globe,
   Linkedin,
   MessageCircle,
-  Rocket,
   Search,
   Send,
-  Sparkles,
-  TrendingUp,
 } from 'lucide-react';
 import { dmApi } from '../../api/dm.api';
 import { marketplaceApi, MarketplaceProfile } from '../../api/marketplace.api';
@@ -24,7 +20,7 @@ import { Input } from '../../components/ui/Input';
 import { Spinner } from '../../components/ui/Spinner';
 import { useAuthStore } from '../../store/authStore';
 import { getApiErrorMessage } from '../../utils/apiError';
-import { getStartupSectionPath, normalizeStartupRouteId } from './navigation';
+import { normalizeStartupRouteId } from './navigation';
 import { isStartupFounder } from './startupAccess';
 
 const getInvestorSearchText = (profile: MarketplaceProfile) =>
@@ -156,45 +152,8 @@ export function InvestorOutreach() {
       startup?.tagline?.trim() &&
       startup?.category?.trim(),
     ) || false;
-  const hasStartup = Boolean(normalizedStartupId);
-
   return (
     <div className="space-y-6">
-      <div className="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
-        <div>
-          <h1 className="text-3xl font-bold text-white">Investor Outreach</h1>
-          <p className="mt-2 max-w-3xl text-slate-400">
-            Launch your startup profile, shortlist investors, send pitch
-            requests, and continue the conversation in one workflow. Investor
-            deal creation still happens when an investor accepts and expresses
-            interest from their side.
-          </p>
-        </div>
-        <div className="flex flex-wrap gap-3">
-          <Button
-            variant="secondary"
-            onClick={() =>
-              navigate(getStartupSectionPath(normalizedStartupId!, 'overview'))
-            }
-            disabled={!hasStartup}
-          >
-            <Rocket className="mr-2 h-4 w-4" />
-            Launch Overview
-          </Button>
-          <Button
-            onClick={() =>
-              navigate(
-                getStartupSectionPath(normalizedStartupId!, 'investor-deals'),
-              )
-            }
-            disabled={!hasStartup}
-          >
-            <BriefcaseBusiness className="mr-2 h-4 w-4" />
-            Investor Deals
-          </Button>
-        </div>
-      </div>
-
       {feedback ? (
         <div
           className={`rounded-2xl px-4 py-3 text-sm ${
@@ -226,25 +185,6 @@ export function InvestorOutreach() {
           <h2 className="mt-3 text-xl font-bold text-white">
             Investor outreach is managed by the startup creator or founders.
           </h2>
-          <p className="mt-3 text-sm leading-6 text-amber-100/90">
-            You can contribute to execution through the linked workspace, but
-            investor shortlisting, pitch requests, and deal conversations should
-            be initiated by founders so ownership and fundraising communication
-            stay accountable.
-          </p>
-          <div className="mt-5 flex flex-wrap gap-3">
-            <Button
-              variant="secondary"
-              onClick={() =>
-                navigate(
-                  getStartupSectionPath(normalizedStartupId!, 'overview'),
-                )
-              }
-            >
-              <Rocket className="mr-2 h-4 w-4" />
-              Back to Overview
-            </Button>
-          </div>
         </Card>
       ) : (
         <>
@@ -256,11 +196,6 @@ export function InvestorOutreach() {
               <div className="mt-3 text-2xl font-bold text-white">
                 {startup?.name?.trim() ? 'Ready' : 'Draft'}
               </div>
-              <p className="mt-2 text-sm text-slate-400">
-                {startup?.name?.trim()
-                  ? `${startup.name} is available as your pitch source.`
-                  : 'Create your startup profile on the Overview tab first.'}
-              </p>
             </Card>
 
             <Card className="p-5">
@@ -270,11 +205,6 @@ export function InvestorOutreach() {
               <div className="mt-3 text-2xl font-bold text-white">
                 {startup?.launchedToInvestors ? 'Live' : 'Pending'}
               </div>
-              <p className="mt-2 text-sm text-slate-400">
-                {startup?.launchedToInvestors
-                  ? 'Investors can now discover you in their marketplace.'
-                  : 'You can still send pitch requests, but launch to investors to appear in investor discovery.'}
-              </p>
             </Card>
 
             <Card className="p-5">
@@ -284,11 +214,6 @@ export function InvestorOutreach() {
               <div className="mt-3 text-2xl font-bold text-white">
                 {startup?.pitchDeckUrl ? 'Uploaded' : 'Missing'}
               </div>
-              <p className="mt-2 text-sm text-slate-400">
-                {startup?.pitchDeckUrl
-                  ? 'Pitch requests can include your deck automatically.'
-                  : 'Upload a pitch deck on the Overview tab to strengthen investor outreach.'}
-              </p>
             </Card>
 
             <Card className="p-5">
@@ -298,84 +223,9 @@ export function InvestorOutreach() {
               <div className="mt-3 text-2xl font-bold text-white">
                 {activeDeals.length}
               </div>
-              <p className="mt-2 text-sm text-slate-400">
-                Formal investor interest and deal-stage progress will appear in
-                Investor Deals.
-              </p>
             </Card>
           </div>
-
           <Card className="overflow-hidden p-0">
-            <div className="grid gap-6 border-b border-slate-800 px-6 py-6 lg:grid-cols-[1.15fr_0.85fr]">
-              <div>
-                <div className="flex items-center gap-2 text-xs uppercase tracking-[0.3em] text-cyan-300">
-                  <Sparkles className="h-4 w-4" />
-                  Outreach Workflow
-                </div>
-                <div className="mt-4 space-y-3 text-sm text-slate-300">
-                  <p>
-                    1. Build and save the startup profile on the Overview tab.
-                  </p>
-                  <p>
-                    2. Launch to investors so your startup appears inside the
-                    investor dashboard.
-                  </p>
-                  <p>
-                    3. Shortlist investors here and send either a direct message
-                    or a structured pitch request.
-                  </p>
-                  <p>
-                    4. Continue the conversation in Messages. If the investor is
-                    interested, they create formal deal interest from their
-                    investor workflow.
-                  </p>
-                </div>
-              </div>
-              <div className="rounded-3xl border border-cyan-500/20 bg-gradient-to-br from-cyan-500/10 via-slate-900 to-slate-900 p-5">
-                <div className="text-sm font-semibold text-white">
-                  Current readiness
-                </div>
-                <div className="mt-4 space-y-3 text-sm text-slate-300">
-                  <div className="flex items-center justify-between gap-4">
-                    <span>Startup profile saved</span>
-                    <span
-                      className={
-                        startup?.name?.trim()
-                          ? 'text-emerald-300'
-                          : 'text-amber-300'
-                      }
-                    >
-                      {startup?.name?.trim() ? 'Yes' : 'No'}
-                    </span>
-                  </div>
-                  <div className="flex items-center justify-between gap-4">
-                    <span>Launched to investors</span>
-                    <span
-                      className={
-                        startup?.launchedToInvestors
-                          ? 'text-emerald-300'
-                          : 'text-amber-300'
-                      }
-                    >
-                      {startup?.launchedToInvestors ? 'Yes' : 'No'}
-                    </span>
-                  </div>
-                  <div className="flex items-center justify-between gap-4">
-                    <span>Pitch deck attached</span>
-                    <span
-                      className={
-                        startup?.pitchDeckUrl
-                          ? 'text-emerald-300'
-                          : 'text-amber-300'
-                      }
-                    >
-                      {startup?.pitchDeckUrl ? 'Yes' : 'No'}
-                    </span>
-                  </div>
-                </div>
-              </div>
-            </div>
-
             <div className="px-6 py-5">
               <div className="relative max-w-xl">
                 <Search className="pointer-events-none absolute left-4 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-500" />
@@ -534,10 +384,7 @@ export function InvestorOutreach() {
 
           {!canPitchFromStartup ? (
             <Card className="border border-amber-500/20 bg-amber-500/5 p-5 text-sm text-amber-100">
-              Save a startup profile on the Overview tab first. You can still
-              use Product Workspace projects as a pitch source, but a saved
-              startup profile makes investor outreach and launch visibility much
-              cleaner.
+              Save a startup profile first.
             </Card>
           ) : null}
         </>

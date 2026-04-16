@@ -2,6 +2,7 @@ import { PropsWithChildren, useEffect, useMemo, useRef, useState } from 'react';
 import { NavLink, Outlet, useLocation, useNavigate } from 'react-router-dom';
 import {
   Bell,
+  ChevronDown,
   ChevronRight,
   Menu,
   X,
@@ -37,6 +38,11 @@ interface DashboardLayoutProps {
 }
 
 type SidebarNotificationSection = 'applications' | 'events' | 'messages';
+type DashboardAccountMenuItem =
+  | Extract<DashboardNavItem, { kind: 'link' }>
+  | Extract<DashboardNavItem, { kind: 'action' }>;
+
+const STUDENT_ACCOUNT_MENU_LABELS = new Set(['Portfolio', 'Settings', 'Help Desk']);
 
 const SIDEBAR_PARENT_PATH_ALIASES: Partial<Record<UserRole, Record<string, string[]>>> = {
   [UserRole.SCHOOL]: {
@@ -83,6 +89,10 @@ const SIDEBAR_NOTIFICATION_PATHS: Record<SidebarNotificationSection, string[]> =
   ],
   messages: ['/dashboard/messages', '/dashboard/recruiter/messages'],
 };
+
+const isStudentAccountMenuItem = (item: DashboardNavItem) =>
+  (item.kind === 'link' && STUDENT_ACCOUNT_MENU_LABELS.has(item.label)) ||
+  (item.kind === 'action' && item.action === 'logout');
 
 const splitPathSegments = (value: string) =>
   value
@@ -402,6 +412,21 @@ export function DashboardLayout({ children, role }: PropsWithChildren<DashboardL
 
   const resolvedRole = user?.role ?? role;
   const navItems = resolvedRole ? SIDEBAR_CONFIG[resolvedRole] : [];
+  const usesStudentAccountMenu = resolvedRole === UserRole.STUDENT;
+  const sidebarNavItems = useMemo(
+    () =>
+      usesStudentAccountMenu ? navItems.filter((item) => !isStudentAccountMenuItem(item)) : navItems,
+    [navItems, usesStudentAccountMenu],
+  );
+  const studentAccountMenuItems = useMemo(
+    () =>
+      usesStudentAccountMenu
+        ? navItems.filter(
+            (item): item is DashboardAccountMenuItem => isStudentAccountMenuItem(item),
+          )
+        : [],
+    [navItems, usesStudentAccountMenu],
+  );
   const normalizedPathname = location.pathname.replace(/\/+$/, '') || '/';
   const isMarketplaceRoute = normalizedPathname.includes('/marketplace');
   const isRecruiterMarketplaceRoute =
@@ -654,6 +679,84 @@ export function DashboardLayout({ children, role }: PropsWithChildren<DashboardL
     );
   };
 
+  const renderStudentAccountMenu = ({
+    align = 'end' as 'start' | 'end',
+    side = 'bottom' as 'top' | 'bottom',
+  } = {}) => {
+    if (!usesStudentAccountMenu || studentAccountMenuItems.length === 0) {
+      return null;
+    }
+
+    return (
+      <DropdownMenu>
+        <DropdownMenuTrigger asChild>
+          <button
+            type="button"
+            aria-label="Open account menu"
+            className="group flex items-center gap-3 px-1 py-1 text-left transition"
+          >
+            <div className="relative flex h-11 w-11 shrink-0 items-center justify-center bg-gradient-to-br from-cyan-400 via-teal-400 to-emerald-500 text-sm font-bold text-slate-950">
+              {initials}
+              <span className="absolute -bottom-0.5 -right-0.5 h-3.5 w-3.5 border-2 border-slate-950 bg-emerald-400" />
+            </div>
+            <div className="min-w-0">
+              <div className="dashboard-theme-faint text-[10px] uppercase tracking-[0.28em]">
+                Account
+              </div>
+              <div className="dashboard-theme-text truncate text-sm font-semibold">
+                {user.displayName}
+              </div>
+              <div className="mt-1 flex items-center">
+                <Badge>{user.role}</Badge>
+              </div>
+            </div>
+            <ChevronDown className="dashboard-theme-faint h-4 w-4 shrink-0 transition group-data-[state=open]:rotate-180 group-hover:text-cyan-300" />
+          </button>
+        </DropdownMenuTrigger>
+        <DropdownMenuContent
+          align={align}
+          side={side}
+          sideOffset={12}
+          className="dashboard-theme-border dashboard-theme-popover w-[17rem] border bg-slate-950/96 p-1.5"
+        >
+          {studentAccountMenuItems.map((item) =>
+            item.kind === 'link' ? (
+              <DropdownMenuItem
+                key={item.label}
+                onSelect={() => {
+                  trackNavigationClick(item.path, item.label);
+                  navigate(item.path);
+                  setSidebarOpen(false);
+                }}
+                className={`dashboard-theme-text dashboard-theme-hover px-3 py-2.5 focus:bg-cyan-500/10 ${
+                  isPathActive(item.path, shouldMatchExactly(item.path)) ? 'bg-cyan-500/10 text-cyan-100' : ''
+                }`}
+              >
+                <item.icon className="h-4 w-4" />
+                <div className="flex min-w-0 flex-1 items-center justify-between gap-3">
+                  <span className="truncate font-medium">{item.label}</span>
+                  <ChevronRight className="h-4 w-4 opacity-60" />
+                </div>
+              </DropdownMenuItem>
+            ) : (
+              <DropdownMenuItem
+                key={item.label}
+                variant="destructive"
+                onSelect={() => {
+                  void handleLogout();
+                }}
+                className="px-3 py-2.5"
+              >
+                <item.icon className="h-4 w-4" />
+                <span className="font-medium">{item.label}</span>
+              </DropdownMenuItem>
+            ),
+          )}
+        </DropdownMenuContent>
+      </DropdownMenu>
+    );
+  };
+
   return (
     <div className="dashboard-theme-bg h-screen overflow-hidden">
       <div className="flex h-full">
@@ -675,12 +778,14 @@ export function DashboardLayout({ children, role }: PropsWithChildren<DashboardL
           </div>
 
           <div className="min-h-0 flex-1 overflow-y-auto pr-1">
-            <div className="space-y-2">{navItems.map(renderItem)}</div>
+            <div className="space-y-2">{sidebarNavItems.map(renderItem)}</div>
 
-            <div className="dashboard-theme-border dashboard-theme-surface mt-8 rounded-3xl border p-5">
-              <div className="text-xs uppercase tracking-[0.3em] text-cyan-700 dark:text-cyan-300">Active Role</div>
-              <div className="dashboard-theme-text mt-3 text-xl font-semibold capitalize">{user.role}</div>
-            </div>
+            {!usesStudentAccountMenu ? (
+              <div className="dashboard-theme-border dashboard-theme-surface mt-8 rounded-3xl border p-5">
+                <div className="text-xs uppercase tracking-[0.3em] text-cyan-700 dark:text-cyan-300">Active Role</div>
+                <div className="dashboard-theme-text mt-3 text-xl font-semibold capitalize">{user.role}</div>
+              </div>
+            ) : null}
           </div>
         </aside>
 
@@ -701,18 +806,22 @@ export function DashboardLayout({ children, role }: PropsWithChildren<DashboardL
                 <div className="flex items-center gap-3">
                   <GlobalWorkspaceInviteDialog />
                   <NotificationBell notifications={notifications} unreadCount={unreadNotificationsCount} />
-                  <NavLink
-                    to="/portfolio"
-                    className="dashboard-theme-border dashboard-theme-surface dashboard-theme-hover flex items-center gap-3 rounded-2xl border px-4 py-2 transition hover:border-cyan-500/40"
-                  >
-                    <div className="flex h-11 w-11 items-center justify-center rounded-full bg-gradient-to-br from-cyan-500 to-emerald-500 text-sm font-bold text-slate-50">
-                      {initials}
-                    </div>
-                    <div>
-                      <div className="dashboard-theme-text text-sm font-semibold">{user.displayName}</div>
-                      <Badge>{user.role}</Badge>
-                    </div>
-                  </NavLink>
+                  {usesStudentAccountMenu ? (
+                    renderStudentAccountMenu()
+                  ) : (
+                    <NavLink
+                      to="/portfolio"
+                      className="dashboard-theme-border dashboard-theme-surface dashboard-theme-hover flex items-center gap-3 rounded-2xl border px-4 py-2 transition hover:border-cyan-500/40"
+                    >
+                      <div className="flex h-11 w-11 items-center justify-center rounded-full bg-gradient-to-br from-cyan-500 to-emerald-500 text-sm font-bold text-slate-50">
+                        {initials}
+                      </div>
+                      <div>
+                        <div className="dashboard-theme-text text-sm font-semibold">{user.displayName}</div>
+                        <Badge>{user.role}</Badge>
+                      </div>
+                    </NavLink>
+                  )}
                 </div>
               </div>
             </header>

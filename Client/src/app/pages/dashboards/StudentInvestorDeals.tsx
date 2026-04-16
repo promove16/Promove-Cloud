@@ -193,9 +193,25 @@ function DealCard({
           {deal.nextActionLabel}
         </div>
         <p className="mt-2 text-xs text-slate-500">{stage.description}</p>
-        <div className="mt-3 inline-flex items-center gap-2 rounded-full border border-slate-800 bg-slate-900 px-3 py-1 text-xs text-slate-300">
-          <Handshake className="h-3.5 w-3.5 text-cyan-400" />
-          Founder response: {deal.founderDecision.status}
+        <div className="mt-3 flex flex-wrap items-center gap-2">
+          <span className="inline-flex items-center gap-2 rounded-full border border-slate-800 bg-slate-900 px-3 py-1 text-xs text-slate-300">
+            <Handshake className="h-3.5 w-3.5 text-cyan-400" />
+            Founder response:{" "}
+            {deal.status !== "active" && deal.founderDecision.status === "pending"
+              ? "closed without response"
+              : deal.founderDecision.status}
+          </span>
+          {deal.adminApprovedAt ? (
+            <span className="inline-flex items-center gap-2 rounded-full border border-emerald-500/30 bg-emerald-500/10 px-3 py-1 text-xs text-emerald-300">
+              <CheckCircle2 className="h-3.5 w-3.5" />
+              Admin approved {new Date(deal.adminApprovedAt).toLocaleDateString("en-IN")}
+            </span>
+          ) : deal.adminApprovalRequired ? (
+            <span className="inline-flex items-center gap-2 rounded-full border border-amber-500/30 bg-amber-500/10 px-3 py-1 text-xs text-amber-300">
+              <Clock className="h-3.5 w-3.5" />
+              Awaiting admin approval
+            </span>
+          ) : null}
         </div>
         {deal.founderDecision.note ? (
           <p className="mt-3 text-xs leading-5 text-slate-400">{deal.founderDecision.note}</p>
@@ -328,9 +344,6 @@ export function StudentInvestorDeals() {
     <div className="space-y-8">
       <div>
         <h1 className="text-3xl font-bold text-white">Investor Deals</h1>
-        <p className="mt-2 text-slate-400">
-          Monitor the status of your investor deal flow across all stages.
-        </p>
       </div>
 
       <div className="grid gap-4 sm:grid-cols-3">
@@ -356,11 +369,6 @@ export function StudentInvestorDeals() {
           <h3 className="mb-2 text-lg font-semibold text-white">
             {normalizedStartupId ? "No investor deals for this startup yet" : "No investor deals yet"}
           </h3>
-          <p className="text-slate-400">
-            {normalizedStartupId
-              ? "Launch this startup to investors from the Startup Launch engine to begin deal flow."
-              : "Launch your startup to investors from the Startup Launch engine to begin deal flow."}
-          </p>
         </div>
       ) : (
         <>

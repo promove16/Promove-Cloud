@@ -6,6 +6,7 @@ import { asyncHandler } from '../../utils/asyncHandler';
 import {
   createPatent,
   createPatentRequest,
+  createSimplePatentSupportRequest,
   getPatentRequest,
   listMyPatentRequests,
   listMyPatents,
@@ -27,5 +28,8 @@ router.patch('/:id/showcase', authenticate, authorize(UserRole.STUDENT), asyncHa
 router.post('/requests/submit', authenticate, authorize(UserRole.STUDENT), asyncHandler(createPatentRequest));
 router.get('/requests/mine', authenticate, authorize(UserRole.STUDENT), asyncHandler(listMyPatentRequests));
 router.get('/requests/:id', authenticate, authorize(UserRole.STUDENT), asyncHandler(getPatentRequest));
+
+// ── Simple Patent Support Request ───────────────────────────────────────────
+router.post('/requests', authenticate, authorize(UserRole.STUDENT), asyncHandler(createSimplePatentSupportRequest));
 
 export default router;

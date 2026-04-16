@@ -60,24 +60,29 @@ const patentRequestSchema = new Schema<IPatentRequest>(
     studentId: { type: Schema.Types.ObjectId, required: true, index: true },
     workspaceId: { type: Schema.Types.ObjectId, default: undefined },
 
+    // Simple support request fields (optional for basic requests)
+    projectTitle: { type: String, default: undefined },
+    description: { type: String, default: undefined },
+    patentType: { type: String, default: undefined },
+
     // Form 1 — Application for grant of patent
-    inventionTitle: { type: String, required: true, trim: true },
+    inventionTitle: { type: String, default: undefined },
     inventionCategory: {
       type: String,
       enum: ['mobile_app_backend', 'iot_hardware_interface', 'mechanical_improvement', 'software_hardware_integration', 'other'],
-      required: true,
+      default: undefined,
     },
-    applicantDetails: { type: applicantSchema, required: true },
-    inventors: { type: [inventorSchema], required: true },
+    applicantDetails: { type: applicantSchema, default: undefined },
+    inventors: { type: [inventorSchema], default: [] },
 
     // Form 2 — Specification
     specificationType: {
       type: String,
       enum: ['provisional', 'complete'],
-      required: true,
+      default: 'provisional',
     },
-    technicalField: { type: String, required: true },
-    backgroundArt: { type: String, required: true },
+    technicalField: { type: String, default: '' },
+    backgroundArt: { type: String, default: '' },
     inventionDescription: { type: String, required: true },
     abstractText: { type: String, required: true },
     claimsText: { type: String, required: true },
@@ -124,7 +129,7 @@ const patentRequestSchema = new Schema<IPatentRequest>(
     // Status & tracking
     status: {
       type: String,
-      enum: ['draft', 'submitted', 'documents_review', 'filing_in_progress', 'filed_with_ipo', 'examination_requested', 'granted', 'rejected'],
+      enum: ['draft', 'submitted', 'under_review', 'in_progress', 'filed', 'completed', 'cancelled', 'documents_review', 'filing_in_progress', 'filed_with_ipo', 'examination_requested', 'granted', 'rejected'],
       default: 'submitted',
     },
     submittedAt: { type: Date, default: undefined },

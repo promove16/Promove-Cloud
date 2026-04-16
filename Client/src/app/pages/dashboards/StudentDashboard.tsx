@@ -276,6 +276,13 @@ export function StudentDashboard() {
     [mentorSessions],
   );
   const nextMentorSession = upcomingMentorSessions[0];
+  const mentorSessionsTitle = mentorSessionsQuery.isLoading
+    ? "Loading sessions..."
+    : nextMentorSession
+      ? nextMentorSession.title
+      : mentorSessions.length > 0
+        ? "No upcoming mentor sessions"
+        : "No mentor sessions yet";
   const activeStartup = startups[0];
   const activeDealCountByStartupId = useMemo(() => {
     const counts = new Map<string, number>();
@@ -651,11 +658,7 @@ export function StudentDashboard() {
                 Mentor Sessions
               </div>
               <h3 className="mt-3 text-2xl font-bold text-white">
-                {mentorSessionsQuery.isLoading
-                  ? "Loading sessions..."
-                  : nextMentorSession
-                    ? nextMentorSession.title
-                    : "No mentor sessions yet"}
+                {mentorSessionsTitle}
               </h3>
               <p className="mt-2 text-sm leading-6 text-slate-400">
                 {nextMentorSession

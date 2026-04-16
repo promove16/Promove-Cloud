@@ -11,6 +11,7 @@ import {
   getStudentPortfolioView,
   githubOauthCallback,
   getMySessions,
+  getMyInstitutionMentorshipPrograms,
   getMyOnboarding,
   claimMyOnboardingStep,
   importGithubRepositories,
@@ -41,6 +42,12 @@ router.post('/me/github/import', authenticate, asyncHandler(importGithubReposito
 router.get('/me/onboarding', authenticate, asyncHandler(getMyOnboarding));
 router.post('/me/onboarding/claim/:stepId', authenticate, asyncHandler(claimMyOnboardingStep));
 router.get('/me/sessions', authenticate, authorize(UserRole.STUDENT), asyncHandler(getMySessions));
+router.get(
+  '/me/institution-mentorship-programs',
+  authenticate,
+  authorize(UserRole.STUDENT),
+  asyncHandler(getMyInstitutionMentorshipPrograms),
+);
 router.post(
   '/me/launch-to-recruiters',
   authenticate,

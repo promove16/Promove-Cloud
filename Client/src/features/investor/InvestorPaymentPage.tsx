@@ -34,18 +34,26 @@ export default function InvestorPaymentPage() {
     );
   }
 
+  const dealClosed = deal.status !== 'active' || deal.currentStage === 4;
   const founderAccepted = deal.founderDecision.status === 'accepted';
   const paymentAlreadyMarked = deal.currentStage >= 2;
   const amountLabel =
     typeof deal.amountINR === 'number' ? `INR ${deal.amountINR.toLocaleString()}` : deal.amountINR;
+  const founderDecisionLabel = dealClosed && deal.founderDecision.status === 'pending'
+    ? 'deal closed'
+    : deal.founderDecision.status;
 
   return (
     <div className="mx-auto max-w-4xl space-y-6">
       <div className="flex flex-wrap items-center justify-between gap-4">
         <div>
-          <h1 className="text-3xl font-bold text-white">Payment Placeholder</h1>
+          <h1 className="text-3xl font-bold text-white">
+            {dealClosed ? 'Deal Completed' : 'Payment'}
+          </h1>
           <p className="mt-2 text-slate-400">
-            Payment gateway is not connected yet. This is a temporary placeholder.
+            {dealClosed
+              ? 'This deal is already closed. The payment step is locked.'
+              : 'Payment gateway is not yet connected. Review the deal details below; payment will unlock once the integration is live.'}
           </p>
         </div>
         <Button variant="secondary" onClick={() => navigate('/dashboard/investor')}>
@@ -61,13 +69,18 @@ export default function InvestorPaymentPage() {
           </Badge>
           <Badge
             className={
-              founderAccepted
+              founderAccepted || dealClosed
                 ? 'border-emerald-500/30 bg-emerald-500/10 text-emerald-300'
                 : 'border-amber-500/30 bg-amber-500/10 text-amber-300'
             }
           >
-            Founder {deal.founderDecision.status}
+            Founder {founderDecisionLabel}
           </Badge>
+          {deal.adminApprovedAt ? (
+            <Badge className="border-emerald-500/30 bg-emerald-500/10 text-emerald-300">
+              Admin approved {new Date(deal.adminApprovedAt).toLocaleDateString('en-IN')}
+            </Badge>
+          ) : null}
         </div>
 
         <div>
@@ -90,17 +103,21 @@ export default function InvestorPaymentPage() {
           </div>
         </div>
 
-        {!founderAccepted ? (
+        {dealClosed ? (
+          <div className="rounded-2xl border border-emerald-500/30 bg-emerald-500/10 px-4 py-3 text-sm text-emerald-200">
+            This deal is closed. Track the investment from your portfolio instead.
+          </div>
+        ) : !founderAccepted ? (
           <div className="rounded-2xl border border-amber-500/30 bg-amber-500/10 px-4 py-3 text-sm text-amber-200">
-            Founder acceptance is still pending. This placeholder cannot initiate payment.
+            Founder acceptance is still pending. Payment is locked until the founder accepts.
           </div>
         ) : paymentAlreadyMarked ? (
           <div className="rounded-2xl border border-emerald-500/30 bg-emerald-500/10 px-4 py-3 text-sm text-emerald-200">
-            The deal is already beyond the payment placeholder stage.
+            The deal is already beyond the payment step.
           </div>
         ) : (
-          <div className="rounded-2xl border border-cyan-500/30 bg-cyan-500/10 px-4 py-3 text-sm text-cyan-200">
-            Review the deal details here. No payment action is available in this temporary page.
+          <div className="rounded-2xl border border-amber-500/30 bg-amber-500/10 px-4 py-3 text-sm text-amber-200">
+            Payment gateway integration is pending. Payment will unlock once the integration is live; no action is required from you right now.
           </div>
         )}
       </Card>

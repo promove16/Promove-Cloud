@@ -25,51 +25,46 @@ export const STARTUP_LAUNCH_LEGACY_NEW_OVERVIEW_PATH = `${STARTUP_LAUNCH_BASE_PA
 
 export const STARTUP_LAUNCH_SECTION_LINKS: StartupLaunchSectionLink[] = [
   {
-    label: "Launch",
-    shortLabel: "Launch",
-    description:
-      "Build the startup profile, pass admin review, and launch to investors or mentors.",
+    label: "Initialization",
+    shortLabel: "Init",
+    description: "Define your startup's vision, mission, business model, and core details",
     segment: "overview",
     icon: Rocket,
   },
   {
-    label: "Investor Outreach",
-    shortLabel: "Outreach",
-    description:
-      "Founder-managed investor shortlisting, pitch requests, and fundraising conversations.",
-    segment: "investor-outreach",
-    icon: Send,
-  },
-  {
-    label: "Product Workspace",
+    label: "Workspace",
     shortLabel: "Workspace",
-    description:
-      "Link a dedicated product workspace to this startup and review the founder team synced from it.",
+    description: "Collaborate with your team, share updates, and track progress",
     segment: "product-workspace",
     icon: FolderKanban,
   },
   {
     label: "Cap Table",
     shortLabel: "Cap Table",
-    description:
-      "Founder-managed retained equity, sole investor allocation, and penny investor shares.",
+    description: "Manage equity distribution, shares, and investor stakes",
     segment: "cap-table",
     icon: BarChart3,
   },
   {
-    label: "Investors Deals",
-    shortLabel: "Investors Deals",
-    description:
-      "Monitor live investor deal flow, stages, and closed outcomes in one place.",
+    label: "Patent System",
+    shortLabel: "Patents",
+    description: "File for patent protection or request admin-assisted patents with tracking",
+    segment: "patent-support",
+    icon: FileText,
+  },
+  {
+    label: "Investor Deals",
+    shortLabel: "Deals",
+    description: "Receive and manage investment offers from investors",
     segment: "investor-deals",
     icon: BriefcaseBusiness,
   },
   {
-    label: "Patent Support",
-    shortLabel: "Patent Support",
-    description: "Request patent support for startups that need IP protection.",
-    segment: "patent-support",
-    icon: FileText,
+    label: "Investor Outreach",
+    shortLabel: "Outreach",
+    description: "Proactively reach out to investors and pitch your startup",
+    segment: "investor-outreach",
+    icon: Send,
   },
 ];
 

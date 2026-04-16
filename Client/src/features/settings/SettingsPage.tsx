@@ -13,6 +13,7 @@ import { UserRole } from '../../types/roles.types';
 import { OptionTabs } from '../../components/ui/OptionTabs';
 import { toast } from '../../app/components/ui/sonner';
 import { AuthPasswordField } from '../auth/AuthPasswordField';
+import { StudentInstitutionStatusPanel } from '../institution/studentInstitutionStatus';
 import { SupportFloatingWidget } from '../support/SupportFloatingWidget';
 
 // ─── Layout helper ────────────────────────────────────────────────────────────
@@ -990,17 +991,12 @@ export function SettingsPage() {
                 <div className={card}>
                   <p className={sectionHdr}>Institution Access</p>
                   <div className="space-y-5">
+                    <StudentInstitutionStatusPanel user={authUser} />
+
                     <div className="rounded-xl border border-slate-800 bg-slate-950/60 p-4">
-                      <div className="flex flex-wrap items-center gap-2">
-                        <span className="rounded-full border border-cyan-500/30 bg-cyan-500/10 px-3 py-1 text-xs font-semibold uppercase tracking-[0.16em] text-cyan-300">
-                          Institution link {authUser?.institutionVerificationStatus ?? 'none'}
-                        </span>
-                        <span className="rounded-full border border-slate-700 px-3 py-1 text-xs font-semibold uppercase tracking-[0.16em] text-slate-300">
-                          Account approval {authUser?.verificationStatus ?? 'not_required'}
-                        </span>
-                      </div>
-                      <p className="mt-3 text-sm leading-6 text-slate-400">
-                        Institution-managed education is locked after approval. You can still add separate past or future education entries in your portfolio editor.
+                      <div className="text-sm font-semibold text-white">Institution-managed education lock</div>
+                      <p className="mt-2 text-sm leading-6 text-slate-400">
+                        Institution-managed education is controlled by the linked school or college after approval. You can still add separate past or future education entries in your portfolio editor without changing this managed record.
                       </p>
                     </div>
 

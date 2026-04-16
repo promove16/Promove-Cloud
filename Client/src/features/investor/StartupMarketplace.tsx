@@ -320,6 +320,7 @@ export default function StartupMarketplace() {
           {startups.map((startup) => {
             const liveScore = startup.founder?.innovationScore ?? startup.innovationScoreAtLaunch;
             const isSaved = savedStartupIds.has(startup._id);
+            const isFullyClosed = !startup.acceptsPennyInvestors && !startup.acceptsSoleInvestor;
 
             return (
               <Card key={startup._id} className="p-5">
@@ -327,6 +328,11 @@ export default function StartupMarketplace() {
                   <div>
                     <div className="text-xl font-semibold text-white">{startup.name}</div>
                     <div className="mt-1 text-sm text-cyan-300">{startup.category}</div>
+                    {startup.adminApprovedAt ? (
+                      <div className="mt-1 text-xs font-medium text-emerald-300">
+                        Approved {new Date(startup.adminApprovedAt).toLocaleDateString('en-IN')}
+                      </div>
+                    ) : null}
                     <div className="mt-2 text-sm leading-6 text-slate-400">{startup.tagline}</div>
                     <p className="mt-3 line-clamp-2 text-sm leading-6 text-slate-400">
                       {startup.founder?.displayName ?? 'Founding team'} is currently at {liveScore}/{MAX_INNOVATION_SCORE}.
@@ -354,13 +360,16 @@ export default function StartupMarketplace() {
                   {startup.acceptsPennyInvestors ? (
                     <Badge className="border-cyan-500/30 bg-cyan-500/10 text-cyan-300">Accepting Penny Investors</Badge>
                   ) : (
-                    <Badge className="border-slate-700 bg-slate-900 text-slate-400">No Penny Investors</Badge>
+                    <Badge className="border-slate-700 bg-slate-900 text-slate-400">Penny slots filled</Badge>
                   )}
                   {startup.acceptsSoleInvestor ? (
                     <Badge className="border-amber-500/30 bg-amber-500/10 text-amber-300">Accepting Sole Investor</Badge>
                   ) : (
-                    <Badge className="border-slate-700 bg-slate-900 text-slate-400">No Sole Investor</Badge>
+                    <Badge className="border-slate-700 bg-slate-900 text-slate-400">Sole investor locked</Badge>
                   )}
+                  {isFullyClosed ? (
+                    <Badge className="border-emerald-500/30 bg-emerald-500/10 text-emerald-300">Fully subscribed</Badge>
+                  ) : null}
                 </div>
 
                 <div className="mt-5 flex flex-wrap gap-3">
@@ -380,7 +389,13 @@ export default function StartupMarketplace() {
                       </>
                     )}
                   </Button>
-                  <Button onClick={() => openStartup(startup._id)}>Express Interest</Button>
+                  {isFullyClosed ? (
+                    <Button variant="secondary" disabled>
+                      Not Accepting Investors
+                    </Button>
+                  ) : (
+                    <Button onClick={() => openStartup(startup._id)}>Express Interest</Button>
+                  )}
                 </div>
               </Card>
             );

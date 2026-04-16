@@ -15,6 +15,23 @@ export type StartupIpProtectionType = 'patent' | 'copyright' | 'trademark' | 'de
 export type StartupTeamMemberType = 'founder' | 'coFounder' | 'mentor' | 'advisor';
 export type StartupPitchRequestStatus = 'pending' | 'accepted' | 'rejected' | 'withdrawn';
 export type StartupPatentType = 'self_filed' | 'promove_assisted';
+export type StartupBusinessModelType =
+  | 'subscription'
+  | 'transactional'
+  | 'marketplace'
+  | 'freemium'
+  | 'advertising'
+  | 'services'
+  | 'hardware'
+  | 'hybrid';
+export type StartupLegalEntityType =
+  | 'not_registered'
+  | 'sole_proprietorship'
+  | 'partnership'
+  | 'llp'
+  | 'private_limited'
+  | 'opc'
+  | 'public_limited';
 export type StartupDocumentCategory =
   | 'business_plan'
   | 'incorporation_certificate'
@@ -79,6 +96,26 @@ export interface StartupRegistrationProfile {
   ipProtectionType: StartupIpProtectionType;
 }
 
+export interface StartupInitializationProfile {
+  vision: string;
+  mission: string;
+  foundingStory: string;
+  teamComposition: string;
+  productStage: StartupInnovationStage;
+  productOverview: string;
+  customerProfile: string;
+  marketOpportunity: string;
+  businessModel: StartupBusinessModelType;
+  pricingStrategy: string;
+  competitiveLandscape: string;
+  defensibleMoat: string;
+  currentTraction: string;
+  upcomingMilestones: string;
+  fundingAsk: string;
+  legalEntityType: StartupLegalEntityType;
+  risksAndMitigation: string;
+}
+
 export interface StartupDocument {
   _id: string;
   category: StartupDocumentCategory;
@@ -135,6 +172,7 @@ export interface Startup {
   activeProducts: number;
   businessProfile: StartupBusinessProfile;
   registrationProfile: StartupRegistrationProfile;
+  initializationProfile: StartupInitializationProfile;
   documents: StartupDocument[];
   launchedToInvestors: boolean;
   launchedToMentors: boolean;

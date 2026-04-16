@@ -221,3 +221,67 @@ export const getPatentRequestById = async (userId: string, requestId: string) =>
   }
   return request;
 };
+
+// ─── Simple Patent Support Request ───────────────────────────────────────────
+
+export const patentSupportRequestSchema = z.object({
+  workspaceId: z.string().min(1),
+  projectTitle: z.string().trim().min(3).max(200),
+  description: z.string().trim().min(20).max(5000),
+  patentType: z.enum(['invention', 'design', 'trademark', 'utility']),
+});
+
+export const createPatentSupportRequest = async (
+  userId: string,
+  payload: z.infer<typeof patentSupportRequestSchema>,
+) => {
+  const workspace = await Workspace.findById(payload.workspaceId);
+  if (!workspace) {
+    throw new ApiError(404, 'WORKSPACE_NOT_FOUND', 'Workspace not found.');
+  }
+
+  const patentRequest = await PatentRequest.create({
+    studentId: userId,
+    workspaceId: payload.workspaceId,
+    projectTitle: payload.projectTitle,
+    description: payload.description,
+    patentType: payload.patentType,
+    status: 'submitted',
+    inventors: [],
+    applicantDetails: {
+      fullName: '',
+      address: '',
+      entityType: 'individual',
+    },
+    specificationType: 'provisional',
+    technicalField: '',
+    backgroundArt: '',
+    inventionDescription: payload.description,
+    abstractText: '',
+    claimsText: '',
+    bestMode: '',
+    hasFiledAbroad: false,
+    inventorDeclarationConfirmed: false,
+    powerOfAttorneyGranted: false,
+    claimingFeeReduction: false,
+    priorArtSearchSummary: '',
+    noveltyStatement: '',
+    proposedExaminationType: 'normal',
+    publicDisclosureStatus: false,
+    documents: [],
+  });
+
+  await notificationQueue.add('patent-request-submitted', {
+    userId,
+    requestId: patentRequest._id.toString(),
+    projectTitle: payload.projectTitle,
+  });
+
+  await notificationQueue.add('patent-request-admin-notify', {
+    requestId: patentRequest._id.toString(),
+    projectTitle: payload.projectTitle,
+    studentId: userId,
+  });
+
+  return patentRequest.toObject();
+};
