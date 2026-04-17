@@ -49,6 +49,9 @@ export const startupApi = {
     const response = await api.patch<ApiSuccessResponse<Startup>>(`/api/startup/${startupId}`, payload);
     return response.data.data;
   },
+  async delete(startupId: string) {
+    await api.delete(`/api/startup/${startupId}`);
+  },
   async requestReview(startupId: string) {
     const response = await api.post<ApiSuccessResponse<Startup>>(`/api/startup/${startupId}/request-review`);
     return response.data.data;

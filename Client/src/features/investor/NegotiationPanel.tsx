@@ -71,12 +71,13 @@ export function NegotiationPanel({ deal, isInvestor }: NegotiationPanelProps) {
 
   const sendMessageMutation = useMutation({
     mutationFn: (msg: string) => dealApi.sendNegotiationMessage(deal._id, msg),
-    onSuccess: (_data, sentMsg) => {
+    onSuccess: async (_data, sentMsg) => {
       setMessage('');
       setFailedMessage(null);
       setOptimisticMessages((prev) => prev.filter((m) => m.message !== sentMsg));
       setFeedback(null);
-      queryClient.invalidateQueries({ queryKey: ['investor-deal', deal._id] });
+      await queryClient.invalidateQueries({ queryKey: ['investor-deal', deal._id] });
+      await queryClient.invalidateQueries({ queryKey: ['investor-deals'] });
     },
     onError: (error, sentMsg) => {
       setOptimisticMessages((prev) =>
@@ -93,12 +94,13 @@ export function NegotiationPanel({ deal, isInvestor }: NegotiationPanelProps) {
   const proposeTermsMutation = useMutation({
     mutationFn: (payload: { amountINR: number; equityPercent: number }) => 
       dealApi.proposeNegotiationTerms(deal._id, payload),
-    onSuccess: () => {
+    onSuccess: async () => {
       setShowProposalForm(false);
       setProposedAmount('');
       setProposedEquity('');
       setFeedback({ type: 'success', message: 'Terms updated.' });
-      queryClient.invalidateQueries({ queryKey: ['investor-deal', deal._id] });
+      await queryClient.invalidateQueries({ queryKey: ['investor-deal', deal._id] });
+      await queryClient.invalidateQueries({ queryKey: ['investor-deals'] });
     },
     onError: (error) => {
       setFeedback({
@@ -110,9 +112,10 @@ export function NegotiationPanel({ deal, isInvestor }: NegotiationPanelProps) {
 
   const agreeTermsMutation = useMutation({
     mutationFn: () => dealApi.agreeNegotiationTerms(deal._id),
-    onSuccess: () => {
+    onSuccess: async () => {
       setFeedback({ type: 'success', message: 'Terms marked as agreed.' });
-      queryClient.invalidateQueries({ queryKey: ['investor-deal', deal._id] });
+      await queryClient.invalidateQueries({ queryKey: ['investor-deal', deal._id] });
+      await queryClient.invalidateQueries({ queryKey: ['investor-deals'] });
     },
     onError: (error) => {
       setFeedback({

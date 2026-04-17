@@ -9,6 +9,7 @@ import {
   updateIpoDetails,
   addInternalNote,
   addTimelineEntry,
+  reviewPatentRequestDocument,
 } from './patentRequestAdmin.service';
 import {
   updateStatusSchema,
@@ -17,6 +18,7 @@ import {
   addNoteSchema,
   addTimelineEntrySchema,
   listRequestsQuerySchema,
+  reviewDocumentSchema,
 } from './patentRequestAdmin.validation';
 
 const isObjectId = (value: string) => /^[0-9a-fA-F]{24}$/.test(value);
@@ -70,4 +72,15 @@ export const addTimelineController = async (req: Request, res: Response) => {
   if (!id || !isObjectId(id)) throw new ApiError(400, 'INVALID_ID', 'Invalid ID format');
   const payload = addTimelineEntrySchema.parse(req.body);
   res.status(200).json(new ApiResponse(await addTimelineEntry(req.user._id, id, payload)));
+};
+
+export const reviewDocumentController = async (req: Request, res: Response) => {
+  if (!req.user) throw new ApiError(401, 'UNAUTHORIZED', 'Invalid or expired token');
+  const id = String(req.params.id);
+  const documentId = String(req.params.documentId);
+  if (!id || !isObjectId(id) || !documentId || !isObjectId(documentId)) {
+    throw new ApiError(400, 'INVALID_ID', 'Invalid ID format');
+  }
+  const payload = reviewDocumentSchema.parse(req.body);
+  res.status(200).json(new ApiResponse(await reviewPatentRequestDocument(req.user._id, id, documentId, payload)));
 };

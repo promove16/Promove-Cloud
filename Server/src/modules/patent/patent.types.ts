@@ -168,9 +168,14 @@ export type PatentRequestDocCategory =
   | 'prior_art_report'
   | 'assignment_deed'
   | 'priority_document'
+  | 'patent_certificate'
+  | 'supporting_evidence'
   | 'other';
 
+export type PatentDocReviewStatus = 'pending' | 'approved' | 'rejected' | 'revision_requested';
+
 export interface PatentRequestDocument {
+  _id?: Types.ObjectId;
   uploadId?: Types.ObjectId;
   fileUrl: string;
   fileType: 'pdf' | 'image';
@@ -178,6 +183,13 @@ export interface PatentRequestDocument {
   fileSizeBytes: number;
   note?: string;
   documentCategory: PatentRequestDocCategory;
+  reviewStatus?: PatentDocReviewStatus;
+  reviewNote?: string;
+  reviewedAt?: Date;
+  reviewedBy?: Types.ObjectId;
+  uploadedAt?: Date;
+  storageProvider?: 'cloudinary' | 's3';
+  storageKey?: string;
 }
 
 export interface IPatentRequest {
@@ -189,6 +201,25 @@ export interface IPatentRequest {
   projectTitle?: string;
   description?: string;
   patentType?: 'invention' | 'design' | 'trademark';
+
+  // Intake questionnaire (ProMove-assisted filing)
+  questionnaire?: {
+    problemStatement: string;
+    solutionDifferentiation: string;
+    coreInnovation: string;
+    priorArtStatus: string;
+    workingMechanism: string;
+    keyComponents: string;
+    developmentStage: string;
+    documentationReadiness: string;
+    inventorOwnership: string;
+    developmentContext: string;
+    targetMarkets: string;
+    commercializationStrategy: string;
+    publicDisclosureStatus: string;
+    legalAgreements: string;
+    ipProtectionType: string;
+  };
 
   // ── Form 1 — Application for grant of patent ──────────────────────────────
   inventionTitle: string;

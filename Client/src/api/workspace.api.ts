@@ -34,6 +34,7 @@ export interface WorkspaceProgressPayload {
 
 export interface WorkspaceTaskPayload {
   title: string;
+  description?: string;
   priority: 'High' | 'Medium' | 'Low';
   assignedTo?: string;
   dueDate?: string;
@@ -68,6 +69,10 @@ export const workspaceApi = {
   },
   async update(workspaceId: string, payload: Partial<WorkspacePayload> & { stage?: Workspace['stage'] }) {
     const response = await api.patch<ApiSuccessResponse<Workspace>>(`/api/workspace/${workspaceId}`, payload);
+    return response.data.data;
+  },
+  async remove(workspaceId: string) {
+    const response = await api.delete<ApiSuccessResponse<{ deleted: boolean }>>(`/api/workspace/${workspaceId}`);
     return response.data.data;
   },
   async addProgress(workspaceId: string, payload: WorkspaceProgressPayload) {

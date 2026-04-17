@@ -54,7 +54,7 @@ const WorkshopCard = ({
   onOpen,
 }: {
   deal: DealSummaryView;
-  onOpen: (startupId: string) => void;
+  onOpen: (workspaceId: string) => void;
 }) => {
   if (!deal.productWorkshop) {
     return null;
@@ -104,7 +104,7 @@ const WorkshopCard = ({
           </div>
         </div>
         <div className="flex shrink-0">
-          <Button onClick={() => onOpen(deal.startupId)}>Open Product Workshop</Button>
+          <Button onClick={() => onOpen(deal.productWorkshop!.workspaceId)}>Open Product Workshop</Button>
         </div>
       </div>
     </Card>
@@ -120,7 +120,7 @@ const PortfolioCompanyCard = ({
 }: {
   item: InvestorPortfolioItem;
   workshopDeal?: DealSummaryView;
-  onOpen: (startupId: string) => void;
+  onOpen: (workspaceId: string) => void;
 }) => (
   <Card className="overflow-hidden border border-slate-800 bg-slate-950/50 transition-all hover:border-slate-700">
     <div className="flex flex-col lg:flex-row">
@@ -267,8 +267,8 @@ const PortfolioCompanyCard = ({
         
         <Button 
           onClick={() => {
-            if (workshopDeal) {
-              onOpen(workshopDeal.startupId);
+            if (workshopDeal?.productWorkshop) {
+              onOpen(workshopDeal.productWorkshop.workspaceId);
             }
           }}
           disabled={!workshopDeal?.productWorkshop}
@@ -417,7 +417,7 @@ export default function ProductWorkshop() {
                 <WorkshopCard
                   key={deal._id}
                   deal={deal}
-                  onOpen={(startupId) => navigate(`/dashboard/investor/product-workshop/${startupId}`)}
+                  onOpen={(workspaceId) => navigate(`/product-workspace/${workspaceId}`)}
                 />
               ))
             )}
@@ -517,7 +517,7 @@ export default function ProductWorkshop() {
                     key={item._id}
                     item={item}
                     workshopDeal={portfolioWorkshopsByStartupId.get(item.startupId)}
-                    onOpen={(startupId) => navigate(`/dashboard/investor/product-workshop/${startupId}`)}
+                    onOpen={(workspaceId) => navigate(`/product-workspace/${workspaceId}`)}
                   />
                 ))}
               </div>

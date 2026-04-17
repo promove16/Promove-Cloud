@@ -59,7 +59,14 @@ import {
   updateIpoDetailsController,
   addNoteController,
   addTimelineController,
+  reviewDocumentController,
 } from '../patent/patentRequestAdmin.controller';
+import {
+  sendMessageController as patentSendMessageController,
+  listMessagesController as patentListMessagesController,
+  markReadController as patentMarkReadController,
+  unreadCountController as patentUnreadCountController,
+} from '../patent/patentConversation.controller';
 
 const router = Router();
 
@@ -95,8 +102,13 @@ router.get('/patent-requests/:id', asyncHandler(getPatentRequestDetailController
 router.patch('/patent-requests/:id/status', asyncHandler(updateStatusController));
 router.patch('/patent-requests/:id/assign', asyncHandler(assignCaseController));
 router.patch('/patent-requests/:id/ipo-details', asyncHandler(updateIpoDetailsController));
+router.patch('/patent-requests/:id/documents/:documentId/review', asyncHandler(reviewDocumentController));
 router.post('/patent-requests/:id/notes', asyncHandler(addNoteController));
 router.post('/patent-requests/:id/timeline', asyncHandler(addTimelineController));
+router.get('/patent-requests/:id/messages', asyncHandler(patentListMessagesController));
+router.post('/patent-requests/:id/messages', asyncHandler(patentSendMessageController));
+router.patch('/patent-requests/:id/messages/read', asyncHandler(patentMarkReadController));
+router.get('/patent-requests/:id/messages/unread', asyncHandler(patentUnreadCountController));
 router.get('/awards', asyncHandler(getAwardsController));
 router.patch('/awards/:id/approve', asyncHandler(approveAwardController));
 router.patch('/awards/:id/reject', asyncHandler(rejectAwardController));

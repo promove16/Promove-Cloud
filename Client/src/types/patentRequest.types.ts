@@ -63,9 +63,14 @@ export type PatentRequestDocCategory =
   | 'prior_art_report'
   | 'assignment_deed'
   | 'priority_document'
+  | 'patent_certificate'
+  | 'supporting_evidence'
   | 'other';
 
+export type PatentDocReviewStatus = 'pending' | 'approved' | 'rejected' | 'revision_requested';
+
 export interface PatentRequestDocument {
+  _id?: string;
   uploadId?: string;
   fileUrl: string;
   fileType: 'pdf' | 'image';
@@ -73,17 +78,60 @@ export interface PatentRequestDocument {
   fileSizeBytes: number;
   note?: string;
   documentCategory: PatentRequestDocCategory;
+  reviewStatus?: PatentDocReviewStatus;
+  reviewNote?: string;
+  reviewedAt?: string;
+  reviewedBy?: string;
+  uploadedAt?: string;
+  storageProvider?: 'cloudinary' | 's3';
+  storageKey?: string;
+}
+
+export interface PatentConversationMessage {
+  _id: string;
+  patentRequestId: string;
+  senderId: string;
+  senderRole: 'student' | 'admin';
+  senderName: string;
+  senderAvatar?: string;
+  message: string;
+  attachmentUrl?: string;
+  attachmentType?: 'pdf' | 'image';
+  attachmentName?: string;
+  readAt?: string;
+  sentAt: string;
+}
+
+export interface PatentRequestQuestionnaire {
+  problemStatement: string;
+  solutionDifferentiation: string;
+  coreInnovation: string;
+  priorArtStatus: string;
+  workingMechanism: string;
+  keyComponents: string;
+  developmentStage: string;
+  documentationReadiness: string;
+  inventorOwnership: string;
+  developmentContext: string;
+  targetMarkets: string;
+  commercializationStrategy: string;
+  publicDisclosureStatus: string;
+  legalAgreements: string;
+  ipProtectionType: string;
 }
 
 export interface PatentRequestSubmission {
   _id: string;
   studentId: string;
   workspaceId?: string;
-  
+
   // Simple support request fields (optional)
   projectTitle?: string;
   description?: string;
   patentType?: PatentSupportRequestPatentType;
+
+  // Intake questionnaire
+  questionnaire?: PatentRequestQuestionnaire;
   
   // Full patent request fields
   inventionTitle?: string;

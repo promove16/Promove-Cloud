@@ -1397,6 +1397,62 @@ export const deleteStartupDocument = async (startupId: string, userId: string, d
   return serializeStartup(startup);
 };
 
+export const deleteStartup = async (startupId: string, userId: string) => {
+  const startup = await getStartupForFounder(startupId, userId);
+
+  // Only the primary founder (first in the list) can delete
+  if (String(startup.founderIds[0]) !== String(userId)) {
+    throw new ApiError(403, 'FORBIDDEN', 'Only the primary founder can delete this startup.');
+  }
+
+  // Cannot delete a verified startup that is live on the marketplace
+  if (startup.reviewStatus === 'approved' && (startup.launchedToInvestors || startup.launchedToMentors || startup.launchedToRecruiters)) {
+    throw new ApiError(
+      400,
+      'STARTUP_VERIFIED_AND_LAUNCHED',
+      'Cannot delete a verified startup that is live on the marketplace.',
+    );
+  }
+
+  // Cannot delete if the startup has active investor deals
+  const hasDeals = await Deal.exists({
+    startupId: startup._id,
+    status: { $ne: 'cancelled' },
+  });
+
+  if (hasDeals) {
+    throw new ApiError(
+      400,
+      'STARTUP_HAS_INVESTORS',
+      'Cannot delete a startup that has active investor deals. Cancel all deals first.',
+    );
+  }
+
+  // Clean up pitch deck
+  await deleteStoredAsset({
+    storageProvider: startup.pitchDeckStorageProvider,
+    storageKey: startup.pitchDeckStorageKey,
+    cloudinaryPublicId: startup.pitchDeckCloudinaryPublicId,
+    legacyCloudinaryResourceType: 'raw',
+  });
+
+  // Clean up uploaded documents
+  await Promise.all(
+    startup.documents.map((document) =>
+      deleteStoredAsset({
+        storageProvider: document.storageProvider,
+        storageKey: document.storageKey,
+        cloudinaryPublicId: document.cloudinaryPublicId,
+        legacyCloudinaryResourceType: document.fileType === 'pdf' ? 'raw' : 'image',
+      }),
+    ),
+  );
+
+  // Soft delete
+  startup.isActive = false;
+  await startup.save();
+};
+
 export const promoteToCoFounder = async (startupId: string, userId: string, memberId: string) => {
   const startup = await getStartupForFounder(startupId, userId);
   prepareStartupForEditableMutation(startup);

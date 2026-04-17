@@ -2,6 +2,7 @@ import { ClientSession, Types } from 'mongoose';
 import { z } from 'zod';
 import { notificationQueue } from '../../config/bullmq';
 import { redis } from '../../config/redis';
+import { generateSignedCloudinaryUrl } from '../../services/cloudinaryService';
 import { ApiError } from '../../utils/ApiError';
 import { readRedisJson } from '../../utils/redisJson';
 import { runMongoTransaction } from '../../utils/runMongoTransaction';
@@ -101,6 +102,8 @@ type LeanStartup = {
   stage: string;
   projectId?: Types.ObjectId;
   pitchDeckUrl?: string;
+  pitchDeckStorageProvider?: 'cloudinary' | 's3';
+  pitchDeckStorageKey?: string;
   launchedToInvestors?: boolean;
   launchedAt?: Date;
   innovationScoreAtLaunch: number;
@@ -324,6 +327,37 @@ const mapProductWorkshop = (workspace?: LeanProductWorkshop | null) =>
       }
     : undefined;
 
+const extractCloudinaryPublicId = (url?: string) => {
+  if (!url || !url.includes('cloudinary.com')) {
+    return null;
+  }
+
+  const match = url.match(/upload\/v\d+\/(.+)$/);
+  return match ? match[1].replace(/\.[^.]+$/, '') : null;
+};
+
+const getSignedPitchDeckUrl = (startup: LeanStartup) => {
+  if (!startup.pitchDeckUrl) {
+    return undefined;
+  }
+
+  if (startup.pitchDeckStorageProvider !== 'cloudinary') {
+    return startup.pitchDeckUrl;
+  }
+
+  const storageKey = startup.pitchDeckStorageKey || extractCloudinaryPublicId(startup.pitchDeckUrl);
+  if (!storageKey) {
+    return startup.pitchDeckUrl;
+  }
+
+  try {
+    return generateSignedCloudinaryUrl(storageKey, 'raw');
+  } catch (error) {
+    console.error('Error generating signed pitch deck URL for deal context:', error);
+    return startup.pitchDeckUrl;
+  }
+};
+
 const buildSummary = (
   deal: DealDocumentLike,
   startup: LeanStartup,
@@ -379,26 +413,30 @@ const buildDetail = (
   investor: LeanUser,
   investorDisplayName: string,
   productWorkshop?: LeanProductWorkshop | null,
-): DealDetailView => ({
-  ...buildSummary(deal, startup, student, investor, investorDisplayName, productWorkshop),
-  startup: {
-    _id: String(startup._id),
-    name: startup.name,
-    tagline: startup.tagline,
-    category: startup.category,
-    stage: startup.stage,
-    ...(startup.pitchDeckUrl ? { pitchDeckUrl: startup.pitchDeckUrl } : {}),
-  },
-  student: getParticipantSummary(student),
-  investor: getParticipantSummary(investor),
-  ...(deal.fundTransferInitiatedAt ? { fundTransferInitiatedAt: deal.fundTransferInitiatedAt.toISOString() } : {}),
-  ...(deal.closedAt ? { closedAt: deal.closedAt.toISOString() } : {}),
-});
+): DealDetailView => {
+  const pitchDeckUrl = getSignedPitchDeckUrl(startup);
+
+  return {
+    ...buildSummary(deal, startup, student, investor, investorDisplayName, productWorkshop),
+    startup: {
+      _id: String(startup._id),
+      name: startup.name,
+      tagline: startup.tagline,
+      category: startup.category,
+      stage: startup.stage,
+      ...(pitchDeckUrl ? { pitchDeckUrl } : {}),
+    },
+    student: getParticipantSummary(student),
+    investor: getParticipantSummary(investor),
+    ...(deal.fundTransferInitiatedAt ? { fundTransferInitiatedAt: deal.fundTransferInitiatedAt.toISOString() } : {}),
+    ...(deal.closedAt ? { closedAt: deal.closedAt.toISOString() } : {}),
+  };
+};
 
 const fetchDealContext = async (deal: DealDocumentLike) => {
   const [startup, student, investor] = await Promise.all([
     Startup.findById(deal.startupId)
-      .select('_id name tagline category stage projectId pitchDeckUrl founderIds launchedToInvestors launchedAt innovationScoreAtLaunch traction totalShares availableShares reservedForSole maxPennyInvestors currentPennyCount hasSoleInvestor soleInvestorId')
+      .select('_id name tagline category stage projectId pitchDeckUrl pitchDeckStorageProvider pitchDeckStorageKey founderIds launchedToInvestors launchedAt innovationScoreAtLaunch traction totalShares availableShares reservedForSole maxPennyInvestors currentPennyCount hasSoleInvestor soleInvestorId')
       .lean<LeanStartup>(),
     User.findById(deal.studentId)
       .select('_id displayName avatar role innovationScore scoreBreakdown')
@@ -1024,9 +1062,15 @@ export const recordFounderDecision = async (
     link: '/dashboard/investor/deals',
   });
 
-  if (transactionResult.decision === 'accepted' && context.startup.projectId) {
+  const acceptedWorkspaceId = deal.linkedWorkspaceId
+    ? String(deal.linkedWorkspaceId)
+    : context.startup.projectId
+      ? String(context.startup.projectId)
+      : undefined;
+
+  if (transactionResult.decision === 'accepted' && acceptedWorkspaceId) {
     await ensureDirectWorkspaceChatAccess(
-      String(context.startup.projectId),
+      acceptedWorkspaceId,
       transactionResult.investorId,
       'investor',
     );
@@ -1460,7 +1504,7 @@ export const getInvestorStartup = async (investorId: string, startupId: string) 
     launchedToInvestors: true,
     reviewStatus: 'approved',
   })
-    .select('_id name tagline category stage pitchDeckUrl founderIds launchedToInvestors launchedAt innovationScoreAtLaunch traction totalShares availableShares reservedForSole maxPennyInvestors currentPennyCount hasSoleInvestor soleInvestorId')
+    .select('_id name tagline category stage pitchDeckUrl pitchDeckStorageProvider pitchDeckStorageKey founderIds launchedToInvestors launchedAt innovationScoreAtLaunch traction totalShares availableShares reservedForSole maxPennyInvestors currentPennyCount hasSoleInvestor soleInvestorId')
     .lean<LeanStartup>();
 
   if (!startup) {
@@ -1478,6 +1522,7 @@ export const getInvestorStartup = async (investorId: string, startupId: string) 
     startup.founderIds.length > 0
       ? await ScoreEvent.find({ userId: startup.founderIds[0] }).sort({ createdAt: -1 }).limit(25).lean()
       : [];
+  const pitchDeckUrl = getSignedPitchDeckUrl(startup);
 
   return {
     startup: {
@@ -1489,7 +1534,7 @@ export const getInvestorStartup = async (investorId: string, startupId: string) 
       ...(startup.launchedAt ? { launchedAt: startup.launchedAt.toISOString() } : {}),
       innovationScoreAtLaunch: startup.innovationScoreAtLaunch,
       teamSize: startup.founderIds.length,
-      ...(startup.pitchDeckUrl ? { pitchDeckUrl: startup.pitchDeckUrl } : {}),
+      ...(pitchDeckUrl ? { pitchDeckUrl } : {}),
       traction: startup.traction,
       acceptsPennyInvestors: startup.currentPennyCount < startup.maxPennyInvestors,
       acceptsSoleInvestor: !startup.hasSoleInvestor,
@@ -1906,6 +1951,9 @@ export const linkWorkshopToDeal = async (dealId: string, workspaceId: string, us
 
   deal.linkedWorkspaceId = new Types.ObjectId(workspaceId);
   await deal.save();
+  if (deal.founderDecision?.status === 'accepted' || deal.stage >= 2) {
+    await ensureDirectWorkspaceChatAccess(workspaceId, String(deal.investorId), 'investor');
+  }
   await invalidateInvestmentCaches(String(deal.startupId));
 
   return {

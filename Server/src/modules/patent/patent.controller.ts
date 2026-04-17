@@ -6,9 +6,12 @@ import {
   getMyPatentRequests,
   getPatentRequestById,
   patentRequestSubmissionSchema,
+  patentRequestDocumentUploadSchema,
   submitPatentRequest,
   createPatentSupportRequest,
+  deletePatentRequestDocument,
   patentSupportRequestSchema,
+  uploadPatentRequestDocument,
 } from './patentRequest.service';
 
 export const createPatent = async (req: Request, res: Response) => {
@@ -47,6 +50,24 @@ export const listMyPatentRequests = async (req: Request, res: Response) => {
 export const getPatentRequest = async (req: Request, res: Response) => {
   const request = await getPatentRequestById(req.user!._id, String(req.params.id));
   res.json(new ApiResponse(request));
+};
+
+export const uploadPatentRequestDocumentController = async (req: Request, res: Response) => {
+  if (!req.file) {
+    throw new ApiError(400, 'FILE_REQUIRED', 'A patent workflow document is required.');
+  }
+  const request = await uploadPatentRequestDocument(
+    req.user!._id,
+    String(req.params.id),
+    req.file,
+    patentRequestDocumentUploadSchema.parse(req.body),
+  );
+  res.status(200).json(new ApiResponse(request));
+};
+
+export const deletePatentRequestDocumentController = async (req: Request, res: Response) => {
+  const request = await deletePatentRequestDocument(req.user!._id, String(req.params.id), String(req.params.documentId));
+  res.status(200).json(new ApiResponse(request));
 };
 
 // ─── Simple Patent Support Request ──────────────────────────────────────────

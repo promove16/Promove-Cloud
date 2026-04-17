@@ -47,12 +47,25 @@ const requestDocSchema = new Schema<IPatentRequest['documents'][number]>(
         'prior_art_report',
         'assignment_deed',
         'priority_document',
+        'patent_certificate',
+        'supporting_evidence',
         'other',
       ],
       required: true,
     },
+    reviewStatus: {
+      type: String,
+      enum: ['pending', 'approved', 'rejected', 'revision_requested'],
+      default: 'pending',
+    },
+    reviewNote: { type: String, default: undefined },
+    reviewedAt: { type: Date, default: undefined },
+    reviewedBy: { type: Schema.Types.ObjectId, default: undefined },
+    uploadedAt: { type: Date, default: () => new Date() },
+    storageProvider: { type: String, enum: ['cloudinary', 's3'], default: undefined },
+    storageKey: { type: String, default: undefined },
   },
-  { _id: false },
+  { _id: true },
 );
 
 const patentRequestSchema = new Schema<IPatentRequest>(
@@ -64,6 +77,31 @@ const patentRequestSchema = new Schema<IPatentRequest>(
     projectTitle: { type: String, default: undefined },
     description: { type: String, default: undefined },
     patentType: { type: String, enum: ['invention', 'design', 'trademark'], default: undefined },
+
+    // Intake questionnaire (submitted when student chooses ProMove-assisted filing)
+    questionnaire: {
+      type: new Schema(
+        {
+          problemStatement: { type: String, default: '' },
+          solutionDifferentiation: { type: String, default: '' },
+          coreInnovation: { type: String, default: '' },
+          priorArtStatus: { type: String, default: '' },
+          workingMechanism: { type: String, default: '' },
+          keyComponents: { type: String, default: '' },
+          developmentStage: { type: String, default: '' },
+          documentationReadiness: { type: String, default: '' },
+          inventorOwnership: { type: String, default: '' },
+          developmentContext: { type: String, default: '' },
+          targetMarkets: { type: String, default: '' },
+          commercializationStrategy: { type: String, default: '' },
+          publicDisclosureStatus: { type: String, default: '' },
+          legalAgreements: { type: String, default: '' },
+          ipProtectionType: { type: String, default: '' },
+        },
+        { _id: false },
+      ),
+      default: undefined,
+    },
 
     // Form 1 — Application for grant of patent
     inventionTitle: { type: String, default: undefined },

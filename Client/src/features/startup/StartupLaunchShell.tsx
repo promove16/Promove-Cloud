@@ -5,9 +5,7 @@ import { DashboardLayout } from "../../app/components/DashboardLayout";
 import { startupApi } from "../../api/startup.api";
 import { StartupSectionTabs } from "./StartupSectionTabs";
 import {
-  getStartupSectionPath,
   STARTUP_LAUNCH_LIST_PATH,
-  STARTUP_LAUNCH_SECTION_LINKS,
 } from "./navigation";
 
 export function StartupLaunchShell() {
@@ -21,15 +19,6 @@ export function StartupLaunchShell() {
   });
   const startup = startupQuery.data;
   const isLocked = Boolean(startup?.editAccess?.isLocked);
-  const activeSection =
-    STARTUP_LAUNCH_SECTION_LINKS.find((section) => {
-      const path = getStartupSectionPath(startupId ?? "", section.segment);
-      return (
-        location.pathname === path || location.pathname.startsWith(`${path}/`)
-      );
-    }) ?? STARTUP_LAUNCH_SECTION_LINKS[0];
-
-  const startupName = startup?.name?.trim() || "Startup";
 
   return (
     <DashboardLayout role="student">
@@ -58,19 +47,6 @@ export function StartupLaunchShell() {
         </div>
 
         <StartupSectionTabs />
-
-        <div className="rounded-2xl border border-slate-800/70 bg-slate-950/40 p-5">
-          <div className="flex flex-col gap-2">
-            <div className="max-w-3xl">
-              <div className="text-xs font-semibold uppercase tracking-[0.24em] text-cyan-300">
-                {activeSection.label}
-              </div>
-              <h1 className="mt-2 text-2xl font-semibold text-white">
-                {startupName}
-              </h1>
-            </div>
-          </div>
-        </div>
 
         <Outlet context={{ startupId }} />
       </div>

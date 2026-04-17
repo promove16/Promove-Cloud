@@ -4,6 +4,8 @@ import { notificationQueue } from '../../config/bullmq';
 import { ApiError } from '../../utils/ApiError';
 import { User } from '../user/user.model';
 import { UserRole } from '../../types/roles.types';
+import { AdminAuditLog } from '../admin/adminAuditLog.model';
+import { Startup } from '../startup/startup.model';
 import { PatentRequest } from './patentRequest.model';
 import { LEGACY_STATUS_MAP, type PatentRequestStatus } from './patent.types';
 import {
@@ -13,6 +15,7 @@ import {
   addNoteSchema,
   addTimelineEntrySchema,
   listRequestsQuerySchema,
+  reviewDocumentSchema,
 } from './patentRequestAdmin.validation';
 
 // ─── Status transition map ───────────────────────────────────────────────────
@@ -38,6 +41,66 @@ const normalizeStatus = (raw: string): PatentRequestStatus =>
   (LEGACY_STATUS_MAP[raw] as PatentRequestStatus) ?? (raw as PatentRequestStatus);
 
 const toIso = (value: Date | string) => new Date(value).toISOString();
+
+const autoVerifyLinkedStartup = async (
+  adminId: string,
+  request: {
+    _id: Types.ObjectId;
+    workspaceId?: Types.ObjectId;
+    ipoApplicationNumber?: string;
+    inventionTitle?: string;
+    projectTitle?: string;
+  },
+  grantedAt: Date,
+) => {
+  if (!request.workspaceId) {
+    return;
+  }
+
+  const startup = await Startup.findOne({ projectId: request.workspaceId, isActive: true });
+  if (!startup) {
+    return;
+  }
+
+  startup.traction = {
+    ...startup.traction,
+    patentFiled: true,
+    patentType: 'promove_assisted',
+    patentApplicationId: request.ipoApplicationNumber || String(request._id),
+  };
+  startup.reviewStatus = 'approved';
+  startup.reviewRequestedAt = startup.reviewRequestedAt ?? grantedAt;
+  startup.adminReviewedAt = grantedAt;
+  startup.adminReviewedBy = new Types.ObjectId(adminId);
+  startup.adminNotes = `Auto-verified after patent grant for ${request.inventionTitle ?? request.projectTitle ?? 'linked startup patent request'}.`;
+  startup.adminEditUnlockActive = false;
+  startup.adminEditUnlockApprovedAt = undefined;
+  startup.adminEditUnlockApprovedBy = null;
+  startup.adminEditUnlockReason = undefined;
+
+  await startup.save();
+
+  await AdminAuditLog.create({
+    adminId: new Types.ObjectId(adminId),
+    action: 'STARTUP_AUTO_VERIFIED_BY_PATENT',
+    targetId: startup._id,
+    targetModel: 'Startup',
+    metadata: {
+      startupId: String(startup._id),
+      patentRequestId: String(request._id),
+      ipoApplicationNumber: request.ipoApplicationNumber,
+      reviewStatus: startup.reviewStatus,
+    },
+  });
+
+  await notificationQueue.add('startup-auto-verified-by-patent', {
+    userId: String(startup.founderIds[0]),
+    type: 'startup_launch',
+    title: 'Startup auto-verified',
+    body: `${startup.name} was automatically verified after the linked patent was granted.`,
+    link: '/startup-launch',
+  });
+};
 
 // ─── List patent requests ────────────────────────────────────────────────────
 
@@ -205,6 +268,10 @@ export const updatePatentRequestStatus = async (
     },
   );
 
+  if (targetStatus === 'granted') {
+    await autoVerifyLinkedStartup(adminId, request, now);
+  }
+
   // Notify student
   await notificationQueue.add('patent-request-status-update', {
     userId: String(request.studentId),
@@ -340,4 +407,51 @@ export const addTimelineEntry = async (
   }
 
   return { added: true };
+};
+
+export const reviewPatentRequestDocument = async (
+  adminId: string,
+  requestId: string,
+  documentId: string,
+  payload: z.infer<typeof reviewDocumentSchema>,
+) => {
+  const request = await PatentRequest.findById(requestId);
+  if (!request) {
+    throw new ApiError(404, 'PATENT_REQUEST_NOT_FOUND', 'Patent request not found.');
+  }
+
+  const document = request.documents.find((item) => String(item._id) === documentId);
+  if (!document) {
+    throw new ApiError(404, 'PATENT_DOCUMENT_NOT_FOUND', 'Patent document not found.');
+  }
+
+  document.reviewStatus = payload.reviewStatus;
+  document.reviewNote = payload.reviewNote?.trim() || undefined;
+  document.reviewedAt = new Date();
+  document.reviewedBy = new Types.ObjectId(adminId);
+
+  if (normalizeStatus(request.status) === 'submitted') {
+    request.status = 'documents_review';
+  }
+
+  request.lastStatusUpdate = new Date();
+  request.trackingTimeline = request.trackingTimeline ?? [];
+  request.trackingTimeline.push({
+    status: 'document_review_update',
+    note: `${document.fileName} marked ${payload.reviewStatus.replace(/_/g, ' ')}.`,
+    updatedAt: new Date(),
+    updatedBy: new Types.ObjectId(adminId),
+  });
+
+  await request.save();
+
+  await notificationQueue.add('patent-request-document-reviewed', {
+    userId: String(request.studentId),
+    type: 'patent_status',
+    title: 'Patent document reviewed',
+    body: `${document.fileName} was marked ${payload.reviewStatus.replace(/_/g, ' ')} by the patent team.`,
+    link: '/startup-launch',
+  });
+
+  return request.toObject();
 };

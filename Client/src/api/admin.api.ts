@@ -26,6 +26,7 @@ import {
   ReviewMentorshipProgramInput,
 } from '../types/mentorship.types';
 import { PatentFilingDocuments, PatentSupportingDocument } from '../types/patent.types';
+import { PatentDocReviewStatus, PatentRequestDocument, PatentRequestQuestionnaire } from '../types/patentRequest.types';
 import { Problem } from '../types/problem.types';
 import { RequestStatus, WorkflowRequest } from '../types/request.types';
 import { UserRole } from '../types/roles.types';
@@ -162,6 +163,20 @@ export interface AdminPatentRequestListItem {
     avatar?: string;
     innovationScore: number;
   };
+}
+
+export interface AdminPatentRequestDetail extends Omit<AdminPatentRequestListItem, 'inventionTitle'> {
+  inventionTitle?: string;
+  projectTitle?: string;
+  description?: string;
+  questionnaire?: PatentRequestQuestionnaire;
+  documents: PatentRequestDocument[];
+  adminNotes?: string;
+  ipoPriorityDate?: string;
+  publicationDate?: string;
+  grantDate?: string;
+  lastStatusUpdate?: string;
+  updatedAt: string;
 }
 
 export interface AdminPatentRequestListResponse {
@@ -809,7 +824,7 @@ export const adminApi = {
     return response.data.data;
   },
   async getPatentRequestDetail(id: string) {
-    const response = await api.get<ApiSuccessResponse<Record<string, unknown>>>(
+    const response = await api.get<ApiSuccessResponse<AdminPatentRequestDetail>>(
       `/api/admin/patent-requests/${id}`,
     );
     return response.data.data;
@@ -849,6 +864,55 @@ export const adminApi = {
     const response = await api.post<ApiSuccessResponse<{ added: true }>>(
       `/api/admin/patent-requests/${id}/timeline`,
       payload,
+    );
+    return response.data.data;
+  },
+  async reviewPatentRequestDocument(
+    id: string,
+    documentId: string,
+    payload: { reviewStatus: PatentDocReviewStatus; reviewNote?: string },
+  ) {
+    const response = await api.patch<ApiSuccessResponse<AdminPatentRequestDetail>>(
+      `/api/admin/patent-requests/${id}/documents/${documentId}/review`,
+      payload,
+    );
+    return response.data.data;
+  },
+
+  // ── Patent Conversation ────────────────────────────────────────────────────
+  async getPatentMessages(requestId: string, params?: { before?: string; limit?: number }) {
+    const response = await api.get<ApiSuccessResponse<Array<{
+      _id: string;
+      patentRequestId: string;
+      senderId: string;
+      senderRole: 'student' | 'admin';
+      senderName: string;
+      senderAvatar?: string;
+      message: string;
+      readAt?: string;
+      sentAt: string;
+    }>>>(
+      `/api/admin/patent-requests/${requestId}/messages`,
+      { params },
+    );
+    return response.data.data;
+  },
+  async sendPatentMessage(requestId: string, message: string) {
+    const response = await api.post<ApiSuccessResponse<unknown>>(
+      `/api/admin/patent-requests/${requestId}/messages`,
+      { message },
+    );
+    return response.data.data;
+  },
+  async markPatentMessagesRead(requestId: string) {
+    const response = await api.patch<ApiSuccessResponse<{ marked: boolean }>>(
+      `/api/admin/patent-requests/${requestId}/messages/read`,
+    );
+    return response.data.data;
+  },
+  async getPatentUnreadCount(requestId: string) {
+    const response = await api.get<ApiSuccessResponse<{ count: number }>>(
+      `/api/admin/patent-requests/${requestId}/messages/unread`,
     );
     return response.data.data;
   },

@@ -1,4 +1,4 @@
-import { useMemo, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import {
   AlertCircle,
@@ -9,12 +9,13 @@ import {
   FileCheck,
   FileText,
   Loader2,
+  MessageCircle,
   MessageSquarePlus,
   Send,
   User,
   X,
 } from 'lucide-react';
-import { adminApi, AdminPatentRequestListItem } from '../../api/admin.api';
+import { adminApi, AdminPatentRequestDetail, AdminPatentRequestListItem } from '../../api/admin.api';
 import { Badge } from '../../components/ui/Badge';
 import { Button } from '../../components/ui/Button';
 import { Card } from '../../components/ui/Card';
@@ -86,6 +87,36 @@ const STATUS_COLORS: Record<string, string> = {
   abandoned: 'bg-slate-600/40 text-slate-400',
 };
 
+const DOCUMENT_CATEGORY_LABELS: Record<string, string> = {
+  form1_application: 'Form 1 application',
+  form2_specification: 'Form 2 specification',
+  form3_foreign_filing: 'Form 3 foreign filing',
+  form5_inventorship: 'Form 5 inventorship',
+  form26_power_of_attorney: 'Form 26 power of attorney',
+  form28_startup_status: 'Form 28 startup status',
+  drawings: 'Drawings',
+  prior_art_report: 'Prior art report',
+  assignment_deed: 'Assignment deed',
+  priority_document: 'Priority document',
+  patent_certificate: 'Patent certificate',
+  supporting_evidence: 'Supporting evidence',
+  other: 'Other',
+};
+
+const DOCUMENT_REVIEW_LABELS: Record<string, string> = {
+  pending: 'Pending review',
+  approved: 'Approved',
+  rejected: 'Rejected',
+  revision_requested: 'Revision requested',
+};
+
+const DOCUMENT_REVIEW_STYLES: Record<string, string> = {
+  pending: 'bg-amber-500/10 text-amber-300',
+  approved: 'bg-emerald-500/10 text-emerald-300',
+  rejected: 'bg-rose-500/10 text-rose-300',
+  revision_requested: 'bg-orange-500/10 text-orange-300',
+};
+
 const VALID_TRANSITIONS: Record<string, string[]> = {
   draft: ['submitted'],
   submitted: ['documents_review', 'abandoned'],
@@ -129,9 +160,60 @@ function CaseDetailModal({
   const [actionError, setActionError] = useState('');
   const [ipoAppNumber, setIpoAppNumber] = useState('');
   const [ipoFilingDate, setIpoFilingDate] = useState('');
-  const [activeTab, setActiveTab] = useState<'overview' | 'actions' | 'notes'>('overview');
+  const [activeTab, setActiveTab] = useState<'overview' | 'actions' | 'notes' | 'conversation'>('overview');
+  const [conversationMessage, setConversationMessage] = useState('');
+  const [documentReviewNotes, setDocumentReviewNotes] = useState<Record<string, string>>({});
+  const messagesEndRef = useRef<HTMLDivElement>(null);
 
   const nextStatuses = VALID_TRANSITIONS[item.status] ?? [];
+
+  const detailQuery = useQuery({
+    queryKey: ['admin-patent-detail', item._id],
+    queryFn: () => adminApi.getPatentRequestDetail(item._id),
+  });
+
+  const detail = detailQuery.data as AdminPatentRequestDetail | undefined;
+  const questionnaire = detail?.questionnaire as Record<string, string> | undefined;
+  const documents = detail?.documents ?? [];
+
+  const messagesQuery = useQuery({
+    queryKey: ['admin-patent-messages', item._id],
+    queryFn: () => adminApi.getPatentMessages(item._id),
+    refetchInterval: activeTab === 'conversation' ? 10_000 : false,
+    enabled: activeTab === 'conversation',
+  });
+
+  const unreadQuery = useQuery({
+    queryKey: ['admin-patent-unread', item._id],
+    queryFn: () => adminApi.getPatentUnreadCount(item._id),
+  });
+
+  const sendMessageMutation = useMutation({
+    mutationFn: () => adminApi.sendPatentMessage(item._id, conversationMessage),
+    onSuccess: async () => {
+      setConversationMessage('');
+      await queryClient.invalidateQueries({ queryKey: ['admin-patent-messages', item._id] });
+      await queryClient.invalidateQueries({ queryKey: ['admin-patent-unread', item._id] });
+    },
+  });
+
+  useEffect(() => {
+    if (activeTab === 'conversation' && messagesQuery.data?.length) {
+      void adminApi.markPatentMessagesRead(item._id);
+      void queryClient.invalidateQueries({ queryKey: ['admin-patent-unread', item._id] });
+    }
+  }, [activeTab, messagesQuery.data?.length, item._id, queryClient]);
+
+  useEffect(() => {
+    messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
+  }, [messagesQuery.data]);
+
+  const sortedMessages = useMemo(
+    () => [...(messagesQuery.data ?? [])].reverse(),
+    [messagesQuery.data],
+  );
+
+  const unreadCount = unreadQuery.data?.count ?? 0;
 
   const statusMutation = useMutation({
     mutationFn: (status: string) =>
@@ -175,6 +257,30 @@ function CaseDetailModal({
     },
   });
 
+  const reviewDocumentMutation = useMutation({
+    mutationFn: ({
+      documentId,
+      reviewStatus,
+      reviewNote,
+    }: {
+      documentId: string;
+      reviewStatus: 'approved' | 'rejected' | 'revision_requested';
+      reviewNote?: string;
+    }) =>
+      adminApi.reviewPatentRequestDocument(item._id, documentId, {
+        reviewStatus,
+        reviewNote,
+      }),
+    onSuccess: async () => {
+      setActionError('');
+      await queryClient.invalidateQueries({ queryKey: ['admin-patent-detail', item._id] });
+      await queryClient.invalidateQueries({ queryKey: ['admin-patent-requests'] });
+    },
+    onError: (err: unknown) => {
+      setActionError(getApiErrorMessage(err, 'Failed to review document.'));
+    },
+  });
+
   const deadlines = [
     { label: 'Complete Specification', value: item.completeSpecDeadline },
     { label: 'Examination Request', value: item.examRequestDeadline },
@@ -212,13 +318,18 @@ function CaseDetailModal({
 
           {/* Tabs */}
           <div className="mt-5 flex gap-1 border-b border-slate-800 pb-0">
-            {(['overview', 'actions', 'notes'] as const).map((tab) => (
+            {(['overview', 'actions', 'conversation', 'notes'] as const).map((tab) => (
               <button
                 key={tab}
                 onClick={() => setActiveTab(tab)}
-                className={`rounded-t-lg px-4 py-2.5 text-sm font-medium transition-colors ${activeTab === tab ? 'bg-slate-800 text-white' : 'text-slate-400 hover:text-slate-200'}`}
+                className={`relative rounded-t-lg px-4 py-2.5 text-sm font-medium transition-colors ${activeTab === tab ? 'bg-slate-800 text-white' : 'text-slate-400 hover:text-slate-200'}`}
               >
-                {tab === 'overview' ? 'Overview' : tab === 'actions' ? 'Actions' : 'Notes'}
+                {tab === 'overview' ? 'Overview' : tab === 'actions' ? 'Actions' : tab === 'conversation' ? 'Conversation' : 'Notes'}
+                {tab === 'conversation' && unreadCount > 0 && (
+                  <span className="absolute -right-1 -top-1 flex h-5 w-5 items-center justify-center rounded-full bg-cyan-500 text-[10px] font-bold text-slate-950">
+                    {unreadCount}
+                  </span>
+                )}
               </button>
             ))}
           </div>
@@ -278,6 +389,78 @@ function CaseDetailModal({
                     </div>
                   </div>
                 )}
+
+                {/* Intake Questionnaire */}
+                {questionnaire && Object.values(questionnaire).some((v) => v) && (
+                  <div>
+                    <div className="mb-3 text-xs uppercase tracking-[0.2em] text-cyan-300">
+                      Intake Questionnaire
+                    </div>
+                    <div className="overflow-hidden rounded-xl border border-slate-800 bg-slate-950/60">
+                      {Object.entries(questionnaire)
+                        .filter(([, value]) => value)
+                        .map(([key, value], i, arr) => (
+                          <div
+                            key={key}
+                            className={`px-4 py-3 ${i !== arr.length - 1 ? 'border-b border-slate-800' : ''}`}
+                          >
+                            <div className="mb-1 text-xs font-medium text-slate-500">
+                              {key
+                                .replace(/([A-Z])/g, ' $1')
+                                .replace(/_/g, ' ')
+                                .trim()}
+                            </div>
+                            <div className="text-sm leading-relaxed text-white">{value}</div>
+                          </div>
+                        ))}
+                    </div>
+                  </div>
+                )}
+
+                {documents.length > 0 && (
+                  <div>
+                    <div className="mb-3 text-xs uppercase tracking-[0.2em] text-cyan-300">
+                      Documents
+                    </div>
+                    <div className="space-y-3">
+                      {documents.map((document) => {
+                        const reviewStatus = document.reviewStatus ?? 'pending';
+                        return (
+                          <div
+                            key={document._id ?? document.fileUrl}
+                            className="rounded-xl border border-slate-800 bg-slate-950/60 px-4 py-3"
+                          >
+                            <div className="flex flex-wrap items-start justify-between gap-3">
+                              <div className="min-w-0">
+                                <a
+                                  href={document.fileUrl}
+                                  target="_blank"
+                                  rel="noreferrer"
+                                  className="truncate text-sm font-semibold text-white hover:text-cyan-300"
+                                >
+                                  {document.fileName}
+                                </a>
+                                <div className="mt-1 text-xs text-slate-500">
+                                  {DOCUMENT_CATEGORY_LABELS[document.documentCategory] ?? document.documentCategory}
+                                </div>
+                                {document.reviewNote ? (
+                                  <div className="mt-2 text-sm text-slate-300">
+                                    {document.reviewNote}
+                                  </div>
+                                ) : null}
+                              </div>
+                              <span
+                                className={`rounded-full px-2.5 py-1 text-xs font-semibold ${DOCUMENT_REVIEW_STYLES[reviewStatus]}`}
+                              >
+                                {DOCUMENT_REVIEW_LABELS[reviewStatus] ?? reviewStatus}
+                              </span>
+                            </div>
+                          </div>
+                        );
+                      })}
+                    </div>
+                  </div>
+                )}
               </div>
             )}
 
@@ -324,6 +507,80 @@ function CaseDetailModal({
                   </div>
                 )}
 
+                {documents.length > 0 && (
+                  <div>
+                    <div className="mb-3 text-xs uppercase tracking-[0.2em] text-cyan-300">
+                      Review Documents
+                    </div>
+                    <div className="space-y-3">
+                      {documents.map((document) => {
+                        const reviewStatus = document.reviewStatus ?? 'pending';
+                        const noteValue = documentReviewNotes[document._id ?? ''] ?? document.reviewNote ?? '';
+                        return (
+                          <div
+                            key={document._id ?? document.fileUrl}
+                            className="rounded-xl border border-slate-800 bg-slate-950/60 p-4"
+                          >
+                            <div className="flex flex-wrap items-start justify-between gap-3">
+                              <div className="min-w-0">
+                                <a
+                                  href={document.fileUrl}
+                                  target="_blank"
+                                  rel="noreferrer"
+                                  className="truncate text-sm font-semibold text-white hover:text-cyan-300"
+                                >
+                                  {document.fileName}
+                                </a>
+                                <div className="mt-1 text-xs text-slate-500">
+                                  {DOCUMENT_CATEGORY_LABELS[document.documentCategory] ?? document.documentCategory}
+                                </div>
+                              </div>
+                              <span
+                                className={`rounded-full px-2.5 py-1 text-xs font-semibold ${DOCUMENT_REVIEW_STYLES[reviewStatus]}`}
+                              >
+                                {DOCUMENT_REVIEW_LABELS[reviewStatus] ?? reviewStatus}
+                              </span>
+                            </div>
+                            <textarea
+                              value={noteValue}
+                              onChange={(e) =>
+                                setDocumentReviewNotes((current) => ({
+                                  ...current,
+                                  [document._id ?? '']: e.target.value,
+                                }))
+                              }
+                              placeholder="Optional review note"
+                              className="mt-3 min-h-20 w-full rounded-xl border border-slate-800 bg-slate-900 px-4 py-3 text-sm text-white placeholder:text-slate-500"
+                            />
+                            <div className="mt-3 flex flex-wrap gap-2">
+                              {(['approved', 'revision_requested', 'rejected'] as const).map((status) => (
+                                <Button
+                                  key={status}
+                                  variant={status === 'approved' ? 'primary' : 'secondary'}
+                                  onClick={() =>
+                                    document._id &&
+                                    reviewDocumentMutation.mutate({
+                                      documentId: document._id,
+                                      reviewStatus: status,
+                                      reviewNote: noteValue.trim() || undefined,
+                                    })
+                                  }
+                                  disabled={!document._id || reviewDocumentMutation.isPending}
+                                >
+                                  {reviewDocumentMutation.isPending ? (
+                                    <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                                  ) : null}
+                                  {DOCUMENT_REVIEW_LABELS[status]}
+                                </Button>
+                              ))}
+                            </div>
+                          </div>
+                        );
+                      })}
+                    </div>
+                  </div>
+                )}
+
                 {/* IPO Details */}
                 <div>
                   <div className="mb-3 text-xs uppercase tracking-[0.2em] text-cyan-300">
@@ -357,6 +614,99 @@ function CaseDetailModal({
                     )}
                     Save IPO Details
                   </Button>
+                </div>
+              </div>
+            )}
+
+            {activeTab === 'conversation' && (
+              <div className="flex flex-col rounded-xl border border-slate-800 bg-slate-950/60 overflow-hidden">
+                <div className="border-b border-slate-800 px-5 py-3">
+                  <div className="flex items-center gap-2">
+                    <MessageCircle className="h-4 w-4 text-cyan-400" />
+                    <span className="text-xs uppercase tracking-[0.2em] text-cyan-300">
+                      1-on-1 Conversation with Student
+                    </span>
+                  </div>
+                  <p className="mt-1 text-xs text-slate-500">
+                    {item.student.displayName} &middot; Messages are visible to both admin and student
+                  </p>
+                </div>
+
+                <div className="flex-1 overflow-y-auto px-5 py-4 space-y-3 max-h-72 min-h-[200px]">
+                  {messagesQuery.isLoading ? (
+                    <div className="flex items-center justify-center py-8">
+                      <Loader2 className="h-5 w-5 animate-spin text-slate-500" />
+                    </div>
+                  ) : sortedMessages.length === 0 ? (
+                    <div className="flex flex-col items-center justify-center py-8 text-slate-500">
+                      <Send className="mb-2 h-6 w-6 opacity-40" />
+                      <div className="text-sm">No messages yet. Start a conversation with the student.</div>
+                    </div>
+                  ) : (
+                    sortedMessages.map((msg) => (
+                      <div
+                        key={msg._id}
+                        className={`flex ${msg.senderRole === 'admin' ? 'justify-end' : 'justify-start'}`}
+                      >
+                        <div
+                          className={`max-w-[75%] rounded-2xl px-4 py-2.5 ${
+                            msg.senderRole === 'admin'
+                              ? 'bg-cyan-500/15 text-white'
+                              : 'bg-slate-800 text-slate-200'
+                          }`}
+                        >
+                          <div className="flex items-center gap-2 mb-1">
+                            <span className="text-xs font-semibold text-slate-400">
+                              {msg.senderName}
+                            </span>
+                            <span className="text-[10px] text-slate-600">
+                              {new Date(msg.sentAt).toLocaleString('en-IN', {
+                                day: '2-digit',
+                                month: 'short',
+                                hour: '2-digit',
+                                minute: '2-digit',
+                              })}
+                            </span>
+                            {msg.readAt && msg.senderRole === 'admin' && (
+                              <span className="text-[10px] text-cyan-500">Read</span>
+                            )}
+                          </div>
+                          <div className="text-sm leading-relaxed whitespace-pre-wrap">
+                            {msg.message}
+                          </div>
+                        </div>
+                      </div>
+                    ))
+                  )}
+                  <div ref={messagesEndRef} />
+                </div>
+
+                <div className="border-t border-slate-800 px-5 py-3">
+                  <div className="flex gap-2">
+                    <input
+                      value={conversationMessage}
+                      onChange={(e) => setConversationMessage(e.target.value)}
+                      onKeyDown={(e) => {
+                        if (e.key === 'Enter' && !e.shiftKey && conversationMessage.trim()) {
+                          e.preventDefault();
+                          sendMessageMutation.mutate();
+                        }
+                      }}
+                      className="flex-1 rounded-xl border border-slate-800 bg-slate-950 px-4 py-2.5 text-sm text-white placeholder:text-slate-500"
+                      placeholder="Type a message to the student..."
+                    />
+                    <Button
+                      variant="primary"
+                      onClick={() => sendMessageMutation.mutate()}
+                      disabled={!conversationMessage.trim() || sendMessageMutation.isPending}
+                    >
+                      {sendMessageMutation.isPending ? (
+                        <Loader2 className="h-4 w-4 animate-spin" />
+                      ) : (
+                        <Send className="h-4 w-4" />
+                      )}
+                    </Button>
+                  </div>
                 </div>
               </div>
             )}

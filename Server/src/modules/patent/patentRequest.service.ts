@@ -1,10 +1,13 @@
+import { Types } from 'mongoose';
 import { z } from 'zod';
 import { notificationQueue } from '../../config/bullmq';
+import { uploadFile, deleteStoredAsset } from '../../services/fileStorageService';
 import { ApiError } from '../../utils/ApiError';
 import { User } from '../user/user.model';
 import { UserRole } from '../../types/roles.types';
 import { Workspace } from '../workspace/workspace.model';
 import { PatentRequest } from './patentRequest.model';
+import { LEGACY_STATUS_MAP, type PatentRequestStatus } from './patent.types';
 
 // ─── Zod schemas ──────────────────────────────────────────────────────────────
 
@@ -34,8 +37,30 @@ const PATENT_REQUEST_DOC_CATEGORIES = [
   'prior_art_report',
   'assignment_deed',
   'priority_document',
+  'patent_certificate',
+  'supporting_evidence',
   'other',
 ] as const;
+
+const MUTABLE_PATENT_REQUEST_STATUSES = new Set<PatentRequestStatus>([
+  'draft',
+  'submitted',
+  'documents_review',
+  'ready_for_filing',
+  'filed_with_ipo',
+  'published',
+  'examination_requested',
+  'fer_issued',
+  'fer_response_submitted',
+]);
+
+const normalizePatentRequestStatus = (raw: string): PatentRequestStatus =>
+  (LEGACY_STATUS_MAP[raw] as PatentRequestStatus) ?? (raw as PatentRequestStatus);
+
+export const patentRequestDocumentUploadSchema = z.object({
+  documentCategory: z.enum(PATENT_REQUEST_DOC_CATEGORIES),
+  note: z.string().trim().max(300).optional(),
+});
 
 export const patentRequestSubmissionSchema = z
   .object({
@@ -239,13 +264,138 @@ export const getPatentRequestById = async (userId: string, requestId: string) =>
   return request;
 };
 
+const getMutablePatentRequestForStudent = async (userId: string, requestId: string) => {
+  const request = await PatentRequest.findOne({ _id: requestId, studentId: userId });
+  if (!request) {
+    throw new ApiError(404, 'PATENT_REQUEST_NOT_FOUND', 'Patent request not found.');
+  }
+
+  const normalizedStatus = normalizePatentRequestStatus(request.status);
+  if (!MUTABLE_PATENT_REQUEST_STATUSES.has(normalizedStatus)) {
+    throw new ApiError(
+      409,
+      'PATENT_REQUEST_LOCKED',
+      'Documents can only be changed while the patent request is still in progress.',
+    );
+  }
+
+  return request;
+};
+
+export const uploadPatentRequestDocument = async (
+  userId: string,
+  requestId: string,
+  file: Express.Multer.File,
+  payload: z.infer<typeof patentRequestDocumentUploadSchema>,
+) => {
+  const request = await getMutablePatentRequestForStudent(userId, requestId);
+  const fileType = file.mimetype === 'application/pdf' ? 'pdf' : 'image';
+  const uploaded = await uploadFile({
+    buffer: file.buffer,
+    folder: 'promove/patent-request-documents',
+    fileName: file.originalname,
+    contentType: file.mimetype || (fileType === 'pdf' ? 'application/pdf' : 'image/jpeg'),
+  });
+
+  request.documents.push({
+    _id: new Types.ObjectId(),
+    fileUrl: uploaded.url,
+    fileType,
+    fileName: file.originalname,
+    fileSizeBytes: file.size,
+    documentCategory: payload.documentCategory,
+    reviewStatus: 'pending',
+    uploadedAt: new Date(),
+    ...(payload.note?.trim() ? { note: payload.note.trim() } : {}),
+    storageProvider: uploaded.provider,
+    storageKey: uploaded.key,
+  });
+
+  const normalizedStatus = normalizePatentRequestStatus(request.status);
+  if (normalizedStatus === 'submitted') {
+    request.status = 'documents_review';
+    request.lastStatusUpdate = new Date();
+    request.trackingTimeline = request.trackingTimeline ?? [];
+    request.trackingTimeline.push({
+      status: 'documents_review',
+      note: `Student uploaded ${payload.documentCategory.replace(/_/g, ' ')} for review.`,
+      updatedAt: new Date(),
+      updatedBy: new Types.ObjectId(userId),
+    });
+  }
+
+  await request.save();
+
+  await notificationQueue.add('patent-request-document-uploaded', {
+    userId,
+    type: 'patent_status',
+    title: 'Patent document uploaded',
+    body: `${file.originalname} was added to your patent workflow.`,
+    link: '/startup-launch',
+  });
+
+  const admins = await User.find({ role: UserRole.ADMIN }).select('_id').lean();
+  await Promise.all(
+    admins.map((admin) =>
+      notificationQueue.add('patent-request-document-admin-notify', {
+        userId: String(admin._id),
+        type: 'patent_status',
+        title: 'New patent document uploaded',
+        body: `${file.originalname} was uploaded for ${(request.inventionTitle ?? request.projectTitle ?? 'a patent request')}.`,
+        link: '/admin/patent-requests',
+      }),
+    ),
+  );
+
+  return request.toObject();
+};
+
+export const deletePatentRequestDocument = async (userId: string, requestId: string, documentId: string) => {
+  const request = await getMutablePatentRequestForStudent(userId, requestId);
+  const document = request.documents.find((item) => String(item._id) === documentId);
+
+  if (!document) {
+    throw new ApiError(404, 'PATENT_DOCUMENT_NOT_FOUND', 'Patent document not found.');
+  }
+
+  await deleteStoredAsset({
+    storageProvider: document.storageProvider,
+    storageKey: document.storageKey,
+    legacyCloudinaryResourceType: document.fileType === 'pdf' ? 'raw' : 'image',
+  });
+
+  request.documents = request.documents.filter((item) => String(item._id) !== documentId);
+  await request.save();
+
+  return request.toObject();
+};
+
 // ─── Simple Patent Support Request ───────────────────────────────────────────
+
+const questionnaireSchema = z.object({
+  problemStatement: z.string().trim().default(''),
+  solutionDifferentiation: z.string().trim().default(''),
+  coreInnovation: z.string().trim().default(''),
+  priorArtStatus: z.string().trim().default(''),
+  workingMechanism: z.string().trim().default(''),
+  keyComponents: z.string().trim().default(''),
+  developmentStage: z.string().trim().default(''),
+  documentationReadiness: z.string().trim().default(''),
+  inventorOwnership: z.string().trim().default(''),
+  developmentContext: z.string().trim().default(''),
+  targetMarkets: z.string().trim().default(''),
+  commercializationStrategy: z.string().trim().default(''),
+  publicDisclosureStatus: z.string().trim().default(''),
+  legalAgreements: z.string().trim().default(''),
+  ipProtectionType: z.string().trim().default(''),
+});
 
 export const patentSupportRequestSchema = z.object({
   workspaceId: z.string().min(1),
   projectTitle: z.string().trim().min(3).max(200),
   description: z.string().trim().min(20).max(5000),
   patentType: z.enum(['invention', 'design', 'trademark']),
+  questionnaire: questionnaireSchema.optional(),
 });
 
 export const createPatentSupportRequest = async (
@@ -263,7 +413,38 @@ export const createPatentSupportRequest = async (
     projectTitle: payload.projectTitle,
     description: payload.description,
     patentType: payload.patentType,
+    inventionTitle: payload.projectTitle,
+    inventionCategory: 'other',
+    applicantDetails: {
+      fullName: 'Pending applicant details',
+      address: 'Pending applicant address from admin-assisted intake',
+      entityType: 'startup',
+    },
+    inventors: [
+      {
+        fullName: 'Pending inventor details',
+        address: 'Pending inventor address from admin-assisted intake',
+        nationality: 'Pending',
+        contribution: 'To be confirmed during admin-assisted patent drafting.',
+      },
+    ],
+    specificationType: 'provisional',
+    technicalField: payload.questionnaire?.workingMechanism || 'Pending technical field details from admin-assisted intake.',
+    backgroundArt: payload.questionnaire?.priorArtStatus || 'Pending prior-art summary from admin-assisted intake.',
     inventionDescription: payload.description,
+    abstractText: payload.questionnaire?.coreInnovation || payload.description.slice(0, 120),
+    claimsText: 'Claims will be drafted during admin-assisted filing review.',
+    bestMode: payload.questionnaire?.workingMechanism || payload.description,
+    hasFiledAbroad: false,
+    inventorDeclarationConfirmed: true,
+    powerOfAttorneyGranted: false,
+    claimingFeeReduction: true,
+    feeReductionEntityType: 'startup',
+    priorArtSearchSummary: payload.questionnaire?.priorArtStatus || 'Prior-art review pending.',
+    noveltyStatement: payload.questionnaire?.solutionDifferentiation || payload.description,
+    proposedExaminationType: 'normal',
+    publicDisclosureStatus: false,
+    ...(payload.questionnaire ? { questionnaire: payload.questionnaire } : {}),
     status: 'submitted',
     submittedAt: new Date(),
     documents: [],

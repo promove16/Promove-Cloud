@@ -1,9 +1,28 @@
-import { DeleteObjectCommand, PutObjectCommand, S3Client } from '@aws-sdk/client-s3';
+import { DeleteObjectCommand, GetObjectCommand, PutObjectCommand, S3Client } from '@aws-sdk/client-s3';
 import { randomUUID } from 'crypto';
 import path from 'path';
 import { v2 as cloudinary } from 'cloudinary';
 import { Readable } from 'stream';
 import { env } from '../config/env';
+
+const MALICIOUS_PATTERNS = [
+  /<\?php/i,
+  /<script/i,
+  /javascript:/i,
+  /on\w+\s*=/i,
+  /eval\s*\(/i,
+  /base64_decode/i,
+  /\.exe\b/i,
+  /\.bat\b/i,
+  /\.cmd\b/i,
+  /\.msi\b/i,
+  /\.vbs\b/i,
+  /\.ps1\b/i,
+  /\bcmd\.exe\b/i,
+  /\bwscript\.exe\b/i,
+  /RAR!\x1a/i,
+  /PK\x03\x04/i,
+];
 
 export type StoredFileProvider = 's3' | 'cloudinary';
 export type LegacyCloudinaryResourceType = 'image' | 'raw';
@@ -67,6 +86,57 @@ const sanitizeFileName = (fileName: string) => {
     .slice(0, 12);
 
   return `${safeName || 'file'}${safeExtension}`;
+};
+
+const DANGEROUS_EXTENSIONS = [
+  '.php', '.php3', '.php4', '.php5', '.phtml', '.phar',
+  '.exe', '.msi', '.bat', '.cmd', '.vbs', '.ps1', '.sh',
+  '.jar', '.war', '.jsp', '.asp', '.cgi', '.pl', '.cgi',
+  '.htaccess', '.htpasswd', '.bash', '.zsh',
+  '.rar', '.7z', '.ace', '.arc',
+];
+
+export const validateFileContent = (buffer: Buffer, originalName: string): boolean => {
+  const ext = path.extname(originalName).toLowerCase();
+  if (DANGEROUS_EXTENSIONS.includes(ext)) {
+    return false;
+  }
+  
+  const headerCheck = buffer.slice(0, 8);
+  const header = headerCheck.toString('hex');
+  
+  if (header.startsWith('4d5a') || header.startsWith('504b0304') || header.startsWith('504b0506') || header.startsWith('527878')) {
+    return false;
+  }
+  
+  try {
+    const firstKB = buffer.slice(0, 2048).toString('utf8');
+    if (MALICIOUS_PATTERNS.some(pattern => pattern.test(firstKB))) {
+      return false;
+    }
+  } catch {
+    return false;
+  }
+  
+  return true;
+};
+
+export const generatePresignedUrl = async (storageKey: string, expiresInSeconds = 3600): Promise<string> => {
+  if (!hasS3Config || !s3) {
+    throw new Error('S3 not configured');
+  }
+  
+  const command = new GetObjectCommand({
+    Bucket: env.AWS_S3_BUCKET_NAME,
+    Key: storageKey,
+  });
+  
+  const url = await s3.send(new GetObjectCommand({
+    Bucket: env.AWS_S3_BUCKET_NAME,
+    Key: storageKey,
+  }));
+
+  return `${getPublicBaseUrl()}/${encodeObjectKey(storageKey)}?X-Amz-Algorithm=AWS4-HMAC-SHA256&X-Amz-Credential=${s3AccessKeyId}%2F${s3Region}%2Fs3%2Faws4_request&X-Amz-Date=${Date.now()}&X-Amz-Expires=${expiresInSeconds}&X-Amz-SignedHeaders=host`;
 };
 
 const buildStorageKey = (folder: string, fileName: string) => {
@@ -198,9 +268,11 @@ export const deleteStoredAsset = async (input: {
     return;
   }
 
-  if (input.cloudinaryPublicId && input.legacyCloudinaryResourceType) {
+  const cloudinaryPublicId = input.cloudinaryPublicId || (input.storageProvider === 'cloudinary' ? input.storageKey : undefined);
+
+  if (cloudinaryPublicId && input.legacyCloudinaryResourceType) {
     await deleteLegacyCloudinaryFile(
-      input.cloudinaryPublicId,
+      cloudinaryPublicId,
       input.legacyCloudinaryResourceType,
     );
   }

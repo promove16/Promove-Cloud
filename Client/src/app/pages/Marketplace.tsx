@@ -2085,8 +2085,12 @@ function GeneralMarketplace({ dashboardRole }: { dashboardRole: UserRole }) {
     : listQuery.isError;
 
   return (
-    <div className="min-h-[calc(100vh-7rem)] bg-[radial-gradient(circle_at_top,#16213d_0%,#0a0f1d_34%,#050814_100%)] text-slate-100">
-      <div className="w-full px-4 py-5 sm:px-6 lg:px-8">
+    <div className="relative min-h-[calc(100vh-7rem)] overflow-hidden bg-[#070b17] text-slate-100">
+      <div className="pointer-events-none absolute inset-0">
+        <div className="absolute inset-x-0 top-0 h-[140vh] bg-[radial-gradient(circle_at_top,rgba(22,33,61,0.96)_0%,rgba(13,20,48,0.88)_26%,rgba(8,13,31,0.72)_56%,rgba(7,11,23,0)_100%)]" />
+        <div className="absolute inset-0 bg-[linear-gradient(180deg,rgba(9,13,28,0.12)_0%,rgba(7,11,23,0.68)_42%,rgba(7,11,23,1)_100%)]" />
+      </div>
+      <div className="relative w-full px-4 py-5 sm:px-6 lg:px-8">
         <section className="border-b border-slate-800 text-white">
           <div className="flex flex-col gap-6">
             <div className="flex flex-col gap-3 lg:flex-row lg:items-end lg:justify-between">

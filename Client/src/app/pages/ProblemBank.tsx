@@ -114,10 +114,7 @@ export function ProblemBank() {
   const deferredSearchQuery = useDeferredValue(searchValue.trim());
   const viewerRole = authUser?.role ?? UserRole.STUDENT;
   const canClaimProblems = viewerRole === UserRole.STUDENT;
-  const canOpenProductWorkspace =
-    viewerRole === UserRole.STUDENT ||
-    viewerRole === UserRole.MENTOR ||
-    viewerRole === UserRole.INVESTOR;
+  const canOpenProductWorkspace = viewerRole === UserRole.STUDENT;
 
   const problemsQuery = useInfiniteQuery({
     queryKey: [
@@ -165,11 +162,6 @@ export function ProblemBank() {
         .map((workspace) => [workspace.claimedProblemId!, workspace._id]),
     );
   }, [canClaimProblems, workspacesQuery.data]);
-  const primaryProblemWorkspaceId = useMemo(
-    () => (workspacesQuery.data ?? []).find((workspace) => Boolean(workspace.claimedProblemId))?._id ?? null,
-    [workspacesQuery.data],
-  );
-
   const getProblemWorkspaceId = (problem: Problem) =>
     problem.viewerState?.workspaceId ??
     workspaceIdByClaimedProblemId.get(problem._id) ??
@@ -327,12 +319,10 @@ export function ProblemBank() {
             {canOpenProductWorkspace ? (
               <button
                 type="button"
-                onClick={() =>
-                  navigate(primaryProblemWorkspaceId ? `/product-workspace/${primaryProblemWorkspaceId}` : "/product-workspace")
-                }
+                onClick={() => navigate("/product-workspace")}
                 className="rounded-xl bg-gradient-to-r from-cyan-600 to-blue-600 px-5 py-3 text-sm font-semibold text-white"
               >
-                Open Product Workshop
+                Open Product Workspace
               </button>
             ) : null}
           </div>
@@ -497,7 +487,7 @@ export function ProblemBank() {
                         }
                         className="flex-1 rounded-lg bg-gradient-to-r from-cyan-600 to-blue-600 px-6 py-3 font-semibold text-white"
                       >
-                        Open Product Workshop
+                        Open Product Workspace
                       </button>
                     ) : canClaimProblems ? (
                       <button
@@ -647,7 +637,7 @@ export function ProblemBank() {
                         }
                         className="rounded-lg bg-slate-800 px-4 py-2 text-sm font-semibold text-white"
                       >
-                        Open Product Workshop
+                        Open Product Workspace
                       </button>
                     </div>
 
@@ -879,7 +869,7 @@ export function ProblemBank() {
                     }
                     className="rounded-lg bg-gradient-to-r from-cyan-600 to-blue-600 px-5 py-3 font-semibold text-white"
                   >
-                    Open Product Workshop
+                    Open Product Workspace
                   </button>
                 ) : canClaimProblems ? (
                   <button

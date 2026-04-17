@@ -56,6 +56,12 @@ const createDefaultDraft = (): ExpressInterestDraft => ({
   chosenRole: 'observer',
 });
 
+const isSameDraft = (left: ExpressInterestDraft, right: ExpressInterestDraft) =>
+  left.investorType === right.investorType &&
+  left.proposedAmountINR === right.proposedAmountINR &&
+  left.proposedEquityPercent === right.proposedEquityPercent &&
+  left.chosenRole === right.chosenRole;
+
 const getDraftStorageKey = (startupId: string) => `investor-interest-draft:${startupId}`;
 
 const readDraft = (startupId: string): ExpressInterestDraft | null => {
@@ -173,6 +179,7 @@ export function StartupDetailDrawer({
   const [showCloseConfirm, setShowCloseConfirm] = useState(false);
   const [draftRestoredToast, setDraftRestoredToast] = useState(false);
   const [touchedFields, setTouchedFields] = useState<Set<string>>(new Set());
+  const [loadedDraft, setLoadedDraft] = useState<ExpressInterestDraft>(createDefaultDraft);
   const backdropRef = useRef<HTMLDivElement>(null);
   const startupQuery = useQuery({
     queryKey: ['investor-startup', startupId],
@@ -191,11 +198,13 @@ export function StartupDetailDrawer({
     chosenRole,
     selectedTypeAvailable,
   });
-  const draftIsDirty =
-    investorType !== createDefaultDraft().investorType ||
-    proposedAmountINR !== createDefaultDraft().proposedAmountINR ||
-    proposedEquityPercent !== createDefaultDraft().proposedEquityPercent ||
-    chosenRole !== createDefaultDraft().chosenRole;
+  const currentDraft: ExpressInterestDraft = {
+    investorType,
+    proposedAmountINR,
+    proposedEquityPercent,
+    chosenRole,
+  };
+  const draftIsDirty = !isSameDraft(currentDraft, loadedDraft);
   const canSubmitInterest =
     canExpressInterest &&
     Boolean(detail?.canExpressInterest) &&
@@ -210,14 +219,24 @@ export function StartupDetailDrawer({
       setProposedAmountINR(defaultDraft.proposedAmountINR);
       setProposedEquityPercent(defaultDraft.proposedEquityPercent);
       setChosenRole(defaultDraft.chosenRole);
+      setLoadedDraft(defaultDraft);
+      setTouchedFields(new Set());
       return;
     }
 
     const restoredDraft = readDraft(startupId) ?? createDefaultDraft();
-    setInvestorType(restoredDraft.investorType);
-    setProposedAmountINR(sanitizeAmountInput(restoredDraft.proposedAmountINR));
-    setProposedEquityPercent(sanitizeEquityInput(restoredDraft.proposedEquityPercent));
-    setChosenRole(restoredDraft.chosenRole);
+    const normalizedDraft: ExpressInterestDraft = {
+      investorType: restoredDraft.investorType,
+      proposedAmountINR: sanitizeAmountInput(restoredDraft.proposedAmountINR),
+      proposedEquityPercent: sanitizeEquityInput(restoredDraft.proposedEquityPercent),
+      chosenRole: restoredDraft.chosenRole,
+    };
+    setInvestorType(normalizedDraft.investorType);
+    setProposedAmountINR(normalizedDraft.proposedAmountINR);
+    setProposedEquityPercent(normalizedDraft.proposedEquityPercent);
+    setChosenRole(normalizedDraft.chosenRole);
+    setLoadedDraft(normalizedDraft);
+    setTouchedFields(new Set());
   }, [startupId]);
 
   useEffect(() => {

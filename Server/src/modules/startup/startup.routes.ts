@@ -7,6 +7,7 @@ import { asyncHandler } from '../../utils/asyncHandler';
 import { ApiError } from '../../utils/ApiError';
 import {
   createStartup,
+  deleteStartupController,
   demoteFromCoFounderController,
   getMyStartupsController,
   getStartupByIdController,
@@ -64,6 +65,7 @@ router.post('/:id/upload-pitch', authorize(UserRole.STUDENT), upload.single('fil
 router.post('/:id/documents', authorize(UserRole.STUDENT), documentUpload.single('file'), asyncHandler(uploadStartupDocumentController));
 router.post('/:id/members/:memberId/promote', authorize(UserRole.STUDENT), asyncHandler(promoteToCoFounderController));
 router.post('/:id/members/:memberId/demote', authorize(UserRole.STUDENT), asyncHandler(demoteFromCoFounderController));
+router.delete('/:id', authorize(UserRole.STUDENT), asyncHandler(deleteStartupController));
 router.delete('/:id/documents/:documentId', authorize(UserRole.STUDENT), asyncHandler(removeStartupDocumentController));
 
 router.post('/:id/pitch-request', authorize(UserRole.STUDENT), asyncHandler(sendPitchRequestController));

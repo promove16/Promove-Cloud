@@ -909,6 +909,84 @@ describe('investment workflow integration', () => {
     );
   });
 
+  it('grants investors access to a linked workshop once an accepted deal is connected', async () => {
+    const founder = await createUser(UserRole.STUDENT, { displayName: 'Workshop Founder' });
+    const investor = await createUser(UserRole.INVESTOR, { displayName: 'Workshop Investor' });
+    const startup = await createStartup(founder._id.toString());
+    const linkedWorkspace = await Workspace.create({
+      ownerId: founder._id,
+      teamMemberIds: [founder._id],
+      title: 'Due Diligence Workspace',
+      category: 'Software',
+      stage: 'Build',
+      isActive: true,
+    });
+
+    const expressResponse = await request(app)
+      .post(`/api/investor/express-interest/${startup._id}`)
+      .set(authHeader(investor))
+      .send({
+        investorType: 'penny',
+        proposedAmountINR: 25000,
+        proposedEquityPercent: 2,
+        chosenRole: 'shareholder',
+      });
+
+    expect(expressResponse.status).toBe(201);
+    const dealId = expressResponse.body.data._id;
+
+    await agreeToCurrentTerms({ dealId, participant: founder });
+    await moveToDueDiligence({ dealId, investor });
+
+    const founderAcceptResponse = await request(app)
+      .patch(`/api/deals/${dealId}/founder-decision`)
+      .set(authHeader(founder))
+      .send({ decision: 'accepted' });
+
+    expect(founderAcceptResponse.status).toBe(200);
+
+    const linkResponse = await request(app)
+      .patch(`/api/deals/${dealId}/link-workshop`)
+      .set(authHeader(founder))
+      .send({ workspaceId: linkedWorkspace._id.toString() });
+
+    expect(linkResponse.status).toBe(200);
+    expect(linkResponse.body.data.workspaceId).toBe(linkedWorkspace._id.toString());
+
+    const workspaceResponse = await request(app)
+      .get(`/api/workspace/${linkedWorkspace._id}`)
+      .set(authHeader(investor));
+
+    expect(workspaceResponse.status).toBe(200);
+    expect(workspaceResponse.body.data).toEqual(
+      expect.objectContaining({
+        _id: linkedWorkspace._id.toString(),
+        title: 'Due Diligence Workspace',
+      }),
+    );
+  });
+
+  it('returns a signed pitch deck URL in investor startup detail when cloudinary storage metadata exists', async () => {
+    const founder = await createUser(UserRole.STUDENT, { displayName: 'Pitch Founder' });
+    const investor = await createUser(UserRole.INVESTOR, { displayName: 'Pitch Investor' });
+    const startup = await createStartup(founder._id.toString(), {
+      pitchDeckUrl: 'https://res.cloudinary.com/demo/raw/upload/v123/promove/pitch.pdf',
+      pitchDeckStorageProvider: 'cloudinary',
+      pitchDeckStorageKey: 'promove/pitch',
+    });
+
+    const response = await request(app)
+      .get(`/api/investor/startups/${startup._id}`)
+      .set(authHeader(investor));
+
+    expect(response.status).toBe(200);
+    expect(response.body.data.startup.pitchDeckUrl).toContain('/raw/upload/');
+    expect(response.body.data.startup.pitchDeckUrl).toContain('promove/pitch');
+    expect(response.body.data.startup.pitchDeckUrl).not.toBe(
+      'https://res.cloudinary.com/demo/raw/upload/v123/promove/pitch.pdf',
+    );
+  });
+
   it('moves a deal from negotiation to due diligence after terms are agreed', async () => {
     const founder = await createUser(UserRole.STUDENT, { displayName: 'Stage Zero Founder' });
     const investor = await createUser(UserRole.INVESTOR, { displayName: 'Stage Zero Investor' });

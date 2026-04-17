@@ -549,10 +549,16 @@ const startupDocumentLabels = Object.fromEntries(
   STARTUP_IPR_DOCUMENT_SPECS.map((spec) => [spec.category, spec.label]),
 ) as Partial<Record<StartupDocumentCategory, string>>;
 
-export const getRequiredStartupDocumentCategories = (
-  registrationProfile: StartupRegistrationProfile,
-): StartupDocumentCategory[] =>
-  registrationProfile.developmentStage === 'idea' ? ['design_plan_sketch'] : ['technical_documentation'];
+export const getRequiredStartupDocumentCategories = ({
+  registrationProfile,
+  initializationProfile,
+}: {
+  registrationProfile: StartupRegistrationProfile;
+  initializationProfile?: StartupInitializationProfile;
+}): StartupDocumentCategory[] => {
+  const stage = initializationProfile?.productStage ?? registrationProfile.developmentStage;
+  return stage === 'idea' ? ['design_plan_sketch'] : ['technical_documentation'];
+};
 
 export const buildStartupReviewReadiness = (startup: {
   name?: string;
@@ -562,6 +568,7 @@ export const buildStartupReviewReadiness = (startup: {
   pitchDeckUrl?: string;
   documents?: readonly { category?: StartupDocumentCategory }[];
   registrationProfile?: StartupRegistrationProfile;
+  initializationProfile?: StartupInitializationProfile;
 }): StartupReadiness => {
   const missingItems: string[] = [];
   const documents = startup.documents ?? [];
@@ -574,7 +581,12 @@ export const buildStartupReviewReadiness = (startup: {
   );
   const uploadedCategorySet = new Set(uploadedDocumentCategories);
   const registrationProfile = startup.registrationProfile ?? DEFAULT_STARTUP_IPR_PROFILE;
-  const requiredDocumentCategories = getRequiredStartupDocumentCategories(registrationProfile);
+  const initializationProfile =
+    startup.initializationProfile ?? DEFAULT_STARTUP_INIT_PROFILE;
+  const requiredDocumentCategories = getRequiredStartupDocumentCategories({
+    registrationProfile,
+    initializationProfile,
+  });
 
   const addMissing = (condition: boolean, label: string) => {
     if (condition) {
@@ -586,6 +598,23 @@ export const buildStartupReviewReadiness = (startup: {
   addMissing(!startup.tagline?.trim(), 'startup tagline');
   addMissing(!startup.category?.trim(), 'startup category');
   addMissing((startup.founderIds?.length ?? 0) === 0, 'at least one founder');
+  addMissing(initializationProfile.vision.trim().length < 40, 'startup vision');
+  addMissing(initializationProfile.mission.trim().length < 40, 'startup mission');
+  addMissing(initializationProfile.foundingStory.trim().length < 60, 'founding story');
+  addMissing(initializationProfile.teamComposition.trim().length < 40, 'team composition');
+  addMissing(!initializationProfile.productStage.trim(), 'product stage');
+  addMissing(initializationProfile.productOverview.trim().length < 40, 'product overview');
+  addMissing(initializationProfile.customerProfile.trim().length < 30, 'ideal customer profile');
+  addMissing(initializationProfile.marketOpportunity.trim().length < 40, 'market opportunity');
+  addMissing(!initializationProfile.businessModel.trim(), 'business model');
+  addMissing(initializationProfile.pricingStrategy.trim().length < 30, 'pricing strategy');
+  addMissing(initializationProfile.competitiveLandscape.trim().length < 30, 'competitive landscape');
+  addMissing(initializationProfile.defensibleMoat.trim().length < 30, 'defensible moat');
+  addMissing(initializationProfile.currentTraction.trim().length < 20, 'current traction');
+  addMissing(initializationProfile.upcomingMilestones.trim().length < 30, 'upcoming milestones');
+  addMissing(initializationProfile.fundingAsk.trim().length < 30, 'funding ask');
+  addMissing(!initializationProfile.legalEntityType.trim(), 'legal entity type');
+  addMissing(initializationProfile.risksAndMitigation.trim().length < 30, 'risks and mitigation');
   addMissing(registrationProfile.problemStatement.trim().length < 40, 'IPR problem statement');
   addMissing(registrationProfile.solutionDifferentiation.trim().length < 40, 'solution differentiation');
   addMissing(registrationProfile.coreInnovation.trim().length < 30, 'core innovation');

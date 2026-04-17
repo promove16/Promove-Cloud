@@ -2,6 +2,7 @@ import { Request, Response } from 'express';
 import { ApiResponse } from '../../utils/ApiResponse';
 import {
   createStartupProfile,
+  deleteStartup,
   deleteStartupDocument,
   demoteFromCoFounder,
   getStartupById,
@@ -113,6 +114,12 @@ export const demoteFromCoFounderController = async (req: Request, res: Response)
   const memberId = getRequiredObjectIdParam(req.params.memberId, 'MEMBER_REQUIRED', 'Member id is required');
   const startup = await demoteFromCoFounder(startupId, req.user!._id, memberId);
   res.json(new ApiResponse(startup));
+};
+
+export const deleteStartupController = async (req: Request, res: Response) => {
+  const startupId = getRequiredObjectIdParam(req.params.id, 'STARTUP_REQUIRED', 'Startup id is required');
+  await deleteStartup(startupId, req.user!._id);
+  res.json(new ApiResponse(null));
 };
 
 export const removeStartupDocumentController = async (req: Request, res: Response) => {

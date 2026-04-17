@@ -177,6 +177,11 @@ const StudentInvestorDeals = lazy(() =>
     default: module.StudentInvestorDeals,
   })),
 );
+const StudentWorkspaces = lazy(() =>
+  import("../app/pages/dashboards/StudentWorkspaces").then((module) => ({
+    default: module.StudentWorkspaces,
+  })),
+);
 const ProblemBank = lazy(() =>
   import("../app/pages/ProblemBank").then((module) => ({
     default: module.ProblemBank,
@@ -474,6 +479,20 @@ function RecruiterMarketplaceRouteRedirect({
   );
 }
 
+function InvestorProductWorkspaceRedirect() {
+  const { workspaceId } = useParams<{ workspaceId?: string }>();
+
+  if (!workspaceId) {
+    return <Navigate to="/dashboard/investor/product-workshop" replace />;
+  }
+
+  return <Navigate to={`/product-workspace/${workspaceId}`} replace />;
+}
+
+function ProductWorkspaceIndexRoute() {
+  return <LazyPage component={ProductWorkspace} />;
+}
+
 const NON_ADMIN_DASHBOARD_ROLES = [
   UserRole.STUDENT,
   UserRole.MENTOR,
@@ -569,7 +588,15 @@ export const router = createBrowserRouter([
         ),
       },
       {
-        path: "/product-workspace/:projectId?",
+        path: "/product-workspace",
+        element: (
+          <ProtectedRolesRoute roles={[UserRole.STUDENT, UserRole.MENTOR, UserRole.INVESTOR]}>
+            <ProductWorkspaceIndexRoute />
+          </ProtectedRolesRoute>
+        ),
+      },
+      {
+        path: "/product-workspace/:projectId",
         element: (
           <ProtectedRolesRoute roles={[UserRole.STUDENT, UserRole.MENTOR, UserRole.INVESTOR]}>
             <LazyPage component={ProductWorkspace} />
@@ -694,6 +721,7 @@ export const router = createBrowserRouter([
             element: <ProtectedRoleRoute role={UserRole.STUDENT} />,
             children: [
               { index: true, element: <LazyPage component={LegacyStudentDashboard} /> },
+              { path: "workspaces", element: <LazyPage component={StudentWorkspaces} /> },
               { path: "score", element: <LazyPage component={InnovationScorePage} /> },
               { path: "mentor-sessions", element: <LazyPage component={StudentMentorSessions} /> },
               { path: "investor-deals", element: <Navigate to="/startup-launch" replace /> },
@@ -726,7 +754,7 @@ export const router = createBrowserRouter([
               { path: "pitch-requests", element: <LazyPage component={InvestorPitchRequests} /> },
               { path: "institutions", element: <LazyPage component={InvestorInstitutions} /> },
               { path: "product-workshop", element: <LazyPage component={InvestorProductWorkshop} /> },
-              { path: "product-workshop/:startupId", element: <LazyPage component={StartupWorkspace} /> },
+              { path: "product-workshop/:workspaceId", element: <InvestorProductWorkspaceRedirect /> },
               { path: "portfolio", element: <LazyPage component={InvestorPortfolio} /> },
               { path: "deals/:dealId/payment", element: <LazyPage component={InvestorPaymentPage} /> },
               { path: "marketplace", element: <Navigate to="/dashboard/investor/startups" replace /> },

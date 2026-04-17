@@ -15,6 +15,13 @@ const PATENT_REQUEST_STATUSES = [
   'abandoned',
 ] as const;
 
+const PATENT_DOC_REVIEW_STATUSES = [
+  'pending',
+  'approved',
+  'rejected',
+  'revision_requested',
+] as const;
+
 export const updateStatusSchema = z.object({
   status: z.enum(PATENT_REQUEST_STATUSES),
   note: z.string().trim().max(1500).optional(),
@@ -39,6 +46,24 @@ export const addTimelineEntrySchema = z.object({
   status: z.string().trim().min(1).max(100),
   note: z.string().trim().max(1500).optional(),
 });
+
+export const reviewDocumentSchema = z
+  .object({
+    reviewStatus: z.enum(PATENT_DOC_REVIEW_STATUSES),
+    reviewNote: z.string().trim().max(1500).optional(),
+  })
+  .superRefine((value, ctx) => {
+    if (
+      (value.reviewStatus === 'rejected' || value.reviewStatus === 'revision_requested') &&
+      (!value.reviewNote || value.reviewNote.length < 5)
+    ) {
+      ctx.addIssue({
+        code: z.ZodIssueCode.custom,
+        path: ['reviewNote'],
+        message: 'Add a short review note when rejecting a document or requesting a revision.',
+      });
+    }
+  });
 
 export const listRequestsQuerySchema = z.object({
   status: z.enum(PATENT_REQUEST_STATUSES).optional(),

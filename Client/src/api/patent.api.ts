@@ -15,6 +15,11 @@ export const patentApi = {
     documentUploads: { uploadId: string; category: PatentDocumentCategory }[];
     questionnaire: PatentQuestionnaire;
     filingDocuments?: PatentFilingDocuments;
+    patentStage?: "filed" | "published" | "granted";
+    ipoApplicationNumber?: string;
+    ipoFilingDate?: string;
+    grantNumber?: string;
+    grantDate?: string;
   }) {
     const response = await api.post<ApiSuccessResponse<PatentSubmission>>('/api/patents/submit', payload);
     return response.data.data;

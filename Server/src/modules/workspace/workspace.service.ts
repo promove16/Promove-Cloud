@@ -1,7 +1,7 @@
 import { Types } from 'mongoose';
 import { z } from 'zod';
 import { sendTeamInviteEmail } from '../../services/emailService';
-import { deleteStoredAsset, uploadFile } from '../../services/fileStorageService';
+import { deleteStoredAsset, uploadFile, validateFileContent } from '../../services/fileStorageService';
 import { generateSignedCloudinaryUrl } from '../../services/cloudinaryService';
 import { applyScoreAsync } from '../../services/scoreEngine';
 import { User } from '../user/user.model';
@@ -14,6 +14,11 @@ import {
   declineRequest,
   registerRequestHandler,
 } from '../request/request.service';
+import { Deal } from '../deal/deal.model';
+import { Patent } from '../patent/patent.model';
+import { PatentRequest } from '../patent/patentRequest.model';
+import { ProblemSubmission } from '../problemBank/problemSubmission.model';
+import { Startup } from '../startup/startup.model';
 import { Workspace } from './workspace.model';
 import { ApiError } from '../../utils/ApiError';
 
@@ -412,11 +417,6 @@ export const createWorkspace = async (
     );
   }
 
-  const activeCount = await Workspace.countDocuments({ ownerId: userId, isActive: true });
-  if (activeCount >= 3) {
-    throw new ApiError(400, 'WORKSPACE_LIMIT_REACHED', 'You can only have 3 active workspaces.');
-  }
-
   const workspace = await Workspace.create({
     ownerId: userId,
     teamMemberIds: [userId],
@@ -441,6 +441,37 @@ export const updateWorkspace = async (
 
 export const deleteWorkspace = async (workspaceId: string, userId: string) => {
   await getWorkspaceForOwner(workspaceId, userId);
+
+  const [
+    linkedStartup,
+    linkedProblemSubmission,
+    linkedPatent,
+    linkedPatentRequest,
+    linkedInvestorDeal,
+  ] = await Promise.all([
+    Startup.exists({ projectId: workspaceId, isActive: true }),
+    ProblemSubmission.exists({ workspaceId }),
+    Patent.exists({ workspaceId }),
+    PatentRequest.exists({ workspaceId }),
+    Deal.exists({ linkedWorkspaceId: workspaceId }),
+  ]);
+
+  const dependencyLabels = [
+    linkedStartup ? 'startup launch records' : null,
+    linkedProblemSubmission ? 'Problem Bank review activity' : null,
+    linkedPatent ? 'patent records' : null,
+    linkedPatentRequest ? 'patent support requests' : null,
+    linkedInvestorDeal ? 'investor deal links' : null,
+  ].filter((label): label is string => Boolean(label));
+
+  if (dependencyLabels.length > 0) {
+    throw new ApiError(
+      400,
+      'WORKSPACE_HAS_DEPENDENCIES',
+      `This workspace cannot be deleted because it is linked to ${dependencyLabels.join(', ')}.`,
+    );
+  }
+
   await Workspace.findByIdAndDelete(workspaceId);
   await ChatMessage.deleteMany({ workspaceId });
 };
@@ -506,6 +537,11 @@ export const uploadWorkspaceFile = async (
     file.mimetype,
     file.originalname,
   ) as 'pdf' | 'image' | 'doc' | 'ppt' | 'xls' | 'video' | 'audio' | 'other';
+
+  if (!validateFileContent(file.buffer, file.originalname)) {
+    throw new ApiError(400, 'INVALID_FILE', 'File contains potentially malicious content or has an unsafe extension');
+  }
+
   const upload = await uploadFile({
     buffer: file.buffer,
     folder: 'promove/workspaces',

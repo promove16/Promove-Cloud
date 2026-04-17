@@ -36,6 +36,5 @@ const chatMessageSchema = new Schema<IChatMessage>(
 );
 
 chatMessageSchema.index({ workspaceId: 1, sentAt: -1 });
-chatMessageSchema.index({ sentAt: 1 }, { expireAfterSeconds: 48 * 60 * 60 });
 
 export const ChatMessage = model<IChatMessage>('ChatMessage', chatMessageSchema);

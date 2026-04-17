@@ -30,6 +30,7 @@ import {
 import type {
   ChatMessage,
   ChatMessageAttachment,
+  Workspace,
   WorkspaceTask,
   WorkspaceUpload,
   WorkspaceUploadCategory,
@@ -39,7 +40,9 @@ import { DashboardLayout } from "../components/DashboardLayout";
 import { workspaceApi } from "../../api/workspace.api";
 import { useWorkspaceChat } from "../../hooks/useWorkspaceChat";
 import { useAuthStore } from "../../store/authStore";
+import { UserRole } from "../../types/roles.types";
 import { FileViewerModal } from "../../components/file-viewer/FileViewerModal";
+import { ProductWorkspaceManager } from "./ProductWorkspaceManager";
 
 const d = (value?: string) =>
   value
@@ -84,11 +87,33 @@ type ProgressFormState = {
 
 type ProgressFormErrors = Partial<Record<"note" | "completionPercent", string>>;
 
+type WorkspaceDraftState = {
+  title: string;
+  category: string;
+  stage: Workspace["stage"];
+};
+
+type WorkspaceCreateState = {
+  title: string;
+  category: string;
+};
+
 const createEmptyProgressForm = (): ProgressFormState => ({
   note: "",
   milestoneRef: "",
   completionPercent: "",
   file: null,
+});
+
+const createEmptyWorkspaceDraft = (): WorkspaceDraftState => ({
+  title: "",
+  category: "",
+  stage: "Ideation",
+});
+
+const createEmptyWorkspaceCreateState = (): WorkspaceCreateState => ({
+  title: "",
+  category: "",
 });
 
 const validateProgressForm = (
@@ -156,7 +181,7 @@ const getAttachmentIcon = (fileType?: WorkspaceUploadFileType) => {
   }
 };
 
-export function ProductWorkspace() {
+function ProductWorkspaceDetail() {
   const { projectId } = useParams();
   const navigate = useNavigate();
   const queryClient = useQueryClient();
@@ -210,12 +235,18 @@ export function ProductWorkspace() {
   const [hasAttemptedProgressSubmit, setHasAttemptedProgressSubmit] =
     useState(false);
   const [showNegotiationPanel, setShowNegotiationPanel] = useState(false);
+  const [showWorkspaceCreateForm, setShowWorkspaceCreateForm] = useState(false);
   const [participantForm, setParticipantForm] = useState({
     email: "",
     message: "",
     proposedRole: "developer" as const,
   });
   const [selectedWorkspaceId, setSelectedWorkspaceId] = useState<string>("");
+  const [workspaceDraft, setWorkspaceDraft] = useState<WorkspaceDraftState>(
+    createEmptyWorkspaceDraft,
+  );
+  const [workspaceCreateDraft, setWorkspaceCreateDraft] =
+    useState<WorkspaceCreateState>(createEmptyWorkspaceCreateState);
   const [selectedUpload, setSelectedUpload] = useState<WorkspaceUpload | null>(
     null,
   );
@@ -233,11 +264,7 @@ export function ProductWorkspace() {
   );
   const isProgressFormValid = Object.keys(progressFormErrors).length === 0;
   const showProgressValidation = hasAttemptedProgressSubmit;
-  const problemBankWorkspaceOptions = useMemo(
-    () =>
-      (listQuery.data ?? []).filter((item) => Boolean(item.claimedProblemId)),
-    [listQuery.data],
-  );
+  const workspaceOptions = listQuery.data ?? [];
   const workspaceId = projectId || selectedWorkspaceId || undefined;
   const workspaceQuery = useQuery({
     queryKey: ["workspace", workspaceId],
@@ -247,8 +274,10 @@ export function ProductWorkspace() {
   const workspace = workspaceQuery.data;
   const teamMembers = workspace?.teamMembers ?? [];
   const isOwner = workspace?.ownerId === currentUser?._id;
+  const canCreateWorkspace = currentUser?.role === "student";
   const canManageWorkspace =
     currentUser?.role === "student" && Boolean(workspace);
+  const canManageOwnedWorkspace = canCreateWorkspace && Boolean(isOwner);
   const canManageChatAccess = Boolean(isOwner);
   const chat = useWorkspaceChat(workspaceId);
 
@@ -263,26 +292,40 @@ export function ProductWorkspace() {
       return;
     }
 
-    const hasSelectedWorkspace = problemBankWorkspaceOptions.some(
-      (item) => item._id === selectedWorkspaceId,
-    );
+    const hasSelectedWorkspace = workspaceOptions.some((item) => item._id === selectedWorkspaceId);
     if (!hasSelectedWorkspace) {
-      setSelectedWorkspaceId(problemBankWorkspaceOptions[0]?._id ?? "");
+      setSelectedWorkspaceId(workspaceOptions[0]?._id ?? "");
     }
-  }, [
-    projectId,
-    listQuery.data,
-    problemBankWorkspaceOptions,
-    selectedWorkspaceId,
-  ]);
+  }, [projectId, listQuery.data, selectedWorkspaceId, workspaceOptions]);
 
-  const refresh = async () => {
-    if (!workspaceId) return;
-    await Promise.all([
+  useEffect(() => {
+    if (!workspace) {
+      setWorkspaceDraft(createEmptyWorkspaceDraft());
+      return;
+    }
+
+    setWorkspaceDraft({
+      title: workspace.title,
+      category: workspace.category,
+      stage: workspace.stage,
+    });
+  }, [workspace]);
+
+  const refresh = async (targetWorkspaceId = workspaceId) => {
+    const refreshTasks = [
       queryClient.invalidateQueries({ queryKey: ["workspaces"] }),
-      queryClient.invalidateQueries({ queryKey: ["workspace", workspaceId] }),
       queryClient.invalidateQueries({ queryKey: ["score", "me"] }),
-    ]);
+    ];
+
+    if (targetWorkspaceId) {
+      refreshTasks.push(
+        queryClient.invalidateQueries({
+          queryKey: ["workspace", targetWorkspaceId],
+        }),
+      );
+    }
+
+    await Promise.all(refreshTasks);
   };
 
   const resetProgressForm = () => {
@@ -450,6 +493,84 @@ export function ProductWorkspace() {
       setToast("Chat participant removed.");
       await refresh();
     },
+  });
+
+  const createWorkspace = useMutation({
+    mutationFn: () =>
+      workspaceApi.create({
+        title: workspaceCreateDraft.title.trim(),
+        category: workspaceCreateDraft.category.trim(),
+      }),
+    onSuccess: async (createdWorkspace) => {
+      queryClient.setQueryData(
+        ["workspace", createdWorkspace._id],
+        createdWorkspace,
+      );
+      setWorkspaceCreateDraft(createEmptyWorkspaceCreateState());
+      setShowWorkspaceCreateForm(false);
+      setSelectedWorkspaceId(createdWorkspace._id);
+      setToast("Workspace created.");
+      await refresh(createdWorkspace._id);
+      if (projectId) {
+        navigate("/product-workspace", { replace: true });
+      }
+    },
+    onError: (error) =>
+      setToast(
+        (error as { response?: { data?: { error?: { message?: string } } } })
+          ?.response?.data?.error?.message ??
+          "Unable to create a workspace right now.",
+      ),
+  });
+
+  const updateWorkspaceDetails = useMutation({
+    mutationFn: () =>
+      workspaceApi.update(workspaceId!, {
+        title: workspaceDraft.title.trim(),
+        category: workspaceDraft.category.trim(),
+        stage: workspaceDraft.stage,
+      }),
+    onSuccess: async (updatedWorkspace) => {
+      queryClient.setQueryData(
+        ["workspace", updatedWorkspace._id],
+        updatedWorkspace,
+      );
+      setToast("Workspace details updated.");
+      await refresh(updatedWorkspace._id);
+    },
+    onError: (error) =>
+      setToast(
+        (error as { response?: { data?: { error?: { message?: string } } } })
+          ?.response?.data?.error?.message ??
+          "Unable to update workspace details.",
+      ),
+  });
+
+  const deleteWorkspace = useMutation({
+    mutationFn: (targetWorkspaceId: string) => workspaceApi.remove(targetWorkspaceId),
+    onSuccess: async (_result, deletedWorkspaceId) => {
+      queryClient.removeQueries({ queryKey: ["workspace", deletedWorkspaceId] });
+      setToast("Workspace deleted.");
+
+      if (projectId === deletedWorkspaceId) {
+        navigate("/product-workspace", { replace: true });
+      }
+
+      if (selectedWorkspaceId === deletedWorkspaceId) {
+        const fallbackWorkspaceId = workspaceOptions.find(
+          (item) => item._id !== deletedWorkspaceId,
+        )?._id;
+        setSelectedWorkspaceId(fallbackWorkspaceId ?? "");
+      }
+
+      await refresh();
+    },
+    onError: (error) =>
+      setToast(
+        (error as { response?: { data?: { error?: { message?: string } } } })
+          ?.response?.data?.error?.message ??
+          "Unable to delete this workspace.",
+      ),
   });
 
   const progress = useMutation({
@@ -625,7 +746,10 @@ export function ProductWorkspace() {
       "Ready for review",
     [workspace?.milestones],
   );
-  const workspaceOptions = problemBankWorkspaceOptions;
+  const problemBankWorkspaceCount = workspaceOptions.filter(
+    (item) => Boolean(item.claimedProblemId),
+  ).length;
+  const independentWorkspaceCount = workspaceOptions.length - problemBankWorkspaceCount;
   const completedTaskCount = (workspace?.tasks ?? []).filter(
     (task) => task.done,
   ).length;
@@ -640,6 +764,15 @@ export function ProductWorkspace() {
   const workspaceSourceLabel = workspace?.claimedProblemId
     ? "Problem Bank"
     : "Independent Workspace";
+  const isWorkspaceDraftDirty = Boolean(
+    workspace &&
+      (workspaceDraft.title.trim() !== workspace.title ||
+        workspaceDraft.category.trim() !== workspace.category ||
+        workspaceDraft.stage !== workspace.stage),
+  );
+  const canSubmitWorkspaceCreate =
+    workspaceCreateDraft.title.trim().length >= 2 &&
+    workspaceCreateDraft.category.trim().length >= 2;
   const chatRoster = workspace
     ? [
         ...teamMembers,
@@ -731,7 +864,7 @@ export function ProductWorkspace() {
   }, [activeTab, chat.messages.length, typingParticipantNames.length]);
 
   return (
-    <DashboardLayout role="student">
+    <DashboardLayout role={currentUser?.role ?? UserRole.STUDENT}>
       <div className="space-y-6">
         <section className="relative overflow-hidden rounded-[28px] border border-slate-800/80 bg-slate-950 px-6 py-6 shadow-[0_24px_80px_rgba(2,6,23,0.45)] lg:px-8 lg:py-8">
           <div className="absolute inset-x-0 top-0 h-40 bg-[radial-gradient(circle_at_top_left,rgba(59,130,246,0.22),transparent_42%),radial-gradient(circle_at_top_right,rgba(168,85,247,0.18),transparent_36%)]" />
@@ -2259,4 +2392,14 @@ export function ProductWorkspace() {
       />
     </DashboardLayout>
   );
+}
+
+export function ProductWorkspace() {
+  const { projectId } = useParams();
+
+  if (!projectId) {
+    return <ProductWorkspaceManager />;
+  }
+
+  return <ProductWorkspaceDetail />;
 }

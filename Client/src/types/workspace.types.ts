@@ -17,6 +17,7 @@ export interface WorkspaceMilestone {
 export interface WorkspaceTask {
   _id: string;
   title: string;
+  description?: string;
   priority: 'High' | 'Medium' | 'Low';
   assignedTo?: string;
   dueDate?: string;

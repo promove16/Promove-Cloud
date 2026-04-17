@@ -8,6 +8,7 @@ import { Button } from '../../components/ui/Button';
 import { Card } from '../../components/ui/Card';
 import { Input } from '../../components/ui/Input';
 import { Spinner } from '../../components/ui/Spinner';
+import { Slider } from '../../app/components/ui/slider';
 import { getStudentPortfolioViewPath } from '../marketplace/navigation';
 
 const MAX_INNOVATION_SCORE = 1000;
@@ -20,6 +21,7 @@ export default function TalentSearch() {
   const [institution, setInstitution] = useState('');
   const [minScore, setMinScore] = useState(0);
   const [maxScore, setMaxScore] = useState(MAX_INNOVATION_SCORE);
+  const scoreRange = useMemo(() => [minScore, maxScore], [maxScore, minScore]);
 
   const params = useMemo(
     () => ({
@@ -155,41 +157,33 @@ export default function TalentSearch() {
             <Input value={institution} onChange={(event) => setInstitution(event.target.value)} placeholder="IIT Delhi, BITS Pilani" />
           </div>
           <div>
-            <label className="mb-2 block text-xs uppercase tracking-[0.25em] text-slate-500">Score Range</label>
-            <div className="rounded-2xl border border-slate-800 bg-slate-950 px-4 py-3 text-sm text-slate-300">
-              {minScore} - {maxScore}
+            <div className="mb-2 flex items-center justify-between gap-3 text-xs uppercase tracking-[0.25em] text-slate-500">
+              <label>Score Range</label>
+              <span className="text-sm tracking-[0.18em] text-slate-300">
+                {minScore} - {maxScore}
+              </span>
             </div>
           </div>
         </div>
-        <div className="mt-4 grid gap-4 lg:grid-cols-2">
-          <div>
-            <label className="mb-2 block text-xs uppercase tracking-[0.25em] text-slate-500">Minimum Score</label>
-            <input
-              type="range"
+        <div className="mt-4">
+          <div className="rounded-2xl border border-slate-800 bg-slate-950 px-4 py-4">
+            <Slider
               min={0}
               max={MAX_INNOVATION_SCORE}
               step={1}
-              value={minScore}
-              onChange={(event) => setMinScore(Math.min(Number(event.target.value), maxScore))}
-              className="w-full"
+              value={scoreRange}
+              onValueChange={(nextRange: number[]) => {
+                const [nextMin = 0, nextMax = MAX_INNOVATION_SCORE] = nextRange;
+                setMinScore(nextMin);
+                setMaxScore(nextMax);
+              }}
+              className="[&_[data-slot=slider-range]]:bg-gradient-to-r [&_[data-slot=slider-range]]:from-cyan-400 [&_[data-slot=slider-range]]:to-emerald-400 [&_[data-slot=slider-thumb]]:border-cyan-300 [&_[data-slot=slider-thumb]]:bg-white [&_[data-slot=slider-track]]:bg-slate-800"
             />
-            <div className="mt-2 flex justify-between text-xs text-slate-500">
-              {scoreMarks.map((mark) => (
-                <span key={mark}>{mark}</span>
-              ))}
-            </div>
           </div>
-          <div>
-            <label className="mb-2 block text-xs uppercase tracking-[0.25em] text-slate-500">Maximum Score</label>
-            <input
-              type="range"
-              min={0}
-              max={MAX_INNOVATION_SCORE}
-              step={1}
-              value={maxScore}
-              onChange={(event) => setMaxScore(Math.max(Number(event.target.value), minScore))}
-              className="w-full"
-            />
+          <div className="mt-2 flex justify-between text-xs text-slate-500">
+            {scoreMarks.map((mark) => (
+              <span key={mark}>{mark}</span>
+            ))}
           </div>
         </div>
       </Card>

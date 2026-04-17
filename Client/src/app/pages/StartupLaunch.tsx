@@ -276,6 +276,7 @@ export function StartupLaunch() {
   const isNew = !startupId;
 
   const [showLaunchModal, setShowLaunchModal] = useState(false);
+  const [showPreviewModal, setShowPreviewModal] = useState(false);
   const [launchTarget, setLaunchTarget] = useState<
     "investors" | "mentors" | "both"
   >("both");
@@ -331,6 +332,7 @@ export function StartupLaunch() {
     queryKey: ["student", "active-deals"],
     queryFn: dealApi.getMyDeals,
     refetchInterval: 60_000,
+    enabled: false,
   });
   const startup = startupQuery.data;
   const workspaces = workspaceQuery.data ?? [];
@@ -362,7 +364,7 @@ export function StartupLaunch() {
       return;
     }
 
-    navigate(`/startup-launch/${pendingRedirectStartupId}/overview`, {
+    navigate(getStartupSectionPath(pendingRedirectStartupId, "overview"), {
       replace: true,
     });
     setPendingRedirectStartupId(null);
@@ -671,35 +673,43 @@ export function StartupLaunch() {
   }, [form, hasAttemptedSubmit]);
 
   const currentStartupId = startup?._id ?? startupId;
+  const workspaceSectionPath = currentStartupId
+    ? getStartupSectionPath(currentStartupId, "product-workspace")
+    : null;
   const activeDeals = (dealsQuery.data?.items ?? []).filter((deal) =>
     currentStartupId ? deal.startupId === currentStartupId : true,
   );
   const formTeamSize =
     workspaceTeamSize || form.teamSize || startup?.teamSize || 1;
-  const requiredDocumentCategories = getRequiredStartupDocumentCategories(
-    form.registrationProfile,
-  );
+  const requiredDocumentCategories = getRequiredStartupDocumentCategories({
+    registrationProfile: form.registrationProfile,
+    initializationProfile: form.initializationProfile,
+  });
   const currentDocuments = startup?.documents ?? [];
   const currentReviewReadiness = useMemo(
     () =>
-      startup
-        ? buildStartupReviewReadiness({
-            name: form.name,
-            tagline: form.tagline,
-            category: form.category,
-            founderIds: startup.founderIds,
-            pitchDeckUrl: startup.pitchDeckUrl,
-            documents: currentDocuments,
-            registrationProfile: form.registrationProfile,
-          })
-        : undefined,
+      buildStartupReviewReadiness({
+        name: form.name,
+        tagline: form.tagline,
+        category: form.category,
+        founderIds:
+          startup?.founderIds?.length && startup.founderIds.length > 0
+            ? startup.founderIds
+            : ["draft-founder"],
+        pitchDeckUrl: startup?.pitchDeckUrl,
+        documents: currentDocuments,
+        registrationProfile: form.registrationProfile,
+        initializationProfile: form.initializationProfile,
+      }),
     [
       currentDocuments,
       form.category,
+      form.initializationProfile,
       form.name,
       form.registrationProfile,
       form.tagline,
-      startup,
+      startup?.founderIds,
+      startup?.pitchDeckUrl,
     ],
   );
   const documentsByCategory = new Map(
@@ -809,7 +819,7 @@ export function StartupLaunch() {
   const editAccess = startup?.editAccess;
   const isEditingLocked = Boolean(!isNew && editAccess?.isLocked);
   const editLockReason = editAccess?.reason ?? "";
-  const readiness = currentReviewReadiness ?? startup?.readiness;
+  const readiness = currentReviewReadiness;
   const reviewTone =
     reviewStatus === "approved"
       ? "bg-emerald-500/10 border-emerald-500/20 text-emerald-200"
@@ -1021,6 +1031,11 @@ export function StartupLaunch() {
       : isUnderReview
         ? "Startup review is already pending."
         : formatReadinessActionMessage(readiness?.missingItems ?? []);
+  const footerStatusMessage = isEditingLocked
+    ? `${editLockReason} Raise a Smart Help request if you need admin-approved edits.`
+    : isRequestReviewBlocked
+      ? requestReviewBlockedReason
+      : launchBlockedReason;
   const startupUnlockRequestPath = useMemo(() => {
     if (!currentStartupId) {
       return "/dashboard/help-desk/new?category=startup_patent";
@@ -1224,7 +1239,11 @@ export function StartupLaunch() {
               <button
                 type="button"
                 onClick={importSelectedWorkspace}
-                disabled={!selectedWorkspaceId}
+                title={
+                  selectedWorkspaceId
+                    ? "Import startup basics from the selected problem workspace"
+                    : "Select a problem workspace to import"
+                }
                 className="inline-flex items-center gap-2 border border-cyan-500/30 bg-cyan-500/10 px-4 py-3 text-sm font-semibold text-cyan-50 transition hover:border-cyan-400/50 hover:bg-cyan-500/15 disabled:cursor-not-allowed disabled:opacity-50"
               >
                 <FolderKanban className="h-4 w-4" />
@@ -1239,25 +1258,27 @@ export function StartupLaunch() {
                 <span className="mb-2 block text-sm font-semibold text-white">
                   Problem workspace
                 </span>
-                <select
-                  value={selectedWorkspaceId}
-                  onChange={(event) =>
-                    setForm((current) => ({
-                      ...current,
-                      projectId: event.target.value || undefined,
-                    }))
-                  }
-                  className={fieldOkClassName}
-                >
-                  <option value="">Select a solved problem workspace</option>
-                  {problemWorkspaces.map((workspace) => (
-                    <option key={workspace._id} value={workspace._id}>
-                      {workspace.title} · {workspace.category} · {workspace.progressPercent}% complete
-                    </option>
-                  ))}
-                </select>
+                <div className="flex gap-2">
+                  <select
+                    value={selectedWorkspaceId}
+                    onChange={(event) =>
+                      setForm((current) => ({
+                        ...current,
+                        projectId: event.target.value || undefined,
+                      }))
+                    }
+                    className={fieldOkClassName}
+                  >
+                    <option value="">Select a solved problem workspace</option>
+                    {problemWorkspaces.map((workspace) => (
+                      <option key={workspace._id} value={workspace._id}>
+                        {workspace.title} · {workspace.category} · {workspace.progressPercent}% complete
+                      </option>
+                    ))}
+                  </select>
+                </div>
                 <span className="mt-2 block text-xs text-slate-500">
-                  This links the startup draft to the workspace and syncs the team size on save.
+                  Select a workspace and click Import to pull in name, category, and team.
                 </span>
               </label>
 
@@ -1292,6 +1313,61 @@ export function StartupLaunch() {
               No problem workspaces are ready to promote yet. You can still create the startup draft manually.
             </div>
           )}
+        </section>
+      ) : null}
+
+      {isNew ? (
+        <section className="border border-slate-800/70 bg-slate-950/40 px-5 py-5">
+          <div className="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
+            <div>
+              <div className="text-xs font-semibold uppercase tracking-[0.24em] text-cyan-300">
+                Review Readiness
+              </div>
+              <h2 className="mt-2 text-xl font-semibold text-white">
+                What the draft still needs before review
+              </h2>
+              <p className="mt-2 max-w-3xl text-sm text-slate-400">
+                This preview uses the current form state. Save the startup draft first, then return here to submit it once the missing items are complete.
+              </p>
+            </div>
+            <div className="border border-slate-800 bg-slate-950/70 px-3 py-2 text-xs uppercase tracking-[0.2em] text-slate-400">
+              {readiness.isReviewReady
+                ? "Review ready"
+                : `${readiness.missingItems.length} items pending`}
+            </div>
+          </div>
+
+          <div className="mt-5 grid gap-4 lg:grid-cols-[minmax(0,1.1fr)_minmax(0,0.9fr)]">
+            <div className="space-y-3">
+              {(readiness.missingItems.length > 0
+                ? readiness.missingItems.slice(0, 8)
+                : ["The startup draft is complete enough for admin review once it is saved."]).map(
+                (item) => (
+                  <div
+                    key={item}
+                    className="border-l-2 border-slate-800 px-4 py-2 text-sm text-slate-300"
+                  >
+                    {item}
+                  </div>
+                ),
+              )}
+            </div>
+            <div className="space-y-3 border-t border-slate-800 pt-4 lg:border-t-0 lg:border-l lg:pl-5 lg:pt-0">
+              <div className="text-xs uppercase tracking-[0.2em] text-slate-500">
+                Required uploads
+              </div>
+              <div className="text-sm text-slate-300">
+                {requiredDocumentCategories.length > 0
+                  ? requiredDocumentCategories
+                      .map((item) => item.replace(/_/g, " "))
+                      .join(", ")
+                  : "No stage-specific uploads are required yet."}
+              </div>
+              <div className="text-xs text-slate-500">
+                {formatReadinessActionMessage(readiness.missingItems)}
+              </div>
+            </div>
+          </div>
         </section>
       ) : null}
 
@@ -1369,46 +1445,17 @@ export function StartupLaunch() {
                       <div className="mt-3 border-l-2 border-white/10 pl-3 text-sm text-slate-200">
                         Admin notes: {startup.adminNotes}
                       </div>
-                    ) : null}
-                    {isEditingLocked ? (
-                      <div className="mt-3 border-l-2 border-amber-400 pl-3 text-sm text-amber-100">
-                        {editLockReason}
-                        <button
-                          type="button"
-                          onClick={() => navigate(startupUnlockRequestPath)}
-                          className="ml-3 font-semibold text-cyan-200 underline underline-offset-4"
-                        >
-                          Raise Smart Help request
-                        </button>
-                      </div>
-                    ) : null}
-                  </div>
-                </div>
-              </div>
+) : null}
 
-              <div className="grid gap-3">
-                <div className="flex flex-wrap items-center justify-between gap-3 border-b border-slate-800/70 pb-3">
-                  <div>
-                    <div className="text-xs font-semibold uppercase tracking-[0.24em] text-cyan-300">
-                      Launch Progress
-                    </div>
-                    <div className="mt-1 text-sm text-slate-300">
-                      {completedWorkflowCount}/{workflowSteps.length} steps
-                      complete
-                    </div>
-                  </div>
-                  <div className="text-sm text-slate-400">
-                    {currentWorkflowStep ? (
-                      <>
-                        Next:{" "}
-                        <span className="text-white">
-                          {currentWorkflowStep.label}
-                        </span>
-                      </>
-                    ) : (
-                      <span className="text-emerald-300">
-                        All launch steps complete
-                      </span>
+                    {startup && !isUnderReview && !isApproved && (
+                      <button
+                        type="button"
+                        onClick={handleRequestReviewClick}
+                        disabled={isRequestReviewBusy || isRequestReviewBlocked}
+                        className="bg-cyan-600 px-5 py-3 text-sm font-semibold text-white hover:bg-cyan-500 disabled:opacity-50"
+                      >
+                        Submit for Admin Review
+                      </button>
                     )}
                   </div>
                 </div>
@@ -1652,6 +1699,15 @@ export function StartupLaunch() {
                       Linked Product Workspace
                     </h2>
                   </div>
+                  {workspaceSectionPath ? (
+                    <button
+                      type="button"
+                      onClick={() => navigate(workspaceSectionPath)}
+                      className="bg-cyan-600 px-4 py-2 text-sm font-semibold text-white hover:bg-cyan-500"
+                    >
+                      {activeWorkspace ? "Open Workspace" : "Create Workspace"}
+                    </button>
+                  ) : null}
                 </div>
                 <div className="mt-5 grid gap-4 border-t border-slate-800/70 pt-4 md:grid-cols-3">
                   <div className="border-l border-slate-800/70 pl-4">
@@ -1865,26 +1921,38 @@ export function StartupLaunch() {
                 })}
 
                 <div className="flex flex-col gap-3 border-t border-cyan-500/20 bg-cyan-500/5 px-4 py-4 sm:flex-row sm:items-center sm:justify-between">
-                  <div>
-                    <div className="text-sm font-semibold text-white">
-                      Save all changes
-                    </div>
-                    <div className="mt-1 text-xs text-cyan-100/80">
-                      Saves the full startup profile including all IPR answers above.
-                    </div>
+                  <div className="flex flex-wrap gap-2">
+                    <button
+                      type="button"
+                      onClick={() => setShowPreviewModal(true)}
+                      disabled={!form.name.trim()}
+                      className="border border-slate-700 bg-slate-800 px-4 py-3 text-sm font-semibold text-slate-200 hover:bg-slate-700 disabled:opacity-50"
+                    >
+                      Preview
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => persistStartup.mutate()}
+                      disabled={persistStartup.isPending || isEditingLocked}
+                      className="bg-white px-5 py-3 text-sm font-semibold text-slate-950 transition hover:bg-slate-100 disabled:cursor-not-allowed disabled:opacity-60"
+                    >
+                      {persistStartup.isPending
+                        ? "Saving…"
+                        : isNew
+                          ? "Create Startup Draft"
+                          : "Save All Changes"}
+                    </button>
+                    {startup && !isUnderReview && !isApproved && (
+                      <button
+                        type="button"
+                        onClick={handleRequestReviewClick}
+                        disabled={isRequestReviewBusy || isRequestReviewBlocked}
+                        className="bg-cyan-600 px-5 py-3 text-sm font-semibold text-white hover:bg-cyan-500 disabled:opacity-50"
+                      >
+                        Submit for Review
+                      </button>
+                    )}
                   </div>
-                  <button
-                    type="button"
-                    onClick={() => persistStartup.mutate()}
-                    disabled={persistStartup.isPending || isEditingLocked}
-                    className="bg-white px-5 py-3 text-sm font-semibold text-slate-950 transition hover:bg-slate-100 disabled:cursor-not-allowed disabled:opacity-60"
-                  >
-                    {persistStartup.isPending
-                      ? "Saving…"
-                      : isNew
-                        ? "Create Startup Draft"
-                        : "Save All Changes"}
-                  </button>
                 </div>
               </>
             ) : (
@@ -2229,11 +2297,9 @@ export function StartupLaunch() {
           <p className="text-sm font-semibold text-white">
             {isNew ? "Create your startup draft" : "Save or submit your startup"}
           </p>
-          {isEditingLocked || launchBlockedReason ? (
+          {footerStatusMessage ? (
             <p className="mt-1 text-sm text-slate-400">
-              {isEditingLocked
-                ? `${editLockReason} Raise a Smart Help request if you need admin-approved edits.`
-                : launchBlockedReason}
+              {footerStatusMessage}
             </p>
           ) : null}
         </div>
@@ -2243,7 +2309,7 @@ export function StartupLaunch() {
               <button
                 type="button"
                 onClick={handleRequestReviewClick}
-                disabled={isRequestReviewBusy}
+                disabled={isRequestReviewBlocked || isRequestReviewBusy}
                 aria-disabled={isRequestReviewBlocked || isRequestReviewBusy}
                 title={
                   isRequestReviewBlocked
@@ -2332,6 +2398,85 @@ export function StartupLaunch() {
                 className="border border-red-500/30 bg-red-500/10 px-4 py-2.5 text-sm font-semibold text-red-200 transition hover:bg-red-500/20"
               >
                 Discard & leave
+              </button>
+            </div>
+          </div>
+        </div>
+      ) : null}
+
+      {showPreviewModal ? (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-950/80 p-6 backdrop-blur-sm">
+          <div className="w-full max-w-2xl max-h-[80vh] overflow-y-auto border border-slate-800 bg-slate-900 p-6">
+            <div className="mb-6 flex items-center justify-between">
+              <h2 className="text-2xl font-bold text-white">
+                Startup Preview
+              </h2>
+              <button
+                type="button"
+                aria-label="Close preview"
+                onClick={() => setShowPreviewModal(false)}
+                className="text-slate-400 hover:text-white"
+              >
+                <X className="w-5 h-5" />
+              </button>
+            </div>
+            <div className="space-y-4">
+              <div>
+                <div className="text-xs uppercase tracking-wider text-slate-500">Startup Name</div>
+                <div className="text-lg font-semibold text-white">{form.name || "(Not set)"}</div>
+              </div>
+              <div>
+                <div className="text-xs uppercase tracking-wider text-slate-500">Tagline</div>
+                <div className="text-white">{form.tagline || "(Not set)"}</div>
+              </div>
+              <div>
+                <div className="text-xs uppercase tracking-wider text-slate-500">Category</div>
+                <div className="text-white">{form.category || "(Not set)"}</div>
+              </div>
+              <div>
+                <div className="text-xs uppercase tracking-wider text-slate-500">Stage</div>
+                <div className="text-white">{form.stage}</div>
+              </div>
+              <div className="grid grid-cols-2 gap-4">
+                <div>
+                  <div className="text-xs uppercase tracking-wider text-slate-500">Team Size</div>
+                  <div className="text-white">{form.teamSize}</div>
+                </div>
+                <div>
+                  <div className="text-xs uppercase tracking-wider text-slate-500">Funding Needed</div>
+                  <div className="text-white">{form.fundingNeeded ? `₹${form.fundingNeeded.toLocaleString()}` : "Not set"}</div>
+                </div>
+              </div>
+              <div>
+                <div className="text-xs uppercase tracking-wider text-slate-500">Initialization Progress</div>
+                <div className="mt-2 grid grid-cols-2 gap-2">
+                  {initSectionSummaries.map((section) => (
+                    <div key={section.title} className="bg-slate-800 px-3 py-2">
+                      <div className="text-xs text-slate-400">{section.title}</div>
+                      <div className="text-sm text-white">{section.answered}/{section.total}</div>
+                    </div>
+                  ))}
+                </div>
+              </div>
+              <div>
+                <div className="text-xs uppercase tracking-wider text-slate-500">IPR Progress</div>
+                <div className="mt-2 grid grid-cols-2 gap-2">
+                  {iprSectionSummaries.map((section) => (
+                    <div key={section.title} className="bg-slate-800 px-3 py-2">
+                      <div className="text-xs text-slate-400">{section.title}</div>
+                      <div className="text-sm text-white">{section.answered}/{section.total}</div>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            </div>
+            <div className="mt-6 flex justify-end">
+              <button
+                type="button"
+                onClick={() => setShowPreviewModal(false)}
+                className="bg-white px-4 py-2 text-sm font-semibold text-slate-950"
+              >
+                Close
               </button>
             </div>
           </div>
