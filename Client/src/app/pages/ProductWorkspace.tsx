@@ -30,7 +30,6 @@ import {
 import type {
   ChatMessage,
   ChatMessageAttachment,
-  Workspace,
   WorkspaceTask,
   WorkspaceUpload,
   WorkspaceUploadCategory,
@@ -87,33 +86,11 @@ type ProgressFormState = {
 
 type ProgressFormErrors = Partial<Record<"note" | "completionPercent", string>>;
 
-type WorkspaceDraftState = {
-  title: string;
-  category: string;
-  stage: Workspace["stage"];
-};
-
-type WorkspaceCreateState = {
-  title: string;
-  category: string;
-};
-
 const createEmptyProgressForm = (): ProgressFormState => ({
   note: "",
   milestoneRef: "",
   completionPercent: "",
   file: null,
-});
-
-const createEmptyWorkspaceDraft = (): WorkspaceDraftState => ({
-  title: "",
-  category: "",
-  stage: "Ideation",
-});
-
-const createEmptyWorkspaceCreateState = (): WorkspaceCreateState => ({
-  title: "",
-  category: "",
 });
 
 const validateProgressForm = (
@@ -235,18 +212,12 @@ function ProductWorkspaceDetail() {
   const [hasAttemptedProgressSubmit, setHasAttemptedProgressSubmit] =
     useState(false);
   const [showNegotiationPanel, setShowNegotiationPanel] = useState(false);
-  const [showWorkspaceCreateForm, setShowWorkspaceCreateForm] = useState(false);
   const [participantForm, setParticipantForm] = useState({
     email: "",
     message: "",
     proposedRole: "developer" as const,
   });
   const [selectedWorkspaceId, setSelectedWorkspaceId] = useState<string>("");
-  const [workspaceDraft, setWorkspaceDraft] = useState<WorkspaceDraftState>(
-    createEmptyWorkspaceDraft,
-  );
-  const [workspaceCreateDraft, setWorkspaceCreateDraft] =
-    useState<WorkspaceCreateState>(createEmptyWorkspaceCreateState);
   const [selectedUpload, setSelectedUpload] = useState<WorkspaceUpload | null>(
     null,
   );
@@ -264,7 +235,11 @@ function ProductWorkspaceDetail() {
   );
   const isProgressFormValid = Object.keys(progressFormErrors).length === 0;
   const showProgressValidation = hasAttemptedProgressSubmit;
-  const workspaceOptions = listQuery.data ?? [];
+  const problemBankWorkspaceOptions = useMemo(
+    () =>
+      (listQuery.data ?? []).filter((item) => Boolean(item.claimedProblemId)),
+    [listQuery.data],
+  );
   const workspaceId = projectId || selectedWorkspaceId || undefined;
   const workspaceQuery = useQuery({
     queryKey: ["workspace", workspaceId],
@@ -274,10 +249,8 @@ function ProductWorkspaceDetail() {
   const workspace = workspaceQuery.data;
   const teamMembers = workspace?.teamMembers ?? [];
   const isOwner = workspace?.ownerId === currentUser?._id;
-  const canCreateWorkspace = currentUser?.role === "student";
   const canManageWorkspace =
     currentUser?.role === "student" && Boolean(workspace);
-  const canManageOwnedWorkspace = canCreateWorkspace && Boolean(isOwner);
   const canManageChatAccess = Boolean(isOwner);
   const chat = useWorkspaceChat(workspaceId);
 
@@ -292,40 +265,26 @@ function ProductWorkspaceDetail() {
       return;
     }
 
-    const hasSelectedWorkspace = workspaceOptions.some((item) => item._id === selectedWorkspaceId);
+    const hasSelectedWorkspace = problemBankWorkspaceOptions.some(
+      (item) => item._id === selectedWorkspaceId,
+    );
     if (!hasSelectedWorkspace) {
-      setSelectedWorkspaceId(workspaceOptions[0]?._id ?? "");
+      setSelectedWorkspaceId(problemBankWorkspaceOptions[0]?._id ?? "");
     }
-  }, [projectId, listQuery.data, selectedWorkspaceId, workspaceOptions]);
+  }, [
+    projectId,
+    listQuery.data,
+    problemBankWorkspaceOptions,
+    selectedWorkspaceId,
+  ]);
 
-  useEffect(() => {
-    if (!workspace) {
-      setWorkspaceDraft(createEmptyWorkspaceDraft());
-      return;
-    }
-
-    setWorkspaceDraft({
-      title: workspace.title,
-      category: workspace.category,
-      stage: workspace.stage,
-    });
-  }, [workspace]);
-
-  const refresh = async (targetWorkspaceId = workspaceId) => {
-    const refreshTasks = [
+  const refresh = async () => {
+    if (!workspaceId) return;
+    await Promise.all([
       queryClient.invalidateQueries({ queryKey: ["workspaces"] }),
+      queryClient.invalidateQueries({ queryKey: ["workspace", workspaceId] }),
       queryClient.invalidateQueries({ queryKey: ["score", "me"] }),
-    ];
-
-    if (targetWorkspaceId) {
-      refreshTasks.push(
-        queryClient.invalidateQueries({
-          queryKey: ["workspace", targetWorkspaceId],
-        }),
-      );
-    }
-
-    await Promise.all(refreshTasks);
+    ]);
   };
 
   const resetProgressForm = () => {
@@ -361,7 +320,9 @@ function ProductWorkspaceDetail() {
       workspaceApi.updateTask(workspaceId!, payload.taskId, {
         done: payload.done,
       }),
-    onSuccess: refresh,
+    onSuccess: async () => {
+      await refresh();
+    },
   });
 
   const deleteTask = useMutation({
@@ -493,84 +454,6 @@ function ProductWorkspaceDetail() {
       setToast("Chat participant removed.");
       await refresh();
     },
-  });
-
-  const createWorkspace = useMutation({
-    mutationFn: () =>
-      workspaceApi.create({
-        title: workspaceCreateDraft.title.trim(),
-        category: workspaceCreateDraft.category.trim(),
-      }),
-    onSuccess: async (createdWorkspace) => {
-      queryClient.setQueryData(
-        ["workspace", createdWorkspace._id],
-        createdWorkspace,
-      );
-      setWorkspaceCreateDraft(createEmptyWorkspaceCreateState());
-      setShowWorkspaceCreateForm(false);
-      setSelectedWorkspaceId(createdWorkspace._id);
-      setToast("Workspace created.");
-      await refresh(createdWorkspace._id);
-      if (projectId) {
-        navigate("/product-workspace", { replace: true });
-      }
-    },
-    onError: (error) =>
-      setToast(
-        (error as { response?: { data?: { error?: { message?: string } } } })
-          ?.response?.data?.error?.message ??
-          "Unable to create a workspace right now.",
-      ),
-  });
-
-  const updateWorkspaceDetails = useMutation({
-    mutationFn: () =>
-      workspaceApi.update(workspaceId!, {
-        title: workspaceDraft.title.trim(),
-        category: workspaceDraft.category.trim(),
-        stage: workspaceDraft.stage,
-      }),
-    onSuccess: async (updatedWorkspace) => {
-      queryClient.setQueryData(
-        ["workspace", updatedWorkspace._id],
-        updatedWorkspace,
-      );
-      setToast("Workspace details updated.");
-      await refresh(updatedWorkspace._id);
-    },
-    onError: (error) =>
-      setToast(
-        (error as { response?: { data?: { error?: { message?: string } } } })
-          ?.response?.data?.error?.message ??
-          "Unable to update workspace details.",
-      ),
-  });
-
-  const deleteWorkspace = useMutation({
-    mutationFn: (targetWorkspaceId: string) => workspaceApi.remove(targetWorkspaceId),
-    onSuccess: async (_result, deletedWorkspaceId) => {
-      queryClient.removeQueries({ queryKey: ["workspace", deletedWorkspaceId] });
-      setToast("Workspace deleted.");
-
-      if (projectId === deletedWorkspaceId) {
-        navigate("/product-workspace", { replace: true });
-      }
-
-      if (selectedWorkspaceId === deletedWorkspaceId) {
-        const fallbackWorkspaceId = workspaceOptions.find(
-          (item) => item._id !== deletedWorkspaceId,
-        )?._id;
-        setSelectedWorkspaceId(fallbackWorkspaceId ?? "");
-      }
-
-      await refresh();
-    },
-    onError: (error) =>
-      setToast(
-        (error as { response?: { data?: { error?: { message?: string } } } })
-          ?.response?.data?.error?.message ??
-          "Unable to delete this workspace.",
-      ),
   });
 
   const progress = useMutation({
@@ -746,10 +629,7 @@ function ProductWorkspaceDetail() {
       "Ready for review",
     [workspace?.milestones],
   );
-  const problemBankWorkspaceCount = workspaceOptions.filter(
-    (item) => Boolean(item.claimedProblemId),
-  ).length;
-  const independentWorkspaceCount = workspaceOptions.length - problemBankWorkspaceCount;
+  const workspaceOptions = problemBankWorkspaceOptions;
   const completedTaskCount = (workspace?.tasks ?? []).filter(
     (task) => task.done,
   ).length;
@@ -764,15 +644,6 @@ function ProductWorkspaceDetail() {
   const workspaceSourceLabel = workspace?.claimedProblemId
     ? "Problem Bank"
     : "Independent Workspace";
-  const isWorkspaceDraftDirty = Boolean(
-    workspace &&
-      (workspaceDraft.title.trim() !== workspace.title ||
-        workspaceDraft.category.trim() !== workspace.category ||
-        workspaceDraft.stage !== workspace.stage),
-  );
-  const canSubmitWorkspaceCreate =
-    workspaceCreateDraft.title.trim().length >= 2 &&
-    workspaceCreateDraft.category.trim().length >= 2;
   const chatRoster = workspace
     ? [
         ...teamMembers,
@@ -864,7 +735,7 @@ function ProductWorkspaceDetail() {
   }, [activeTab, chat.messages.length, typingParticipantNames.length]);
 
   return (
-    <DashboardLayout role={currentUser?.role ?? UserRole.STUDENT}>
+    <DashboardLayout role="student">
       <div className="space-y-6">
         <section className="relative overflow-hidden rounded-[28px] border border-slate-800/80 bg-slate-950 px-6 py-6 shadow-[0_24px_80px_rgba(2,6,23,0.45)] lg:px-8 lg:py-8">
           <div className="absolute inset-x-0 top-0 h-40 bg-[radial-gradient(circle_at_top_left,rgba(59,130,246,0.22),transparent_42%),radial-gradient(circle_at_top_right,rgba(168,85,247,0.18),transparent_36%)]" />
@@ -2396,8 +2267,9 @@ function ProductWorkspaceDetail() {
 
 export function ProductWorkspace() {
   const { projectId } = useParams();
+  const currentUser = useAuthStore((state) => state.user);
 
-  if (!projectId) {
+  if (!projectId && currentUser?.role === UserRole.STUDENT) {
     return <ProductWorkspaceManager />;
   }
 

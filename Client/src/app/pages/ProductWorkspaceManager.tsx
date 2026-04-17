@@ -57,6 +57,7 @@ export function ProductWorkspaceManager() {
   const navigate = useNavigate();
   const queryClient = useQueryClient();
   const currentUser = useAuthStore((state) => state.user);
+  const canManageWorkspaces = currentUser?.role === UserRole.STUDENT;
   const [searchValue, setSearchValue] = useState("");
   const [selectedWorkspaceId, setSelectedWorkspaceId] = useState("");
   const [editorMode, setEditorMode] = useState<"create" | "edit" | null>(null);
@@ -272,7 +273,8 @@ export function ProductWorkspaceManager() {
             <button
               type="button"
               onClick={openCreateEditor}
-              className="inline-flex items-center justify-center gap-2 rounded-xl bg-gradient-to-r from-cyan-500 to-blue-600 px-5 py-3 text-sm font-semibold text-white transition hover:from-cyan-400 hover:to-blue-500"
+              disabled={!canManageWorkspaces}
+              className="inline-flex items-center justify-center gap-2 rounded-xl bg-gradient-to-r from-cyan-500 to-blue-600 px-5 py-3 text-sm font-semibold text-white transition hover:from-cyan-400 hover:to-blue-500 disabled:cursor-not-allowed disabled:opacity-60"
             >
               <Plus className="h-4 w-4" />
               Create Workspace
@@ -323,7 +325,7 @@ export function ProductWorkspaceManager() {
           </div>
         </section>
 
-        {editorMode ? (
+        {editorMode && canManageWorkspaces ? (
           <section className="rounded-[28px] border border-slate-800 bg-slate-950/90 p-6">
             <div className="flex flex-col gap-6 lg:flex-row lg:items-start lg:justify-between">
               <div className="max-w-2xl">
@@ -499,7 +501,8 @@ export function ProductWorkspaceManager() {
                     <button
                       type="button"
                       onClick={openCreateEditor}
-                      className="rounded-xl border border-slate-700 bg-slate-900 px-5 py-3 text-sm font-semibold text-white"
+                      disabled={!canManageWorkspaces}
+                      className="rounded-xl border border-slate-700 bg-slate-900 px-5 py-3 text-sm font-semibold text-white disabled:cursor-not-allowed disabled:opacity-60"
                     >
                       Create Workspace
                     </button>
@@ -601,7 +604,7 @@ export function ProductWorkspaceManager() {
                             Open
                             <ArrowRight className="h-4 w-4" />
                           </button>
-                          {isOwner ? (
+                          {isOwner && canManageWorkspaces ? (
                             <>
                               <button
                                 type="button"

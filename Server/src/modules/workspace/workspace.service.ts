@@ -18,6 +18,7 @@ import { Deal } from '../deal/deal.model';
 import { Patent } from '../patent/patent.model';
 import { PatentRequest } from '../patent/patentRequest.model';
 import { ProblemSubmission } from '../problemBank/problemSubmission.model';
+import { clearProblemCaches } from '../problemBank/problem.service';
 import { Startup } from '../startup/startup.model';
 import { Workspace } from './workspace.model';
 import { ApiError } from '../../utils/ApiError';
@@ -440,7 +441,7 @@ export const updateWorkspace = async (
 };
 
 export const deleteWorkspace = async (workspaceId: string, userId: string) => {
-  await getWorkspaceForOwner(workspaceId, userId);
+  const workspace = await getWorkspaceForOwner(workspaceId, userId);
 
   const [
     linkedStartup,
@@ -474,6 +475,9 @@ export const deleteWorkspace = async (workspaceId: string, userId: string) => {
 
   await Workspace.findByIdAndDelete(workspaceId);
   await ChatMessage.deleteMany({ workspaceId });
+  if (workspace.claimedProblemId) {
+    await clearProblemCaches();
+  }
 };
 
 export const addProgress = async (

@@ -11,7 +11,7 @@ import {
   Users2,
 } from "lucide-react";
 import { workspaceApi } from "../../../api/workspace.api";
-import { toast } from "../../../components/ui/sonner";
+import { toast } from "../../components/ui/sonner";
 import { useAuthStore } from "../../../store/authStore";
 import type { Workspace } from "../../../types/workspace.types";
 import { getApiErrorMessage } from "../../../utils/apiError";
@@ -86,10 +86,13 @@ export function StudentWorkspaces() {
   const independentWorkspaceCount = workspaces.length - problemWorkspaceCount;
 
   const refreshWorkspaces = async (workspaceId?: string) => {
-    await queryClient.invalidateQueries({ queryKey: ["workspaces"] });
-    if (workspaceId) {
-      await queryClient.invalidateQueries({ queryKey: ["workspace", workspaceId] });
-    }
+    await Promise.all([
+      queryClient.invalidateQueries({ queryKey: ["workspaces"] }),
+      queryClient.invalidateQueries({ queryKey: ["problems"] }),
+      ...(workspaceId
+        ? [queryClient.invalidateQueries({ queryKey: ["workspace", workspaceId] })]
+        : []),
+    ]);
   };
 
   const createWorkspaceMutation = useMutation({

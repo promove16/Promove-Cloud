@@ -177,11 +177,6 @@ const StudentInvestorDeals = lazy(() =>
     default: module.StudentInvestorDeals,
   })),
 );
-const StudentWorkspaces = lazy(() =>
-  import("../app/pages/dashboards/StudentWorkspaces").then((module) => ({
-    default: module.StudentWorkspaces,
-  })),
-);
 const ProblemBank = lazy(() =>
   import("../app/pages/ProblemBank").then((module) => ({
     default: module.ProblemBank,
@@ -721,7 +716,7 @@ export const router = createBrowserRouter([
             element: <ProtectedRoleRoute role={UserRole.STUDENT} />,
             children: [
               { index: true, element: <LazyPage component={LegacyStudentDashboard} /> },
-              { path: "workspaces", element: <LazyPage component={StudentWorkspaces} /> },
+              { path: "workspaces", element: <Navigate to="/product-workspace" replace /> },
               { path: "score", element: <LazyPage component={InnovationScorePage} /> },
               { path: "mentor-sessions", element: <LazyPage component={StudentMentorSessions} /> },
               { path: "investor-deals", element: <Navigate to="/startup-launch" replace /> },
