@@ -22,6 +22,22 @@ const PATENT_DOC_REVIEW_STATUSES = [
   'revision_requested',
 ] as const;
 
+const PATENT_HANDOVER_DOC_CATEGORIES = [
+  'form1_application',
+  'form2_specification',
+  'form3_foreign_filing',
+  'form5_inventorship',
+  'form26_power_of_attorney',
+  'form28_startup_status',
+  'drawings',
+  'prior_art_report',
+  'assignment_deed',
+  'priority_document',
+  'patent_certificate',
+  'supporting_evidence',
+  'other',
+] as const;
+
 export const updateStatusSchema = z.object({
   status: z.enum(PATENT_REQUEST_STATUSES),
   note: z.string().trim().max(1500).optional(),
@@ -64,6 +80,15 @@ export const reviewDocumentSchema = z
       });
     }
   });
+
+export const handoverDocumentUploadSchema = z.object({
+  documentCategory: z.enum(PATENT_HANDOVER_DOC_CATEGORIES),
+  note: z.string().trim().max(300).optional(),
+});
+
+export const completeOfficialHandoverSchema = z.object({
+  note: z.string().trim().max(1500).optional(),
+});
 
 export const listRequestsQuerySchema = z.object({
   status: z.enum(PATENT_REQUEST_STATUSES).optional(),

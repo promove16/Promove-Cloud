@@ -336,14 +336,14 @@ export default function SupportTicketDetailPage({ context }: SupportTicketDetail
                 <Link to={adminEntityPath} className="text-sm font-semibold text-cyan-200 hover:text-cyan-100">
                   {ticket.relatedStartup.name}
                 </Link>
-              ) : (
-                <div className="text-sm font-semibold text-white">{ticket.relatedStartup.name}</div>
-              )}
-              <Badge className="border-slate-700 bg-slate-950 text-slate-300">
-                {ticket.relatedStartup.reviewStatus.replace(/_/g, ' ')}
-              </Badge>
-              <Badge
-                className={
+                ) : (
+                  <div className="text-sm font-semibold text-white">{ticket.relatedStartup.name}</div>
+                )}
+                <Badge className="border-slate-700 bg-slate-950 text-slate-300">
+                  {(ticket.relatedStartup.reviewStatus ?? 'draft').replace(/_/g, ' ')}
+                </Badge>
+                <Badge
+                  className={
                   isRelatedStartupLocked
                     ? 'border-amber-500/30 bg-amber-500/10 text-amber-300'
                     : 'border-emerald-500/30 bg-emerald-500/10 text-emerald-300'

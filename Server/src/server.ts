@@ -1,6 +1,6 @@
 import http from 'http';
 import app from './app';
-import { initializeBullMqRedisTransport } from './config/bullmq';
+import { initializeBullMqRedisTransport, shouldIgnoreBullMqUnhandledRejection } from './config/bullmq';
 import { startActivityWorker } from './jobs/activityWorker';
 import { startNotificationWorker } from './jobs/notificationWorker';
 import { scheduleWeeklyProgressSummaryJob, startRetentionEmailWorker } from './jobs/retentionEmailWorker';
@@ -42,6 +42,10 @@ process.on('uncaughtException', (error) => {
 });
 
 process.on('unhandledRejection', (error) => {
+  if (shouldIgnoreBullMqUnhandledRejection(error)) {
+    return;
+  }
+
   shutdownWithLoggedError('unhandledRejection', error);
 });
 

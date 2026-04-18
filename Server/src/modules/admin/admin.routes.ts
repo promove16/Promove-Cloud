@@ -1,8 +1,10 @@
+import multer from 'multer';
 import { Router } from 'express';
 import { authenticate } from '../../middleware/authenticate';
 import { authorize } from '../../middleware/authorize';
 import { UserRole } from '../../types/roles.types';
 import { asyncHandler } from '../../utils/asyncHandler';
+import { ApiError } from '../../utils/ApiError';
 import {
   createAdminMentorshipProgramController,
   createMentorProfileController,
@@ -60,6 +62,8 @@ import {
   addNoteController,
   addTimelineController,
   reviewDocumentController,
+  uploadOfficialHandoverDocumentController,
+  completeOfficialHandoverController,
 } from '../patent/patentRequestAdmin.controller';
 import {
   sendMessageController as patentSendMessageController,
@@ -69,6 +73,20 @@ import {
 } from '../patent/patentConversation.controller';
 
 const router = Router();
+const pdfFileNamePattern = /\.pdf$/i;
+const patentHandoverUpload = multer({
+  storage: multer.memoryStorage(),
+  limits: { fileSize: 3 * 1024 * 1024 },
+  fileFilter: (_req, file, cb) => {
+    const isPdf = file.mimetype === 'application/pdf' || pdfFileNamePattern.test(file.originalname);
+    const isImage = file.mimetype.startsWith('image/');
+    if (!isPdf && !isImage) {
+      cb(new ApiError(400, 'INVALID_FILE_TYPE', 'Only PDF or image files are allowed.'));
+      return;
+    }
+    cb(null, true);
+  },
+});
 
 router.use(authenticate, authorize(UserRole.ADMIN));
 
@@ -103,6 +121,12 @@ router.patch('/patent-requests/:id/status', asyncHandler(updateStatusController)
 router.patch('/patent-requests/:id/assign', asyncHandler(assignCaseController));
 router.patch('/patent-requests/:id/ipo-details', asyncHandler(updateIpoDetailsController));
 router.patch('/patent-requests/:id/documents/:documentId/review', asyncHandler(reviewDocumentController));
+router.post(
+  '/patent-requests/:id/handover/documents',
+  patentHandoverUpload.single('file'),
+  asyncHandler(uploadOfficialHandoverDocumentController),
+);
+router.patch('/patent-requests/:id/handover', asyncHandler(completeOfficialHandoverController));
 router.post('/patent-requests/:id/notes', asyncHandler(addNoteController));
 router.post('/patent-requests/:id/timeline', asyncHandler(addTimelineController));
 router.get('/patent-requests/:id/messages', asyncHandler(patentListMessagesController));

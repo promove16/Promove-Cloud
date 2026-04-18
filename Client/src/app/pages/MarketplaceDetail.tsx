@@ -214,6 +214,22 @@ function StartupDetailView({
     !isOwnStartup && entity.primaryFounderId ? entity.primaryFounderId : null;
   const isInvestorView = currentUser?.role === UserRole.INVESTOR;
   const canShowInvestorButton = isInvestorView && (entity.acceptsPennyInvestors || entity.acceptsSoleInvestor);
+  const primaryLocation = entity.founders.map((founder) => founder.location).find(Boolean);
+  const summaryMeta = [
+    primaryLocation,
+    ...entity.launchTargets.slice(0, 1),
+    `${entity.innovationScoreAtLaunch} score`,
+    `${entity.teamSize} team`,
+  ].filter(Boolean) as string[];
+  const snapshotChips = [
+    entity.category,
+    entity.stage,
+    entity.traction.mvpBuilt ? "MVP Ready" : "",
+    entity.traction.revenueGenerating ? "Revenue Generating" : "",
+    entity.traction.patentFiled ? "Patent Filed" : "",
+    entity.launchTargets.includes("Investors") ? "Open for Investment" : "",
+    ...entity.trustProfile.signals.slice(0, 3),
+  ].filter(Boolean);
 
   const handleExpressInterest = () => {
     navigate('/dashboard/investor/startups', { state: { highlightStartupId: entity._id } });
@@ -223,54 +239,105 @@ function StartupDetailView({
     <div className="space-y-6">
       <section className="relative overflow-hidden rounded-[32px] border border-white/10 bg-[#090d1b] px-6 py-6 shadow-[0_30px_120px_rgba(15,23,42,0.32)] sm:px-8 sm:py-7 lg:px-10">
         <div className="pointer-events-none absolute inset-0 bg-[radial-gradient(circle_at_top_left,rgba(34,211,238,0.12),transparent_34%),radial-gradient(circle_at_top_right,rgba(217,70,239,0.1),transparent_30%)]" />
-        <div className="relative flex flex-col gap-4 xl:flex-row xl:items-start xl:justify-between">
-          <div className="space-y-3">
-            <div className="inline-flex items-center gap-2 rounded-full border border-fuchsia-400/20 bg-fuchsia-400/10 px-2.5 py-1 text-[11px] font-semibold uppercase tracking-[0.24em] text-fuchsia-100">
-              Startup View
+        <div className="relative flex flex-col gap-8 xl:flex-row xl:items-start xl:justify-between">
+          <div className="min-w-0 flex-1">
+            <div className="flex items-start gap-4">
+              <div className="flex h-14 w-14 shrink-0 items-center justify-center rounded-[18px] bg-[linear-gradient(135deg,#0f172a_0%,#1e293b_100%)] text-lg font-semibold text-white">
+                {entity.name.slice(0, 1).toUpperCase()}
+              </div>
+
+              <div className="min-w-0 flex-1">
+                <div className="flex flex-wrap items-center gap-2">
+                  <span className="rounded-full bg-slate-950 px-3 py-1 text-xs font-semibold uppercase tracking-[0.18em] text-white">
+                    Startup
+                  </span>
+                  <span className="rounded-full border border-cyan-500/30 bg-cyan-500/10 px-3 py-1 text-xs font-semibold text-cyan-200">
+                    Launch
+                  </span>
+                </div>
+
+                <h1 className="mt-4 truncate text-2xl font-semibold tracking-tight text-white sm:text-4xl">
+                  {entity.name}
+                </h1>
+                <p className="mt-2 truncate text-sm font-medium text-slate-400 sm:text-base">
+                  {entity.category} • {entity.stage}
+                </p>
+
+                <div className="mt-4 flex flex-wrap items-center gap-x-4 gap-y-2 text-sm text-slate-400">
+                  {primaryLocation ? (
+                    <span className="inline-flex items-center gap-1.5">
+                      <MapPin className="h-4 w-4 text-cyan-400" />
+                      {primaryLocation}
+                    </span>
+                  ) : null}
+                  {summaryMeta
+                    .filter((meta) => meta !== primaryLocation)
+                    .map((meta) => (
+                      <span key={meta}>{meta}</span>
+                    ))}
+                </div>
+              </div>
             </div>
-            <div>
-              <h1 className="max-w-4xl text-2xl font-semibold tracking-tight text-white sm:text-4xl">{entity.name}</h1>
-              <p className="mt-2 max-w-3xl text-sm leading-6 text-slate-300 sm:text-[15px]">{entity.tagline}</p>
-            </div>
-            <div className="flex flex-wrap gap-1.5">
-              {[entity.category, entity.stage, ...entity.launchTargets].map((chip) => (
-                <span key={chip} className="rounded-full border border-white/10 px-2.5 py-1 text-[11px] font-medium text-slate-200">
+
+            <p className="mt-5 max-w-3xl text-sm leading-6 text-slate-300 sm:text-[15px]">
+              {entity.tagline}
+            </p>
+
+            <div className="mt-5 flex flex-wrap gap-2">
+              {snapshotChips.map((chip) => (
+                <span
+                  key={chip}
+                  className="rounded-full border border-white/10 bg-white/[0.03] px-3 py-1.5 text-xs font-medium text-slate-200"
+                >
                   {chip}
                 </span>
               ))}
             </div>
           </div>
 
-          <div className="flex flex-wrap items-center gap-2">
-            {canShowInvestorButton && (
-              <button
-                onClick={handleExpressInterest}
-                className="inline-flex items-center gap-2 rounded-full border border-cyan-400/30 bg-cyan-400/10 px-3.5 py-2 text-sm font-semibold text-cyan-300 transition hover:border-cyan-400/50 hover:bg-cyan-400/20"
-              >
-                <Handshake className="h-4 w-4" />
-                Express Interest
-              </button>
-            )}
-            {messageFounderId ? (
-              <button
-                onClick={() => onMessage(messageFounderId)}
-                className="inline-flex items-center gap-2 rounded-full border border-white/10 px-3.5 py-2 text-sm font-medium text-white transition hover:border-white/20 hover:bg-white/5"
-              >
-                <MessageCircle className="h-4 w-4" />
-                Message Founder
-              </button>
-            ) : null}
-            {entity.pitchDeckUrl ? (
-              <a
-                href={entity.pitchDeckUrl}
-                target="_blank"
-                rel="noreferrer"
-                className="inline-flex items-center gap-2 rounded-full bg-white px-3.5 py-2 text-sm font-semibold text-slate-950 transition hover:bg-slate-100"
-              >
-                Open Pitch Deck
-                <ExternalLink className="h-4 w-4" />
-              </a>
-            ) : null}
+          <div className="w-full max-w-[320px] shrink-0 space-y-5">
+            <div className="grid grid-cols-2 gap-4">
+              <MetricCard compact label="Score" value={String(entity.innovationScoreAtLaunch)} />
+              <MetricCard compact label="Team" value={String(entity.teamSize)} />
+              <MetricCard compact label="Products" value={String(entity.activeProducts)} />
+              <MetricCard
+                compact
+                label="Funding"
+                value={typeof entity.fundingNeeded === "number" ? money.format(entity.fundingNeeded) : "Undisclosed"}
+              />
+            </div>
+
+            <div className="flex flex-wrap gap-2">
+              {canShowInvestorButton && (
+                <button
+                  onClick={handleExpressInterest}
+                  className="inline-flex items-center gap-2 rounded-full border border-cyan-400/30 bg-cyan-400/10 px-3.5 py-2 text-sm font-semibold text-cyan-300 transition hover:border-cyan-400/50 hover:bg-cyan-400/20"
+                >
+                  <Handshake className="h-4 w-4" />
+                  Express Interest
+                </button>
+              )}
+              {messageFounderId ? (
+                <button
+                  onClick={() => onMessage(messageFounderId)}
+                  className="inline-flex items-center gap-2 rounded-full border border-white/10 px-3.5 py-2 text-sm font-medium text-white transition hover:border-white/20 hover:bg-white/5"
+                >
+                  <MessageCircle className="h-4 w-4" />
+                  Message Founder
+                </button>
+              ) : null}
+              {entity.pitchDeckUrl ? (
+                <a
+                  href={entity.pitchDeckUrl}
+                  target="_blank"
+                  rel="noreferrer"
+                  className="inline-flex items-center gap-2 rounded-full bg-white px-3.5 py-2 text-sm font-semibold text-slate-950 transition hover:bg-slate-100"
+                >
+                  Open Pitch Deck
+                  <ExternalLink className="h-4 w-4" />
+                </a>
+              ) : null}
+            </div>
           </div>
         </div>
       </section>

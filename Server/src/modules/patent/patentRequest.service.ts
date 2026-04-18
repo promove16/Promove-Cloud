@@ -370,6 +370,63 @@ export const deletePatentRequestDocument = async (userId: string, requestId: str
   return request.toObject();
 };
 
+export const acknowledgeOfficialHandover = async (userId: string, requestId: string) => {
+  const request = await PatentRequest.findOne({ _id: requestId, studentId: userId });
+  if (!request) {
+    throw new ApiError(404, 'PATENT_REQUEST_NOT_FOUND', 'Patent request not found.');
+  }
+
+  if (normalizePatentRequestStatus(request.status) !== 'granted') {
+    throw new ApiError(
+      409,
+      'PATENT_HANDOVER_NOT_AVAILABLE',
+      'Official handover can only be acknowledged after the patent has been granted.',
+    );
+  }
+
+  if (!request.officialHandover?.handedOverAt || request.officialHandover.documents.length === 0) {
+    throw new ApiError(409, 'PATENT_HANDOVER_NOT_READY', 'The official handover package is not ready yet.');
+  }
+
+  if (request.officialHandover.studentAcknowledgedAt) {
+    throw new ApiError(409, 'PATENT_HANDOVER_ALREADY_ACKNOWLEDGED', 'Official handover has already been acknowledged.');
+  }
+
+  const now = new Date();
+  request.officialHandover.studentAcknowledgedAt = now;
+  request.officialHandover.studentAcknowledgedBy = new Types.ObjectId(userId);
+  request.nextActionRequired = undefined;
+  request.lastStatusUpdate = now;
+  request.trackingTimeline = request.trackingTimeline ?? [];
+  request.trackingTimeline.push({
+    status: 'official_handover_acknowledged',
+    note: 'Student acknowledged receipt of the official patent handover package.',
+    updatedAt: now,
+    updatedBy: new Types.ObjectId(userId),
+  });
+
+  await request.save();
+
+  const notifyAdminIds =
+    request.adminAssignedTo != null
+      ? [String(request.adminAssignedTo)]
+      : (await User.find({ role: UserRole.ADMIN }).select('_id').lean()).map((admin) => String(admin._id));
+
+  await Promise.all(
+    notifyAdminIds.map((adminId) =>
+      notificationQueue.add('patent-request-handover-acknowledged', {
+        userId: adminId,
+        type: 'patent_status',
+        title: 'Official patent handover acknowledged',
+        body: `${request.inventionTitle ?? request.projectTitle ?? 'A patent case'} handover package was acknowledged by the student.`,
+        link: '/admin/patents',
+      }),
+    ),
+  );
+
+  return request.toObject();
+};
+
 // ─── Simple Patent Support Request ───────────────────────────────────────────
 
 const questionnaireSchema = z.object({
@@ -396,16 +453,52 @@ export const patentSupportRequestSchema = z.object({
   description: z.string().trim().min(20).max(5000),
   patentType: z.enum(['invention', 'design', 'trademark']),
   questionnaire: questionnaireSchema.optional(),
+  documentUploads: z
+    .array(
+      z.object({
+        uploadId: z.string().min(1),
+        category: z.enum(PATENT_REQUEST_DOC_CATEGORIES),
+      }),
+    )
+    .max(15)
+    .optional(),
 });
 
 export const createPatentSupportRequest = async (
   userId: string,
   payload: z.infer<typeof patentSupportRequestSchema>,
 ) => {
-  const workspace = await Workspace.findById(payload.workspaceId);
+  const workspace = await Workspace.findOne({
+    _id: payload.workspaceId,
+    $or: [{ ownerId: userId }, { teamMemberIds: userId }],
+  }).lean();
   if (!workspace) {
-    throw new ApiError(404, 'WORKSPACE_NOT_FOUND', 'Workspace not found.');
+    throw new ApiError(404, 'WORKSPACE_NOT_FOUND', 'Select a valid workspace before requesting patent support.');
   }
+
+  if (workspace.claimedProblemId) {
+    throw new ApiError(
+      400,
+      'PATENT_WORKSPACE_NOT_ELIGIBLE',
+      'Patent support is only available for your own product workspace. ProMove problem-bank workspaces are leaderboard-only.',
+    );
+  }
+
+  const documents = (payload.documentUploads ?? []).map((item) => {
+    const upload = workspace.uploads.find((entry) => String(entry._id) === item.uploadId);
+    if (!upload) {
+      throw new ApiError(400, 'DOCUMENT_NOT_FOUND', 'One or more selected documents no longer exist in the workspace.');
+    }
+    return {
+      uploadId: upload._id,
+      fileUrl: upload.fileUrl,
+      fileType: upload.fileType,
+      fileName: upload.fileName,
+      fileSizeBytes: upload.fileSizeBytes,
+      documentCategory: item.category,
+      ...(upload.note ? { note: upload.note } : {}),
+    };
+  });
 
   const patentRequest = await PatentRequest.create({
     studentId: userId,
@@ -447,7 +540,7 @@ export const createPatentSupportRequest = async (
     ...(payload.questionnaire ? { questionnaire: payload.questionnaire } : {}),
     status: 'submitted',
     submittedAt: new Date(),
-    documents: [],
+    documents,
   });
 
   await notificationQueue.add('patent-request-submitted', {

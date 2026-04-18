@@ -81,7 +81,7 @@ export const requestStartupReviewController = async (req: Request, res: Response
 
 export const uploadPitchController = async (req: Request, res: Response) => {
   if (!req.file) {
-    throw new ApiError(400, 'FILE_REQUIRED', 'A pitch deck PDF is required');
+    throw new ApiError(400, 'FILE_REQUIRED', 'A pitch deck file is required');
   }
   const startupId = getRequiredObjectIdParam(req.params.id, 'STARTUP_REQUIRED', 'Startup id is required');
   const startup = await uploadPitchDeck(startupId, req.user!._id, req.file);

@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useMemo, useState } from 'react';
 import { useNavigate, Link } from 'react-router-dom';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import {
@@ -18,6 +18,7 @@ import { startupApi } from '../../api/startup.api';
 import { DashboardLayout } from '../../app/components/DashboardLayout';
 import { Card } from '../../components/ui/Card';
 import { Spinner } from '../../components/ui/Spinner';
+import { useAuthStore } from '../../store/authStore';
 import type { PatentSubmission } from '../../types/patent.types';
 import type { Startup, StartupReviewStatus } from '../../types/startup.types';
 import {
@@ -41,7 +42,53 @@ const PATENT_STATUS_STYLES: Record<string, string> = {
   submitted: 'bg-amber-500/10 text-amber-300',
 };
 
-function StartupCard({ startup }: { startup: Startup }) {
+const getStartupAccessMeta = (startup: Startup, currentUserId?: string) => {
+  if (!currentUserId) {
+    return {
+      label: 'Accessible Startup',
+      className: 'border-slate-700 bg-slate-900 text-slate-300',
+      canDelete: false,
+      isSelfCreated: false,
+    };
+  }
+
+  const founderIds = startup.founderIds ?? [];
+  const isFounder = founderIds.includes(currentUserId);
+  const isPrimaryFounder = founderIds[0] === currentUserId;
+
+  if (isPrimaryFounder) {
+    return {
+      label: 'Self Created',
+      className: 'border-emerald-500/30 bg-emerald-500/10 text-emerald-200',
+      canDelete: true,
+      isSelfCreated: true,
+    };
+  }
+
+  if (isFounder) {
+    return {
+      label: 'Co-Founder',
+      className: 'border-cyan-500/30 bg-cyan-500/10 text-cyan-200',
+      canDelete: false,
+      isSelfCreated: true,
+    };
+  }
+
+  return {
+    label: 'Invited',
+    className: 'border-violet-500/30 bg-violet-500/10 text-violet-200',
+    canDelete: false,
+    isSelfCreated: false,
+  };
+};
+
+function StartupCard({
+  startup,
+  currentUserId,
+}: {
+  startup: Startup;
+  currentUserId?: string;
+}) {
   const navigate = useNavigate();
   const queryClient = useQueryClient();
   const [showConfirm, setShowConfirm] = useState(false);
@@ -50,7 +97,8 @@ function StartupCard({ startup }: { startup: Startup }) {
   const BadgeIcon = badge.Icon;
   const isLive = startup.launchedToInvestors || startup.launchedToMentors;
   const isVerifiedAndLive = startup.reviewStatus === 'approved' && isLive;
-  const canDelete = !isVerifiedAndLive;
+  const accessMeta = getStartupAccessMeta(startup, currentUserId);
+  const canDelete = accessMeta.canDelete && !isVerifiedAndLive;
   const nameMatches = confirmName.trim().toLowerCase() === (startup.name || '').trim().toLowerCase();
 
   const deleteMutation = useMutation({
@@ -108,6 +156,9 @@ function StartupCard({ startup }: { startup: Startup }) {
             <span className={`inline-flex items-center gap-1.5 rounded-full border px-3 py-1 text-xs font-semibold ${badge.className}`}>
               <BadgeIcon className="h-3 w-3" />
               {badge.label}
+            </span>
+            <span className={`inline-flex items-center rounded-full border px-3 py-1 text-xs font-semibold ${accessMeta.className}`}>
+              {accessMeta.label}
             </span>
             {isLive ? (
               <span className="inline-flex items-center gap-1.5 rounded-full border border-cyan-500/30 bg-cyan-500/10 px-3 py-1 text-xs font-semibold text-cyan-200">
@@ -204,6 +255,46 @@ function StartupCard({ startup }: { startup: Startup }) {
         </div>
       ) : null}
     </>
+  );
+}
+
+function StartupListSection({
+  title,
+  description,
+  startups,
+  currentUserId,
+}: {
+  title: string;
+  description: string;
+  startups: Startup[];
+  currentUserId?: string;
+}) {
+  if (startups.length === 0) {
+    return null;
+  }
+
+  return (
+    <section className="space-y-4">
+      <div className="flex items-end justify-between gap-3 border-b border-slate-800 pb-3">
+        <div>
+          <h2 className="text-xl font-semibold text-white">{title}</h2>
+          <p className="mt-1 text-sm text-slate-400">{description}</p>
+        </div>
+        <span className="rounded-full border border-slate-700 bg-slate-950 px-3 py-1 text-xs font-semibold text-slate-300">
+          {startups.length}
+        </span>
+      </div>
+
+      <div className="grid gap-4 lg:grid-cols-2">
+        {startups.map((startup) => (
+          <StartupCard
+            key={startup._id}
+            startup={startup}
+            currentUserId={currentUserId}
+          />
+        ))}
+      </div>
+    </section>
   );
 }
 
@@ -363,18 +454,39 @@ function StartupPatentSubmissions({ startups }: { startups: Startup[] }) {
 }
 
 export function MyStartups() {
+  const currentUser = useAuthStore((state) => state.user);
   const startupQuery = useQuery({
     queryKey: ['startup', 'mine'],
     queryFn: startupApi.mine,
   });
 
   const startups = startupQuery.data ?? [];
+  const selfCreatedStartups = useMemo(
+    () =>
+      startups.filter((startup) =>
+        (startup.founderIds ?? []).includes(currentUser?._id ?? ''),
+      ),
+    [currentUser?._id, startups],
+  );
+  const invitedStartups = useMemo(
+    () =>
+      startups.filter(
+        (startup) =>
+          !(startup.founderIds ?? []).includes(currentUser?._id ?? ''),
+      ),
+    [currentUser?._id, startups],
+  );
 
   return (
     <DashboardLayout role="student">
       <div className="space-y-6">
         <div className="flex flex-col gap-4 md:flex-row md:items-center md:justify-between">
-          <h1 className="text-3xl font-bold text-white">Startup</h1>
+          <div>
+            <h1 className="text-3xl font-bold text-white">Startup</h1>
+            <p className="mt-2 text-sm text-slate-400">
+              View every startup you created, co-founded, or were invited into.
+            </p>
+          </div>
           <Link
             to={STARTUP_LAUNCH_NEW_PATH}
             className="inline-flex items-center gap-2 rounded-xl bg-gradient-to-r from-blue-600 to-purple-600 px-6 py-3 font-semibold text-white transition hover:from-blue-500 hover:to-purple-500"
@@ -382,6 +494,21 @@ export function MyStartups() {
             <Plus className="h-5 w-5" />
             New Startup
           </Link>
+        </div>
+
+        <div className="grid gap-4 md:grid-cols-3">
+          <Card className="p-5">
+            <div className="text-sm text-slate-400">Accessible startups</div>
+            <div className="mt-2 text-3xl font-semibold text-white">{startups.length}</div>
+          </Card>
+          <Card className="p-5">
+            <div className="text-sm text-slate-400">Self created / co-founded</div>
+            <div className="mt-2 text-3xl font-semibold text-white">{selfCreatedStartups.length}</div>
+          </Card>
+          <Card className="p-5">
+            <div className="text-sm text-slate-400">Invited</div>
+            <div className="mt-2 text-3xl font-semibold text-white">{invitedStartups.length}</div>
+          </Card>
         </div>
 
         {startupQuery.isLoading ? (
@@ -406,11 +533,19 @@ export function MyStartups() {
           </Card>
         ) : (
           <>
-            <div className="grid gap-4 lg:grid-cols-2">
-              {startups.map((startup) => (
-                <StartupCard key={startup._id} startup={startup} />
-              ))}
-            </div>
+            <StartupListSection
+              title="Self Created and Co-Founded"
+              description="Startups where you are part of the founding team."
+              startups={selfCreatedStartups}
+              currentUserId={currentUser?._id}
+            />
+
+            <StartupListSection
+              title="Invited Startups"
+              description="Startups you can access through an invite or linked workspace collaboration."
+              startups={invitedStartups}
+              currentUserId={currentUser?._id}
+            />
 
             <StartupPatentSubmissions startups={startups} />
           </>

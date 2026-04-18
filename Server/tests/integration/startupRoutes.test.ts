@@ -344,6 +344,161 @@ describe('startup route validation', () => {
     );
   });
 
+  it('calculates the full 1000-point rubric score for a fully evidenced startup launch', async () => {
+    const founder = await createStudent('Rubric Score Founder');
+
+    const startup = await Startup.create({
+      founderIds: [founder._id],
+      name: 'Rubric Score Startup',
+      tagline: 'A fully evidenced startup innovation submission',
+      category: 'DeepTech',
+      stage: 'Pre-Launch',
+      pitchDeckUrl: 'https://example.com/pitch-deck.pptx',
+      pitchDeckName: 'pitch-deck.pptx',
+      activeProducts: 2,
+      teamSize: 4,
+      innovationProfile: {
+        rubricVersion: 'startup_innovation_1000',
+        companyProfile: {
+          legalStructure: 'private_limited',
+          cinNumber: 'U12345KA2026PTC000001',
+          dpiitRecognitionNumber: 'DPIIT-2026-12345',
+          msmeUdyamNumber: 'UDYAM-KA-00-1234567',
+          otherGovernmentCertificationName: 'State Startup Mission',
+          otherGovernmentCertificationNumber: 'SSM-7788',
+          websiteUrl: 'https://startup.example.com',
+          productDemoUrl: 'https://demo.example.com',
+          portfolioUrl: 'https://portfolio.example.com',
+        },
+        tractionProfile: {
+          startupStage: 'revenue_generating',
+          problemClarity:
+            'The startup addresses fragmented operational workflows for fast-growing campus ventures.',
+          uniqueSolution:
+            'It unifies compliance, traction evidence, and startup launch scoring in one product workflow.',
+          marketDifferentiation:
+            'The product differentiates through a score-linked evidence model built for startup review and launch readiness.',
+          patentStatus: 'published',
+          hasItrFiling: true,
+          hasRevenueProof: true,
+          hasGovernmentGrant: true,
+          hasAwardRecognition: true,
+          fundingStatus: 'vc',
+          activeUsersCustomers: 850,
+          monthlyGrowthRate: 24,
+          retentionRate: 68,
+        },
+      },
+      documents: [
+        {
+          category: 'incorporation_certificate',
+          fileUrl: 'https://example.com/incorporation.pdf',
+          fileType: 'pdf',
+          fileName: 'incorporation.pdf',
+          fileSizeBytes: 1024,
+          uploadedAt: new Date(),
+          uploadedBy: founder._id,
+        },
+        {
+          category: 'dpiit_certificate',
+          fileUrl: 'https://example.com/dpiit.pdf',
+          fileType: 'pdf',
+          fileName: 'dpiit.pdf',
+          fileSizeBytes: 1024,
+          uploadedAt: new Date(),
+          uploadedBy: founder._id,
+        },
+        {
+          category: 'udyam_certificate',
+          fileUrl: 'https://example.com/udyam.pdf',
+          fileType: 'pdf',
+          fileName: 'udyam.pdf',
+          fileSizeBytes: 1024,
+          uploadedAt: new Date(),
+          uploadedBy: founder._id,
+        },
+        {
+          category: 'government_certificate_other',
+          fileUrl: 'https://example.com/state.pdf',
+          fileType: 'pdf',
+          fileName: 'state.pdf',
+          fileSizeBytes: 1024,
+          uploadedAt: new Date(),
+          uploadedBy: founder._id,
+        },
+        {
+          category: 'patent_proof',
+          fileUrl: 'https://example.com/patent.pdf',
+          fileType: 'pdf',
+          fileName: 'patent.pdf',
+          fileSizeBytes: 1024,
+          uploadedAt: new Date(),
+          uploadedBy: founder._id,
+        },
+        {
+          category: 'itr_filing',
+          fileUrl: 'https://example.com/itr.pdf',
+          fileType: 'pdf',
+          fileName: 'itr.pdf',
+          fileSizeBytes: 1024,
+          uploadedAt: new Date(),
+          uploadedBy: founder._id,
+        },
+        {
+          category: 'revenue_proof',
+          fileUrl: 'https://example.com/revenue.pdf',
+          fileType: 'pdf',
+          fileName: 'revenue.pdf',
+          fileSizeBytes: 1024,
+          uploadedAt: new Date(),
+          uploadedBy: founder._id,
+        },
+        {
+          category: 'grant_certificate',
+          fileUrl: 'https://example.com/grant.pdf',
+          fileType: 'pdf',
+          fileName: 'grant.pdf',
+          fileSizeBytes: 1024,
+          uploadedAt: new Date(),
+          uploadedBy: founder._id,
+        },
+        {
+          category: 'award_certificate',
+          fileUrl: 'https://example.com/award.pdf',
+          fileType: 'pdf',
+          fileName: 'award.pdf',
+          fileSizeBytes: 1024,
+          uploadedAt: new Date(),
+          uploadedBy: founder._id,
+        },
+        {
+          category: 'funding_proof',
+          fileUrl: 'https://example.com/funding.pdf',
+          fileType: 'pdf',
+          fileName: 'funding.pdf',
+          fileSizeBytes: 1024,
+          uploadedAt: new Date(),
+          uploadedBy: founder._id,
+        },
+      ],
+      reviewStatus: 'approved',
+      isActive: true,
+    });
+
+    const response = await request(app)
+      .post(`/api/startup/${startup._id}/launch`)
+      .set(authHeader(founder))
+      .send({ launchTo: 'investors' });
+
+    expect(response.status).toBe(200);
+    expect(response.body.data).toEqual(
+      expect.objectContaining({
+        launchedToInvestors: true,
+        innovationScoreAtLaunch: 1000,
+      }),
+    );
+  });
+
   it('does not expose startups in marketplace listings based on stage alone', async () => {
     const founder = await createStudent('Marketplace Founder');
     const viewer = await createStudent('Marketplace Viewer');

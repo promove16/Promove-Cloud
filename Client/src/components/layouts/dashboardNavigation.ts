@@ -57,7 +57,6 @@ export const SIDEBAR_CONFIG: Record<UserRole, DashboardNavItem[]> = {
   [UserRole.STUDENT]: [
     { kind: 'link', label: 'Dashboard', icon: Home, path: '/dashboard/student' },
     { kind: 'link', label: 'Problem Bank', icon: Sparkles, path: '/problem-bank' },
-    { kind: 'link', label: 'Product Workspace', icon: FolderKanban, path: '/product-workspace' },
     { kind: 'link', label: 'Startup', icon: Rocket, path: STARTUP_LAUNCH_BASE_PATH },
     // { kind: 'link', label: 'Portfolio', icon: Trophy, path: '/portfolio' },
     { kind: 'link', label: 'Marketplace', icon: Globe, path: getMarketplaceBasePath(UserRole.STUDENT) },

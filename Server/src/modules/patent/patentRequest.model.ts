@@ -68,6 +68,18 @@ const requestDocSchema = new Schema<IPatentRequest['documents'][number]>(
   { _id: true },
 );
 
+const officialHandoverSchema = new Schema<NonNullable<IPatentRequest['officialHandover']>>(
+  {
+    documents: { type: [requestDocSchema], default: [] },
+    note: { type: String, default: undefined },
+    handedOverAt: { type: Date, default: undefined },
+    handedOverBy: { type: Schema.Types.ObjectId, default: undefined },
+    studentAcknowledgedAt: { type: Date, default: undefined },
+    studentAcknowledgedBy: { type: Schema.Types.ObjectId, default: undefined },
+  },
+  { _id: false },
+);
+
 const patentRequestSchema = new Schema<IPatentRequest>(
   {
     studentId: { type: Schema.Types.ObjectId, required: true, index: true },
@@ -163,6 +175,7 @@ const patentRequestSchema = new Schema<IPatentRequest>(
 
     // Documents
     documents: { type: [requestDocSchema], default: [] },
+    officialHandover: { type: officialHandoverSchema, default: undefined },
 
     // Status & tracking
     status: {

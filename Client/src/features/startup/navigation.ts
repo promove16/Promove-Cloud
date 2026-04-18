@@ -1,6 +1,5 @@
 import {
   BarChart3,
-  BriefcaseBusiness,
   FileText,
   FolderKanban,
   Rocket,
@@ -25,9 +24,9 @@ export const STARTUP_LAUNCH_LEGACY_NEW_OVERVIEW_PATH = `${STARTUP_LAUNCH_BASE_PA
 
 export const STARTUP_LAUNCH_SECTION_LINKS: StartupLaunchSectionLink[] = [
   {
-    label: "Initialization",
-    shortLabel: "Init",
-    description: "Define your startup's vision, mission, business model, and core details",
+    label: "Initial Setup",
+    shortLabel: "Setup",
+    description: "Define your startup's identity, business model, team context, and review-ready setup details",
     segment: "overview",
     icon: Rocket,
   },
@@ -39,9 +38,9 @@ export const STARTUP_LAUNCH_SECTION_LINKS: StartupLaunchSectionLink[] = [
     icon: FolderKanban,
   },
   {
-    label: "Cap Table",
-    shortLabel: "Cap Table",
-    description: "Manage equity distribution, shares, and investor stakes",
+    label: "Equity & Deals",
+    shortLabel: "Equity & Deals",
+    description: "Manage equity distribution, shares, and investment offers from investors",
     segment: "cap-table",
     icon: BarChart3,
   },
@@ -51,13 +50,6 @@ export const STARTUP_LAUNCH_SECTION_LINKS: StartupLaunchSectionLink[] = [
     description: "File for patent protection or request admin-assisted patents with tracking",
     segment: "patent-support",
     icon: FileText,
-  },
-  {
-    label: "Investor Deals",
-    shortLabel: "Deals",
-    description: "Receive and manage investment offers from investors",
-    segment: "investor-deals",
-    icon: BriefcaseBusiness,
   },
   {
     label: "Investor Outreach",

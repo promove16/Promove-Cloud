@@ -5,6 +5,7 @@ import {
   Startup,
   StartupBusinessProfile,
   StartupDocumentCategory,
+  StartupInnovationProfile,
   StartupInitializationProfile,
   StartupPitchRequest,
   StartupRegistrationProfile,
@@ -30,6 +31,7 @@ export interface StartupPayload {
   businessProfile: StartupBusinessProfile;
   registrationProfile: StartupRegistrationProfile;
   initializationProfile: StartupInitializationProfile;
+  innovationProfile?: StartupInnovationProfile;
 }
 
 export const startupApi = {

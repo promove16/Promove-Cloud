@@ -1,7 +1,7 @@
 import crypto from 'crypto';
 import { Types } from 'mongoose';
 import { z } from 'zod';
-import { logError } from '../../config/logger';
+import { logError, logger } from '../../config/logger';
 import { redis } from '../../config/redis';
 import { ApiError } from '../../utils/ApiError';
 import { applyScore } from '../../services/scoreEngine';
@@ -15,6 +15,23 @@ import { PROBLEM_CATEGORIES, ProblemCategory, ProblemDifficulty } from './proble
 
 const defaultSecurityNotice =
   'Upload only project-safe evidence. Do not share secrets, credentials, private keys, personal data, or production database exports.';
+
+const PROBLEM_CACHE_NON_FATAL_PATTERNS = [
+  /max requests limit exceeded/i,
+  /stream isn't writeable/i,
+  /connection is closed/i,
+  /connection lost/i,
+  /socket closed unexpectedly/i,
+  /ready check failed/i,
+  /econnrefused/i,
+  /econnreset/i,
+  /etimedout/i,
+  /enotfound/i,
+  /network is unreachable/i,
+  /connection ended unexpectedly/i,
+] as const;
+
+let problemCacheDisabledReason: string | null = null;
 
 type ProblemBankSeedRecord = {
   sourceCategorySequence: number;
@@ -226,6 +243,65 @@ const normalizeProblemInput = (payload: z.infer<typeof createProblemSchema>) => 
   maxClaims: Number.MAX_SAFE_INTEGER,
 });
 
+const isProblemCacheBypassError = (error: unknown) => {
+  const message = error instanceof Error ? error.message : String(error);
+  return PROBLEM_CACHE_NON_FATAL_PATTERNS.some((pattern) => pattern.test(message));
+};
+
+const disableProblemCache = (error: unknown) => {
+  if (problemCacheDisabledReason) {
+    return;
+  }
+
+  const message = error instanceof Error ? error.message : String(error);
+  problemCacheDisabledReason = message;
+  logger.warn(
+    `Problem-bank Redis cache disabled. Falling back to database-only responses. Reason: ${message}`,
+  );
+};
+
+const canUseProblemCache = () => problemCacheDisabledReason === null;
+
+const readProblemCache = async <T>(key: string): Promise<T | null> => {
+  if (!canUseProblemCache()) {
+    return null;
+  }
+
+  try {
+    const cached = await redis.get<string>(key);
+    if (!cached) {
+      return null;
+    }
+
+    return (typeof cached === 'string' ? JSON.parse(cached) : cached) as T;
+  } catch (error) {
+    if (isProblemCacheBypassError(error)) {
+      disableProblemCache(error);
+      return null;
+    }
+
+    logError(`Failed to read problem cache key "${key}"`, error);
+    return null;
+  }
+};
+
+const writeProblemCache = async (key: string, payload: unknown, ttlSeconds = 120) => {
+  if (!canUseProblemCache()) {
+    return;
+  }
+
+  try {
+    await redis.set(key, JSON.stringify(payload), { ex: ttlSeconds });
+  } catch (error) {
+    if (isProblemCacheBypassError(error)) {
+      disableProblemCache(error);
+      return;
+    }
+
+    logError(`Failed to write problem cache key "${key}"`, error);
+  }
+};
+
 const trimField = (value: string, maxLength: number) =>
   value.length > maxLength ? value.slice(0, maxLength - 1).trimEnd() : value;
 
@@ -352,10 +428,10 @@ const buildProblemViews = async (
     .createHash('sha1')
     .update(JSON.stringify({ problemIds, userId }))
     .digest('hex')}`;
-  const cached = await redis.get<string>(cacheKey);
+  const cached = await readProblemCache<Array<Record<string, unknown>>>(cacheKey);
 
   if (cached) {
-    return JSON.parse(cached) as Array<Record<string, unknown>>;
+    return cached;
   }
 
   const [viewerWorkspaces, activeWorkspaceCounts, approvedSubmissionStats] =
@@ -463,7 +539,7 @@ const buildProblemViews = async (
     };
   });
 
-  await redis.set(cacheKey, JSON.stringify(payload), { ex: 120 });
+  await writeProblemCache(cacheKey, payload);
   return payload;
 };
 
@@ -487,10 +563,10 @@ export const listProblems = async (query: Record<string, unknown>, userId: strin
     .update(JSON.stringify({ ...query, userId }))
     .digest('hex')}`;
   const seeded = await seedProblemsIfEmpty();
-  const cached = seeded ? null : await redis.get<string>(cacheKey);
+  const cached = seeded ? null : await readProblemCache<{ items: Array<Record<string, unknown>>; nextPage: number | null; total: number }>(cacheKey);
 
   if (cached) {
-    const parsed = typeof cached === 'string' ? JSON.parse(cached) : cached;
+    const parsed = cached;
     if (parsed.total > 0 || (await Problem.countDocuments()) === 0) {
       return parsed;
     }
@@ -525,7 +601,7 @@ export const listProblems = async (query: Record<string, unknown>, userId: strin
 
   const items = await buildProblemViews(problems, userId);
   const payload = { items, nextPage: page * limit < total ? page + 1 : null, total };
-  await redis.set(cacheKey, JSON.stringify(payload), { ex: 120 });
+  await writeProblemCache(cacheKey, payload);
   return payload;
 };
 

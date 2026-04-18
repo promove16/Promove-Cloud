@@ -370,6 +370,9 @@ const getSearchText = (item: MarketplaceDirectoryItem) => {
       item.founders.map((founder) => founder.domain ?? "").join(" "),
       item.founders.map((founder) => founder.location ?? "").join(" "),
       item.launchTargets.join(" "),
+      item.trustProfile.signals.join(" "),
+      item.trustProfile.legalStructure ?? "",
+      item.trustProfile.fundingStatus ?? "",
       item.project?.title ?? "",
       item.project?.category ?? "",
     ]
@@ -418,7 +421,7 @@ const getDetailChips = (item: MarketplaceDirectoryItem) =>
         item.traction.revenueGenerating ? "Revenue Generating" : "",
         item.traction.patentFiled ? "Patent Filed" : "",
         item.launchTargets.includes("Investors") ? "Open for Investment" : "",
-        ...item.founders.map((founder) => founder.displayName),
+        ...item.trustProfile.signals.slice(0, 2),
       ]
     : item.entityType === "school" || item.entityType === "college"
       ? [
@@ -536,8 +539,11 @@ const buildMetaList = (item: MarketplaceDirectoryItem) => {
     return [
       ...item.launchTargets.slice(0, 1),
       `${item.innovationScoreAtLaunch} score`,
+      item.trustProfile.legalStructure ?? "",
+      item.trustProfile.proofCount > 0
+        ? `${item.trustProfile.proofCount} proofs`
+        : "",
       `${item.teamSize} team`,
-      `${item.activeProducts} products`,
     ].filter(Boolean);
   }
 
@@ -654,9 +660,17 @@ const getStartupTractionTags = (item: MarketplaceDirectoryItem) => {
   ]);
 };
 
+const getStartupTrustSignals = (item: MarketplaceDirectoryItem) => {
+  if (!isStartupItem(item)) {
+    return [];
+  }
+
+  return uniqueValues(item.trustProfile.signals);
+};
+
 const getItemSignals = (item: MarketplaceDirectoryItem) => {
   if (isStartupItem(item)) {
-    return [];
+    return getStartupTrustSignals(item);
   }
 
   const userItem = item as MarketplaceUserItem;
@@ -1505,6 +1519,112 @@ function GeneralMarketplace({ dashboardRole }: { dashboardRole: UserRole }) {
     };
 
     if (entityType === "startup") {
+      const scoreMax = maxValue((item) =>
+        isStartupItem(item) ? item.innovationScoreAtLaunch : 0,
+      );
+      const fundingMax = maxValue((item) =>
+        isStartupItem(item) ? (item.fundingNeeded ?? 0) : 0,
+      );
+      const teamMax = maxValue((item) => (isStartupItem(item) ? item.teamSize : 0));
+
+      sections.primary.push(
+        {
+          kind: "checkbox",
+          id: "location",
+          title: "Founder location",
+          filterKey: "location",
+          options: buildFacetOptions(sourceItems, getItemLocations),
+        },
+        {
+          kind: "checkbox",
+          id: "stage",
+          title: "Startup stage",
+          filterKey: "stage",
+          options: buildFacetOptionsFromLists(
+            sourceItems.map((item) => (isStartupItem(item) ? [item.stage] : [])),
+          ),
+        },
+        {
+          kind: "checkbox",
+          id: "category",
+          title: "Sector",
+          filterKey: "category",
+          options: buildFacetOptionsFromLists(
+            sourceItems.map((item) => (isStartupItem(item) ? [item.category] : [])),
+          ),
+        },
+      );
+
+      sections.advanced.push(
+        {
+          kind: "checkbox",
+          id: "launchTargets",
+          title: "Visible to",
+          filterKey: "launchTargets",
+          options: buildFacetOptionsFromLists(
+            sourceItems.map((item) => (isStartupItem(item) ? item.launchTargets : [])),
+          ),
+        },
+        {
+          kind: "checkbox",
+          id: "traction",
+          title: "Traction",
+          filterKey: "traction",
+          options: buildFacetOptionsFromLists(
+            sourceItems.map((item) => getStartupTractionTags(item)),
+          ),
+        },
+        {
+          kind: "checkbox",
+          id: "signals",
+          title: "Trust signals",
+          filterKey: "signals",
+          options: buildFacetOptions(sourceItems, getItemSignals),
+        },
+      );
+
+      if (scoreMax > 0) {
+        sections.advanced.push({
+          kind: "range",
+          id: "score",
+          title: "Innovation score",
+          filterKey: "score",
+          max: scoreMax,
+          step: getRangeStep(scoreMax),
+          minLabel: "0",
+          maxLabel: "Any",
+          formatSelected: (value) => `${value}+`,
+        });
+      }
+
+      if (fundingMax > 0) {
+        sections.advanced.push({
+          kind: "range",
+          id: "funding",
+          title: "Funding need",
+          filterKey: "funding",
+          max: fundingMax,
+          step: getRangeStep(fundingMax),
+          minLabel: "0",
+          maxLabel: "Any",
+          formatSelected: (value) => currency.format(value),
+        });
+      }
+
+      if (teamMax > 0) {
+        sections.advanced.push({
+          kind: "range",
+          id: "team",
+          title: "Team size",
+          filterKey: "team",
+          max: teamMax,
+          step: getRangeStep(teamMax),
+          minLabel: "0",
+          maxLabel: "Any",
+          formatSelected: (value) => `${value}+`,
+        });
+      }
+
       return sections;
     }
 
@@ -1750,6 +1870,13 @@ function GeneralMarketplace({ dashboardRole }: { dashboardRole: UserRole }) {
             optionFilters.traction,
             getStartupTractionTags(item),
           )
+        ) {
+          return false;
+        }
+
+        if (
+          optionFilters.signals.length &&
+          !matchesSelectedOptions(optionFilters.signals, getItemSignals(item))
         ) {
           return false;
         }
@@ -2085,7 +2212,7 @@ function GeneralMarketplace({ dashboardRole }: { dashboardRole: UserRole }) {
     : listQuery.isError;
 
   return (
-    <div className="relative min-h-[calc(100vh-7rem)] overflow-hidden bg-[#070b17] text-slate-100">
+    <div className="relative min-h-[calc(100vh-7rem)] bg-[#070b17] text-slate-100">
       <div className="pointer-events-none absolute inset-0">
         <div className="absolute inset-x-0 top-0 h-[140vh] bg-[radial-gradient(circle_at_top,rgba(22,33,61,0.96)_0%,rgba(13,20,48,0.88)_26%,rgba(8,13,31,0.72)_56%,rgba(7,11,23,0)_100%)]" />
         <div className="absolute inset-0 bg-[linear-gradient(180deg,rgba(9,13,28,0.12)_0%,rgba(7,11,23,0.68)_42%,rgba(7,11,23,1)_100%)]" />
@@ -2428,6 +2555,9 @@ function GeneralMarketplace({ dashboardRole }: { dashboardRole: UserRole }) {
                     const chips = getDetailChips(item)
                       .filter(Boolean)
                       .slice(0, 6);
+                    const trustSignals = isStartupItem(item)
+                      ? getStartupTrustSignals(item).slice(0, 5)
+                      : [];
                     const avatarLabel = title.slice(0, 1).toUpperCase();
                     const itemTypeLabel = isStartupItem(item)
                       ? "Startup"
@@ -2501,6 +2631,19 @@ function GeneralMarketplace({ dashboardRole }: { dashboardRole: UserRole }) {
                                 </span>
                               ))}
                             </div>
+
+                            {trustSignals.length ? (
+                              <div className="mt-4 flex flex-wrap gap-2">
+                                {trustSignals.map((signal) => (
+                                  <span
+                                    key={`${item._id}-trust-${signal}`}
+                                    className="rounded-full border border-emerald-500/25 bg-emerald-500/10 px-3 py-1.5 text-xs font-semibold text-emerald-200"
+                                  >
+                                    {signal}
+                                  </span>
+                                ))}
+                              </div>
+                            ) : null}
                           </div>
 
                           <div className="w-full max-w-[280px] shrink-0 pt-2">

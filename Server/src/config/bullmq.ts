@@ -49,11 +49,13 @@ const NON_RECOVERABLE_REDIS_TRANSPORT_PATTERNS = [
   /network is unreachable/i,
   /connection ended unexpectedly/i,
 ];
+const BULLMQ_IOREDIS_STACK_PATTERN = /node_modules[\\/]+bullmq[\\/]+node_modules[\\/]+ioredis/i;
 
 let remoteBullMqDisabledReason: string | null = null;
 
 const remoteQueues = new Set<Queue>();
 const remoteWorkers = new Set<Worker>();
+const remoteWorkerRuns = new Map<Worker, Promise<void>>();
 
 type BullMqQueueConnection = {
   close: (force?: boolean) => Promise<void>;
@@ -130,6 +132,7 @@ const closeRemoteBullMqResources = () => {
 
   remoteWorkers.clear();
   remoteQueues.clear();
+  remoteWorkerRuns.clear();
 
   workers.forEach((worker) => {
     void worker.close(true).catch((error) => {
@@ -142,6 +145,28 @@ const closeRemoteBullMqResources = () => {
       logError('Failed to close BullMQ queue after Redis shutdown', error);
     });
   });
+};
+
+const startRemoteWorker = (queueName: string, worker: Worker) => {
+  const runPromise = worker
+    .run()
+    .catch((error) => {
+      if (shouldDisableRemoteBullMq(error)) {
+        disableRemoteBullMq(error);
+        return;
+      }
+
+      if (remoteBullMqDisabledReason && isBullMqRedisTransportError(error)) {
+        return;
+      }
+
+      logError(`BullMQ worker "${queueName}" run failed`, error);
+    })
+    .finally(() => {
+      remoteWorkerRuns.delete(worker);
+    });
+
+  remoteWorkerRuns.set(worker, runPromise);
 };
 
 const registerRemoteQueue = (queueName: string) => {
@@ -175,6 +200,23 @@ export const disableRemoteBullMq = (error: unknown) => {
 };
 
 export const shouldDisableBullMqRedis = (error: unknown) => shouldDisableRemoteBullMq(error);
+
+export const shouldIgnoreBullMqUnhandledRejection = (error: unknown) => {
+  if (!remoteBullMqDisabledReason) {
+    return false;
+  }
+
+  if (isBullMqRedisRequestLimitError(error)) {
+    return true;
+  }
+
+  if (!isBullMqRedisTransportError(error)) {
+    return false;
+  }
+
+  const stack = error instanceof Error ? error.stack ?? '' : '';
+  return BULLMQ_IOREDIS_STACK_PATTERN.test(stack);
+};
 
 export const initializeBullMqRedisTransport = async () => {
   if (env.NODE_ENV === 'test' || !isRemoteBullMqActive()) {
@@ -388,6 +430,7 @@ export const createQueueWorker = <T>(
     async (job: Job<T>) => processor({ id: job.id, name: job.name, data: job.data }),
     {
       ...options,
+      autorun: false,
       connection: workerConnection,
     },
   );
@@ -402,6 +445,8 @@ export const createQueueWorker = <T>(
 
     logError(`BullMQ worker "${queueName}" error`, error);
   });
+
+  startRemoteWorker(queueName, worker);
 
   return worker as QueueWorkerLike<T>;
 };

@@ -49,6 +49,7 @@ export interface PatentRequestCreatePayload {
   description: string;
   patentType: 'invention' | 'design' | 'trademark';
   questionnaire?: PatentRequestQuestionnaire;
+  documentUploads?: { uploadId: string; category: PatentRequestDocCategory }[];
 }
 
 export const patentRequestApi = {
@@ -100,6 +101,12 @@ export const patentRequestApi = {
   },
 
   // ── Conversation ────────────────────────────────────────────────────────────
+  async acknowledgeHandover(requestId: string) {
+    const response = await api.patch<ApiSuccessResponse<PatentRequestSubmission>>(
+      `/api/patents/requests/${requestId}/handover/acknowledge`,
+    );
+    return response.data.data;
+  },
   async getMessages(requestId: string, params?: { before?: string; limit?: number }) {
     const response = await api.get<ApiSuccessResponse<PatentConversationMessage[]>>(
       `/api/patents/requests/${requestId}/messages`,

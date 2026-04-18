@@ -192,6 +192,15 @@ export interface PatentRequestDocument {
   storageKey?: string;
 }
 
+export interface PatentRequestOfficialHandover {
+  documents: PatentRequestDocument[];
+  note?: string;
+  handedOverAt?: Date;
+  handedOverBy?: Types.ObjectId;
+  studentAcknowledgedAt?: Date;
+  studentAcknowledgedBy?: Types.ObjectId;
+}
+
 export interface IPatentRequest {
   _id: Types.ObjectId;
   studentId: Types.ObjectId;
@@ -265,6 +274,7 @@ export interface IPatentRequest {
 
   // ── Uploaded documents ──────────────────────────────────────────────────
   documents: PatentRequestDocument[];
+  officialHandover?: PatentRequestOfficialHandover;
 
   // ── Status & tracking ─────────────────────────────────────────────────────
   status: PatentRequestStatus;

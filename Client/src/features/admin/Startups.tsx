@@ -10,6 +10,7 @@ import { Card } from '../../components/ui/Card';
 import { Spinner } from '../../components/ui/Spinner';
 import { StartupReviewStatus } from '../../types/startup.types';
 import {
+  DEFAULT_STARTUP_IPR_PROFILE,
   STARTUP_IPR_QUESTION_LABELS,
   formatStartupIprValue,
 } from '../startup/iprIntake';
@@ -37,20 +38,41 @@ const getErrorMessage = (error: unknown) => {
   return error instanceof Error ? error.message : 'Unable to update startup review right now.';
 };
 
-const getReviewedLabel = (startup: Pick<AdminStartupReviewItem, 'reviewStatus' | 'adminReviewedAt'>) => {
+const fallbackReadiness: AdminStartupReviewItem['readiness'] = {
+  isReviewReady: false,
+  missingItems: [],
+  requiredDocumentCategories: [],
+  uploadedDocumentCategories: [],
+};
+
+const fallbackTraction: AdminStartupReviewItem['traction'] = {
+  patentFiled: false,
+  mvpBuilt: false,
+  revenueGenerating: false,
+};
+
+const formatReviewStatusLabel = (value?: string | null) => (value ?? 'draft').replace(/_/g, ' ');
+
+const formatDocumentCategoryLabel = (value?: string | null) => (value ?? 'other').replace(/_/g, ' ');
+
+const getReviewedLabel = (
+  startup: Pick<Partial<AdminStartupReviewItem>, 'reviewStatus' | 'adminReviewedAt'>,
+) => {
+  const reviewStatus = startup.reviewStatus ?? 'draft';
+
   if (startup.adminReviewedAt) {
     return new Date(startup.adminReviewedAt).toLocaleString('en-IN');
   }
 
-  if (startup.reviewStatus === 'review_requested') {
+  if (reviewStatus === 'review_requested') {
     return 'Pending';
   }
 
-  if (startup.reviewStatus === 'changes_requested') {
+  if (reviewStatus === 'changes_requested') {
     return 'Changes requested';
   }
 
-  if (startup.reviewStatus === 'approved') {
+  if (reviewStatus === 'approved') {
     return 'Approved';
   }
 
@@ -88,7 +110,35 @@ export default function Startups() {
   });
 
   const startups = useMemo(() => {
-    const items = startupsQuery.data ?? [];
+    const items = (startupsQuery.data ?? []).map((startup) => ({
+      ...startup,
+      reviewStatus: startup.reviewStatus ?? 'draft',
+      stage: startup.stage?.trim() || 'Unknown stage',
+      category: startup.category?.trim() || 'Uncategorized',
+      tagline: startup.tagline?.trim() || 'No tagline provided.',
+      founders: Array.isArray(startup.founders)
+        ? startup.founders.map((founder) => ({
+            ...founder,
+            displayName: founder.displayName?.trim() || 'Unnamed founder',
+          }))
+        : [],
+      registrationProfile: {
+        ...DEFAULT_STARTUP_IPR_PROFILE,
+        ...(startup.registrationProfile ?? {}),
+      },
+      readiness: {
+        ...fallbackReadiness,
+        ...(startup.readiness ?? {}),
+        missingItems: startup.readiness?.missingItems ?? [],
+        requiredDocumentCategories: startup.readiness?.requiredDocumentCategories ?? [],
+        uploadedDocumentCategories: startup.readiness?.uploadedDocumentCategories ?? [],
+      },
+      documents: Array.isArray(startup.documents) ? startup.documents : [],
+      traction: {
+        ...fallbackTraction,
+        ...(startup.traction ?? {}),
+      },
+    }));
 
     if (!focusedStartupId) {
       return items;
@@ -180,7 +230,7 @@ export default function Startups() {
                 <div className="space-y-4">
                   <div className="flex flex-wrap gap-2">
                     <Badge className={reviewTone[startup.reviewStatus] ?? reviewTone.draft}>
-                      {startup.reviewStatus.replace(/_/g, ' ')}
+                      {formatReviewStatusLabel(startup.reviewStatus)}
                     </Badge>
                     <Badge>{startup.stage}</Badge>
                     <Badge className="border-slate-700 bg-slate-900 text-slate-300">{startup.category}</Badge>
@@ -316,7 +366,8 @@ export default function Startups() {
                           >
                             <div className="font-medium text-white">{document.fileName}</div>
                             <div className="mt-1 text-xs text-slate-500">
-                              {document.category.replace(/_/g, ' ')} / {new Date(document.uploadedAt).toLocaleDateString('en-IN')}
+                              {formatDocumentCategoryLabel(document.category)} /{' '}
+                              {new Date(document.uploadedAt).toLocaleDateString('en-IN')}
                             </div>
                           </a>
                         ))}

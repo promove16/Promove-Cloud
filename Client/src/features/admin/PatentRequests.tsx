@@ -12,15 +12,16 @@ import {
   MessageCircle,
   MessageSquarePlus,
   Send,
+  Upload,
   User,
   X,
 } from 'lucide-react';
 import { adminApi, AdminPatentRequestDetail, AdminPatentRequestListItem } from '../../api/admin.api';
-import { Badge } from '../../components/ui/Badge';
 import { Button } from '../../components/ui/Button';
 import { Card } from '../../components/ui/Card';
 import { OptionTabs } from '../../components/ui/OptionTabs';
 import { Spinner } from '../../components/ui/Spinner';
+import type { PatentRequestDocCategory } from '../../types/patentRequest.types';
 import { getApiErrorMessage } from '../../utils/apiError';
 
 // ─── Constants ───────────────────────────────────────────────────────────────
@@ -132,8 +133,17 @@ const VALID_TRANSITIONS: Record<string, string[]> = {
   abandoned: [],
 };
 
+const PATENT_HANDOVER_UPLOAD_MAX_BYTES = 3 * 1024 * 1024;
+
 const formatDate = (value?: string) =>
   value ? new Date(value).toLocaleDateString('en-IN', { day: '2-digit', month: 'short', year: 'numeric' }) : '—';
+
+const formatFileSize = (bytes?: number) => {
+  if (!bytes) return '0 B';
+  if (bytes < 1024) return `${bytes} B`;
+  if (bytes < 1024 * 1024) return `${(bytes / 1024).toFixed(1)} KB`;
+  return `${(bytes / (1024 * 1024)).toFixed(1)} MB`;
+};
 
 const getDeadlineUrgency = (deadline?: string) => {
   if (!deadline) return null;
@@ -160,10 +170,16 @@ function CaseDetailModal({
   const [actionError, setActionError] = useState('');
   const [ipoAppNumber, setIpoAppNumber] = useState('');
   const [ipoFilingDate, setIpoFilingDate] = useState('');
-  const [activeTab, setActiveTab] = useState<'overview' | 'actions' | 'notes' | 'conversation'>('overview');
+  const [handoverNote, setHandoverNote] = useState('');
+  const [handoverUploadNote, setHandoverUploadNote] = useState('');
+  const [handoverCategory, setHandoverCategory] = useState<PatentRequestDocCategory>('patent_certificate');
+  const [activeTab, setActiveTab] = useState<
+    'overview' | 'documents' | 'handover' | 'actions' | 'notes' | 'conversation'
+  >('overview');
   const [conversationMessage, setConversationMessage] = useState('');
   const [documentReviewNotes, setDocumentReviewNotes] = useState<Record<string, string>>({});
   const messagesEndRef = useRef<HTMLDivElement>(null);
+  const handoverFileInputRef = useRef<HTMLInputElement>(null);
 
   const nextStatuses = VALID_TRANSITIONS[item.status] ?? [];
 
@@ -175,6 +191,10 @@ function CaseDetailModal({
   const detail = detailQuery.data as AdminPatentRequestDetail | undefined;
   const questionnaire = detail?.questionnaire as Record<string, string> | undefined;
   const documents = detail?.documents ?? [];
+  const officialHandover = detail?.officialHandover;
+  const handoverDocuments = officialHandover?.documents ?? [];
+  const handoverCompleted = !!officialHandover?.handedOverAt;
+  const handoverAcknowledged = !!officialHandover?.studentAcknowledgedAt;
 
   const messagesQuery = useQuery({
     queryKey: ['admin-patent-messages', item._id],
@@ -281,11 +301,62 @@ function CaseDetailModal({
     },
   });
 
+  const uploadHandoverDocumentMutation = useMutation({
+    mutationFn: (file: File) =>
+      adminApi.uploadPatentRequestHandoverDocument(
+        item._id,
+        file,
+        handoverCategory,
+        handoverUploadNote.trim() || undefined,
+      ),
+    onSuccess: async () => {
+      setActionError('');
+      setHandoverUploadNote('');
+      if (handoverFileInputRef.current) {
+        handoverFileInputRef.current.value = '';
+      }
+      await queryClient.invalidateQueries({ queryKey: ['admin-patent-detail', item._id] });
+      await queryClient.invalidateQueries({ queryKey: ['admin-patent-requests'] });
+    },
+    onError: (err: unknown) => {
+      setActionError(getApiErrorMessage(err, 'Failed to upload official handover document.'));
+    },
+  });
+
+  const completeHandoverMutation = useMutation({
+    mutationFn: () =>
+      adminApi.completePatentRequestHandover(item._id, {
+        note: handoverNote.trim() || undefined,
+      }),
+    onSuccess: async () => {
+      setActionError('');
+      await queryClient.invalidateQueries({ queryKey: ['admin-patent-detail', item._id] });
+      await queryClient.invalidateQueries({ queryKey: ['admin-patent-requests'] });
+    },
+    onError: (err: unknown) => {
+      setActionError(getApiErrorMessage(err, 'Failed to complete official handover.'));
+    },
+  });
+
   const deadlines = [
     { label: 'Complete Specification', value: item.completeSpecDeadline },
     { label: 'Examination Request', value: item.examRequestDeadline },
     { label: 'FER Response', value: item.ferResponseDeadline },
   ].filter((d) => d.value);
+
+  const handleHandoverFileChange = (event: React.ChangeEvent<HTMLInputElement>) => {
+    const file = event.target.files?.[0];
+    if (!file) return;
+
+    if (file.size > PATENT_HANDOVER_UPLOAD_MAX_BYTES) {
+      setActionError(`File must be ${formatFileSize(PATENT_HANDOVER_UPLOAD_MAX_BYTES)} or less.`);
+      event.target.value = '';
+      return;
+    }
+
+    setActionError('');
+    uploadHandoverDocumentMutation.mutate(file);
+  };
 
   return (
     <div className="fixed inset-0 z-50 overflow-y-auto bg-slate-950/80 p-4 backdrop-blur-sm sm:p-6">
@@ -318,13 +389,33 @@ function CaseDetailModal({
 
           {/* Tabs */}
           <div className="mt-5 flex gap-1 border-b border-slate-800 pb-0">
-            {(['overview', 'actions', 'conversation', 'notes'] as const).map((tab) => (
+            {(['overview', 'documents', 'handover', 'actions', 'conversation', 'notes'] as const).map((tab) => (
               <button
                 key={tab}
                 onClick={() => setActiveTab(tab)}
                 className={`relative rounded-t-lg px-4 py-2.5 text-sm font-medium transition-colors ${activeTab === tab ? 'bg-slate-800 text-white' : 'text-slate-400 hover:text-slate-200'}`}
               >
-                {tab === 'overview' ? 'Overview' : tab === 'actions' ? 'Actions' : tab === 'conversation' ? 'Conversation' : 'Notes'}
+                {tab === 'overview'
+                  ? 'Overview'
+                  : tab === 'documents'
+                    ? 'Documents'
+                    : tab === 'handover'
+                      ? 'Handover'
+                    : tab === 'actions'
+                      ? 'Actions'
+                      : tab === 'conversation'
+                        ? 'Conversation'
+                        : 'Notes'}
+                {tab === 'documents' && documents.length > 0 ? (
+                  <span className="ml-2 rounded-full bg-slate-700 px-1.5 py-0.5 text-[10px] font-semibold text-slate-200">
+                    {documents.length}
+                  </span>
+                ) : null}
+                {tab === 'handover' && handoverDocuments.length > 0 ? (
+                  <span className="ml-2 rounded-full bg-slate-700 px-1.5 py-0.5 text-[10px] font-semibold text-slate-200">
+                    {handoverDocuments.length}
+                  </span>
+                ) : null}
                 {tab === 'conversation' && unreadCount > 0 && (
                   <span className="absolute -right-1 -top-1 flex h-5 w-5 items-center justify-center rounded-full bg-cyan-500 text-[10px] font-bold text-slate-950">
                     {unreadCount}
@@ -417,18 +508,50 @@ function CaseDetailModal({
                   </div>
                 )}
 
-                {documents.length > 0 && (
+                {documents.length > 0 ? (
+                  <div className="rounded-xl border border-slate-800 bg-slate-950/60 px-4 py-3 text-sm text-slate-300">
+                    {documents.length} document{documents.length === 1 ? '' : 's'} uploaded.
+                    Open the <span className="font-medium text-white">Documents</span> tab to review files.
+                  </div>
+                ) : null}
+
+                {item.status === 'granted' ? (
+                  <div className="rounded-xl border border-slate-800 bg-slate-950/60 px-4 py-3 text-sm text-slate-300">
+                    Official document handover:{' '}
+                    <span className="font-medium text-white">
+                      {handoverAcknowledged
+                        ? 'Acknowledged by student'
+                        : handoverCompleted
+                          ? 'Shared with student'
+                          : 'Pending package creation'}
+                    </span>
+                    . Open the <span className="font-medium text-white">Handover</span> tab to manage the final package.
+                  </div>
+                ) : null}
+              </div>
+            )}
+
+            {activeTab === 'documents' && (
+              <div className="space-y-5">
+                {documents.length === 0 ? (
+                  <div className="rounded-xl border border-slate-800 bg-slate-950/60 px-5 py-8 text-center text-sm text-slate-500">
+                    No documents have been uploaded for this patent support case yet.
+                  </div>
+                ) : (
                   <div>
                     <div className="mb-3 text-xs uppercase tracking-[0.2em] text-cyan-300">
-                      Documents
+                      Uploaded Documents
                     </div>
                     <div className="space-y-3">
                       {documents.map((document) => {
                         const reviewStatus = document.reviewStatus ?? 'pending';
+                        const noteKey = document._id ?? document.fileUrl;
+                        const noteValue = documentReviewNotes[noteKey] ?? document.reviewNote ?? '';
+
                         return (
                           <div
                             key={document._id ?? document.fileUrl}
-                            className="rounded-xl border border-slate-800 bg-slate-950/60 px-4 py-3"
+                            className="rounded-xl border border-slate-800 bg-slate-950/60 p-4"
                           >
                             <div className="flex flex-wrap items-start justify-between gap-3">
                               <div className="min-w-0">
@@ -443,9 +566,9 @@ function CaseDetailModal({
                                 <div className="mt-1 text-xs text-slate-500">
                                   {DOCUMENT_CATEGORY_LABELS[document.documentCategory] ?? document.documentCategory}
                                 </div>
-                                {document.reviewNote ? (
-                                  <div className="mt-2 text-sm text-slate-300">
-                                    {document.reviewNote}
+                                {document.uploadedAt ? (
+                                  <div className="mt-1 text-xs text-slate-500">
+                                    Uploaded {formatDate(document.uploadedAt)}
                                   </div>
                                 ) : null}
                               </div>
@@ -455,11 +578,215 @@ function CaseDetailModal({
                                 {DOCUMENT_REVIEW_LABELS[reviewStatus] ?? reviewStatus}
                               </span>
                             </div>
+
+                            {document.note ? (
+                              <div className="mt-3 rounded-lg border border-slate-800 bg-slate-900/70 px-3 py-2 text-sm text-slate-300">
+                                Student note: {document.note}
+                              </div>
+                            ) : null}
+
+                            <textarea
+                              value={noteValue}
+                              onChange={(e) =>
+                                setDocumentReviewNotes((current) => ({
+                                  ...current,
+                                  [noteKey]: e.target.value,
+                                }))
+                              }
+                              placeholder="Add admin review note"
+                              className="mt-3 min-h-20 w-full rounded-xl border border-slate-800 bg-slate-900 px-4 py-3 text-sm text-white placeholder:text-slate-500"
+                            />
+
+                            <div className="mt-3 flex flex-wrap items-center gap-2">
+                              <a href={document.fileUrl} target="_blank" rel="noreferrer">
+                                <Button variant="secondary">
+                                  <FileText className="mr-2 h-4 w-4" />
+                                  Open Document
+                                </Button>
+                              </a>
+
+                              {(['approved', 'revision_requested', 'rejected'] as const)
+                                .filter((status) => !(reviewStatus === 'approved' && status === 'approved'))
+                                .map((status) => (
+                                <Button
+                                  key={status}
+                                  variant={status === 'approved' ? 'primary' : 'secondary'}
+                                  onClick={() =>
+                                    document._id &&
+                                    reviewDocumentMutation.mutate({
+                                      documentId: document._id,
+                                      reviewStatus: status,
+                                      reviewNote: noteValue.trim() || undefined,
+                                    })
+                                  }
+                                  disabled={!document._id || reviewDocumentMutation.isPending}
+                                >
+                                  {reviewDocumentMutation.isPending ? (
+                                    <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                                  ) : null}
+                                  {DOCUMENT_REVIEW_LABELS[status]}
+                                </Button>
+                              ))}
+                            </div>
                           </div>
                         );
                       })}
                     </div>
                   </div>
+                )}
+              </div>
+            )}
+
+            {activeTab === 'handover' && (
+              <div className="space-y-5">
+                {item.status !== 'granted' ? (
+                  <div className="rounded-xl border border-slate-800 bg-slate-950/60 px-5 py-8 text-center text-sm text-slate-500">
+                    Official document handover becomes available after the patent is granted.
+                  </div>
+                ) : (
+                  <>
+                    <div
+                      className={`rounded-xl border px-4 py-3 text-sm ${
+                        handoverAcknowledged
+                          ? 'border-emerald-500/20 bg-emerald-500/10 text-emerald-200'
+                          : handoverCompleted
+                            ? 'border-cyan-500/20 bg-cyan-500/10 text-cyan-100'
+                            : 'border-amber-500/20 bg-amber-500/10 text-amber-100'
+                      }`}
+                    >
+                      {handoverAcknowledged
+                        ? `Student acknowledged the official handover on ${formatDate(officialHandover?.studentAcknowledgedAt)}.`
+                        : handoverCompleted
+                          ? `Official handover was completed on ${formatDate(officialHandover?.handedOverAt)} and is waiting for student acknowledgement.`
+                          : 'Upload the final grant package, certificate, and any closing documents, then mark the handover complete.'}
+                    </div>
+
+                    {!handoverAcknowledged ? (
+                      <div className="rounded-xl border border-slate-800 bg-slate-950/60 p-4">
+                        <div className="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
+                          <div>
+                            <div className="text-xs uppercase tracking-[0.2em] text-cyan-300">
+                              Upload Official Documents
+                            </div>
+                            <p className="mt-1 text-sm text-slate-400">
+                              Share the final patent certificate, assignment deed, and other closing records.
+                            </p>
+                          </div>
+                          <label className="inline-flex cursor-pointer items-center gap-2 rounded-lg bg-cyan-500 px-4 py-2 text-sm font-semibold text-slate-950 transition hover:bg-cyan-400">
+                            {uploadHandoverDocumentMutation.isPending ? (
+                              <Loader2 className="h-4 w-4 animate-spin" />
+                            ) : (
+                              <Upload className="h-4 w-4" />
+                            )}
+                            Upload file
+                            <input
+                              ref={handoverFileInputRef}
+                              type="file"
+                              accept=".pdf,image/*"
+                              className="hidden"
+                              onChange={handleHandoverFileChange}
+                              disabled={uploadHandoverDocumentMutation.isPending}
+                            />
+                          </label>
+                        </div>
+                        <div className="mt-4 grid gap-3 md:grid-cols-[220px,1fr]">
+                          <select
+                            value={handoverCategory}
+                            onChange={(e) => setHandoverCategory(e.target.value as PatentRequestDocCategory)}
+                            className="rounded-xl border border-slate-800 bg-slate-950 px-4 py-2.5 text-sm text-white"
+                          >
+                            {Object.entries(DOCUMENT_CATEGORY_LABELS).map(([value, label]) => (
+                              <option key={value} value={value}>
+                                {label}
+                              </option>
+                            ))}
+                          </select>
+                          <input
+                            value={handoverUploadNote}
+                            onChange={(e) => setHandoverUploadNote(e.target.value)}
+                            placeholder="Optional note for this handover file"
+                            className="rounded-xl border border-slate-800 bg-slate-950 px-4 py-2.5 text-sm text-white placeholder:text-slate-500"
+                          />
+                        </div>
+                      </div>
+                    ) : null}
+
+                    <div className="overflow-hidden rounded-xl border border-slate-800 bg-slate-950/60">
+                      {handoverDocuments.length === 0 ? (
+                        <div className="px-5 py-8 text-center text-sm text-slate-500">
+                          No official handover documents uploaded yet.
+                        </div>
+                      ) : (
+                        handoverDocuments
+                          .slice()
+                          .sort((left, right) => {
+                            const leftTime = left.uploadedAt ? new Date(left.uploadedAt).getTime() : 0;
+                            const rightTime = right.uploadedAt ? new Date(right.uploadedAt).getTime() : 0;
+                            return rightTime - leftTime;
+                          })
+                          .map((document, index, arr) => (
+                            <div
+                              key={document._id ?? `${document.fileUrl}-${index}`}
+                              className={`px-5 py-4 ${index !== arr.length - 1 ? 'border-b border-slate-800' : ''}`}
+                            >
+                              <div className="flex flex-col gap-3 md:flex-row md:items-start md:justify-between">
+                                <div className="min-w-0">
+                                  <a
+                                    href={document.fileUrl}
+                                    target="_blank"
+                                    rel="noreferrer"
+                                    className="truncate text-sm font-semibold text-white hover:text-cyan-300"
+                                  >
+                                    {document.fileName}
+                                  </a>
+                                  <div className="mt-1 text-xs text-slate-500">
+                                    {DOCUMENT_CATEGORY_LABELS[document.documentCategory] ?? document.documentCategory}
+                                    {' / '}
+                                    {formatFileSize(document.fileSizeBytes)}
+                                    {document.uploadedAt ? ` / Uploaded ${formatDate(document.uploadedAt)}` : ''}
+                                  </div>
+                                  {document.note ? (
+                                    <div className="mt-2 text-sm text-slate-300">{document.note}</div>
+                                  ) : null}
+                                </div>
+                                <a href={document.fileUrl} target="_blank" rel="noreferrer">
+                                  <Button variant="secondary">
+                                    <FileText className="mr-2 h-4 w-4" />
+                                    Open
+                                  </Button>
+                                </a>
+                              </div>
+                            </div>
+                          ))
+                      )}
+                    </div>
+
+                    <div className="rounded-xl border border-slate-800 bg-slate-950/60 p-4">
+                      <div className="text-xs uppercase tracking-[0.2em] text-cyan-300">Complete Handover</div>
+                      <textarea
+                        value={handoverNote}
+                        onChange={(e) => setHandoverNote(e.target.value)}
+                        placeholder="Optional note for the student about what is included in the final handover package."
+                        className="mt-3 min-h-24 w-full rounded-xl border border-slate-800 bg-slate-950 px-4 py-3 text-sm text-white placeholder:text-slate-500"
+                        disabled={handoverCompleted || handoverAcknowledged}
+                      />
+                      {!handoverCompleted && !handoverAcknowledged ? (
+                        <Button
+                          variant="primary"
+                          className="mt-3"
+                          onClick={() => completeHandoverMutation.mutate()}
+                          disabled={handoverDocuments.length === 0 || completeHandoverMutation.isPending}
+                        >
+                          {completeHandoverMutation.isPending ? (
+                            <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                          ) : (
+                            <FileCheck className="mr-2 h-4 w-4" />
+                          )}
+                          Mark Official Handover Complete
+                        </Button>
+                      ) : null}
+                    </div>
+                  </>
                 )}
               </div>
             )}
@@ -504,80 +831,6 @@ function CaseDetailModal({
                   <div className="rounded-xl border border-slate-800 bg-slate-950/60 px-5 py-6 text-center text-sm text-slate-500">
                     <CheckCircle2 className="mx-auto mb-2 h-6 w-6 opacity-40" />
                     This case has reached a terminal status. No further transitions available.
-                  </div>
-                )}
-
-                {documents.length > 0 && (
-                  <div>
-                    <div className="mb-3 text-xs uppercase tracking-[0.2em] text-cyan-300">
-                      Review Documents
-                    </div>
-                    <div className="space-y-3">
-                      {documents.map((document) => {
-                        const reviewStatus = document.reviewStatus ?? 'pending';
-                        const noteValue = documentReviewNotes[document._id ?? ''] ?? document.reviewNote ?? '';
-                        return (
-                          <div
-                            key={document._id ?? document.fileUrl}
-                            className="rounded-xl border border-slate-800 bg-slate-950/60 p-4"
-                          >
-                            <div className="flex flex-wrap items-start justify-between gap-3">
-                              <div className="min-w-0">
-                                <a
-                                  href={document.fileUrl}
-                                  target="_blank"
-                                  rel="noreferrer"
-                                  className="truncate text-sm font-semibold text-white hover:text-cyan-300"
-                                >
-                                  {document.fileName}
-                                </a>
-                                <div className="mt-1 text-xs text-slate-500">
-                                  {DOCUMENT_CATEGORY_LABELS[document.documentCategory] ?? document.documentCategory}
-                                </div>
-                              </div>
-                              <span
-                                className={`rounded-full px-2.5 py-1 text-xs font-semibold ${DOCUMENT_REVIEW_STYLES[reviewStatus]}`}
-                              >
-                                {DOCUMENT_REVIEW_LABELS[reviewStatus] ?? reviewStatus}
-                              </span>
-                            </div>
-                            <textarea
-                              value={noteValue}
-                              onChange={(e) =>
-                                setDocumentReviewNotes((current) => ({
-                                  ...current,
-                                  [document._id ?? '']: e.target.value,
-                                }))
-                              }
-                              placeholder="Optional review note"
-                              className="mt-3 min-h-20 w-full rounded-xl border border-slate-800 bg-slate-900 px-4 py-3 text-sm text-white placeholder:text-slate-500"
-                            />
-                            <div className="mt-3 flex flex-wrap gap-2">
-                              {(['approved', 'revision_requested', 'rejected'] as const).map((status) => (
-                                <Button
-                                  key={status}
-                                  variant={status === 'approved' ? 'primary' : 'secondary'}
-                                  onClick={() =>
-                                    document._id &&
-                                    reviewDocumentMutation.mutate({
-                                      documentId: document._id,
-                                      reviewStatus: status,
-                                      reviewNote: noteValue.trim() || undefined,
-                                    })
-                                  }
-                                  disabled={!document._id || reviewDocumentMutation.isPending}
-                                >
-                                  {reviewDocumentMutation.isPending ? (
-                                    <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                                  ) : null}
-                                  {DOCUMENT_REVIEW_LABELS[status]}
-                                </Button>
-                              ))}
-                            </div>
-                          </div>
-                        );
-                      })}
-                    </div>
                   </div>
                 )}
 
@@ -784,16 +1037,6 @@ export default function PatentRequests() {
 
   return (
     <div className="space-y-6">
-      <div className="flex items-end justify-between gap-4">
-        <div>
-          <div className="text-xs uppercase tracking-[0.3em] text-cyan-300">Patent Requests</div>
-          <h1 className="mt-2 text-3xl font-bold text-white">Assisted Filing Cases</h1>
-          <p className="mt-2 text-slate-400">
-            Manage patent support requests from intake through India patent office workflow.
-          </p>
-        </div>
-      </div>
-
       <OptionTabs
         items={FILTER_TABS.map((tab) => ({
           id: tab.key,

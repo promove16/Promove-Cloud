@@ -12,6 +12,7 @@ import {
   deletePatentRequestDocument,
   patentSupportRequestSchema,
   uploadPatentRequestDocument,
+  acknowledgeOfficialHandover,
 } from './patentRequest.service';
 
 export const createPatent = async (req: Request, res: Response) => {
@@ -67,6 +68,11 @@ export const uploadPatentRequestDocumentController = async (req: Request, res: R
 
 export const deletePatentRequestDocumentController = async (req: Request, res: Response) => {
   const request = await deletePatentRequestDocument(req.user!._id, String(req.params.id), String(req.params.documentId));
+  res.status(200).json(new ApiResponse(request));
+};
+
+export const acknowledgeOfficialHandoverController = async (req: Request, res: Response) => {
+  const request = await acknowledgeOfficialHandover(req.user!._id, String(req.params.id));
   res.status(200).json(new ApiResponse(request));
 };
 

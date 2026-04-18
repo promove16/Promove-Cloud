@@ -118,6 +118,7 @@ export const useLogoutMutation = () => {
 
 export const useBootstrapAuth = () => {
   const persistedUserId = useAuthStore((state) => state.user?._id ?? null);
+  const accessToken = useAuthStore((state) => state.accessToken);
   const setAuth = useAuthStore((state) => state.setAuth);
   const clearAuth = useAuthStore((state) => state.clearAuth);
   const setLoading = useAuthStore((state) => state.setLoading);
@@ -127,6 +128,11 @@ export const useBootstrapAuth = () => {
 
     const bootstrap = async () => {
       setLoading(true);
+
+      if (accessToken) {
+        setLoading(false);
+        return;
+      }
 
       if (!persistedUserId) {
         clearAuth();
@@ -168,7 +174,7 @@ export const useBootstrapAuth = () => {
     return () => {
       active = false;
     };
-  }, [clearAuth, persistedUserId, setAuth, setLoading]);
+  }, [accessToken, clearAuth, persistedUserId, setAuth, setLoading]);
 };
 
 export function AuthBootstrap({ children }: PropsWithChildren) {

@@ -26,7 +26,13 @@ import {
   ReviewMentorshipProgramInput,
 } from '../types/mentorship.types';
 import { PatentFilingDocuments, PatentSupportingDocument } from '../types/patent.types';
-import { PatentDocReviewStatus, PatentRequestDocument, PatentRequestQuestionnaire } from '../types/patentRequest.types';
+import {
+  PatentDocReviewStatus,
+  PatentRequestDocCategory,
+  PatentRequestDocument,
+  PatentRequestOfficialHandover,
+  PatentRequestQuestionnaire,
+} from '../types/patentRequest.types';
 import { Problem } from '../types/problem.types';
 import { RequestStatus, WorkflowRequest } from '../types/request.types';
 import { UserRole } from '../types/roles.types';
@@ -171,6 +177,7 @@ export interface AdminPatentRequestDetail extends Omit<AdminPatentRequestListIte
   description?: string;
   questionnaire?: PatentRequestQuestionnaire;
   documents: PatentRequestDocument[];
+  officialHandover?: PatentRequestOfficialHandover;
   adminNotes?: string;
   ipoPriorityDate?: string;
   publicationDate?: string;
@@ -880,6 +887,31 @@ export const adminApi = {
   },
 
   // ── Patent Conversation ────────────────────────────────────────────────────
+  async uploadPatentRequestHandoverDocument(
+    id: string,
+    file: File,
+    documentCategory: PatentRequestDocCategory,
+    note?: string,
+  ) {
+    const body = new FormData();
+    body.append('file', file);
+    body.append('documentCategory', documentCategory);
+    if (note) {
+      body.append('note', note);
+    }
+    const response = await api.post<ApiSuccessResponse<AdminPatentRequestDetail>>(
+      `/api/admin/patent-requests/${id}/handover/documents`,
+      body,
+    );
+    return response.data.data;
+  },
+  async completePatentRequestHandover(id: string, payload: { note?: string }) {
+    const response = await api.patch<ApiSuccessResponse<AdminPatentRequestDetail>>(
+      `/api/admin/patent-requests/${id}/handover`,
+      payload,
+    );
+    return response.data.data;
+  },
   async getPatentMessages(requestId: string, params?: { before?: string; limit?: number }) {
     const response = await api.get<ApiSuccessResponse<Array<{
       _id: string;

@@ -16,6 +16,7 @@ import {
   listShowcasedPatents,
   showcasePatent,
   uploadPatentRequestDocumentController,
+  acknowledgeOfficialHandoverController,
 } from './patent.controller';
 import {
   sendMessageController,
@@ -55,6 +56,7 @@ router.get('/requests/mine', authenticate, authorize(UserRole.STUDENT), asyncHan
 router.get('/requests/:id', authenticate, authorize(UserRole.STUDENT), asyncHandler(getPatentRequest));
 router.post('/requests/:id/documents', authenticate, authorize(UserRole.STUDENT), documentUpload.single('file'), asyncHandler(uploadPatentRequestDocumentController));
 router.delete('/requests/:id/documents/:documentId', authenticate, authorize(UserRole.STUDENT), asyncHandler(deletePatentRequestDocumentController));
+router.patch('/requests/:id/handover/acknowledge', authenticate, authorize(UserRole.STUDENT), asyncHandler(acknowledgeOfficialHandoverController));
 
 // ── Simple Patent Support Request ───────────────────────────────────────────
 router.post('/requests', authenticate, authorize(UserRole.STUDENT), asyncHandler(createSimplePatentSupportRequest));

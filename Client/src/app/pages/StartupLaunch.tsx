@@ -1,419 +1,553 @@
-import { ChangeEvent, useCallback, useEffect, useMemo, useState } from "react";
-import { useNavigate, useOutletContext, useParams, useBlocker } from "react-router-dom";
-import { isAxiosError } from "axios";
+import { useEffect, useMemo, useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+import { useNavigate, useOutletContext, useParams } from "react-router-dom";
 import {
-  CheckCircle,
-  Download,
+  Area,
+  AreaChart,
+  Bar,
+  BarChart,
+  CartesianGrid,
+  Cell,
+  Legend,
+  Line,
+  ResponsiveContainer,
+  Tooltip,
+  XAxis,
+  YAxis,
+} from "recharts";
+import {
+  Award,
+  Banknote,
+  Boxes,
+  CheckCircle2,
+  CircleDot,
+  Edit3,
   FileText,
+  Flag,
   FolderKanban,
+  Loader2,
+  Package,
+  PieChart as PieIcon,
   Rocket,
-  ShieldCheck,
-  Target,
+  Save,
+  Sparkles,
   TrendingUp,
-  Upload,
   Users,
-  X,
 } from "lucide-react";
-import { dealApi } from "../../api/deal.api";
-import { startupApi, StartupPayload } from "../../api/startup.api";
+import { startupApi, type StartupPayload } from "../../api/startup.api";
 import { workspaceApi } from "../../api/workspace.api";
+import { dealApi } from "../../api/deal.api";
+import { DEFAULT_STARTUP_INIT_PROFILE } from "../../features/startup/iprIntake";
 import {
-  DEFAULT_STARTUP_INIT_PROFILE,
-  DEFAULT_STARTUP_IPR_PROFILE,
-  STARTUP_INIT_QUESTION_SECTIONS,
-  STARTUP_IPR_QUESTION_SECTIONS,
-  STARTUP_IPR_UPLOAD_MAX_BYTES,
-  STARTUP_IPR_DOCUMENT_SPECS,
-  buildStartupReviewReadiness,
-  formatStartupIprValue,
-  formatStartupInitValue,
-  getRequiredStartupDocumentCategories,
-} from "../../features/startup/iprIntake";
+  buildInnovationScorePreview,
+  DEFAULT_STARTUP_INNOVATION_PROFILE,
+  STARTUP_FUNDING_STATUS_OPTIONS,
+  STARTUP_LEGAL_STRUCTURE_OPTIONS,
+  STARTUP_PATENT_STATUS_OPTIONS,
+  STARTUP_RUBRIC_DOCUMENT_MAX_BYTES,
+  STARTUP_RUBRIC_DOCUMENT_SPECS,
+  STARTUP_RUBRIC_PITCH_ACCEPT,
+  STARTUP_RUBRIC_PITCH_MAX_BYTES,
+  STARTUP_SCORING_STAGE_OPTIONS,
+} from "../../features/startup/innovationRubric";
 import {
-  getStartupSectionPath,
+  getStartupOverviewPath,
   normalizeStartupRouteId,
 } from "../../features/startup/navigation";
-import { Card } from "../../components/ui/Card";
 import { Spinner } from "../../components/ui/Spinner";
+import { getApiErrorMessage } from "../../utils/apiError";
 import type {
   Startup,
+  StartupBusinessProfile,
   StartupDocumentCategory,
-  StartupInitializationProfile,
+  StartupInnovationProfile,
   StartupRegistrationProfile,
 } from "../../types/startup.types";
 
-const createEmptyPayload = (): StartupPayload => ({
+const DEFAULT_BUSINESS_PROFILE: StartupBusinessProfile = {
+  problemStatement: "",
+  solutionSummary: "",
+  targetCustomers: "",
+  marketAnalysis: "",
+  revenueModel: "",
+  goToMarketPlan: "",
+};
+
+const DEFAULT_REGISTRATION_PROFILE: StartupRegistrationProfile = {
+  problemStatement: "",
+  solutionDifferentiation: "",
+  coreInnovation: "",
+  priorArtStatus: "",
+  workingMechanism: "",
+  keyComponents: "",
+  developmentStage: "idea",
+  documentationReadiness: "",
+  inventorOwnership: "individual",
+  developmentContext: "",
+  targetMarkets: "",
+  commercializationStrategy: "build_startup",
+  publicDisclosureStatus: "",
+  legalAgreements: "",
+  ipProtectionType: "patent",
+};
+
+interface IdentityForm {
+  name: string;
+  tagline: string;
+  category: string;
+  teamSize: number;
+  activeProducts: number;
+  fundingNeeded: number;
+}
+
+const DEFAULT_IDENTITY: IdentityForm = {
   name: "",
   tagline: "",
   category: "",
-  stage: "Pre-Idea",
-  activeProducts: 1,
   teamSize: 1,
-  traction: {
-    patentFiled: false,
-    mvpBuilt: false,
-    revenueGenerating: false,
-    patentType: undefined,
-    patentApplicationId: undefined,
+  activeProducts: 0,
+  fundingNeeded: 0,
+};
+
+const fieldCls =
+  "w-full border border-slate-800 bg-slate-950/80 px-3 py-2 text-sm text-white outline-none transition focus:border-cyan-400/60";
+
+const REVIEW_BADGE: Record<
+  Startup["reviewStatus"],
+  { label: string; className: string }
+> = {
+  draft: {
+    label: "Draft",
+    className: "border-slate-700 bg-slate-900 text-slate-300",
   },
-  businessProfile: {
-    problemStatement: "",
-    solutionSummary: "",
-    targetCustomers: "",
-    marketAnalysis: "",
-    revenueModel: "",
-    goToMarketPlan: "",
+  review_requested: {
+    label: "Under Review",
+    className: "border-amber-500/30 bg-amber-500/10 text-amber-200",
   },
-  registrationProfile: { ...DEFAULT_STARTUP_IPR_PROFILE },
-  initializationProfile: { ...DEFAULT_STARTUP_INIT_PROFILE },
-});
-
-/* ── field limits (mirrors server Zod schema) ── */
-const FIELD_LIMITS = {
-  name: 120,
-  tagline: 200,
-  category: 100,
-  // registration profile
-  problemStatement: 2500,
-  solutionDifferentiation: 2500,
-  coreInnovation: 2000,
-  priorArtStatus: 2000,
-  workingMechanism: 2500,
-  keyComponents: 2000,
-  documentationReadiness: 1500,
-  developmentContext: 2000,
-  targetMarkets: 2000,
-  publicDisclosureStatus: 1500,
-  legalAgreements: 1500,
-  // initialization profile
-  vision: 2500,
-  mission: 2500,
-  foundingStory: 4000,
-  teamComposition: 2000,
-  productOverview: 2500,
-  customerProfile: 2000,
-  marketOpportunity: 2000,
-  pricingStrategy: 1500,
-  competitiveLandscape: 2000,
-  defensibleMoat: 2000,
-  currentTraction: 1500,
-  upcomingMilestones: 2000,
-  fundingAsk: 2000,
-  risksAndMitigation: 2000,
-} as const;
-
-type FieldErrors = Record<string, string>;
-
-const STARTUP_FIELD_ANCHORS: Record<string, { id: string; name?: string }> = {
-  name: { id: "startup-name", name: "name" },
-  tagline: { id: "startup-tagline", name: "tagline" },
-  category: { id: "startup-category", name: "category" },
-  fundingNeeded: { id: "startup-funding", name: "fundingNeeded" },
-  activeProducts: { id: "startup-offerings", name: "activeOfferings" },
+  changes_requested: {
+    label: "Changes Requested",
+    className: "border-rose-500/30 bg-rose-500/10 text-rose-200",
+  },
+  approved: {
+    label: "Approved",
+    className: "border-emerald-500/30 bg-emerald-500/10 text-emerald-200",
+  },
 };
 
-const validateStartupForm = (form: StartupPayload): FieldErrors => {
-  const errors: FieldErrors = {};
-
-  if (!form.name.trim()) {
-    errors.name = "Startup name is required.";
-  } else if (form.name.length > FIELD_LIMITS.name) {
-    errors.name = `Name must be ${FIELD_LIMITS.name} characters or fewer.`;
-  }
-
-  if (!form.tagline.trim()) {
-    errors.tagline = "Tagline is required.";
-  } else if (form.tagline.length > FIELD_LIMITS.tagline) {
-    errors.tagline = `Tagline must be ${FIELD_LIMITS.tagline} characters or fewer.`;
-  }
-
-  if (!form.category.trim()) {
-    errors.category = "Category is required.";
-  } else if (form.category.length > FIELD_LIMITS.category) {
-    errors.category = `Category must be ${FIELD_LIMITS.category} characters or fewer.`;
-  }
-
-  if (form.fundingNeeded !== undefined && form.fundingNeeded < 0) {
-    errors.fundingNeeded = "Funding amount cannot be negative.";
-  }
-
-  if (form.activeProducts < 0) {
-    errors.activeProducts = "Active offerings cannot be negative.";
-  }
-
-  return errors;
+const formatINR = (value?: number) => {
+  if (!value) return "--";
+  if (value >= 10_000_000) return `₹${(value / 10_000_000).toFixed(1)} Cr`;
+  if (value >= 100_000) return `₹${(value / 100_000).toFixed(1)} L`;
+  return `₹${value.toLocaleString("en-IN")}`;
 };
 
-const scrollToStartupField = (fieldName: string) => {
-  const anchor = STARTUP_FIELD_ANCHORS[fieldName];
-  const element =
-    (anchor?.id ? document.getElementById(anchor.id) : null) ??
-    (anchor?.name ? document.querySelector(`[name="${anchor.name}"]`) : null);
+const formatDate = (value?: string) =>
+  value
+    ? new Date(value).toLocaleDateString("en-IN", {
+        day: "numeric",
+        month: "short",
+      })
+    : "--";
 
-  if (!(element instanceof HTMLElement)) {
-    window.scrollTo({ top: 0, behavior: "smooth" });
-    return;
-  }
+const formatFileSize = (bytes: number) =>
+  `${Math.round(bytes / (1024 * 1024))} MB max`;
 
-  window.requestAnimationFrame(() => {
-    element.scrollIntoView({ behavior: "smooth", block: "center" });
-    element.focus();
-  });
+const weekStart = (date: Date) => {
+  const d = new Date(date);
+  const day = d.getDay();
+  const diff = (day + 6) % 7;
+  d.setDate(d.getDate() - diff);
+  d.setHours(0, 0, 0, 0);
+  return d;
 };
 
-const shortDateFormatter = new Intl.DateTimeFormat("en-IN", {
-  day: "2-digit",
-  month: "short",
-  year: "numeric",
-});
+const STARTUP_TRUST_PROOF_CATEGORIES: StartupDocumentCategory[] = [
+  "incorporation_certificate",
+  "startup_india_certificate",
+  "dpiit_certificate",
+  "udyam_certificate",
+  "government_certificate_other",
+  "business_plan",
+  "dpr",
+  "patent_proof",
+  "itr_filing",
+  "revenue_proof",
+  "grant_certificate",
+  "award_certificate",
+  "funding_proof",
+];
 
-const shortDateTimeFormatter = new Intl.DateTimeFormat("en-IN", {
-  day: "2-digit",
-  month: "short",
-  year: "numeric",
-  hour: "numeric",
-  minute: "2-digit",
-});
-
-const getStartupActionErrorMessage = (error: unknown, fallback: string) => {
-  if (isAxiosError<{ error?: { message?: string } }>(error)) {
-    return error.response?.data?.error?.message ?? fallback;
-  }
-
-  return error instanceof Error ? error.message : fallback;
+const STARTUP_LEGAL_STRUCTURE_LABELS: Record<string, string> = {
+  sole_proprietorship: "Sole Proprietorship",
+  partnership: "Partnership",
+  llp: "LLP",
+  private_limited: "Pvt Ltd",
+  opc: "OPC",
+  public_limited: "Public Ltd",
 };
 
-const formatReadinessActionMessage = (missingItems: string[]) => {
-  if (missingItems.length === 0) {
-    return "Startup profile is incomplete for review.";
-  }
-
-  const topItems = missingItems.slice(0, 5).join(", ");
-  return missingItems.length > 5
-    ? `Complete before review: ${topItems}, and ${missingItems.length - 5} more.`
-    : `Complete before review: ${topItems}.`;
+const STARTUP_FUNDING_STATUS_LABELS: Record<string, string> = {
+  bootstrapped: "Bootstrapped",
+  angel_seed: "Angel / Seed",
+  vc: "VC Funded",
 };
 
-type WorkflowStepStatus = "complete" | "current" | "blocked" | "optional";
+const hasStartupDocument = (
+  startup: Startup,
+  ...categories: StartupDocumentCategory[]
+) =>
+  categories.some((category) =>
+    (startup.documents ?? []).some(
+      (document) => document.category === category,
+    ),
+  );
 
-const workflowStatusClassName: Record<WorkflowStepStatus, string> = {
-  complete: "border-emerald-500/30 bg-emerald-500/10 text-emerald-200",
-  current: "border-cyan-500/30 bg-cyan-500/10 text-cyan-100",
-  blocked: "border-slate-800 bg-slate-950/70 text-slate-400",
-  optional: "border-amber-500/30 bg-amber-500/10 text-amber-100",
-};
-
-const workflowStatusLabel: Record<WorkflowStepStatus, string> = {
-  complete: "Complete",
-  current: "Next",
-  blocked: "Blocked",
-  optional: "Optional",
-};
-
-const getStartupStageFromWorkspaceStage = (
-  stage: string | undefined,
-): StartupPayload["stage"] => {
-  switch (stage) {
-    case "Launch":
-      return "Launched";
-    case "Patent":
-      return "Pre-Launch";
-    case "Build":
-      return "MVP";
-    case "Problem":
-    case "Ideation":
-    default:
-      return "Ideation";
-  }
-};
-
-const mapStartupToForm = (startup?: Partial<Startup> | null): StartupPayload => {
-  const defaultPayload = createEmptyPayload();
-
-  if (!startup) {
-    return defaultPayload;
-  }
+const buildStartupTrustSummary = (startup: Startup) => {
+  const companyProfile = startup.innovationProfile?.companyProfile;
+  const tractionProfile = startup.innovationProfile?.tractionProfile;
+  const legalStructure = companyProfile?.legalStructure;
+  const legalStructureLabel =
+    legalStructure && legalStructure !== "not_registered"
+      ? (STARTUP_LEGAL_STRUCTURE_LABELS[legalStructure] ?? legalStructure)
+      : undefined;
+  const fundingStatus = tractionProfile?.fundingStatus;
+  const fundingStatusLabel =
+    fundingStatus && fundingStatus !== "none"
+      ? (STARTUP_FUNDING_STATUS_LABELS[fundingStatus] ?? fundingStatus)
+      : undefined;
+  const patentLabel =
+    tractionProfile?.patentStatus === "published"
+      ? "Patent Published"
+      : tractionProfile?.patentStatus === "filed" ||
+          startup.traction?.patentFiled
+        ? "Patent Filed"
+        : undefined;
+  const proofCount =
+    STARTUP_TRUST_PROOF_CATEGORIES.filter((category) =>
+      hasStartupDocument(startup, category),
+    ).length + (startup.pitchDeckUrl ? 1 : 0);
+  const signals = Array.from(
+    new Set(
+      [
+        legalStructureLabel ? "Registered Entity" : "",
+        companyProfile?.cinNumber ? "CIN Listed" : "",
+        companyProfile?.dpiitRecognitionNumber ||
+        hasStartupDocument(
+          startup,
+          "startup_india_certificate",
+          "dpiit_certificate",
+        )
+          ? "DPIIT Recognized"
+          : "",
+        companyProfile?.msmeUdyamNumber ||
+        hasStartupDocument(startup, "udyam_certificate")
+          ? "Udyam Registered"
+          : "",
+        companyProfile?.otherGovernmentCertificationName ||
+        companyProfile?.otherGovernmentCertificationNumber ||
+        hasStartupDocument(startup, "government_certificate_other")
+          ? "Govt Certified"
+          : "",
+        startup.pitchDeckUrl ? "Pitch Deck Ready" : "",
+        hasStartupDocument(startup, "business_plan", "dpr") ? "DPR Ready" : "",
+        companyProfile?.websiteUrl ? "Website Live" : "",
+        companyProfile?.productDemoUrl ? "Demo Available" : "",
+        companyProfile?.portfolioUrl ? "Portfolio Linked" : "",
+        patentLabel,
+        tractionProfile?.hasItrFiling ||
+        hasStartupDocument(startup, "itr_filing")
+          ? "ITR Filed"
+          : "",
+        tractionProfile?.hasRevenueProof ||
+        hasStartupDocument(startup, "revenue_proof")
+          ? "Revenue Verified"
+          : "",
+        tractionProfile?.hasGovernmentGrant ||
+        hasStartupDocument(startup, "grant_certificate")
+          ? "Grant Backed"
+          : "",
+        tractionProfile?.hasAwardRecognition ||
+        hasStartupDocument(startup, "award_certificate")
+          ? "Award Recognized"
+          : "",
+        fundingStatus === "bootstrapped"
+          ? "Bootstrapped"
+          : fundingStatus === "angel_seed"
+            ? "Angel Backed"
+            : fundingStatus === "vc"
+              ? "VC Funded"
+              : "",
+        hasStartupDocument(startup, "funding_proof") ? "Funding Verified" : "",
+      ].filter(Boolean),
+    ),
+  ) as string[];
 
   return {
-    ...defaultPayload,
-    projectId: startup.projectId,
-    name: startup.name ?? defaultPayload.name,
-    tagline: startup.tagline ?? defaultPayload.tagline,
-    category: startup.category ?? defaultPayload.category,
-    stage: startup.stage ?? defaultPayload.stage,
-    fundingNeeded: startup.fundingNeeded,
-    activeProducts: startup.activeProducts ?? defaultPayload.activeProducts,
-    teamSize: startup.teamSize ?? defaultPayload.teamSize,
-    traction: {
-      ...defaultPayload.traction,
-      ...(startup.traction ?? {}),
-    },
-    businessProfile: {
-      ...defaultPayload.businessProfile,
-      ...(startup.businessProfile ?? {}),
-    },
-    registrationProfile: {
-      ...defaultPayload.registrationProfile,
-      ...(startup.registrationProfile ?? {}),
-    },
-    initializationProfile: {
-      ...defaultPayload.initializationProfile,
-      ...(startup.initializationProfile ?? {}),
-    },
+    signals,
+    proofCount,
+    links: [
+      { label: "Website", url: companyProfile?.websiteUrl },
+      { label: "Product demo", url: companyProfile?.productDemoUrl },
+      { label: "Portfolio", url: companyProfile?.portfolioUrl },
+    ].filter((entry): entry is { label: string; url: string } =>
+      Boolean(entry.url),
+    ),
+    credentialRows: [
+      {
+        label: "Legal entity",
+        value: legalStructureLabel ?? "Not added",
+        done: Boolean(legalStructureLabel),
+      },
+      {
+        label: "CIN",
+        value: companyProfile?.cinNumber || "Not added",
+        done: Boolean(companyProfile?.cinNumber),
+      },
+      {
+        label: "DPIIT",
+        value:
+          companyProfile?.dpiitRecognitionNumber ||
+          (hasStartupDocument(
+            startup,
+            "startup_india_certificate",
+            "dpiit_certificate",
+          )
+            ? "Proof uploaded"
+            : "Not added"),
+        done: Boolean(
+          companyProfile?.dpiitRecognitionNumber ||
+          hasStartupDocument(
+            startup,
+            "startup_india_certificate",
+            "dpiit_certificate",
+          ),
+        ),
+      },
+      {
+        label: "Udyam",
+        value:
+          companyProfile?.msmeUdyamNumber ||
+          (hasStartupDocument(startup, "udyam_certificate")
+            ? "Proof uploaded"
+            : "Not added"),
+        done: Boolean(
+          companyProfile?.msmeUdyamNumber ||
+          hasStartupDocument(startup, "udyam_certificate"),
+        ),
+      },
+      {
+        label: "Patent status",
+        value: patentLabel ?? "No patent claim",
+        done: Boolean(patentLabel),
+      },
+      {
+        label: "Funding status",
+        value: fundingStatusLabel ?? "Not disclosed",
+        done: Boolean(fundingStatusLabel),
+      },
+    ],
+    proofRows: [
+      {
+        label: "Pitch deck",
+        done: Boolean(startup.pitchDeckUrl),
+      },
+      {
+        label: "DPR",
+        done: hasStartupDocument(startup, "business_plan", "dpr"),
+      },
+      {
+        label: "ITR filing",
+        done:
+          Boolean(tractionProfile?.hasItrFiling) ||
+          hasStartupDocument(startup, "itr_filing"),
+      },
+      {
+        label: "Revenue proof",
+        done:
+          Boolean(tractionProfile?.hasRevenueProof) ||
+          hasStartupDocument(startup, "revenue_proof"),
+      },
+      {
+        label: "Grant proof",
+        done:
+          Boolean(tractionProfile?.hasGovernmentGrant) ||
+          hasStartupDocument(startup, "grant_certificate"),
+      },
+      {
+        label: "Award proof",
+        done:
+          Boolean(tractionProfile?.hasAwardRecognition) ||
+          hasStartupDocument(startup, "award_certificate"),
+      },
+      {
+        label: "Funding proof",
+        done: hasStartupDocument(startup, "funding_proof"),
+      },
+    ],
   };
 };
 
 export function StartupLaunch() {
-  const maxPitchDeckSizeBytes = 10 * 1024 * 1024;
-  const maxIprUploadSizeBytes = STARTUP_IPR_UPLOAD_MAX_BYTES;
-  const pdfFileNamePattern = /\.pdf$/i;
   const navigate = useNavigate();
   const queryClient = useQueryClient();
-  const { startupId: paramId } = useParams<{ startupId: string }>();
-  const context = useOutletContext<{ startupId?: string }>();
-  const startupId = context?.startupId ?? normalizeStartupRouteId(paramId);
-  const isNew = !startupId;
-
-  const [showLaunchModal, setShowLaunchModal] = useState(false);
-  const [showPreviewModal, setShowPreviewModal] = useState(false);
-  const [launchTarget, setLaunchTarget] = useState<
-    "investors" | "mentors" | "both"
-  >("both");
-  const [toast, setToast] = useState("");
-  const [pendingPitchDeckName, setPendingPitchDeckName] = useState("");
-  const [pendingDocumentCategory, setPendingDocumentCategory] =
-    useState<StartupDocumentCategory | null>(null);
-  const [form, setForm] = useState<StartupPayload>(createEmptyPayload);
-  const [isIprIntakeOpen, setIsIprIntakeOpen] = useState(true);
-  const [activeIprSectionTitle, setActiveIprSectionTitle] = useState(
-    STARTUP_INIT_QUESTION_SECTIONS[0]?.title ?? "",
-  );
-  const [fieldErrors, setFieldErrors] = useState<FieldErrors>({});
-  const [hasAttemptedSubmit, setHasAttemptedSubmit] = useState(false);
-  const [savedFormSnapshot, setSavedFormSnapshot] = useState(() =>
-    JSON.stringify(createEmptyPayload()),
-  );
-  const [pendingRedirectStartupId, setPendingRedirectStartupId] = useState<
-    string | null
-  >(null);
-
-  /* ── dirty tracking & unsaved changes guard ── */
-  const formSnapshot = useMemo(() => JSON.stringify(form), [form]);
-  const formIsDirty = formSnapshot !== savedFormSnapshot;
-
-  useEffect(() => {
-    if (!formIsDirty) return;
-    const handler = (e: BeforeUnloadEvent) => {
-      e.preventDefault();
-    };
-    window.addEventListener("beforeunload", handler);
-    return () => window.removeEventListener("beforeunload", handler);
-  }, [formIsDirty]);
-
-  const blocker = useBlocker(
-    useCallback(
-      ({ currentLocation, nextLocation }: { currentLocation: { pathname: string }; nextLocation: { pathname: string } }) =>
-        formIsDirty && currentLocation.pathname !== nextLocation.pathname,
-      [formIsDirty],
-    ),
+  const { startupId: routeStartupId } = useParams<{ startupId?: string }>();
+  const outletContext = useOutletContext<{ startupId?: string } | null>();
+  const startupId = normalizeStartupRouteId(
+    outletContext?.startupId ?? routeStartupId,
   );
 
-  const workspaceQuery = useQuery({
-    queryKey: ["workspaces"],
-    queryFn: () => workspaceApi.list(),
-  });
   const startupQuery = useQuery({
     queryKey: ["startup", startupId],
     queryFn: () => startupApi.getById(startupId!),
     enabled: Boolean(startupId),
   });
-  const dealsQuery = useQuery({
-    queryKey: ["student", "active-deals"],
-    queryFn: dealApi.getMyDeals,
-    refetchInterval: 60_000,
-    enabled: false,
-  });
   const startup = startupQuery.data;
-  const workspaces = workspaceQuery.data ?? [];
-  const problemWorkspaces = useMemo(
-    () => workspaces.filter((workspace) => Boolean(workspace.claimedProblemId)),
-    [workspaces],
+  const hasSavedSetup = Boolean(
+    startup && startup.name?.trim() && startup.category?.trim(),
   );
-  const selectedWorkspaceId = startup?.projectId ?? form.projectId ?? "";
-  const activeWorkspace =
-    workspaces.find((workspace) => workspace._id === selectedWorkspaceId) ??
-    null;
-  const workspaceTeamSize =
-    activeWorkspace?.teamMembers?.length ??
-    activeWorkspace?.teamMemberIds?.length ??
-    0;
+  const canEditSetup = !startupId || Boolean(startup?.editAccess?.canEdit);
+
+  const [mode, setMode] = useState<"dashboard" | "edit">(
+    startupId ? "dashboard" : "edit",
+  );
 
   useEffect(() => {
-    if (!startup) {
-      return;
-    }
+    setMode(startupId ? "dashboard" : "edit");
+  }, [startupId]);
 
-    const loaded = mapStartupToForm(startup);
-    setForm(loaded);
-    setSavedFormSnapshot(JSON.stringify(loaded));
+  const [identity, setIdentity] = useState<IdentityForm>(DEFAULT_IDENTITY);
+  const [innovationProfile, setInnovationProfile] =
+    useState<StartupInnovationProfile>(DEFAULT_STARTUP_INNOVATION_PROFILE);
+  const [toast, setToast] = useState("");
+  const [error, setError] = useState("");
+  const [uploadingKey, setUploadingKey] = useState<string | null>(null);
+
+  useEffect(() => {
+    if (!startup) return;
+    setIdentity({
+      name: startup.name ?? "",
+      tagline: startup.tagline ?? "",
+      category: startup.category ?? "",
+      teamSize: startup.teamSize ?? 1,
+      activeProducts: startup.activeProducts ?? 0,
+      fundingNeeded: startup.fundingNeeded ?? 0,
+    });
+    setInnovationProfile({
+      ...DEFAULT_STARTUP_INNOVATION_PROFILE,
+      ...(startup.innovationProfile ?? {}),
+      companyProfile: {
+        ...DEFAULT_STARTUP_INNOVATION_PROFILE.companyProfile,
+        ...(startup.innovationProfile?.companyProfile ?? {}),
+      },
+      tractionProfile: {
+        ...DEFAULT_STARTUP_INNOVATION_PROFILE.tractionProfile,
+        ...(startup.innovationProfile?.tractionProfile ?? {}),
+      },
+    });
   }, [startup]);
 
   useEffect(() => {
-    if (!pendingRedirectStartupId || formIsDirty) {
-      return;
-    }
+    if (!toast) return;
+    const timer = setTimeout(() => setToast(""), 2500);
+    return () => clearTimeout(timer);
+  }, [toast]);
 
-    navigate(getStartupSectionPath(pendingRedirectStartupId, "overview"), {
-      replace: true,
-    });
-    setPendingRedirectStartupId(null);
-  }, [formIsDirty, navigate, pendingRedirectStartupId]);
+  const basePayload = useMemo<StartupPayload>(
+    () => ({
+      name: identity.name.trim(),
+      tagline: identity.tagline.trim(),
+      category: identity.category.trim(),
+      stage: startup?.stage ?? "Ideation",
+      teamSize: Number(identity.teamSize) || 0,
+      activeProducts: Number(identity.activeProducts) || 0,
+      fundingNeeded: Number(identity.fundingNeeded) || 0,
+      traction: {
+        patentFiled: startup?.traction?.patentFiled ?? false,
+        mvpBuilt: startup?.traction?.mvpBuilt ?? false,
+        revenueGenerating: startup?.traction?.revenueGenerating ?? false,
+        usersCount: startup?.traction?.usersCount,
+        patentType: startup?.traction?.patentType,
+        patentApplicationId: startup?.traction?.patentApplicationId,
+      },
+      businessProfile: startup?.businessProfile ?? DEFAULT_BUSINESS_PROFILE,
+      registrationProfile:
+        startup?.registrationProfile ?? DEFAULT_REGISTRATION_PROFILE,
+      initializationProfile:
+        startup?.initializationProfile ?? DEFAULT_STARTUP_INIT_PROFILE,
+      innovationProfile,
+    }),
+    [identity, innovationProfile, startup],
+  );
 
-  const persistStartup = useMutation({
+  const uploadedDocumentCategories = useMemo(
+    () => (startup?.documents ?? []).map((document) => document.category),
+    [startup?.documents],
+  );
+
+  const documentsByCategory = useMemo(
+    () =>
+      new Map(
+        (startup?.documents ?? []).map((document) => [
+          document.category,
+          document,
+        ]),
+      ),
+    [startup?.documents],
+  );
+
+  const scorePreview = useMemo(
+    () =>
+      buildInnovationScorePreview({
+        innovationProfile,
+        pitchDeckUploaded: Boolean(startup?.pitchDeckUrl),
+        uploadedDocumentCategories,
+      }),
+    [innovationProfile, startup?.pitchDeckUrl, uploadedDocumentCategories],
+  );
+
+  const save = useMutation({
     mutationFn: async () => {
-      const errors = validateStartupForm(form);
-      if (Object.keys(errors).length > 0) {
-        setFieldErrors(errors);
-        setHasAttemptedSubmit(true);
-        const firstErrorField = Object.keys(errors)[0];
-        scrollToStartupField(firstErrorField);
-        throw new Error(Object.values(errors)[0]);
+      if (startupId) {
+        return startupApi.update(startupId, basePayload);
       }
-      setFieldErrors({});
-
-      const payload = {
-        ...form,
-        projectId: selectedWorkspaceId || undefined,
-        teamSize: workspaceTeamSize || form.teamSize || startup?.teamSize || 1,
-      };
-
-      if (startup?._id) {
-        return startupApi.update(startup._id, payload);
-      }
-      return startupApi.create(payload);
+      return startupApi.create(basePayload);
     },
     onSuccess: async (saved) => {
-      const normalizedSavedStartup = mapStartupToForm(saved);
-      queryClient.setQueryData(["startup", saved._id], saved);
-      setForm(normalizedSavedStartup);
-      setSavedFormSnapshot(JSON.stringify(normalizedSavedStartup));
-      setFieldErrors({});
-      setHasAttemptedSubmit(false);
-      blocker.reset?.();
-      setToast("Startup draft saved. Submit it for admin review when ready.");
-      await queryClient.invalidateQueries({ queryKey: ["startup"] });
-      if (isNew && saved._id) {
-        setPendingRedirectStartupId(saved._id);
+      setError("");
+      setToast("Saved");
+      await Promise.all([
+        queryClient.invalidateQueries({ queryKey: ["startup"] }),
+        queryClient.invalidateQueries({ queryKey: ["startup", saved._id] }),
+      ]);
+      if (!startupId) {
+        navigate(getStartupOverviewPath(saved._id));
+      } else {
+        setMode("dashboard");
       }
     },
-    onError: (error) => {
-      setToast(
-        getStartupActionErrorMessage(
-          error,
-          "Unable to save startup profile right now.",
-        ),
-      );
+    onError: (err) => {
+      setError(getApiErrorMessage(err, "Unable to save startup."));
+    },
+  });
+
+  const uploadPitch = useMutation({
+    mutationFn: async (file: File) => startupApi.uploadPitch(startupId!, file),
+    onMutate: () => {
+      setUploadingKey("pitch");
+      setError("");
+    },
+    onSuccess: async (saved) => {
+      setToast("Pitch deck uploaded");
+      await Promise.all([
+        queryClient.invalidateQueries({ queryKey: ["startup"] }),
+        queryClient.invalidateQueries({ queryKey: ["startup", saved._id] }),
+      ]);
+    },
+    onError: (err) => {
+      setError(getApiErrorMessage(err, "Unable to upload pitch deck."));
+    },
+    onSettled: () => {
+      setUploadingKey(null);
     },
   });
 
@@ -424,2128 +558,1759 @@ export function StartupLaunch() {
     }: {
       file: File;
       category: StartupDocumentCategory;
-    }) => {
-      const savedStartup = startup?._id
-        ? startup
-        : await persistStartup.mutateAsync();
-      return startupApi.uploadDocument(savedStartup._id, file, category);
+    }) => startupApi.uploadDocument(startupId!, file, category),
+    onMutate: ({ category }) => {
+      setUploadingKey(category);
+      setError("");
     },
-    onSuccess: async (savedStartup, variables) => {
-      setPendingDocumentCategory(null);
-      queryClient.setQueryData(["startup", savedStartup._id], savedStartup);
-      setToast(
-        `${STARTUP_IPR_DOCUMENT_SPECS.find((item) => item.category === variables.category)?.label ?? "Startup document"} uploaded.`,
-      );
-      await queryClient.invalidateQueries({ queryKey: ["startup"] });
+    onSuccess: async (saved) => {
+      setToast("Proof uploaded");
+      await Promise.all([
+        queryClient.invalidateQueries({ queryKey: ["startup"] }),
+        queryClient.invalidateQueries({ queryKey: ["startup", saved._id] }),
+      ]);
     },
-    onError: (error) => {
-      setPendingDocumentCategory(null);
-      setToast(
-        getStartupActionErrorMessage(
-          error,
-          "Unable to upload startup document right now.",
-        ),
-      );
+    onError: (err) => {
+      setError(getApiErrorMessage(err, "Unable to upload document."));
+    },
+    onSettled: () => {
+      setUploadingKey(null);
     },
   });
 
   const deleteDocument = useMutation({
     mutationFn: async ({
-      startupId: targetStartupId,
+      category,
       documentId,
     }: {
-      startupId: string;
+      category: StartupDocumentCategory;
       documentId: string;
-    }) => startupApi.deleteDocument(targetStartupId, documentId),
-    onSuccess: async (savedStartup) => {
-      queryClient.setQueryData(["startup", savedStartup._id], savedStartup);
-      setToast("Startup document removed.");
-      await queryClient.invalidateQueries({ queryKey: ["startup"] });
-    },
-    onError: (error) => {
-      setToast(
-        getStartupActionErrorMessage(
-          error,
-          "Unable to remove startup document right now.",
-        ),
-      );
-    },
-  });
-
-  const requestReview = useMutation({
-    mutationFn: async () => {
-      const savedStartup = await persistStartup.mutateAsync();
-      return startupApi.requestReview(savedStartup._id);
+    }) => startupApi.deleteDocument(startupId!, documentId),
+    onMutate: ({ category }) => {
+      setUploadingKey(`delete-${category}`);
+      setError("");
     },
     onSuccess: async (saved) => {
-      setToast("Startup submitted for admin review.");
-      await queryClient.invalidateQueries({ queryKey: ["startup"] });
-      if (isNew && saved._id) {
-        navigate(`/startup-launch/${saved._id}/overview`, { replace: true });
-      }
-    },
-    onError: (error) => {
-      setToast(
-        getStartupActionErrorMessage(
-          error,
-          "Unable to submit startup for admin review.",
-        ),
-      );
-    },
-  });
-
-  const launchStartup = useMutation({
-    mutationFn: async (launchTo: "investors" | "mentors" | "both") => {
-      const savedStartup = startup?._id
-        ? startup
-        : await persistStartup.mutateAsync();
-      return startupApi.launch(savedStartup._id, launchTo);
-    },
-    onSuccess: async () => {
-      setShowLaunchModal(false);
-      setToast(
-        "Your startup is now live! Investors and mentors can discover you.",
-      );
+      setToast("Document removed");
       await Promise.all([
         queryClient.invalidateQueries({ queryKey: ["startup"] }),
-        queryClient.invalidateQueries({ queryKey: ["score", "me"] }),
+        queryClient.invalidateQueries({ queryKey: ["startup", saved._id] }),
       ]);
     },
-    onError: (error) => {
-      setToast(
-        getStartupActionErrorMessage(
-          error,
-          "Unable to launch startup right now.",
-        ),
+    onError: (err) => {
+      setError(getApiErrorMessage(err, "Unable to remove document."));
+    },
+    onSettled: () => {
+      setUploadingKey(null);
+    },
+  });
+
+  const canSubmit =
+    canEditSetup &&
+    identity.name.trim().length > 0 &&
+    identity.category.trim().length > 0 &&
+    !save.isPending;
+
+  const canUpload = Boolean(startupId) && canEditSetup;
+
+  const handlePitchSelected = (file: File | null) => {
+    if (!file) return;
+    if (!startupId) {
+      setError("Save the startup once before uploading pitch files.");
+      return;
+    }
+    if (file.size > STARTUP_RUBRIC_PITCH_MAX_BYTES) {
+      setError(
+        `Pitch deck must be ${formatFileSize(STARTUP_RUBRIC_PITCH_MAX_BYTES)} or less.`,
       );
-    },
-  });
-
-  const uploadPitch = useMutation({
-    mutationFn: async (file: File) => {
-      const savedStartup = startup?._id
-        ? startup
-        : await persistStartup.mutateAsync();
-      return startupApi.uploadPitch(savedStartup._id, file);
-    },
-    onSuccess: async (savedStartup) => {
-      setPendingPitchDeckName("");
-      queryClient.setQueryData(["startup", savedStartup._id], savedStartup);
-      setToast("Pitch deck uploaded.");
-      await queryClient.invalidateQueries({ queryKey: ["startup"] });
-    },
-    onError: (error) => {
-      setPendingPitchDeckName("");
-      if (isAxiosError<{ error?: { message?: string } }>(error)) {
-        setToast(
-          error.response?.data?.error?.message ??
-            "Failed to upload pitch deck PDF. Please try again.",
-        );
-        return;
-      }
-      setToast("Failed to upload pitch deck PDF. Please try again.");
-    },
-  });
-
-  const handlePitchDeckSelect = (event: ChangeEvent<HTMLInputElement>) => {
-    const file = event.target.files?.[0];
-    event.target.value = "";
-
-    if (!file) {
       return;
     }
-
-    if (
-      file.type !== "application/pdf" &&
-      !pdfFileNamePattern.test(file.name)
-    ) {
-      setPendingPitchDeckName("");
-      setToast("Only PDF files are allowed for the pitch deck.");
-      return;
-    }
-
-    if (file.size > maxPitchDeckSizeBytes) {
-      setPendingPitchDeckName("");
-      setToast("Pitch deck PDF must be 10MB or smaller.");
-      return;
-    }
-
-    setPendingPitchDeckName(file.name);
     uploadPitch.mutate(file);
   };
 
-  const handleStartupDocumentSelect = (
+  const handleDocumentSelected = (
     category: StartupDocumentCategory,
-    event: ChangeEvent<HTMLInputElement>,
+    file: File | null,
   ) => {
-    const file = event.target.files?.[0];
-    event.target.value = "";
-
-    if (!file) {
+    if (!file) return;
+    if (!startupId) {
+      setError("Save the startup once before uploading proof files.");
       return;
     }
-
-    const isPdf =
-      file.type === "application/pdf" || pdfFileNamePattern.test(file.name);
-    const isImage = file.type.startsWith("image/");
-    if (!isPdf && !isImage) {
-      setPendingDocumentCategory(null);
-      setToast("Only PDF or image files are allowed for startup documents.");
+    if (file.size > STARTUP_RUBRIC_DOCUMENT_MAX_BYTES) {
+      setError(
+        `Document must be ${formatFileSize(STARTUP_RUBRIC_DOCUMENT_MAX_BYTES)} or less.`,
+      );
       return;
     }
-
-    if (file.size > maxIprUploadSizeBytes) {
-      setPendingDocumentCategory(null);
-      setToast("IPR supporting files must be 3MB or smaller.");
-      return;
-    }
-
-    setPendingDocumentCategory(category);
     uploadDocument.mutate({ file, category });
   };
 
-  const updateRegistrationField = <K extends keyof StartupRegistrationProfile>(
-    key: K,
-    value: StartupRegistrationProfile[K],
-  ) => {
-    setForm((current) => ({
-      ...current,
-      registrationProfile: {
-        ...current.registrationProfile,
-        [key]: value,
-      },
-    }));
-  };
-
-  const updateInitializationField = <K extends keyof StartupInitializationProfile>(
-    key: K,
-    value: StartupInitializationProfile[K],
-  ) => {
-    setForm((current) => ({
-      ...current,
-      initializationProfile: {
-        ...current.initializationProfile,
-        [key]: value,
-      },
-    }));
-  };
-
-  const importSelectedWorkspace = () => {
-    const workspace = problemWorkspaces.find(
-      (item) => item._id === selectedWorkspaceId,
-    );
-
-    if (!workspace) {
-      setToast("Select a problem workspace to import first.");
-      return;
-    }
-
-    setForm((current) => ({
-      ...current,
-      projectId: workspace._id,
-      name: current.name.trim() ? current.name : workspace.title,
-      category: current.category.trim() ? current.category : workspace.category,
-      stage:
-        current.stage !== "Pre-Idea"
-          ? current.stage
-          : getStartupStageFromWorkspaceStage(workspace.stage),
-      teamSize:
-        workspace.teamMembers?.length ??
-        workspace.teamMemberIds?.length ??
-        current.teamSize,
-      businessProfile: {
-        ...current.businessProfile,
-        problemStatement:
-          current.businessProfile.problemStatement.trim() ||
-          `Promoted from the problem workspace "${workspace.title}". Refine this into a startup-grade problem statement before submitting for review.`,
-      },
-    }));
-    setToast(
-      `Imported ${workspace.title}. Review the startup story before saving.`,
-    );
-  };
-
-  // Re-validate on change once user has tried submitting
-  useEffect(() => {
-    if (hasAttemptedSubmit) {
-      setFieldErrors(validateStartupForm(form));
-    }
-  }, [form, hasAttemptedSubmit]);
-
-  const currentStartupId = startup?._id ?? startupId;
-  const workspaceSectionPath = currentStartupId
-    ? getStartupSectionPath(currentStartupId, "product-workspace")
-    : null;
-  const activeDeals = (dealsQuery.data?.items ?? []).filter((deal) =>
-    currentStartupId ? deal.startupId === currentStartupId : true,
-  );
-  const formTeamSize =
-    workspaceTeamSize || form.teamSize || startup?.teamSize || 1;
-  const requiredDocumentCategories = getRequiredStartupDocumentCategories({
-    registrationProfile: form.registrationProfile,
-    initializationProfile: form.initializationProfile,
-  });
-  const currentDocuments = startup?.documents ?? [];
-  const currentReviewReadiness = useMemo(
-    () =>
-      buildStartupReviewReadiness({
-        name: form.name,
-        tagline: form.tagline,
-        category: form.category,
-        founderIds:
-          startup?.founderIds?.length && startup.founderIds.length > 0
-            ? startup.founderIds
-            : ["draft-founder"],
-        pitchDeckUrl: startup?.pitchDeckUrl,
-        documents: currentDocuments,
-        registrationProfile: form.registrationProfile,
-        initializationProfile: form.initializationProfile,
-      }),
-    [
-      currentDocuments,
-      form.category,
-      form.initializationProfile,
-      form.name,
-      form.registrationProfile,
-      form.tagline,
-      startup?.founderIds,
-      startup?.pitchDeckUrl,
-    ],
-  );
-  const documentsByCategory = new Map(
-    currentDocuments.map((document) => [document.category, document]),
-  );
-  const iprQuestionCount = STARTUP_IPR_QUESTION_SECTIONS.reduce(
-    (total, section) => total + section.questions.length,
-    0,
-  );
-  const iprAnsweredQuestionCount = STARTUP_IPR_QUESTION_SECTIONS.reduce(
-    (total, section) =>
-      total +
-      section.questions.filter(
-        (question) =>
-          String(form.registrationProfile[question.key] ?? "").trim().length >
-          0,
-      ).length,
-    0,
-  );
-  const iprSectionSummaries = STARTUP_IPR_QUESTION_SECTIONS.map((section) => ({
-    title: section.title,
-    answered: section.questions.filter(
-      (question) =>
-        String(form.registrationProfile[question.key] ?? "").trim().length > 0,
-    ).length,
-    total: section.questions.length,
-  }));
-  const iprSections = STARTUP_IPR_QUESTION_SECTIONS.map((section) => {
-    const answered = section.questions.filter(
-      (question) =>
-        String(form.registrationProfile[question.key] ?? "").trim().length > 0,
-    ).length;
-
-    return {
-      ...section,
-      answered,
-      total: section.questions.length,
-      isComplete: answered === section.questions.length,
-    };
-  });
-  const iprPreviewAnswers = STARTUP_IPR_QUESTION_SECTIONS.flatMap((section) =>
-    section.questions.map((question) => ({
-      key: question.key,
-      label: question.label,
-      value: String(form.registrationProfile[question.key] ?? "").trim(),
-    })),
-  ).filter((item) => item.value.length > 0);
-  const initQuestionCount = STARTUP_INIT_QUESTION_SECTIONS.reduce(
-    (total, section) => total + section.questions.length,
-    0,
-  );
-  const initAnsweredQuestionCount = STARTUP_INIT_QUESTION_SECTIONS.reduce(
-    (total, section) =>
-      total +
-      section.questions.filter(
-        (question) =>
-          String(form.initializationProfile[question.key] ?? "").trim().length >
-          0,
-      ).length,
-    0,
-  );
-  const initSectionSummaries = STARTUP_INIT_QUESTION_SECTIONS.map((section) => ({
-    title: section.title,
-    answered: section.questions.filter(
-      (question) =>
-        String(form.initializationProfile[question.key] ?? "").trim().length > 0,
-    ).length,
-    total: section.questions.length,
-  }));
-  const initSections = STARTUP_INIT_QUESTION_SECTIONS.map((section) => {
-    const answered = section.questions.filter(
-      (question) =>
-        String(form.initializationProfile[question.key] ?? "").trim().length > 0,
-    ).length;
-
-    return {
-      ...section,
-      answered,
-      total: section.questions.length,
-      isComplete: answered === section.questions.length,
-    };
-  });
-  const initPreviewAnswers = STARTUP_INIT_QUESTION_SECTIONS.flatMap((section) =>
-    section.questions.map((question) => ({
-      key: question.key,
-      label: question.label,
-      value: String(form.initializationProfile[question.key] ?? "").trim(),
-    })),
-  ).filter((item) => item.value.length > 0);
-  const requiredDocumentSpecs = STARTUP_IPR_DOCUMENT_SPECS.filter((spec) =>
-    requiredDocumentCategories.includes(spec.category),
-  );
-  const optionalDocumentSpecs = STARTUP_IPR_DOCUMENT_SPECS.filter(
-    (spec) => !requiredDocumentCategories.includes(spec.category),
-  );
-  const newPageDocumentSpecs = requiredDocumentSpecs;
-  const canLaunch = Boolean(
-    form.name.trim() &&
-    form.tagline.trim() &&
-    form.category.trim() &&
-    formTeamSize > 0,
-  );
-  const reviewStatus = startup?.reviewStatus ?? "draft";
-  const isApproved = reviewStatus === "approved";
-  const isUnderReview = reviewStatus === "review_requested";
-  const hasChangesRequested = reviewStatus === "changes_requested";
-  const editAccess = startup?.editAccess;
-  const isEditingLocked = Boolean(!isNew && editAccess?.isLocked);
-  const editLockReason = editAccess?.reason ?? "";
-  const readiness = currentReviewReadiness;
-  const reviewTone =
-    reviewStatus === "approved"
-      ? "bg-emerald-500/10 border-emerald-500/20 text-emerald-200"
-      : reviewStatus === "review_requested"
-        ? "bg-amber-500/10 border-amber-500/20 text-amber-200"
-        : reviewStatus === "changes_requested"
-          ? "bg-rose-500/10 border-rose-500/20 text-rose-200"
-          : "bg-slate-900 border-slate-800 text-slate-300";
-  const reviewTitle =
-    reviewStatus === "approved"
-      ? "Admin review approved"
-      : reviewStatus === "review_requested"
-        ? "Awaiting admin review"
-        : reviewStatus === "changes_requested"
-          ? "Changes requested by admin"
-          : "Draft startup profile";
-  const reviewDescription =
-    reviewStatus === "approved"
-      ? "This startup is cleared for marketplace launch. Investors can discover it after you launch to investors."
-      : reviewStatus === "review_requested"
-        ? "The admin team is reviewing this startup profile before it goes live in the marketplace."
-        : reviewStatus === "changes_requested"
-          ? "Update the startup profile based on admin notes and submit it again for review."
-          : "Complete the business plan, the IPR intake questionnaire, and the required supporting files before submitting for admin review.";
-  const reviewedStateLabel = startup?.adminReviewedAt
-    ? shortDateTimeFormatter.format(new Date(startup.adminReviewedAt))
-    : reviewStatus === "review_requested"
-      ? "Pending"
-      : reviewStatus === "changes_requested"
-        ? "Changes requested"
-        : reviewStatus === "approved"
-          ? "Approved"
-          : "Not started";
-  const profileStatusLabel = startup?.launchedAt
-    ? "Live"
-    : isApproved
-      ? "Approved"
-      : isUnderReview
-        ? "Under review"
-        : hasChangesRequested
-          ? "Changes requested"
-          : "Draft";
-  const summaryStats = [
-    {
-      label: "Team members",
-      value: String(formTeamSize),
-      icon: Users,
-      tone: "text-cyan-300",
-    },
-    {
-      label: "Launch score",
-      value: String(startup?.innovationScoreAtLaunch ?? 0),
-      icon: TrendingUp,
-      tone: "text-emerald-300",
-    },
-    {
-      label: "Active offerings",
-      value: String(startup?.activeProducts ?? form.activeProducts),
-      icon: Target,
-      tone: "text-violet-300",
-    },
-    {
-      label: "Status",
-      value: profileStatusLabel,
-      icon: CheckCircle,
-      tone: "text-amber-300",
-    },
-  ] as const;
-  const investorPitchListed = Boolean(startup?.launchedToInvestors);
-  const investorApprovalReceived = activeDeals.some(
-    (deal) => deal.status === "active" || deal.status === "closed",
-  );
-  const marketplaceLive = Boolean(
-    startup?.launchedToInvestors || startup?.launchedToMentors,
-  );
-  const launchBlockedReason = !canLaunch
-    ? "Complete the startup name, tagline, category, and founder team before launch."
-    : !isApproved
-      ? "Admin startup review must be approved before marketplace launch."
-      : "";
-  const canOpenLaunchModal = !launchBlockedReason;
-  const workflowSteps: Array<{
-    label: string;
-    detail: string;
-    status: WorkflowStepStatus;
-  }> = [
-    {
-      label: "Create startup profile",
-      detail: canLaunch
-        ? "Core startup identity is ready."
-        : "Name, tagline, category, and team are required.",
-      status: canLaunch ? "complete" : "current",
-    },
-    {
-      label: "Build founder team",
-      detail:
-        formTeamSize > 1
-          ? `${formTeamSize} members are attached to this startup.`
-          : "A solo founder can continue; add collaborators when the startup needs them.",
-      status: formTeamSize > 1 ? "complete" : "optional",
-    },
-    {
-      label: "Complete startup review",
-      detail: readiness?.isReviewReady
-        ? "Startup review requirements are complete."
-        : `Still missing: ${readiness?.missingItems.slice(0, 3).join(", ") || "startup details"}`,
-      status: readiness?.isReviewReady ? "complete" : "current",
-    },
-    {
-      label: "Admin approval",
-      detail: isApproved
-        ? "Admin review is approved."
-        : isUnderReview
-          ? "Admin review is in progress."
-          : "Submit the startup profile for admin review.",
-      status: isApproved ? "complete" : isUnderReview ? "current" : "blocked",
-    },
-    {
-      label: "Launch to marketplace",
-      detail: marketplaceLive
-        ? "Marketplace visibility is live."
-        : "Choose investor or mentor visibility after approval.",
-      status: marketplaceLive
-        ? "complete"
-        : canOpenLaunchModal
-          ? "current"
-          : "blocked",
-    },
-    {
-      label: "Investor interest",
-      detail: investorPitchListed
-        ? "Investors can discover this startup."
-        : "Investor discovery starts after you launch to investors.",
-      status: investorPitchListed
-        ? "complete"
-        : canOpenLaunchModal
-          ? "current"
-          : "blocked",
-    },
-    {
-      label: "Investor approval",
-      detail: investorApprovalReceived
-        ? "Investor interest is active for this startup."
-        : "Investor approval appears after a pitch receives interest.",
-      status: investorApprovalReceived
-        ? "complete"
-        : investorPitchListed
-          ? "current"
-          : "blocked",
-    },
-  ];
-  const checklistItems = [
-    canLaunch
-      ? "Core basics are filled in for launch."
-      : "Name, tagline, category, and at least one founder are required.",
-    isNew
-      ? "Create the startup first, then submit it for admin review."
-      : isApproved
-        ? "Admin review is approved and the startup can be launched."
-        : isUnderReview
-          ? "Admin review is in progress."
-          : hasChangesRequested
-            ? "Admin requested changes before launch."
-            : "Submit the startup to admin review before marketplace launch.",
-    readiness?.isReviewReady
-      ? "Required IPR intake answers and document uploads are complete."
-      : `Still missing: ${readiness?.missingItems.slice(0, 3).join(", ") || "IPR details"}`,
-    activeWorkspace
-      ? `Workspace tab linked: ${activeWorkspace.title}.`
-      : "No product workspace is linked to this startup yet.",
-    requiredDocumentCategories.length > 0
-      ? `${requiredDocumentCategories.length} IPR supporting upload ${requiredDocumentCategories.length === 1 ? "is" : "are"} required at the current stage.`
-      : "No mandatory IPR uploads are required at the current stage yet.",
-  ];
-  const completedWorkflowCount = workflowSteps.filter(
-    (step) => step.status === "complete",
-  ).length;
-  const allWorkflowStepsComplete =
-    workflowSteps.length > 0 &&
-    workflowSteps.every(
-      (step) => step.status === "complete" || step.status === "optional",
-    );
-  const currentWorkflowStep = allWorkflowStepsComplete
-    ? null
-    : workflowSteps.find((step) => step.status === "current") ??
-      workflowSteps.find((step) => step.status === "blocked") ??
-      workflowSteps[workflowSteps.length - 1];
-  const visibleChecklistItems = checklistItems.slice(0, 4);
-  const sectionClassName = isNew
-    ? "border-b border-slate-800/70 pb-8"
-    : "border-t border-slate-800/70 pt-7";
-  const fieldClassName =
-    "w-full border bg-slate-950/30 px-3 py-3 text-sm text-white placeholder:text-slate-500 outline-none transition-colors focus:border-cyan-400";
-  const fieldErrorClassName =
-    "w-full border border-red-500/60 bg-slate-950/30 px-3 py-3 text-sm text-white placeholder:text-slate-500 outline-none transition-colors focus:border-red-400";
-  const fieldOkClassName = `${fieldClassName} border-slate-800`;
-  const textareaClassName = `${fieldClassName} border-slate-800 min-h-28 resize-y`;
-  const getFieldClass = (name: string) =>
-    fieldErrors[name] ? fieldErrorClassName : fieldOkClassName;
-  const isRequestReviewBusy =
-    requestReview.isPending || persistStartup.isPending;
-  const isRequestReviewBlocked = Boolean(
-    isEditingLocked || !readiness?.isReviewReady || isApproved || isUnderReview,
-  );
-  const requestReviewBlockedReason = isEditingLocked
-    ? editLockReason
-    : isApproved
-      ? "Startup is already approved."
-      : isUnderReview
-        ? "Startup review is already pending."
-        : formatReadinessActionMessage(readiness?.missingItems ?? []);
-  const footerStatusMessage = isEditingLocked
-    ? `${editLockReason} Raise a Smart Help request if you need admin-approved edits.`
-    : isRequestReviewBlocked
-      ? requestReviewBlockedReason
-      : launchBlockedReason;
-  const startupUnlockRequestPath = useMemo(() => {
-    if (!currentStartupId) {
-      return "/dashboard/help-desk/new?category=startup_patent";
-    }
-
-    const params = new URLSearchParams({
-      category: "startup_patent",
-      priority: "medium",
-      relatedEntityType: "startup",
-      relatedEntityId: currentStartupId,
-      referenceText: form.name || startup?.name || "Startup profile lock",
-      title: `Request startup edit unlock for ${form.name || startup?.name || "startup"}`,
-      description:
-        `The startup profile is locked after submission or approval and I need admin-approved access to update it.\n\n` +
-        `Startup: ${form.name || startup?.name || "Unknown startup"}\n` +
-        `Current review status: ${reviewStatus}\n` +
-        `Reason shown: ${editLockReason || "Profile is locked for review governance."}\n\n` +
-        `Please approve a temporary edit unlock so I can update the startup and resubmit it for review.`,
-    });
-
-    return `/dashboard/help-desk/new?${params.toString()}`;
-  }, [
-    currentStartupId,
-    editLockReason,
-    form.name,
-    reviewStatus,
-    startup?.name,
-  ]);
-  useEffect(() => {
-    if (!isIprIntakeOpen) {
-      return;
-    }
-
-    const nextSection =
-      initSections.find((section) => !section.isComplete)?.title ??
-      initSections[0]?.title ??
-      "";
-
-    if (
-      !activeIprSectionTitle ||
-      !initSections.some((section) => section.title === activeIprSectionTitle)
-    ) {
-      setActiveIprSectionTitle(nextSection);
-    }
-  }, [activeIprSectionTitle, initSections, isIprIntakeOpen]);
-
-  const handleRequestReviewClick = () => {
-    if (isRequestReviewBusy) {
-      return;
-    }
-
-    if (isRequestReviewBlocked) {
-      setToast(requestReviewBlockedReason);
-      return;
-    }
-
-    requestReview.mutate();
-  };
-  const handleLaunchClick = () => {
-    if (launchBlockedReason) {
-      setToast(launchBlockedReason);
-      return;
-    }
-
-    setShowLaunchModal(true);
-  };
-  const renderDocumentCard = (
-    spec: (typeof STARTUP_IPR_DOCUMENT_SPECS)[number],
-    isRequired: boolean,
-  ) => {
-    const uploadedDocument = documentsByCategory.get(spec.category);
-    const isUploading =
-      pendingDocumentCategory === spec.category && uploadDocument.isPending;
-    const cardClassName = isNew
-      ? "border-b border-slate-800/70 pb-5 last:border-b-0 last:pb-0"
-      : `border-l-2 px-4 py-3 ${isRequired ? "border-cyan-400 bg-cyan-500/5" : "border-slate-700 bg-slate-950/20"}`;
-    const uploadLabelClassName = isNew
-      ? "mt-4 flex cursor-pointer items-center gap-3 border border-dashed border-slate-700 px-4 py-4 text-sm text-slate-200"
-      : `mt-4 flex cursor-pointer items-center gap-3 border border-dashed px-4 py-4 text-sm ${isRequired ? "border-cyan-400/40 text-cyan-100" : "border-slate-700 text-slate-300"}`;
-
+  if (startupId && startupQuery.isLoading) {
     return (
-      <div key={spec.category} className={cardClassName}>
-        <div className="flex items-center gap-2 text-sm font-semibold text-white">
-          {spec.label}
-          {isRequired ? <span className="text-cyan-300">*</span> : null}
-        </div>
-        <p className="mt-1 text-xs text-slate-500">{spec.hint}</p>
-
-        {uploadedDocument ? (
-          <div className="mt-4 border border-cyan-500/20 bg-cyan-500/10 p-3">
-            <div className="text-sm font-medium text-white">
-              {uploadedDocument.fileName}
-            </div>
-            <div className="mt-1 text-xs text-slate-300">
-              Uploaded{" "}
-              {shortDateFormatter.format(new Date(uploadedDocument.uploadedAt))}
-            </div>
-            <div className="mt-3 flex flex-wrap gap-2">
-              <a
-                href={uploadedDocument.fileUrl}
-                target="_blank"
-                rel="noreferrer"
-                className="bg-slate-800 px-3 py-2 text-xs font-semibold text-white"
-              >
-                Open
-              </a>
-              <button
-                type="button"
-                onClick={() =>
-                  deleteDocument.mutate({
-                    startupId: startup!._id,
-                    documentId: uploadedDocument._id,
-                  })
-                }
-                disabled={isEditingLocked}
-                className="border border-slate-700 px-3 py-2 text-xs font-semibold text-slate-200"
-              >
-                Remove
-              </button>
-            </div>
-          </div>
-        ) : (
-          <label className={uploadLabelClassName}>
-            <Upload className="h-4 w-4 text-cyan-300" />
-            {isEditingLocked
-              ? "Uploads are locked"
-              : isUploading
-                ? "Uploading..."
-                : "Upload PDF or image (max 3MB)"}
-            <input
-              type="file"
-              accept="application/pdf,.pdf,image/*"
-              className="hidden"
-              disabled={isEditingLocked}
-              onChange={(event) =>
-                handleStartupDocumentSelect(spec.category, event)
-              }
-            />
-          </label>
-        )}
-      </div>
-    );
-  };
-
-  if (!isNew && startupQuery.isLoading) {
-    return (
-      <div className="flex min-h-[40vh] items-center justify-center">
+      <div className="flex h-64 items-center justify-center">
         <Spinner />
       </div>
     );
   }
 
-  if (!isNew && startupQuery.isError) {
+  if (startupId && startupQuery.isError) {
     return (
-      <Card className="max-w-3xl p-8 text-sm text-red-200">
-        {getStartupActionErrorMessage(
-          startupQuery.error,
-          "Unable to load this startup right now.",
-        )}
-      </Card>
+      <div className="border border-rose-500/30 bg-rose-500/10 p-4 text-sm text-rose-200">
+        Unable to load startup.
+      </div>
     );
   }
 
-  return (
-    <div className="mx-auto w-full max-w-none space-y-7">
-      <div className="flex flex-col gap-3 xl:flex-row xl:items-end xl:justify-between">
-        <div className="space-y-1.5">
-          <div className="text-xs font-semibold uppercase tracking-[0.28em] text-slate-500">
-            Startup Launch
-          </div>
-          <h1 className="text-2xl font-semibold text-white">
-            {isNew ? "Create startup" : "Launch profile"}
-          </h1>
-        </div>
-      </div>
+  const showDashboard = hasSavedSetup && mode === "dashboard" && startup;
 
+  if (showDashboard) {
+    return (
+      <StartupDashboard
+        startup={startup}
+        onEdit={() => setMode("edit")}
+        canEdit={canEditSetup}
+      />
+    );
+  }
+
+  const missingItems = startup?.readiness?.missingItems ?? [];
+
+  return (
+    <form
+      onSubmit={(event) => {
+        event.preventDefault();
+        if (!canSubmit) return;
+        save.mutate();
+      }}
+      className="space-y-6"
+    >
       {toast ? (
-        <div
-          aria-live="polite"
-          className="border border-blue-500/20 bg-blue-500/10 px-4 py-2.5 text-sm text-blue-300"
-        >
+        <div className="border border-emerald-500/30 bg-emerald-500/10 px-4 py-2 text-sm text-emerald-200">
           {toast}
         </div>
       ) : null}
-
-      {isNew ? (
-        <section className={sectionClassName}>
-          <div className="flex flex-col gap-4 lg:flex-row lg:items-end lg:justify-between">
-            <div>
-              <div className="text-xs font-semibold uppercase tracking-[0.24em] text-cyan-300">
-                Promote from Problem Workspace
-              </div>
-              <h2 className="mt-2 text-xl font-semibold text-white">
-                Bring an existing problem solution into startup launch
-              </h2>
-              <p className="mt-2 max-w-3xl text-sm text-slate-400">
-                Optional. Pick a problem workspace if this startup should build on a solved challenge instead of starting from scratch.
-              </p>
-            </div>
-            {problemWorkspaces.length > 0 ? (
-              <button
-                type="button"
-                onClick={importSelectedWorkspace}
-                title={
-                  selectedWorkspaceId
-                    ? "Import startup basics from the selected problem workspace"
-                    : "Select a problem workspace to import"
-                }
-                className="inline-flex items-center gap-2 border border-cyan-500/30 bg-cyan-500/10 px-4 py-3 text-sm font-semibold text-cyan-50 transition hover:border-cyan-400/50 hover:bg-cyan-500/15 disabled:cursor-not-allowed disabled:opacity-50"
-              >
-                <FolderKanban className="h-4 w-4" />
-                Import from Workspace
-              </button>
-            ) : null}
-          </div>
-
-          {problemWorkspaces.length > 0 ? (
-            <div className="mt-5 grid gap-4 lg:grid-cols-[minmax(0,1fr)_320px]">
-              <label className="block">
-                <span className="mb-2 block text-sm font-semibold text-white">
-                  Problem workspace
-                </span>
-                <div className="flex gap-2">
-                  <select
-                    value={selectedWorkspaceId}
-                    onChange={(event) =>
-                      setForm((current) => ({
-                        ...current,
-                        projectId: event.target.value || undefined,
-                      }))
-                    }
-                    className={fieldOkClassName}
-                  >
-                    <option value="">Select a solved problem workspace</option>
-                    {problemWorkspaces.map((workspace) => (
-                      <option key={workspace._id} value={workspace._id}>
-                        {workspace.title} · {workspace.category} · {workspace.progressPercent}% complete
-                      </option>
-                    ))}
-                  </select>
-                </div>
-                <span className="mt-2 block text-xs text-slate-500">
-                  Select a workspace and click Import to pull in name, category, and team.
-                </span>
-              </label>
-
-              <div className="border border-slate-800/70 bg-slate-950/50 px-4 py-4">
-                <div className="text-xs font-semibold uppercase tracking-[0.22em] text-slate-500">
-                  Imported context
-                </div>
-                <div className="mt-3 text-sm text-slate-300">
-                  {activeWorkspace ? (
-                    <>
-                      <div className="font-semibold text-white">
-                        {activeWorkspace.title}
-                      </div>
-                      <div className="mt-1">
-                        {activeWorkspace.category} · {activeWorkspace.stage}
-                      </div>
-                      <div className="mt-1 text-slate-400">
-                        {(activeWorkspace.teamMembers?.length ??
-                          activeWorkspace.teamMemberIds?.length ??
-                          0)}{" "}
-                        team members available to sync
-                      </div>
-                    </>
-                  ) : (
-                    "Choose a problem workspace to preview the linked startup context."
-                  )}
-                </div>
-              </div>
-            </div>
-          ) : (
-            <div className="mt-5 rounded-2xl border border-dashed border-slate-800 px-4 py-5 text-sm text-slate-400">
-              No problem workspaces are ready to promote yet. You can still create the startup draft manually.
-            </div>
-          )}
-        </section>
+      {error ? (
+        <div className="border border-rose-500/30 bg-rose-500/10 px-4 py-2 text-sm text-rose-200">
+          {error}
+        </div>
+      ) : null}
+      {startup?.editAccess?.isLocked ? (
+        <div className="border border-amber-500/30 bg-amber-500/10 px-4 py-2 text-sm text-amber-200">
+          Editing is locked. {startup.editAccess.reason}
+        </div>
+      ) : null}
+      {!startupId ? (
+        <div className="border border-cyan-500/20 bg-cyan-500/5 px-4 py-2 text-sm text-cyan-100">
+          Save the startup once to enable all proof uploads.
+        </div>
       ) : null}
 
-      {isNew ? (
-        <section className="border border-slate-800/70 bg-slate-950/40 px-5 py-5">
-          <div className="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
-            <div>
-              <div className="text-xs font-semibold uppercase tracking-[0.24em] text-cyan-300">
-                Review Readiness
-              </div>
-              <h2 className="mt-2 text-xl font-semibold text-white">
-                What the draft still needs before review
-              </h2>
-              <p className="mt-2 max-w-3xl text-sm text-slate-400">
-                This preview uses the current form state. Save the startup draft first, then return here to submit it once the missing items are complete.
-              </p>
-            </div>
-            <div className="border border-slate-800 bg-slate-950/70 px-3 py-2 text-xs uppercase tracking-[0.2em] text-slate-400">
-              {readiness.isReviewReady
-                ? "Review ready"
-                : `${readiness.missingItems.length} items pending`}
-            </div>
-          </div>
-
-          <div className="mt-5 grid gap-4 lg:grid-cols-[minmax(0,1.1fr)_minmax(0,0.9fr)]">
-            <div className="space-y-3">
-              {(readiness.missingItems.length > 0
-                ? readiness.missingItems.slice(0, 8)
-                : ["The startup draft is complete enough for admin review once it is saved."]).map(
-                (item) => (
-                  <div
-                    key={item}
-                    className="border-l-2 border-slate-800 px-4 py-2 text-sm text-slate-300"
-                  >
-                    {item}
-                  </div>
-                ),
-              )}
-            </div>
-            <div className="space-y-3 border-t border-slate-800 pt-4 lg:border-t-0 lg:border-l lg:pl-5 lg:pt-0">
-              <div className="text-xs uppercase tracking-[0.2em] text-slate-500">
-                Required uploads
-              </div>
-              <div className="text-sm text-slate-300">
-                {requiredDocumentCategories.length > 0
-                  ? requiredDocumentCategories
-                      .map((item) => item.replace(/_/g, " "))
-                      .join(", ")
-                  : "No stage-specific uploads are required yet."}
-              </div>
-              <div className="text-xs text-slate-500">
-                {formatReadinessActionMessage(readiness.missingItems)}
-              </div>
-            </div>
-          </div>
-        </section>
+      {hasSavedSetup ? (
+        <div className="flex items-center justify-between border border-slate-800 bg-slate-950/40 px-4 py-2.5">
+          <span className="text-xs uppercase tracking-[0.2em] text-slate-400">
+            Editing Setup
+          </span>
+          <button
+            type="button"
+            onClick={() => setMode("dashboard")}
+            className="text-xs font-medium text-cyan-300 hover:text-cyan-200"
+          >
+            Back to Dashboard
+          </button>
+        </div>
       ) : null}
 
-      {!isNew ? (
-        <section className="border-y border-slate-800/70 py-5">
-          <div className="grid gap-6 xl:grid-cols-[minmax(0,1.45fr)_minmax(0,1fr)]">
-            <div className="space-y-5">
-              <div className="flex flex-wrap items-start justify-between gap-4">
-                <div className="min-w-0">
-                  <div className="flex flex-wrap items-center gap-2 text-[11px] font-semibold uppercase tracking-[0.24em] text-slate-500">
-                    <span>Launch Profile</span>
-                    <span className="h-1 w-1 bg-slate-700" />
-                    <span>{profileStatusLabel}</span>
-                  </div>
-                  <div className="mt-2 flex flex-wrap items-center gap-2.5">
-                    <h2 className="text-xl font-semibold text-white">
-                      {form.name || "Your startup"}
-                    </h2>
-                    {form.tagline ? (
-                      <span className="text-sm text-slate-400">
-                        {form.tagline}
-                      </span>
-                    ) : null}
-                  </div>
-                </div>
-
-                <div className="flex flex-wrap gap-2 text-sm">
-                  <span className="border border-slate-700 px-2.5 py-1 text-slate-200">
-                    {form.category || "Category pending"}
-                  </span>
-                  <span className="border border-slate-700 px-2.5 py-1 text-slate-200">
-                    {form.stage}
-                  </span>
-                  <span className="border border-slate-700 px-2.5 py-1 text-slate-200">
-                    {formTeamSize} team members
-                  </span>
-                </div>
-              </div>
-
-              <div className="grid gap-4 border-t border-slate-800/70 pt-4 sm:grid-cols-2 xl:grid-cols-4">
-                {summaryStats.map(({ label, value, icon: Icon, tone }) => (
-                  <div
-                    key={label}
-                    className="border-l border-slate-800/70 pl-4"
-                  >
-                    <div
-                      className={`flex items-center gap-2 text-[11px] font-semibold uppercase tracking-[0.18em] ${tone}`}
-                    >
-                      <Icon className="h-4 w-4" />
-                      {label}
-                    </div>
-                    <div className="mt-2 text-lg font-semibold text-white">
-                      {value}
-                    </div>
-                  </div>
-                ))}
-              </div>
-            </div>
-
-            <div className="grid gap-5 border-t border-slate-800/70 pt-5 xl:border-l xl:border-t-0 xl:pl-6 xl:pt-0">
-              <div className={`border-l-2 px-4 py-1 ${reviewTone}`}>
-                <div className="flex items-start gap-3">
-                  <ShieldCheck className="mt-0.5 h-5 w-5 text-cyan-300" />
-                  <div className="min-w-0">
-                    <div className="text-xs font-semibold uppercase tracking-[0.24em] text-slate-400">
-                      Marketplace Review
-                    </div>
-                    <h3 className="mt-2 text-lg font-semibold text-white">
-                      {reviewTitle}
-                    </h3>
-                    <p className="mt-1 text-sm leading-6">
-                      {reviewDescription}
-                    </p>
-                    {startup?.adminNotes ? (
-                      <div className="mt-3 border-l-2 border-white/10 pl-3 text-sm text-slate-200">
-                        Admin notes: {startup.adminNotes}
-                      </div>
-) : null}
-
-                    {startup && !isUnderReview && !isApproved && (
-                      <button
-                        type="button"
-                        onClick={handleRequestReviewClick}
-                        disabled={isRequestReviewBusy || isRequestReviewBlocked}
-                        className="bg-cyan-600 px-5 py-3 text-sm font-semibold text-white hover:bg-cyan-500 disabled:opacity-50"
-                      >
-                        Submit for Admin Review
-                      </button>
-                    )}
-                  </div>
-                </div>
-
-                <div className="space-y-2">
-                  {workflowSteps.map((step, index) => (
-                    <div
-                      key={step.label}
-                      className="flex items-start justify-between gap-4 border-b border-slate-900 pb-2 text-sm last:border-b-0 last:pb-0"
-                    >
-                      <div className="min-w-0">
-                        <div className="font-medium text-white">
-                          {index + 1}. {step.label}
-                        </div>
-                        <div className="mt-1 text-slate-400">{step.detail}</div>
-                      </div>
-                      <span
-                        className={`shrink-0 border px-2 py-0.5 text-[11px] font-semibold uppercase tracking-[0.18em] ${workflowStatusClassName[step.status]}`}
-                      >
-                        {workflowStatusLabel[step.status]}
-                      </span>
-                    </div>
-                  ))}
-                </div>
-
-                <div className="flex flex-wrap gap-x-6 gap-y-2 text-sm text-slate-300">
-                  <div>
-                    Submitted:{" "}
-                    {startup?.reviewRequestedAt
-                      ? shortDateTimeFormatter.format(
-                          new Date(startup.reviewRequestedAt),
-                        )
-                      : "Not submitted"}
-                  </div>
-                  <div>
-                    Reviewed:{" "}
-                    {reviewedStateLabel}
-                  </div>
-                </div>
-              </div>
-            </div>
+      <section className="grid gap-4 lg:grid-cols-[1.6fr_1fr]">
+        <div className="grid gap-4 sm:grid-cols-2">
+          <KpiCard
+            icon={<Sparkles className="h-4 w-4" />}
+            label="Score Preview"
+            value={`${scorePreview.total}/1000`}
+          />
+          <KpiCard
+            icon={<FileText className="h-4 w-4" />}
+            label="Company Profile"
+            value={`${scorePreview.companyProfile.total}/250`}
+          />
+          <KpiCard
+            icon={<TrendingUp className="h-4 w-4" />}
+            label="Health & Traction"
+            value={`${scorePreview.healthAndTraction.total}/750`}
+          />
+          <KpiCard
+            icon={<CheckCircle2 className="h-4 w-4" />}
+            label="Proofs Uploaded"
+            value={String((startup?.documents ?? []).length)}
+          />
+        </div>
+        <div className="border border-slate-800 bg-slate-950/40 p-5">
+          <div className="flex items-center justify-between">
+            <h2 className="text-sm font-semibold uppercase tracking-[0.2em] text-cyan-300">
+              Readiness
+            </h2>
+            <span
+              className={`border px-2 py-1 text-[11px] font-semibold uppercase ${
+                startup?.readiness?.isReviewReady
+                  ? "border-emerald-500/30 bg-emerald-500/10 text-emerald-200"
+                  : "border-amber-500/30 bg-amber-500/10 text-amber-200"
+              }`}
+            >
+              {startup?.readiness?.isReviewReady ? "Ready" : "In Progress"}
+            </span>
           </div>
-        </section>
-      ) : null}
-
-      <div
-        className={
-          isNew
-            ? "space-y-8"
-            : "grid gap-10 xl:grid-cols-[minmax(0,2.2fr)_340px]"
-        }
-      >
-        <div className="space-y-8">
-          <fieldset disabled={isEditingLocked} className="space-y-8">
-            <div className={`${sectionClassName} grid gap-4 lg:grid-cols-3`}>
-              <div>
-                <label
-                  htmlFor="startup-name"
-                  className="mb-2 block text-sm font-semibold text-white"
+          <div className="mt-3 space-y-2 text-sm text-slate-300">
+            {missingItems.length > 0 ? (
+              missingItems.slice(0, 6).map((item) => (
+                <div
+                  key={item}
+                  className="border border-slate-800 bg-slate-900/70 px-3 py-2"
                 >
-                  Startup name <span className="text-red-400">*</span>
-                </label>
-                <input
-                  id="startup-name"
-                  name="name"
-                  autoComplete="organization"
-                  maxLength={FIELD_LIMITS.name}
-                  value={form.name}
-                  onChange={(event) =>
-                    setForm((current) => ({
-                      ...current,
-                      name: event.target.value,
-                    }))
-                  }
-                  placeholder="Your startup name"
-                  className={getFieldClass("name")}
-                />
-                <div className="mt-1 flex items-center justify-between">
-                  {fieldErrors.name ? (
-                    <span className="text-xs text-red-400">{fieldErrors.name}</span>
-                  ) : <span />}
-                  <span className="text-xs text-slate-600">
-                    {form.name.length}/{FIELD_LIMITS.name}
-                  </span>
+                  {item}
                 </div>
-              </div>
-              <div>
-                <label
-                  htmlFor="startup-tagline"
-                  className="mb-2 block text-sm font-semibold text-white"
-                >
-                  Tagline <span className="text-red-400">*</span>
-                </label>
-                <input
-                  id="startup-tagline"
-                  name="tagline"
-                  autoComplete="off"
-                  maxLength={FIELD_LIMITS.tagline}
-                  value={form.tagline}
-                  onChange={(event) =>
-                    setForm((current) => ({
-                      ...current,
-                      tagline: event.target.value,
-                    }))
-                  }
-                  placeholder="A short description of your startup"
-                  className={getFieldClass("tagline")}
-                />
-                <div className="mt-1 flex items-center justify-between">
-                  {fieldErrors.tagline ? (
-                    <span className="text-xs text-red-400">{fieldErrors.tagline}</span>
-                  ) : <span />}
-                  <span className="text-xs text-slate-600">
-                    {form.tagline.length}/{FIELD_LIMITS.tagline}
-                  </span>
-                </div>
-              </div>
-              <div>
-                <label
-                  htmlFor="startup-category"
-                  className="mb-2 block text-sm font-semibold text-white"
-                >
-                  Category <span className="text-red-400">*</span>
-                </label>
-                <input
-                  id="startup-category"
-                  name="category"
-                  autoComplete="off"
-                  maxLength={FIELD_LIMITS.category}
-                  value={form.category}
-                  onChange={(event) =>
-                    setForm((current) => ({
-                      ...current,
-                      category: event.target.value,
-                    }))
-                  }
-                  placeholder="e.g. FinTech, Healthcare, EdTech, Climate…"
-                  className={getFieldClass("category")}
-                />
-                <div className="mt-1 flex items-center justify-between">
-                  {fieldErrors.category ? (
-                    <span className="text-xs text-red-400">{fieldErrors.category}</span>
-                  ) : <span />}
-                  <span className="text-xs text-slate-600">
-                    {form.category.length}/{FIELD_LIMITS.category}
-                  </span>
-                </div>
-              </div>
-              <div>
-                <label
-                  htmlFor="startup-stage"
-                  className="mb-2 block text-sm font-semibold text-white"
-                >
-                  Startup stage
-                </label>
-                <select
-                  id="startup-stage"
-                  name="startupStage"
-                  value={form.stage}
-                  onChange={(event) =>
-                    setForm((current) => ({
-                      ...current,
-                      stage: event.target.value as StartupPayload["stage"],
-                    }))
-                  }
-                  className={fieldOkClassName}
-                >
-                  <option>Pre-Idea</option>
-                  <option>Ideation</option>
-                  <option>MVP</option>
-                  <option>Pre-Launch</option>
-                  <option>Launched</option>
-                </select>
-              </div>
-              <div>
-                <label
-                  htmlFor="startup-funding"
-                  className="mb-2 block text-sm font-semibold text-white"
-                >
-                  Funding needed (INR)
-                </label>
-                <input
-                  id="startup-funding"
-                  name="fundingNeeded"
-                  autoComplete="off"
-                  inputMode="numeric"
-                  type="number"
-                  min={0}
-                  value={form.fundingNeeded ?? ""}
-                  onChange={(event) => {
-                    const raw = event.target.value.replace(/[^0-9]/g, "");
-                    setForm((current) => ({
-                      ...current,
-                      fundingNeeded: raw ? Number(raw) : undefined,
-                    }));
-                  }}
-                  className={getFieldClass("fundingNeeded")}
-                />
-                {fieldErrors.fundingNeeded ? (
-                  <span className="mt-1 block text-xs text-red-400">{fieldErrors.fundingNeeded}</span>
-                ) : null}
-              </div>
-              <div>
-                <label
-                  htmlFor="startup-offerings"
-                  className="mb-2 block text-sm font-semibold text-white"
-                >
-                  Active offerings
-                </label>
-                <input
-                  id="startup-offerings"
-                  name="activeOfferings"
-                  autoComplete="off"
-                  inputMode="numeric"
-                  type="number"
-                  min={0}
-                  value={form.activeProducts}
-                  onChange={(event) => {
-                    const raw = event.target.value.replace(/[^0-9]/g, "");
-                    setForm((current) => ({
-                      ...current,
-                      activeProducts: raw ? Number(raw) : 1,
-                    }));
-                  }}
-                  className={getFieldClass("activeProducts")}
-                />
-                {fieldErrors.activeProducts ? (
-                  <span className="mt-1 block text-xs text-red-400">{fieldErrors.activeProducts}</span>
-                ) : null}
-              </div>
-            </div>
-
-            {!isNew ? (
-              <div className={sectionClassName}>
-                <div className="flex flex-col gap-4 xl:flex-row xl:items-start xl:justify-between">
-                  <div>
-                    <div className="text-xs uppercase tracking-[0.24em] text-cyan-300">
-                      Linked Product Workspace
-                    </div>
-                    <h2 className="mt-2 text-xl font-semibold text-white">
-                      Linked Product Workspace
-                    </h2>
-                  </div>
-                  {workspaceSectionPath ? (
-                    <button
-                      type="button"
-                      onClick={() => navigate(workspaceSectionPath)}
-                      className="bg-cyan-600 px-4 py-2 text-sm font-semibold text-white hover:bg-cyan-500"
-                    >
-                      {activeWorkspace ? "Open Workspace" : "Create Workspace"}
-                    </button>
-                  ) : null}
-                </div>
-                <div className="mt-5 grid gap-4 border-t border-slate-800/70 pt-4 md:grid-cols-3">
-                  <div className="border-l border-slate-800/70 pl-4">
-                    <div className="text-xs uppercase tracking-[0.2em] text-slate-500">
-                      Workspace
-                    </div>
-                    <div className="mt-2 text-base font-semibold text-white">
-                      {activeWorkspace?.title ?? "Not linked"}
-                    </div>
-                  </div>
-                  <div className="border-l border-slate-800/70 pl-4">
-                    <div className="text-xs uppercase tracking-[0.2em] text-slate-500">
-                      Stage
-                    </div>
-                    <div className="mt-2 text-base font-semibold text-white">
-                      {activeWorkspace?.stage ?? "Not linked"}
-                    </div>
-                  </div>
-                  <div className="border-l border-slate-800/70 pl-4">
-                    <div className="text-xs uppercase tracking-[0.2em] text-slate-500">
-                      Team context
-                    </div>
-                    <div className="mt-2 text-base font-semibold text-white">
-                      {activeWorkspace
-                        ? `${activeWorkspace.teamMembers?.length ?? activeWorkspace.teamMemberIds?.length ?? 0} members`
-                        : "No team synced"}
-                    </div>
-                  </div>
-                </div>
-              </div>
-            ) : null}
-          </fieldset>
-
-          <div className={`${sectionClassName} space-y-5`}>
-            <div className="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
-              <div>
-                <div className="text-xs uppercase tracking-[0.24em] text-cyan-300">
-                  Initialization
-                </div>
-                <h2 className="mt-2 text-xl font-semibold text-white">
-                  Startup initialization questionnaire
-                </h2>
-                <p className="mt-2 max-w-3xl text-sm text-slate-400">
-                  Answer the required questions to define your startup's core
-                  identity, business model, and growth plan.
-                </p>
-              </div>
-              <div className="flex flex-wrap items-center gap-2">
-                <div className="border border-cyan-500/20 bg-cyan-500/10 px-3 py-1.5 text-xs font-semibold text-cyan-100">
-                  {initAnsweredQuestionCount}/{initQuestionCount} answered
-                </div>
-                {isIprIntakeOpen ? (
-                  <button
-                    type="button"
-                    onClick={() => setIsIprIntakeOpen(false)}
-                    className="border border-slate-700 px-4 py-2 text-sm font-semibold text-slate-200 transition hover:border-slate-500 hover:text-white"
-                  >
-                    Preview
-                  </button>
-                ) : (
-                  <button
-                    type="button"
-                    onClick={() => {
-                      setActiveIprSectionTitle(
-                        initSections.find((section) => !section.isComplete)
-                          ?.title ??
-                          initSections[0]?.title ??
-                          "",
-                      );
-                      setIsIprIntakeOpen(true);
-                    }}
-                    className="bg-cyan-500 px-4 py-2 text-sm font-semibold text-slate-950 transition hover:bg-cyan-400"
-                  >
-                    Edit
-                  </button>
-                )}
-              </div>
-            </div>
-
-            {isIprIntakeOpen ? (
-              <>
-                {initSections.map((section) => {
-                  const isActive = activeIprSectionTitle === section.title;
-
-                  return (
-                    <div
-                      key={section.title}
-                      className="border-t border-slate-800/70 pt-5 first:border-t-0 first:pt-0"
-                    >
-                      <div className="flex flex-col gap-3 border-b border-slate-800/70 pb-4 sm:flex-row sm:items-center sm:justify-between">
-                        <div>
-                          <div className="text-xs uppercase tracking-[0.22em] text-slate-500">
-                            {section.title}
-                          </div>
-                          <div className="mt-2 text-sm text-slate-400">
-                            {section.answered}/{section.total} answered
-                          </div>
-                        </div>
-                        <div className="flex items-center gap-3">
-                          <span
-                            className={`border px-2.5 py-1 text-[11px] font-semibold uppercase tracking-[0.18em] ${section.isComplete ? "border-emerald-500/30 bg-emerald-500/10 text-emerald-200" : "border-slate-700 text-slate-300"}`}
-                          >
-                            {section.isComplete ? "Complete" : "In Progress"}
-                          </span>
-                          <button
-                            type="button"
-                            onClick={() =>
-                              setActiveIprSectionTitle(
-                                isActive ? "" : section.title,
-                              )
-                            }
-                            className="border border-slate-700 px-3 py-2 text-sm font-semibold text-slate-200 transition hover:border-slate-500 hover:text-white"
-                          >
-                            {isActive ? "Hide" : "Open"}
-                          </button>
-                        </div>
-                      </div>
-
-                      {isActive ? (
-                        <div className="grid gap-4 pt-4 xl:grid-cols-2">
-                          {section.questions.map((question) => (
-                            <div
-                              key={question.key}
-                              className={
-                                question.type === "select"
-                                  ? ""
-                                  : section.questions.length === 1
-                                    ? "xl:col-span-2"
-                                    : ""
-                              }
-                            >
-                              <label
-                                htmlFor={`init-${String(question.key)}`}
-                                className="mb-2 block text-sm font-semibold text-white"
-                              >
-                                {question.label}
-                              </label>
-                              {question.type === "select" ? (
-                                <select
-                                  id={`init-${String(question.key)}`}
-                                  name={String(question.key)}
-                                  value={String(
-                                    form.initializationProfile[question.key],
-                                  )}
-                                  onChange={(event) =>
-                                    updateInitializationField(
-                                      question.key,
-                                      event.target
-                                        .value as StartupInitializationProfile[typeof question.key],
-                                    )
-                                  }
-                                  disabled={isEditingLocked}
-                                  className={fieldOkClassName}
-                                >
-                                  {question.options.map((option) => (
-                                    <option
-                                      key={option.value}
-                                      value={option.value}
-                                    >
-                                      {option.label}
-                                    </option>
-                                  ))}
-                                </select>
-                              ) : (
-                                <textarea
-                                  id={`init-${String(question.key)}`}
-                                  name={String(question.key)}
-                                  maxLength={FIELD_LIMITS[question.key as keyof typeof FIELD_LIMITS] ?? undefined}
-                                  value={String(
-                                    form.initializationProfile[question.key] ??
-                                      "",
-                                  )}
-                                  onChange={(event) =>
-                                    updateInitializationField(
-                                      question.key,
-                                      event.target
-                                        .value as StartupInitializationProfile[typeof question.key],
-                                    )
-                                  }
-                                  disabled={isEditingLocked}
-                                  className={textareaClassName}
-                                  placeholder="Add your response here…"
-                                />
-                              )}
-                              <div className="mt-1.5 flex items-center justify-between gap-2">
-                                {"minLength" in question ? (
-                                  <span className={`text-xs ${
-                                    String(form.initializationProfile[question.key] ?? "").trim().length >= (question.minLength ?? 0)
-                                      ? "text-emerald-500"
-                                      : "text-slate-500"
-                                  }`}>
-                                    Min {question.minLength} chars
-                                    {String(form.initializationProfile[question.key] ?? "").trim().length >= (question.minLength ?? 0)
-                                      ? " \u2713"
-                                      : ""}
-                                  </span>
-                                ) : <span />}
-                                {FIELD_LIMITS[question.key as keyof typeof FIELD_LIMITS] ? (
-                                  <span className="text-xs text-slate-600">
-                                    {String(form.initializationProfile[question.key] ?? "").length}
-                                    /{FIELD_LIMITS[question.key as keyof typeof FIELD_LIMITS]}
-                                  </span>
-                                ) : null}
-                              </div>
-                            </div>
-                          ))}
-                        </div>
-                      ) : null}
-                    </div>
-                  );
-                })}
-
-                <div className="flex flex-col gap-3 border-t border-cyan-500/20 bg-cyan-500/5 px-4 py-4 sm:flex-row sm:items-center sm:justify-between">
-                  <div className="flex flex-wrap gap-2">
-                    <button
-                      type="button"
-                      onClick={() => setShowPreviewModal(true)}
-                      disabled={!form.name.trim()}
-                      className="border border-slate-700 bg-slate-800 px-4 py-3 text-sm font-semibold text-slate-200 hover:bg-slate-700 disabled:opacity-50"
-                    >
-                      Preview
-                    </button>
-                    <button
-                      type="button"
-                      onClick={() => persistStartup.mutate()}
-                      disabled={persistStartup.isPending || isEditingLocked}
-                      className="bg-white px-5 py-3 text-sm font-semibold text-slate-950 transition hover:bg-slate-100 disabled:cursor-not-allowed disabled:opacity-60"
-                    >
-                      {persistStartup.isPending
-                        ? "Saving…"
-                        : isNew
-                          ? "Create Startup Draft"
-                          : "Save All Changes"}
-                    </button>
-                    {startup && !isUnderReview && !isApproved && (
-                      <button
-                        type="button"
-                        onClick={handleRequestReviewClick}
-                        disabled={isRequestReviewBusy || isRequestReviewBlocked}
-                        className="bg-cyan-600 px-5 py-3 text-sm font-semibold text-white hover:bg-cyan-500 disabled:opacity-50"
-                      >
-                        Submit for Review
-                      </button>
-                    )}
-                  </div>
-                </div>
-              </>
+              ))
             ) : (
-              <div className="border-t border-slate-800/70 pt-5">
-                <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-4">
-                  {initSectionSummaries.map((section) => (
-                    <div
-                      key={section.title}
-                      className="border-l border-slate-800/70 px-4 py-3"
-                    >
-                      <div className="text-xs uppercase tracking-[0.2em] text-slate-500">
-                        {section.title}
-                      </div>
-                      <div className="mt-2 text-sm font-semibold text-white">
-                        {section.answered}/{section.total} answered
-                      </div>
-                    </div>
-                  ))}
-                </div>
-                <div className="mt-4 space-y-3">
-                  {initPreviewAnswers.length > 0 ? (
-                    initPreviewAnswers.slice(0, 4).map((item) => (
-                      <div
-                        key={item.key}
-                        className="border-l border-slate-800/70 px-4 py-3"
-                      >
-                        <div className="text-xs font-semibold uppercase tracking-[0.18em] text-slate-500">
-                          {item.label}
-                        </div>
-                        <div className="mt-2 line-clamp-2 text-sm leading-6 text-slate-200">
-                          {formatStartupInitValue(item.key, item.value)}
-                        </div>
-                      </div>
-                    ))
-                  ) : (
-                    <div className="border border-dashed border-slate-800 px-4 py-5 text-sm text-slate-400">
-                      No initialization answers have been saved yet. Use Edit to
-                      complete the questionnaire.
-                    </div>
-                  )}
-                </div>
+              <div className="border border-slate-800 bg-slate-900/70 px-3 py-2 text-emerald-200">
+                No missing items detected in the current startup profile.
               </div>
             )}
           </div>
+        </div>
+      </section>
 
-          <fieldset disabled={isEditingLocked} className="space-y-8">
-            <div className={sectionClassName}>
-              <div className="flex flex-col gap-4 xl:flex-row xl:items-start xl:justify-between">
-                <div>
-                  <div className="text-xs uppercase tracking-[0.24em] text-cyan-300">
-                    Documents & Assets
-                  </div>
-                  <h2 className="mt-2 text-xl font-semibold text-white">
-                    Pitch deck and IPR supporting files
-                  </h2>
-                  <p className="mt-2 max-w-3xl text-sm text-slate-400">
-                    Keep uploads lean. Add the pitch deck once, then upload only
-                    the IPR files required for the current stage.
-                    {isNew
-                      ? " Your first upload will create the startup draft automatically."
-                      : ""}
-                  </p>
-                </div>
-                {!isNew ? (
-                  <div className="border border-cyan-500/20 bg-cyan-500/10 px-3 py-1.5 text-xs text-cyan-100">
-                    {requiredDocumentCategories.length} required upload{" "}
-                    {requiredDocumentCategories.length === 1 ? "slot" : "slots"}
-                  </div>
-                ) : null}
-              </div>
+      <section className="grid gap-4 border border-slate-800 bg-slate-950/40 p-5 md:grid-cols-2">
+        <label className="space-y-1.5">
+          <span className="text-xs uppercase tracking-[0.2em] text-slate-400">
+            Startup Name
+          </span>
+          <input
+            type="text"
+            required
+            disabled={!canEditSetup}
+            value={identity.name}
+            onChange={(event) =>
+              setIdentity((prev) => ({ ...prev, name: event.target.value }))
+            }
+            className={fieldCls}
+          />
+        </label>
+        <label className="space-y-1.5">
+          <span className="text-xs uppercase tracking-[0.2em] text-slate-400">
+            Sector / Category
+          </span>
+          <input
+            type="text"
+            required
+            disabled={!canEditSetup}
+            value={identity.category}
+            onChange={(event) =>
+              setIdentity((prev) => ({ ...prev, category: event.target.value }))
+            }
+            className={fieldCls}
+          />
+        </label>
+        <label className="space-y-1.5 md:col-span-2">
+          <span className="text-xs uppercase tracking-[0.2em] text-slate-400">
+            Tagline
+          </span>
+          <input
+            type="text"
+            disabled={!canEditSetup}
+            value={identity.tagline}
+            onChange={(event) =>
+              setIdentity((prev) => ({ ...prev, tagline: event.target.value }))
+            }
+            className={fieldCls}
+          />
+        </label>
+        <label className="space-y-1.5">
+          <span className="text-xs uppercase tracking-[0.2em] text-slate-400">
+            Team Size
+          </span>
+          <input
+            type="number"
+            min={1}
+            disabled={!canEditSetup}
+            value={identity.teamSize}
+            onChange={(event) =>
+              setIdentity((prev) => ({
+                ...prev,
+                teamSize: Number(event.target.value),
+              }))
+            }
+            className={fieldCls}
+          />
+        </label>
+        <label className="space-y-1.5">
+          <span className="text-xs uppercase tracking-[0.2em] text-slate-400">
+            Active Products
+          </span>
+          <input
+            type="number"
+            min={0}
+            disabled={!canEditSetup}
+            value={identity.activeProducts}
+            onChange={(event) =>
+              setIdentity((prev) => ({
+                ...prev,
+                activeProducts: Number(event.target.value),
+              }))
+            }
+            className={fieldCls}
+          />
+        </label>
+        <label className="space-y-1.5">
+          <span className="text-xs uppercase tracking-[0.2em] text-slate-400">
+            Funding Needed (INR)
+          </span>
+          <input
+            type="number"
+            min={0}
+            disabled={!canEditSetup}
+            value={identity.fundingNeeded}
+            onChange={(event) =>
+              setIdentity((prev) => ({
+                ...prev,
+                fundingNeeded: Number(event.target.value),
+              }))
+            }
+            className={fieldCls}
+          />
+        </label>
+      </section>
 
-              <div
-                className={`mt-5 grid gap-8 ${isNew ? "" : "xl:grid-cols-[minmax(0,0.85fr)_minmax(0,1.15fr)]"}`}
-              >
-                {!isNew ? (
-                  <div className="space-y-4 border-b border-slate-800/70 pb-6 xl:border-b-0 xl:border-r xl:pb-0 xl:pr-8">
-                    <div className="flex items-center justify-between gap-4">
-                      <h3 className="text-lg font-semibold text-white">
-                        Pitch Deck
-                      </h3>
-                      {startup?.pitchDeckUrl ? (
-                        <a
-                          href={startup.pitchDeckUrl}
-                          target="_blank"
-                          rel="noreferrer"
-                          className="inline-flex items-center gap-2 border border-slate-700 px-4 py-2 text-sm font-semibold text-white transition hover:border-slate-500"
-                        >
-                          <Download className="w-4 h-4" />
-                          Open PDF
-                        </a>
-                      ) : null}
-                    </div>
-                    <label className="flex cursor-pointer items-center gap-3 border border-dashed border-slate-700 px-4 py-4 text-white">
-                      <Upload className="w-5 h-5 text-cyan-300" />
-                      {isEditingLocked
-                        ? "Pitch deck changes are locked"
-                        : uploadPitch.isPending
-                          ? "Uploading pitch deck PDF…"
-                          : "Upload pitch deck PDF"}
-                      <input
-                        type="file"
-                        accept="application/pdf,.pdf"
-                        className="hidden"
-                        onChange={handlePitchDeckSelect}
-                      />
-                    </label>
-                    <div className="text-sm text-slate-400">
-                      {uploadPitch.isPending
-                        ? `Uploading: ${pendingPitchDeckName || "selected PDF"}`
-                        : startup?.pitchDeckName
-                          ? `Uploaded file: ${startup.pitchDeckName}`
-                          : "No PDF uploaded yet."}
-                    </div>
-                  </div>
-                ) : null}
-
-                <div className="space-y-6">
-                  {(isNew ? newPageDocumentSpecs : requiredDocumentSpecs)
-                    .length > 0 ? (
-                    <div>
-                      <div className="mb-3 text-xs font-semibold uppercase tracking-[0.22em] text-cyan-300">
-                        {isNew ? "Required Upload" : "Mandatory Docs Upload"}
-                      </div>
-                      <div
-                        className={
-                          isNew ? "space-y-5" : "grid gap-4 md:grid-cols-2"
-                        }
-                      >
-                        {(isNew
-                          ? newPageDocumentSpecs
-                          : requiredDocumentSpecs
-                        ).map((spec) => renderDocumentCard(spec, true))}
-                      </div>
-                    </div>
-                  ) : null}
-
-                  {!isNew && optionalDocumentSpecs.length > 0 ? (
-                    <div>
-                      <div className="mb-3 text-xs font-semibold uppercase tracking-[0.22em] text-slate-500">
-                        Optional Supporting Uploads
-                      </div>
-                      <div className="grid gap-4 md:grid-cols-2">
-                        {optionalDocumentSpecs.map((spec) =>
-                          renderDocumentCard(spec, false),
-                        )}
-                      </div>
-                    </div>
-                  ) : null}
-                </div>
-              </div>
-            </div>
-
-            {!isNew ? (
-              <div className={sectionClassName}>
-                <h2 className="mb-4 text-xl font-semibold text-white">
-                  Traction Indicators
-                </h2>
-                <div className="grid gap-3 md:grid-cols-3">
-                  {[
-                    { key: "patentFiled", label: "Patent Filed" },
-                    { key: "mvpBuilt", label: "MVP Built" },
-                    { key: "revenueGenerating", label: "Revenue Generating" },
-                  ].map((item) => (
-                    <label
-                      key={item.key}
-                      className="flex items-center gap-3 border border-slate-800 bg-slate-950/20 px-4 py-3 text-white"
-                    >
-                      <input
-                        type="checkbox"
-                        checked={
-                          form.traction[
-                            item.key as keyof StartupPayload["traction"]
-                          ] as boolean
-                        }
-                        onChange={(event) =>
-                          setForm((current) => ({
-                            ...current,
-                            traction: {
-                              ...current.traction,
-                              [item.key]: event.target.checked,
-                            },
-                          }))
-                        }
-                      />
-                      {item.label}
-                    </label>
-                  ))}
-                </div>
-
-                {form.traction.patentFiled && (
-                  <div className="mt-4 space-y-3">
-                    <label className="block text-sm font-medium text-slate-300">
-                      Patent Type
-                    </label>
-                    <div className="grid gap-3 md:grid-cols-2">
-                      <label className="flex cursor-pointer items-center gap-3 border border-slate-800 bg-slate-950/20 px-4 py-3 text-white">
-                        <input
-                          type="radio"
-                          name="patentType"
-                          checked={form.traction.patentType === 'self_filed'}
-                          onChange={() =>
-                            setForm((current) => ({
-                              ...current,
-                              traction: {
-                                ...current.traction,
-                                patentType: 'self_filed',
-                              },
-                            }))
-                          }
-                        />
-                        <div>
-                          <div className="font-medium">Self-Filed</div>
-                          <div className="text-xs text-slate-400">I will complete the patent myself</div>
-                        </div>
-                      </label>
-                      <label className="flex cursor-pointer items-center gap-3 border border-slate-800 bg-slate-950/20 px-4 py-3 text-white">
-                        <input
-                          type="radio"
-                          name="patentType"
-                          checked={form.traction.patentType === 'promove_assisted'}
-                          onChange={() =>
-                            setForm((current) => ({
-                              ...current,
-                              traction: {
-                                ...current.traction,
-                                patentType: 'promove_assisted',
-                              },
-                            }))
-                          }
-                        />
-                        <div>
-                          <div className="font-medium">ProMove Assisted</div>
-                          <div className="text-xs text-slate-400">Get help from ProMove to file patent</div>
-                        </div>
-                      </label>
-                    </div>
-                    {form.traction.patentType === 'self_filed' && (
-                      <p className="text-xs text-slate-400">
-                        You will complete the patent application yourself. ProMove will review and approve it.
-                      </p>
-                    )}
-                    {form.traction.patentType === 'promove_assisted' && (
-                      <p className="text-xs text-cyan-400">
-                        ProMove will help you file the patent through their portal. You'll receive tracking updates at each stage.
-                      </p>
-                    )}
-                  </div>
-                )}
-              </div>
-            ) : null}
-          </fieldset>
+      <section className="space-y-4 border border-slate-800 bg-slate-950/40 p-5">
+        <div className="flex items-center justify-between">
+          <h2 className="text-sm font-semibold uppercase tracking-[0.2em] text-cyan-300">
+            Category 1: Company Profile (250 Points)
+          </h2>
+          <span className="text-xs text-slate-400">
+            Upload proofs after the first save
+          </span>
         </div>
 
-        {!isNew ? (
-          <aside className="self-start xl:sticky xl:top-6">
-            <div className="space-y-8 border-l border-slate-800/70 pl-6">
-              <div className="space-y-4">
-                <div>
-                  <div className="text-xs font-semibold uppercase tracking-[0.24em] text-cyan-300">
-                    Next Actions
-                  </div>
-                  <h3 className="mt-2 font-semibold text-white">
-                    What still needs attention
-                  </h3>
-                </div>
-                <ul className="space-y-3 text-sm text-slate-300">
-                  {visibleChecklistItems.map((item) => (
-                    <li
-                      key={item}
-                      className="border-b border-slate-900 pb-3 last:border-b-0 last:pb-0"
-                    >
-                      {item}
-                    </li>
-                  ))}
-                </ul>
-                {readiness?.requiredDocumentCategories.length ? (
-                  <div className="border-l-2 border-slate-700 pl-4">
-                    <div className="flex items-center gap-2 text-xs uppercase tracking-[0.24em] text-slate-400">
-                      <FileText className="h-4 w-4" />
-                      Required Docs
-                    </div>
-                    <div className="mt-2 text-sm text-slate-300">
-                      {readiness.requiredDocumentCategories
-                        .map((item) => item.replace(/_/g, " "))
-                        .join(", ")}
-                    </div>
-                  </div>
-                ) : null}
-              </div>
+        <div className="grid gap-4 md:grid-cols-2">
+          <label className="space-y-1.5">
+            <span className="text-xs uppercase tracking-[0.2em] text-slate-400">
+              Legal Structure
+            </span>
+            <select
+              disabled={!canEditSetup}
+              value={innovationProfile.companyProfile.legalStructure}
+              onChange={(event) =>
+                setInnovationProfile((prev) => ({
+                  ...prev,
+                  companyProfile: {
+                    ...prev.companyProfile,
+                    legalStructure: event.target
+                      .value as StartupInnovationProfile["companyProfile"]["legalStructure"],
+                  },
+                }))
+              }
+              className={fieldCls}
+            >
+              {STARTUP_LEGAL_STRUCTURE_OPTIONS.map((option) => (
+                <option key={option.value} value={option.value}>
+                  {option.label}
+                </option>
+              ))}
+            </select>
+          </label>
 
-              <div className="space-y-4">
-                <div className="flex items-center justify-between gap-4">
-                  <h3 className="font-semibold text-white">
-                    Investor Deal Flow
-                  </h3>
-                  <span className="text-sm text-slate-400">
-                    {activeDeals.length} active deals
-                  </span>
-                </div>
-                {dealsQuery.isLoading ? (
-                  <div className="border border-dashed border-slate-700 px-4 py-5 text-sm text-slate-400">
-                    Loading deal flow…
+          <label className="space-y-1.5">
+            <span className="text-xs uppercase tracking-[0.2em] text-slate-400">
+              CIN Number
+            </span>
+            <input
+              type="text"
+              disabled={!canEditSetup}
+              value={innovationProfile.companyProfile.cinNumber}
+              onChange={(event) =>
+                setInnovationProfile((prev) => ({
+                  ...prev,
+                  companyProfile: {
+                    ...prev.companyProfile,
+                    cinNumber: event.target.value,
+                  },
+                }))
+              }
+              className={fieldCls}
+            />
+          </label>
+
+          <label className="space-y-1.5">
+            <span className="text-xs uppercase tracking-[0.2em] text-slate-400">
+              DPIIT Recognition Number
+            </span>
+            <input
+              type="text"
+              disabled={!canEditSetup}
+              value={innovationProfile.companyProfile.dpiitRecognitionNumber}
+              onChange={(event) =>
+                setInnovationProfile((prev) => ({
+                  ...prev,
+                  companyProfile: {
+                    ...prev.companyProfile,
+                    dpiitRecognitionNumber: event.target.value,
+                  },
+                }))
+              }
+              className={fieldCls}
+            />
+          </label>
+
+          <label className="space-y-1.5">
+            <span className="text-xs uppercase tracking-[0.2em] text-slate-400">
+              MSME / Udyam Number
+            </span>
+            <input
+              type="text"
+              disabled={!canEditSetup}
+              value={innovationProfile.companyProfile.msmeUdyamNumber}
+              onChange={(event) =>
+                setInnovationProfile((prev) => ({
+                  ...prev,
+                  companyProfile: {
+                    ...prev.companyProfile,
+                    msmeUdyamNumber: event.target.value,
+                  },
+                }))
+              }
+              className={fieldCls}
+            />
+          </label>
+
+          <label className="space-y-1.5">
+            <span className="text-xs uppercase tracking-[0.2em] text-slate-400">
+              Other Government Certification
+            </span>
+            <input
+              type="text"
+              disabled={!canEditSetup}
+              value={
+                innovationProfile.companyProfile
+                  .otherGovernmentCertificationName
+              }
+              onChange={(event) =>
+                setInnovationProfile((prev) => ({
+                  ...prev,
+                  companyProfile: {
+                    ...prev.companyProfile,
+                    otherGovernmentCertificationName: event.target.value,
+                  },
+                }))
+              }
+              className={fieldCls}
+            />
+          </label>
+
+          <label className="space-y-1.5">
+            <span className="text-xs uppercase tracking-[0.2em] text-slate-400">
+              Other Certification Number
+            </span>
+            <input
+              type="text"
+              disabled={!canEditSetup}
+              value={
+                innovationProfile.companyProfile
+                  .otherGovernmentCertificationNumber
+              }
+              onChange={(event) =>
+                setInnovationProfile((prev) => ({
+                  ...prev,
+                  companyProfile: {
+                    ...prev.companyProfile,
+                    otherGovernmentCertificationNumber: event.target.value,
+                  },
+                }))
+              }
+              className={fieldCls}
+            />
+          </label>
+        </div>
+
+        <div className="grid gap-4 md:grid-cols-3">
+          <label className="space-y-1.5">
+            <span className="text-xs uppercase tracking-[0.2em] text-slate-400">
+              Website
+            </span>
+            <input
+              type="url"
+              disabled={!canEditSetup}
+              value={innovationProfile.companyProfile.websiteUrl}
+              onChange={(event) =>
+                setInnovationProfile((prev) => ({
+                  ...prev,
+                  companyProfile: {
+                    ...prev.companyProfile,
+                    websiteUrl: event.target.value,
+                  },
+                }))
+              }
+              className={fieldCls}
+              placeholder="https://"
+            />
+          </label>
+          <label className="space-y-1.5">
+            <span className="text-xs uppercase tracking-[0.2em] text-slate-400">
+              Product Demo
+            </span>
+            <input
+              type="url"
+              disabled={!canEditSetup}
+              value={innovationProfile.companyProfile.productDemoUrl}
+              onChange={(event) =>
+                setInnovationProfile((prev) => ({
+                  ...prev,
+                  companyProfile: {
+                    ...prev.companyProfile,
+                    productDemoUrl: event.target.value,
+                  },
+                }))
+              }
+              className={fieldCls}
+              placeholder="https://"
+            />
+          </label>
+          <label className="space-y-1.5">
+            <span className="text-xs uppercase tracking-[0.2em] text-slate-400">
+              Portfolio Link
+            </span>
+            <input
+              type="url"
+              disabled={!canEditSetup}
+              value={innovationProfile.companyProfile.portfolioUrl}
+              onChange={(event) =>
+                setInnovationProfile((prev) => ({
+                  ...prev,
+                  companyProfile: {
+                    ...prev.companyProfile,
+                    portfolioUrl: event.target.value,
+                  },
+                }))
+              }
+              className={fieldCls}
+              placeholder="https://"
+            />
+          </label>
+        </div>
+
+        <div className="grid gap-4 lg:grid-cols-2">
+          <PitchUploadSlot
+            fileName={startup?.pitchDeckName}
+            fileUrl={startup?.pitchDeckUrl}
+            disabled={!canUpload}
+            isUploading={uploadingKey === "pitch" || uploadPitch.isPending}
+            onFileSelected={handlePitchSelected}
+          />
+          {STARTUP_RUBRIC_DOCUMENT_SPECS.slice(0, 5).map((spec) => (
+            <DocumentUploadSlot
+              key={spec.category}
+              label={spec.label}
+              hint={spec.hint}
+              disabled={!canUpload}
+              isUploading={
+                uploadingKey === spec.category ||
+                uploadingKey === `delete-${spec.category}`
+              }
+              document={documentsByCategory.get(spec.category)}
+              onFileSelected={(file) =>
+                handleDocumentSelected(spec.category, file)
+              }
+              onRemove={
+                documentsByCategory.get(spec.category)
+                  ? () =>
+                      deleteDocument.mutate({
+                        category: spec.category,
+                        documentId: documentsByCategory.get(spec.category)!._id,
+                      })
+                  : undefined
+              }
+            />
+          ))}
+        </div>
+      </section>
+
+      <section className="space-y-4 border border-slate-800 bg-slate-950/40 p-5">
+        <h2 className="text-sm font-semibold uppercase tracking-[0.2em] text-cyan-300">
+          Category 2: Health & Traction (750 Points)
+        </h2>
+
+        <div className="grid gap-4 md:grid-cols-2">
+          <label className="space-y-1.5">
+            <span className="text-xs uppercase tracking-[0.2em] text-slate-400">
+              Startup Stage
+            </span>
+            <select
+              disabled={!canEditSetup}
+              value={innovationProfile.tractionProfile.startupStage}
+              onChange={(event) =>
+                setInnovationProfile((prev) => ({
+                  ...prev,
+                  tractionProfile: {
+                    ...prev.tractionProfile,
+                    startupStage: event.target
+                      .value as StartupInnovationProfile["tractionProfile"]["startupStage"],
+                  },
+                }))
+              }
+              className={fieldCls}
+            >
+              {STARTUP_SCORING_STAGE_OPTIONS.map((option) => (
+                <option key={option.value} value={option.value}>
+                  {option.label} ({option.points})
+                </option>
+              ))}
+            </select>
+          </label>
+
+          <label className="space-y-1.5">
+            <span className="text-xs uppercase tracking-[0.2em] text-slate-400">
+              Funding Status
+            </span>
+            <select
+              disabled={!canEditSetup}
+              value={innovationProfile.tractionProfile.fundingStatus}
+              onChange={(event) =>
+                setInnovationProfile((prev) => ({
+                  ...prev,
+                  tractionProfile: {
+                    ...prev.tractionProfile,
+                    fundingStatus: event.target
+                      .value as StartupInnovationProfile["tractionProfile"]["fundingStatus"],
+                  },
+                }))
+              }
+              className={fieldCls}
+            >
+              {STARTUP_FUNDING_STATUS_OPTIONS.map((option) => (
+                <option key={option.value} value={option.value}>
+                  {option.label}
+                </option>
+              ))}
+            </select>
+          </label>
+
+          <LongTextField
+            label="Problem Clarity"
+            value={innovationProfile.tractionProfile.problemClarity}
+            disabled={!canEditSetup}
+            onChange={(value) =>
+              setInnovationProfile((prev) => ({
+                ...prev,
+                tractionProfile: {
+                  ...prev.tractionProfile,
+                  problemClarity: value,
+                },
+              }))
+            }
+          />
+          <LongTextField
+            label="Unique Solution"
+            value={innovationProfile.tractionProfile.uniqueSolution}
+            disabled={!canEditSetup}
+            onChange={(value) =>
+              setInnovationProfile((prev) => ({
+                ...prev,
+                tractionProfile: {
+                  ...prev.tractionProfile,
+                  uniqueSolution: value,
+                },
+              }))
+            }
+          />
+          <LongTextField
+            label="Market Differentiation"
+            value={innovationProfile.tractionProfile.marketDifferentiation}
+            disabled={!canEditSetup}
+            onChange={(value) =>
+              setInnovationProfile((prev) => ({
+                ...prev,
+                tractionProfile: {
+                  ...prev.tractionProfile,
+                  marketDifferentiation: value,
+                },
+              }))
+            }
+          />
+          <label className="space-y-1.5">
+            <span className="text-xs uppercase tracking-[0.2em] text-slate-400">
+              Patent Status
+            </span>
+            <select
+              disabled={!canEditSetup}
+              value={innovationProfile.tractionProfile.patentStatus}
+              onChange={(event) =>
+                setInnovationProfile((prev) => ({
+                  ...prev,
+                  tractionProfile: {
+                    ...prev.tractionProfile,
+                    patentStatus: event.target
+                      .value as StartupInnovationProfile["tractionProfile"]["patentStatus"],
+                  },
+                }))
+              }
+              className={fieldCls}
+            >
+              {STARTUP_PATENT_STATUS_OPTIONS.map((option) => (
+                <option key={option.value} value={option.value}>
+                  {option.label}
+                </option>
+              ))}
+            </select>
+          </label>
+        </div>
+
+        <div className="grid gap-4 md:grid-cols-3">
+          <NumberField
+            label="Active Users / Customers"
+            value={innovationProfile.tractionProfile.activeUsersCustomers}
+            disabled={!canEditSetup}
+            onChange={(value) =>
+              setInnovationProfile((prev) => ({
+                ...prev,
+                tractionProfile: {
+                  ...prev.tractionProfile,
+                  activeUsersCustomers: value,
+                },
+              }))
+            }
+          />
+          <NumberField
+            label="Monthly Growth Rate (%)"
+            value={innovationProfile.tractionProfile.monthlyGrowthRate}
+            disabled={!canEditSetup}
+            onChange={(value) =>
+              setInnovationProfile((prev) => ({
+                ...prev,
+                tractionProfile: {
+                  ...prev.tractionProfile,
+                  monthlyGrowthRate: value,
+                },
+              }))
+            }
+          />
+          <NumberField
+            label="Retention / Repeat Usage (%)"
+            value={innovationProfile.tractionProfile.retentionRate}
+            disabled={!canEditSetup}
+            onChange={(value) =>
+              setInnovationProfile((prev) => ({
+                ...prev,
+                tractionProfile: {
+                  ...prev.tractionProfile,
+                  retentionRate: value,
+                },
+              }))
+            }
+          />
+        </div>
+
+        <div className="grid gap-4 lg:grid-cols-2">
+          {STARTUP_RUBRIC_DOCUMENT_SPECS.slice(5).map((spec) => (
+            <DocumentUploadSlot
+              key={spec.category}
+              label={spec.label}
+              hint={spec.hint}
+              disabled={!canUpload}
+              isUploading={
+                uploadingKey === spec.category ||
+                uploadingKey === `delete-${spec.category}`
+              }
+              document={documentsByCategory.get(spec.category)}
+              onFileSelected={(file) =>
+                handleDocumentSelected(spec.category, file)
+              }
+              onRemove={
+                documentsByCategory.get(spec.category)
+                  ? () =>
+                      deleteDocument.mutate({
+                        category: spec.category,
+                        documentId: documentsByCategory.get(spec.category)!._id,
+                      })
+                  : undefined
+              }
+              controls={
+                spec.category === "itr_filing" ? (
+                  <ClaimToggle
+                    checked={innovationProfile.tractionProfile.hasItrFiling}
+                    disabled={!canEditSetup}
+                    label="ITR filing available"
+                    onChange={(checked) =>
+                      setInnovationProfile((prev) => ({
+                        ...prev,
+                        tractionProfile: {
+                          ...prev.tractionProfile,
+                          hasItrFiling: checked,
+                        },
+                      }))
+                    }
+                  />
+                ) : spec.category === "revenue_proof" ? (
+                  <ClaimToggle
+                    checked={innovationProfile.tractionProfile.hasRevenueProof}
+                    disabled={!canEditSetup}
+                    label="Revenue proof available"
+                    onChange={(checked) =>
+                      setInnovationProfile((prev) => ({
+                        ...prev,
+                        tractionProfile: {
+                          ...prev.tractionProfile,
+                          hasRevenueProof: checked,
+                        },
+                      }))
+                    }
+                  />
+                ) : spec.category === "grant_certificate" ? (
+                  <ClaimToggle
+                    checked={
+                      innovationProfile.tractionProfile.hasGovernmentGrant
+                    }
+                    disabled={!canEditSetup}
+                    label="Government grant received"
+                    onChange={(checked) =>
+                      setInnovationProfile((prev) => ({
+                        ...prev,
+                        tractionProfile: {
+                          ...prev.tractionProfile,
+                          hasGovernmentGrant: checked,
+                        },
+                      }))
+                    }
+                  />
+                ) : spec.category === "award_certificate" ? (
+                  <ClaimToggle
+                    checked={
+                      innovationProfile.tractionProfile.hasAwardRecognition
+                    }
+                    disabled={!canEditSetup}
+                    label="Award / recognition received"
+                    onChange={(checked) =>
+                      setInnovationProfile((prev) => ({
+                        ...prev,
+                        tractionProfile: {
+                          ...prev.tractionProfile,
+                          hasAwardRecognition: checked,
+                        },
+                      }))
+                    }
+                  />
+                ) : spec.category === "funding_proof" ? (
+                  <div className="text-xs text-slate-400">
+                    Required for Angel / Seed and VC funding claims.
                   </div>
-                ) : activeDeals.length === 0 ? (
-                  <div className="border border-dashed border-slate-700 px-4 py-5 text-sm text-slate-400">
-                    No investor deals yet.
+                ) : spec.category === "patent_proof" ? (
+                  <div className="text-xs text-slate-400">
+                    Required for patent filed or published claims.
                   </div>
-                ) : (
-                  <div className="space-y-3">
-                    {activeDeals.slice(0, 3).map((deal, index) => (
-                      <div
-                        key={deal._id}
-                        className="border-l-2 border-slate-700 pl-4"
-                      >
-                        <div className="flex items-start justify-between gap-3">
-                          <div>
-                            <div className="font-semibold text-white">
-                              {deal.currentStage < 2
-                                ? `Investor #${index + 1}`
-                                : deal.investorDisplayName}
-                            </div>
-                            <div className="text-sm text-slate-400">
-                              {deal.nextActionLabel}
-                            </div>
-                          </div>
-                          <span className="border border-blue-500/30 px-2 py-0.5 text-[11px] font-semibold uppercase tracking-[0.18em] text-blue-300">
-                            Stage {deal.currentStage}
-                          </span>
-                        </div>
-                      </div>
-                    ))}
-                  </div>
-                )}
-              </div>
-            </div>
-          </aside>
+                ) : undefined
+              }
+            />
+          ))}
+        </div>
+      </section>
+
+      <div className="flex items-center justify-end gap-3 border-t border-slate-800 pt-4">
+        <button
+          type="submit"
+          disabled={!canSubmit}
+          className="inline-flex items-center gap-2 bg-cyan-600 px-5 py-2.5 text-sm font-semibold text-white transition hover:bg-cyan-500 disabled:cursor-not-allowed disabled:opacity-60"
+        >
+          {save.isPending ? (
+            <Loader2 className="h-4 w-4 animate-spin" />
+          ) : (
+            <Save className="h-4 w-4" />
+          )}
+          {startupId ? "Save Changes" : "Create Startup"}
+        </button>
+      </div>
+    </form>
+  );
+}
+
+function LongTextField({
+  label,
+  value,
+  disabled,
+  onChange,
+}: {
+  label: string;
+  value: string;
+  disabled: boolean;
+  onChange: (value: string) => void;
+}) {
+  return (
+    <label className="space-y-1.5 md:col-span-2">
+      <span className="text-xs uppercase tracking-[0.2em] text-slate-400">
+        {label}
+      </span>
+      <textarea
+        disabled={disabled}
+        value={value}
+        onChange={(event) => onChange(event.target.value)}
+        rows={4}
+        className={`${fieldCls} min-h-28 resize-y`}
+      />
+    </label>
+  );
+}
+
+function NumberField({
+  label,
+  value,
+  disabled,
+  onChange,
+}: {
+  label: string;
+  value: number;
+  disabled: boolean;
+  onChange: (value: number) => void;
+}) {
+  return (
+    <label className="space-y-1.5">
+      <span className="text-xs uppercase tracking-[0.2em] text-slate-400">
+        {label}
+      </span>
+      <input
+        type="number"
+        min={0}
+        disabled={disabled}
+        value={value}
+        onChange={(event) => onChange(Number(event.target.value) || 0)}
+        className={fieldCls}
+      />
+    </label>
+  );
+}
+
+function ClaimToggle({
+  checked,
+  disabled,
+  label,
+  onChange,
+}: {
+  checked: boolean;
+  disabled: boolean;
+  label: string;
+  onChange: (checked: boolean) => void;
+}) {
+  return (
+    <label className="flex items-center gap-2 text-xs text-slate-300">
+      <input
+        type="checkbox"
+        checked={checked}
+        disabled={disabled}
+        onChange={(event) => onChange(event.target.checked)}
+      />
+      <span>{label}</span>
+    </label>
+  );
+}
+
+function PitchUploadSlot({
+  fileName,
+  fileUrl,
+  disabled,
+  isUploading,
+  onFileSelected,
+}: {
+  fileName?: string;
+  fileUrl?: string;
+  disabled: boolean;
+  isUploading: boolean;
+  onFileSelected: (file: File | null) => void;
+}) {
+  return (
+    <div className="border border-slate-800 bg-slate-900/60 p-4">
+      <div className="flex items-start justify-between gap-3">
+        <div>
+          <div className="text-sm font-semibold text-white">
+            Pitch Deck Upload
+          </div>
+          <div className="mt-1 text-xs text-slate-400">
+            Accepts PDF, PPT, and PPTX.{" "}
+            {formatFileSize(STARTUP_RUBRIC_PITCH_MAX_BYTES)}.
+          </div>
+        </div>
+        {fileUrl ? (
+          <a
+            href={fileUrl}
+            target="_blank"
+            rel="noreferrer"
+            className="text-xs font-medium text-cyan-300 hover:text-cyan-200"
+          >
+            View
+          </a>
         ) : null}
       </div>
-
-      <div className="flex flex-col gap-4 border-t border-slate-800/70 pt-6 sm:flex-row sm:items-center sm:justify-between">
-        <div>
-          <p className="text-sm font-semibold text-white">
-            {isNew ? "Create your startup draft" : "Save or submit your startup"}
-          </p>
-          {footerStatusMessage ? (
-            <p className="mt-1 text-sm text-slate-400">
-              {footerStatusMessage}
-            </p>
-          ) : null}
+      <div className="mt-3 flex items-center justify-between gap-3">
+        <div className="min-w-0 text-sm text-slate-300">
+          {fileName ?? "No pitch deck uploaded yet"}
         </div>
-        <div className="flex flex-wrap items-center gap-3 sm:justify-end">
-          {!isNew ? (
-            <>
-              <button
-                type="button"
-                onClick={handleRequestReviewClick}
-                disabled={isRequestReviewBlocked || isRequestReviewBusy}
-                aria-disabled={isRequestReviewBlocked || isRequestReviewBusy}
-                title={
-                  isRequestReviewBlocked
-                    ? requestReviewBlockedReason
-                    : "Save the latest profile and submit for admin review"
-                }
-                className={`border px-4 py-3 text-sm font-semibold transition disabled:cursor-wait disabled:opacity-60 ${
-                  isRequestReviewBlocked
-                    ? "cursor-help border-slate-800 bg-slate-900/70 text-slate-400"
-                    : "border-slate-700 bg-slate-900 text-white hover:border-slate-600"
-                }`}
-              >
-                {isRequestReviewBusy
-                  ? "Submitting…"
-                  : isApproved
-                    ? "Approved"
-                    : isUnderReview
-                      ? "Under Review"
-                      : "Submit for Review"}
-              </button>
-              {isEditingLocked ? (
-                <button
-                  type="button"
-                  onClick={() => navigate(startupUnlockRequestPath)}
-                  className="border border-cyan-500/30 bg-cyan-500/10 px-4 py-3 text-sm font-semibold text-cyan-100 transition hover:border-cyan-400/50 hover:bg-cyan-500/15"
-                >
-                  Request Edit Unlock
-                </button>
-              ) : null}
-              <button
-                type="button"
-                onClick={handleLaunchClick}
-                aria-disabled={!canOpenLaunchModal}
-                title={launchBlockedReason || "Launch to marketplace"}
-                className={`inline-flex items-center gap-2 border border-cyan-500/30 bg-cyan-500/10 px-5 py-3 text-sm font-semibold text-cyan-50 ${
-                  canOpenLaunchModal
-                    ? "hover:border-cyan-400/50 hover:bg-cyan-500/15"
-                    : "cursor-help opacity-50"
-                }`}
-              >
-                <Rocket className="h-4 w-4" />
-                Launch
-              </button>
-            </>
+        <label className="inline-flex cursor-pointer items-center gap-2 border border-slate-700 bg-slate-950 px-3 py-2 text-xs font-semibold text-slate-200 disabled:cursor-not-allowed disabled:opacity-60">
+          {isUploading ? (
+            <Loader2 className="h-3.5 w-3.5 animate-spin" />
           ) : null}
-          <button
-            type="button"
-            onClick={() => persistStartup.mutate()}
-            disabled={persistStartup.isPending || isEditingLocked}
-            className="bg-white px-5 py-3 text-sm font-semibold text-slate-950 transition hover:bg-slate-100 disabled:cursor-not-allowed disabled:opacity-60"
-          >
-            {persistStartup.isPending
-              ? "Saving…"
-              : isNew
-                ? "Create Startup Draft"
-                : isEditingLocked
-                  ? "Profile Locked"
-                  : reviewStatus === "draft"
-                    ? "Save Draft"
-                    : "Save Profile"}
-          </button>
-        </div>
+          {fileName ? "Replace" : "Upload"}
+          <input
+            type="file"
+            accept={STARTUP_RUBRIC_PITCH_ACCEPT}
+            disabled={disabled || isUploading}
+            className="hidden"
+            onChange={(event) => {
+              onFileSelected(event.target.files?.[0] ?? null);
+              event.currentTarget.value = "";
+            }}
+          />
+        </label>
       </div>
-
-      {blocker.state === "blocked" ? (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-950/80 p-6 backdrop-blur-sm">
-          <div className="w-full max-w-md border border-slate-800 bg-slate-900 p-6">
-            <h2 className="text-lg font-bold text-white">
-              You have unsaved changes
-            </h2>
-            <p className="mt-2 text-sm text-slate-300">
-              If you leave this page, your changes will be lost. Do you want to
-              save before leaving?
-            </p>
-            <div className="mt-5 flex justify-end gap-3">
-              <button
-                type="button"
-                onClick={() => blocker.reset?.()}
-                className="border border-slate-700 px-4 py-2.5 text-sm font-semibold text-white transition hover:border-slate-500"
-              >
-                Stay on page
-              </button>
-              <button
-                type="button"
-                onClick={() => blocker.proceed?.()}
-                className="border border-red-500/30 bg-red-500/10 px-4 py-2.5 text-sm font-semibold text-red-200 transition hover:bg-red-500/20"
-              >
-                Discard & leave
-              </button>
-            </div>
-          </div>
-        </div>
-      ) : null}
-
-      {showPreviewModal ? (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-950/80 p-6 backdrop-blur-sm">
-          <div className="w-full max-w-2xl max-h-[80vh] overflow-y-auto border border-slate-800 bg-slate-900 p-6">
-            <div className="mb-6 flex items-center justify-between">
-              <h2 className="text-2xl font-bold text-white">
-                Startup Preview
-              </h2>
-              <button
-                type="button"
-                aria-label="Close preview"
-                onClick={() => setShowPreviewModal(false)}
-                className="text-slate-400 hover:text-white"
-              >
-                <X className="w-5 h-5" />
-              </button>
-            </div>
-            <div className="space-y-4">
-              <div>
-                <div className="text-xs uppercase tracking-wider text-slate-500">Startup Name</div>
-                <div className="text-lg font-semibold text-white">{form.name || "(Not set)"}</div>
-              </div>
-              <div>
-                <div className="text-xs uppercase tracking-wider text-slate-500">Tagline</div>
-                <div className="text-white">{form.tagline || "(Not set)"}</div>
-              </div>
-              <div>
-                <div className="text-xs uppercase tracking-wider text-slate-500">Category</div>
-                <div className="text-white">{form.category || "(Not set)"}</div>
-              </div>
-              <div>
-                <div className="text-xs uppercase tracking-wider text-slate-500">Stage</div>
-                <div className="text-white">{form.stage}</div>
-              </div>
-              <div className="grid grid-cols-2 gap-4">
-                <div>
-                  <div className="text-xs uppercase tracking-wider text-slate-500">Team Size</div>
-                  <div className="text-white">{form.teamSize}</div>
-                </div>
-                <div>
-                  <div className="text-xs uppercase tracking-wider text-slate-500">Funding Needed</div>
-                  <div className="text-white">{form.fundingNeeded ? `₹${form.fundingNeeded.toLocaleString()}` : "Not set"}</div>
-                </div>
-              </div>
-              <div>
-                <div className="text-xs uppercase tracking-wider text-slate-500">Initialization Progress</div>
-                <div className="mt-2 grid grid-cols-2 gap-2">
-                  {initSectionSummaries.map((section) => (
-                    <div key={section.title} className="bg-slate-800 px-3 py-2">
-                      <div className="text-xs text-slate-400">{section.title}</div>
-                      <div className="text-sm text-white">{section.answered}/{section.total}</div>
-                    </div>
-                  ))}
-                </div>
-              </div>
-              <div>
-                <div className="text-xs uppercase tracking-wider text-slate-500">IPR Progress</div>
-                <div className="mt-2 grid grid-cols-2 gap-2">
-                  {iprSectionSummaries.map((section) => (
-                    <div key={section.title} className="bg-slate-800 px-3 py-2">
-                      <div className="text-xs text-slate-400">{section.title}</div>
-                      <div className="text-sm text-white">{section.answered}/{section.total}</div>
-                    </div>
-                  ))}
-                </div>
-              </div>
-            </div>
-            <div className="mt-6 flex justify-end">
-              <button
-                type="button"
-                onClick={() => setShowPreviewModal(false)}
-                className="bg-white px-4 py-2 text-sm font-semibold text-slate-950"
-              >
-                Close
-              </button>
-            </div>
-          </div>
-        </div>
-      ) : null}
-
-      {showLaunchModal ? (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-950/80 p-6 backdrop-blur-sm">
-          <div className="w-full max-w-xl border border-slate-800 bg-slate-900 p-6">
-            <div className="mb-6 flex items-center justify-between">
-              <h2 className="text-2xl font-bold text-white">
-                Launch Your Startup To:
-              </h2>
-              <button
-                type="button"
-                aria-label="Close launch modal"
-                onClick={() => setShowLaunchModal(false)}
-                className="text-slate-400 hover:text-white"
-              >
-                <X className="w-5 h-5" />
-              </button>
-            </div>
-            <div className="mb-5 border border-cyan-500/20 bg-cyan-500/10 px-4 py-3 text-sm text-cyan-100">
-              Approved student-created startups can be launched to investors,
-              mentors, or both. Use the dedicated workspace tab when this
-              startup needs its own linked product workspace.
-            </div>
-            <div className="space-y-3 mb-6">
-              {[
-                ["investors", "Launch to Investors"],
-                ["mentors", "Launch to Mentors"],
-                ["both", "Launch to Both (Recommended)"],
-              ].map(([value, label]) => (
-                <button
-                  key={value}
-                  type="button"
-                  onClick={() =>
-                    setLaunchTarget(value as "investors" | "mentors" | "both")
-                  }
-                  className={`w-full border px-5 py-4 text-left text-white transition ${
-                    launchTarget === value
-                      ? "border border-blue-500/50 bg-blue-500/10"
-                      : "border border-slate-800 bg-slate-950 hover:border-blue-500/40"
-                  }`}
-                >
-                  {label}
-                </button>
-              ))}
-            </div>
-            <div className="flex justify-end gap-3">
-              <button
-                type="button"
-                onClick={() => setShowLaunchModal(false)}
-                className="border border-slate-700 px-5 py-3 font-semibold text-white"
-              >
-                Cancel
-              </button>
-              <button
-                type="button"
-                onClick={() => launchStartup.mutate(launchTarget)}
-                disabled={launchStartup.isPending}
-                className="border border-cyan-500/30 bg-cyan-500/10 px-5 py-3 font-semibold text-white disabled:opacity-60"
-              >
-                {launchStartup.isPending ? "Launching…" : "Launch Now"}
-              </button>
-            </div>
-          </div>
-        </div>
-      ) : null}
     </div>
   );
 }
+
+function DocumentUploadSlot({
+  label,
+  hint,
+  document,
+  disabled,
+  isUploading,
+  onFileSelected,
+  onRemove,
+  controls,
+}: {
+  label: string;
+  hint: string;
+  document?: Startup["documents"][number];
+  disabled: boolean;
+  isUploading: boolean;
+  onFileSelected: (file: File | null) => void;
+  onRemove?: () => void;
+  controls?: React.ReactNode;
+}) {
+  return (
+    <div className="border border-slate-800 bg-slate-900/60 p-4">
+      <div className="flex items-start justify-between gap-3">
+        <div>
+          <div className="text-sm font-semibold text-white">{label}</div>
+          <div className="mt-1 text-xs text-slate-400">{hint}</div>
+        </div>
+        {document?.fileUrl ? (
+          <a
+            href={document.fileUrl}
+            target="_blank"
+            rel="noreferrer"
+            className="text-xs font-medium text-cyan-300 hover:text-cyan-200"
+          >
+            View
+          </a>
+        ) : null}
+      </div>
+      {controls ? <div className="mt-3">{controls}</div> : null}
+      <div className="mt-3 flex items-center justify-between gap-3">
+        <div className="min-w-0 text-sm text-slate-300">
+          {document?.fileName ?? "No proof uploaded yet"}
+        </div>
+        <div className="flex items-center gap-2">
+          {document && onRemove ? (
+            <button
+              type="button"
+              disabled={disabled || isUploading}
+              onClick={onRemove}
+              className="border border-slate-700 bg-slate-950 px-3 py-2 text-xs font-semibold text-slate-200 disabled:cursor-not-allowed disabled:opacity-60"
+            >
+              Remove
+            </button>
+          ) : null}
+          <label className="inline-flex cursor-pointer items-center gap-2 border border-slate-700 bg-slate-950 px-3 py-2 text-xs font-semibold text-slate-200 disabled:cursor-not-allowed disabled:opacity-60">
+            {isUploading ? (
+              <Loader2 className="h-3.5 w-3.5 animate-spin" />
+            ) : null}
+            {document ? "Replace" : "Upload"}
+            <input
+              type="file"
+              accept=".pdf,image/*"
+              disabled={disabled || isUploading}
+              className="hidden"
+              onChange={(event) => {
+                onFileSelected(event.target.files?.[0] ?? null);
+                event.currentTarget.value = "";
+              }}
+            />
+          </label>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+function StartupDashboard({
+  startup,
+  onEdit,
+  canEdit,
+}: {
+  startup: Startup;
+  onEdit: () => void;
+  canEdit: boolean;
+}) {
+  const reviewBadge = REVIEW_BADGE[startup.reviewStatus] ?? REVIEW_BADGE.draft;
+
+  const capTableQuery = useQuery({
+    queryKey: ["startup", startup._id, "cap-table"],
+    queryFn: () => dealApi.getCapTable(startup._id),
+    retry: false,
+  });
+
+  const workspaceQuery = useQuery({
+    queryKey: ["workspace", startup.projectId],
+    queryFn: () => workspaceApi.getById(startup.projectId!),
+    enabled: Boolean(startup.projectId),
+  });
+
+  const pitchRequests = startup.pitchRequests ?? [];
+  const pendingRequests = pitchRequests.filter(
+    (req) => req.status === "pending",
+  ).length;
+  const acceptedRequests = pitchRequests.filter(
+    (req) => req.status === "accepted",
+  ).length;
+
+  const activityData = useMemo(() => {
+    const buckets = new Map<string, { new: number; cumulative: number }>();
+    const today = new Date();
+    const start = weekStart(today);
+    start.setDate(start.getDate() - 7 * 7);
+    for (let i = 0; i < 8; i++) {
+      const d = new Date(start);
+      d.setDate(d.getDate() + i * 7);
+      const key = d.toISOString().slice(0, 10);
+      buckets.set(key, { new: 0, cumulative: 0 });
+    }
+    pitchRequests.forEach((req) => {
+      const bucketKey = weekStart(new Date(req.requestedAt))
+        .toISOString()
+        .slice(0, 10);
+      const bucket = buckets.get(bucketKey);
+      if (bucket) bucket.new += 1;
+    });
+    let running = 0;
+    return Array.from(buckets.entries()).map(([key, value]) => {
+      running += value.new;
+      return {
+        week: new Date(key).toLocaleDateString("en-IN", {
+          day: "numeric",
+          month: "short",
+        }),
+        new: value.new,
+        cumulative: running,
+      };
+    });
+  }, [pitchRequests]);
+
+  const totalRequestsInWindow = activityData.reduce(
+    (sum, bucket) => sum + bucket.new,
+    0,
+  );
+
+  const equityData = useMemo(() => {
+    const cap = capTableQuery.data;
+    if (!cap)
+      return [] as Array<{ name: string; shares: number; color: string }>;
+    const founder = cap.founderRetained?.sharesAllocated ?? 0;
+    const sole = cap.soleInvestor?.sharesAllocated ?? 0;
+    const penny = cap.pennyInvestors.reduce(
+      (sum, row) => sum + (row.sharesAllocated ?? 0),
+      0,
+    );
+    const available = cap.availableShares ?? 0;
+    return [
+      { name: "Founder", shares: founder, color: "#22d3ee" },
+      { name: "Sole Investor", shares: sole, color: "#a855f7" },
+      { name: "Penny Pool", shares: penny, color: "#f59e0b" },
+      { name: "Available", shares: available, color: "#475569" },
+    ].filter((entry) => entry.shares > 0);
+  }, [capTableQuery.data]);
+
+  const totalEquityShares =
+    capTableQuery.data?.totalShares ??
+    equityData.reduce((sum, row) => sum + row.shares, 0);
+
+  const workspace = workspaceQuery.data;
+  const completedMilestones =
+    workspace?.milestones.filter((m) => m.isCompleted).length ?? 0;
+  const totalMilestones = workspace?.milestones.length ?? 0;
+  const completedTasks =
+    workspace?.tasks.filter((task) => task.done).length ?? 0;
+  const totalTasks = workspace?.tasks.length ?? 0;
+
+  const tractionItems = [
+    { label: "MVP built", done: startup.traction?.mvpBuilt },
+    { label: "Patent filed", done: startup.traction?.patentFiled },
+    { label: "Revenue generating", done: startup.traction?.revenueGenerating },
+  ];
+
+  const launchItems = [
+    { label: "Investors", live: startup.launchedToInvestors },
+    { label: "Mentors", live: startup.launchedToMentors },
+    { label: "Recruiters", live: Boolean(startup.launchedToRecruiters) },
+  ];
+  const trustSummary = useMemo(
+    () => buildStartupTrustSummary(startup),
+    [startup],
+  );
+
+  return (
+    <div className="space-y-6">
+      <section className="flex flex-col gap-4 border border-slate-800 bg-slate-950/40 p-5 md:flex-row md:items-center md:justify-between">
+        <div className="flex items-start gap-4">
+          <div className="flex h-14 w-14 items-center justify-center bg-gradient-to-br from-cyan-500 to-purple-500 text-xl font-bold text-white">
+            {startup.name?.slice(0, 1).toUpperCase() ?? (
+              <Rocket className="h-6 w-6" />
+            )}
+          </div>
+          <div className="min-w-0 space-y-2">
+            <h1 className="truncate text-2xl font-semibold text-white">
+              {startup.name}
+            </h1>
+            {startup.tagline ? (
+              <p className="text-sm text-slate-400">{startup.tagline}</p>
+            ) : null}
+            <div className="flex flex-wrap items-center gap-2 text-xs">
+              {startup.category ? (
+                <span className="border border-slate-700 bg-slate-900 px-2.5 py-1 text-slate-300">
+                  {startup.category}
+                </span>
+              ) : null}
+              <span className="border border-slate-700 bg-slate-900 px-2.5 py-1 text-slate-300">
+                {startup.stage}
+              </span>
+              <span
+                className={`inline-flex items-center gap-1.5 border px-2.5 py-1 font-semibold ${reviewBadge.className}`}
+              >
+                <CircleDot className="h-3 w-3" />
+                {reviewBadge.label}
+              </span>
+            </div>
+          </div>
+        </div>
+        <button
+          type="button"
+          onClick={onEdit}
+          disabled={!canEdit}
+          className="inline-flex items-center gap-2 border border-slate-700 bg-slate-900 px-4 py-2 text-sm font-semibold text-slate-200 transition hover:border-cyan-500/60 hover:text-cyan-200 disabled:cursor-not-allowed disabled:opacity-60"
+        >
+          <Edit3 className="h-4 w-4" />
+          Edit Setup
+        </button>
+      </section>
+
+      <section className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
+        <KpiCard
+          icon={<Users className="h-4 w-4" />}
+          label="Team Size"
+          value={String(startup.teamSize ?? 0)}
+        />
+        <KpiCard
+          icon={<Package className="h-4 w-4" />}
+          label="Active Products"
+          value={String(startup.activeProducts ?? 0)}
+        />
+        <KpiCard
+          icon={<Banknote className="h-4 w-4" />}
+          label="Funding Needed"
+          value={formatINR(startup.fundingNeeded)}
+        />
+        <KpiCard
+          icon={<Sparkles className="h-4 w-4" />}
+          label="Innovation Score"
+          value={String(
+            startup.innovationScoreAtLaunch ||
+              startup.innovationScorePreview?.total ||
+              0,
+          )}
+        />
+      </section>
+
+      <section className="grid gap-4 lg:grid-cols-[2fr_1fr]">
+        <div className="border border-slate-800 bg-slate-950/40 p-5">
+          <div className="flex items-center justify-between">
+            <div className="flex items-center gap-2 text-sm font-semibold text-white">
+              <TrendingUp className="h-4 w-4 text-cyan-300" />
+              Investor Interest (last 8 weeks)
+            </div>
+            <div className="text-xs text-slate-400">
+              {totalRequestsInWindow} pitch requests
+            </div>
+          </div>
+          <div className="mt-4 h-64 w-full">
+            <ResponsiveContainer width="100%" height="100%">
+              <AreaChart
+                data={activityData}
+                margin={{ top: 10, right: 16, left: 0, bottom: 0 }}
+              >
+                <defs>
+                  <linearGradient
+                    id="colorCumulative"
+                    x1="0"
+                    y1="0"
+                    x2="0"
+                    y2="1"
+                  >
+                    <stop offset="0%" stopColor="#22d3ee" stopOpacity={0.45} />
+                    <stop offset="100%" stopColor="#22d3ee" stopOpacity={0} />
+                  </linearGradient>
+                </defs>
+                <CartesianGrid strokeDasharray="3 3" stroke="#1e293b" />
+                <XAxis
+                  dataKey="week"
+                  stroke="#64748b"
+                  tick={{ fontSize: 11, fill: "#94a3b8" }}
+                />
+                <YAxis
+                  stroke="#64748b"
+                  tick={{ fontSize: 11, fill: "#94a3b8" }}
+                  allowDecimals={false}
+                />
+                <Tooltip
+                  contentStyle={{
+                    backgroundColor: "#0f172a",
+                    border: "1px solid #334155",
+                    color: "#e2e8f0",
+                    fontSize: 12,
+                  }}
+                  labelStyle={{ color: "#94a3b8" }}
+                />
+                <Legend
+                  wrapperStyle={{ fontSize: 12, color: "#94a3b8" }}
+                  iconType="circle"
+                />
+                <Area
+                  type="monotone"
+                  dataKey="cumulative"
+                  name="Cumulative"
+                  stroke="#22d3ee"
+                  strokeWidth={2}
+                  fill="url(#colorCumulative)"
+                />
+                <Line
+                  type="monotone"
+                  dataKey="new"
+                  name="New / week"
+                  stroke="#a855f7"
+                  strokeWidth={2}
+                  dot={{ r: 3 }}
+                />
+              </AreaChart>
+            </ResponsiveContainer>
+          </div>
+          <div className="mt-3 grid grid-cols-3 gap-3 text-center text-xs text-slate-400">
+            <div className="border border-slate-800 bg-slate-900/50 py-2">
+              <div className="text-lg font-semibold text-white">
+                {pitchRequests.length}
+              </div>
+              <div>Total requests</div>
+            </div>
+            <div className="border border-slate-800 bg-slate-900/50 py-2">
+              <div className="text-lg font-semibold text-amber-300">
+                {pendingRequests}
+              </div>
+              <div>Pending</div>
+            </div>
+            <div className="border border-slate-800 bg-slate-900/50 py-2">
+              <div className="text-lg font-semibold text-emerald-300">
+                {acceptedRequests}
+              </div>
+              <div>Accepted</div>
+            </div>
+          </div>
+        </div>
+
+        <div className="border border-slate-800 bg-slate-950/40 p-5">
+          <div className="flex items-center gap-2 text-sm font-semibold text-white">
+            <PieIcon className="h-4 w-4 text-cyan-300" />
+            Equity Distribution
+          </div>
+          {capTableQuery.isLoading ? (
+            <div className="flex h-48 items-center justify-center">
+              <Spinner />
+            </div>
+          ) : equityData.length === 0 ? (
+            <div className="flex h-48 flex-col items-center justify-center text-center text-sm text-slate-500">
+              <Award className="mb-2 h-6 w-6 opacity-50" />
+              No cap table allocated yet.
+            </div>
+          ) : (
+            <>
+              <div className="mt-3 h-44">
+                <ResponsiveContainer width="100%" height="100%">
+                  <BarChart
+                    data={equityData}
+                    layout="vertical"
+                    margin={{ left: 0, right: 10, top: 5, bottom: 5 }}
+                  >
+                    <XAxis type="number" hide />
+                    <YAxis
+                      dataKey="name"
+                      type="category"
+                      width={90}
+                      stroke="#64748b"
+                      tick={{ fontSize: 11, fill: "#94a3b8" }}
+                    />
+                    <Tooltip
+                      contentStyle={{
+                        backgroundColor: "#0f172a",
+                        border: "1px solid #334155",
+                        color: "#e2e8f0",
+                        fontSize: 12,
+                      }}
+                      formatter={(value) =>
+                        `${Number(value).toLocaleString()} shares`
+                      }
+                    />
+                    <Bar dataKey="shares" radius={[0, 4, 4, 0]}>
+                      {equityData.map((entry) => (
+                        <Cell key={entry.name} fill={entry.color} />
+                      ))}
+                    </Bar>
+                  </BarChart>
+                </ResponsiveContainer>
+              </div>
+              <div className="mt-3 space-y-1 text-xs text-slate-400">
+                <div className="flex items-center justify-between">
+                  <span>Total shares</span>
+                  <span className="text-slate-200">
+                    {totalEquityShares.toLocaleString()}
+                  </span>
+                </div>
+                <div className="flex items-center justify-between">
+                  <span>Investor equity</span>
+                  <span className="text-slate-200">
+                    {(capTableQuery.data?.totalInvestorEquity ?? 0).toFixed(2)}%
+                  </span>
+                </div>
+                <div className="flex items-center justify-between">
+                  <span>Founder equity</span>
+                  <span className="text-slate-200">
+                    {(
+                      capTableQuery.data?.founderRetained?.equityPercent ?? 0
+                    ).toFixed(2)}
+                    %
+                  </span>
+                </div>
+              </div>
+            </>
+          )}
+        </div>
+      </section>
+
+      <section className="grid gap-4 lg:grid-cols-3">
+        <div className="border border-slate-800 bg-slate-950/40 p-5">
+          <div className="flex items-center gap-2 text-sm font-semibold text-white">
+            <Flag className="h-4 w-4 text-cyan-300" />
+            Traction
+          </div>
+          <ul className="mt-4 space-y-2">
+            {tractionItems.map((item) => (
+              <li
+                key={item.label}
+                className="flex items-center justify-between border border-slate-800 bg-slate-900/60 px-3 py-2 text-sm text-slate-300"
+              >
+                <span>{item.label}</span>
+                <CheckCircle2
+                  className={`h-4 w-4 ${item.done ? "text-emerald-400" : "text-slate-600"}`}
+                />
+              </li>
+            ))}
+            {startup.traction?.usersCount ? (
+              <li className="flex items-center justify-between border border-slate-800 bg-slate-900/60 px-3 py-2 text-sm text-slate-300">
+                <span>Users</span>
+                <span className="text-white">
+                  {startup.traction.usersCount.toLocaleString()}
+                </span>
+              </li>
+            ) : null}
+          </ul>
+        </div>
+
+        <div className="border border-slate-800 bg-slate-950/40 p-5">
+          <div className="flex items-center gap-2 text-sm font-semibold text-white">
+            <Rocket className="h-4 w-4 text-cyan-300" />
+            Launch Visibility
+          </div>
+          <ul className="mt-4 space-y-2">
+            {launchItems.map((item) => (
+              <li
+                key={item.label}
+                className="flex items-center justify-between border border-slate-800 bg-slate-900/60 px-3 py-2 text-sm text-slate-300"
+              >
+                <span>{item.label}</span>
+                <span
+                  className={`border px-2 py-0.5 text-[11px] font-semibold ${item.live ? "border-emerald-500/30 bg-emerald-500/10 text-emerald-200" : "border-slate-700 bg-slate-900 text-slate-400"}`}
+                >
+                  {item.live ? "Live" : "Not live"}
+                </span>
+              </li>
+            ))}
+            <li className="flex items-center justify-between border border-slate-800 bg-slate-900/60 px-3 py-2 text-sm text-slate-300">
+              <span>Launched at</span>
+              <span className="text-white">
+                {formatDate(startup.launchedAt)}
+              </span>
+            </li>
+          </ul>
+        </div>
+
+        <div className="border border-slate-800 bg-slate-950/40 p-5">
+          <div className="flex items-center gap-2 text-sm font-semibold text-white">
+            <FolderKanban className="h-4 w-4 text-cyan-300" />
+            Workspace Progress
+          </div>
+          {workspaceQuery.isLoading ? (
+            <div className="flex h-32 items-center justify-center">
+              <Spinner />
+            </div>
+          ) : !workspace ? (
+            <div className="mt-4 text-sm text-slate-500">
+              No workspace linked yet.
+            </div>
+          ) : (
+            <div className="mt-4 space-y-3 text-sm text-slate-300">
+              <div>
+                <div className="mb-1 flex items-center justify-between text-xs text-slate-400">
+                  <span>Overall</span>
+                  <span className="text-white">
+                    {workspace.progressPercent}%
+                  </span>
+                </div>
+                <div className="h-2 w-full overflow-hidden bg-slate-800">
+                  <div
+                    className="h-full bg-gradient-to-r from-cyan-500 to-purple-500"
+                    style={{ width: `${workspace.progressPercent}%` }}
+                  />
+                </div>
+              </div>
+              <div className="grid grid-cols-2 gap-3 text-xs">
+                <div className="border border-slate-800 bg-slate-900/60 p-2 text-center">
+                  <div className="text-lg font-semibold text-white">
+                    {completedMilestones}/{totalMilestones}
+                  </div>
+                  <div className="text-slate-400">Milestones</div>
+                </div>
+                <div className="border border-slate-800 bg-slate-900/60 p-2 text-center">
+                  <div className="text-lg font-semibold text-white">
+                    {completedTasks}/{totalTasks}
+                  </div>
+                  <div className="text-slate-400">Tasks</div>
+                </div>
+              </div>
+              <div className="text-xs text-slate-400">
+                Stage: <span className="text-slate-200">{workspace.stage}</span>
+              </div>
+            </div>
+          )}
+        </div>
+      </section>
+
+      <section className="grid gap-4 lg:grid-cols-[2fr_1fr]">
+        <div className="border border-slate-800 bg-slate-950/40 p-5">
+          <div className="flex items-center justify-between gap-3">
+            <div className="flex items-center gap-2 text-sm font-semibold text-white">
+              <Sparkles className="h-4 w-4 text-cyan-300" />
+              Trust Signals
+            </div>
+            <div className="text-xs text-slate-400">
+              {trustSummary.proofCount} proof
+              {trustSummary.proofCount === 1 ? "" : "s"} attached
+            </div>
+          </div>
+
+          {trustSummary.signals.length ? (
+            <div className="mt-4 flex flex-wrap gap-2">
+              {trustSummary.signals.map((signal) => (
+                <span
+                  key={signal}
+                  className="rounded-full border border-emerald-500/25 bg-emerald-500/10 px-3 py-1.5 text-xs font-semibold text-emerald-200"
+                >
+                  {signal}
+                </span>
+              ))}
+            </div>
+          ) : (
+            <div className="mt-4 text-sm text-slate-500">
+              Add registration details, public links, and proof uploads to build
+              marketplace trust.
+            </div>
+          )}
+
+          <div className="mt-5 grid gap-2 sm:grid-cols-2">
+            {trustSummary.proofRows.map((row) => (
+              <div
+                key={row.label}
+                className="flex items-center justify-between border border-slate-800 bg-slate-900/60 px-3 py-2 text-sm text-slate-300"
+              >
+                <span>{row.label}</span>
+                <CheckCircle2
+                  className={`h-4 w-4 ${row.done ? "text-emerald-400" : "text-slate-600"}`}
+                />
+              </div>
+            ))}
+          </div>
+        </div>
+
+        <div className="border border-slate-800 bg-slate-950/40 p-5">
+          <div className="flex items-center gap-2 text-sm font-semibold text-white">
+            <Award className="h-4 w-4 text-cyan-300" />
+            Credibility Snapshot
+          </div>
+
+          <div className="mt-4 space-y-2">
+            {trustSummary.credentialRows.map((row) => (
+              <div
+                key={row.label}
+                className="flex items-center justify-between border border-slate-800 bg-slate-900/60 px-3 py-2 text-sm text-slate-300"
+              >
+                <span>{row.label}</span>
+                <span className={row.done ? "text-white" : "text-slate-500"}>
+                  {row.value}
+                </span>
+              </div>
+            ))}
+          </div>
+
+          <div className="mt-4 border border-slate-800 bg-slate-900/60 p-3">
+            <div className="text-xs uppercase tracking-[0.18em] text-slate-500">
+              Public presence
+            </div>
+            {trustSummary.links.length ? (
+              <div className="mt-3 flex flex-wrap gap-2">
+                {trustSummary.links.map((link) => (
+                  <a
+                    key={link.label}
+                    href={link.url}
+                    target="_blank"
+                    rel="noreferrer"
+                    className="inline-flex items-center gap-2 border border-cyan-500/25 bg-cyan-500/10 px-3 py-1.5 text-xs font-semibold text-cyan-200 transition hover:border-cyan-400/40 hover:text-cyan-100"
+                  >
+                    {link.label}
+                  </a>
+                ))}
+              </div>
+            ) : (
+              <div className="mt-3 text-sm text-slate-500">
+                No public links added yet.
+              </div>
+            )}
+          </div>
+        </div>
+      </section>
+
+      <section className="grid gap-4 lg:grid-cols-[2fr_1fr]">
+        <div className="border border-slate-800 bg-slate-950/40 p-5">
+          <div className="flex items-center gap-2 text-sm font-semibold text-white">
+            <Boxes className="h-4 w-4 text-cyan-300" />
+            Recent Pitch Requests
+          </div>
+          {pitchRequests.length === 0 ? (
+            <div className="mt-4 text-sm text-slate-500">
+              No pitch requests yet.
+            </div>
+          ) : (
+            <ul className="mt-3 divide-y divide-slate-800">
+              {pitchRequests.slice(0, 5).map((request) => (
+                <li
+                  key={request._id}
+                  className="flex items-center justify-between py-3 text-sm"
+                >
+                  <div className="min-w-0">
+                    <div className="truncate text-white">
+                      {request.startupName || "Pitch"}
+                    </div>
+                    <div className="text-xs text-slate-500">
+                      {formatDate(request.requestedAt)}
+                    </div>
+                  </div>
+                  <span
+                    className={`border px-2 py-0.5 text-[11px] font-semibold uppercase ${
+                      request.status === "accepted"
+                        ? "border-emerald-500/30 bg-emerald-500/10 text-emerald-200"
+                        : request.status === "rejected"
+                          ? "border-rose-500/30 bg-rose-500/10 text-rose-200"
+                          : request.status === "withdrawn"
+                            ? "border-slate-700 bg-slate-900 text-slate-400"
+                            : "border-amber-500/30 bg-amber-500/10 text-amber-200"
+                    }`}
+                  >
+                    {request.status}
+                  </span>
+                </li>
+              ))}
+            </ul>
+          )}
+        </div>
+
+        <div className="border border-slate-800 bg-slate-950/40 p-5">
+          <div className="flex items-center gap-2 text-sm font-semibold text-white">
+            <FileText className="h-4 w-4 text-cyan-300" />
+            Documents
+          </div>
+          <div className="mt-4 text-sm text-slate-300">
+            <div className="flex items-center justify-between border border-slate-800 bg-slate-900/60 px-3 py-2">
+              <span>Pitch deck</span>
+              {startup.pitchDeckUrl ? (
+                <a
+                  href={startup.pitchDeckUrl}
+                  target="_blank"
+                  rel="noreferrer"
+                  className="text-xs font-medium text-cyan-300 hover:text-cyan-200"
+                >
+                  View
+                </a>
+              ) : (
+                <span className="text-xs text-slate-500">Not uploaded</span>
+              )}
+            </div>
+            <div className="mt-2 flex items-center justify-between border border-slate-800 bg-slate-900/60 px-3 py-2">
+              <span>Uploaded files</span>
+              <span className="text-white">
+                {(startup.documents ?? []).length}
+              </span>
+            </div>
+            <div className="mt-2 flex items-center justify-between border border-slate-800 bg-slate-900/60 px-3 py-2">
+              <span>Readiness</span>
+              <span
+                className={
+                  startup.readiness?.isReviewReady
+                    ? "text-emerald-300"
+                    : "text-amber-300"
+                }
+              >
+                {startup.readiness?.isReviewReady ? "Ready" : "Incomplete"}
+              </span>
+            </div>
+          </div>
+        </div>
+      </section>
+    </div>
+  );
+}
+
+function KpiCard({
+  icon,
+  label,
+  value,
+}: {
+  icon: React.ReactNode;
+  label: string;
+  value: string;
+}) {
+  return (
+    <div className="border border-slate-800 bg-slate-950/40 p-4">
+      <div className="flex items-center gap-2 text-xs uppercase tracking-[0.2em] text-slate-400">
+        <span className="text-cyan-300">{icon}</span>
+        {label}
+      </div>
+      <div className="mt-2 text-2xl font-semibold text-white">{value}</div>
+    </div>
+  );
+}
+
+export default StartupLaunch;

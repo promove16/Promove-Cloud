@@ -30,6 +30,7 @@ import type {
   PatentDocReviewStatus,
   PatentRequestDocCategory,
   PatentRequestDocument,
+  PatentRequestOfficialHandover,
   PatentRequestSubmission,
 } from "../../types/patentRequest.types";
 import { DashboardLayout } from "../components/DashboardLayout";
@@ -261,67 +262,85 @@ const PROTOTYPE_STATUSES: Array<{
   { value: "validated_prototype", label: "Validated prototype" },
 ];
 
-const GOVT_DOCS: Array<{
-  category: PatentDocumentCategory;
+const PATENT_SUPPORT_FILE_SLOTS: Array<{
+  key: string;
+  category: PatentRequestDocCategory;
   label: string;
   required: boolean;
   hint: string;
 }> = [
   {
-    category: "design_plan_sketch",
+    key: "design_plan_sketch",
+    category: "drawings",
     label: "Design, plan, or pen-paper sketch",
     required: false,
     hint: "Recommended for rough concepts, paper sketches, hand-drawn plans, or lightweight images",
   },
   {
-    category: "prior_art_search",
+    key: "prior_art_search",
+    category: "prior_art_report",
     label: "Prior art search",
     required: false,
     hint: "Search notes, patent references, or prior-art report",
   },
   {
-    category: "specification_draft",
+    key: "specification_draft",
+    category: "form2_specification",
     label: "Specification draft",
     required: false,
     hint: "Background, working principle, components, or best method draft",
   },
   {
-    category: "abstract_draft",
+    key: "abstract_draft",
+    category: "supporting_evidence",
     label: "Abstract draft",
     required: false,
     hint: "Short technical summary or invention overview",
   },
   {
-    category: "claims_draft",
+    key: "claims_draft",
+    category: "other",
     label: "Claims draft",
     required: false,
     hint: "Draft claims or early scope definition, if available",
   },
   {
-    category: "drawings_diagrams",
+    key: "drawings_diagrams",
+    category: "drawings",
     label: "Drawings, block diagrams, or flowcharts",
     required: false,
     hint: "PDF or image of technical drawings",
   },
   {
-    category: "examination_request",
+    key: "examination_request",
+    category: "other",
     label: "Examination request plan",
     required: false,
     hint: "Form 18 or equivalent examination request preparation",
   },
   {
+    key: "form3_foreign_filing",
     category: "form3_foreign_filing",
     label: "Form 3 foreign filing",
     required: false,
     hint: "Required only if filing in foreign jurisdictions",
   },
   {
-    category: "cost_management",
+    key: "cost_management",
+    category: "other",
     label: "Cost management notes",
     required: false,
     hint: "Budget plan, provisional-first strategy, funding notes",
   },
 ];
+
+const GOVT_DOCS = PATENT_SUPPORT_FILE_SLOTS as Array<{
+  key: string;
+  category: PatentDocumentCategory;
+  label: string;
+  required: boolean;
+  hint: string;
+}>;
 
 type QuestionKey = keyof PatentQuestionnaire;
 
@@ -349,6 +368,39 @@ const getPatentAnswersFromStartupProfile = (
   ...DEFAULT_ANSWERS,
   ...(profile ?? {}),
 });
+
+const isPlaceholderPatentAnswer = (value: string) => {
+  const normalized = value.trim().toLowerCase();
+  if (!normalized) return false;
+
+  return (
+    normalized.includes("[state the main difference]") ||
+    normalized.includes("[describe existing method]") ||
+    normalized.includes("[describe your improvement]") ||
+    normalized.includes("my solution differs from existing market solutions")
+  );
+};
+
+const mergePatentAnswers = (
+  primary?: Partial<PatentQuestionnaire>,
+  fallback?: Partial<PatentQuestionnaire>,
+): PatentQuestionnaire => {
+  const primaryAnswers = getPatentAnswersFromStartupProfile(primary);
+  const fallbackAnswers = getPatentAnswersFromStartupProfile(fallback);
+
+  return Object.fromEntries(
+    Object.keys(DEFAULT_ANSWERS).map((key) => {
+      const primaryValue = primaryAnswers[key as QuestionKey]?.trim() ?? "";
+      const fallbackValue = fallbackAnswers[key as QuestionKey]?.trim() ?? "";
+
+      if (primaryValue && !isPlaceholderPatentAnswer(primaryValue)) {
+        return [key, primaryValue];
+      }
+
+      return [key, fallbackValue || primaryValue];
+    }),
+  ) as unknown as PatentQuestionnaire;
+};
 
 const hasAnyPatentAnswer = (answers: Record<QuestionKey, string>) =>
   Object.values(answers).some((value) => value.trim().length > 0);
@@ -1002,6 +1054,7 @@ function StartupPatentRequestOverview({
 interface SelfUploadPatentFormProps {
   startupId?: string;
   activeWorkspace?: { _id: string; title: string } | null;
+  initialAnswers: PatentQuestionnaire;
   isStartupScoped: boolean;
   workspaceId: string;
   setWorkspaceId: (id: string) => void;
@@ -1029,6 +1082,8 @@ interface SelfUploadPatentFormProps {
 
 type AdminAssistPatentFormProps = Omit<
   SelfUploadPatentFormProps,
+  | "submitted"
+  | "setSubmitted"
   | "patentStage"
   | "setPatentStage"
   | "applicationNumber"
@@ -1045,6 +1100,7 @@ function SelfUploadPatentForm(props: SelfUploadPatentFormProps) {
   const {
     startupId,
     activeWorkspace,
+    initialAnswers,
     isStartupScoped,
     workspaceId,
     setWorkspaceId,
@@ -1073,6 +1129,7 @@ function SelfUploadPatentForm(props: SelfUploadPatentFormProps) {
   } | null>(null);
   const [isUploading, setIsUploading] = useState(false);
   const [uploadError, setUploadError] = useState("");
+
   const [submitSuccess, setSubmitSuccess] = useState(false);
 
   const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -1105,30 +1162,14 @@ function SelfUploadPatentForm(props: SelfUploadPatentFormProps) {
         formData.append("workspaceId", activeWorkspace._id);
       }
 
-      return patentApi.submit({
-        projectTitle: projectTitle,
-        workspaceId: activeWorkspace?._id || "",
-        documentUploads: [],
-        questionnaire: {
-          problemStatement: "",
-          solutionDifferentiation: "",
-          coreInnovation: "",
-          priorArtStatus: "",
-          workingMechanism: "",
-          keyComponents: "",
-          developmentStage: "",
-          documentationReadiness: "",
-          inventorOwnership: "",
-          developmentContext: "",
-          targetMarkets: "",
-          commercializationStrategy: "",
-          publicDisclosureStatus: "",
-          legalAgreements: "",
-          ipProtectionType: "",
-        },
-        patentStage,
-        ipoApplicationNumber: applicationNumber || undefined,
-        ipoFilingDate: filingDate || undefined,
+        return patentApi.submit({
+          projectTitle: projectTitle,
+          workspaceId: activeWorkspace?._id || "",
+          documentUploads: [],
+          questionnaire: initialAnswers,
+          patentStage,
+          ipoApplicationNumber: applicationNumber || undefined,
+          ipoFilingDate: filingDate || undefined,
         grantNumber: grantNumber || undefined,
         grantDate: grantDate || undefined,
       });
@@ -1711,6 +1752,154 @@ function PatentRequestDocumentsPanel({
 
 // ─── Admin-Assist Patent Form ───────────────────────────────────────────────
 
+function OfficialHandoverPanel({
+  requestId,
+  handover,
+  canAcknowledge,
+}: {
+  requestId: string;
+  handover?: PatentRequestOfficialHandover;
+  canAcknowledge: boolean;
+}) {
+  const queryClient = useQueryClient();
+  const [handoverError, setHandoverError] = useState("");
+  const documents = handover?.documents ?? [];
+  const handoverCompleted = !!handover?.handedOverAt;
+  const handoverAcknowledged = !!handover?.studentAcknowledgedAt;
+
+  const acknowledgeMutation = useMutation({
+    mutationFn: () => patentRequestApi.acknowledgeHandover(requestId),
+    onSuccess: async () => {
+      setHandoverError("");
+      await queryClient.invalidateQueries({
+        queryKey: ["patent-requests", "mine"],
+      });
+    },
+    onError: (err) => {
+      type ApiErr = { response?: { data?: { error?: { message?: string } } } };
+      setHandoverError(
+        (err as ApiErr)?.response?.data?.error?.message ??
+          "Unable to acknowledge the official handover.",
+      );
+    },
+  });
+
+  const sortedDocuments = [...documents].sort((left, right) => {
+    const leftTime = left.uploadedAt ? new Date(left.uploadedAt).getTime() : 0;
+    const rightTime = right.uploadedAt ? new Date(right.uploadedAt).getTime() : 0;
+    return rightTime - leftTime;
+  });
+
+  return (
+    <div className="space-y-4">
+      <div
+        className={`rounded-xl border px-5 py-4 text-sm ${
+          handoverAcknowledged
+            ? "border-emerald-500/20 bg-emerald-500/10 text-emerald-200"
+            : handoverCompleted
+              ? "border-cyan-500/20 bg-cyan-500/10 text-cyan-100"
+              : "border-slate-800 bg-slate-900/60 text-slate-400"
+        }`}
+      >
+        {handoverAcknowledged
+          ? `You acknowledged this handover on ${formatDate(
+              handover?.studentAcknowledgedAt,
+            )}.`
+          : handoverCompleted
+            ? `ProMove shared the official patent handover package on ${formatDate(
+                handover?.handedOverAt,
+              )}. Review the documents below and acknowledge receipt.`
+            : "The official handover package is not ready yet. It will appear here once ProMove completes the post-grant handover."}
+      </div>
+
+      {handover?.note ? (
+        <div className="rounded-xl border border-slate-800 bg-slate-900/60 px-5 py-4">
+          <div className="mb-1 text-xs font-semibold uppercase tracking-widest text-slate-400">
+            Handover Note
+          </div>
+          <div className="text-sm text-slate-300">{handover.note}</div>
+        </div>
+      ) : null}
+
+      <div className="overflow-hidden rounded-xl border border-slate-800 bg-slate-900/60">
+        {sortedDocuments.length > 0 ? (
+          sortedDocuments.map((document, index) => (
+            <div
+              key={document._id ?? `${document.fileUrl}-${index}`}
+              className={`px-5 py-4 ${
+                index !== sortedDocuments.length - 1
+                  ? "border-b border-slate-800"
+                  : ""
+              }`}
+            >
+              <div className="flex flex-col gap-3 md:flex-row md:items-start md:justify-between">
+                <div className="min-w-0">
+                  <a
+                    href={document.fileUrl}
+                    target="_blank"
+                    rel="noreferrer"
+                    className="truncate text-sm font-semibold text-white hover:text-cyan-300"
+                  >
+                    {document.fileName}
+                  </a>
+                  <div className="mt-1 text-xs text-slate-500">
+                    {DOCUMENT_CATEGORY_LABELS[document.documentCategory] ??
+                      formatKey(document.documentCategory)}
+                    {" / "}
+                    {formatFileSize(document.fileSizeBytes)}
+                    {document.uploadedAt
+                      ? ` / Uploaded ${formatDate(document.uploadedAt)}`
+                      : ""}
+                  </div>
+                  {document.note ? (
+                    <div className="mt-2 text-sm text-slate-300">
+                      {document.note}
+                    </div>
+                  ) : null}
+                </div>
+                <a
+                  href={document.fileUrl}
+                  target="_blank"
+                  rel="noreferrer"
+                  className="rounded-lg border border-slate-700 px-3 py-1.5 text-xs font-semibold text-slate-300 transition hover:border-cyan-500/40 hover:text-cyan-300"
+                >
+                  Open
+                </a>
+              </div>
+            </div>
+          ))
+        ) : (
+          <div className="px-5 py-8 text-center text-sm text-slate-500">
+            No official handover documents have been shared yet.
+          </div>
+        )}
+      </div>
+
+      {handoverError ? (
+        <div className="rounded-lg border border-red-500/20 bg-red-500/10 px-3 py-2 text-sm text-red-300">
+          {handoverError}
+        </div>
+      ) : null}
+
+      {canAcknowledge && handoverCompleted && !handoverAcknowledged ? (
+        <button
+          type="button"
+          onClick={() => acknowledgeMutation.mutate()}
+          disabled={acknowledgeMutation.isPending}
+          className="inline-flex items-center gap-2 rounded-lg bg-cyan-500 px-4 py-2.5 text-sm font-semibold text-slate-950 transition hover:bg-cyan-400 disabled:cursor-not-allowed disabled:opacity-50"
+        >
+          {acknowledgeMutation.isPending ? (
+            <Loader2 className="h-4 w-4 animate-spin" />
+          ) : (
+            <Handshake className="h-4 w-4" />
+          )}
+          Acknowledge Official Handover
+        </button>
+      ) : null}
+    </div>
+  );
+}
+
 const TRACKING_STAGES = [
   {
     key: "submitted",
@@ -1752,14 +1941,13 @@ const TRACKING_STAGES = [
 function AdminAssistPatentForm({
   startupId,
   activeWorkspace,
+  initialAnswers,
   isStartupScoped,
   workspaceId,
   setWorkspaceId,
   projectTitle,
   setProjectTitle,
   patentEligibleWorkspaces,
-  submitted,
-  setSubmitted,
   setPatentOption,
 }: AdminAssistPatentFormProps) {
   const queryClient = useQueryClient();
@@ -1772,14 +1960,212 @@ function AdminAssistPatentForm({
   const [intakeAnswers, setIntakeAnswers] =
     useState<Record<QuestionKey, string>>(DEFAULT_ANSWERS);
   const [activeTab, setActiveTab] = useState<
-    "tracking" | "documents" | "conversation" | "questionnaire"
+    "tracking" | "documents" | "handover" | "conversation" | "questionnaire"
   >("tracking");
+  const [categorySlots, setCategorySlots] = useState<Record<string, SlotState>>(
+    {},
+  );
+
+  const fileInputRefs = useRef<Record<string, HTMLInputElement | null>>({});
+  const categorySlotsRef = useRef(categorySlots);
+  const selectedWorkspaceId =
+    (isStartupScoped ? activeWorkspace?._id : workspaceId) ||
+    activeWorkspace?._id ||
+    "";
+  const selectedWorkspaceIdRef = useRef(selectedWorkspaceId);
+
+  useEffect(() => {
+    setIntakeAnswers((current) =>
+      hasAnyPatentAnswer(current)
+        ? mergePatentAnswers(current, initialAnswers)
+        : initialAnswers,
+    );
+  }, [initialAnswers]);
 
   const patentRequestsQuery = useQuery({
     queryKey: ["patent-requests", "mine"],
     queryFn: () => patentRequestApi.mine(),
     enabled: isStartupScoped,
   });
+
+  useEffect(() => {
+    categorySlotsRef.current = categorySlots;
+  }, [categorySlots]);
+
+  useEffect(() => {
+    const previousWorkspaceId = selectedWorkspaceIdRef.current;
+    if (previousWorkspaceId && previousWorkspaceId !== selectedWorkspaceId) {
+      const uploadsToCleanup = Object.values(categorySlotsRef.current).filter(
+        (slot): slot is SlotState & { uploadId: string; workspaceId: string } =>
+          Boolean(slot.uploadId && slot.workspaceId === previousWorkspaceId),
+      );
+
+      if (uploadsToCleanup.length > 0) {
+        void Promise.allSettled(
+          uploadsToCleanup.map((slot) =>
+            workspaceApi.removeUpload(previousWorkspaceId, slot.uploadId),
+          ),
+        );
+      }
+
+      setCategorySlots((current) => {
+        const next = { ...current };
+        for (const [slotKey, slot] of Object.entries(next)) {
+          if (slot.workspaceId === previousWorkspaceId) {
+            delete next[slotKey];
+          }
+        }
+        return next;
+      });
+    }
+
+    selectedWorkspaceIdRef.current = selectedWorkspaceId;
+  }, [selectedWorkspaceId]);
+
+  useEffect(
+    () => () => {
+      const currentWorkspaceId = selectedWorkspaceIdRef.current;
+      if (!currentWorkspaceId) {
+        return;
+      }
+
+      const uploadsToCleanup = Object.values(categorySlotsRef.current).filter(
+        (slot): slot is SlotState & { uploadId: string; workspaceId: string } =>
+          Boolean(slot.uploadId && slot.workspaceId === currentWorkspaceId),
+      );
+
+      if (uploadsToCleanup.length === 0) {
+        return;
+      }
+
+      void Promise.allSettled(
+        uploadsToCleanup.map((slot) =>
+          workspaceApi.removeUpload(currentWorkspaceId, slot.uploadId),
+        ),
+      );
+    },
+    [],
+  );
+
+  const handleFileSelect = async (
+    slotKey: string,
+    category: PatentRequestDocCategory,
+    file: File,
+  ) => {
+    const targetWorkspaceId = selectedWorkspaceIdRef.current;
+    if (!targetWorkspaceId) return;
+
+    if (file.size > PATENT_SUPPORT_UPLOAD_MAX_BYTES) {
+      setCategorySlots((prev) => ({
+        ...prev,
+        [slotKey]: {
+          ...createEmptySlotState(targetWorkspaceId),
+          error: `File must be ${formatFileSize(PATENT_SUPPORT_UPLOAD_MAX_BYTES)} or less.`,
+        },
+      }));
+      if (fileInputRefs.current[slotKey]) {
+        fileInputRefs.current[slotKey]!.value = "";
+      }
+      return;
+    }
+
+    const existingSlot = categorySlotsRef.current[slotKey];
+    if (existingSlot?.uploadId && existingSlot.workspaceId) {
+      try {
+        await workspaceApi.removeUpload(
+          existingSlot.workspaceId,
+          existingSlot.uploadId,
+        );
+      } catch (_error) {
+        setCategorySlots((prev) => ({
+          ...prev,
+          [slotKey]: {
+            ...(prev[slotKey] ?? createEmptySlotState(existingSlot.workspaceId)),
+            uploading: false,
+            error: "Unable to remove the previous upload. Please try again.",
+          },
+        }));
+        return;
+      }
+    }
+
+    setCategorySlots((prev) => ({
+      ...prev,
+      [slotKey]: {
+        uploadId: null,
+        fileName: null,
+        uploading: true,
+        error: "",
+        workspaceId: targetWorkspaceId,
+      },
+    }));
+
+    try {
+      const uploads = await workspaceApi.upload(
+        targetWorkspaceId,
+        file,
+        PATENT_SUPPORT_FILE_SLOTS.find((slot) => slot.key === slotKey)?.label,
+      );
+      const newUpload = uploads[uploads.length - 1];
+      if (selectedWorkspaceIdRef.current !== targetWorkspaceId) {
+        await workspaceApi
+          .removeUpload(targetWorkspaceId, newUpload._id)
+          .catch(() => undefined);
+        return;
+      }
+
+      setCategorySlots((prev) => ({
+        ...prev,
+        [slotKey]: {
+          uploadId: newUpload._id,
+          fileName: newUpload.fileName,
+          uploading: false,
+          error: "",
+          workspaceId: targetWorkspaceId,
+        },
+      }));
+    } catch (error) {
+      const apiMessage =
+        (error as { response?: { data?: { error?: { message?: string } } } })
+          ?.response?.data?.error?.message ?? "Upload failed. Try again.";
+      setCategorySlots((prev) => ({
+        ...prev,
+        [slotKey]: {
+          ...createEmptySlotState(targetWorkspaceId),
+          error: apiMessage,
+        },
+      }));
+    }
+  };
+
+  const clearSlot = async (slotKey: string) => {
+    const slot = categorySlotsRef.current[slotKey];
+
+    if (slot?.uploadId && slot.workspaceId) {
+      try {
+        await workspaceApi.removeUpload(slot.workspaceId, slot.uploadId);
+      } catch (_error) {
+        setCategorySlots((prev) => ({
+          ...prev,
+          [slotKey]: {
+            ...(prev[slotKey] ?? createEmptySlotState(slot.workspaceId)),
+            uploading: false,
+            error: "Unable to remove the uploaded file. Please try again.",
+          },
+        }));
+        return;
+      }
+    }
+
+    setCategorySlots((prev) => {
+      const next = { ...prev };
+      delete next[slotKey];
+      return next;
+    });
+    if (fileInputRefs.current[slotKey]) {
+      fileInputRefs.current[slotKey]!.value = "";
+    }
+  };
 
   const allIntakeValid = QUESTION_SECTIONS.every((section) =>
     section.questions.every((question) => {
@@ -1788,26 +2174,43 @@ function AdminAssistPatentForm({
       return value.length >= question.minLength;
     }),
   );
+  const documentUploads = useMemo(
+    () =>
+      PATENT_SUPPORT_FILE_SLOTS.filter(
+        (slot) => categorySlots[slot.key]?.uploadId,
+      ).map((slot) => ({
+        uploadId: categorySlots[slot.key]!.uploadId!,
+        category: slot.category,
+      })),
+    [categorySlots],
+  );
+  const uploadedSupportCount = documentUploads.length;
+  const anySlotUploading = Object.values(categorySlots).some(
+    (slot) => slot.uploading,
+  );
 
   const submitMutation = useMutation({
     mutationFn: async () => {
       if (!projectTitle.trim()) throw new Error("Project title is required");
       if (!requestDescription.trim())
         throw new Error("Description is required");
+      if (!selectedWorkspaceId) throw new Error("Workspace is required");
 
-      return patentRequestApi.create({
-        workspaceId: activeWorkspace?._id || workspaceId || "",
-        projectTitle: projectTitle,
-        description: requestDescription,
-        patentType,
-        questionnaire: intakeAnswers,
-      });
+        return patentRequestApi.create({
+          workspaceId: selectedWorkspaceId,
+          projectTitle: projectTitle,
+          description: requestDescription,
+          patentType,
+          questionnaire: mergePatentAnswers(intakeAnswers, initialAnswers),
+          documentUploads,
+        });
     },
     onSuccess: async () => {
       setSubmitSuccess(true);
       setProjectTitle("");
       setRequestDescription("");
       setIntakeAnswers(DEFAULT_ANSWERS);
+      setCategorySlots({});
       await queryClient.invalidateQueries({
         queryKey: ["patent-requests", "mine"],
       });
@@ -1821,12 +2224,33 @@ function AdminAssistPatentForm({
   });
 
   const visibleRequests = patentRequestsQuery.data ?? [];
-  const activeRequest = visibleRequests.find(
+  const inProgressRequest = visibleRequests.find(
     (r) =>
       r.status !== "granted" &&
       r.status !== "rejected" &&
       r.status !== "abandoned",
   );
+  const pendingHandoverRequest = visibleRequests.find(
+    (r) =>
+      r.status === "granted" &&
+      !r.officialHandover?.studentAcknowledgedAt,
+  );
+  const activeRequest = inProgressRequest ?? pendingHandoverRequest;
+  const activeRequestQuestionnaire = mergePatentAnswers(
+    activeRequest?.questionnaire,
+    initialAnswers,
+  );
+  const activeRequestHandover = activeRequest?.officialHandover;
+  const hasHandoverTab =
+    !!activeRequest &&
+    (activeRequest.status === "granted" ||
+      (activeRequestHandover?.documents?.length ?? 0) > 0);
+
+  useEffect(() => {
+    if (activeTab === "handover" && !hasHandoverTab) {
+      setActiveTab("tracking");
+    }
+  }, [activeTab, hasHandoverTab]);
 
   if (submitSuccess && !activeRequest) {
     return (
@@ -1884,12 +2308,40 @@ const canEditDocuments = !!activeRequest &&
 
       {!activeRequest && !submitSuccess && (
         <div className="space-y-5">
-          {/* Basic Info */}
           <section className="border-b border-slate-800 pb-5">
             <div className="mb-3 text-xs uppercase tracking-[0.28em] text-cyan-300">
               Project Details
             </div>
-            <div className="grid gap-4 md:grid-cols-2">
+            <div className="grid gap-4 md:grid-cols-3">
+              <div>
+                <label className="mb-2 block text-sm font-semibold text-white">
+                  Workspace
+                </label>
+                {isStartupScoped ? (
+                  <div className={fieldCls}>
+                    {activeWorkspace?.title ?? "Linked startup workspace"}
+                  </div>
+                ) : (
+                  <select
+                    value={selectedWorkspaceId}
+                    onChange={(e) => {
+                      setWorkspaceId(e.target.value);
+                      setProjectTitle(
+                        patentEligibleWorkspaces.find(
+                          (workspace) => workspace._id === e.target.value,
+                        )?.title ?? "",
+                      );
+                    }}
+                    className={fieldCls}
+                  >
+                    {patentEligibleWorkspaces.map((workspace) => (
+                      <option key={workspace._id} value={workspace._id}>
+                        {workspace.title}
+                      </option>
+                    ))}
+                  </select>
+                )}
+              </div>
               <div>
                 <label className="mb-2 block text-sm font-semibold text-white">
                   Project Title
@@ -1931,49 +2383,148 @@ const canEditDocuments = !!activeRequest &&
             </div>
           </section>
 
-          {/* Intake Questionnaire */}
-          <section>
-            <div className="mb-3 flex flex-col gap-1 sm:flex-row sm:items-end sm:justify-between">
-              <div className="text-xs uppercase tracking-[0.28em] text-cyan-300">
-                Patent Intake Questionnaire
+          <div className="grid gap-5 xl:grid-cols-[minmax(0,1fr),minmax(360px,0.8fr)] xl:items-start">
+            <section className="order-2 self-start border-t border-slate-800 pt-5 xl:order-2 xl:border-l xl:border-t-0 xl:pl-5 xl:pt-0">
+              <div className="flex flex-col gap-2 md:flex-row md:items-end md:justify-between">
+                <div className="text-xs uppercase tracking-[0.28em] text-cyan-300">
+                  Supporting Files
+                </div>
+                <div className="text-sm text-slate-400">
+                  {uploadedSupportCount} / {PATENT_SUPPORT_FILE_SLOTS.length} added
+                  {" "} - {formatFileSize(PATENT_SUPPORT_UPLOAD_MAX_BYTES)} max each
+                </div>
               </div>
-              <div className="text-xs text-slate-500">
-                Complete each field to submit your request
+
+              <div className="mt-4 divide-y divide-slate-800 border-y border-slate-800">
+                {PATENT_SUPPORT_FILE_SLOTS.map(
+                  ({ key, category, label, required, hint }) => {
+                    const slot = categorySlots[key];
+                    const hasUpload = Boolean(slot?.uploadId);
+                    const isUploading = Boolean(slot?.uploading);
+                    const slotError = slot?.error ?? "";
+                    const isDisabled = !selectedWorkspaceId || isUploading;
+                    const isRecommended = key === "design_plan_sketch";
+
+                    return (
+                      <div
+                        key={key}
+                        className="grid gap-3 py-2.5 md:grid-cols-[minmax(0,1fr),220px] md:items-center"
+                      >
+                        <div className="min-w-0">
+                          <div className="flex flex-wrap items-center gap-2 text-sm font-semibold text-white">
+                            {label}
+                            {isRecommended ? (
+                              <span className="rounded-full bg-cyan-500/10 px-2 py-0.5 text-[10px] uppercase tracking-[0.2em] text-cyan-200">
+                                Recommended
+                              </span>
+                            ) : null}
+                            {required ? (
+                              <span className="text-red-400">*</span>
+                            ) : null}
+                          </div>
+                          <p className="mt-1 truncate text-xs text-slate-500">
+                            {hint}
+                          </p>
+                          {slotError ? (
+                            <p className="mt-1 text-xs text-red-400">
+                              {slotError}
+                            </p>
+                          ) : null}
+                        </div>
+
+                        <div className="flex justify-start md:justify-end">
+                          {hasUpload ? (
+                            <div className="flex w-full items-center justify-between gap-2 rounded-lg bg-cyan-500/10 px-3 py-2 md:w-[220px]">
+                              <div className="flex min-w-0 items-center gap-2">
+                                <FileText className="h-4 w-4 shrink-0 text-cyan-400" />
+                                <span className="truncate text-sm text-white">
+                                  {slot?.fileName}
+                                </span>
+                              </div>
+                              <button
+                                type="button"
+                                onClick={() => {
+                                  void clearSlot(key);
+                                }}
+                                className="shrink-0 rounded-lg p-1 text-slate-400 transition-colors hover:text-red-400"
+                                title="Remove and re-upload"
+                              >
+                                <X className="h-3.5 w-3.5" />
+                              </button>
+                            </div>
+                          ) : (
+                            <label
+                              className={`flex w-full cursor-pointer items-center justify-center gap-2 rounded-lg border border-dashed px-3 py-2 text-center transition md:w-[220px] ${
+                                isDisabled
+                                  ? "cursor-not-allowed border-slate-800 opacity-50"
+                                  : "border-slate-700 hover:border-cyan-500/50 hover:bg-slate-950/40"
+                              }`}
+                            >
+                              {isUploading ? (
+                                <>
+                                  <Loader2 className="h-4 w-4 animate-spin text-cyan-400" />
+                                  <span className="text-xs text-slate-400">
+                                    Uploading
+                                  </span>
+                                </>
+                              ) : (
+                                <>
+                                  <Upload className="h-4 w-4 text-slate-500" />
+                                  <span className="text-xs text-slate-400">
+                                    {!selectedWorkspaceId
+                                      ? "Select workspace"
+                                      : "Upload file"}
+                                  </span>
+                                </>
+                              )}
+                              <input
+                                ref={(el) => {
+                                  fileInputRefs.current[key] = el;
+                                }}
+                                type="file"
+                                accept=".pdf,image/*"
+                                className="sr-only"
+                                disabled={isDisabled}
+                                onChange={(e) => {
+                                  const file = e.target.files?.[0];
+                                  if (file) {
+                                    void handleFileSelect(key, category, file);
+                                  }
+                                }}
+                              />
+                            </label>
+                          )}
+                        </div>
+                      </div>
+                    );
+                  },
+                )}
               </div>
-            </div>
-            <div className="space-y-4">
-              {QUESTION_SECTIONS.map((section) => (
-                <div key={section.title}>
-                  <div className="mb-2 text-sm font-semibold text-slate-300">
-                    {section.title}
-                  </div>
-                  <div className="space-y-3">
-                    {section.questions.map((question) => (
-                      <div key={question.key}>
-                        <label className="mb-1 block text-sm text-slate-400">
-                          {question.label}
-                        </label>
-                        {question.type === "select" ? (
-                          <select
-                            value={intakeAnswers[question.key]}
-                            onChange={(e) =>
-                              setIntakeAnswers((prev) => ({
-                                ...prev,
-                                [question.key]: e.target.value,
-                              }))
-                            }
-                            className={fieldCls}
-                          >
-                            <option value="">Select...</option>
-                            {question.options.map((option) => (
-                              <option key={option.value} value={option.value}>
-                                {option.label}
-                              </option>
-                            ))}
-                          </select>
-                        ) : (
-                          <div>
-                            <textarea
+            </section>
+
+            <section className="order-1">
+              <div className="mb-3 flex flex-col gap-1 sm:flex-row sm:items-end sm:justify-between">
+                <div className="text-xs uppercase tracking-[0.28em] text-cyan-300">
+                  Patent Intake Questionnaire
+                </div>
+                <div className="text-xs text-slate-500">
+                  Complete each field to submit your request
+                </div>
+              </div>
+              <div className="space-y-4">
+                {QUESTION_SECTIONS.map((section) => (
+                  <div key={section.title}>
+                    <div className="mb-2 text-sm font-semibold text-slate-300">
+                      {section.title}
+                    </div>
+                    <div className="space-y-3">
+                      {section.questions.map((question) => (
+                        <div key={question.key}>
+                          <label className="mb-1 block text-sm text-slate-400">
+                            {question.label}
+                          </label>
+                          {question.type === "select" ? (
+                            <select
                               value={intakeAnswers[question.key]}
                               onChange={(e) =>
                                 setIntakeAnswers((prev) => ({
@@ -1981,29 +2532,49 @@ const canEditDocuments = !!activeRequest &&
                                   [question.key]: e.target.value,
                                 }))
                               }
-                              className={textAreaCls}
-                              placeholder={question.label}
-                            />
-                            <div
-                              className={`mt-1 text-xs ${
-                                intakeAnswers[question.key].trim().length >=
-                                question.minLength
-                                  ? "text-slate-600"
-                                  : "text-amber-500/70"
-                              }`}
+                              className={fieldCls}
                             >
-                              {intakeAnswers[question.key].trim().length}/
-                              {question.minLength}
+                              <option value="">Select...</option>
+                              {question.options.map((option) => (
+                                <option key={option.value} value={option.value}>
+                                  {option.label}
+                                </option>
+                              ))}
+                            </select>
+                          ) : (
+                            <div>
+                              <textarea
+                                value={intakeAnswers[question.key]}
+                                onChange={(e) =>
+                                  setIntakeAnswers((prev) => ({
+                                    ...prev,
+                                    [question.key]: e.target.value,
+                                  }))
+                                }
+                                className={textAreaCls}
+                                placeholder={question.label}
+                              />
+                              <div
+                                className={`mt-1 text-xs ${
+                                  intakeAnswers[question.key].trim().length >=
+                                  question.minLength
+                                    ? "text-slate-600"
+                                    : "text-amber-500/70"
+                                }`}
+                              >
+                                {intakeAnswers[question.key].trim().length}/
+                                {question.minLength}
+                              </div>
                             </div>
-                          </div>
-                        )}
-                      </div>
-                    ))}
+                          )}
+                        </div>
+                      ))}
+                    </div>
                   </div>
-                </div>
-              ))}
-            </div>
-          </section>
+                ))}
+              </div>
+            </section>
+          </div>
 
           {submitError && <p className="text-sm text-red-400">{submitError}</p>}
 
@@ -2014,6 +2585,7 @@ const canEditDocuments = !!activeRequest &&
               !projectTitle.trim() ||
               !requestDescription.trim() ||
               !allIntakeValid ||
+              anySlotUploading ||
               submitMutation.isPending
             }
             className="rounded-lg bg-amber-500 px-6 py-3 text-sm font-semibold text-slate-950 transition hover:bg-amber-400 disabled:cursor-not-allowed disabled:opacity-50"
@@ -2027,6 +2599,11 @@ const canEditDocuments = !!activeRequest &&
               Complete all intake questions to enable submission.
             </p>
           )}
+          {anySlotUploading ? (
+            <p className="text-xs text-slate-500">
+              Wait for supporting files to finish uploading before submitting.
+            </p>
+          ) : null}
         </div>
       )}
 
@@ -2065,6 +2642,14 @@ const canEditDocuments = !!activeRequest &&
                   key: "documents",
                   label: `Documents (${activeRequest.documents?.length ?? 0})`,
                 },
+                ...(hasHandoverTab
+                  ? [
+                      {
+                        key: "handover" as const,
+                        label: `Handover (${activeRequestHandover?.documents?.length ?? 0})`,
+                      },
+                    ]
+                  : []),
                 { key: "conversation", label: "Conversation" },
                 { key: "questionnaire", label: "Questionnaire" },
               ] as const
@@ -2175,6 +2760,25 @@ const canEditDocuments = !!activeRequest &&
                   )}
                 </div>
               )}
+
+              {activeRequest.status === "granted" ? (
+                <div className="rounded-xl border border-slate-800 bg-slate-900/60 px-5 py-4">
+                  <div className="mb-1 text-xs font-semibold uppercase tracking-widest text-slate-400">
+                    Official Document Handover
+                  </div>
+                  <div className="text-sm text-slate-300">
+                    {activeRequestHandover?.studentAcknowledgedAt
+                      ? `Acknowledged on ${formatDate(
+                          activeRequestHandover.studentAcknowledgedAt,
+                        )}.`
+                      : activeRequestHandover?.handedOverAt
+                        ? `Package shared on ${formatDate(
+                            activeRequestHandover.handedOverAt,
+                          )}. Review it in the Handover tab and acknowledge receipt.`
+                        : "The post-grant handover package is being prepared by ProMove."}
+                  </div>
+                </div>
+              ) : null}
             </div>
           )}
 
@@ -2191,14 +2795,22 @@ const canEditDocuments = !!activeRequest &&
             />
           )}
 
-          {/* Questionnaire Tab - read-only view of submitted answers */}
-          {activeTab === "questionnaire" && (
-            <div className="rounded-xl border border-slate-800 bg-slate-900/60 overflow-hidden">
-              {activeRequest.questionnaire ? (
-                Object.entries(activeRequest.questionnaire).map(
-                  ([key, value], i, arr) => (
-                    <div
-                      key={key}
+          {activeTab === "handover" && (
+            <OfficialHandoverPanel
+              requestId={activeRequest._id}
+              handover={activeRequestHandover}
+              canAcknowledge={activeRequest.status === "granted"}
+            />
+          )}
+
+            {/* Questionnaire Tab - read-only view of submitted answers */}
+            {activeTab === "questionnaire" && (
+              <div className="rounded-xl border border-slate-800 bg-slate-900/60 overflow-hidden">
+                {hasAnyPatentAnswer(activeRequestQuestionnaire) ? (
+                  Object.entries(activeRequestQuestionnaire).map(
+                    ([key, value], i, arr) => (
+                      <div
+                        key={key}
                       className={`px-5 py-4 ${i !== arr.length - 1 ? "border-b border-slate-800" : ""}`}
                     >
                       <div className="mb-2 text-xs font-medium text-slate-500">
@@ -2210,9 +2822,9 @@ const canEditDocuments = !!activeRequest &&
                         )}
                       </div>
                     </div>
-                  ),
-                )
-              ) : (
+                    ),
+                  )
+                ) : (
                 <div className="px-5 py-8 text-center text-sm text-slate-500">
                   No questionnaire data submitted with this request.
                 </div>
@@ -2231,9 +2843,12 @@ const canEditDocuments = !!activeRequest &&
             {visibleRequests
               .filter(
                 (r) =>
+                  r._id !== activeRequest?._id &&
+                  (
                   r.status === "granted" ||
                   r.status === "rejected" ||
-                  r.status === "abandoned",
+                  r.status === "abandoned"
+                  ),
               )
               .map((request) => (
                 <div
@@ -2317,6 +2932,10 @@ export function PatentSupport() {
   });
   const startup = startupQuery.data;
   const startupWorkspaceId = startup?.projectId ?? "";
+  const startupPatentAnswers = useMemo(
+    () => mergePatentAnswers(undefined, startup?.registrationProfile),
+    [startup?.registrationProfile],
+  );
   const patentEligibleWorkspaces = useMemo(() => {
     const allWorkspaces = workspacesQuery.data ?? [];
     const base = allWorkspaces.filter(
@@ -2379,6 +2998,26 @@ export function PatentSupport() {
       (request) => request.workspaceId === selectedWorkspaceId,
     );
   }, [isStartupScoped, patentRequestsQuery.data, selectedWorkspaceId]);
+  const hasActivePatentRequest = useMemo(
+    () =>
+      visiblePatentRequests.some(
+        (request) =>
+          request.status !== "granted" &&
+          request.status !== "rejected" &&
+          request.status !== "abandoned",
+      ),
+    [visiblePatentRequests],
+  );
+  const hasActivePatentSubmission = useMemo(
+    () =>
+      visiblePatents.some(
+        (patent) =>
+          patent.status !== "approved" && patent.status !== "rejected",
+      ),
+    [visiblePatents],
+  );
+  const hasSubmittedPatentFlow =
+    hasActivePatentRequest || hasActivePatentSubmission;
 
   useEffect(() => {
     if (isStartupScoped) {
@@ -2419,13 +3058,14 @@ export function PatentSupport() {
     }
 
     setProjectTitle((current) => current || startup.name || "");
-    setAnswers((current) => {
-      if (hasAnyPatentAnswer(current)) {
-        return current;
-      }
-      return getPatentAnswersFromStartupProfile(startup.registrationProfile);
-    });
   }, [isStartupScoped, startup]);
+
+  useEffect(() => {
+    if (!hasActivePatentRequest) {
+      return;
+    }
+    setPatentOption("admin-assist");
+  }, [hasActivePatentRequest]);
 
   useEffect(() => {
     categorySlotsRef.current = categorySlots;
@@ -2698,7 +3338,10 @@ export function PatentSupport() {
         {/* Page header */}
 
         {/* Patent Option Selection */}
-        {hasPatentEligibleWorkspaces && !patentOption && !submitted ? (
+        {hasPatentEligibleWorkspaces &&
+        !patentOption &&
+        !submitted &&
+        !hasSubmittedPatentFlow ? (
           <div className="space-y-4">
             <div className="text-xs uppercase tracking-[0.28em] text-cyan-300">
               Choose Your Patent Approach
@@ -2751,7 +3394,7 @@ export function PatentSupport() {
         ) : null}
 
         {/* Back button when option selected */}
-        {patentOption && (
+        {patentOption && !hasSubmittedPatentFlow && (
           <div className="mb-4">
             <button
               type="button"
@@ -2764,7 +3407,9 @@ export function PatentSupport() {
         )}
 
         {/* Overview - show existing patents/requests */}
-        {isStartupScoped && hasPatentEligibleWorkspaces ? (
+        {isStartupScoped &&
+        hasPatentEligibleWorkspaces &&
+        !hasActivePatentRequest ? (
           <StartupPatentRequestOverview
             requests={visiblePatentRequests}
             latestSubmission={visiblePatents[0]}
@@ -2774,11 +3419,12 @@ export function PatentSupport() {
 
         {/* Self-Upload Path - when user has existing patent */}
         {patentOption === "self-upload" && hasPatentEligibleWorkspaces ? (
-          <SelfUploadPatentForm
-            startupId={startupId}
-            activeWorkspace={activeWorkspace}
-            isStartupScoped={isStartupScoped}
-            workspaceId={workspaceId}
+            <SelfUploadPatentForm
+              startupId={startupId}
+              activeWorkspace={activeWorkspace}
+              initialAnswers={startupPatentAnswers}
+              isStartupScoped={isStartupScoped}
+              workspaceId={workspaceId}
             setWorkspaceId={setWorkspaceId}
             projectTitle={projectTitle}
             setProjectTitle={setProjectTitle}
@@ -2801,23 +3447,22 @@ export function PatentSupport() {
 
         {/* Admin-Assist Path - when user needs patent support */}
         {patentOption === "admin-assist" && hasPatentEligibleWorkspaces ? (
-          <AdminAssistPatentForm
-            startupId={startupId}
-            activeWorkspace={activeWorkspace}
-            isStartupScoped={isStartupScoped}
-            workspaceId={workspaceId}
+            <AdminAssistPatentForm
+              startupId={startupId}
+              activeWorkspace={activeWorkspace}
+              initialAnswers={startupPatentAnswers}
+              isStartupScoped={isStartupScoped}
+              workspaceId={workspaceId}
             setWorkspaceId={setWorkspaceId}
             projectTitle={projectTitle}
             setProjectTitle={setProjectTitle}
             patentEligibleWorkspaces={patentEligibleWorkspaces}
-            submitted={submitted}
-            setSubmitted={setSubmitted}
             setPatentOption={setPatentOption}
           />
         ) : null}
 
         {/* Original Patent Intake - only show when no option selected */}
-        {!patentOption && hasPatentEligibleWorkspaces ? (
+        {false && !patentOption && hasPatentEligibleWorkspaces ? (
           submitted ? (
             <div className="rounded-lg border border-slate-800 bg-slate-900/60 p-8 text-center">
               <div className="mx-auto mb-4 flex h-16 w-16 items-center justify-center rounded-full bg-green-500/10">

@@ -1,6 +1,7 @@
 import { Types } from 'mongoose';
 import { z } from 'zod';
 import { notificationQueue } from '../../config/bullmq';
+import { uploadFile } from '../../services/fileStorageService';
 import { ApiError } from '../../utils/ApiError';
 import { User } from '../user/user.model';
 import { UserRole } from '../../types/roles.types';
@@ -16,6 +17,8 @@ import {
   addTimelineEntrySchema,
   listRequestsQuerySchema,
   reviewDocumentSchema,
+  handoverDocumentUploadSchema,
+  completeOfficialHandoverSchema,
 } from './patentRequestAdmin.validation';
 
 // ─── Status transition map ───────────────────────────────────────────────────
@@ -41,6 +44,24 @@ const normalizeStatus = (raw: string): PatentRequestStatus =>
   (LEGACY_STATUS_MAP[raw] as PatentRequestStatus) ?? (raw as PatentRequestStatus);
 
 const toIso = (value: Date | string) => new Date(value).toISOString();
+
+const assertGrantReadyForHandover = (
+  request: Awaited<ReturnType<typeof PatentRequest.findById>>,
+) => {
+  if (!request) {
+    throw new ApiError(404, 'PATENT_REQUEST_NOT_FOUND', 'Patent request not found.');
+  }
+
+  if (normalizeStatus(request.status) !== 'granted') {
+    throw new ApiError(
+      409,
+      'PATENT_HANDOVER_NOT_AVAILABLE',
+      'Official handover is only available after the patent has been granted.',
+    );
+  }
+
+  return request;
+};
 
 const autoVerifyLinkedStartup = async (
   adminId: string,
@@ -450,6 +471,113 @@ export const reviewPatentRequestDocument = async (
     type: 'patent_status',
     title: 'Patent document reviewed',
     body: `${document.fileName} was marked ${payload.reviewStatus.replace(/_/g, ' ')} by the patent team.`,
+    link: '/startup-launch',
+  });
+
+  return request.toObject();
+};
+
+export const uploadOfficialHandoverDocument = async (
+  adminId: string,
+  requestId: string,
+  file: Express.Multer.File,
+  payload: z.infer<typeof handoverDocumentUploadSchema>,
+) => {
+  const request = assertGrantReadyForHandover(await PatentRequest.findById(requestId));
+
+  if (request.officialHandover?.studentAcknowledgedAt) {
+    throw new ApiError(
+      409,
+      'PATENT_HANDOVER_ACKNOWLEDGED',
+      'The student has already acknowledged this handover. Create an internal note for follow-up changes.',
+    );
+  }
+
+  const fileType = file.mimetype === 'application/pdf' ? 'pdf' : 'image';
+  const uploaded = await uploadFile({
+    buffer: file.buffer,
+    folder: 'promove/patent-handover-documents',
+    fileName: file.originalname,
+    contentType: file.mimetype || (fileType === 'pdf' ? 'application/pdf' : 'image/jpeg'),
+  });
+
+  request.officialHandover = request.officialHandover ?? { documents: [] };
+  request.officialHandover.documents.push({
+    _id: new Types.ObjectId(),
+    fileUrl: uploaded.url,
+    fileType,
+    fileName: file.originalname,
+    fileSizeBytes: file.size,
+    documentCategory: payload.documentCategory,
+    reviewStatus: 'approved',
+    uploadedAt: new Date(),
+    ...(payload.note?.trim() ? { note: payload.note.trim() } : {}),
+    storageProvider: uploaded.provider,
+    storageKey: uploaded.key,
+  });
+
+  request.lastStatusUpdate = new Date();
+  request.trackingTimeline = request.trackingTimeline ?? [];
+  request.trackingTimeline.push({
+    status: 'official_handover_document_uploaded',
+    note: `Admin uploaded official handover document ${file.originalname}.`,
+    updatedAt: new Date(),
+    updatedBy: new Types.ObjectId(adminId),
+  });
+
+  await request.save();
+
+  await notificationQueue.add('patent-request-handover-document-uploaded', {
+    userId: String(request.studentId),
+    type: 'patent_status',
+    title: 'Official patent document uploaded',
+    body: `${file.originalname} was added to your official patent handover package.`,
+    link: '/startup-launch',
+  });
+
+  return request.toObject();
+};
+
+export const completeOfficialHandover = async (
+  adminId: string,
+  requestId: string,
+  payload: z.infer<typeof completeOfficialHandoverSchema>,
+) => {
+  const request = assertGrantReadyForHandover(await PatentRequest.findById(requestId));
+
+  if (!request.officialHandover?.documents.length) {
+    throw new ApiError(
+      400,
+      'PATENT_HANDOVER_DOCUMENTS_REQUIRED',
+      'Upload at least one official handover document before completing the handover.',
+    );
+  }
+
+  if (request.officialHandover.handedOverAt) {
+    throw new ApiError(409, 'PATENT_HANDOVER_ALREADY_COMPLETED', 'Official handover has already been completed.');
+  }
+
+  const now = new Date();
+  request.officialHandover.note = payload.note?.trim() || undefined;
+  request.officialHandover.handedOverAt = now;
+  request.officialHandover.handedOverBy = new Types.ObjectId(adminId);
+  request.nextActionRequired = 'Review the official patent handover package and acknowledge receipt.';
+  request.lastStatusUpdate = now;
+  request.trackingTimeline = request.trackingTimeline ?? [];
+  request.trackingTimeline.push({
+    status: 'official_handover_completed',
+    note: payload.note?.trim() || 'Official patent handover package shared with the student.',
+    updatedAt: now,
+    updatedBy: new Types.ObjectId(adminId),
+  });
+
+  await request.save();
+
+  await notificationQueue.add('patent-request-handover-completed', {
+    userId: String(request.studentId),
+    type: 'patent_status',
+    title: 'Official patent handover ready',
+    body: `ProMove has shared the final handover package for "${request.inventionTitle ?? request.projectTitle}".`,
     link: '/startup-launch',
   });
 

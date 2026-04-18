@@ -156,6 +156,16 @@ export interface MarketplaceStartupTraction {
   usersCount?: number;
 }
 
+export interface MarketplaceStartupTrustProfile {
+  signals: string[];
+  proofCount: number;
+  hasWebsite: boolean;
+  hasProductDemo: boolean;
+  hasPortfolio: boolean;
+  legalStructure?: string;
+  fundingStatus?: string;
+}
+
 export interface MarketplaceStartupItem {
   _id: string;
   entityType: 'startup';
@@ -171,6 +181,7 @@ export interface MarketplaceStartupItem {
   launchedAt?: string;
   traction: MarketplaceStartupTraction;
   launchTargets: string[];
+  trustProfile: MarketplaceStartupTrustProfile;
   founders: MarketplaceFounderSummary[];
   primaryFounderId?: string;
   project?: MarketplaceProjectSummary;
@@ -294,6 +305,18 @@ const normalizeStartupTraction = (
   ...(typeof traction?.usersCount === 'number' ? { usersCount: traction.usersCount } : {}),
 });
 
+const normalizeStartupTrustProfile = (
+  trustProfile?: Partial<MarketplaceStartupTrustProfile>,
+): MarketplaceStartupTrustProfile => ({
+  signals: trustProfile?.signals ?? [],
+  proofCount: trustProfile?.proofCount ?? 0,
+  hasWebsite: trustProfile?.hasWebsite ?? false,
+  hasProductDemo: trustProfile?.hasProductDemo ?? false,
+  hasPortfolio: trustProfile?.hasPortfolio ?? false,
+  ...(trustProfile?.legalStructure ? { legalStructure: trustProfile.legalStructure } : {}),
+  ...(trustProfile?.fundingStatus ? { fundingStatus: trustProfile.fundingStatus } : {}),
+});
+
 const normalizeStartupItem = (
   startup: Partial<MarketplaceStartupItem>,
 ): MarketplaceStartupItem => ({
@@ -311,6 +334,7 @@ const normalizeStartupItem = (
   ...(startup.launchedAt ? { launchedAt: startup.launchedAt } : {}),
   traction: normalizeStartupTraction(startup.traction),
   launchTargets: startup.launchTargets ?? [],
+  trustProfile: normalizeStartupTrustProfile(startup.trustProfile),
   founders: (startup.founders ?? []).map((founder) => normalizeFounderSummary(founder)),
   ...(startup.primaryFounderId ? { primaryFounderId: startup.primaryFounderId } : {}),
   ...(startup.project ? { project: normalizeProjectSummary(startup.project) } : {}),

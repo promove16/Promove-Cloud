@@ -14,9 +14,15 @@ import { Workspace } from '../workspace/workspace.model';
 import { ensureDirectWorkspaceChatAccess } from '../workspace/workspace.service';
 import { Deal } from '../deal/deal.model';
 import { AdminAuditLog } from '../admin/adminAuditLog.model';
-import type { StartupDocumentCategory, StartupEditAccess, StartupReadiness } from './startup.types';
+import type {
+  StartupDocumentCategory,
+  StartupEditAccess,
+  StartupInnovationProfile,
+  StartupInnovationScoreBreakdown,
+  StartupReadiness,
+} from './startup.types';
 
-const pdfFileNamePattern = /\.pdf$/i;
+const pitchDeckFileNamePattern = /\.(pdf|ppt|pptx)$/i;
 
 const STARTUP_DOCUMENT_CATEGORIES = [
   'business_plan',
@@ -41,6 +47,15 @@ const STARTUP_DOCUMENT_CATEGORIES = [
   'drawings_diagrams',
   'design_plan_sketch',
   'prior_art_search',
+  'dpiit_certificate',
+  'udyam_certificate',
+  'government_certificate_other',
+  'dpr',
+  'itr_filing',
+  'revenue_proof',
+  'grant_certificate',
+  'award_certificate',
+  'funding_proof',
 ] as const satisfies readonly StartupDocumentCategory[];
 
 const startupDocumentCategorySchema = z.enum(STARTUP_DOCUMENT_CATEGORIES);
@@ -92,6 +107,37 @@ const DEFAULT_INITIALIZATION_PROFILE = {
   risksAndMitigation: '',
 } as const;
 
+const DEFAULT_INNOVATION_PROFILE = {
+  companyProfile: {
+    legalStructure: 'not_registered',
+    cinNumber: '',
+    dpiitRecognitionNumber: '',
+    msmeUdyamNumber: '',
+    otherGovernmentCertificationName: '',
+    otherGovernmentCertificationNumber: '',
+    websiteUrl: '',
+    productDemoUrl: '',
+    portfolioUrl: '',
+  },
+  tractionProfile: {
+    startupStage: 'idea',
+    problemClarity: '',
+    uniqueSolution: '',
+    marketDifferentiation: '',
+    patentStatus: 'none',
+    hasItrFiling: false,
+    hasRevenueProof: false,
+    hasGovernmentGrant: false,
+    hasAwardRecognition: false,
+    fundingStatus: 'none',
+    activeUsersCustomers: 0,
+    monthlyGrowthRate: 0,
+    retentionRate: 0,
+  },
+} as const satisfies Omit<StartupInnovationProfile, 'rubricVersion'>;
+
+const REGISTERED_ENTITY_TYPES = new Set(['llp', 'private_limited', 'opc']);
+
 const documentLabelMap: Record<StartupDocumentCategory, string> = {
   business_plan: 'business plan or financial model',
   incorporation_certificate: 'certificate of incorporation',
@@ -115,6 +161,15 @@ const documentLabelMap: Record<StartupDocumentCategory, string> = {
   drawings_diagrams: 'drawings or diagrams',
   design_plan_sketch: 'design, plan, or pen-paper sketch',
   prior_art_search: 'prior art search notes',
+  dpiit_certificate: 'DPIIT certificate',
+  udyam_certificate: 'MSME or Udyam certificate',
+  government_certificate_other: 'other government certification proof',
+  dpr: 'detailed project report (DPR)',
+  itr_filing: 'ITR filing proof',
+  revenue_proof: 'revenue proof',
+  grant_certificate: 'government grant proof',
+  award_certificate: 'award or recognition proof',
+  funding_proof: 'funding proof',
 };
 
 const buildTextField = (max: number) => z.string().trim().max(max).default('');
@@ -192,6 +247,53 @@ const startupInitializationProfileSchema = z
   })
   .default(DEFAULT_INITIALIZATION_PROFILE);
 
+const startupInnovationProfileSchema = z
+  .object({
+    rubricVersion: z.enum(['startup_innovation_1000']).optional(),
+    companyProfile: z
+      .object({
+        legalStructure: z
+          .enum([
+            'not_registered',
+            'sole_proprietorship',
+            'partnership',
+            'llp',
+            'private_limited',
+            'opc',
+          ])
+          .default('not_registered'),
+        cinNumber: buildTextField(50),
+        dpiitRecognitionNumber: buildTextField(80),
+        msmeUdyamNumber: buildTextField(80),
+        otherGovernmentCertificationName: buildTextField(120),
+        otherGovernmentCertificationNumber: buildTextField(80),
+        websiteUrl: buildTextField(300),
+        productDemoUrl: buildTextField(300),
+        portfolioUrl: buildTextField(300),
+      })
+      .default(DEFAULT_INNOVATION_PROFILE.companyProfile),
+    tractionProfile: z
+      .object({
+        startupStage: z
+          .enum(['idea', 'mvp_ready', 'market_ready', 'revenue_generating'])
+          .default('idea'),
+        problemClarity: buildTextField(2000),
+        uniqueSolution: buildTextField(2000),
+        marketDifferentiation: buildTextField(2000),
+        patentStatus: z.enum(['none', 'filed', 'published']).default('none'),
+        hasItrFiling: z.boolean().default(false),
+        hasRevenueProof: z.boolean().default(false),
+        hasGovernmentGrant: z.boolean().default(false),
+        hasAwardRecognition: z.boolean().default(false),
+        fundingStatus: z.enum(['none', 'bootstrapped', 'angel_seed', 'vc']).default('none'),
+        activeUsersCustomers: z.number().int().min(0).default(0),
+        monthlyGrowthRate: z.number().min(0).default(0),
+        retentionRate: z.number().min(0).max(100).default(0),
+      })
+      .default(DEFAULT_INNOVATION_PROFILE.tractionProfile),
+  })
+  .default(DEFAULT_INNOVATION_PROFILE);
+
 export const startupSchema = z.object({
   projectId: z.string().optional(),
   name: z.string().trim().min(0).max(120).default(''),
@@ -217,6 +319,7 @@ export const startupSchema = z.object({
   businessProfile: startupBusinessProfileSchema,
   registrationProfile: startupRegistrationProfileSchema,
   initializationProfile: startupInitializationProfileSchema,
+  innovationProfile: startupInnovationProfileSchema.optional(),
 });
 
 export const launchSchema = z.object({
@@ -247,6 +350,7 @@ type StartupSchemaInput = z.input<typeof startupSchema>;
 type StartupBusinessProfileInput = z.input<typeof startupBusinessProfileSchema>;
 type StartupRegistrationProfileInput = z.input<typeof startupRegistrationProfileSchema>;
 type StartupInitializationProfileInput = z.input<typeof startupInitializationProfileSchema>;
+type StartupInnovationProfileInput = z.input<typeof startupInnovationProfileSchema>;
 
 type StartupLinkedWorkspace = {
   _id: Types.ObjectId;
@@ -424,10 +528,67 @@ const normalizeInitializationProfile = (
   };
 };
 
+const normalizeInnovationProfile = (
+  innovationProfile?: StartupInnovationProfileInput,
+) => {
+  const profile = startupInnovationProfileSchema.parse(
+    innovationProfile ?? DEFAULT_INNOVATION_PROFILE,
+  );
+
+  return {
+    ...(profile.rubricVersion ? { rubricVersion: profile.rubricVersion } : {}),
+    companyProfile: {
+      legalStructure: profile.companyProfile.legalStructure,
+      cinNumber: profile.companyProfile.cinNumber.trim(),
+      dpiitRecognitionNumber: profile.companyProfile.dpiitRecognitionNumber.trim(),
+      msmeUdyamNumber: profile.companyProfile.msmeUdyamNumber.trim(),
+      otherGovernmentCertificationName:
+        profile.companyProfile.otherGovernmentCertificationName.trim(),
+      otherGovernmentCertificationNumber:
+        profile.companyProfile.otherGovernmentCertificationNumber.trim(),
+      websiteUrl: profile.companyProfile.websiteUrl.trim(),
+      productDemoUrl: profile.companyProfile.productDemoUrl.trim(),
+      portfolioUrl: profile.companyProfile.portfolioUrl.trim(),
+    },
+    tractionProfile: {
+      startupStage: profile.tractionProfile.startupStage,
+      problemClarity: profile.tractionProfile.problemClarity.trim(),
+      uniqueSolution: profile.tractionProfile.uniqueSolution.trim(),
+      marketDifferentiation: profile.tractionProfile.marketDifferentiation.trim(),
+      patentStatus: profile.tractionProfile.patentStatus,
+      hasItrFiling: profile.tractionProfile.hasItrFiling,
+      hasRevenueProof: profile.tractionProfile.hasRevenueProof,
+      hasGovernmentGrant: profile.tractionProfile.hasGovernmentGrant,
+      hasAwardRecognition: profile.tractionProfile.hasAwardRecognition,
+      fundingStatus: profile.tractionProfile.fundingStatus,
+      activeUsersCustomers: Math.max(0, Math.round(profile.tractionProfile.activeUsersCustomers)),
+      monthlyGrowthRate: Math.max(0, Number(profile.tractionProfile.monthlyGrowthRate) || 0),
+      retentionRate: Math.min(100, Math.max(0, Number(profile.tractionProfile.retentionRate) || 0)),
+    },
+  };
+};
+
+const mapScoringStageToStartupStage = (
+  scoringStage: StartupInnovationProfile['tractionProfile']['startupStage'],
+): StartupSchemaInput['stage'] => {
+  switch (scoringStage) {
+    case 'idea':
+      return 'Ideation';
+    case 'mvp_ready':
+      return 'MVP';
+    case 'market_ready':
+    case 'revenue_generating':
+      return 'Pre-Launch';
+    default:
+      return 'Pre-Idea';
+  }
+};
+
 const buildStartupInput = (source: Partial<Record<string, any>>): StartupSchemaInput => {
   const businessProfileSource = source.businessProfile ?? {};
   const registrationProfileSource = source.registrationProfile ?? {};
   const initializationProfileSource = source.initializationProfile ?? {};
+  const innovationProfileSource = source.innovationProfile ?? {};
   const tractionSource = source.traction ?? {};
 
   const businessProfile: StartupBusinessProfileInput = {
@@ -443,6 +604,19 @@ const buildStartupInput = (source: Partial<Record<string, any>>): StartupSchemaI
   const initializationProfile: StartupInitializationProfileInput = {
     ...DEFAULT_INITIALIZATION_PROFILE,
     ...initializationProfileSource,
+  };
+
+  const innovationProfile: StartupInnovationProfileInput = {
+    ...DEFAULT_INNOVATION_PROFILE,
+    ...innovationProfileSource,
+    companyProfile: {
+      ...DEFAULT_INNOVATION_PROFILE.companyProfile,
+      ...(innovationProfileSource.companyProfile ?? {}),
+    },
+    tractionProfile: {
+      ...DEFAULT_INNOVATION_PROFILE.tractionProfile,
+      ...(innovationProfileSource.tractionProfile ?? {}),
+    },
   };
 
   return {
@@ -463,6 +637,7 @@ const buildStartupInput = (source: Partial<Record<string, any>>): StartupSchemaI
     businessProfile,
     registrationProfile,
     initializationProfile,
+    innovationProfile,
   };
 };
 
@@ -474,13 +649,27 @@ const normalizeStartupPayload = (payload: StartupSchemaInput) => {
   const initializationProfile = normalizeInitializationProfile(
     normalizedPayload.initializationProfile ?? DEFAULT_INITIALIZATION_PROFILE,
   );
+  const innovationProfile = normalizeInnovationProfile(normalizedPayload.innovationProfile);
   const businessProfile = normalizedPayload.businessProfile ?? DEFAULT_BUSINESS_PROFILE;
+  const startupStageFromRubric = innovationProfile.rubricVersion
+    ? mapScoringStageToStartupStage(innovationProfile.tractionProfile.startupStage)
+    : normalizedPayload.stage;
+  const tractionFromRubric = innovationProfile.rubricVersion
+    ? {
+        patentFiled: innovationProfile.tractionProfile.patentStatus !== 'none',
+        mvpBuilt: innovationProfile.tractionProfile.startupStage !== 'idea',
+        revenueGenerating:
+          innovationProfile.tractionProfile.startupStage === 'revenue_generating',
+        usersCount: innovationProfile.tractionProfile.activeUsersCustomers,
+      }
+    : normalizedPayload.traction;
 
   return {
     ...normalizedPayload,
     name: normalizedPayload.name.trim(),
     tagline: normalizedPayload.tagline.trim(),
     category: normalizedPayload.category.trim(),
+    stage: startupStageFromRubric,
     businessProfile: {
       problemStatement: businessProfile.problemStatement.trim(),
       solutionSummary: businessProfile.solutionSummary.trim(),
@@ -491,7 +680,8 @@ const normalizeStartupPayload = (payload: StartupSchemaInput) => {
     },
     registrationProfile,
     initializationProfile,
-    traction: normalizedPayload.traction,
+    innovationProfile,
+    traction: tractionFromRubric,
   };
 };
 
@@ -603,7 +793,7 @@ const buildAccessibleStartupQuery = (userId: string, workspaceIds: Types.ObjectI
   ],
 });
 
-const getRequiredStartupDocumentCategories = (startup: {
+const getLegacyRequiredStartupDocumentCategories = (startup: {
   initializationProfile?: {
     productStage?: string;
   };
@@ -616,6 +806,65 @@ const getRequiredStartupDocumentCategories = (startup: {
   return stage === 'idea' ? ['design_plan_sketch'] : ['technical_documentation'];
 };
 
+const usesInnovationRubric = (startup: Record<string, any>) =>
+  startup.innovationProfile?.rubricVersion === 'startup_innovation_1000';
+
+const getUploadedDocumentCategories = (
+  documents?: Array<{ category?: StartupDocumentCategory }>,
+) =>
+  Array.from(
+    new Set(
+      (documents ?? [])
+        .map((document) => document.category)
+        .filter((category): category is StartupDocumentCategory => Boolean(category)),
+    ),
+  );
+
+const getInnovationRequiredDocumentCategories = (startup: Record<string, any>) => {
+  const companyProfile = startup.innovationProfile?.companyProfile ?? {};
+  const tractionProfile = startup.innovationProfile?.tractionProfile ?? {};
+  const requiredDocuments = new Set<StartupDocumentCategory>();
+
+  if (
+    REGISTERED_ENTITY_TYPES.has(companyProfile.legalStructure) ||
+    Boolean(companyProfile.cinNumber?.trim())
+  ) {
+    requiredDocuments.add('incorporation_certificate');
+  }
+  if (companyProfile.dpiitRecognitionNumber?.trim()) {
+    requiredDocuments.add('dpiit_certificate');
+  }
+  if (companyProfile.msmeUdyamNumber?.trim()) {
+    requiredDocuments.add('udyam_certificate');
+  }
+  if (
+    companyProfile.otherGovernmentCertificationName?.trim() ||
+    companyProfile.otherGovernmentCertificationNumber?.trim()
+  ) {
+    requiredDocuments.add('government_certificate_other');
+  }
+  if (tractionProfile.patentStatus && tractionProfile.patentStatus !== 'none') {
+    requiredDocuments.add('patent_proof');
+  }
+  if (tractionProfile.hasItrFiling) {
+    requiredDocuments.add('itr_filing');
+  }
+  if (tractionProfile.hasRevenueProof) {
+    requiredDocuments.add('revenue_proof');
+  }
+  if (tractionProfile.hasGovernmentGrant) {
+    requiredDocuments.add('grant_certificate');
+  }
+  if (tractionProfile.hasAwardRecognition) {
+    requiredDocuments.add('award_certificate');
+  }
+  if (tractionProfile.fundingStatus === 'angel_seed' || tractionProfile.fundingStatus === 'vc') {
+    requiredDocuments.add('funding_proof');
+  }
+
+  return Array.from(requiredDocuments);
+};
+
 const toIsoString = (value: unknown) => {
   if (!value) return undefined;
   if (value instanceof Date) return value.toISOString();
@@ -624,7 +873,7 @@ const toIsoString = (value: unknown) => {
   return Number.isNaN(normalized.getTime()) ? undefined : normalized.toISOString();
 };
 
-const buildStartupReadiness = (startup: {
+const buildLegacyStartupReadiness = (startup: {
   name?: string;
   tagline?: string;
   category?: string;
@@ -678,16 +927,14 @@ const buildStartupReadiness = (startup: {
 }): StartupReadiness => {
   const missingItems: string[] = [];
   const founderIds = Array.isArray(startup.founderIds) ? startup.founderIds : [];
-  const documents = startup.documents ?? [];
-  const uploadedDocumentCategories = Array.from(
-    new Set(
-      documents
-        .map((document) => document.category)
-        .filter((category): category is StartupDocumentCategory => Boolean(category)),
-    ),
-  );
+  const uploadedDocumentCategories = getUploadedDocumentCategories(startup.documents);
   const uploadedCategorySet = new Set(uploadedDocumentCategories);
-  const requiredDocumentCategories = getRequiredStartupDocumentCategories(startup);
+  const requiredDocumentCategories = getLegacyRequiredStartupDocumentCategories(startup);
+  const hasInitializationNarrative = Boolean(
+    startup.initializationProfile?.vision?.trim() ||
+      startup.initializationProfile?.mission?.trim() ||
+      startup.initializationProfile?.productOverview?.trim(),
+  );
 
   const addMissing = (condition: boolean, label: string) => {
     if (condition) missingItems.push(label);
@@ -697,23 +944,38 @@ const buildStartupReadiness = (startup: {
   addMissing(!startup.tagline?.trim(), 'startup tagline');
   addMissing(!startup.category?.trim(), 'startup category');
   addMissing(founderIds.length === 0, 'at least one founder');
-  addMissing((startup.initializationProfile?.vision?.trim().length ?? 0) < 40, 'startup vision');
-  addMissing((startup.initializationProfile?.mission?.trim().length ?? 0) < 40, 'startup mission');
-  addMissing((startup.initializationProfile?.foundingStory?.trim().length ?? 0) < 60, 'founding story');
-  addMissing((startup.initializationProfile?.teamComposition?.trim().length ?? 0) < 40, 'team composition');
-  addMissing(!startup.initializationProfile?.productStage?.trim(), 'product stage');
-  addMissing((startup.initializationProfile?.productOverview?.trim().length ?? 0) < 40, 'product overview');
-  addMissing((startup.initializationProfile?.customerProfile?.trim().length ?? 0) < 30, 'ideal customer profile');
-  addMissing((startup.initializationProfile?.marketOpportunity?.trim().length ?? 0) < 40, 'market opportunity');
-  addMissing(!startup.initializationProfile?.businessModel?.trim(), 'business model');
-  addMissing((startup.initializationProfile?.pricingStrategy?.trim().length ?? 0) < 30, 'pricing strategy');
-  addMissing((startup.initializationProfile?.competitiveLandscape?.trim().length ?? 0) < 30, 'competitive landscape');
-  addMissing((startup.initializationProfile?.defensibleMoat?.trim().length ?? 0) < 30, 'defensible moat');
-  addMissing((startup.initializationProfile?.currentTraction?.trim().length ?? 0) < 20, 'current traction');
-  addMissing((startup.initializationProfile?.upcomingMilestones?.trim().length ?? 0) < 30, 'upcoming milestones');
-  addMissing((startup.initializationProfile?.fundingAsk?.trim().length ?? 0) < 30, 'funding ask');
-  addMissing(!startup.initializationProfile?.legalEntityType?.trim(), 'legal entity type');
-  addMissing((startup.initializationProfile?.risksAndMitigation?.trim().length ?? 0) < 30, 'risks and mitigation');
+
+  if (hasInitializationNarrative) {
+    addMissing((startup.initializationProfile?.vision?.trim().length ?? 0) < 40, 'startup vision');
+    addMissing((startup.initializationProfile?.mission?.trim().length ?? 0) < 40, 'startup mission');
+    addMissing((startup.initializationProfile?.foundingStory?.trim().length ?? 0) < 60, 'founding story');
+    addMissing((startup.initializationProfile?.teamComposition?.trim().length ?? 0) < 40, 'team composition');
+    addMissing(!startup.initializationProfile?.productStage?.trim(), 'product stage');
+    addMissing((startup.initializationProfile?.productOverview?.trim().length ?? 0) < 40, 'product overview');
+    addMissing((startup.initializationProfile?.customerProfile?.trim().length ?? 0) < 30, 'ideal customer profile');
+    addMissing((startup.initializationProfile?.marketOpportunity?.trim().length ?? 0) < 40, 'market opportunity');
+    addMissing(!startup.initializationProfile?.businessModel?.trim(), 'business model');
+    addMissing((startup.initializationProfile?.pricingStrategy?.trim().length ?? 0) < 30, 'pricing strategy');
+    addMissing((startup.initializationProfile?.competitiveLandscape?.trim().length ?? 0) < 30, 'competitive landscape');
+    addMissing((startup.initializationProfile?.defensibleMoat?.trim().length ?? 0) < 30, 'defensible moat');
+    addMissing((startup.initializationProfile?.currentTraction?.trim().length ?? 0) < 20, 'current traction');
+    addMissing((startup.initializationProfile?.upcomingMilestones?.trim().length ?? 0) < 30, 'upcoming milestones');
+    addMissing((startup.initializationProfile?.fundingAsk?.trim().length ?? 0) < 30, 'funding ask');
+    addMissing(!startup.initializationProfile?.legalEntityType?.trim(), 'legal entity type');
+    addMissing((startup.initializationProfile?.risksAndMitigation?.trim().length ?? 0) < 30, 'risks and mitigation');
+  } else {
+    addMissing((startup.registrationProfile?.problemStatement?.trim().length ?? 0) < 40, 'problem statement');
+    addMissing(
+      (startup.registrationProfile?.solutionDifferentiation?.trim().length ?? 0) < 40,
+      'solution differentiation',
+    );
+    addMissing((startup.registrationProfile?.coreInnovation?.trim().length ?? 0) < 30, 'core innovation');
+    addMissing((startup.registrationProfile?.workingMechanism?.trim().length ?? 0) < 40, 'working mechanism');
+    addMissing((startup.registrationProfile?.keyComponents?.trim().length ?? 0) < 20, 'key components');
+    addMissing((startup.registrationProfile?.documentationReadiness?.trim().length ?? 0) < 10, 'documentation readiness');
+    addMissing((startup.registrationProfile?.targetMarkets?.trim().length ?? 0) < 20, 'target markets');
+    addMissing(!startup.registrationProfile?.developmentStage?.trim(), 'development stage');
+  }
   addMissing(!startup.pitchDeckUrl && !uploadedCategorySet.has('business_plan'), 'business plan or pitch deck upload');
 
   for (const category of requiredDocumentCategories) {
@@ -727,6 +989,73 @@ const buildStartupReadiness = (startup: {
     uploadedDocumentCategories,
   };
 };
+
+const buildInnovationStartupReadiness = (startup: Record<string, any>): StartupReadiness => {
+  const missingItems: string[] = [];
+  const founderIds = Array.isArray(startup.founderIds) ? startup.founderIds : [];
+  const companyProfile = startup.innovationProfile?.companyProfile ?? {};
+  const tractionProfile = startup.innovationProfile?.tractionProfile ?? {};
+  const uploadedDocumentCategories = getUploadedDocumentCategories(startup.documents);
+  const uploadedCategorySet = new Set(uploadedDocumentCategories);
+  const requiredDocumentCategories = getInnovationRequiredDocumentCategories(startup);
+
+  const addMissing = (condition: boolean, label: string) => {
+    if (condition) {
+      missingItems.push(label);
+    }
+  };
+
+  addMissing(!startup.name?.trim(), 'startup name');
+  addMissing(!startup.tagline?.trim(), 'startup tagline');
+  addMissing(!startup.category?.trim(), 'startup category');
+  addMissing(founderIds.length === 0, 'at least one founder');
+  addMissing(!companyProfile.legalStructure?.trim(), 'legal structure');
+  addMissing(
+    REGISTERED_ENTITY_TYPES.has(companyProfile.legalStructure) &&
+      !companyProfile.cinNumber?.trim(),
+    'CIN number',
+  );
+  addMissing(
+    !startup.pitchDeckUrl && !uploadedCategorySet.has('dpr'),
+    'pitch deck or DPR upload',
+  );
+  addMissing(
+    !companyProfile.websiteUrl?.trim() &&
+      !companyProfile.productDemoUrl?.trim() &&
+      !companyProfile.portfolioUrl?.trim(),
+    'website, demo, or portfolio link',
+  );
+  addMissing(!tractionProfile.startupStage?.trim(), 'startup stage');
+  addMissing((tractionProfile.problemClarity?.trim().length ?? 0) < 30, 'problem clarity');
+  addMissing((tractionProfile.uniqueSolution?.trim().length ?? 0) < 30, 'unique solution');
+  addMissing(
+    (tractionProfile.marketDifferentiation?.trim().length ?? 0) < 30,
+    'market differentiation',
+  );
+
+  if (
+    companyProfile.otherGovernmentCertificationName?.trim() &&
+    !companyProfile.otherGovernmentCertificationNumber?.trim()
+  ) {
+    missingItems.push('other government certification number');
+  }
+
+  for (const category of requiredDocumentCategories) {
+    addMissing(!uploadedCategorySet.has(category), documentLabelMap[category]);
+  }
+
+  return {
+    isReviewReady: missingItems.length === 0,
+    missingItems,
+    requiredDocumentCategories,
+    uploadedDocumentCategories,
+  };
+};
+
+const buildStartupReadiness = (startup: Record<string, any>): StartupReadiness =>
+  usesInnovationRubric(startup)
+    ? buildInnovationStartupReadiness(startup)
+    : buildLegacyStartupReadiness(startup as never);
 
 const formatReadinessErrorMessage = (readiness: StartupReadiness) => {
   if (readiness.missingItems.length === 0) return 'Startup profile is incomplete for review.';
@@ -745,8 +1074,10 @@ const completionScore = (checks: boolean[], maxScore: number) => {
   return Math.round((completed / checks.length) * maxScore);
 };
 
-const calculateStartupInnovationScore = (startup: Record<string, any>) => {
-  const readiness = buildStartupReadiness(startup as never);
+const buildLegacyInnovationScoreBreakdown = (
+  startup: Record<string, any>,
+): StartupInnovationScoreBreakdown => {
+  const readiness = buildLegacyStartupReadiness(startup as never);
   const businessProfile = startup.businessProfile ?? {};
   const initializationProfile = startup.initializationProfile ?? {};
   const traction = startup.traction ?? {};
@@ -811,13 +1142,194 @@ const calculateStartupInnovationScore = (startup: Record<string, any>) => {
       (startup.reviewStatus === 'approved' ? 20 : 0),
   );
 
-  return normalizeInnovationScore(
+  const total = normalizeInnovationScore(
     businessScore + registrationScore + documentationScore + tractionScore + teamScore,
   );
+
+  return {
+    total,
+    companyProfile: {
+      total: businessScore + documentationScore,
+      businessScore,
+      documentationScore,
+    },
+    healthAndTraction: {
+      total: registrationScore + tractionScore + teamScore,
+      registrationScore,
+      tractionScore,
+      teamScore,
+    },
+  };
 };
+
+const calculateMetricScore = (
+  value: number,
+  thresholds: Array<{ min: number; score: number }>,
+) => {
+  for (const threshold of thresholds) {
+    if (value >= threshold.min) {
+      return threshold.score;
+    }
+  }
+  return 0;
+};
+
+const buildRubricInnovationScoreBreakdown = (
+  startup: Record<string, any>,
+): StartupInnovationScoreBreakdown => {
+  const uploadedDocuments = new Set(getUploadedDocumentCategories(startup.documents));
+  const companyProfile = startup.innovationProfile?.companyProfile ?? {};
+  const tractionProfile = startup.innovationProfile?.tractionProfile ?? {};
+
+  const legalStructure = REGISTERED_ENTITY_TYPES.has(companyProfile.legalStructure) ? 50 : 0;
+  const cinNumber =
+    companyProfile.cinNumber?.trim() && uploadedDocuments.has('incorporation_certificate')
+      ? 30
+      : 0;
+  const dpiitRecognition =
+    companyProfile.dpiitRecognitionNumber?.trim() && uploadedDocuments.has('dpiit_certificate')
+      ? 70
+      : 0;
+  const msmeUdyam =
+    companyProfile.msmeUdyamNumber?.trim() && uploadedDocuments.has('udyam_certificate')
+      ? 20
+      : 0;
+  const otherGovernmentCertification =
+    (companyProfile.otherGovernmentCertificationName?.trim() ||
+      companyProfile.otherGovernmentCertificationNumber?.trim()) &&
+    uploadedDocuments.has('government_certificate_other')
+      ? 10
+      : 0;
+  const governmentRecognition = Math.min(
+    100,
+    dpiitRecognition + msmeUdyam + otherGovernmentCertification,
+  );
+  const companyDocumentation = startup.pitchDeckUrl || uploadedDocuments.has('dpr') ? 50 : 0;
+  const portfolioPresence =
+    companyProfile.websiteUrl?.trim() ||
+    companyProfile.productDemoUrl?.trim() ||
+    companyProfile.portfolioUrl?.trim()
+      ? 20
+      : 0;
+
+  const stageScoreMap = {
+    idea: 50,
+    mvp_ready: 100,
+    market_ready: 150,
+    revenue_generating: 200,
+  } as const;
+  const startupStage =
+    stageScoreMap[
+      (tractionProfile.startupStage as keyof typeof stageScoreMap) ?? 'idea'
+    ] ?? 0;
+  const problemClarity = (tractionProfile.problemClarity?.trim().length ?? 0) >= 30 ? 40 : 0;
+  const uniqueSolution = (tractionProfile.uniqueSolution?.trim().length ?? 0) >= 30 ? 40 : 0;
+  const marketDifferentiation =
+    (tractionProfile.marketDifferentiation?.trim().length ?? 0) >= 30 ? 40 : 0;
+  const innovationUniqueness = problemClarity + uniqueSolution + marketDifferentiation;
+  const patentStrength =
+    tractionProfile.patentStatus === 'published' && uploadedDocuments.has('patent_proof')
+      ? 120
+      : tractionProfile.patentStatus === 'filed' && uploadedDocuments.has('patent_proof')
+        ? 40
+        : 0;
+  const itrFiling =
+    tractionProfile.hasItrFiling && uploadedDocuments.has('itr_filing') ? 40 : 0;
+  const revenueProof =
+    tractionProfile.hasRevenueProof && uploadedDocuments.has('revenue_proof') ? 80 : 0;
+  const revenueValidation = itrFiling + revenueProof;
+  const governmentGrant =
+    tractionProfile.hasGovernmentGrant && uploadedDocuments.has('grant_certificate') ? 40 : 0;
+  const awardsRecognition =
+    tractionProfile.hasAwardRecognition && uploadedDocuments.has('award_certificate') ? 20 : 0;
+  const grantsAndRecognition = governmentGrant + awardsRecognition;
+  const fundingStatus =
+    tractionProfile.fundingStatus === 'vc'
+      ? uploadedDocuments.has('funding_proof')
+        ? 60
+        : 0
+      : tractionProfile.fundingStatus === 'angel_seed'
+        ? uploadedDocuments.has('funding_proof')
+          ? 40
+          : 0
+        : tractionProfile.fundingStatus === 'bootstrapped'
+          ? 20
+          : 0;
+  const activeUsersCustomers = calculateMetricScore(
+    Number(tractionProfile.activeUsersCustomers) || 0,
+    [
+      { min: 500, score: 30 },
+      { min: 100, score: 25 },
+      { min: 25, score: 15 },
+      { min: 1, score: 5 },
+    ],
+  );
+  const growthRate = calculateMetricScore(Number(tractionProfile.monthlyGrowthRate) || 0, [
+    { min: 20, score: 20 },
+    { min: 10, score: 15 },
+    { min: 5, score: 10 },
+    { min: 1, score: 5 },
+  ]);
+  const retention = calculateMetricScore(Number(tractionProfile.retentionRate) || 0, [
+    { min: 60, score: 20 },
+    { min: 40, score: 15 },
+    { min: 20, score: 10 },
+    { min: 1, score: 5 },
+  ]);
+  const tractionMetrics = activeUsersCustomers + growthRate + retention;
+
+  const companyTotal =
+    legalStructure +
+    cinNumber +
+    governmentRecognition +
+    companyDocumentation +
+    portfolioPresence;
+  const healthTotal =
+    startupStage +
+    innovationUniqueness +
+    patentStrength +
+    revenueValidation +
+    grantsAndRecognition +
+    fundingStatus +
+    tractionMetrics;
+  const total = normalizeInnovationScore(companyTotal + healthTotal);
+
+  return {
+    total,
+    companyProfile: {
+      total: companyTotal,
+      legalStructure,
+      cinNumber,
+      governmentRecognition,
+      companyDocumentation,
+      portfolioPresence,
+    },
+    healthAndTraction: {
+      total: healthTotal,
+      startupStage,
+      innovationUniqueness,
+      patentStrength,
+      revenueValidation,
+      grantsAndRecognition,
+      fundingStatus,
+      tractionMetrics,
+    },
+  };
+};
+
+const calculateStartupInnovationScoreBreakdown = (
+  startup: Record<string, any>,
+): StartupInnovationScoreBreakdown =>
+  usesInnovationRubric(startup)
+    ? buildRubricInnovationScoreBreakdown(startup)
+    : buildLegacyInnovationScoreBreakdown(startup);
+
+const calculateStartupInnovationScore = (startup: Record<string, any>) =>
+  calculateStartupInnovationScoreBreakdown(startup).total;
 
 const sanitizeStartupForClient = (startup: Record<string, any>) => {
   const editAccess = buildStartupEditAccess(startup);
+  const innovationScorePreview = calculateStartupInnovationScoreBreakdown(startup);
 
   let pitchDeckUrl = startup.pitchDeckUrl;
   if (pitchDeckUrl) {
@@ -853,6 +1365,7 @@ const sanitizeStartupForClient = (startup: Record<string, any>) => {
       ...(editAccess.unlockedBy ? { unlockedBy: String(editAccess.unlockedBy) } : {}),
     },
     readiness: buildStartupReadiness(startup as never),
+    innovationScorePreview,
   };
 };
 
@@ -951,6 +1464,18 @@ export const updateStartupProfile = async (
     registrationProfile: {
       ...(startupSnapshot.registrationProfile ?? {}),
       ...(payload.registrationProfile ?? {}),
+    },
+    innovationProfile: {
+      ...(startupSnapshot.innovationProfile ?? {}),
+      ...(payload.innovationProfile ?? {}),
+      companyProfile: {
+        ...(startupSnapshot.innovationProfile?.companyProfile ?? {}),
+        ...(payload.innovationProfile?.companyProfile ?? {}),
+      },
+      tractionProfile: {
+        ...(startupSnapshot.innovationProfile?.tractionProfile ?? {}),
+        ...(payload.innovationProfile?.tractionProfile ?? {}),
+      },
     },
     traction: {
       ...(startupSnapshot.traction ?? {}),
@@ -1141,8 +1666,13 @@ startup.launchedToInvestors = startup.launchedToInvestors || payload.launchTo ==
 };
 
 export const uploadPitchDeck = async (startupId: string, userId: string, file: Express.Multer.File) => {
-  if (file.mimetype !== 'application/pdf' && !pdfFileNamePattern.test(file.originalname)) {
-    throw new ApiError(400, 'INVALID_FILE_TYPE', 'Only PDF files are allowed');
+  const isPdf = file.mimetype === 'application/pdf';
+  const isPowerPoint =
+    file.mimetype === 'application/vnd.ms-powerpoint' ||
+    file.mimetype ===
+      'application/vnd.openxmlformats-officedocument.presentationml.presentation';
+  if ((!isPdf && !isPowerPoint) || !pitchDeckFileNamePattern.test(file.originalname)) {
+    throw new ApiError(400, 'INVALID_FILE_TYPE', 'Only PDF, PPT, or PPTX files are allowed');
   }
   const startup = await getStartupForFounder(startupId, userId);
   prepareStartupForEditableMutation(startup);
@@ -1158,7 +1688,7 @@ export const uploadPitchDeck = async (startupId: string, userId: string, file: E
     buffer: file.buffer,
     folder: 'promove/startups',
     fileName: file.originalname,
-    contentType: file.mimetype || 'application/pdf',
+    contentType: file.mimetype || 'application/octet-stream',
   });
 
   startup.pitchDeckUrl = uploaded.url;

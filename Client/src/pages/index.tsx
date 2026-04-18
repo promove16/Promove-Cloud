@@ -79,6 +79,7 @@ const AdminDashboard = lazy(() => import("../features/admin/Dashboard"));
 const AdminUserManagement = lazy(() => import("../features/admin/UserManagement"));
 const AdminUserRequests = lazy(() => import("../features/admin/UserRequests"));
 const AdminUserDirectory = lazy(() => import("../features/admin/UserDirectory"));
+const AdminPatentsWorkspace = lazy(() => import("../features/admin/PatentsWorkspace"));
 const AdminPatents = lazy(() => import("../features/admin/Patents"));
 const AdminPatentRequests = lazy(() => import("../features/admin/PatentRequests"));
 const AdminStartups = lazy(() => import("../features/admin/Startups"));
@@ -172,11 +173,6 @@ const StudentMentorSessions = lazy(() =>
     default: module.StudentMentorSessions,
   })),
 );
-const StudentInvestorDeals = lazy(() =>
-  import("../app/pages/dashboards/StudentInvestorDeals").then((module) => ({
-    default: module.StudentInvestorDeals,
-  })),
-);
 const ProblemBank = lazy(() =>
   import("../app/pages/ProblemBank").then((module) => ({
     default: module.ProblemBank,
@@ -194,7 +190,7 @@ const PatentSupport = lazy(() =>
 );
 const StartupLaunch = lazy(() =>
   import("../app/pages/StartupLaunch").then((module) => ({
-    default: module.StartupLaunch,
+    default: module.StartupLaunch ?? module.default,
   })),
 );
 const Portfolio = lazy(() =>
@@ -639,7 +635,7 @@ export const router = createBrowserRouter([
             { path: "investor-outreach", element: <LazyPage component={InvestorOutreach} /> },
             { path: "product-workspace", element: <LazyPage component={StartupWorkspace} /> },
             { path: "cap-table", element: <LazyPage component={StartupCapTable} /> },
-            { path: "investor-deals", element: <LazyPage component={StudentInvestorDeals} /> },
+            { path: "investor-deals", element: <Navigate to="../cap-table" replace /> },
             { path: "patent-support", element: <LazyPage component={PatentSupport} /> },
           ],
         },
@@ -808,8 +804,20 @@ export const router = createBrowserRouter([
                   { path: "directory", element: <LazyPage component={AdminUserDirectory} /> },
                 ],
               },
-              { path: "patents", element: <LazyPage component={AdminPatents} /> },
-              { path: "patent-requests", element: <LazyPage component={AdminPatentRequests} /> },
+              {
+                path: "patents",
+                element: <LazyPage component={AdminPatentsWorkspace} />,
+                children: [
+                  { index: true, element: <Navigate to="review" replace /> },
+                  { path: "review", element: <LazyPage component={AdminPatents} /> },
+                  { path: "assisted-filing", element: <LazyPage component={AdminPatentRequests} /> },
+                  { path: "*", element: <Navigate to="review" replace /> },
+                ],
+              },
+              {
+                path: "patent-requests",
+                element: <Navigate to="/dashboard/admin/patents/assisted-filing" replace />,
+              },
               { path: "startups", element: <LazyPage component={AdminStartups} /> },
               {
                 path: "deals",

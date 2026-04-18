@@ -23,14 +23,20 @@ import {
   getPitchRequestsController,
 } from './startup.controller';
 
-const pdfFileNamePattern = /\.pdf$/i;
+const pitchDeckFileNamePattern = /\.(pdf|ppt|pptx)$/i;
+const documentPdfFileNamePattern = /\.pdf$/i;
 
 const upload = multer({
   storage: multer.memoryStorage(),
   limits: { fileSize: 10 * 1024 * 1024 },
   fileFilter: (_req, file, cb) => {
-    if (file.mimetype !== 'application/pdf' && !pdfFileNamePattern.test(file.originalname)) {
-      cb(new ApiError(400, 'INVALID_FILE_TYPE', 'Only PDF files are allowed'));
+    const isPdf = file.mimetype === 'application/pdf';
+    const isPowerPoint =
+      file.mimetype === 'application/vnd.ms-powerpoint' ||
+      file.mimetype ===
+        'application/vnd.openxmlformats-officedocument.presentationml.presentation';
+    if ((!isPdf && !isPowerPoint) || !pitchDeckFileNamePattern.test(file.originalname)) {
+      cb(new ApiError(400, 'INVALID_FILE_TYPE', 'Only PDF, PPT, or PPTX files are allowed'));
       return;
     }
     cb(null, true);
@@ -41,7 +47,8 @@ const documentUpload = multer({
   storage: multer.memoryStorage(),
   limits: { fileSize: 3 * 1024 * 1024 },
   fileFilter: (_req, file, cb) => {
-    const isPdf = file.mimetype === 'application/pdf' || pdfFileNamePattern.test(file.originalname);
+    const isPdf =
+      file.mimetype === 'application/pdf' || documentPdfFileNamePattern.test(file.originalname);
     const isImage = file.mimetype.startsWith('image/');
     if (!isPdf && !isImage) {
       cb(new ApiError(400, 'INVALID_FILE_TYPE', 'Only PDF or image files are allowed'));

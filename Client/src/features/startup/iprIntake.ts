@@ -583,10 +583,7 @@ export const buildStartupReviewReadiness = (startup: {
   const registrationProfile = startup.registrationProfile ?? DEFAULT_STARTUP_IPR_PROFILE;
   const initializationProfile =
     startup.initializationProfile ?? DEFAULT_STARTUP_INIT_PROFILE;
-  const requiredDocumentCategories = getRequiredStartupDocumentCategories({
-    registrationProfile,
-    initializationProfile,
-  });
+  const requiredDocumentCategories: StartupDocumentCategory[] = [];
 
   const addMissing = (condition: boolean, label: string) => {
     if (condition) {
@@ -615,26 +612,6 @@ export const buildStartupReviewReadiness = (startup: {
   addMissing(initializationProfile.fundingAsk.trim().length < 30, 'funding ask');
   addMissing(!initializationProfile.legalEntityType.trim(), 'legal entity type');
   addMissing(initializationProfile.risksAndMitigation.trim().length < 30, 'risks and mitigation');
-  addMissing(registrationProfile.problemStatement.trim().length < 40, 'IPR problem statement');
-  addMissing(registrationProfile.solutionDifferentiation.trim().length < 40, 'solution differentiation');
-  addMissing(registrationProfile.coreInnovation.trim().length < 30, 'core innovation');
-  addMissing(registrationProfile.priorArtStatus.trim().length < 20, 'prior art status');
-  addMissing(registrationProfile.workingMechanism.trim().length < 40, 'working mechanism');
-  addMissing(registrationProfile.keyComponents.trim().length < 20, 'key components');
-  addMissing(!registrationProfile.developmentStage.trim(), 'innovation stage');
-  addMissing(registrationProfile.documentationReadiness.trim().length < 10, 'documentation readiness');
-  addMissing(!registrationProfile.inventorOwnership.trim(), 'inventor ownership');
-  addMissing(registrationProfile.developmentContext.trim().length < 20, 'development context');
-  addMissing(registrationProfile.targetMarkets.trim().length < 20, 'target markets');
-  addMissing(!registrationProfile.commercializationStrategy.trim(), 'commercialization strategy');
-  addMissing(registrationProfile.publicDisclosureStatus.trim().length < 10, 'public disclosure status');
-  addMissing(registrationProfile.legalAgreements.trim().length < 10, 'legal agreements');
-  addMissing(!registrationProfile.ipProtectionType.trim(), 'IP protection type');
-  addMissing(!startup.pitchDeckUrl && !uploadedCategorySet.has('business_plan'), 'business plan or pitch deck upload');
-
-  for (const category of requiredDocumentCategories) {
-    addMissing(!uploadedCategorySet.has(category), startupDocumentLabels[category] ?? category.replace(/_/g, ' '));
-  }
 
   return {
     isReviewReady: missingItems.length === 0,

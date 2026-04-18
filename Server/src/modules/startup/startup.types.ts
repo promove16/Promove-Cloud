@@ -46,7 +46,24 @@ export type StartupDocumentCategory =
   | 'technical_documentation'
   | 'drawings_diagrams'
   | 'design_plan_sketch'
-  | 'prior_art_search';
+  | 'prior_art_search'
+  | 'dpiit_certificate'
+  | 'udyam_certificate'
+  | 'government_certificate_other'
+  | 'dpr'
+  | 'itr_filing'
+  | 'revenue_proof'
+  | 'grant_certificate'
+  | 'award_certificate'
+  | 'funding_proof';
+export type StartupRubricVersion = 'startup_innovation_1000';
+export type StartupScoringStage =
+  | 'idea'
+  | 'mvp_ready'
+  | 'market_ready'
+  | 'revenue_generating';
+export type StartupPatentStatus = 'none' | 'filed' | 'published';
+export type StartupFundingStatus = 'none' | 'bootstrapped' | 'angel_seed' | 'vc';
 
 export interface StartupBusinessProfile {
   problemStatement: string;
@@ -117,6 +134,47 @@ export interface StartupReadiness {
   uploadedDocumentCategories: StartupDocumentCategory[];
 }
 
+export interface StartupInnovationProfile {
+  rubricVersion?: StartupRubricVersion;
+  companyProfile: {
+    legalStructure: StartupLegalEntityType;
+    cinNumber: string;
+    dpiitRecognitionNumber: string;
+    msmeUdyamNumber: string;
+    otherGovernmentCertificationName: string;
+    otherGovernmentCertificationNumber: string;
+    websiteUrl: string;
+    productDemoUrl: string;
+    portfolioUrl: string;
+  };
+  tractionProfile: {
+    startupStage: StartupScoringStage;
+    problemClarity: string;
+    uniqueSolution: string;
+    marketDifferentiation: string;
+    patentStatus: StartupPatentStatus;
+    hasItrFiling: boolean;
+    hasRevenueProof: boolean;
+    hasGovernmentGrant: boolean;
+    hasAwardRecognition: boolean;
+    fundingStatus: StartupFundingStatus;
+    activeUsersCustomers: number;
+    monthlyGrowthRate: number;
+    retentionRate: number;
+  };
+}
+
+export interface StartupInnovationScoreBreakdownSection {
+  total: number;
+  [key: string]: number;
+}
+
+export interface StartupInnovationScoreBreakdown {
+  total: number;
+  companyProfile: StartupInnovationScoreBreakdownSection;
+  healthAndTraction: StartupInnovationScoreBreakdownSection;
+}
+
 export interface StartupEditAccess {
   isLocked: boolean;
   canEdit: boolean;
@@ -169,6 +227,7 @@ export interface IStartup {
   businessProfile: StartupBusinessProfile;
   registrationProfile: StartupRegistrationProfile;
   initializationProfile: StartupInitializationProfile;
+  innovationProfile?: StartupInnovationProfile;
   documents: StartupDocument[];
   launchedToInvestors: boolean;
   launchedToMentors: boolean;
@@ -208,6 +267,7 @@ export interface IStartup {
   pitchRequests?: StartupPitchRequest[];
   editAccess?: StartupEditAccess;
   readiness?: StartupReadiness;
+  innovationScorePreview?: StartupInnovationScoreBreakdown;
   isActive: boolean;
   createdAt: Date;
   updatedAt: Date;

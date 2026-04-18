@@ -140,9 +140,43 @@ type PublicStartup = {
     revenueGenerating: boolean;
     usersCount?: number;
   };
+  innovationProfile?: {
+    companyProfile?: {
+      legalStructure?: string;
+      cinNumber?: string;
+      dpiitRecognitionNumber?: string;
+      msmeUdyamNumber?: string;
+      otherGovernmentCertificationName?: string;
+      otherGovernmentCertificationNumber?: string;
+      websiteUrl?: string;
+      productDemoUrl?: string;
+      portfolioUrl?: string;
+    };
+    tractionProfile?: {
+      patentStatus?: 'none' | 'filed' | 'published';
+      hasItrFiling?: boolean;
+      hasRevenueProof?: boolean;
+      hasGovernmentGrant?: boolean;
+      hasAwardRecognition?: boolean;
+      fundingStatus?: 'none' | 'bootstrapped' | 'angel_seed' | 'vc';
+    };
+  };
+  documents?: Array<{
+    category: string;
+  }>;
   isActive: boolean;
   createdAt: Date;
   updatedAt: Date;
+};
+
+type StartupTrustProfile = {
+  signals: string[];
+  proofCount: number;
+  hasWebsite: boolean;
+  hasProductDemo: boolean;
+  hasPortfolio: boolean;
+  legalStructure?: string;
+  fundingStatus?: string;
 };
 
 type MarketplaceFounder = {
@@ -203,6 +237,126 @@ const MARKETPLACE_USER_ROLES = new Set<MarketplaceEntityType>([
 const compactString = (value?: string | null) => {
   const trimmed = value?.trim();
   return trimmed ? trimmed : undefined;
+};
+
+const STARTUP_PROOF_DOCUMENT_CATEGORIES = new Set([
+  'incorporation_certificate',
+  'startup_india_certificate',
+  'dpiit_certificate',
+  'udyam_certificate',
+  'government_certificate_other',
+  'business_plan',
+  'dpr',
+  'patent_proof',
+  'itr_filing',
+  'revenue_proof',
+  'grant_certificate',
+  'award_certificate',
+  'funding_proof',
+]);
+
+const STARTUP_LEGAL_STRUCTURE_LABELS: Record<string, string> = {
+  sole_proprietorship: 'Sole Proprietorship',
+  partnership: 'Partnership',
+  llp: 'LLP',
+  private_limited: 'Pvt Ltd',
+  opc: 'OPC',
+  public_limited: 'Public Ltd',
+};
+
+const STARTUP_FUNDING_STATUS_LABELS: Record<string, string> = {
+  bootstrapped: 'Bootstrapped',
+  angel_seed: 'Angel / Seed',
+  vc: 'VC Funded',
+};
+
+const uniqueStrings = (values: Array<string | undefined>) =>
+  Array.from(new Set(values.filter((value): value is string => Boolean(value))));
+
+const hasStartupDocument = (startup: PublicStartup, ...categories: string[]) => {
+  const uploaded = new Set((startup.documents ?? []).map((document) => document.category));
+  return categories.some((category) => uploaded.has(category));
+};
+
+const countStartupProofs = (startup: PublicStartup) => {
+  const uploaded = new Set((startup.documents ?? []).map((document) => document.category));
+  const proofDocuments = Array.from(uploaded).filter((category) =>
+    STARTUP_PROOF_DOCUMENT_CATEGORIES.has(category),
+  ).length;
+
+  return proofDocuments + (startup.pitchDeckUrl ? 1 : 0);
+};
+
+const buildStartupTrustProfile = (startup: PublicStartup): StartupTrustProfile => {
+  const companyProfile = startup.innovationProfile?.companyProfile;
+  const tractionProfile = startup.innovationProfile?.tractionProfile;
+  const legalStructure = companyProfile?.legalStructure;
+  const legalStructureLabel =
+    legalStructure && legalStructure !== 'not_registered'
+      ? STARTUP_LEGAL_STRUCTURE_LABELS[legalStructure] ?? legalStructure
+      : undefined;
+  const fundingStatus = tractionProfile?.fundingStatus;
+  const fundingStatusLabel =
+    fundingStatus && fundingStatus !== 'none'
+      ? STARTUP_FUNDING_STATUS_LABELS[fundingStatus] ?? fundingStatus
+      : undefined;
+  const hasWebsite = Boolean(compactString(companyProfile?.websiteUrl));
+  const hasProductDemo = Boolean(compactString(companyProfile?.productDemoUrl));
+  const hasPortfolio = Boolean(compactString(companyProfile?.portfolioUrl));
+  const patentStatus = tractionProfile?.patentStatus;
+
+  return {
+    signals: uniqueStrings([
+      legalStructureLabel ? 'Registered Entity' : undefined,
+      compactString(companyProfile?.cinNumber) ? 'CIN Listed' : undefined,
+      compactString(companyProfile?.dpiitRecognitionNumber) ||
+      hasStartupDocument(startup, 'startup_india_certificate', 'dpiit_certificate')
+        ? 'DPIIT Recognized'
+        : undefined,
+      compactString(companyProfile?.msmeUdyamNumber) || hasStartupDocument(startup, 'udyam_certificate')
+        ? 'Udyam Registered'
+        : undefined,
+      compactString(companyProfile?.otherGovernmentCertificationName) ||
+      compactString(companyProfile?.otherGovernmentCertificationNumber) ||
+      hasStartupDocument(startup, 'government_certificate_other')
+        ? 'Govt Certified'
+        : undefined,
+      startup.pitchDeckUrl ? 'Pitch Deck Ready' : undefined,
+      hasStartupDocument(startup, 'business_plan', 'dpr') ? 'DPR Ready' : undefined,
+      hasWebsite ? 'Website Live' : undefined,
+      hasProductDemo ? 'Demo Available' : undefined,
+      hasPortfolio ? 'Portfolio Linked' : undefined,
+      patentStatus === 'published'
+        ? 'Patent Published'
+        : patentStatus === 'filed' || startup.traction?.patentFiled
+          ? 'Patent Filed'
+          : undefined,
+      tractionProfile?.hasItrFiling || hasStartupDocument(startup, 'itr_filing') ? 'ITR Filed' : undefined,
+      tractionProfile?.hasRevenueProof || hasStartupDocument(startup, 'revenue_proof')
+        ? 'Revenue Verified'
+        : undefined,
+      tractionProfile?.hasGovernmentGrant || hasStartupDocument(startup, 'grant_certificate')
+        ? 'Grant Backed'
+        : undefined,
+      tractionProfile?.hasAwardRecognition || hasStartupDocument(startup, 'award_certificate')
+        ? 'Award Recognized'
+        : undefined,
+      fundingStatus === 'bootstrapped'
+        ? 'Bootstrapped'
+        : fundingStatus === 'angel_seed'
+          ? 'Angel Backed'
+          : fundingStatus === 'vc'
+            ? 'VC Funded'
+            : undefined,
+      hasStartupDocument(startup, 'funding_proof') ? 'Funding Verified' : undefined,
+    ]),
+    proofCount: countStartupProofs(startup),
+    hasWebsite,
+    hasProductDemo,
+    hasPortfolio,
+    ...(legalStructureLabel ? { legalStructure: legalStructureLabel } : {}),
+    ...(fundingStatusLabel ? { fundingStatus: fundingStatusLabel } : {}),
+  };
 };
 
 type PublicUserMapOptions = {
@@ -517,6 +671,7 @@ const buildStartupView = (
       ...(typeof startup.traction?.usersCount === 'number' ? { usersCount: startup.traction.usersCount } : {}),
     },
     launchTargets: toStartupVisibility(startup),
+    trustProfile: buildStartupTrustProfile(startup),
     founders: founders.map(mapFounder),
     ...(founders[0] ? { primaryFounderId: String(founders[0]._id) } : {}),
     ...(project ? { project } : {}),
@@ -626,7 +781,7 @@ const listMarketplaceStartups = async (requesterRole: UserRole, search?: string,
   const [startups, total] = await Promise.all([
     Startup.find(query)
       .select(
-        '_id founderIds projectId name tagline category stage pitchDeckUrl teamSize fundingNeeded activeProducts launchedToInvestors launchedToMentors launchedToRecruiters launchedAt innovationScoreAtLaunch totalShares availableShares reservedForSole maxPennyInvestors currentPennyCount hasSoleInvestor traction isActive createdAt updatedAt',
+        '_id founderIds projectId name tagline category stage pitchDeckUrl teamSize fundingNeeded activeProducts launchedToInvestors launchedToMentors launchedToRecruiters launchedAt innovationScoreAtLaunch totalShares availableShares reservedForSole maxPennyInvestors currentPennyCount hasSoleInvestor traction innovationProfile documents isActive createdAt updatedAt',
       )
       .sort({ launchedAt: -1, innovationScoreAtLaunch: -1, updatedAt: -1 })
       .skip((page - 1) * limit)
@@ -705,7 +860,7 @@ const getMarketplaceUserDetail = async (
       founderIds: userId,
     })
       .select(
-        '_id founderIds projectId name tagline category stage pitchDeckUrl teamSize fundingNeeded activeProducts launchedToInvestors launchedToMentors launchedToRecruiters launchedAt innovationScoreAtLaunch totalShares availableShares reservedForSole maxPennyInvestors currentPennyCount hasSoleInvestor traction isActive createdAt updatedAt',
+        '_id founderIds projectId name tagline category stage pitchDeckUrl teamSize fundingNeeded activeProducts launchedToInvestors launchedToMentors launchedToRecruiters launchedAt innovationScoreAtLaunch totalShares availableShares reservedForSole maxPennyInvestors currentPennyCount hasSoleInvestor traction innovationProfile documents isActive createdAt updatedAt',
       )
       .sort({ launchedAt: -1, updatedAt: -1 })
       .limit(6)
@@ -760,7 +915,7 @@ const getMarketplaceStartupDetail = async (requesterRole: UserRole, startupId: s
     ...buildStartupVisibilityQuery(requesterRole),
   })
     .select(
-      '_id founderIds projectId name tagline category stage pitchDeckUrl teamSize fundingNeeded activeProducts launchedToInvestors launchedToMentors launchedToRecruiters launchedAt innovationScoreAtLaunch totalShares availableShares reservedForSole maxPennyInvestors currentPennyCount hasSoleInvestor traction isActive createdAt updatedAt',
+      '_id founderIds projectId name tagline category stage pitchDeckUrl teamSize fundingNeeded activeProducts launchedToInvestors launchedToMentors launchedToRecruiters launchedAt innovationScoreAtLaunch totalShares availableShares reservedForSole maxPennyInvestors currentPennyCount hasSoleInvestor traction innovationProfile documents isActive createdAt updatedAt',
     )
     .lean<PublicStartup | null>();
 

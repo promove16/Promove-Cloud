@@ -24,6 +24,15 @@ const startupDocumentCategoryEnum = [
   'drawings_diagrams',
   'design_plan_sketch',
   'prior_art_search',
+  'dpiit_certificate',
+  'udyam_certificate',
+  'government_certificate_other',
+  'dpr',
+  'itr_filing',
+  'revenue_proof',
+  'grant_certificate',
+  'award_certificate',
+  'funding_proof',
 ] as const;
 
 const startupSchema = new Schema<IStartup>(
@@ -144,6 +153,62 @@ const startupSchema = new Schema<IStartup>(
         default: 'not_registered',
       },
       risksAndMitigation: { type: String, trim: true, default: '' },
+    },
+    innovationProfile: {
+      rubricVersion: {
+        type: String,
+        enum: ['startup_innovation_1000'],
+        default: undefined,
+      },
+      companyProfile: {
+        legalStructure: {
+          type: String,
+          enum: [
+            'not_registered',
+            'sole_proprietorship',
+            'partnership',
+            'llp',
+            'private_limited',
+            'opc',
+          ],
+          default: 'not_registered',
+        },
+        cinNumber: { type: String, trim: true, default: '' },
+        dpiitRecognitionNumber: { type: String, trim: true, default: '' },
+        msmeUdyamNumber: { type: String, trim: true, default: '' },
+        otherGovernmentCertificationName: { type: String, trim: true, default: '' },
+        otherGovernmentCertificationNumber: { type: String, trim: true, default: '' },
+        websiteUrl: { type: String, trim: true, default: '' },
+        productDemoUrl: { type: String, trim: true, default: '' },
+        portfolioUrl: { type: String, trim: true, default: '' },
+      },
+      tractionProfile: {
+        startupStage: {
+          type: String,
+          enum: ['idea', 'mvp_ready', 'market_ready', 'revenue_generating'],
+          default: 'idea',
+        },
+        problemClarity: { type: String, trim: true, default: '' },
+        uniqueSolution: { type: String, trim: true, default: '' },
+        marketDifferentiation: { type: String, trim: true, default: '' },
+        patentStatus: {
+          type: String,
+          enum: ['none', 'filed', 'published'],
+          default: 'none',
+        },
+        hasItrFiling: { type: Boolean, default: false },
+        hasRevenueProof: { type: Boolean, default: false },
+        hasGovernmentGrant: { type: Boolean, default: false },
+        hasAwardRecognition: { type: Boolean, default: false },
+        fundingStatus: {
+          type: String,
+          enum: ['none', 'bootstrapped', 'angel_seed', 'vc'],
+          default: 'none',
+        },
+        activeUsersCustomers: { type: Number, default: 0, min: 0 },
+        monthlyGrowthRate: { type: Number, default: 0, min: 0 },
+        retentionRate: { type: Number, default: 0, min: 0, max: 100 },
+      },
     },
     documents: {
       type: [

@@ -9,6 +9,7 @@ import { workspaceApi } from "../../api/workspace.api";
 import { useAuthStore } from "../../store/authStore";
 import { useWorkspaceChat } from "../../hooks/useWorkspaceChat";
 import { getApiErrorMessage } from "../../utils/apiError";
+import { ProductWorkspaceDetail } from "../../app/pages/ProductWorkspace";
 
 const d = (value?: string) =>
   value ? new Date(value).toLocaleDateString("en-IN", { day: "numeric", month: "short" }) : "Not set";
@@ -271,6 +272,15 @@ export function StartupWorkspace() {
     return <div className="p-6 text-sm text-slate-400">Startup not found.</div>;
   }
 
+  if (startup.projectId && workspace) {
+    return (
+      <ProductWorkspaceDetail
+        projectIdOverride={startup.projectId}
+        embedded
+      />
+    );
+  }
+
   if (!startup?.projectId || !workspace) {
     const isBusy = createWorkspaceAndAttach.isPending || attachExistingWorkspace.isPending;
     const lockReason = startup.editAccess?.reason || "This startup cannot be edited right now.";
@@ -387,16 +397,18 @@ export function StartupWorkspace() {
       </div>
 
       {activeTab === "chat" && (
-        <div className="flex flex-col bg-slate-900">
-          <div className="flex items-center gap-2 border-b border-slate-800 px-3 py-2">
-            <div className="flex h-8 w-8 items-center justify-center rounded-full bg-slate-700 text-xs text-white">
-              {primaryParticipant?.avatar ? <img src={primaryParticipant.avatar} className="h-8 w-8 rounded-full object-cover" /> : initials(primaryParticipant?.displayName ?? "WS")}
+        <div className="flex flex-col bg-[#0a0a0a] rounded-lg overflow-hidden border border-slate-800">
+          <div className="flex items-center gap-3 border-b border-slate-700 px-3 py-2 bg-[#1a1a1a]">
+            <div className="flex h-9 w-9 items-center justify-center rounded-full bg-emerald-600 text-xs font-semibold text-white">
+              {primaryParticipant?.avatar ? <img src={primaryParticipant.avatar} className="h-9 w-9 rounded-full object-cover" /> : initials(primaryParticipant?.displayName ?? "WS")}
             </div>
-            <div className="text-sm text-white">{workspace.title}</div>
-            <div className="text-xs text-slate-500">{typingLabel ?? (onlineChatParticipants.length > 0 ? `${onlineChatParticipants.length} online` : "Offline")}</div>
+            <div className="flex-1">
+              <div className="text-sm font-medium text-white">{workspace.title}</div>
+              <div className="text-xs text-emerald-400">{typingLabel ?? (onlineChatParticipants.length > 0 ? `${onlineChatParticipants.length} online` : "Click to chat")}</div>
+            </div>
           </div>
           
-          <div ref={chatScrollerRef} className="h-80 overflow-y-auto p-3 space-y-2">
+          <div ref={chatScrollerRef} className="h-[calc(100vh-320px)] min-h-64 overflow-y-auto p-3 space-y-1">
             {chat.messages.length === 0 && <div className="text-center text-sm text-slate-500 p-4">Start the conversation</div>}
             {chat.messages.map((m) => {
               const sender = teamMembers.find((tm) => tm._id === m.senderId) ?? workspace?.chatParticipants?.find((p) => p.userId === m.senderId);
@@ -405,17 +417,26 @@ export function StartupWorkspace() {
               const delivered = s?.deliveredAt ?? m.deliveredAt;
               const seenBy = (s?.seenBy ?? m.seenBy ?? []).filter((u) => u !== currentUser?._id);
               const att = m.attachment ?? (m.attachmentUrl ? { fileUrl: m.attachmentUrl, fileType: m.attachmentType!, fileName: m.attachmentName ?? "File", fileSizeBytes: m.attachmentSizeBytes ?? 0 } : undefined);
+              const isSeen = seenBy.length > 0;
 
               return (
                 <div key={m._id} className={`flex ${isOwn ? "justify-end" : "justify-start"}`}>
-                  <div className={`max-w-[80%] p-2 ${isOwn ? "bg-emerald-900" : "bg-slate-800"}`}>
-                    {!isOwn && <div className="text-xs text-slate-400 mb-1">{sender?.displayName}</div>}
-                    {att?.fileType === "image" && <img src={att.fileUrl} className="max-h-40 rounded mb-1" />}
-                    {att && att.fileType !== "image" && <a href={att.fileUrl} className="flex gap-2 text-xs text-cyan-400 mb-1">📎 {att.fileName}</a>}
-                    {m.message && <p className="text-sm">{m.message}</p>}
-                    <div className="text-xs text-slate-500 mt-1 flex items-center gap-1">
-                      <span>{d(m.sentAt)}</span>
-                      {isOwn && (seenBy.length > 0 ? <CheckCheck className="h-3 w-3 text-sky-400" /> : delivered ? <CheckCheck className="h-3 w-3" /> : <Check className="h-3 w-3" />)}
+                  <div className={`max-w-[75%] rounded-lg px-3 py-2 ${isOwn ? "bg-emerald-600" : "bg-slate-800"}`}>
+                    {!isOwn && <div className="text-xs font-medium text-cyan-300 mb-1">{sender?.displayName}</div>}
+                    {att?.fileType === "image" && <img src={att.fileUrl} className="max-h-48 rounded mb-1" />}
+                    {att && att.fileType !== "image" && <a href={att.fileUrl} className="flex gap-2 text-xs text-cyan-300 mb-1">📎 {att.fileName}</a>}
+                    {m.message && <p className="text-sm text-white whitespace-pre-wrap">{m.message}</p>}
+                    <div className="text-[10px] text-right mt-1 flex items-center justify-end gap-1 text-slate-400">
+                      <span>{d(m.sentAt).replace(",", "")}</span>
+                      {isOwn && (
+                        isSeen ? (
+                          <span className="text-blue-400">✓✓</span>
+                        ) : delivered ? (
+                          <CheckCheck className="h-3 w-3" />
+                        ) : (
+                          <Check className="h-3 w-3" />
+                        )
+                      )}
                     </div>
                   </div>
                 </div>
@@ -424,11 +445,11 @@ export function StartupWorkspace() {
             {typingLabel && <div className="text-xs text-slate-500 p-2">{typingLabel}</div>}
           </div>
 
-          <div className="flex gap-2 border-t border-slate-800 p-2">
+          <div className="flex items-center gap-2 border-t border-slate-700 p-2 bg-slate-900">
             <input type="file" accept="image/*,.pdf,.doc,.docx" className="hidden" onChange={(e) => onChatFile(e.target.files?.[0] ?? null)} />
-            <input value={chatDraft} onChange={(e) => setChatDraft(e.target.value)} onKeyDown={(e) => { if (e.key === "Enter" && !e.shiftKey) { e.preventDefault(); sendMessage(); } }} placeholder="Message..." className="flex-1 bg-slate-800 px-3 py-2 text-sm text-white" />
-            <button onClick={sendMessage} disabled={!chatDraft.trim() && !chatAttachment || isSendingChat} className="bg-blue-600 px-3 py-2 text-white disabled:opacity-50">
-              {isSendingChat ? "..." : <Send className="h-4 w-4" />}
+            <input value={chatDraft} onChange={(e) => setChatDraft(e.target.value)} onKeyDown={(e) => { if (e.key === "Enter" && !e.shiftKey) { e.preventDefault(); sendMessage(); } }} placeholder="Type a message..." className="flex-1 bg-slate-800 rounded-full px-4 py-2.5 text-sm text-white placeholder:text-slate-500" />
+            <button onClick={sendMessage} disabled={!chatDraft.trim() && !chatAttachment || isSendingChat} className="bg-emerald-600 hover:bg-emerald-500 p-2.5 rounded-full text-white disabled:opacity-50 transition">
+              {isSendingChat ? "..." : <Send className="h-5 w-5" />}
             </button>
           </div>
         </div>

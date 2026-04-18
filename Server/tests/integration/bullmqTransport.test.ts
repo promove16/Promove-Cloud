@@ -69,4 +69,60 @@ describe('bullmq transport bootstrap', () => {
     expect(disconnect).toHaveBeenCalledTimes(1);
     expect(bullmq.hasActiveBullMqRedisConnection()).toBe(false);
   });
+
+  test('starts BullMQ workers with autorun disabled so transport failures are handled explicitly', async () => {
+    const workerOn = jest.fn();
+    const workerRun = jest.fn().mockRejectedValue(new Error('Connection is closed.'));
+    const workerClose = jest.fn().mockResolvedValue(undefined);
+    const workerConstructor = jest.fn().mockImplementation(() => ({
+      close: workerClose,
+      on: workerOn,
+      run: workerRun,
+    }));
+
+    jest.doMock('bullmq', () => ({
+      __esModule: true,
+      Job: class {},
+      Queue: class {},
+      Worker: workerConstructor,
+    }));
+
+    const bullmq = await import('../../src/config/bullmq');
+
+    bullmq.createQueueWorker('notifications', async () => undefined);
+    await new Promise((resolve) => setImmediate(resolve));
+
+    expect(workerConstructor).toHaveBeenCalledWith(
+      'notifications',
+      expect.any(Function),
+      expect.objectContaining({
+        autorun: false,
+        connection: expect.any(Object),
+      }),
+    );
+    expect(workerOn).toHaveBeenCalledWith('error', expect.any(Function));
+    expect(workerRun).toHaveBeenCalledTimes(1);
+    expect(workerClose).toHaveBeenCalledWith(true);
+    expect(bullmq.hasActiveBullMqRedisConnection()).toBe(false);
+  });
+
+  test('ignores leaked BullMQ transport rejections after fallback has been enabled', async () => {
+    const bullmq = await import('../../src/config/bullmq');
+
+    bullmq.disableRemoteBullMq(new Error('ERR max requests limit exceeded'));
+
+    const leakedTransportError = new Error('Connection is closed.');
+    leakedTransportError.stack = [
+      'Error: Connection is closed.',
+      '    at EventEmitter.connectionCloseHandler (C:\\repo\\node_modules\\bullmq\\node_modules\\ioredis\\built\\Redis.js:208:28)',
+    ].join('\n');
+
+    expect(bullmq.shouldIgnoreBullMqUnhandledRejection(leakedTransportError)).toBe(true);
+    expect(
+      bullmq.shouldIgnoreBullMqUnhandledRejection(new Error('ERR max requests limit exceeded')),
+    ).toBe(true);
+    expect(
+      bullmq.shouldIgnoreBullMqUnhandledRejection(new Error('Connection is closed.')),
+    ).toBe(false);
+  });
 });

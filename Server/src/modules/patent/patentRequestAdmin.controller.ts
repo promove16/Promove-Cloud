@@ -10,6 +10,8 @@ import {
   addInternalNote,
   addTimelineEntry,
   reviewPatentRequestDocument,
+  uploadOfficialHandoverDocument,
+  completeOfficialHandover,
 } from './patentRequestAdmin.service';
 import {
   updateStatusSchema,
@@ -19,6 +21,8 @@ import {
   addTimelineEntrySchema,
   listRequestsQuerySchema,
   reviewDocumentSchema,
+  handoverDocumentUploadSchema,
+  completeOfficialHandoverSchema,
 } from './patentRequestAdmin.validation';
 
 const isObjectId = (value: string) => /^[0-9a-fA-F]{24}$/.test(value);
@@ -83,4 +87,21 @@ export const reviewDocumentController = async (req: Request, res: Response) => {
   }
   const payload = reviewDocumentSchema.parse(req.body);
   res.status(200).json(new ApiResponse(await reviewPatentRequestDocument(req.user._id, id, documentId, payload)));
+};
+
+export const uploadOfficialHandoverDocumentController = async (req: Request, res: Response) => {
+  if (!req.user) throw new ApiError(401, 'UNAUTHORIZED', 'Invalid or expired token');
+  const id = String(req.params.id);
+  if (!id || !isObjectId(id)) throw new ApiError(400, 'INVALID_ID', 'Invalid ID format');
+  if (!req.file) throw new ApiError(400, 'FILE_REQUIRED', 'An official handover document is required.');
+  const payload = handoverDocumentUploadSchema.parse(req.body);
+  res.status(200).json(new ApiResponse(await uploadOfficialHandoverDocument(req.user._id, id, req.file, payload)));
+};
+
+export const completeOfficialHandoverController = async (req: Request, res: Response) => {
+  if (!req.user) throw new ApiError(401, 'UNAUTHORIZED', 'Invalid or expired token');
+  const id = String(req.params.id);
+  if (!id || !isObjectId(id)) throw new ApiError(400, 'INVALID_ID', 'Invalid ID format');
+  const payload = completeOfficialHandoverSchema.parse(req.body);
+  res.status(200).json(new ApiResponse(await completeOfficialHandover(req.user._id, id, payload)));
 };

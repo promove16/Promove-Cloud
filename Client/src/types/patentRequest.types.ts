@@ -87,6 +87,15 @@ export interface PatentRequestDocument {
   storageKey?: string;
 }
 
+export interface PatentRequestOfficialHandover {
+  documents: PatentRequestDocument[];
+  note?: string;
+  handedOverAt?: string;
+  handedOverBy?: string;
+  studentAcknowledgedAt?: string;
+  studentAcknowledgedBy?: string;
+}
+
 export interface PatentConversationMessage {
   _id: string;
   patentRequestId: string;
@@ -161,6 +170,7 @@ export interface PatentRequestSubmission {
   proposedExaminationType?: PatentRequestExaminationType;
   publicDisclosureStatus?: boolean;
   documents?: PatentRequestDocument[];
+  officialHandover?: PatentRequestOfficialHandover;
   status: PatentRequestStatus;
   submittedAt?: string;
   ipoApplicationNumber?: string;

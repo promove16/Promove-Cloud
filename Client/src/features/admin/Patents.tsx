@@ -441,14 +441,6 @@ export default function Patents() {
 
   return (
     <div className="space-y-6">
-      <div className="flex items-end justify-between gap-4">
-        <div>
-          <div className="text-xs uppercase tracking-[0.3em] text-cyan-300">Patents</div>
-          <h1 className="mt-2 text-3xl font-bold text-white">Patent Review</h1>
-          <p className="mt-2 text-slate-400">Review submissions before approving score awards.</p>
-        </div>
-      </div>
-
       <OptionTabs
         items={tabs.map((tab) => ({ id: tab.key, label: tab.label }))}
         activeId={activeTab}
