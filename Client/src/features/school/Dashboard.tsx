@@ -90,7 +90,7 @@ export default function Dashboard() {
           description: 'Recorded mentorship support delivered to student innovators.',
           icon: Users,
           color: 'from-violet-500 to-fuchsia-500',
-          to: '/dashboard/school/mentors',
+          to: '/dashboard/school/events?tab=mentorship',
         },
         {
           title: 'Startup Launches',

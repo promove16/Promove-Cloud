@@ -65,7 +65,7 @@ export default function Dashboard() {
           badge: `+${recentActivity?.startupsLast30Days ?? 0} in 30d`,
           icon: Rocket,
           color: 'from-amber-500 to-orange-500',
-          to: '/dashboard/college/analytics',
+          to: '/dashboard/college/startups',
         },
       ]}
       topInnovatorsTitle="Top Student Innovators"
@@ -78,7 +78,7 @@ export default function Dashboard() {
       recentProjectsAction={{ label: 'Open Operations', to: '/dashboard/college/operations' }}
       recentProjectsEmptyMessage="No active student projects are available yet."
       announcementTitle="Placement pipeline is live"
-      announcementBody={`${stats?.studentsPlaced ?? 0} students are already marked as placed, the current placement rate is ${stats?.placementVelocity ?? 0}%, and ${stats?.startupsLaunched ?? 0} startups are active in the college pipeline. Use the placement tracker for recruiter outcomes and the operations hub for students, projects, investors, recruiters, mentorship, and events.`}
+      announcementBody={`${stats?.studentsPlaced ?? 0} students are already marked as placed, the current placement rate is ${stats?.placementVelocity ?? 0}%, and ${stats?.startupsLaunched ?? 0} startups are active in the college pipeline. Use the placement tracker for hiring outcomes and the operations hub for students, projects, investors, mentorship, and events.`}
       announcementAction={{ label: 'Open Placement Tracker', to: '/dashboard/college/placement' }}
       showcaseTitle="College Showcase"
       showcaseDescription="Showcase the college's innovation standing across rating, mentorship, startup momentum, and investor access."
@@ -96,7 +96,7 @@ export default function Dashboard() {
           description: 'Mentor engagement delivered across the student innovation pipeline.',
           icon: Users,
           color: 'from-violet-500 to-fuchsia-500',
-          to: '/dashboard/college/mentors',
+          to: '/dashboard/college/events?tab=mentorship',
         },
         {
           title: 'Startup Launches',
@@ -104,6 +104,7 @@ export default function Dashboard() {
           description: 'Student startups launched and tracked from this college.',
           icon: TrendingUp,
           color: 'from-amber-500 to-orange-500',
+          to: '/dashboard/college/startups',
         },
         {
           title: 'Investor Connections',

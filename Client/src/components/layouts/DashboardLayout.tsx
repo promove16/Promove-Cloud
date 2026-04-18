@@ -63,6 +63,22 @@ const SHARED_ROUTE_LABELS = [
 ] as const;
 
 const SIDEBAR_PARENT_PATH_ALIASES: Partial<Record<UserRole, Record<string, string[]>>> = {
+  [UserRole.SCHOOL]: {
+    '/dashboard/school/students': [
+      '/dashboard/school/projects',
+      '/dashboard/school/patents',
+      '/dashboard/school/startups',
+      '/dashboard/school/operations',
+    ],
+  },
+  [UserRole.COLLEGE]: {
+    '/dashboard/college/students': [
+      '/dashboard/college/projects',
+      '/dashboard/college/patents',
+      '/dashboard/college/startups',
+      '/dashboard/college/operations',
+    ],
+  },
   [UserRole.RECRUITER]: {
     '/dashboard/recruiter/marketplace': ['/dashboard/recruiter/applications'],
     '/dashboard/recruiter/drives': [

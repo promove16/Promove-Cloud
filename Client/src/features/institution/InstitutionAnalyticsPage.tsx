@@ -113,7 +113,6 @@ export function InstitutionAnalyticsPage({
         eyebrow={`${institutionLabel} Workspace`}
         title={`${institutionLabel} Analytics`}
         description={`Live student activity, startup momentum, and mentorship pipeline insights for your ${institutionLabel.toLowerCase()}.`}
-        showMenu={false}
       />
 
       <section className="grid gap-4 md:grid-cols-2 xl:grid-cols-4">

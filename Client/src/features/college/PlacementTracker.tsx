@@ -4,6 +4,7 @@ import { Download } from 'lucide-react';
 import { Button } from '../../components/ui/Button';
 import { Card } from '../../components/ui/Card';
 import { collegeApi } from '../../api/college.api';
+import { InstitutionWorkspaceHeader } from '../institution/InstitutionWorkspaceHeader';
 import HiringPartnersList from './HiringPartnersList';
 import PlacementStatusTable from './PlacementStatusTable';
 
@@ -49,16 +50,18 @@ export default function PlacementTracker() {
 
   return (
     <div className="space-y-6">
-      <div className="flex flex-col gap-4 lg:flex-row lg:items-end lg:justify-between">
-        <div>
-          <h1 className="text-3xl font-bold text-white">Placement Tracker</h1>
-          <p className="mt-2 text-slate-400">Product-to-Employee Pipeline</p>
-        </div>
-        <Button onClick={exportCsv}>
-          <Download className="mr-2 h-4 w-4" />
-          Export Placement Data
-        </Button>
-      </div>
+      <InstitutionWorkspaceHeader
+        mode="college"
+        eyebrow="Student Workspace"
+        title="Placement Tracker"
+        description="Product-to-employee pipeline visibility for student placement outcomes."
+        headerAction={
+          <Button onClick={exportCsv}>
+            <Download className="mr-2 h-4 w-4" />
+            Export Placement Data
+          </Button>
+        }
+      />
 
       <div className="grid gap-4 xl:grid-cols-4">
         {[

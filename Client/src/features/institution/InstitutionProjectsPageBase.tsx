@@ -8,6 +8,7 @@ import { Card } from '../../components/ui/Card';
 import { Spinner } from '../../components/ui/Spinner';
 import type { RecentProject } from '../../types/school.types';
 import { getStudentPortfolioViewPath } from '../marketplace/navigation';
+import { InstitutionWorkspaceHeader } from './InstitutionWorkspaceHeader';
 
 type Props = {
   mode: 'school' | 'college';
@@ -53,28 +54,28 @@ export function InstitutionProjectsPageBase({
 
   return (
     <div className="space-y-6">
-      <div className="flex flex-col gap-4 lg:flex-row lg:items-end lg:justify-between">
-        <div>
-          <div className="text-xs uppercase tracking-[0.3em] text-cyan-300">Projects</div>
-          <h1 className="mt-2 text-3xl font-bold text-white">{title}</h1>
-          <p className="mt-2 text-slate-400">{subtitle}</p>
-        </div>
-        <div className="grid gap-3 sm:grid-cols-3">
-          <Card className="p-4">
-            <div className="text-xs uppercase tracking-[0.2em] text-slate-500">Active Projects</div>
-            <div className="mt-2 text-2xl font-bold text-white">{projects.length}</div>
-          </Card>
-          <Card className="p-4">
-            <div className="text-xs uppercase tracking-[0.2em] text-slate-500">Avg Progress</div>
-            <div className="mt-2 text-2xl font-bold text-white">{averageProgress}%</div>
-          </Card>
-          <Card className="p-4">
-            <div className="text-xs uppercase tracking-[0.2em] text-slate-500">Latest Update</div>
-            <div className="mt-2 text-2xl font-bold text-white">
-              {projects[0] ? formatDate(projects[0].updatedAt) : '-'}
-            </div>
-          </Card>
-        </div>
+      <InstitutionWorkspaceHeader
+        mode={mode}
+        eyebrow="Student Workspace"
+        title={title}
+        description={subtitle}
+      />
+
+      <div className="grid gap-3 sm:grid-cols-3">
+        <Card className="p-4">
+          <div className="text-xs uppercase tracking-[0.2em] text-slate-500">Active Projects</div>
+          <div className="mt-2 text-2xl font-bold text-white">{projects.length}</div>
+        </Card>
+        <Card className="p-4">
+          <div className="text-xs uppercase tracking-[0.2em] text-slate-500">Avg Progress</div>
+          <div className="mt-2 text-2xl font-bold text-white">{averageProgress}%</div>
+        </Card>
+        <Card className="p-4">
+          <div className="text-xs uppercase tracking-[0.2em] text-slate-500">Latest Update</div>
+          <div className="mt-2 text-2xl font-bold text-white">
+            {projects[0] ? formatDate(projects[0].updatedAt) : '-'}
+          </div>
+        </Card>
       </div>
 
       {projectsQuery.isLoading ? (

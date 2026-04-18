@@ -217,7 +217,6 @@ export default function OperationsPage() {
         eyebrow="School Operations"
         title={institutionName}
         description="Manage student access tokens, process verification approvals, and handle roster onboarding from one place."
-        showMenu={false}
       />
 
       <DashboardMetricRail columnsClassName="md:grid-cols-4" items={statusHintItems} />

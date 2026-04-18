@@ -1,13 +1,14 @@
 import { schoolApi } from '../../api/school.api';
-import { InstitutionStartupsPageBase } from '../institution/InstitutionStartupsPageBase';
+import { InstitutionInnovationPipelinePage } from '../institution/InstitutionInnovationPipelinePage';
 
 export default function StartupsPage() {
   return (
-    <InstitutionStartupsPageBase
+    <InstitutionInnovationPipelinePage
       mode="school"
-      title="School Startups"
-      subtitle="Student startup launches and review readiness for this school."
+      institutionLabel="School"
       basePath="/dashboard/school"
+      fetchProjects={schoolApi.getProjects}
+      fetchPatents={schoolApi.getPatents}
       fetchStartups={schoolApi.getStartups}
     />
   );

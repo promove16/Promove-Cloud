@@ -6,6 +6,7 @@ import { collegeApi } from '../../api/college.api';
 import { Button } from '../../components/ui/Button';
 import { Card } from '../../components/ui/Card';
 import { Input } from '../../components/ui/Input';
+import { InstitutionWorkspaceHeader } from '../institution/InstitutionWorkspaceHeader';
 
 export default function RecruiterDirectory() {
   const [search, setSearch] = useState('');
@@ -27,21 +28,23 @@ export default function RecruiterDirectory() {
 
   return (
     <div className="space-y-6">
-      <div className="flex flex-col gap-4 lg:flex-row lg:items-end lg:justify-between">
-        <div>
-          <h1 className="text-3xl font-bold text-white">Recruiter Directory</h1>
-          <p className="mt-2 text-slate-400">Companies actively scouting from your institution</p>
-        </div>
-        <div className="relative w-full max-w-md">
-          <Search className="pointer-events-none absolute left-4 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-500" />
-          <Input
-            value={search}
-            onChange={(event) => setSearch(event.target.value)}
-            placeholder="Search by recruiter or company"
-            className="pl-11"
-          />
-        </div>
-      </div>
+      <InstitutionWorkspaceHeader
+        mode="college"
+        eyebrow="Student Workspace"
+        title="Recruiter Directory"
+        description="Companies actively scouting from your institution"
+        tabsAction={
+          <div className="relative w-full max-w-md">
+            <Search className="pointer-events-none absolute left-4 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-500" />
+            <Input
+              value={search}
+              onChange={(event) => setSearch(event.target.value)}
+              placeholder="Search by recruiter or company"
+              className="pl-11"
+            />
+          </div>
+        }
+      />
 
       <div className="grid gap-4 xl:grid-cols-2">
         {recruiters.length > 0 ? (

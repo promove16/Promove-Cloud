@@ -1,8 +1,9 @@
-import { useEffect, useMemo, useState } from 'react';
+ï»¿import { useEffect, useMemo, useState } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { Card } from '../../components/ui/Card';
 import { Button } from '../../components/ui/Button';
 import { schoolApi } from '../../api/school.api';
+import { InstitutionWorkspaceHeader } from '../institution/InstitutionWorkspaceHeader';
 import {
   ComplianceActionPriority,
   ComplianceActionRecord,
@@ -201,17 +202,17 @@ export default function ComplianceReport() {
 
   return (
     <div className="space-y-6">
-      <div className="flex flex-col gap-4 lg:flex-row lg:items-end lg:justify-between">
-        <div>
-          <h1 className="text-3xl font-bold text-white">School Compliance Panel</h1>
-          <p className="mt-2 text-slate-400">
-            Monitor framework progress, handle incidents, manage alerts, and close compliance actions.
-          </p>
-        </div>
-        <Button onClick={() => generateMutation.mutate()} disabled={generateMutation.isPending}>
-          {generateMutation.isPending ? 'Generating report...' : 'Download Full Report'}
-        </Button>
-      </div>
+      <InstitutionWorkspaceHeader
+        mode="school"
+        eyebrow="Student Workspace"
+        title="School Compliance Panel"
+        description="Monitor framework progress, handle incidents, manage alerts, and close compliance actions."
+        headerAction={
+          <Button onClick={() => generateMutation.mutate()} disabled={generateMutation.isPending}>
+            {generateMutation.isPending ? 'Generating report...' : 'Download Full Report'}
+          </Button>
+        }
+      />
 
       <Card className="p-3">
         <div className="grid gap-2 sm:grid-cols-5">
@@ -367,7 +368,7 @@ export default function ComplianceReport() {
                     <div className="flex flex-wrap items-start justify-between gap-3">
                       <div>
                         <div className="font-semibold text-white">{incident.title}</div>
-                        <div className="mt-1 text-xs text-slate-400">{formatLabel(incident.category)} • {new Date(incident.createdAt).toLocaleString('en-IN')}</div>
+                        <div className="mt-1 text-xs text-slate-400">{formatLabel(incident.category)} | {new Date(incident.createdAt).toLocaleString('en-IN')}</div>
                       </div>
                       <div className="flex gap-2">
                         <div className={badgeClass(incident.severity)}>{formatLabel(incident.severity)}</div>

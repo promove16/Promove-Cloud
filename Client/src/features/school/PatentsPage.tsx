@@ -1,14 +1,15 @@
 import { schoolApi } from '../../api/school.api';
-import { InstitutionPatentsPageBase } from '../institution/InstitutionPatentsPageBase';
+import { InstitutionInnovationPipelinePage } from '../institution/InstitutionInnovationPipelinePage';
 
 export default function PatentsPage() {
   return (
-    <InstitutionPatentsPageBase
+    <InstitutionInnovationPipelinePage
       mode="school"
-      title="School Patents"
-      subtitle="Institution patent submissions with student ownership and status details."
+      institutionLabel="School"
       basePath="/dashboard/school"
+      fetchProjects={schoolApi.getProjects}
       fetchPatents={schoolApi.getPatents}
+      fetchStartups={schoolApi.getStartups}
     />
   );
 }

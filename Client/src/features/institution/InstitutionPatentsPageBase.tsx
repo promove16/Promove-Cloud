@@ -8,6 +8,7 @@ import { Card } from '../../components/ui/Card';
 import { Spinner } from '../../components/ui/Spinner';
 import type { InstitutionPatent } from '../../types/school.types';
 import { getStudentPortfolioViewPath } from '../marketplace/navigation';
+import { InstitutionWorkspaceHeader } from './InstitutionWorkspaceHeader';
 
 type Props = {
   mode: 'school' | 'college';
@@ -61,11 +62,12 @@ export function InstitutionPatentsPageBase({
 
   return (
     <div className="space-y-6">
-      <div>
-        <div className="text-xs uppercase tracking-[0.3em] text-cyan-300">Patents</div>
-        <h1 className="mt-2 text-3xl font-bold text-white">{title}</h1>
-        <p className="mt-2 text-slate-400">{subtitle}</p>
-      </div>
+      <InstitutionWorkspaceHeader
+        mode={mode}
+        eyebrow="Student Workspace"
+        title={title}
+        description={subtitle}
+      />
 
       {patentsQuery.isLoading ? (
         <div className="flex items-center justify-center py-12">

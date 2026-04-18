@@ -1,4 +1,8 @@
-import { CalendarDays, GraduationCap, Settings2, Users } from "lucide-react";
+import {
+  FolderKanban,
+  KeyRound,
+  Users,
+} from "lucide-react";
 import { NavLink, useLocation } from "react-router-dom";
 import {
   getOptionTabClassName,
@@ -24,16 +28,15 @@ const INSTITUTION_WORKSPACE_ITEMS: Record<
       icon: Users,
     },
     {
-      label: "Mentorship",
-      path: "/dashboard/school/mentors",
-      icon: GraduationCap,
+      label: "Roster & Onboarding",
+      path: "/dashboard/school/operations",
+      icon: KeyRound,
     },
     {
-      label: "Operations",
-      path: "/dashboard/school/operations",
-      icon: Settings2,
+      label: "Innovation Pipeline",
+      path: "/dashboard/school/projects",
+      icon: FolderKanban,
     },
-    { label: "Events", path: "/dashboard/school/events", icon: CalendarDays },
   ],
   college: [
     {
@@ -42,16 +45,15 @@ const INSTITUTION_WORKSPACE_ITEMS: Record<
       icon: Users,
     },
     {
-      label: "Mentorship",
-      path: "/dashboard/college/mentors",
-      icon: GraduationCap,
+      label: "Roster & Onboarding",
+      path: "/dashboard/college/operations",
+      icon: KeyRound,
     },
     {
-      label: "Operations",
-      path: "/dashboard/college/operations",
-      icon: Settings2,
+      label: "Innovation Pipeline",
+      path: "/dashboard/college/projects",
+      icon: FolderKanban,
     },
-    { label: "Events", path: "/dashboard/college/events", icon: CalendarDays },
   ],
 };
 

@@ -1,7 +1,7 @@
 import { collegeApi } from '../../api/college.api';
 import { InstitutionInnovationPipelinePage } from '../institution/InstitutionInnovationPipelinePage';
 
-export default function ProjectsPage() {
+export default function StartupsPage() {
   return (
     <InstitutionInnovationPipelinePage
       mode="college"

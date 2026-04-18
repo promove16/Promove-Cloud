@@ -15,6 +15,7 @@ import { Card } from '../../components/ui/Card';
 import { Input } from '../../components/ui/Input';
 import { ApiErrorResponse } from '../../types/auth.types';
 import type { CollegeEvent } from '../../types/college.types';
+import { MentorshipProgramPanel } from '../institution/MentorshipProgramPanel';
 import { InstitutionWorkspaceHeader } from '../institution/InstitutionWorkspaceHeader';
 
 const eventTypes = [
@@ -25,7 +26,7 @@ const eventTypes = [
 ] as const;
 
 type InstitutionEventManagerMode = 'college' | 'school';
-type CollegeEventTab = 'internal' | 'hiring';
+type EventManagerTab = 'internal' | 'hiring' | 'mentorship';
 
 type CreateEventPayload = {
   title: string;
@@ -45,6 +46,11 @@ const EVENT_MANAGER_CONFIG: Record<
     headerMode: 'college' | 'school';
     queryKey: string;
     listEvents: () => Promise<ManagedInstitutionEvent[]>;
+    mentorshipQueryKey: string;
+    mentorshipHeading: string;
+    mentorshipDescription: string;
+    fetchPrograms: typeof collegeApi.getMentorshipPrograms;
+    createProgram: typeof collegeApi.createMentorshipProgram;
     createEvent: (
       payload: CreateEventPayload,
     ) => Promise<ManagedInstitutionEvent>;
@@ -54,12 +60,24 @@ const EVENT_MANAGER_CONFIG: Record<
     headerMode: 'college',
     queryKey: 'college-events',
     listEvents: collegeApi.listEvents,
+    mentorshipQueryKey: 'college-mentorship-programs',
+    mentorshipHeading: 'College mentorship requests',
+    mentorshipDescription:
+      'Request mentorship programs for your college, route them to admin for approval, and monitor mentor assignment and scheduling decisions without leaving the events workspace.',
+    fetchPrograms: collegeApi.getMentorshipPrograms,
+    createProgram: collegeApi.createMentorshipProgram,
     createEvent: collegeApi.createEvent,
   },
   school: {
     headerMode: 'school',
     queryKey: 'school-events',
     listEvents: schoolApi.listEvents,
+    mentorshipQueryKey: 'school-mentorship-programs',
+    mentorshipHeading: 'School mentorship requests',
+    mentorshipDescription:
+      'Request mentorship programs for your school, send them to admin for approval, and track assigned mentors and scheduling decisions alongside school events.',
+    fetchPrograms: schoolApi.getMentorshipPrograms,
+    createProgram: schoolApi.createMentorshipProgram,
     createEvent: schoolApi.createEvent,
   },
 };
@@ -97,8 +115,14 @@ const inputErrorClassName =
 
 const getDescription = (
   mode: InstitutionEventManagerMode,
-  tab: CollegeEventTab,
+  tab: EventManagerTab,
 ) => {
+  if (tab === 'mentorship') {
+    return mode === 'school'
+      ? 'Plan mentorship programs, send requests for admin approval, and track mentor assignment from the same workspace as your events.'
+      : 'Plan mentorship programs, route them for admin approval, and manage mentor scheduling without leaving the events workspace.';
+  }
+
   if (mode === 'school') {
     return 'Create and track internal school events, submissions, and rankings.';
   }
@@ -120,18 +144,33 @@ function getErrorMessage(error: unknown, fallback: string) {
     : fallback;
 }
 
+const getTabFromSearchParams = (
+  mode: InstitutionEventManagerMode,
+  searchParams: URLSearchParams,
+): EventManagerTab => {
+  const tab = searchParams.get('tab');
+
+  if (tab === 'mentorship') {
+    return 'mentorship';
+  }
+
+  if (mode === 'college' && tab === 'hiring') {
+    return 'hiring';
+  }
+
+  return 'internal';
+};
+
 export default function EventManager({
   mode = 'college',
 }: {
   mode?: InstitutionEventManagerMode;
 }) {
-  const [searchParams] = useSearchParams();
+  const [searchParams, setSearchParams] = useSearchParams();
   const queryClient = useQueryClient();
   const config = EVENT_MANAGER_CONFIG[mode];
-  const [activeTab, setActiveTab] = useState<CollegeEventTab>(
-    mode === 'college' && searchParams.get('tab') === 'hiring'
-      ? 'hiring'
-      : 'internal',
+  const [activeTab, setActiveTab] = useState<EventManagerTab>(
+    getTabFromSearchParams(mode, searchParams),
   );
   const [showCreate, setShowCreate] = useState(false);
   const [createError, setCreateError] = useState('');
@@ -227,12 +266,23 @@ export default function EventManager({
   const canCreateInternalEvent = mode === 'school' || activeTab === 'internal';
 
   useEffect(() => {
-    if (mode !== 'college') {
-      return;
-    }
-
-    setActiveTab(searchParams.get('tab') === 'hiring' ? 'hiring' : 'internal');
+    setActiveTab(getTabFromSearchParams(mode, searchParams));
   }, [mode, searchParams]);
+
+  const selectTab = (tab: EventManagerTab) => {
+    setActiveTab(tab);
+    setShowCreate(false);
+    setCreateError('');
+    reset(defaultEventFormValues);
+
+    const nextSearchParams = new URLSearchParams(searchParams);
+    if (tab === 'internal') {
+      nextSearchParams.delete('tab');
+    } else {
+      nextSearchParams.set('tab', tab);
+    }
+    setSearchParams(nextSearchParams, { replace: true });
+  };
 
   const toggleCreateForm = () => {
     setShowCreate((current) => {
@@ -266,34 +316,25 @@ export default function EventManager({
         eyebrow="Events"
         title="Events"
         description={getDescription(mode, activeTab)}
+        showMenu={false}
         tabsAction={
           <div className="flex flex-wrap gap-3">
-            {mode === 'college' ? (
-              <div className="flex rounded-xl border border-slate-800 bg-slate-950 p-1">
+            <div className="flex rounded-xl border border-slate-800 bg-slate-950 p-1">
+              <button
+                type="button"
+                onClick={() => selectTab('internal')}
+                className={`rounded-lg px-4 py-2 text-sm font-medium transition ${
+                  activeTab === 'internal'
+                    ? 'bg-cyan-500/10 text-cyan-300'
+                    : 'text-slate-400 hover:text-white'
+                }`}
+              >
+                Internal Events
+              </button>
+              {mode === 'college' ? (
                 <button
                   type="button"
-                  onClick={() => {
-                    setActiveTab('internal');
-                    setShowCreate(false);
-                    setCreateError('');
-                    reset(defaultEventFormValues);
-                  }}
-                  className={`rounded-lg px-4 py-2 text-sm font-medium transition ${
-                    activeTab === 'internal'
-                      ? 'bg-cyan-500/10 text-cyan-300'
-                      : 'text-slate-400 hover:text-white'
-                  }`}
-                >
-                  Internal Events
-                </button>
-                <button
-                  type="button"
-                  onClick={() => {
-                    setActiveTab('hiring');
-                    setShowCreate(false);
-                    setCreateError('');
-                    reset(defaultEventFormValues);
-                  }}
+                  onClick={() => selectTab('hiring')}
                   className={`rounded-lg px-4 py-2 text-sm font-medium transition ${
                     activeTab === 'hiring'
                       ? 'bg-amber-500/10 text-amber-300'
@@ -302,8 +343,19 @@ export default function EventManager({
                 >
                   Hiring Events
                 </button>
-              </div>
-            ) : null}
+              ) : null}
+              <button
+                type="button"
+                onClick={() => selectTab('mentorship')}
+                className={`rounded-lg px-4 py-2 text-sm font-medium transition ${
+                  activeTab === 'mentorship'
+                    ? 'bg-violet-500/10 text-violet-300'
+                    : 'text-slate-400 hover:text-white'
+                }`}
+              >
+                Mentorship
+              </button>
+            </div>
 
             {canCreateInternalEvent ? (
               <Button onClick={toggleCreateForm}>
@@ -314,7 +366,17 @@ export default function EventManager({
         }
       />
 
-      {showCreate && canCreateInternalEvent ? (
+      {activeTab === 'mentorship' ? (
+        <MentorshipProgramPanel
+          queryKey={config.mentorshipQueryKey}
+          heading={config.mentorshipHeading}
+          description={config.mentorshipDescription}
+          fetchPrograms={config.fetchPrograms}
+          createProgram={config.createProgram}
+        />
+      ) : null}
+
+      {showCreate && canCreateInternalEvent && activeTab !== 'mentorship' ? (
         <Card className="p-6">
           <form onSubmit={onSubmit} noValidate>
             <div className="grid gap-4 md:grid-cols-2">
@@ -426,14 +488,17 @@ export default function EventManager({
         </Card>
       ) : null}
 
-      {(eventsQuery.isLoading ||
+      {activeTab !== 'mentorship' &&
+      (eventsQuery.isLoading ||
         (mode === 'college' &&
           activeTab === 'hiring' &&
           hiringEventsQuery.isLoading)) ? (
         <Card className="p-6 text-sm text-slate-400">Loading events...</Card>
       ) : null}
 
-      {!eventsQuery.isLoading && visibleEvents.length === 0 ? (
+      {activeTab !== 'mentorship' &&
+      !eventsQuery.isLoading &&
+      visibleEvents.length === 0 ? (
         <Card className="p-8 text-center">
           <div className="text-lg font-semibold text-white">
             {mode === 'college' && activeTab === 'hiring'
@@ -448,7 +513,7 @@ export default function EventManager({
         </Card>
       ) : null}
 
-      <div className="space-y-4">
+      {activeTab !== 'mentorship' ? <div className="space-y-4">
         {visibleEvents.map((event) => (
           <Card
             key={event._id}
@@ -661,7 +726,7 @@ export default function EventManager({
             </div>
           </Card>
         ))}
-      </div>
+      </div> : null}
     </div>
   );
 }
