@@ -32,7 +32,6 @@ import {
   listStudentRosterQuerySchema,
   manualStudentRosterEntrySchema,
 } from '../institution/studentRoster.service';
-import { sendStudentRosterInvite } from '../institution/studentInvite.service';
 import {
   getDashboardStats,
   getInvestorDirectory,
@@ -578,21 +577,7 @@ export const createCollegeStudentRosterEntry = async (
   collegeId: string,
   actorId: string,
   payload: z.infer<typeof manualStudentRosterEntrySchema>,
-) => {
-  const entry = await createStudentRosterEntry(collegeId, UserRole.COLLEGE, actorId, payload);
-
-  if (entry.status === 'invited' && !entry.linkedUserId) {
-    await sendStudentRosterInvite({
-      institutionId: collegeId,
-      institutionRole: UserRole.COLLEGE,
-      createdBy: actorId,
-      studentEmail: entry.email,
-      studentName: entry.displayName,
-    });
-  }
-
-  return entry;
-};
+) => createStudentRosterEntry(collegeId, UserRole.COLLEGE, actorId, payload);
 
 export const cancelCollegeStudentRosterInvite = (
   collegeId: string,
@@ -610,28 +595,7 @@ export const importCollegeStudentRosterEntries = async (
   collegeId: string,
   actorId: string,
   file: { originalname: string; buffer: Buffer },
-) => {
-  const result = await importStudentRosterEntries(collegeId, UserRole.COLLEGE, actorId, file);
-  const createdEntries = result.createdEntries ?? [];
-
-  if (createdEntries.length > 0) {
-    await Promise.all(
-      createdEntries
-        .filter((entry) => entry.status === 'invited' && !entry.linkedUserId)
-        .map((entry) =>
-          sendStudentRosterInvite({
-            institutionId: collegeId,
-            institutionRole: UserRole.COLLEGE,
-            createdBy: actorId,
-            studentEmail: entry.email,
-            studentName: entry.displayName,
-          }),
-        ),
-    );
-  }
-
-  return result;
-};
+) => importStudentRosterEntries(collegeId, UserRole.COLLEGE, actorId, file);
 
 export const importCollegeStudentCredentials = (
   collegeId: string,

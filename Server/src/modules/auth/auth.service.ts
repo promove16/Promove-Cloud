@@ -27,7 +27,6 @@ import {
 } from '../institution/institutionVerification.service';
 import {
   findInstitutionRosterMatchByEmail,
-  markStudentRosterEntryRegistered,
   syncStudentRosterVerificationStatus,
 } from '../institution/studentRoster.service';
 
@@ -877,21 +876,15 @@ export const submitInstitutionToken = async (userId: string, institutionToken: s
   }
 
   await registerTokenUsage(String(tokenRecord._id));
+  // shouldAutoVerifyFromRoster === Boolean(matchedRoster), so when a roster
+  // entry exists we always auto-verify and sync to 'verified' immediately.
   if (matchedRoster) {
-    if (shouldAutoVerifyFromRoster) {
-      await syncStudentRosterVerificationStatus(
-        String(matchedRoster.institutionId),
-        user.email,
-        String(user._id),
-        'verified',
-      );
-    } else {
-      await markStudentRosterEntryRegistered(
-        String(matchedRoster.institutionId),
-        user.email,
-        String(user._id),
-      );
-    }
+    await syncStudentRosterVerificationStatus(
+      String(matchedRoster.institutionId),
+      user.email,
+      String(user._id),
+      'verified',
+    );
   }
 
   if (shouldAutoVerifyFromRoster) {

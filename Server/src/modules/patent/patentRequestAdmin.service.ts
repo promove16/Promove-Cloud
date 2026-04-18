@@ -1,4 +1,4 @@
-import { Types } from 'mongoose';
+import { HydratedDocument, Types } from 'mongoose';
 import { z } from 'zod';
 import { notificationQueue } from '../../config/bullmq';
 import { uploadFile } from '../../services/fileStorageService';
@@ -8,7 +8,7 @@ import { UserRole } from '../../types/roles.types';
 import { AdminAuditLog } from '../admin/adminAuditLog.model';
 import { Startup } from '../startup/startup.model';
 import { PatentRequest } from './patentRequest.model';
-import { LEGACY_STATUS_MAP, type PatentRequestStatus } from './patent.types';
+import { LEGACY_STATUS_MAP, type IPatentRequest, type PatentRequestStatus } from './patent.types';
 import {
   updateStatusSchema,
   assignRequestSchema,
@@ -45,9 +45,11 @@ const normalizeStatus = (raw: string): PatentRequestStatus =>
 
 const toIso = (value: Date | string) => new Date(value).toISOString();
 
+type PatentRequestDocument = HydratedDocument<IPatentRequest>;
+
 const assertGrantReadyForHandover = (
-  request: Awaited<ReturnType<typeof PatentRequest.findById>>,
-) => {
+  request: PatentRequestDocument | null,
+): PatentRequestDocument => {
   if (!request) {
     throw new ApiError(404, 'PATENT_REQUEST_NOT_FOUND', 'Patent request not found.');
   }

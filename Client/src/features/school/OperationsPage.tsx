@@ -1,30 +1,21 @@
 import { FormEvent, useState } from 'react';
 import { isAxiosError } from 'axios';
-import { Link } from 'react-router-dom';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import {
-  ArrowLeft,
-  ArrowRight,
-  BriefcaseBusiness,
-  CalendarDays,
-  FileText,
-  FolderKanban,
-  GraduationCap,
   KeyRound,
-  Rocket,
   ShieldCheck,
   Users,
+  X,
 } from 'lucide-react';
 import { schoolApi } from '../../api/school.api';
+import { toast } from '../../app/components/ui/sonner';
 import { Button } from '../../components/ui/Button';
-import { Card } from '../../components/ui/Card';
 import { ApiErrorResponse } from '../../types/auth.types';
 import {
   BulkCredentialImportResult,
   TemporaryStudentCredentials,
 } from '../../types/school.types';
 import { useAuthStore } from '../../store/authStore';
-import { PatentShowcase } from '../shared/PatentShowcase';
 import { StudentIntakePanel } from '../institution/StudentIntakePanel';
 import { StudentAccessWorkspace } from '../institution/StudentAccessWorkspace';
 import { InstitutionWorkspaceHeader } from '../institution/InstitutionWorkspaceHeader';
@@ -47,7 +38,13 @@ export default function OperationsPage() {
     null,
   );
   const [bulkCredentialResult, setBulkCredentialResult] = useState<BulkCredentialImportResult | null>(null);
-  const [opsNotice, setOpsNotice] = useState('');
+
+  // Inline rejection dialog state
+  const [pendingReject, setPendingReject] = useState<{ studentId: string } | null>(null);
+  const [rejectReason, setRejectReason] = useState('');
+
+  // Inline cancel-invite confirmation state
+  const [pendingCancelInviteId, setPendingCancelInviteId] = useState<string | null>(null);
 
   const dashboardQuery = useQuery({
     queryKey: ['school-dashboard'],
@@ -70,34 +67,39 @@ export default function OperationsPage() {
     mutationFn: schoolApi.createStudentAccessToken,
     onSuccess: () => {
       setTokenLabel('');
-      setOpsNotice('Student access token generated.');
       void queryClient.invalidateQueries({ queryKey: ['school-student-access-tokens'] });
     },
     onError: (error) => {
-      setOpsNotice(getErrorMessage(error, 'Unable to generate this token right now.'));
+      toast.error(getErrorMessage(error, 'Unable to generate this token right now.'));
     },
   });
   const createRosterEntryMutation = useMutation({
     mutationFn: schoolApi.createStudentRosterEntry,
-    onSuccess: () => {
-      setOpsNotice('Student roster entry created.');
+    onSuccess: (entry) => {
+      toast.success(
+        entry.status === 'invited' && !entry.linkedUserId
+          ? 'Student invite saved. Registration email sent.'
+          : 'Student roster entry saved.',
+      );
       void Promise.all([
         queryClient.invalidateQueries({ queryKey: ['school-student-roster'] }),
         queryClient.invalidateQueries({ queryKey: ['school-dashboard'] }),
       ]);
     },
     onError: (error) => {
-      setOpsNotice(getErrorMessage(error, 'Unable to add this student right now.'));
+      toast.error(getErrorMessage(error, 'Unable to add this student right now.'));
     },
   });
   const cancelInviteMutation = useMutation({
     mutationFn: schoolApi.cancelStudentInvite,
     onSuccess: () => {
-      setOpsNotice('Student invite cancelled.');
+      toast.success('Student invite cancelled.');
+      setPendingCancelInviteId(null);
       void queryClient.invalidateQueries({ queryKey: ['school-student-roster'] });
     },
     onError: (error) => {
-      setOpsNotice(getErrorMessage(error, 'Unable to cancel this invite.'));
+      toast.error(getErrorMessage(error, 'Unable to cancel this invite.'));
+      setPendingCancelInviteId(null);
       void queryClient.invalidateQueries({ queryKey: ['school-student-roster'] });
     },
   });
@@ -105,7 +107,6 @@ export default function OperationsPage() {
     mutationFn: schoolApi.createTemporaryStudentCredentials,
     onSuccess: (credential) => {
       setLatestTemporaryCredential(credential);
-      setOpsNotice('Temporary login created.');
       void Promise.all([
         queryClient.invalidateQueries({ queryKey: ['school-student-roster'] }),
         queryClient.invalidateQueries({ queryKey: ['school-dashboard'] }),
@@ -113,41 +114,40 @@ export default function OperationsPage() {
       ]);
     },
     onError: (error) => {
-      setOpsNotice(getErrorMessage(error, 'Unable to create the temporary login right now.'));
+      toast.error(getErrorMessage(error, 'Unable to create the temporary login right now.'));
     },
   });
   const importRosterWithCredentialsMutation = useMutation({
     mutationFn: schoolApi.importStudentRosterWithCredentials,
     onSuccess: (result) => {
       setBulkCredentialResult(result);
-      setOpsNotice('Roster imported with generated credentials.');
       void Promise.all([
         queryClient.invalidateQueries({ queryKey: ['school-student-roster'] }),
         queryClient.invalidateQueries({ queryKey: ['school-dashboard'] }),
       ]);
     },
     onError: (error) => {
-      setOpsNotice(getErrorMessage(error, 'Unable to import the roster with credentials.'));
+      toast.error(getErrorMessage(error, 'Unable to import the roster with credentials.'));
     },
   });
   const importRosterMutation = useMutation({
     mutationFn: schoolApi.importStudentRoster,
     onSuccess: () => {
-      setOpsNotice('Roster import complete.');
+      toast.success('Roster import complete.');
       void Promise.all([
         queryClient.invalidateQueries({ queryKey: ['school-student-roster'] }),
         queryClient.invalidateQueries({ queryKey: ['school-dashboard'] }),
       ]);
     },
     onError: (error) => {
-      setOpsNotice(getErrorMessage(error, 'Unable to import the roster right now.'));
+      toast.error(getErrorMessage(error, 'Unable to import the roster right now.'));
     },
   });
   const reviewMutation = useMutation({
     mutationFn: ({ studentId, decision, reason }: { studentId: string; decision: 'approved' | 'rejected'; reason?: string }) =>
       schoolApi.reviewStudentVerification(studentId, { decision, reason }),
     onSuccess: () => {
-      setOpsNotice('Verification review saved.');
+      toast.success('Verification review saved.');
       void Promise.all([
         queryClient.invalidateQueries({ queryKey: ['school-student-verifications'] }),
         queryClient.invalidateQueries({ queryKey: ['school-dashboard'] }),
@@ -155,7 +155,7 @@ export default function OperationsPage() {
       ]);
     },
     onError: (error) => {
-      setOpsNotice(getErrorMessage(error, 'Unable to review this student right now.'));
+      toast.error(getErrorMessage(error, 'Unable to review this student right now.'));
     },
   });
 
@@ -172,13 +172,15 @@ export default function OperationsPage() {
     });
   };
 
-  const handleReject = (studentId: string) => {
-    const reason = window.prompt('Add a short reason for rejection (optional):')?.trim();
+  const handleConfirmReject = () => {
+    if (!pendingReject) return;
     reviewMutation.mutate({
-      studentId,
+      studentId: pendingReject.studentId,
       decision: 'rejected',
-      ...(reason ? { reason } : {}),
+      ...(rejectReason.trim() ? { reason: rejectReason.trim() } : {}),
     });
+    setPendingReject(null);
+    setRejectReason('');
   };
 
   const statusHintItems = [
@@ -207,65 +209,6 @@ export default function OperationsPage() {
       icon: Users,
     },
   ];
-  const operationsHubItems = [
-    {
-      title: 'Student Innovators',
-      description: 'Open the ranked student roster, review portfolios, and issue onboarding access tokens.',
-      to: '/dashboard/school/students',
-      icon: Users,
-      stat: `${data?.stats.totalStudents ?? 0} students`,
-      secondaryAction: { label: 'Issue Access Token', to: '/dashboard/school/students?issueToken=1' },
-    },
-    {
-      title: 'Projects',
-      description: 'Track active student workspaces, current stages, and recent execution updates.',
-      to: '/dashboard/school/projects',
-      icon: FolderKanban,
-      stat: `${data?.stats.activeProjects ?? 0} active`,
-    },
-    {
-      title: 'Patents',
-      description: 'Review student patent filings, progress, and approval status.',
-      to: '/dashboard/school/patents',
-      icon: FileText,
-      stat: `${data?.stats.patentsFiled ?? 0} filed`,
-    },
-    {
-      title: 'Startups',
-      description: 'See which student ventures have launched and how the pipeline is progressing.',
-      to: '/dashboard/school/startups',
-      icon: Rocket,
-      stat: `${data?.stats.startupsLaunched ?? 0} launched`,
-    },
-    {
-      title: 'Events',
-      description: 'Create school events, manage registrations, and monitor participation.',
-      to: '/dashboard/school/events',
-      icon: CalendarDays,
-      stat: `${data?.upcomingEvents?.length ?? 0} upcoming`,
-    },
-    {
-      title: 'Investor Directory',
-      description: 'Browse available investors connected to the institution ecosystem.',
-      to: '/dashboard/school/investors',
-      icon: BriefcaseBusiness,
-      stat: 'Outreach ready',
-    },
-    {
-      title: 'Mentorship',
-      description: 'Manage mentor programs, assignments, and institution support coverage.',
-      to: '/dashboard/school/mentors',
-      icon: GraduationCap,
-      stat: `${data?.stats.totalMentoringHours ?? 0} hrs logged`,
-    },
-    {
-      title: 'Compliance',
-      description: 'Open alerts, incidents, actions, and report downloads from the school compliance workspace.',
-      to: '/dashboard/school/compliance',
-      icon: ShieldCheck,
-      stat: `${data?.institutionProfile?.policies.length ?? 0} frameworks`,
-    },
-  ];
 
   return (
     <div className="space-y-8 pb-8">
@@ -273,63 +216,11 @@ export default function OperationsPage() {
         mode="school"
         eyebrow="School Operations"
         title={institutionName}
-        description="Use this command center to launch every school management workspace, then handle approvals, access tokens, and roster intake from one place."
+        description="Manage student access tokens, process verification approvals, and handle roster onboarding from one place."
         showMenu={false}
-        tabsAction={
-          <Link to="/dashboard/school">
-            <Button variant="secondary">
-              Back to Dashboard
-              <ArrowLeft className="ml-2 h-4 w-4" />
-            </Button>
-          </Link>
-        }
       />
 
       <DashboardMetricRail columnsClassName="md:grid-cols-4" items={statusHintItems} />
-
-      <DashboardSection
-        eyebrow="Operations Hub"
-        title="Launch every school workspace"
-        description="The hub mirrors the school manual: students, projects, patents, startups, events, investors, and mentors are all reachable from here."
-      >
-        <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-3">
-          {operationsHubItems.map((item) => (
-            <Card key={item.title} className="flex h-full flex-col justify-between border-slate-800 bg-slate-900/85 p-5 shadow-none">
-              <div>
-                <div className="flex items-start justify-between gap-4">
-                  <div className="flex h-12 w-12 items-center justify-center rounded-2xl bg-cyan-500/10 text-cyan-300">
-                    <item.icon className="h-6 w-6" />
-                  </div>
-                  <div className="rounded-full border border-slate-800 bg-slate-950/80 px-3 py-1 text-xs font-medium text-slate-300">
-                    {item.stat}
-                  </div>
-                </div>
-                <h3 className="mt-5 text-xl font-semibold text-white">{item.title}</h3>
-                <p className="mt-2 text-sm leading-6 text-slate-400">{item.description}</p>
-              </div>
-              <div className="mt-6 flex flex-wrap gap-3">
-                <Link to={item.to}>
-                  <Button>
-                    Open workspace
-                    <ArrowRight className="ml-2 h-4 w-4" />
-                  </Button>
-                </Link>
-                {item.secondaryAction ? (
-                  <Link to={item.secondaryAction.to}>
-                    <Button variant="secondary">{item.secondaryAction.label}</Button>
-                  </Link>
-                ) : null}
-              </div>
-            </Card>
-          ))}
-        </div>
-      </DashboardSection>
-
-      {opsNotice ? (
-        <div className="rounded-2xl border border-cyan-500/30 bg-cyan-500/10 px-4 py-3 text-sm text-cyan-200">
-          {opsNotice}
-        </div>
-      ) : null}
 
       <div className="grid gap-6">
         <StudentAccessWorkspace
@@ -346,7 +237,10 @@ export default function OperationsPage() {
           onTokenLabelChange={setTokenLabel}
           onCreateToken={handleCreateToken}
           onApproveStudent={(studentId) => reviewMutation.mutate({ studentId, decision: 'approved' })}
-          onRejectStudent={handleReject}
+          onRejectStudent={(studentId) => {
+            setPendingReject({ studentId });
+            setRejectReason('');
+          }}
         />
 
         <DashboardSection
@@ -368,12 +262,8 @@ export default function OperationsPage() {
             isTemporaryCredentialSubmitting={createTemporaryCredentialMutation.isPending}
             temporaryCredential={latestTemporaryCredential}
             bulkCredentialResult={bulkCredentialResult}
-            onCreateManualEntry={(payload) => createRosterEntryMutation.mutate(payload)}
-            onCancelInvite={(rosterEntryId) => {
-              if (window.confirm('Cancel this student invite?')) {
-                cancelInviteMutation.mutate(rosterEntryId);
-              }
-            }}
+            onCreateManualEntry={(payload) => createRosterEntryMutation.mutateAsync(payload)}
+            onCancelInvite={(rosterEntryId) => setPendingCancelInviteId(rosterEntryId)}
             cancellingInviteId={cancelInviteMutation.isPending ? cancelInviteMutation.variables : null}
             onImportFile={(file) => importRosterMutation.mutate(file)}
             onImportFileWithCredentials={(file) => importRosterWithCredentialsMutation.mutate(file)}
@@ -382,7 +272,79 @@ export default function OperationsPage() {
         </DashboardSection>
       </div>
 
-      <PatentShowcase />
+      {/* Rejection reason dialog */}
+      {pendingReject ? (
+        <div className="fixed inset-0 z-50 flex items-center justify-center px-4">
+          <div
+            className="absolute inset-0 bg-black/60 backdrop-blur-sm"
+            onClick={() => setPendingReject(null)}
+          />
+          <div className="relative w-full max-w-md rounded-2xl border border-slate-700 bg-slate-950 p-6 shadow-2xl">
+            <div className="flex items-center justify-between">
+              <h3 className="text-base font-semibold text-white">Reject student verification</h3>
+              <button
+                type="button"
+                onClick={() => setPendingReject(null)}
+                className="flex h-7 w-7 items-center justify-center rounded-lg text-slate-400 hover:bg-slate-800 hover:text-white"
+              >
+                <X className="h-4 w-4" />
+              </button>
+            </div>
+            <p className="mt-2 text-sm text-slate-400">
+              Optionally add a reason. It will be visible to your institution's review trail.
+            </p>
+            <textarea
+              value={rejectReason}
+              onChange={(e) => setRejectReason(e.target.value)}
+              placeholder="Reason for rejection (optional)"
+              rows={3}
+              className="mt-4 w-full resize-none rounded-lg border border-slate-700 bg-slate-900 px-3 py-2.5 text-sm text-white placeholder-slate-500 focus:border-rose-500 focus:outline-none"
+            />
+            <div className="mt-4 flex justify-end gap-3">
+              <Button variant="secondary" onClick={() => setPendingReject(null)}>
+                Cancel
+              </Button>
+              <button
+                type="button"
+                onClick={handleConfirmReject}
+                disabled={reviewMutation.isPending}
+                className="rounded-2xl bg-rose-600 px-5 py-2.5 text-sm font-semibold text-white transition hover:bg-rose-500 disabled:opacity-60"
+              >
+                {reviewMutation.isPending ? 'Rejecting...' : 'Confirm Rejection'}
+              </button>
+            </div>
+          </div>
+        </div>
+      ) : null}
+
+      {/* Cancel invite confirmation dialog */}
+      {pendingCancelInviteId ? (
+        <div className="fixed inset-0 z-50 flex items-center justify-center px-4">
+          <div
+            className="absolute inset-0 bg-black/60 backdrop-blur-sm"
+            onClick={() => setPendingCancelInviteId(null)}
+          />
+          <div className="relative w-full max-w-sm rounded-2xl border border-slate-700 bg-slate-950 p-6 shadow-2xl">
+            <h3 className="text-base font-semibold text-white">Cancel student invite?</h3>
+            <p className="mt-2 text-sm text-slate-400">
+              The invite email will be invalidated and the roster entry removed. This cannot be undone.
+            </p>
+            <div className="mt-5 flex justify-end gap-3">
+              <Button variant="secondary" onClick={() => setPendingCancelInviteId(null)}>
+                Keep invite
+              </Button>
+              <button
+                type="button"
+                onClick={() => cancelInviteMutation.mutate(pendingCancelInviteId)}
+                disabled={cancelInviteMutation.isPending}
+                className="rounded-2xl bg-rose-600 px-5 py-2.5 text-sm font-semibold text-white transition hover:bg-rose-500 disabled:opacity-60"
+              >
+                {cancelInviteMutation.isPending ? 'Cancelling...' : 'Yes, cancel'}
+              </button>
+            </div>
+          </div>
+        </div>
+      ) : null}
     </div>
   );
 }

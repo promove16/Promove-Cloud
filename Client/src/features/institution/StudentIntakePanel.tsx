@@ -59,7 +59,7 @@ type StudentIntakePanelProps = {
     gradeOrProgram?: string;
     rollNumber?: string;
     notes?: string;
-  }) => void;
+  }) => Promise<StudentRosterEntry>;
   onCancelInvite?: (rosterEntryId: string) => void;
   cancellingInviteId?: string | null;
   isImportWithCredentialsSubmitting?: boolean;
@@ -132,16 +132,21 @@ export function StudentIntakePanel({
     [roster],
   );
 
-  const handleManualSubmit = (event: FormEvent<HTMLFormElement>) => {
+  const handleManualSubmit = async (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault();
-    onCreateManualEntry({
-      displayName: manualForm.displayName.trim(),
-      email: manualForm.email.trim(),
-      ...(manualForm.secondaryLabel.trim() ? { gradeOrProgram: manualForm.secondaryLabel.trim() } : {}),
-      ...(manualForm.rollNumber.trim() ? { rollNumber: manualForm.rollNumber.trim() } : {}),
-      ...(manualForm.notes.trim() ? { notes: manualForm.notes.trim() } : {}),
-    });
-    setManualForm({ displayName: '', email: '', secondaryLabel: '', rollNumber: '', notes: '' });
+
+    try {
+      await onCreateManualEntry({
+        displayName: manualForm.displayName.trim(),
+        email: manualForm.email.trim(),
+        ...(manualForm.secondaryLabel.trim() ? { gradeOrProgram: manualForm.secondaryLabel.trim() } : {}),
+        ...(manualForm.rollNumber.trim() ? { rollNumber: manualForm.rollNumber.trim() } : {}),
+        ...(manualForm.notes.trim() ? { notes: manualForm.notes.trim() } : {}),
+      });
+      setManualForm({ displayName: '', email: '', secondaryLabel: '', rollNumber: '', notes: '' });
+    } catch {
+      // Keep the form data in place so the user can correct and resubmit.
+    }
   };
 
   const handleFileChange = (event: ChangeEvent<HTMLInputElement>) => {
@@ -290,7 +295,7 @@ export function StudentIntakePanel({
             <OptionTabs
               items={tabs}
               activeId={activeTab}
-              onChange={setActiveTab}
+              onChange={(tabId) => setActiveTab(tabId as Tab)}
               stretch
               aria-label="Student onboarding sections"
             />

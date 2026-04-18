@@ -99,6 +99,14 @@ export function LoginPage() {
           return;
         }
 
+        if (apiError?.code === 'INSTITUTION_VERIFICATION_REJECTED') {
+          setError(
+            apiError.message ||
+              'Your institution could not verify your account. Please contact your school or college for support.',
+          );
+          return;
+        }
+
         setError(apiError?.message ?? 'Unable to sign in right now.');
         return;
       }

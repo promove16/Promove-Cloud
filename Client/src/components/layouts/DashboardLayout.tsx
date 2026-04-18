@@ -63,27 +63,6 @@ const SHARED_ROUTE_LABELS = [
 ] as const;
 
 const SIDEBAR_PARENT_PATH_ALIASES: Partial<Record<UserRole, Record<string, string[]>>> = {
-  [UserRole.SCHOOL]: {
-    '/dashboard/school/operations': [
-      '/dashboard/school/students',
-      '/dashboard/school/mentors',
-      '/dashboard/school/events',
-      '/dashboard/school/projects',
-      '/dashboard/school/patents',
-      '/dashboard/school/startups',
-      '/dashboard/school/investors',
-    ],
-  },
-  [UserRole.COLLEGE]: {
-    '/dashboard/college/students': [
-      '/dashboard/college/operations',
-      '/dashboard/college/mentors',
-      '/dashboard/college/events',
-      '/dashboard/college/projects',
-      '/dashboard/college/investors',
-      '/dashboard/college/recruiters',
-    ],
-  },
   [UserRole.RECRUITER]: {
     '/dashboard/recruiter/marketplace': ['/dashboard/recruiter/applications'],
     '/dashboard/recruiter/drives': [
@@ -873,7 +852,7 @@ export function DashboardLayout({ children, role }: PropsWithChildren<DashboardL
           </div>
         </aside>
 
-        <div className="flex min-h-0 flex-1 flex-col">
+        <div className="flex min-h-0 min-w-0 flex-1 flex-col">
           {!isPortfolioRoute ? (
             <header className="dashboard-theme-border dashboard-theme-header sticky top-0 z-30 border-b backdrop-blur-xl">
               <div className="flex items-center justify-between px-4 py-4 lg:px-8">
@@ -898,7 +877,7 @@ export function DashboardLayout({ children, role }: PropsWithChildren<DashboardL
 
           <main
             className={`flex min-h-0 flex-1 flex-col overflow-y-auto ${
-              shouldUseFullBleedMain ? 'p-0' : 'px-4 py-6 lg:px-8'
+              shouldUseFullBleedMain ? 'min-w-0 p-0' : 'min-w-0 px-4 py-6 lg:px-8'
             }`}
           >
             {children ?? <Outlet />}

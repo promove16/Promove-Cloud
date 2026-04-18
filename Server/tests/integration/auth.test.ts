@@ -7,6 +7,7 @@ import app from '../../src/app';
 import { env } from '../../src/config/env';
 import { redis } from '../../src/config/redis';
 import { InstitutionStudentRosterEntry } from '../../src/modules/institution/studentRoster.model';
+import { StudentAccessToken } from '../../src/modules/institution/studentAccessToken.model';
 import { User } from '../../src/modules/user/user.model';
 import {
   sendInstitutionStudentInviteEmail,
@@ -291,6 +292,149 @@ describe('auth integration', () => {
       );
     });
 
+    it('creates a roster invite token automatically when no active institution token exists', async () => {
+      const schoolEmail = `manual-no-token-${randomUUID()}@school.test`;
+      const { user: schoolUser } = await createApprovedUser({
+        role: UserRole.SCHOOL,
+        email: schoolEmail,
+        displayName: 'No Token School',
+        institutionProfile: {
+          institutionName: 'No Token School',
+          location: 'Lucknow',
+          totalStudentsEnrolled: 510,
+          academicYear: '2025-26',
+        },
+      });
+
+      const schoolLogin = await loginAs(schoolEmail);
+      const rosterEmail = `manual-no-token-${randomUUID()}@school.test`;
+
+      const response = await request(app)
+        .post('/api/school/student-roster/manual')
+        .set('Authorization', `Bearer ${schoolLogin.accessToken}`)
+        .send({
+          displayName: 'Invite Student',
+          email: rosterEmail,
+          gradeOrProgram: 'Class 10',
+        });
+
+      expect(response.status).toBe(201);
+      expect(sendInstitutionStudentInviteEmail).toHaveBeenCalledTimes(1);
+      expect(sendInstitutionStudentInviteEmail).toHaveBeenCalledWith(
+        expect.objectContaining({
+          inviteLink: expect.stringMatching(/institutionToken=SCH-[A-F0-9]{8}/),
+        }),
+      );
+
+      const createdToken = await StudentAccessToken.findOne({
+        institutionId: schoolUser._id,
+        institutionRole: UserRole.SCHOOL,
+        label: 'Roster Invite',
+      }).lean();
+
+      expect(createdToken?.token).toMatch(/^SCH-[A-F0-9]{8}$/);
+    });
+
+    it('keeps the roster write successful when invite email delivery fails', async () => {
+      const schoolEmail = `manual-mail-fail-${randomUUID()}@school.test`;
+      await createApprovedUser({
+        role: UserRole.SCHOOL,
+        email: schoolEmail,
+        displayName: 'Mail Failure School',
+        institutionProfile: {
+          institutionName: 'Mail Failure School',
+          location: 'Nagpur',
+          totalStudentsEnrolled: 430,
+          academicYear: '2025-26',
+        },
+      });
+      const schoolLogin = await loginAs(schoolEmail);
+
+      (sendInstitutionStudentInviteEmail as jest.Mock).mockRejectedValueOnce(
+        new Error('SMTP temporarily unavailable'),
+      );
+
+      const rosterEmail = `manual-mail-fail-${randomUUID()}@school.test`;
+      const response = await request(app)
+        .post('/api/school/student-roster/manual')
+        .set('Authorization', `Bearer ${schoolLogin.accessToken}`)
+        .send({
+          displayName: 'Student Saved Despite Mail Failure',
+          email: rosterEmail,
+          gradeOrProgram: 'Class 9',
+        });
+
+      expect(response.status).toBe(201);
+      expect(response.body.data.email).toBe(rosterEmail);
+
+      const rosterEntry = await InstitutionStudentRosterEntry.findOne({ email: rosterEmail }).lean();
+      expect(rosterEntry?.displayName).toBe('Student Saved Despite Mail Failure');
+      expect(rosterEntry?.status).toBe('invited');
+    });
+
+    it('resends the roster invite email when a pending manual student entry is submitted again', async () => {
+      const schoolEmail = `manual-resend-${randomUUID()}@school.test`;
+      await createApprovedUser({
+        role: UserRole.SCHOOL,
+        email: schoolEmail,
+        displayName: 'Manual Resend School',
+        institutionProfile: {
+          institutionName: 'Manual Resend School',
+          location: 'Bengaluru',
+          totalStudentsEnrolled: 720,
+          academicYear: '2025-26',
+        },
+      });
+
+      const { token, accessToken } = await createInstitutionToken(UserRole.SCHOOL, schoolEmail);
+      const rosterEmail = `manual-resend-${randomUUID()}@school.test`;
+
+      const firstResponse = await request(app)
+        .post('/api/school/student-roster/manual')
+        .set('Authorization', `Bearer ${accessToken}`)
+        .send({
+          displayName: 'Invite Student',
+          email: rosterEmail,
+          gradeOrProgram: 'Class 11',
+        });
+
+      expect(firstResponse.status).toBe(201);
+      expect(sendInstitutionStudentInviteEmail).toHaveBeenCalledTimes(1);
+
+      jest.clearAllMocks();
+
+      const secondResponse = await request(app)
+        .post('/api/school/student-roster/manual')
+        .set('Authorization', `Bearer ${accessToken}`)
+        .send({
+          displayName: 'Invite Student Updated',
+          email: rosterEmail,
+          gradeOrProgram: 'Class 12',
+        });
+
+      expect(secondResponse.status).toBe(201);
+      expect(sendInstitutionStudentInviteEmail).toHaveBeenCalledTimes(1);
+      expect(sendInstitutionStudentInviteEmail).toHaveBeenCalledWith(
+        expect.objectContaining({
+          toEmail: rosterEmail,
+          studentEmail: rosterEmail,
+          institutionName: 'Manual Resend School',
+          institutionRole: UserRole.SCHOOL,
+          inviteLink: expect.stringContaining(`inviteeEmail=${encodeURIComponent(rosterEmail)}`),
+        }),
+      );
+      expect(sendInstitutionStudentInviteEmail).toHaveBeenCalledWith(
+        expect.objectContaining({
+          inviteLink: expect.stringContaining(`institutionToken=${encodeURIComponent(token)}`),
+        }),
+      );
+
+      const rosterEntry = await InstitutionStudentRosterEntry.findOne({ email: rosterEmail }).lean();
+      expect(rosterEntry?.displayName).toBe('Invite Student Updated');
+      expect(rosterEntry?.gradeOrProgram).toBe('Class 12');
+      expect(rosterEntry?.status).toBe('invited');
+    });
+
     it('sends invite emails for created roster rows during import', async () => {
       const schoolEmail = `import-${randomUUID()}@school.test`;
       await createApprovedUser({
@@ -530,6 +674,307 @@ describe('auth integration', () => {
 
       expect(listResponse.status).toBe(200);
       expect(listResponse.body.data).toHaveLength(0);
+    });
+  });
+
+  describe('institution token edge-cases', () => {
+    it('rejects student signup when the institution token is expired', async () => {
+      const schoolEmail = `expired-token-${randomUUID()}@school.test`;
+      const { user: schoolUser } = await createApprovedUser({
+        role: UserRole.SCHOOL,
+        email: schoolEmail,
+        displayName: 'Expired Token School',
+        institutionProfile: {
+          institutionName: 'Expired Token School',
+          location: 'Delhi',
+          totalStudentsEnrolled: 500,
+          academicYear: '2025-26',
+        },
+      });
+
+      // Insert an already-expired token directly so we can test the error path.
+      const expiredToken = await StudentAccessToken.create({
+        institutionId: schoolUser._id,
+        institutionRole: UserRole.SCHOOL,
+        createdBy: schoolUser._id,
+        token: 'SCH-EXPIRED1',
+        isActive: true,
+        expiresAt: new Date(Date.now() - 1000), // already expired
+      });
+
+      const response = await request(app).post('/api/auth/register').send({
+        email: `student-${randomUUID()}@school.test`,
+        password: PASSWORD,
+        displayName: 'Expired Student',
+        role: 'student',
+        institutionToken: expiredToken.token,
+      });
+
+      expect(response.status).toBe(400);
+      expect(response.body.error.code).toBe('INSTITUTION_TOKEN_EXPIRED');
+      expect(response.headers['set-cookie']).toBeUndefined();
+    });
+
+    it('rejects student signup when the institution token is completely invalid', async () => {
+      const response = await request(app).post('/api/auth/register').send({
+        email: `student-${randomUUID()}@example.com`,
+        password: PASSWORD,
+        displayName: 'Bad Token Student',
+        role: 'student',
+        institutionToken: 'SCH-DOESNOTEXIST',
+      });
+
+      expect(response.status).toBe(400);
+      expect(response.body.error.code).toBe('INVALID_INSTITUTION_TOKEN');
+      expect(response.headers['set-cookie']).toBeUndefined();
+    });
+  });
+
+  describe('institution approval flow', () => {
+    it('allows a school to approve a pending student verification', async () => {
+      const schoolEmail = `approve-flow-${randomUUID()}@school.test`;
+      await createApprovedUser({
+        role: UserRole.SCHOOL,
+        email: schoolEmail,
+        displayName: 'Approve Flow School',
+        institutionProfile: {
+          institutionName: 'Approve Flow School',
+          location: 'Bengaluru',
+          totalStudentsEnrolled: 600,
+          academicYear: '2025-26',
+        },
+      });
+      const { token, accessToken: schoolAccessToken } = await createInstitutionToken(
+        UserRole.SCHOOL,
+        schoolEmail,
+      );
+
+      // Register a student without a roster entry so they land in pending state.
+      const studentEmail = `pending-student-${randomUUID()}@school.test`;
+      const registerResponse = await request(app).post('/api/auth/register').send({
+        email: studentEmail,
+        password: PASSWORD,
+        displayName: 'Pending Student',
+        role: 'student',
+        institutionToken: token,
+      });
+
+      expect(registerResponse.status).toBe(201);
+      expect(registerResponse.body.data.pendingApproval).toBe(true);
+      expect(registerResponse.body.data.user.verificationStatus).toBe('pending');
+
+      const studentId = registerResponse.body.data.user._id as string;
+
+      // Verify the student is blocked from logging in.
+      const blockedLogin = await request(app).post('/api/auth/login').send({
+        email: studentEmail,
+        password: PASSWORD,
+      });
+      expect(blockedLogin.status).toBe(403);
+      expect(blockedLogin.body.error.code).toBe('INSTITUTION_APPROVAL_PENDING');
+
+      // School approves the student.
+      const approveResponse = await request(app)
+        .patch(`/api/school/student-verifications/${studentId}`)
+        .set('Authorization', `Bearer ${schoolAccessToken}`)
+        .send({ decision: 'approved' });
+
+      expect(approveResponse.status).toBe(200);
+      expect(approveResponse.body.data.status).toBe('verified');
+
+      // Student can now log in.
+      const loginResponse = await request(app).post('/api/auth/login').send({
+        email: studentEmail,
+        password: PASSWORD,
+      });
+      expect(loginResponse.status).toBe(200);
+      expect(loginResponse.body.data.user.verificationStatus).toBe('verified');
+      expect(loginResponse.body.data.user.isActive).toBe(true);
+      // Token-only students have no pre-existing roster entry, so no roster
+      // record is created or updated by the approval step.
+    });
+
+    it('allows a college to approve a pending student verification', async () => {
+      const collegeEmail = `approve-college-${randomUUID()}@college.test`;
+      await createApprovedUser({
+        role: UserRole.COLLEGE,
+        email: collegeEmail,
+        displayName: 'Approve Flow College',
+        institutionProfile: {
+          institutionName: 'Approve Flow College',
+          location: 'Pune',
+          totalStudentsEnrolled: 1400,
+          academicYear: '2025-26',
+        },
+      });
+      const { token, accessToken: collegeAccessToken } = await createInstitutionToken(
+        UserRole.COLLEGE,
+        collegeEmail,
+      );
+
+      const studentEmail = `pending-college-student-${randomUUID()}@college.test`;
+      const registerResponse = await request(app).post('/api/auth/register').send({
+        email: studentEmail,
+        password: PASSWORD,
+        displayName: 'Pending College Student',
+        role: 'student',
+        institutionToken: token,
+      });
+
+      expect(registerResponse.status).toBe(201);
+      expect(registerResponse.body.data.pendingApproval).toBe(true);
+      const studentId = registerResponse.body.data.user._id as string;
+
+      const approveResponse = await request(app)
+        .patch(`/api/college/student-verifications/${studentId}`)
+        .set('Authorization', `Bearer ${collegeAccessToken}`)
+        .send({ decision: 'approved' });
+
+      expect(approveResponse.status).toBe(200);
+      expect(approveResponse.body.data.status).toBe('verified');
+
+      const loginResponse = await request(app).post('/api/auth/login').send({
+        email: studentEmail,
+        password: PASSWORD,
+      });
+
+      expect(loginResponse.status).toBe(200);
+      expect(loginResponse.body.data.user.verificationStatus).toBe('verified');
+      expect(loginResponse.body.data.user.isActive).toBe(true);
+    });
+
+    it('allows a school to reject a pending student and blocks their login', async () => {
+      const schoolEmail = `reject-flow-${randomUUID()}@school.test`;
+      await createApprovedUser({
+        role: UserRole.SCHOOL,
+        email: schoolEmail,
+        displayName: 'Reject Flow School',
+        institutionProfile: {
+          institutionName: 'Reject Flow School',
+          location: 'Chennai',
+          totalStudentsEnrolled: 400,
+          academicYear: '2025-26',
+        },
+      });
+      const { token, accessToken: schoolAccessToken } = await createInstitutionToken(
+        UserRole.SCHOOL,
+        schoolEmail,
+      );
+
+      const studentEmail = `reject-student-${randomUUID()}@school.test`;
+      const registerResponse = await request(app).post('/api/auth/register').send({
+        email: studentEmail,
+        password: PASSWORD,
+        displayName: 'Reject Pending Student',
+        role: 'student',
+        institutionToken: token,
+      });
+
+      expect(registerResponse.status).toBe(201);
+      const studentId = registerResponse.body.data.user._id as string;
+
+      // School rejects with a reason.
+      const rejectResponse = await request(app)
+        .patch(`/api/school/student-verifications/${studentId}`)
+        .set('Authorization', `Bearer ${schoolAccessToken}`)
+        .send({ decision: 'rejected', reason: 'Cannot confirm enrollment.' });
+
+      expect(rejectResponse.status).toBe(200);
+      expect(rejectResponse.body.data.status).toBe('rejected');
+
+      // Rejected student is blocked at login with the specific error code.
+      const loginResponse = await request(app).post('/api/auth/login').send({
+        email: studentEmail,
+        password: PASSWORD,
+      });
+      expect(loginResponse.status).toBe(403);
+      expect(loginResponse.body.error.code).toBe('INSTITUTION_VERIFICATION_REJECTED');
+      // Token-only students have no pre-existing roster entry, so no roster
+      // record is updated by the rejection step.
+    });
+
+    it('allows a college to add a manual roster invite and sends the email link', async () => {
+      const collegeEmail = `manual-college-${randomUUID()}@college.test`;
+      await createApprovedUser({
+        role: UserRole.COLLEGE,
+        email: collegeEmail,
+        displayName: 'Manual Invite College',
+        institutionProfile: {
+          institutionName: 'Manual Invite College',
+          location: 'Indore',
+          totalStudentsEnrolled: 1800,
+          academicYear: '2025-26',
+        },
+      });
+
+      const { token, accessToken } = await createInstitutionToken(UserRole.COLLEGE, collegeEmail);
+      const rosterEmail = `manual-college-${randomUUID()}@college.test`;
+
+      const response = await request(app)
+        .post('/api/college/student-roster/manual')
+        .set('Authorization', `Bearer ${accessToken}`)
+        .send({
+          displayName: 'College Invite Student',
+          email: rosterEmail,
+          gradeOrProgram: 'B.Tech CSE',
+        });
+
+      expect(response.status).toBe(201);
+      expect(sendInstitutionStudentInviteEmail).toHaveBeenCalledTimes(1);
+      expect(sendInstitutionStudentInviteEmail).toHaveBeenCalledWith(
+        expect.objectContaining({
+          toEmail: rosterEmail,
+          studentEmail: rosterEmail,
+          institutionName: 'Manual Invite College',
+          institutionRole: UserRole.COLLEGE,
+          inviteLink: expect.stringContaining(`institutionToken=${encodeURIComponent(token)}`),
+        }),
+      );
+    });
+
+    it('blocks re-reviewing a student who has already been reviewed', async () => {
+      const schoolEmail = `already-reviewed-${randomUUID()}@school.test`;
+      await createApprovedUser({
+        role: UserRole.SCHOOL,
+        email: schoolEmail,
+        displayName: 'Already Reviewed School',
+        institutionProfile: {
+          institutionName: 'Already Reviewed School',
+          location: 'Mumbai',
+          totalStudentsEnrolled: 700,
+          academicYear: '2025-26',
+        },
+      });
+      const { token, accessToken: schoolAccessToken } = await createInstitutionToken(
+        UserRole.SCHOOL,
+        schoolEmail,
+      );
+
+      const studentEmail = `reviewed-once-${randomUUID()}@school.test`;
+      const registerResponse = await request(app).post('/api/auth/register').send({
+        email: studentEmail,
+        password: PASSWORD,
+        displayName: 'Already Reviewed Student',
+        role: 'student',
+        institutionToken: token,
+      });
+
+      const studentId = registerResponse.body.data.user._id as string;
+
+      // First review — approve.
+      await request(app)
+        .patch(`/api/school/student-verifications/${studentId}`)
+        .set('Authorization', `Bearer ${schoolAccessToken}`)
+        .send({ decision: 'approved' });
+
+      // Second review attempt should be rejected.
+      const secondReview = await request(app)
+        .patch(`/api/school/student-verifications/${studentId}`)
+        .set('Authorization', `Bearer ${schoolAccessToken}`)
+        .send({ decision: 'rejected', reason: 'Changed mind.' });
+
+      expect(secondReview.status).toBe(400);
+      expect(secondReview.body.error.code).toBe('VERIFICATION_ALREADY_REVIEWED');
     });
   });
 

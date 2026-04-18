@@ -1,6 +1,8 @@
+import { randomBytes } from 'crypto';
 import { z } from 'zod';
 import { Readable } from 'stream';
 import ExcelJS from 'exceljs';
+import { logError } from '../../config/logger';
 import { env } from '../../config/env';
 import { UserRole } from '../../types/roles.types';
 import { ApiError } from '../../utils/ApiError';
@@ -97,6 +99,8 @@ type InstitutionRosterOwner = {
   displayName: string;
 };
 
+const ROSTER_INVITE_TOKEN_TTL_DAYS = 90;
+
 const assertInstitutionRole = async (
   institutionId: string,
   institutionRole: UserRole.SCHOOL | UserRole.COLLEGE,
@@ -127,12 +131,47 @@ const resolveLatestActiveInstitutionToken = async (institutionId: string) => {
   return activeToken?.token ?? null;
 };
 
+const generateStudentAccessToken = async (
+  institutionRole: UserRole.SCHOOL | UserRole.COLLEGE,
+): Promise<string> => {
+  const prefix = institutionRole === UserRole.SCHOOL ? 'SCH' : 'COL';
+
+  for (let attempt = 0; attempt < 5; attempt += 1) {
+    const candidate = `${prefix}-${randomBytes(4).toString('hex').toUpperCase()}`;
+    const existing = await StudentAccessToken.exists({ token: candidate });
+    if (!existing) {
+      return candidate;
+    }
+  }
+
+  throw new ApiError(500, 'TOKEN_GENERATION_FAILED', 'Unable to generate a unique student token');
+};
+
+const ensureInviteInstitutionToken = async (institution: InstitutionRosterOwner) => {
+  const existingToken = await resolveLatestActiveInstitutionToken(String(institution._id));
+  if (existingToken) {
+    return existingToken;
+  }
+
+  const token = await generateStudentAccessToken(institution.role);
+  await StudentAccessToken.create({
+    institutionId: institution._id,
+    institutionRole: institution.role,
+    createdBy: institution._id,
+    label: 'Roster Invite',
+    token,
+    expiresAt: new Date(Date.now() + ROSTER_INVITE_TOKEN_TTL_DAYS * 24 * 60 * 60 * 1000),
+  });
+
+  return token;
+};
+
 const buildInstitutionStudentInviteLink = async (
   institution: InstitutionRosterOwner,
   inviteeEmail: string,
 ) => {
   const inviteUrl = new URL('/signup', env.CLIENT_URL);
-  const activeToken = await resolveLatestActiveInstitutionToken(String(institution._id));
+  const activeToken = await ensureInviteInstitutionToken(institution);
 
   inviteUrl.searchParams.set('inviteRole', UserRole.STUDENT);
   inviteUrl.searchParams.set('inviteeEmail', normalizeEmail(inviteeEmail));
@@ -157,14 +196,18 @@ const sendStudentRosterInviteIfNeeded = async (
     return;
   }
 
-  const inviteLink = await buildInstitutionStudentInviteLink(institution, entry.email);
-  await sendInstitutionStudentInviteEmail({
-    toEmail: entry.email,
-    studentEmail: entry.email,
-    institutionName: institution.displayName,
-    institutionRole: institution.role,
-    inviteLink,
-  });
+  try {
+    const inviteLink = await buildInstitutionStudentInviteLink(institution, entry.email);
+    await sendInstitutionStudentInviteEmail({
+      toEmail: entry.email,
+      studentEmail: entry.email,
+      institutionName: institution.displayName,
+      institutionRole: institution.role,
+      inviteLink,
+    });
+  } catch (error) {
+    logError('Failed to send institution student roster invite email', error);
+  }
 };
 
 const deriveRosterStatus = (user?: StudentRosterLinkedUser | null): StudentRosterStatus => {
@@ -423,9 +466,7 @@ export const createStudentRosterEntry = async (
 ): Promise<StudentRosterEntryView> => {
   const institution = await assertInstitutionRole(institutionId, institutionRole);
   const result = await upsertRosterEntry(institutionId, institutionRole, createdBy, payload, 'manual');
-  if (result.created) {
-    await sendStudentRosterInviteIfNeeded(institution, result.entry);
-  }
+  await sendStudentRosterInviteIfNeeded(institution, result.entry);
   return result.entry;
 };
 

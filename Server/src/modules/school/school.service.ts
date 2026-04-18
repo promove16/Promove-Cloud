@@ -42,7 +42,6 @@ import {
   listStudentRosterQuerySchema,
   manualStudentRosterEntrySchema,
 } from '../institution/studentRoster.service';
-import { sendStudentRosterInvite } from '../institution/studentInvite.service';
 import {
   InnovationScoreDistributionBucket,
   DashboardEventView,
@@ -901,21 +900,7 @@ export const createSchoolStudentRosterEntry = async (
   schoolId: string,
   actorId: string,
   payload: z.infer<typeof manualStudentRosterEntrySchema>,
-) => {
-  const entry = await createStudentRosterEntry(schoolId, UserRole.SCHOOL, actorId, payload);
-
-  if (entry.status === 'invited' && !entry.linkedUserId) {
-    await sendStudentRosterInvite({
-      institutionId: schoolId,
-      institutionRole: UserRole.SCHOOL,
-      createdBy: actorId,
-      studentEmail: entry.email,
-      studentName: entry.displayName,
-    });
-  }
-
-  return entry;
-};
+) => createStudentRosterEntry(schoolId, UserRole.SCHOOL, actorId, payload);
 
 export const cancelSchoolStudentRosterInvite = (
   schoolId: string,
@@ -933,28 +918,7 @@ export const importSchoolStudentRosterEntries = async (
   schoolId: string,
   actorId: string,
   file: { originalname: string; buffer: Buffer },
-) => {
-  const result = await importStudentRosterEntries(schoolId, UserRole.SCHOOL, actorId, file);
-  const createdEntries = result.createdEntries ?? [];
-
-  if (createdEntries.length > 0) {
-    await Promise.all(
-      createdEntries
-        .filter((entry) => entry.status === 'invited' && !entry.linkedUserId)
-        .map((entry) =>
-          sendStudentRosterInvite({
-            institutionId: schoolId,
-            institutionRole: UserRole.SCHOOL,
-            createdBy: actorId,
-            studentEmail: entry.email,
-            studentName: entry.displayName,
-          }),
-        ),
-    );
-  }
-
-  return result;
-};
+) => importStudentRosterEntries(schoolId, UserRole.SCHOOL, actorId, file);
 
 export const importSchoolStudentCredentials = (
   schoolId: string,

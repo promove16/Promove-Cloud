@@ -4,8 +4,8 @@ import { InstitutionWorkspaceMenu } from './InstitutionWorkspaceMenu';
 type InstitutionWorkspaceHeaderProps = {
   mode: 'school' | 'college';
   eyebrow: string;
-  title: string;
-  description: string;
+  title?: string;
+  description?: string;
   headerAction?: ReactNode;
   tabsAction?: ReactNode;
   showMenu?: boolean;
@@ -25,8 +25,8 @@ export function InstitutionWorkspaceHeader({
       <div className="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
         <div>
           <div className="text-[11px] uppercase tracking-[0.35em] text-cyan-300">{eyebrow}</div>
-          <h1 className="mt-2 text-3xl font-bold text-white md:text-4xl">{title}</h1>
-          <p className="mt-2 max-w-3xl text-slate-400">{description}</p>
+          {title ? <h1 className="mt-2 text-3xl font-bold text-white md:text-4xl">{title}</h1> : null}
+          {description ? <p className="mt-2 max-w-3xl text-slate-400">{description}</p> : null}
         </div>
         {headerAction ? <div className="shrink-0">{headerAction}</div> : null}
       </div>
