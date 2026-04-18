@@ -17,6 +17,7 @@ output/playwright/
 scripts/manual-tests/
 Server/scripts/
 Server/dist/
+Server/deleteUser.js
 Client/dist/
 Client/guidelines/
 Client/ATTRIBUTIONS.md
