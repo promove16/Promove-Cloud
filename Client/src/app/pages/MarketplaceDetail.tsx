@@ -1,6 +1,6 @@
 import { useMemo, useState } from "react";
 import { Link, Navigate, useNavigate, useParams } from "react-router-dom";
-import { useQuery } from "@tanstack/react-query";
+import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import {
   ArrowLeft,
   ArrowRight,
@@ -28,6 +28,7 @@ import {
   MarketplaceUserDetail,
   marketplaceApi,
 } from "../../api/marketplace.api";
+import { requestApi } from "../../api/request.api";
 import {
   getStartupInviteActionLabel,
   isStartupInviteTargetType,
@@ -477,6 +478,7 @@ export function ProfileDetailView({
   dashboardRole: UserRole;
 }) {
   const navigate = useNavigate();
+  const queryClient = useQueryClient();
   const currentUserId = useAuthStore((state) => state.user?._id);
   const links = linkList(entity);
   const isInstitution = isInstitutionEntityType(entity.entityType);
@@ -494,6 +496,42 @@ export function ProfileDetailView({
   const inviteEntityType = isStartupInviteTargetType(entity.entityType)
     ? entity.entityType
     : null;
+
+  const requestHiringEventMutation = useMutation({
+    mutationFn: () =>
+      requestApi.create({
+        requestType: "college_event_invite",
+        actionType: "approve",
+        toUserId: entity._id,
+        targetEntityType: "recruiter",
+        targetEntityId: entity._id,
+        targetEntityTitle: entity.displayName,
+        targetRole: "recruiter",
+        requestedRole: "hiring_event_partner",
+        requestedPermission: "college_hiring_event_request",
+        message: `We would like to coordinate a hiring event with ${entity.displayName}. Please review this request and connect on the event format, roles, and timeline.`,
+        metadata: {
+          recruiterId: entity._id,
+          recruiterName: entity.displayName,
+          requestOrigin: "college_marketplace_detail",
+          eventRequestKind: "hiring_event",
+        },
+        deepLink: "/dashboard/invitations",
+        acceptRedirect: "/dashboard/messages",
+        declineRedirect: "/dashboard/invitations",
+      }),
+    onSuccess: async () => {
+      setInviteFeedback(`Hiring event request sent to ${entity.displayName}.`);
+      await queryClient.invalidateQueries({ queryKey: ["requests", "outgoing"] });
+    },
+    onError: (error) => {
+      setInviteFeedback(
+        error instanceof Error
+          ? error.message
+          : "Unable to send the hiring event request right now.",
+      );
+    },
+  });
 
   const handleApplyToJob = async (jobId: string) => {
     if (applyingJobId || appliedJobIds[jobId]) {
@@ -516,7 +554,13 @@ export function ProfileDetailView({
   };
 
   const canInviteToStartup =
-    Boolean(inviteEntityType) && entity._id !== currentUserId;
+    Boolean(inviteEntityType) &&
+    inviteEntityType !== "investor" &&
+    entity._id !== currentUserId;
+  const canRequestHiringEvent =
+    dashboardRole === UserRole.COLLEGE &&
+    entity.entityType === "recruiter" &&
+    entity._id !== currentUserId;
 
   return (
     <div className="space-y-6">
@@ -578,6 +622,15 @@ export function ProfileDetailView({
               >
                 <Send className="h-4 w-4" />
                 {getStartupInviteActionLabel(inviteEntityType!)}
+              </button>
+            ) : null}
+            {canRequestHiringEvent ? (
+              <button
+                onClick={() => void requestHiringEventMutation.mutateAsync()}
+                className="inline-flex items-center gap-2 rounded-full border border-white/10 bg-white/5 px-4 py-2 text-sm font-medium text-white transition hover:border-white/20 hover:bg-white/10"
+              >
+                <CalendarDays className="h-4 w-4" />
+                Request Hiring Event
               </button>
             ) : null}
             {links.map((link) => {

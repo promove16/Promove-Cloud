@@ -134,7 +134,7 @@ export function ReportUserModal({ isOpen, onClose, reportedUserId, reportedUserN
                       className={`flex w-full items-center gap-3 rounded-xl border p-3 text-left transition ${
                         selectedReason === reason.value
                           ? 'border-red-500/50 bg-red-500/10'
-                          : 'border-slate-700 bg-slate-800/50 hover:border-slate-600'
+                          : 'border-slate-700 bg-slate-800 hover:border-slate-600'
                       }`}
                     >
                       <div className={`h-4 w-4 rounded-full border-2 ${

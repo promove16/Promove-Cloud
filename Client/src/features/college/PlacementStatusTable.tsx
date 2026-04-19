@@ -38,7 +38,7 @@ export default function PlacementStatusTable({ records }: Props) {
           placeholder="Search by student, recruiter, company, or status"
         />
       </div>
-      <div className="grid grid-cols-[1.3fr,180px,160px,1fr,160px] border-b border-slate-800 bg-slate-900/70 px-5 py-4 text-xs uppercase tracking-[0.3em] text-slate-400">
+      <div className="grid grid-cols-[1.3fr,180px,160px,1fr,160px] border-b border-slate-800 bg-slate-900 px-5 py-4 text-xs uppercase tracking-[0.3em] text-slate-400">
         <div>Student Name</div>
         <div>Innovation Score</div>
         <div>Status</div>

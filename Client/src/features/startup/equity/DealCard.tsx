@@ -74,7 +74,7 @@ function LinkWorkspaceButton({
         <div
           role="dialog"
           aria-modal="true"
-          className="fixed inset-0 z-50 flex items-center justify-center bg-slate-950/80 p-4 backdrop-blur-sm"
+          className="fixed inset-0 z-50 flex items-center justify-center bg-slate-950 p-4 backdrop-blur-sm"
           onClick={() => setShowModal(false)}
         >
           <div
@@ -181,7 +181,7 @@ export function DealCard({
   const StageIcon = stage.icon;
 
   return (
-    <article className="rounded-2xl border border-slate-800 bg-slate-900/80 p-5 transition hover:border-slate-700">
+    <article className="rounded-2xl border border-slate-800 bg-slate-900 p-5 transition hover:border-slate-700">
       <header className="mb-4 flex items-start justify-between gap-3">
         <div className="min-w-0">
           <h3 className="truncate text-base font-semibold text-white">{investorName}</h3>
@@ -197,7 +197,7 @@ export function DealCard({
         </span>
       </header>
 
-      <div className="rounded-xl border border-slate-800 bg-slate-950/70 p-4">
+      <div className="rounded-xl border border-slate-800 bg-slate-950 p-4">
         <div className="flex items-center gap-2 text-sm text-slate-200">
           {stage.stage === 4 ? (
             <CheckCircle2 className="h-4 w-4 text-emerald-400" />
@@ -266,31 +266,31 @@ export function DealCard({
       </div>
 
       <dl className="mt-4 grid grid-cols-2 gap-3 text-xs sm:grid-cols-4">
-        <div className="rounded-xl border border-slate-800 bg-slate-950/70 p-3">
+        <div className="rounded-xl border border-slate-800 bg-slate-950 p-3">
           <dt className="uppercase tracking-wider text-slate-500">Investment</dt>
           <dd className="mt-1 font-semibold text-white">
             {deal.amountINR > 0 ? formatINR(deal.amountINR) : '–'}
           </dd>
         </div>
-        <div className="rounded-xl border border-slate-800 bg-slate-950/70 p-3">
+        <div className="rounded-xl border border-slate-800 bg-slate-950 p-3">
           <dt className="uppercase tracking-wider text-slate-500">Equity</dt>
           <dd className="mt-1 font-semibold text-white">
             {deal.equityPercent > 0 ? `${deal.equityPercent}%` : '–'}
           </dd>
         </div>
-        <div className="rounded-xl border border-slate-800 bg-slate-950/70 p-3">
+        <div className="rounded-xl border border-slate-800 bg-slate-950 p-3">
           <dt className="uppercase tracking-wider text-slate-500">Shares</dt>
           <dd className="mt-1 font-semibold text-white">
             {deal.sharesAllocated > 0 ? deal.sharesAllocated.toLocaleString('en-IN') : '–'}
           </dd>
         </div>
-        <div className="rounded-xl border border-slate-800 bg-slate-950/70 p-3">
+        <div className="rounded-xl border border-slate-800 bg-slate-950 p-3">
           <dt className="uppercase tracking-wider text-slate-500">Updated</dt>
           <dd className="mt-1 font-semibold text-white">{formatDate(deal.updatedAt)}</dd>
         </div>
       </dl>
 
-      <div className="mt-4 rounded-xl border border-slate-800 bg-slate-950/70 p-3">
+      <div className="mt-4 rounded-xl border border-slate-800 bg-slate-950 p-3">
         <div className="flex items-center justify-between gap-2">
           <div className="flex items-center gap-2">
             <Link2 className="h-4 w-4 text-cyan-400" />

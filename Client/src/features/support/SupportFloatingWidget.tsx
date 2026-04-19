@@ -166,15 +166,15 @@ export function SupportFloatingWidget() {
     <>
       {open ? (
         <div
-          className="fixed inset-0 z-40 bg-slate-950/30 backdrop-blur-[1px] sm:hidden"
+          className="fixed inset-0 z-40 bg-slate-950 backdrop-blur-[1px] sm:hidden"
           onClick={() => setOpen(false)}
         />
       ) : null}
 
       <div className="fixed bottom-6 right-4 z-50 md:bottom-8 md:right-6 xl:bottom-6">
         {open ? (
-          <div className="flex max-h-[calc(100vh-1.5rem)] w-[min(100vw-1.5rem,24rem)] flex-col overflow-hidden rounded-[2rem] border border-slate-800 bg-slate-950/95 shadow-[0_24px_80px_rgba(2,8,23,0.55)] backdrop-blur-xl sm:max-h-[calc(100vh-3rem)]">
-            <div className="border-b border-slate-800 bg-[radial-gradient(circle_at_top_left,rgba(34,211,238,0.16),transparent_35%),radial-gradient(circle_at_top_right,rgba(59,130,246,0.14),transparent_32%)] px-4 py-4">
+          <div className="flex max-h-[calc(100vh-1.5rem)] w-[min(100vw-1.5rem,24rem)] flex-col overflow-hidden rounded-[2rem] border border-slate-800 bg-slate-950 shadow-[0_24px_80px_rgba(2,8,23,0.55)] backdrop-blur-xl sm:max-h-[calc(100vh-3rem)]">
+            <div className="border-b border-slate-800 bg-[radial-gradient(circle_at_top_left,rgba(59,130,246,0.16),transparent_35%),radial-gradient(circle_at_top_right,rgba(59,130,246,0.14),transparent_32%)] px-4 py-4">
               <div className="flex items-start justify-between gap-3">
                 <div>
                   <div className="text-[11px] uppercase tracking-[0.3em] text-cyan-300">Smart Help</div>
@@ -200,7 +200,7 @@ export function SupportFloatingWidget() {
                   className={`rounded-full px-3 py-1.5 text-xs font-semibold transition ${
                     activeTab === 'assistant'
                       ? 'bg-cyan-500/15 text-cyan-200'
-                      : 'bg-slate-900/80 text-slate-400 hover:text-slate-200'
+                      : 'bg-slate-900 text-slate-400 hover:text-slate-200'
                   }`}
                 >
                   Assistant
@@ -211,7 +211,7 @@ export function SupportFloatingWidget() {
                   className={`rounded-full px-3 py-1.5 text-xs font-semibold transition ${
                     activeTab === 'tickets'
                       ? 'bg-cyan-500/15 text-cyan-200'
-                      : 'bg-slate-900/80 text-slate-400 hover:text-slate-200'
+                      : 'bg-slate-900 text-slate-400 hover:text-slate-200'
                   }`}
                 >
                   Tickets
@@ -228,14 +228,14 @@ export function SupportFloatingWidget() {
                         key={prompt}
                         type="button"
                         onClick={() => setDraft(prompt)}
-                        className="rounded-full border border-slate-800 bg-slate-900/70 px-3 py-1.5 text-left text-[11px] text-slate-300 transition hover:border-cyan-500/40 hover:text-cyan-200"
+                        className="rounded-full border border-slate-800 bg-slate-900 px-3 py-1.5 text-left text-[11px] text-slate-300 transition hover:border-cyan-500/40 hover:text-cyan-200"
                       >
                         {prompt}
                       </button>
                     ))}
                   </div>
 
-                  <div className="rounded-2xl border border-slate-800 bg-slate-900/60 p-3">
+                  <div className="rounded-2xl border border-slate-800 bg-slate-900 p-3">
                     <label className="flex items-center gap-2 text-[11px] uppercase tracking-[0.24em] text-slate-500">
                       <Search className="h-3.5 w-3.5" />
                       Describe the issue
@@ -289,7 +289,7 @@ export function SupportFloatingWidget() {
                           key={reply}
                           type="button"
                           onClick={() => setAssistantReply(reply)}
-                          className="block w-full rounded-2xl border border-slate-800 bg-slate-900/70 px-4 py-3 text-left text-sm leading-6 text-slate-200 transition hover:border-cyan-500/40"
+                          className="block w-full rounded-2xl border border-slate-800 bg-slate-900 px-4 py-3 text-left text-sm leading-6 text-slate-200 transition hover:border-cyan-500/40"
                         >
                           {reply}
                         </button>
@@ -297,7 +297,7 @@ export function SupportFloatingWidget() {
                     )}
                   </div>
 
-                  <div className="rounded-2xl border border-slate-800 bg-slate-900/60 p-4">
+                  <div className="rounded-2xl border border-slate-800 bg-slate-900 p-4">
                     <div className="flex items-center justify-between gap-3">
                       <div>
                         <div className="text-sm font-semibold text-white">Still need human help?</div>
@@ -342,7 +342,7 @@ export function SupportFloatingWidget() {
 
                   <Link
                     to={SUPPORT_USER_BASE_PATH}
-                    className="block rounded-2xl border border-slate-800 bg-slate-900/60 px-4 py-3 text-center text-sm font-semibold text-cyan-300 transition hover:border-cyan-500/40 hover:text-cyan-200"
+                    className="block rounded-2xl border border-slate-800 bg-slate-900 px-4 py-3 text-center text-sm font-semibold text-cyan-300 transition hover:border-cyan-500/40 hover:text-cyan-200"
                     onClick={() => setOpen(false)}
                   >
                     Open full support history
@@ -355,7 +355,7 @@ export function SupportFloatingWidget() {
           <button
             type="button"
             onClick={() => setOpen(true)}
-            className="group flex h-14 w-14 items-center justify-center rounded-full border border-cyan-500/20 bg-slate-950/95 text-left shadow-[0_20px_50px_rgba(2,8,23,0.45)] backdrop-blur-xl transition hover:border-cyan-400/40 xl:h-auto xl:w-auto xl:justify-start xl:gap-2 xl:px-3 xl:py-2.5"
+            className="group flex h-14 w-14 items-center justify-center rounded-full border border-cyan-500/20 bg-slate-950 text-left shadow-[0_20px_50px_rgba(2,8,23,0.45)] backdrop-blur-xl transition hover:border-cyan-400/40 xl:h-auto xl:w-auto xl:justify-start xl:gap-2 xl:px-3 xl:py-2.5"
             aria-label="Open smart help desk"
           >
             <div className="flex h-12 w-12 items-center justify-center rounded-full bg-gradient-to-br from-cyan-500 to-blue-600 text-white xl:h-10 xl:w-10">
@@ -381,7 +381,7 @@ function TicketListItem({ ticket }: { ticket: SupportTicket }) {
   return (
     <Link
       to={buildUserTicketPath(ticket._id)}
-      className="block rounded-2xl border border-slate-800 bg-slate-900/60 px-4 py-4 transition hover:border-cyan-500/40"
+      className="block rounded-2xl border border-slate-800 bg-slate-900 px-4 py-4 transition hover:border-cyan-500/40"
     >
       <div className="flex flex-wrap items-center gap-2">
         <Badge className="border-slate-700 bg-slate-950 font-mono text-slate-200">{ticket.ticketCode}</Badge>

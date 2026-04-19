@@ -224,7 +224,7 @@ export default function Startups() {
           {startups.map((startup) => (
             <Card
               key={startup._id}
-              className={`p-6 ${startup._id === focusedStartupId ? 'border-cyan-500/40 shadow-[0_0_0_1px_rgba(34,211,238,0.18)]' : ''}`}
+              className={`p-6 ${startup._id === focusedStartupId ? 'border-cyan-500/40 shadow-[0_0_0_1px_rgba(59,130,246,0.18)]' : ''}`}
             >
               <div className="flex flex-col gap-6 xl:flex-row xl:items-start xl:justify-between">
                 <div className="space-y-4">
@@ -248,19 +248,19 @@ export default function Startups() {
                   </div>
 
                   <div className="grid gap-3 md:grid-cols-3">
-                    <div className="rounded-2xl border border-slate-800 bg-slate-950/70 px-4 py-3">
+                    <div className="rounded-2xl border border-slate-800 bg-slate-950 px-4 py-3">
                       <div className="text-xs uppercase tracking-[0.22em] text-slate-500">Founders</div>
                       <div className="mt-2 text-sm text-white">
                         {startup.founders.map((founder) => founder.displayName).join(', ') || 'No founders mapped'}
                       </div>
                     </div>
-                    <div className="rounded-2xl border border-slate-800 bg-slate-950/70 px-4 py-3">
+                    <div className="rounded-2xl border border-slate-800 bg-slate-950 px-4 py-3">
                       <div className="text-xs uppercase tracking-[0.22em] text-slate-500">Products / Team</div>
                       <div className="mt-2 text-sm text-white">
                         {startup.activeProducts} active products / {startup.teamSize} team members
                       </div>
                     </div>
-                    <div className="rounded-2xl border border-slate-800 bg-slate-950/70 px-4 py-3">
+                    <div className="rounded-2xl border border-slate-800 bg-slate-950 px-4 py-3">
                       <div className="text-xs uppercase tracking-[0.22em] text-slate-500">Timeline</div>
                       <div className="mt-2 text-sm text-white">
                         Submitted {startup.reviewRequestedAt ? new Date(startup.reviewRequestedAt).toLocaleString('en-IN') : 'Not submitted'}
@@ -272,7 +272,7 @@ export default function Startups() {
                   </div>
 
                   <div className="grid gap-3 md:grid-cols-2">
-                    <div className="rounded-2xl border border-slate-800 bg-slate-950/70 px-4 py-4">
+                    <div className="rounded-2xl border border-slate-800 bg-slate-950 px-4 py-4">
                       <div className="text-xs uppercase tracking-[0.22em] text-slate-500">IPR Intake Summary</div>
                       <div className="mt-3 space-y-2 text-sm text-slate-300">
                         <div>
@@ -297,7 +297,7 @@ export default function Startups() {
                       </div>
                     </div>
 
-                    <div className="rounded-2xl border border-slate-800 bg-slate-950/70 px-4 py-4">
+                    <div className="rounded-2xl border border-slate-800 bg-slate-950 px-4 py-4">
                       <div className="flex items-center gap-2 text-xs uppercase tracking-[0.22em] text-slate-500">
                         <ShieldCheck className="h-4 w-4" />
                         Review Readiness
@@ -330,7 +330,7 @@ export default function Startups() {
                     </a>
                   ) : null}
 
-                  <div className="rounded-2xl border border-slate-800 bg-slate-950/70 px-4 py-4">
+                  <div className="rounded-2xl border border-slate-800 bg-slate-950 px-4 py-4">
                     <div className="mb-3 flex items-center gap-2 text-xs uppercase tracking-[0.22em] text-slate-500">
                       <FileText className="h-4 w-4" />
                       IPR Intake Answers
@@ -349,7 +349,7 @@ export default function Startups() {
                     </div>
                   </div>
 
-                  <div className="rounded-2xl border border-slate-800 bg-slate-950/70 px-4 py-4">
+                  <div className="rounded-2xl border border-slate-800 bg-slate-950 px-4 py-4">
                     <div className="mb-3 flex items-center gap-2 text-xs uppercase tracking-[0.22em] text-slate-500">
                       <FileText className="h-4 w-4" />
                       Uploaded Documents
@@ -378,14 +378,14 @@ export default function Startups() {
                   </div>
 
                   {startup.adminNotes ? (
-                    <div className="rounded-2xl border border-slate-800 bg-slate-950/70 px-4 py-4 text-sm text-slate-300">
+                    <div className="rounded-2xl border border-slate-800 bg-slate-950 px-4 py-4 text-sm text-slate-300">
                       Latest admin notes: {startup.adminNotes}
                     </div>
                   ) : null}
                 </div>
 
                 <div className="w-full max-w-xl space-y-3">
-                  <div className="rounded-2xl border border-slate-800 bg-slate-950/70 p-4">
+                  <div className="rounded-2xl border border-slate-800 bg-slate-950 p-4">
                     <div className="mb-2 text-xs uppercase tracking-[0.22em] text-slate-500">Review Notes</div>
                     <textarea
                       value={notesByStartup[startup._id] ?? ''}
@@ -417,21 +417,21 @@ export default function Startups() {
                   </div>
 
                   <div className="grid gap-3 sm:grid-cols-3">
-                    <div className="rounded-2xl border border-slate-800 bg-slate-950/70 p-4">
+                    <div className="rounded-2xl border border-slate-800 bg-slate-950 p-4">
                       <Clock3 className="h-4 w-4 text-cyan-300" />
                       <div className="mt-3 text-sm font-semibold text-white">Admin gate</div>
                       <div className="mt-2 text-xs leading-5 text-slate-400">
                         Launch to investor marketplace is blocked until approval.
                       </div>
                     </div>
-                    <div className="rounded-2xl border border-slate-800 bg-slate-950/70 p-4">
+                    <div className="rounded-2xl border border-slate-800 bg-slate-950 p-4">
                       <Rocket className="h-4 w-4 text-cyan-300" />
                       <div className="mt-3 text-sm font-semibold text-white">Publication</div>
                       <div className="mt-2 text-xs leading-5 text-slate-400">
                         Approved startups can be launched by the student into investor discovery.
                       </div>
                     </div>
-                    <div className="rounded-2xl border border-slate-800 bg-slate-950/70 p-4">
+                    <div className="rounded-2xl border border-slate-800 bg-slate-950 p-4">
                       <CheckCircle2 className="h-4 w-4 text-cyan-300" />
                       <div className="mt-3 text-sm font-semibold text-white">Deal flow</div>
                       <div className="mt-2 text-xs leading-5 text-slate-400">

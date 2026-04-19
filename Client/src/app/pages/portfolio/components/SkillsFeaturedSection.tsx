@@ -11,9 +11,9 @@ interface SkillsFeaturedSectionProps {
 
 export function SkillsFeaturedSection({ skills, featured }: SkillsFeaturedSectionProps) {
   return (
-    <section className="grid gap-8 border-t border-slate-800/80 pt-8 lg:grid-cols-2 lg:gap-12">
+    <section className="grid gap-8 border-t border-slate-800 pt-8 lg:grid-cols-2 lg:gap-12">
       <article>
-        <h3 className="border-b border-slate-800/80 pb-3 text-[34px] font-semibold leading-none text-slate-100">
+        <h3 className="border-b border-slate-800 pb-3 text-[34px] font-semibold leading-none text-slate-100">
           Skills
         </h3>
         {skills.length > 0 ? (
@@ -30,8 +30,8 @@ export function SkillsFeaturedSection({ skills, featured }: SkillsFeaturedSectio
         )}
       </article>
 
-      <article className="lg:border-l lg:border-slate-800/80 lg:pl-12">
-        <h3 className="border-b border-slate-800/80 pb-3 text-[34px] font-semibold leading-none text-slate-100">
+      <article className="lg:border-l lg:border-slate-800 lg:pl-12">
+        <h3 className="border-b border-slate-800 pb-3 text-[34px] font-semibold leading-none text-slate-100">
           Featured
         </h3>
         {featured.length > 0 ? (

@@ -32,8 +32,8 @@ function MetricCard({
 }) {
   const content = (
     <Card
-      className={`border-slate-800/90 bg-slate-950/85 p-5 ${
-        href ? 'transition hover:border-cyan-500/40 hover:bg-slate-950' : ''
+      className={`border-slate-800 bg-slate-900 p-5 ${
+        href ? 'transition hover:border-blue-500/40 hover:bg-slate-800' : ''
       }`}
     >
       <div className="flex items-start justify-between gap-4">
@@ -220,7 +220,7 @@ export default function Dashboard() {
   return (
     <div className="space-y-8">
       <section className="relative overflow-hidden border border-slate-800 bg-slate-950">
-        <div className="absolute inset-x-0 h-40 bg-[radial-gradient(circle_at_top_left,rgba(34,211,238,0.12),transparent_35%),radial-gradient(circle_at_top_right,rgba(59,130,246,0.1),transparent_28%)]" />
+        <div className="absolute inset-x-0 h-40 bg-[radial-gradient(circle_at_top_left,rgba(59,130,246,0.12),transparent_35%),radial-gradient(circle_at_top_right,rgba(59,130,246,0.1),transparent_28%)]" />
         <div className="relative space-y-6 px-6 py-6 lg:px-8 lg:py-8">
           <div className="flex flex-col gap-6 xl:flex-row xl:items-end xl:justify-between">
             <div className="max-w-3xl">
@@ -278,7 +278,7 @@ export default function Dashboard() {
             <Link
               key={section.path}
               to={section.path}
-              className="group border border-slate-800 bg-slate-950 px-6 py-5 transition hover:border-cyan-500/40 hover:bg-slate-950/80"
+              className="group border border-slate-800 bg-slate-900 px-6 py-5 transition hover:border-blue-500/40 hover:bg-slate-800"
             >
               <div className="flex items-start justify-between gap-4">
                 <div className="min-w-0">

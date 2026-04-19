@@ -33,15 +33,15 @@ export default function InvestorPitchRequests() {
     <div className="mx-auto w-full max-w-5xl space-y-6">
       <div>
         <h1 className="text-2xl font-bold text-white">Pitch Requests</h1>
-        <p className="text-slate-400">Startups that have sent you direct pitch requests</p>
+        <p className="text-slate-400">Startups that have sent you direct investor outreach</p>
       </div>
 
       {pitchRequests?.length === 0 ? (
-        <Card className="border-slate-800 bg-slate-950/50 p-12 text-center">
+        <Card className="border-slate-800 bg-slate-950 p-12 text-center">
           <MessageSquare className="mx-auto mb-4 h-12 w-12 text-slate-600" />
           <h3 className="text-lg font-semibold text-white">No Pitch Requests Yet</h3>
           <p className="text-slate-400 mt-2">
-            When students send you direct pitch requests, they will appear here.
+            When students send you direct investor outreach, they will appear here.
             Browse the startup marketplace to discover new opportunities.
           </p>
           <Link
@@ -67,7 +67,7 @@ export default function InvestorPitchRequests() {
                   return (
                     <Card
                       key={request._id}
-                      className="border-slate-800 bg-slate-950/50 p-4 transition hover:border-slate-700"
+                      className="border-slate-800 bg-slate-950 p-4 transition hover:border-slate-700"
                     >
                       <div className="flex items-start justify-between gap-4">
                         <div className="flex-1">
@@ -113,7 +113,7 @@ export default function InvestorPitchRequests() {
                   return (
                     <Card
                       key={request._id}
-                      className="border-slate-800 bg-slate-950/30 p-4 opacity-70"
+                      className="border-slate-800 bg-slate-950 p-4 opacity-70"
                     >
                       <div className="flex items-start justify-between gap-4">
                         <div className="flex-1">

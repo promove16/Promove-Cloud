@@ -289,7 +289,7 @@ export function StartupWorkspace() {
       : null;
 
     return (
-      <div className="space-y-6 border border-slate-800 bg-slate-950/40 p-6 sm:p-8">
+      <div className="space-y-6 border border-slate-800 bg-slate-950 p-6 sm:p-8">
         {toast ? <div className="rounded border border-cyan-500/30 bg-cyan-500/10 px-4 py-3 text-sm text-cyan-100">{toast}</div> : null}
 
         <div className="max-w-3xl space-y-3">
@@ -310,7 +310,7 @@ export function StartupWorkspace() {
         </div>
 
         <div className="grid gap-5 lg:grid-cols-[minmax(0,1fr)_minmax(0,1fr)]">
-          <section className="border border-slate-800 bg-slate-900/60 p-5">
+          <section className="border border-slate-800 bg-slate-900 p-5">
             <div className="text-xs uppercase tracking-[0.22em] text-slate-500">Create new</div>
             <h2 className="mt-3 text-lg font-semibold text-white">Create a startup workspace</h2>
             <p className="mt-2 text-sm text-slate-400">
@@ -338,7 +338,7 @@ export function StartupWorkspace() {
             </button>
           </section>
 
-          <section className="border border-slate-800 bg-slate-900/60 p-5">
+          <section className="border border-slate-800 bg-slate-900 p-5">
             <div className="text-xs uppercase tracking-[0.22em] text-slate-500">Attach existing</div>
             <h2 className="mt-3 text-lg font-semibold text-white">Link an existing workspace</h2>
             <p className="mt-2 text-sm text-slate-400">
@@ -350,7 +350,7 @@ export function StartupWorkspace() {
                 value={selectedExistingWorkspaceId}
                 onChange={(event) => setSelectedExistingWorkspaceId(event.target.value)}
                 disabled={!canEditStartupWorkspaceLink || availableWorkspaceOptions.length === 0 || isBusy}
-                className="w-full border border-slate-800 bg-slate-950/40 px-3 py-3 text-sm text-white outline-none transition focus:border-cyan-400 disabled:cursor-not-allowed disabled:opacity-60"
+                className="w-full border border-slate-800 bg-slate-950 px-3 py-3 text-sm text-white outline-none transition focus:border-cyan-400 disabled:cursor-not-allowed disabled:opacity-60"
               >
                 {availableWorkspaceOptions.length === 0 ? (
                   <option value="">No other workspaces available</option>

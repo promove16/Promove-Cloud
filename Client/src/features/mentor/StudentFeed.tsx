@@ -50,7 +50,7 @@ function ScheduleModal({
   if (!open) return null;
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-950/70 p-4 backdrop-blur-sm">
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-950 p-4 backdrop-blur-sm">
       <Card className="w-full max-w-2xl p-6">
         <div className="flex items-start justify-between gap-4">
           <div>

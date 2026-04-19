@@ -370,7 +370,7 @@ export function StartupDetailDrawer({
   };
 
   return (
-    <div className="fixed inset-0 z-50 flex justify-end bg-slate-950/80 backdrop-blur-sm">
+    <div className="fixed inset-0 z-50 flex justify-end bg-slate-950 backdrop-blur-sm">
       {/* Backdrop click handler */}
       <div
         ref={backdropRef}
@@ -381,7 +381,7 @@ export function StartupDetailDrawer({
       <div className="h-full w-full max-w-4xl overflow-y-auto border-l border-slate-800 bg-slate-950 px-6 py-6 text-white">
         {/* Close confirmation dialog */}
         {showCloseConfirm && (
-          <div className="fixed inset-0 z-[60] flex items-center justify-center bg-slate-950/80 backdrop-blur-sm">
+          <div className="fixed inset-0 z-[60] flex items-center justify-center bg-slate-950 backdrop-blur-sm">
             <Card className="mx-4 max-w-md space-y-4 p-6">
               <h3 className="text-lg font-bold text-white">Unsaved Changes</h3>
               <p className="text-sm text-slate-400">
@@ -447,7 +447,7 @@ export function StartupDetailDrawer({
                   {detail.startup.founders.map((founder) => (
                     <div
                       key={founder._id}
-                      className="rounded-2xl border border-slate-800 bg-slate-900/80 p-4"
+                      className="rounded-2xl border border-slate-800 bg-slate-900 p-4"
                     >
                       <div className="text-xs uppercase tracking-[0.2em] text-slate-500">Founder</div>
                       <div className="mt-2 font-semibold text-white">{founder.displayName}</div>
@@ -491,7 +491,7 @@ export function StartupDetailDrawer({
               </div>
               <div className="mt-4 grid gap-4 md:grid-cols-2 xl:grid-cols-3">
                 {detail.teamMembers.map((founder) => (
-                  <div key={founder._id} className="rounded-2xl border border-slate-800 bg-slate-900/80 p-4">
+                  <div key={founder._id} className="rounded-2xl border border-slate-800 bg-slate-900 p-4">
                     <div className="flex items-center justify-between gap-3">
                       <div>
                         <div className="font-semibold text-white">{founder.displayName}</div>
@@ -520,7 +520,7 @@ export function StartupDetailDrawer({
                 {detail.scoreEvents.map((event) => (
                   <div
                     key={event._id}
-                    className="flex items-start justify-between gap-4 rounded-2xl border border-slate-800 bg-slate-900/70 p-4"
+                    className="flex items-start justify-between gap-4 rounded-2xl border border-slate-800 bg-slate-900 p-4"
                   >
                     <div>
                       <div className="font-semibold text-white">
@@ -551,7 +551,7 @@ export function StartupDetailDrawer({
                   }}
                   disabled={!canChoosePenny}
                   className={`rounded-2xl border p-4 text-left ${
-                    investorType === 'penny' ? 'border-cyan-400 bg-cyan-500/10' : 'border-slate-800 bg-slate-900/80'
+                    investorType === 'penny' ? 'border-cyan-400 bg-cyan-500/10' : 'border-slate-800 bg-slate-900'
                   } ${!canChoosePenny ? 'cursor-not-allowed opacity-50' : ''}`}
                 >
                   <div className="font-semibold text-white">Penny Investor</div>
@@ -568,7 +568,7 @@ export function StartupDetailDrawer({
                   }}
                   disabled={!canChooseSole}
                   className={`rounded-2xl border p-4 text-left ${
-                    investorType === 'sole' ? 'border-amber-400 bg-amber-500/10' : 'border-slate-800 bg-slate-900/80'
+                    investorType === 'sole' ? 'border-amber-400 bg-amber-500/10' : 'border-slate-800 bg-slate-900'
                   } ${!canChooseSole ? 'cursor-not-allowed opacity-50' : ''}`}
                 >
                   <div className="font-semibold text-white">Sole Investor</div>

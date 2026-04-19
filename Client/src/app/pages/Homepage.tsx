@@ -85,7 +85,7 @@ const successStories = [
 export function Homepage() {
   return (
     <div className="min-h-screen bg-gradient-to-b from-slate-950 via-slate-900 to-slate-950">
-      <nav className="sticky top-0 z-50 border-b border-slate-800 bg-slate-950/50 backdrop-blur-xl">
+      <nav className="sticky top-0 z-50 border-b border-slate-800 bg-slate-950 backdrop-blur-xl">
         <div className="mx-auto flex max-w-7xl flex-col gap-4 px-4 py-4 sm:flex-row sm:items-center sm:justify-between sm:px-6">
           <BusinessLogo
             to="/"
@@ -137,7 +137,7 @@ export function Homepage() {
               next: "/problem-bank",
               intent: "submit_problem",
             })}
-            className="rounded-xl border border-slate-700 bg-slate-800/50 px-8 py-4 font-semibold text-white transition-all hover:bg-slate-800"
+            className="rounded-xl border border-slate-700 bg-slate-800 px-8 py-4 font-semibold text-white transition-all hover:bg-slate-800"
           >
             Submit a Problem
           </Link>
@@ -174,7 +174,7 @@ export function Homepage() {
             <Link
               key={module.title}
               to={module.link}
-              className="group rounded-2xl border border-slate-800 bg-slate-950/85 p-6 transition-all hover:border-cyan-500/40 hover:bg-slate-900"
+              className="group rounded-2xl border border-slate-800 bg-slate-950 p-6 transition-all hover:border-cyan-500/40 hover:bg-slate-900"
             >
               <module.icon className="mb-4 h-10 w-10 text-cyan-300 transition-transform group-hover:scale-110" />
               <h3 className="mb-2 text-lg font-bold text-slate-50">{module.title}</h3>
@@ -198,7 +198,7 @@ export function Homepage() {
       </section>
 
       <section id="about" className="mx-auto max-w-7xl scroll-mt-24 px-4 py-16 sm:px-6 sm:py-20">
-        <div className="grid gap-8 rounded-[28px] border border-slate-800 bg-slate-900/70 p-8 lg:grid-cols-[1.2fr_0.8fr] lg:p-12">
+        <div className="grid gap-8 rounded-[28px] border border-slate-800 bg-slate-900 p-8 lg:grid-cols-[1.2fr_0.8fr] lg:p-12">
           <div>
             <div className="text-xs uppercase tracking-[0.32em] text-cyan-300">About ProMove</div>
             <h2 className="mt-4 text-3xl font-bold text-white sm:text-4xl">
@@ -211,14 +211,14 @@ export function Homepage() {
             </p>
           </div>
           <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-1">
-            <div className="rounded-2xl border border-slate-800 bg-slate-950/70 p-5">
+            <div className="rounded-2xl border border-slate-800 bg-slate-950 p-5">
               <div className="text-sm font-semibold text-white">Institution-ready onboarding</div>
               <p className="mt-2 text-sm leading-6 text-slate-300">
                 Schools, colleges, mentors, investors, and recruiters each get the right access
                 flow instead of a one-size-fits-all sign-in wall.
               </p>
             </div>
-            <div className="rounded-2xl border border-slate-800 bg-slate-950/70 p-5">
+            <div className="rounded-2xl border border-slate-800 bg-slate-950 p-5">
               <div className="text-sm font-semibold text-white">Full innovation lifecycle</div>
               <p className="mt-2 text-sm leading-6 text-slate-300">
                 Teams can move from real-world problem intake to product execution, IP readiness,

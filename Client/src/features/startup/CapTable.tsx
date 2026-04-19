@@ -96,7 +96,7 @@ function KpiCard({ icon, label, value, hint, tone = 'default' }: KpiCardProps) {
         : 'text-cyan-300';
 
   return (
-    <Card className="border border-slate-800 bg-slate-950/40 p-4">
+    <Card className="border border-slate-800 bg-slate-950 p-4">
       <div className="flex items-center gap-2 text-[11px] uppercase tracking-[0.2em] text-slate-400">
         <span className={accent}>{icon}</span>
         {label}
@@ -142,7 +142,7 @@ function EmptyState({
   description: string;
 }) {
   return (
-    <div className="flex flex-col items-center justify-center rounded-2xl border border-dashed border-slate-800 bg-slate-950/40 p-10 text-center">
+    <div className="flex flex-col items-center justify-center rounded-2xl border border-dashed border-slate-800 bg-slate-950 p-10 text-center">
       <div className="text-slate-500">{icon}</div>
       <h3 className="mt-3 text-base font-semibold text-white">{title}</h3>
       <p className="mt-1 max-w-md text-sm text-slate-400">{description}</p>
@@ -229,7 +229,7 @@ function EquityDistributionCard({
   const chartData = useMemo(
     () =>
       [
-        { name: 'Founder', value: founderShare, color: '#22d3ee' },
+        { name: 'Founder', value: founderShare, color: '#3b82f6' },
         { name: 'Sole Investor', value: soleShare, color: '#a855f7' },
         { name: 'Penny Pool', value: pennyShare, color: '#f59e0b' },
         { name: 'Available', value: availableShare, color: '#475569' },
@@ -238,7 +238,7 @@ function EquityDistributionCard({
   );
 
   return (
-    <Card className="border border-slate-800 bg-slate-950/40 p-5">
+    <Card className="border border-slate-800 bg-slate-950 p-5">
       <SectionHeader
         icon={<PieIcon className="h-4 w-4" />}
         title="Equity Distribution"
@@ -298,7 +298,7 @@ function EquityDistributionCard({
               return (
                 <li
                   key={entry.name}
-                  className="flex items-center justify-between gap-3 rounded-xl border border-slate-800 bg-slate-950/70 px-3 py-2"
+                  className="flex items-center justify-between gap-3 rounded-xl border border-slate-800 bg-slate-950 px-3 py-2"
                 >
                   <span className="flex items-center gap-2">
                     <span
@@ -330,7 +330,7 @@ function PipelineFunnelCard({ metrics }: { metrics: DealMetrics }) {
   );
 
   return (
-    <Card className="border border-slate-800 bg-slate-950/40 p-5">
+    <Card className="border border-slate-800 bg-slate-950 p-5">
       <SectionHeader
         icon={<TrendingUp className="h-4 w-4" />}
         title="Pipeline Funnel"
@@ -365,7 +365,7 @@ function PipelineFunnelCard({ metrics }: { metrics: DealMetrics }) {
                   </span>
                   <span className="font-semibold text-white">{count}</span>
                 </div>
-                <div className="h-2 overflow-hidden rounded-full bg-slate-800/80">
+                <div className="h-2 overflow-hidden rounded-full bg-slate-800">
                   <div
                     className={`h-full ${meta.fillClassName} transition-all`}
                     style={{ width: count === 0 ? '4px' : `${Math.max(width, 6)}%` }}
@@ -385,14 +385,14 @@ function CapitalFlowCard({ metrics }: { metrics: DealMetrics }) {
   const closedRatio = total > 0 ? (metrics.capitalClosed / total) * 100 : 0;
 
   return (
-    <Card className="border border-slate-800 bg-slate-950/40 p-5">
+    <Card className="border border-slate-800 bg-slate-950 p-5">
       <SectionHeader
         icon={<Wallet className="h-4 w-4" />}
         title="Capital Flow"
         description="Funds in motion versus capital already secured."
       />
       <div className="mt-4 grid gap-3 sm:grid-cols-2">
-        <div className="rounded-xl border border-slate-800 bg-slate-950/70 p-4">
+        <div className="rounded-xl border border-slate-800 bg-slate-950 p-4">
           <div className="text-[11px] uppercase tracking-wider text-slate-500">Committed</div>
           <div className="mt-1 text-xl font-semibold text-white">
             {formatINR(metrics.capitalCommitted)}
@@ -439,7 +439,7 @@ function RecentActivityCard({ deals }: { deals: DealSummaryView[] }) {
   );
 
   return (
-    <Card className="border border-slate-800 bg-slate-950/40 p-5">
+    <Card className="border border-slate-800 bg-slate-950 p-5">
       <SectionHeader
         icon={<Briefcase className="h-4 w-4" />}
         title="Recent Activity"
@@ -518,20 +518,20 @@ function CapTableSection({
 
   return (
     <div className="space-y-4">
-      <Card className="border border-slate-800 bg-slate-950/40 p-5">
+      <Card className="border border-slate-800 bg-slate-950 p-5">
         <SectionHeader
           icon={<Crown className="h-4 w-4" />}
           title="Founder Retained"
           description="Shares and equity still held by the founding team."
         />
         <div className="mt-4 grid gap-3 sm:grid-cols-2">
-          <div className="rounded-xl border border-slate-800 bg-slate-950/70 p-4">
+          <div className="rounded-xl border border-slate-800 bg-slate-950 p-4">
             <div className="text-[11px] uppercase tracking-wider text-slate-500">Equity</div>
             <div className="mt-1 text-2xl font-semibold text-white">
               {formatPercent(capTable.founderRetained.equityPercent)}
             </div>
           </div>
-          <div className="rounded-xl border border-slate-800 bg-slate-950/70 p-4">
+          <div className="rounded-xl border border-slate-800 bg-slate-950 p-4">
             <div className="text-[11px] uppercase tracking-wider text-slate-500">Shares</div>
             <div className="mt-1 text-2xl font-semibold text-white">
               {formatNumber(capTable.founderRetained.sharesAllocated)}
@@ -540,7 +540,7 @@ function CapTableSection({
         </div>
       </Card>
 
-      <Card className="border border-slate-800 bg-slate-950/40 p-5">
+      <Card className="border border-slate-800 bg-slate-950 p-5">
         <SectionHeader
           icon={<Building2 className="h-4 w-4" />}
           title="Sole Investor"
@@ -562,7 +562,7 @@ function CapTableSection({
         )}
       </Card>
 
-      <Card className="border border-slate-800 bg-slate-950/40 p-5">
+      <Card className="border border-slate-800 bg-slate-950 p-5">
         <SectionHeader
           icon={<Users className="h-4 w-4" />}
           title="Penny Investors"
@@ -599,7 +599,7 @@ function CapTableRow({
   return (
     <div
       className={`mt-4 grid gap-3 rounded-xl border p-4 sm:grid-cols-5 ${
-        highlight ? 'border-amber-500/20 bg-amber-500/5' : 'border-slate-800 bg-slate-950/70'
+        highlight ? 'border-amber-500/20 bg-amber-500/5' : 'border-slate-800 bg-slate-950'
       }`}
     >
       <div className="sm:col-span-2">
@@ -927,7 +927,7 @@ export default function StartupEquityAndDeals() {
       ) : null}
 
       {dealsQuery.isFetching && !dealsQuery.isLoading ? (
-        <div className="pointer-events-none fixed bottom-6 right-6 inline-flex items-center gap-2 rounded-full border border-slate-700 bg-slate-900/90 px-3 py-1.5 text-xs text-slate-300 shadow-lg">
+        <div className="pointer-events-none fixed bottom-6 right-6 inline-flex items-center gap-2 rounded-full border border-slate-700 bg-slate-900 px-3 py-1.5 text-xs text-slate-300 shadow-lg">
           <span className="inline-block h-3 w-3 animate-spin rounded-full border-2 border-slate-500 border-t-cyan-400" />
           Refreshing deals…
         </div>

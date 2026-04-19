@@ -98,7 +98,7 @@ const AnalyticsOverviewPanel = memo(function AnalyticsOverviewPanel({
   return (
     <div className="space-y-8">
       <header className="relative overflow-hidden border border-slate-800 bg-slate-950">
-        <div className="absolute inset-0 bg-[radial-gradient(circle_at_top_left,rgba(34,211,238,0.12),transparent_38%),radial-gradient(circle_at_top_right,rgba(16,185,129,0.1),transparent_28%)]" />
+        <div className="absolute inset-0 bg-[radial-gradient(circle_at_top_left,rgba(59,130,246,0.12),transparent_38%),radial-gradient(circle_at_top_right,rgba(16,185,129,0.1),transparent_28%)]" />
         <div className="relative border-b border-slate-800 px-6 py-6 lg:px-8">
           <div className="flex flex-col gap-6 xl:flex-row xl:items-end xl:justify-between">
             <div className="max-w-3xl">
@@ -109,15 +109,15 @@ const AnalyticsOverviewPanel = memo(function AnalyticsOverviewPanel({
               </p>
             </div>
             <div className="grid gap-3 sm:grid-cols-3 xl:min-w-[30rem]">
-              <div className="border border-slate-800/80 bg-slate-950/80 px-4 py-3">
+              <div className="border border-slate-800 bg-slate-950 px-4 py-3">
                 <div className="text-[11px] uppercase tracking-[0.25em] text-slate-500">Refresh</div>
                 <div className="mt-2 text-sm font-medium text-white">60 second polling</div>
               </div>
-              <div className="border border-slate-800/80 bg-slate-950/80 px-4 py-3">
+              <div className="border border-slate-800 bg-slate-950 px-4 py-3">
                 <div className="text-[11px] uppercase tracking-[0.25em] text-slate-500">Log feeds</div>
                 <div className="mt-2 text-sm font-medium text-white">App logs load on demand</div>
               </div>
-              <div className="border border-slate-800/80 bg-slate-950/80 px-4 py-3">
+              <div className="border border-slate-800 bg-slate-950 px-4 py-3">
                 <div className="text-[11px] uppercase tracking-[0.25em] text-slate-500">Top signal</div>
                 <div className="mt-2 text-sm font-medium text-white">{analytics.dealConversionRate}% deal completion</div>
               </div>
@@ -127,7 +127,7 @@ const AnalyticsOverviewPanel = memo(function AnalyticsOverviewPanel({
 
         <div className="relative grid gap-px bg-slate-800 md:grid-cols-2 xl:grid-cols-4">
           {overviewMetrics.map((metric) => (
-            <div key={metric.label} className="bg-slate-950/95 px-6 py-5">
+            <div key={metric.label} className="bg-slate-950 px-6 py-5">
               <div className="flex items-start justify-between gap-4">
                 <div>
                   <div className="text-xs uppercase tracking-[0.24em] text-slate-500">{metric.label}</div>
@@ -169,7 +169,7 @@ const AnalyticsOverviewPanel = memo(function AnalyticsOverviewPanel({
                     </div>
                     <div className="h-2.5 overflow-hidden bg-slate-900">
                       <div
-                        className="h-full bg-[linear-gradient(90deg,rgba(34,211,238,0.95),rgba(16,185,129,0.85))] transition-all duration-500"
+                        className="h-full bg-[linear-gradient(90deg,rgba(59,130,246,0.95),rgba(16,185,129,0.85))] transition-all duration-500"
                         style={{ width: `${(bucket.value / maxScoreBucket) * 100}%` }}
                       />
                     </div>
@@ -226,7 +226,7 @@ const AnalyticsOverviewPanel = memo(function AnalyticsOverviewPanel({
                     key={entry.role}
                     type="button"
                     onClick={() => onRoleSelect(entry.role)}
-                    className="grid w-full grid-cols-[auto_1fr_auto_auto] items-center gap-4 px-1 py-4 text-left transition hover:bg-slate-900/60"
+                    className="grid w-full grid-cols-[auto_1fr_auto_auto] items-center gap-4 px-1 py-4 text-left transition hover:bg-slate-900"
                   >
                     <span className={`h-2.5 w-2.5 ${entry.color}`} />
                     <div>
@@ -271,7 +271,7 @@ const AnalyticsOverviewPanel = memo(function AnalyticsOverviewPanel({
                 </div>
                 <div className="mt-5 h-3 overflow-hidden bg-slate-900">
                   <div
-                    className="h-full bg-[linear-gradient(90deg,rgba(34,211,238,0.95),rgba(59,130,246,0.85))]"
+                    className="h-full bg-[linear-gradient(90deg,rgba(59,130,246,0.95),rgba(59,130,246,0.85))]"
                     style={{ width: `${(pennyCapital / totalCapital) * 100}%` }}
                   />
                 </div>

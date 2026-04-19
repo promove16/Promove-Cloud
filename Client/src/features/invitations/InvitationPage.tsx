@@ -22,7 +22,7 @@ import {
 } from './requestPresentation';
 
 const rowClassName =
-  'grid gap-3 border-b border-slate-800/80 px-3 py-3 lg:grid-cols-[minmax(0,1.2fr)_170px_150px_170px] lg:items-center';
+  'grid gap-3 border-b border-slate-800 px-3 py-3 lg:grid-cols-[minmax(0,1.2fr)_170px_150px_170px] lg:items-center';
 
 function getErrorMessage(error: unknown, fallback: string) {
   return (
@@ -87,7 +87,7 @@ function RequestRow({
   return (
     <div
       className={`${rowClassName} transition ${
-        isSelected ? 'bg-slate-900/70' : 'hover:bg-slate-900/50'
+        isSelected ? 'bg-slate-900' : 'hover:bg-slate-900'
       } ${onSelect ? 'cursor-pointer' : ''}`}
       onClick={() => onSelect?.(request)}
       onKeyDown={(event) => {
@@ -112,7 +112,7 @@ function RequestRow({
           {request.requestedPermission ? ` | ${request.requestedPermission}` : ''}
         </div>
         {request.message ? (
-          <div className="mt-2 rounded border border-slate-800 bg-slate-950/70 px-3 py-2 text-xs text-slate-300">
+          <div className="mt-2 rounded border border-slate-800 bg-slate-950 px-3 py-2 text-xs text-slate-300">
             {request.message}
           </div>
         ) : null}
@@ -214,22 +214,22 @@ function RequestDetailCard({
         </div>
 
         <div className="grid gap-3 lg:grid-cols-3">
-          <div className="rounded-xl border border-slate-800 bg-slate-950/70 px-4 py-3">
+          <div className="rounded-xl border border-slate-800 bg-slate-950 px-4 py-3">
             <div className="text-[11px] uppercase tracking-[0.24em] text-slate-500">Created</div>
             <div className="mt-2 text-sm text-white">{formatRequestStamp(request.createdAt)}</div>
           </div>
-          <div className="rounded-xl border border-slate-800 bg-slate-950/70 px-4 py-3">
+          <div className="rounded-xl border border-slate-800 bg-slate-950 px-4 py-3">
             <div className="text-[11px] uppercase tracking-[0.24em] text-slate-500">Expires</div>
             <div className="mt-2 text-sm text-white">{formatRequestStamp(request.expiresAt)}</div>
           </div>
-          <div className="rounded-xl border border-slate-800 bg-slate-950/70 px-4 py-3">
+          <div className="rounded-xl border border-slate-800 bg-slate-950 px-4 py-3">
             <div className="text-[11px] uppercase tracking-[0.24em] text-slate-500">Last response</div>
             <div className="mt-2 text-sm text-white">{formatRequestStamp(request.respondedAt ?? request.updatedAt)}</div>
           </div>
         </div>
 
         {request.message ? (
-          <div className="rounded-xl border border-slate-800 bg-slate-950/70 px-4 py-3">
+          <div className="rounded-xl border border-slate-800 bg-slate-950 px-4 py-3">
             <div className="flex items-center gap-2 text-[11px] uppercase tracking-[0.24em] text-slate-500">
               <FileText className="h-3.5 w-3.5" />
               Message
@@ -239,7 +239,7 @@ function RequestDetailCard({
         ) : null}
 
         <div className="grid gap-4 xl:grid-cols-[minmax(0,1.1fr)_minmax(0,0.9fr)]">
-          <div className="rounded-xl border border-slate-800 bg-slate-950/70 px-4 py-3">
+          <div className="rounded-xl border border-slate-800 bg-slate-950 px-4 py-3">
             <div className="flex items-center gap-2 text-[11px] uppercase tracking-[0.24em] text-slate-500">
               <Link2 className="h-3.5 w-3.5" />
               Linked content
@@ -251,7 +251,7 @@ function RequestDetailCard({
                     key={`${target.label}-${target.path}`}
                     type="button"
                     onClick={() => navigate(target.path)}
-                    className="flex w-full items-center justify-between rounded-xl border border-slate-800 px-3 py-3 text-left transition hover:border-cyan-500/40 hover:bg-slate-900/80"
+                    className="flex w-full items-center justify-between rounded-xl border border-slate-800 px-3 py-3 text-left transition hover:border-cyan-500/40 hover:bg-slate-900"
                   >
                     <div>
                       <div className="text-sm font-medium text-white">{target.label}</div>
@@ -266,7 +266,7 @@ function RequestDetailCard({
             )}
           </div>
 
-          <div className="rounded-xl border border-slate-800 bg-slate-950/70 px-4 py-3">
+          <div className="rounded-xl border border-slate-800 bg-slate-950 px-4 py-3">
             <div className="flex items-center gap-2 text-[11px] uppercase tracking-[0.24em] text-slate-500">
               <Clock3 className="h-3.5 w-3.5" />
               Request context
@@ -293,7 +293,7 @@ function RequestDetailCard({
         </div>
 
         {metadataEntries.length > 0 ? (
-          <div className="rounded-xl border border-slate-800 bg-slate-950/70 px-4 py-3">
+          <div className="rounded-xl border border-slate-800 bg-slate-950 px-4 py-3">
             <div className="text-[11px] uppercase tracking-[0.24em] text-slate-500">Linked details</div>
             <div className="mt-3 grid gap-3 sm:grid-cols-2 xl:grid-cols-3">
               {metadataEntries.map((entry) => (

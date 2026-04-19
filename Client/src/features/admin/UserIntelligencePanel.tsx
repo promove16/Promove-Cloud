@@ -44,7 +44,7 @@ function UserDetailPanel({
           { label: 'API requests', value: detail.summary.apiRequests },
           { label: 'Write actions', value: detail.summary.writeActions },
         ].map((metric) => (
-          <div key={metric.label} className="border border-slate-800 bg-slate-900/60 px-4 py-4">
+          <div key={metric.label} className="border border-slate-800 bg-slate-900 px-4 py-4">
             <div className="text-[11px] uppercase tracking-[0.2em] text-slate-500">{metric.label}</div>
             <div className="mt-3 text-3xl font-semibold text-white">{numberFormatter.format(metric.value)}</div>
           </div>
@@ -198,7 +198,7 @@ export const UserIntelligencePanel = memo(function UserIntelligencePanel({
                 type="button"
                 onClick={() => setSelectedUserId(user.userId)}
                 className={`grid w-full grid-cols-[1fr_auto] gap-4 px-6 py-4 text-left transition lg:px-8 ${
-                  selectedUserId === user.userId ? 'bg-cyan-500/10' : 'hover:bg-slate-900/60'
+                  selectedUserId === user.userId ? 'bg-cyan-500/10' : 'hover:bg-slate-900'
                 }`}
               >
                 <div className="min-w-0">

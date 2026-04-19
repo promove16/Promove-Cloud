@@ -80,7 +80,7 @@ const viewToggleButtonClass =
   'inline-flex items-center gap-2 rounded-lg px-3 py-2 text-sm font-medium transition focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-cyan-400/60';
 
 const cardActionClass =
-  'inline-flex items-center justify-center gap-1.5 rounded-lg border border-slate-700 bg-slate-800/50 px-3 py-2 text-xs font-medium text-slate-300 transition hover:border-slate-600 hover:bg-slate-800 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-cyan-400/60';
+  'inline-flex items-center justify-center gap-1.5 rounded-lg border border-slate-700 bg-slate-800 px-3 py-2 text-xs font-medium text-slate-300 transition hover:border-slate-600 hover:bg-slate-800 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-cyan-400/60';
 
 const selectClass =
   'rounded-xl border border-slate-700 bg-slate-900 px-3 py-2 text-sm text-white outline-none transition focus:border-cyan-400/50';
@@ -221,7 +221,7 @@ function ApplicantCard({
   const hasContact = Boolean(applicant.contactEmail);
 
   return (
-    <article className="group relative flex flex-col rounded-2xl border border-slate-800 bg-slate-900/60 p-4 transition hover:border-slate-700 hover:bg-slate-800/40">
+    <article className="group relative flex flex-col rounded-2xl border border-slate-800 bg-slate-900 p-4 transition hover:border-slate-700 hover:bg-slate-800/40">
       <div className="flex items-start gap-3">
         <button
           type="button"
@@ -271,7 +271,7 @@ function ApplicantCard({
           {applicant.skills.slice(0, 2).map((skill) => (
             <span
               key={`${applicant._id}-${skill}`}
-              className="rounded-full border border-slate-700 bg-slate-800/50 px-2 py-0.5 text-[10px] text-slate-400"
+              className="rounded-full border border-slate-700 bg-slate-800 px-2 py-0.5 text-[10px] text-slate-400"
             >
               {skill}
             </span>
@@ -334,7 +334,7 @@ function ApplicantTable({
   return (
     <div className="overflow-x-auto rounded-2xl border border-slate-800">
       <table className="min-w-full border-collapse">
-        <thead className="bg-slate-900/90">
+        <thead className="bg-slate-900">
           <tr className="text-left text-xs uppercase tracking-[0.22em] text-slate-500">
             <th scope="col" className="w-12 px-4 py-3">
               <span className="sr-only">Select</span>
@@ -361,7 +361,7 @@ function ApplicantTable({
         </thead>
         <tbody>
           {applicants.map((applicant) => (
-            <tr key={applicant._id} className="border-t border-slate-800 bg-slate-950/35 align-top">
+            <tr key={applicant._id} className="border-t border-slate-800 bg-slate-950 align-top">
               <td className="px-4 py-4">
                 <label className="inline-flex cursor-pointer items-center">
                   <span className="sr-only">Select {applicant.displayName}</span>
@@ -715,7 +715,7 @@ export default function ApplicationsPipeline() {
 
   return (
     <div className={`${RECRUITER_PAGE_CONTENT_CLASS} space-y-5`}>
-      <section className="space-y-4 rounded-3xl border border-slate-800/80 bg-slate-950/45 px-5 py-5 sm:px-6">
+      <section className="space-y-4 rounded-3xl border border-slate-800 bg-slate-950 px-5 py-5 sm:px-6">
         <div className="flex flex-col gap-4 xl:flex-row xl:items-start xl:justify-between">
           <div className="space-y-3">
             <RecruiterSectionNav items={recruiterMarketplaceSectionItems} />
@@ -732,11 +732,11 @@ export default function ApplicationsPipeline() {
           </div>
 
           <div className="flex flex-wrap gap-3">
-            <div className="rounded-2xl border border-slate-800 bg-slate-900/80 px-5 py-3">
+            <div className="rounded-2xl border border-slate-800 bg-slate-900 px-5 py-3">
               <div className="text-xs uppercase tracking-[0.22em] text-slate-500">Total Applications</div>
               <div className="mt-1 text-2xl font-bold text-white">{totalApplicants}</div>
             </div>
-            <div className="rounded-2xl border border-slate-800 bg-slate-900/80 px-5 py-3">
+            <div className="rounded-2xl border border-slate-800 bg-slate-900 px-5 py-3">
               <div className="text-xs uppercase tracking-[0.22em] text-slate-500">Active Jobs</div>
               <div className="mt-1 text-2xl font-bold text-white">{activeJobs}</div>
             </div>
@@ -749,7 +749,7 @@ export default function ApplicationsPipeline() {
       </section>
 
       <div className="grid gap-6 xl:grid-cols-[320px,minmax(0,1fr)]">
-        <aside className="space-y-4 rounded-3xl border border-slate-800 bg-slate-950/45 p-4">
+        <aside className="space-y-4 rounded-3xl border border-slate-800 bg-slate-950 p-4">
           <div className="flex items-center justify-between px-1 pb-2">
             <div>
               <div className="text-xs uppercase tracking-[0.3em] text-cyan-300">Jobs</div>
@@ -778,7 +778,7 @@ export default function ApplicationsPipeline() {
                     className={`w-full rounded-xl border px-4 py-3 text-left transition focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-cyan-400/60 ${
                       isSelected
                         ? 'border-cyan-500/50 bg-cyan-500/5'
-                        : 'border-slate-800 hover:border-slate-700 hover:bg-slate-900/40'
+                        : 'border-slate-800 hover:border-slate-700 hover:bg-slate-900'
                     }`}
                   >
                     <div className="flex items-start justify-between gap-2">
@@ -823,7 +823,7 @@ export default function ApplicationsPipeline() {
           </div>
         </aside>
 
-        <main className="space-y-4 rounded-3xl border border-slate-800 bg-slate-950/45 p-5">
+        <main className="space-y-4 rounded-3xl border border-slate-800 bg-slate-950 p-5">
           <div aria-live="polite" className="sr-only">
             {statusMessage}
           </div>
@@ -883,7 +883,7 @@ export default function ApplicationsPipeline() {
                     />
                   </div>
 
-                  <div className="inline-flex rounded-xl border border-slate-800 bg-slate-900/70 p-1">
+                  <div className="inline-flex rounded-xl border border-slate-800 bg-slate-900 p-1">
                     <button
                       type="button"
                       aria-pressed={viewMode === 'grid'}
@@ -909,7 +909,7 @@ export default function ApplicationsPipeline() {
                   </div>
                 </div>
 
-                <div className="flex flex-col gap-3 rounded-2xl border border-slate-800 bg-slate-900/40 px-4 py-3 xl:flex-row xl:items-center xl:justify-between">
+                <div className="flex flex-col gap-3 rounded-2xl border border-slate-800 bg-slate-900 px-4 py-3 xl:flex-row xl:items-center xl:justify-between">
                   <div className="flex flex-wrap items-center gap-3 text-sm text-slate-300">
                     <label className="inline-flex cursor-pointer items-center gap-2">
                       <input

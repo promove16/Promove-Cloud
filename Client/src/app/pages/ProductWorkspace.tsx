@@ -1181,7 +1181,7 @@ export function ProductWorkspaceDetail({
   };
   const progressModal =
     showProgressModal && workspace && canManageWorkspace ? (
-      <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-950/80 p-6 backdrop-blur-sm">
+      <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-950 p-6 backdrop-blur-sm">
         <div className="w-full max-w-2xl rounded-2xl border border-slate-800 bg-slate-900 p-6">
           <div className="mb-6 flex items-center justify-between">
             <h2 className="text-2xl font-bold text-white">
@@ -1328,7 +1328,7 @@ export function ProductWorkspaceDetail({
     ) : null;
   const taskFormPanel =
     showTaskForm && canManageWorkspace ? (
-      <div className="grid gap-3 rounded-2xl border border-slate-800 bg-slate-950/70 p-4 md:grid-cols-2">
+      <div className="grid gap-3 rounded-2xl border border-slate-800 bg-slate-950 p-4 md:grid-cols-2">
         <input
           value={taskForm.title}
           onChange={(event) =>
@@ -1485,10 +1485,10 @@ export function ProductWorkspaceDetail({
     },
   ];
   const chatPanel = workspace ? (
-    <div className="overflow-hidden rounded-[28px] border border-slate-800/70 bg-[linear-gradient(180deg,rgba(8,12,22,0.96)_0%,rgba(5,8,16,0.98)_100%)]">
+    <div className="overflow-hidden rounded-[28px] border border-slate-800 bg-[linear-gradient(180deg,rgba(8,12,22,0.96)_0%,rgba(5,8,16,0.98)_100%)]">
       <div className="grid gap-0 xl:grid-cols-[minmax(0,1fr)_300px]">
-      <div className="overflow-hidden xl:border-r xl:border-slate-800/70">
-        <div className="flex min-h-[64px] items-center justify-between gap-4 border-b border-slate-800/70 px-5 py-4">
+      <div className="overflow-hidden xl:border-r xl:border-slate-800">
+        <div className="flex min-h-[64px] items-center justify-between gap-4 border-b border-slate-800 px-5 py-4">
           <div className="min-w-0">
             <div className="truncate text-sm font-semibold text-white">
               {workspace.title}
@@ -1502,7 +1502,7 @@ export function ProductWorkspaceDetail({
           </div>
         </div>
 
-        <div className="border-b border-slate-800/70 px-5 py-3">
+        <div className="border-b border-slate-800 px-5 py-3">
           <div className="mb-2 flex items-center justify-between gap-3">
             <div>
               <div className="text-[11px] uppercase tracking-[0.18em] text-slate-500">
@@ -1514,7 +1514,7 @@ export function ProductWorkspaceDetail({
             </div>
           </div>
           <div className="grid gap-3 xl:grid-cols-3">
-            <div className="min-w-0 rounded-[20px] border border-slate-800/70 bg-slate-950/50 p-3.5">
+            <div className="min-w-0 rounded-[20px] border border-slate-800 bg-slate-950 p-3.5">
               <div className="flex items-center gap-2 text-[11px] uppercase tracking-[0.18em] text-slate-500">
                 <CheckCircle className="h-3.5 w-3.5 text-cyan-300" />
                 Tasks
@@ -1542,7 +1542,7 @@ export function ProductWorkspaceDetail({
               </div>
             </div>
 
-            <div className="min-w-0 rounded-[20px] border border-slate-800/70 bg-slate-950/50 p-3.5">
+            <div className="min-w-0 rounded-[20px] border border-slate-800 bg-slate-950 p-3.5">
               <div className="flex items-center gap-2 text-[11px] uppercase tracking-[0.18em] text-slate-500">
                 <Clock className="h-3.5 w-3.5 text-amber-300" />
                 Next Follow-Up
@@ -1583,7 +1583,7 @@ export function ProductWorkspaceDetail({
               )}
             </div>
 
-            <div className="min-w-0 rounded-[20px] border border-slate-800/70 bg-slate-950/50 p-3.5">
+            <div className="min-w-0 rounded-[20px] border border-slate-800 bg-slate-950 p-3.5">
               <div className="flex items-center gap-2 text-[11px] uppercase tracking-[0.18em] text-slate-500">
                 <FileText className="h-3.5 w-3.5 text-emerald-300" />
                 Latest Doc
@@ -1626,7 +1626,7 @@ export function ProductWorkspaceDetail({
           </div>
 
           {latestProgressUpdate ? (
-            <div className="mt-3 flex items-center gap-2 rounded-[18px] border border-slate-800/70 bg-slate-950/40 px-3.5 py-2.5 text-xs text-slate-300">
+            <div className="mt-3 flex items-center gap-2 rounded-[18px] border border-slate-800 bg-slate-950 px-3.5 py-2.5 text-xs text-slate-300">
               <Rocket className="h-3.5 w-3.5 text-sky-300" />
               <span className="font-semibold text-white">Latest progress:</span>
               <span className="truncate">{latestProgressUpdate.note}</span>
@@ -1687,7 +1687,7 @@ export function ProductWorkspaceDetail({
                     className={`w-full rounded-2xl px-4 py-3 ${
                       isOwn
                         ? "bg-emerald-500/12 text-white ring-1 ring-emerald-400/15"
-                        : "bg-slate-900/78 text-white ring-1 ring-slate-800"
+                        : "bg-slate-900 text-white ring-1 ring-slate-800"
                     }`}
                   >
                     {attachment?.fileType === "image" ? (
@@ -1711,10 +1711,10 @@ export function ProductWorkspaceDetail({
                         className={`mb-3 flex w-full items-center gap-3 rounded-xl px-3 py-3 text-left transition ${
                           isOwn
                             ? "bg-emerald-500/8 hover:bg-emerald-500/14"
-                            : "bg-slate-950/70 hover:bg-slate-900"
+                            : "bg-slate-950 hover:bg-slate-900"
                         }`}
                       >
-                        <div className="flex h-9 w-9 items-center justify-center rounded-xl bg-slate-950/80 text-slate-300">
+                        <div className="flex h-9 w-9 items-center justify-center rounded-xl bg-slate-950 text-slate-300">
                           {getAttachmentIcon(attachment.fileType)}
                         </div>
                         <div className="min-w-0 flex-1">
@@ -1789,7 +1789,7 @@ export function ProductWorkspaceDetail({
 
           {typingLabel ? (
             <div className="flex justify-start">
-              <div className="inline-flex items-center gap-3 rounded-full bg-slate-900/90 px-3 py-2 text-xs text-slate-300 ring-1 ring-slate-800">
+              <div className="inline-flex items-center gap-3 rounded-full bg-slate-900 px-3 py-2 text-xs text-slate-300 ring-1 ring-slate-800">
                 <div className="flex items-center gap-1">
                   <span className="h-2 w-2 animate-bounce rounded-full bg-slate-400 [animation-delay:-0.25s]" />
                   <span className="h-2 w-2 animate-bounce rounded-full bg-slate-400 [animation-delay:-0.12s]" />
@@ -1802,10 +1802,10 @@ export function ProductWorkspaceDetail({
         </div>
       </div>
 
-        <div className="border-t border-slate-800/70 px-5 py-5">
+        <div className="border-t border-slate-800 px-5 py-5">
           <div className="relative space-y-4">
             {chatComposerAction === "task" ? (
-              <div className="space-y-4 rounded-[24px] border border-slate-800/80 bg-slate-950/70 p-5">
+              <div className="space-y-4 rounded-[24px] border border-slate-800 bg-slate-950 p-5">
                 <div className="flex items-start justify-between gap-4">
                   <div>
                     <div className="text-xs uppercase tracking-[0.18em] text-slate-500">
@@ -1951,7 +1951,7 @@ export function ProductWorkspaceDetail({
             ) : null}
 
             {chatComposerAction === "doc" ? (
-              <div className="space-y-4 rounded-[24px] border border-slate-800/80 bg-slate-950/70 p-5">
+              <div className="space-y-4 rounded-[24px] border border-slate-800 bg-slate-950 p-5">
                 <div className="flex items-start justify-between gap-4">
                   <div>
                     <div className="text-xs uppercase tracking-[0.18em] text-slate-500">
@@ -2026,7 +2026,7 @@ export function ProductWorkspaceDetail({
             ) : null}
 
             {chatComposerAction === "progress" ? (
-              <div className="space-y-4 rounded-[24px] border border-slate-800/80 bg-slate-950/70 p-5">
+              <div className="space-y-4 rounded-[24px] border border-slate-800 bg-slate-950 p-5">
                 <div className="flex items-start justify-between gap-4">
                   <div>
                     <div className="text-xs uppercase tracking-[0.18em] text-slate-500">
@@ -2136,7 +2136,7 @@ export function ProductWorkspaceDetail({
               </div>
             ) : null}
 
-            <div className="relative flex items-center gap-3 border-t border-slate-800/70 pt-4">
+            <div className="relative flex items-center gap-3 border-t border-slate-800 pt-4">
               <div className="relative">
                 <button
                   type="button"
@@ -2312,8 +2312,8 @@ export function ProductWorkspaceDetail({
         </div>
       </div>
 
-      <aside className="bg-slate-950/70 xl:min-h-full xl:border-l xl:border-slate-800/70">
-        <div className="flex min-h-[64px] items-center justify-between gap-3 border-b border-slate-800/70 px-5 py-4">
+      <aside className="bg-slate-950 xl:min-h-full xl:border-l xl:border-slate-800">
+        <div className="flex min-h-[64px] items-center justify-between gap-3 border-b border-slate-800 px-5 py-4">
           <div>
             <div className="text-[11px] uppercase tracking-[0.18em] text-slate-500">
               Participants
@@ -2333,7 +2333,7 @@ export function ProductWorkspaceDetail({
           ) : null}
         </div>
         <div className="max-h-[684px] overflow-y-auto overflow-x-hidden px-5 py-4">
-          <div className="mb-5 rounded-[20px] border border-slate-800/70 bg-slate-950/60 p-3.5">
+          <div className="mb-5 rounded-[20px] border border-slate-800 bg-slate-950 p-3.5">
             <div className="text-[11px] uppercase tracking-[0.18em] text-slate-500">
               Quick Find
             </div>
@@ -2360,7 +2360,7 @@ export function ProductWorkspaceDetail({
                           key={task._id}
                           type="button"
                           onClick={() => remindTaskInChat(task)}
-                          className="w-full min-w-0 rounded-2xl border border-slate-800/70 bg-slate-950/60 px-3 py-2.5 text-left transition hover:border-slate-600"
+                          className="w-full min-w-0 rounded-2xl border border-slate-800 bg-slate-950 px-3 py-2.5 text-left transition hover:border-slate-600"
                         >
                           <div className="truncate text-sm font-semibold text-white">
                             {task.title}
@@ -2388,7 +2388,7 @@ export function ProductWorkspaceDetail({
                           key={upload._id}
                           type="button"
                           onClick={() => openFileInNewTab(upload.fileUrl)}
-                          className="w-full min-w-0 rounded-2xl border border-slate-800/70 bg-slate-950/60 px-3 py-2.5 text-left transition hover:border-slate-600"
+                          className="w-full min-w-0 rounded-2xl border border-slate-800 bg-slate-950 px-3 py-2.5 text-left transition hover:border-slate-600"
                         >
                           <div className="truncate text-sm font-semibold text-white">
                             {upload.fileName}
@@ -2411,7 +2411,7 @@ export function ProductWorkspaceDetail({
                       {quickFindProgressResults.slice(0, 2).map((update) => (
                         <div
                           key={update._id}
-                          className="min-w-0 rounded-2xl border border-slate-800/70 bg-slate-950/60 px-3 py-2.5"
+                          className="min-w-0 rounded-2xl border border-slate-800 bg-slate-950 px-3 py-2.5"
                         >
                           <div className="line-clamp-2 text-sm text-white">
                             {update.note}
@@ -2439,7 +2439,7 @@ export function ProductWorkspaceDetail({
                   <button
                     type="button"
                     onClick={() => remindTaskInChat(myOpenTasks[0])}
-                    className="flex min-w-0 items-center justify-between gap-3 rounded-2xl border border-slate-800/70 bg-slate-950/60 px-3 py-2.5 text-left transition hover:border-slate-600"
+                    className="flex min-w-0 items-center justify-between gap-3 rounded-2xl border border-slate-800 bg-slate-950 px-3 py-2.5 text-left transition hover:border-slate-600"
                   >
                     <div className="min-w-0">
                       <div className="text-xs uppercase tracking-[0.16em] text-slate-500">
@@ -2457,7 +2457,7 @@ export function ProductWorkspaceDetail({
                   <button
                     type="button"
                     onClick={() => openFileInNewTab(latestWorkspaceUpload.fileUrl)}
-                    className="flex min-w-0 items-center justify-between gap-3 rounded-2xl border border-slate-800/70 bg-slate-950/60 px-3 py-2.5 text-left transition hover:border-slate-600"
+                    className="flex min-w-0 items-center justify-between gap-3 rounded-2xl border border-slate-800 bg-slate-950 px-3 py-2.5 text-left transition hover:border-slate-600"
                   >
                     <div className="min-w-0">
                       <div className="text-xs uppercase tracking-[0.16em] text-slate-500">
@@ -2481,7 +2481,7 @@ export function ProductWorkspaceDetail({
               return (
                 <div
                   key={member._id}
-                  className="flex items-center gap-3 rounded-2xl border border-slate-800/60 bg-slate-950/50 px-3 py-3"
+                  className="flex items-center gap-3 rounded-2xl border border-slate-800/60 bg-slate-950 px-3 py-3"
                 >
                   <div className="relative flex h-10 w-10 items-center justify-center overflow-hidden rounded-full bg-gradient-to-br from-sky-500 to-indigo-500 text-xs font-bold text-white">
                     {member.avatar ? (
@@ -2514,7 +2514,7 @@ export function ProductWorkspaceDetail({
           </div>
 
           {workspacePermissions.canInviteMembers ? (
-            <div className="mt-5 border-t border-slate-800/70 pt-5">
+            <div className="mt-5 border-t border-slate-800 pt-5">
               <div className="mb-3 flex items-center justify-between gap-3">
                 <div>
                   <div className="text-[11px] uppercase tracking-[0.18em] text-slate-500">
@@ -2539,7 +2539,7 @@ export function ProductWorkspaceDetail({
               </div>
 
               {showInviteForm ? (
-                <div className="space-y-3 rounded-[24px] border border-slate-800 bg-slate-950/70 p-4">
+                <div className="space-y-3 rounded-[24px] border border-slate-800 bg-slate-950 p-4">
                   <input
                     value={inviteEmail}
                     onChange={(event) => setInviteEmail(event.target.value)}
@@ -2650,7 +2650,7 @@ export function ProductWorkspaceDetail({
 
             <div className="space-y-6">
               <div className="grid gap-6 xl:grid-cols-[minmax(0,1.7fr)_320px]">
-                <section className="rounded-[28px] border border-slate-800 bg-slate-900/80 p-6">
+                <section className="rounded-[28px] border border-slate-800 bg-slate-900 p-6">
                   <div className="mb-6 flex flex-col gap-4 md:flex-row md:items-end md:justify-between">
                     <div>
                       <div className="text-xs uppercase tracking-[0.28em] text-slate-500">
@@ -2665,7 +2665,7 @@ export function ProductWorkspaceDetail({
                       </p>
                     </div>
                     <div className="flex flex-wrap items-center gap-3 md:justify-end">
-                      <div className="rounded-2xl border border-slate-800 bg-slate-950/80 px-4 py-3 text-right">
+                      <div className="rounded-2xl border border-slate-800 bg-slate-950 px-4 py-3 text-right">
                         <div className="text-xs uppercase tracking-[0.24em] text-slate-500">
                           Current target
                         </div>
@@ -2691,7 +2691,7 @@ export function ProductWorkspaceDetail({
                     {workspace.milestones.map((milestone) => (
                       <div
                         key={milestone._id}
-                        className="grid gap-3 rounded-2xl border border-slate-800/80 bg-slate-950/60 px-4 py-4 md:grid-cols-[44px_minmax(0,1fr)_64px] md:items-center"
+                        className="grid gap-3 rounded-2xl border border-slate-800 bg-slate-950 px-4 py-4 md:grid-cols-[44px_minmax(0,1fr)_64px] md:items-center"
                       >
                         <div
                           className={`flex h-11 w-11 items-center justify-center rounded-2xl ${
@@ -2743,7 +2743,7 @@ export function ProductWorkspaceDetail({
                 </section>
 
                 <div className="space-y-6">
-                  <div className="rounded-lg border border-slate-800 bg-slate-900/80 p-4">
+                  <div className="rounded-lg border border-slate-800 bg-slate-900 p-4">
                     <h3 className="font-semibold text-white">Project Stats</h3>
                     <div className="mt-4 grid grid-cols-2 gap-3">
                       <div className="rounded-2xl bg-slate-950 p-4 text-center">
@@ -2773,7 +2773,7 @@ export function ProductWorkspaceDetail({
                     </div>
                   </div>
 
-                  <div className="rounded-lg border border-slate-800 bg-slate-900/80 p-4">
+                  <div className="rounded-lg border border-slate-800 bg-slate-900 p-4">
                     <h3 className="font-semibold text-white">Recent Updates</h3>
                     <div className="mt-4 space-y-3">
                       {recentUpdates.length > 0 ? (
@@ -2807,7 +2807,7 @@ export function ProductWorkspaceDetail({
                   className={`${
                     activeTab === "chat"
                       ? "bg-transparent p-0"
-                      : "rounded-[28px] border border-slate-800 bg-slate-900/80 p-4 lg:p-6"
+                      : "rounded-[28px] border border-slate-800 bg-slate-900 p-4 lg:p-6"
                   }`}
                 >
                   <div className="mb-5 flex flex-col gap-4 border-b border-slate-800 pb-5 lg:flex-row lg:items-end lg:justify-between">
@@ -2828,7 +2828,7 @@ export function ProductWorkspaceDetail({
                     className={
                       activeTab === "chat"
                         ? "p-0"
-                        : "rounded-2xl border border-slate-800 bg-slate-950/40 p-4"
+                        : "rounded-2xl border border-slate-800 bg-slate-950 p-4"
                     }
                   >
                   {activeTab === "tasks" && (
@@ -2840,7 +2840,7 @@ export function ProductWorkspaceDetail({
                       {taskFormPanel}
                       <div className="space-y-2">
                         {(workspace.tasks ?? []).map((task) => (
-                          <div key={task._id} className="flex items-start gap-2 p-2 rounded border border-slate-800 bg-slate-950/70">
+                          <div key={task._id} className="flex items-start gap-2 p-2 rounded border border-slate-800 bg-slate-950">
                             <button onClick={() => toggleTask.mutate({ taskId: task._id, done: !task.done })} disabled={!canManageWorkspace}>
                               {task.done ? <CheckCircle className="h-4 w-4 text-emerald-400" /> : <Circle className="h-4 w-4 text-slate-500" />}
                             </button>
@@ -2875,7 +2875,7 @@ export function ProductWorkspaceDetail({
                             className={`rounded-full border px-4 py-2 text-sm font-semibold transition ${
                               showInviteForm
                                 ? "border-sky-500/40 bg-sky-500/10 text-sky-100"
-                                : "border-slate-700 bg-slate-950/80 text-white hover:border-slate-500"
+                                : "border-slate-700 bg-slate-950 text-white hover:border-slate-500"
                             }`}
                           >
                             {showInviteForm ? "Close Invite" : "Invite Teammate"}
@@ -2884,7 +2884,7 @@ export function ProductWorkspaceDetail({
                       </div>
 
                       {showInviteForm ? (
-                        <div className="space-y-3 rounded-2xl border border-slate-800 bg-slate-950/70 p-4">
+                        <div className="space-y-3 rounded-2xl border border-slate-800 bg-slate-950 p-4">
                           <div className="grid gap-3 lg:grid-cols-[minmax(0,1fr)_180px]">
                             <input
                               value={inviteEmail}
@@ -2934,7 +2934,7 @@ export function ProductWorkspaceDetail({
                           {pendingInvites.map((pendingInvite) => (
                             <div
                               key={pendingInvite._id}
-                              className="flex flex-col gap-1 rounded-2xl border border-slate-800 bg-slate-950/70 px-4 py-3 md:flex-row md:items-center md:justify-between"
+                              className="flex flex-col gap-1 rounded-2xl border border-slate-800 bg-slate-950 px-4 py-3 md:flex-row md:items-center md:justify-between"
                             >
                               <div className="min-w-0">
                                 <div className="truncate text-sm font-semibold text-white">
@@ -2956,7 +2956,7 @@ export function ProductWorkspaceDetail({
                         {teamMembers.map((m) => (
                           <div
                             key={m._id}
-                            className="flex items-center gap-3 rounded-2xl border border-slate-800 bg-slate-950/70 px-4 py-3"
+                            className="flex items-center gap-3 rounded-2xl border border-slate-800 bg-slate-950 px-4 py-3"
                           >
                             <div className="flex h-10 w-10 items-center justify-center overflow-hidden rounded-full bg-gradient-to-br from-sky-500 to-indigo-500 text-xs font-bold text-white">
                               {m.avatar ? (
@@ -2969,7 +2969,7 @@ export function ProductWorkspaceDetail({
                               <div className="text-sm font-semibold text-white">{m.displayName}</div>
                               <div className="text-xs uppercase tracking-[0.18em] text-slate-500">{m.role}</div>
                             </div>
-                            <span className="rounded-full border border-slate-800 bg-slate-900/80 px-3 py-1.5 text-[11px] font-semibold uppercase tracking-[0.18em] text-slate-500">
+                            <span className="rounded-full border border-slate-800 bg-slate-900 px-3 py-1.5 text-[11px] font-semibold uppercase tracking-[0.18em] text-slate-500">
                               {m._id === workspace.ownerId ? "Owner" : "Member"}
                             </span>
                           </div>
@@ -2987,7 +2987,7 @@ export function ProductWorkspaceDetail({
                         {(workspace.uploads ?? []).map((upload) => (
                           <div
                             key={upload._id}
-                            className="flex flex-col gap-3 rounded-2xl border border-slate-800 bg-slate-950/70 px-4 py-3 md:flex-row md:items-center md:justify-between"
+                            className="flex flex-col gap-3 rounded-2xl border border-slate-800 bg-slate-950 px-4 py-3 md:flex-row md:items-center md:justify-between"
                           >
                             <div className="min-w-0 flex items-start gap-3">
                               <div className="mt-0.5 flex h-10 w-10 items-center justify-center rounded-2xl bg-slate-900 text-slate-300">
@@ -3030,7 +3030,7 @@ export function ProductWorkspaceDetail({
                   {activeTab === "chat" ? chatPanel : null}
                   {false && activeTab === "chat" && (
                     <div className="space-y-3">
-                      <div className="flex items-center justify-between rounded-2xl border border-slate-800 bg-slate-900/70 px-4 py-3">
+                      <div className="flex items-center justify-between rounded-2xl border border-slate-800 bg-slate-900 px-4 py-3">
                         <div className="min-w-0">
                           <div className="truncate text-sm font-semibold text-white">{workspace?.title}</div>
                           <div className="text-xs text-slate-400">
@@ -3048,7 +3048,7 @@ export function ProductWorkspaceDetail({
                         >
                           <div className="space-y-1">
                             {chat.messages.length === 0 ? (
-                              <div className="mx-auto max-w-md rounded-2xl border border-slate-700 bg-slate-900/95 px-4 py-3 text-center text-sm text-slate-300 shadow-sm">
+                              <div className="mx-auto max-w-md rounded-2xl border border-slate-700 bg-slate-900 px-4 py-3 text-center text-sm text-slate-300 shadow-sm">
                                 Start the thread with an update, an image, a document, or a code snippet.
                               </div>
                             ) : null}
@@ -3201,7 +3201,7 @@ export function ProductWorkspaceDetail({
 
                           {typingLabel ? (
                             <div className="flex justify-start">
-                              <div className="inline-flex items-center gap-3 rounded-[20px] bg-slate-900/95 px-3 py-2 text-xs text-slate-300 shadow-sm">
+                              <div className="inline-flex items-center gap-3 rounded-[20px] bg-slate-900 px-3 py-2 text-xs text-slate-300 shadow-sm">
                                 <div className="flex items-center gap-1">
                                   <span className="h-2 w-2 animate-bounce rounded-full bg-slate-400 [animation-delay:-0.25s]" />
                                   <span className="h-2 w-2 animate-bounce rounded-full bg-slate-400 [animation-delay:-0.12s]" />
@@ -3213,7 +3213,7 @@ export function ProductWorkspaceDetail({
                           ) : null}
                         </div>
                       </div>
-                      <div className="rounded-3xl border border-slate-800 bg-slate-900/70 px-3 py-3">
+                      <div className="rounded-3xl border border-slate-800 bg-slate-900 px-3 py-3">
                         <div className="space-y-3">
                           <div className="flex flex-wrap gap-2">
                             {canManageWorkspace ? (
@@ -3221,7 +3221,7 @@ export function ProductWorkspaceDetail({
                                 <button
                                   type="button"
                                   onClick={() => imageAttachmentInputRef.current?.click()}
-                                  className="inline-flex items-center gap-2 rounded-full border border-slate-700 bg-slate-900/80 px-3 py-2 text-xs font-semibold text-white transition hover:border-slate-500"
+                                  className="inline-flex items-center gap-2 rounded-full border border-slate-700 bg-slate-900 px-3 py-2 text-xs font-semibold text-white transition hover:border-slate-500"
                                 >
                                   <ImagePlus className="h-3.5 w-3.5 text-sky-300" />
                                   Upload Image
@@ -3229,14 +3229,14 @@ export function ProductWorkspaceDetail({
                                 <button
                                   type="button"
                                   onClick={() => docAttachmentInputRef.current?.click()}
-                                  className="inline-flex items-center gap-2 rounded-full border border-slate-700 bg-slate-900/80 px-3 py-2 text-xs font-semibold text-white transition hover:border-slate-500"
+                                  className="inline-flex items-center gap-2 rounded-full border border-slate-700 bg-slate-900 px-3 py-2 text-xs font-semibold text-white transition hover:border-slate-500"
                                 >
                                   <FileText className="h-3.5 w-3.5 text-cyan-300" />
                                   Upload Docs
                                 </button>
                               </>
                             ) : (
-                              <span className="rounded-full border border-slate-800 bg-slate-900/80 px-3 py-2 text-xs text-slate-400">
+                              <span className="rounded-full border border-slate-800 bg-slate-900 px-3 py-2 text-xs text-slate-400">
                                 File uploads are limited to workspace student collaborators.
                               </span>
                             )}
@@ -3250,7 +3250,7 @@ export function ProductWorkspaceDetail({
                               className={`inline-flex items-center gap-2 rounded-full border px-3 py-2 text-xs font-semibold transition ${
                                 chatComposerMode === "code"
                                   ? "border-violet-400/40 bg-violet-500/10 text-violet-100"
-                                  : "border-slate-700 bg-slate-900/80 text-white hover:border-slate-500"
+                                  : "border-slate-700 bg-slate-900 text-white hover:border-slate-500"
                               }`}
                             >
                               <Code2 className="h-3.5 w-3.5 text-violet-300" />
@@ -3259,7 +3259,7 @@ export function ProductWorkspaceDetail({
                           </div>
 
                           {chatComposerMode === "code" ? (
-                            <div className="rounded-2xl border border-slate-700 bg-slate-950/70 p-3">
+                            <div className="rounded-2xl border border-slate-700 bg-slate-950 p-3">
                               <div className="mb-3 flex items-center justify-between gap-3">
                                 <div className="text-sm font-semibold text-white">
                                   Send code safely as plain text
@@ -3432,7 +3432,7 @@ export function ProductWorkspaceDetail({
   return (
     <DashboardLayout role="student">
       <div className="space-y-6">
-        <section className="relative overflow-hidden rounded-[28px] border border-slate-800/80 bg-slate-950 px-6 py-6 shadow-[0_24px_80px_rgba(2,6,23,0.45)] lg:px-8 lg:py-8">
+        <section className="relative overflow-hidden rounded-[28px] border border-slate-800 bg-slate-950 px-6 py-6 shadow-[0_24px_80px_rgba(2,6,23,0.45)] lg:px-8 lg:py-8">
           <div className="absolute inset-x-0 top-0 h-40 bg-[radial-gradient(circle_at_top_left,rgba(59,130,246,0.22),transparent_42%),radial-gradient(circle_at_top_right,rgba(168,85,247,0.18),transparent_36%)]" />
           <div className="relative space-y-6">
             <div className="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
@@ -3455,10 +3455,10 @@ export function ProductWorkspaceDetail({
                     <span className="rounded-full border border-emerald-500/20 bg-emerald-500/10 px-3 py-1 text-emerald-300">
                       {workspace.stage}
                     </span>
-                    <span className="rounded-full border border-slate-700 bg-slate-900/80 px-3 py-1 text-slate-300">
+                    <span className="rounded-full border border-slate-700 bg-slate-900 px-3 py-1 text-slate-300">
                       {workspaceSourceLabel}
                     </span>
-                    <span className="inline-flex items-center gap-2 rounded-full border border-slate-700 bg-slate-900/80 px-3 py-1 text-slate-300">
+                    <span className="inline-flex items-center gap-2 rounded-full border border-slate-700 bg-slate-900 px-3 py-1 text-slate-300">
                       <Clock className="h-4 w-4 text-slate-500" />
                       Started {d(workspace.createdAt)}
                     </span>
@@ -3483,7 +3483,7 @@ export function ProductWorkspaceDetail({
               </div>
             </div>
 
-            <div className="grid gap-4 border-t border-slate-800/80 pt-6 lg:grid-cols-[minmax(0,1.4fr)_300px]">
+            <div className="grid gap-4 border-t border-slate-800 pt-6 lg:grid-cols-[minmax(0,1.4fr)_300px]">
               <div className="space-y-4">
                 <div>
                   <div className="text-xs uppercase tracking-[0.32em] text-slate-500">
@@ -3509,7 +3509,7 @@ export function ProductWorkspaceDetail({
                         <button
                           key={item._id}
                           onClick={() => setSelectedWorkspaceId(item._id)}
-                          className={`min-w-[220px] flex-1 rounded-2xl border px-4 py-3 text-left transition ${isActive ? "border-sky-500/40 bg-sky-500/12 text-white shadow-[0_0_0_1px_rgba(56,189,248,0.15)]" : "border-slate-800 bg-slate-900/70 text-slate-300 hover:border-slate-700 hover:bg-slate-900"}`}
+                          className={`min-w-[220px] flex-1 rounded-2xl border px-4 py-3 text-left transition ${isActive ? "border-sky-500/40 bg-sky-500/12 text-white shadow-[0_0_0_1px_rgba(56,189,248,0.15)]" : "border-slate-800 bg-slate-900 text-slate-300 hover:border-slate-700 hover:bg-slate-900"}`}
                         >
                           <div className="truncate font-semibold">
                             {item.title}
@@ -3523,7 +3523,7 @@ export function ProductWorkspaceDetail({
                       );
                     })}
                     {!listQuery.isLoading && workspaceOptions.length === 0 ? (
-                      <div className="rounded-2xl border border-dashed border-slate-800 bg-slate-900/60 px-4 py-5 text-sm text-slate-400">
+                      <div className="rounded-2xl border border-dashed border-slate-800 bg-slate-900 px-4 py-5 text-sm text-slate-400">
                         No Problem Bank workspace exists yet. Start from the
                         Problem Bank to create one.
                       </div>
@@ -3532,7 +3532,7 @@ export function ProductWorkspaceDetail({
                 ) : null}
               </div>
 
-              <div className="rounded-2xl border border-slate-800 bg-slate-900/70 p-5">
+              <div className="rounded-2xl border border-slate-800 bg-slate-900 p-5">
                 <div className="text-xs uppercase tracking-[0.28em] text-slate-500">
                   Focus
                 </div>
@@ -3571,7 +3571,7 @@ export function ProductWorkspaceDetail({
         ) : null}
 
         {!workspace && !listQuery.isLoading ? (
-          <section className="rounded-[28px] border border-dashed border-slate-700 bg-slate-950/90 p-10 text-center">
+          <section className="rounded-[28px] border border-dashed border-slate-700 bg-slate-950 p-10 text-center">
             <Rocket className="mx-auto mb-4 h-10 w-10 text-slate-500" />
             <h2 className="text-2xl font-bold text-white">
               No workspace available yet
@@ -3594,7 +3594,7 @@ export function ProductWorkspaceDetail({
         {workspace ? (
           <div className="space-y-6">
             <div className="grid gap-6 xl:grid-cols-[minmax(0,1.65fr)_340px]">
-              <section className="rounded-[28px] border border-slate-800 bg-slate-900/80 p-6 lg:p-7">
+              <section className="rounded-[28px] border border-slate-800 bg-slate-900 p-6 lg:p-7">
                 <div className="mb-6 flex flex-col gap-4 md:flex-row md:items-end md:justify-between">
                   <div>
                     <div className="text-xs uppercase tracking-[0.28em] text-slate-500">
@@ -3608,7 +3608,7 @@ export function ProductWorkspaceDetail({
                       splitting it into separate cards.
                     </p>
                   </div>
-                  <div className="rounded-2xl border border-slate-800 bg-slate-950/80 px-4 py-3 text-right">
+                  <div className="rounded-2xl border border-slate-800 bg-slate-950 px-4 py-3 text-right">
                     <div className="text-xs uppercase tracking-[0.24em] text-slate-500">
                       Current target
                     </div>
@@ -3622,7 +3622,7 @@ export function ProductWorkspaceDetail({
                   {workspace.milestones.map((milestone) => (
                     <div
                       key={milestone._id}
-                      className="grid gap-3 rounded-2xl border border-slate-800/80 bg-slate-950/60 px-4 py-4 md:grid-cols-[44px_minmax(0,1fr)_64px] md:items-center"
+                      className="grid gap-3 rounded-2xl border border-slate-800 bg-slate-950 px-4 py-4 md:grid-cols-[44px_minmax(0,1fr)_64px] md:items-center"
                     >
                       <div
                         className={`flex h-11 w-11 items-center justify-center rounded-2xl ${milestone.isCompleted ? "bg-emerald-500/12" : milestone.completionPercent > 0 ? "bg-sky-500/12" : "bg-slate-800"}`}
@@ -3660,7 +3660,7 @@ export function ProductWorkspaceDetail({
               </section>
 
               <div className="space-y-6">
-                <div className="rounded-[28px] border border-slate-800 bg-slate-900/80 p-6">
+                <div className="rounded-[28px] border border-slate-800 bg-slate-900 p-6">
                   <h3 className="font-bold text-white">Project Stats</h3>
                   <div className="mt-4 grid grid-cols-2 gap-3">
                     <div className="rounded-2xl bg-slate-950 p-4 text-center">
@@ -3690,7 +3690,7 @@ export function ProductWorkspaceDetail({
                   </div>
                 </div>
 
-                <div className="rounded-[28px] border border-slate-800 bg-slate-900/80 p-6">
+                <div className="rounded-[28px] border border-slate-800 bg-slate-900 p-6">
                   <h3 className="font-bold text-white">Recent Updates</h3>
                   <div className="mt-4 space-y-3">
                     {recentUpdates.length > 0 ? (
@@ -3724,7 +3724,7 @@ export function ProductWorkspaceDetail({
                 className={`${
                   activeTab === "chat"
                     ? "bg-transparent p-0"
-                    : "rounded-[28px] border border-slate-800 bg-slate-900/80 p-4 lg:p-6"
+                    : "rounded-[28px] border border-slate-800 bg-slate-900 p-4 lg:p-6"
                 }`}
               >
                 <div className="flex flex-col gap-4 border-b border-slate-800 pb-5 lg:flex-row lg:items-end lg:justify-between">
@@ -3761,7 +3761,7 @@ export function ProductWorkspaceDetail({
                       {(workspace.tasks ?? []).map((task) => (
                         <div
                           key={task._id}
-                          className="flex items-start gap-3 rounded-2xl border border-slate-800 bg-slate-950/70 p-4"
+                          className="flex items-start gap-3 rounded-2xl border border-slate-800 bg-slate-950 p-4"
                         >
                           <button
                             onClick={() =>
@@ -3827,7 +3827,7 @@ export function ProductWorkspaceDetail({
                             className={`inline-flex items-center gap-2 rounded-full border px-4 py-2 text-sm font-semibold transition ${
                               showInviteForm
                                 ? "border-sky-500/40 bg-sky-500/10 text-sky-100"
-                                : "border-slate-700 bg-slate-950/70 text-white hover:border-slate-500"
+                                : "border-slate-700 bg-slate-950 text-white hover:border-slate-500"
                             }`}
                           >
                             <UserPlus className="h-4 w-4" />
@@ -3837,7 +3837,7 @@ export function ProductWorkspaceDetail({
                       </div>
 
                       {showInviteForm ? (
-                        <div className="border-y border-slate-800/80 py-4">
+                        <div className="border-y border-slate-800 py-4">
                           <div className="mb-4 text-xs uppercase tracking-[0.24em] text-slate-500">
                             Send Invite
                           </div>
@@ -3848,7 +3848,7 @@ export function ProductWorkspaceDetail({
                                 setInviteEmail(event.target.value)
                               }
                               placeholder="student@college.edu"
-                              className="rounded-2xl border border-slate-800 bg-slate-950/80 px-4 py-3 text-sm text-white outline-none transition focus:border-sky-400"
+                              className="rounded-2xl border border-slate-800 bg-slate-950 px-4 py-3 text-sm text-white outline-none transition focus:border-sky-400"
                             />
                             <select
                               value={inviteRole}
@@ -3857,7 +3857,7 @@ export function ProductWorkspaceDetail({
                                   event.target.value as typeof inviteRole,
                                 )
                               }
-                              className="rounded-2xl border border-slate-800 bg-slate-950/80 px-4 py-3 text-sm text-white outline-none transition focus:border-sky-400"
+                              className="rounded-2xl border border-slate-800 bg-slate-950 px-4 py-3 text-sm text-white outline-none transition focus:border-sky-400"
                             >
                               <option value="developer">Developer</option>
                               <option value="designer">Designer</option>
@@ -3872,7 +3872,7 @@ export function ProductWorkspaceDetail({
                                 setInviteMessage(event.target.value)
                               }
                               placeholder="Short note, ownership, or onboarding context"
-                              className="rounded-2xl border border-slate-800 bg-slate-950/80 px-4 py-3 text-sm text-white outline-none transition focus:border-sky-400 xl:col-span-2"
+                              className="rounded-2xl border border-slate-800 bg-slate-950 px-4 py-3 text-sm text-white outline-none transition focus:border-sky-400 xl:col-span-2"
                             />
                           </div>
                           <div className="mt-4 flex flex-wrap items-center justify-between gap-3">
@@ -3894,14 +3894,14 @@ export function ProductWorkspaceDetail({
                       ) : null}
 
                       {pendingInvites.length > 0 ? (
-                        <div className="space-y-2 border-b border-slate-800/80 pb-4">
+                        <div className="space-y-2 border-b border-slate-800 pb-4">
                           <div className="text-xs uppercase tracking-[0.24em] text-slate-500">
                             Pending
                           </div>
                           {pendingInvites.map((pendingInvite) => (
                             <div
                               key={pendingInvite._id}
-                              className="flex flex-col gap-1.5 rounded-2xl bg-slate-950/60 px-4 py-3 md:flex-row md:items-center md:justify-between"
+                              className="flex flex-col gap-1.5 rounded-2xl bg-slate-950 px-4 py-3 md:flex-row md:items-center md:justify-between"
                             >
                               <div className="min-w-0">
                                 <div className="truncate text-sm font-semibold text-white">
@@ -3923,7 +3923,7 @@ export function ProductWorkspaceDetail({
                         </div>
                       ) : null}
 
-                      <div className="divide-y divide-slate-800/70 overflow-hidden rounded-[26px] border border-slate-800/70 bg-slate-950/50">
+                      <div className="divide-y divide-slate-800/70 overflow-hidden rounded-[26px] border border-slate-800 bg-slate-950">
                         {teamMembers.map((member) => (
                           <div
                             key={member._id}
@@ -3957,7 +3957,7 @@ export function ProductWorkspaceDetail({
                                 Remove
                               </button>
                             ) : (
-                              <span className="rounded-full border border-slate-800 bg-slate-900/80 px-3 py-2 text-[11px] font-semibold uppercase tracking-[0.18em] text-slate-500">
+                              <span className="rounded-full border border-slate-800 bg-slate-900 px-3 py-2 text-[11px] font-semibold uppercase tracking-[0.18em] text-slate-500">
                                 {member._id === workspace.ownerId
                                   ? "Owner"
                                   : "Member"}
@@ -3972,7 +3972,7 @@ export function ProductWorkspaceDetail({
                   {activeTab === "uploads" ? (
                     <div className="space-y-4">
                       {canManageWorkspace ? (
-                        <div className="grid gap-3 rounded-2xl border border-slate-800 bg-slate-950/70 p-4 md:grid-cols-2">
+                        <div className="grid gap-3 rounded-2xl border border-slate-800 bg-slate-950 p-4 md:grid-cols-2">
                           <div className="space-y-3">
                             <select
                               value={uploadCategory}
@@ -4071,7 +4071,7 @@ export function ProductWorkspaceDetail({
                           </div>
                         </div>
                       ) : (
-                        <div className="rounded-2xl border border-slate-800 bg-slate-950/70 p-4 text-sm text-slate-400">
+                        <div className="rounded-2xl border border-slate-800 bg-slate-950 p-4 text-sm text-slate-400">
                           Student collaborators manage docs and code records.
                           Mentor and investor access is read-only here.
                         </div>
@@ -4080,7 +4080,7 @@ export function ProductWorkspaceDetail({
                         {(workspace.uploads ?? []).map((upload) => (
                           <div
                             key={upload._id}
-                            className="flex flex-col gap-4 rounded-[24px] border border-slate-800/80 bg-slate-950/60 p-4 md:flex-row md:items-center md:justify-between"
+                            className="flex flex-col gap-4 rounded-[24px] border border-slate-800 bg-slate-950 p-4 md:flex-row md:items-center md:justify-between"
                           >
                             <div className="min-w-0 flex items-start gap-3">
                               <div className="mt-0.5 flex h-11 w-11 shrink-0 items-center justify-center rounded-2xl bg-slate-900 text-slate-300">
@@ -4139,7 +4139,7 @@ export function ProductWorkspaceDetail({
                         {(workspace.repoSubmissions ?? []).map((repo) => (
                           <div
                             key={repo._id}
-                            className="flex items-center justify-between rounded-2xl border border-slate-800 bg-slate-950/70 p-4"
+                            className="flex items-center justify-between rounded-2xl border border-slate-800 bg-slate-950 p-4"
                           >
                             <div className="min-w-0">
                               <div className="truncate font-semibold text-white">
@@ -4172,7 +4172,7 @@ export function ProductWorkspaceDetail({
                         {(workspace.codeSubmissions ?? []).map((snippet) => (
                           <div
                             key={snippet._id}
-                            className="rounded-2xl border border-slate-800 bg-slate-950/70 p-4"
+                            className="rounded-2xl border border-slate-800 bg-slate-950 p-4"
                           >
                             <div className="mb-2 flex items-center justify-between gap-3">
                               <div className="font-semibold text-white">
@@ -4214,7 +4214,7 @@ export function ProductWorkspaceDetail({
                         </button>
                       </div>
                       <div className="overflow-hidden bg-transparent">
-                        <div className="flex items-center justify-between border-b border-slate-800/70 bg-slate-900/70 px-4 py-3">
+                        <div className="flex items-center justify-between border-b border-slate-800 bg-slate-900 px-4 py-3">
                           <div className="flex min-w-0 items-center gap-3">
                             <div className="relative flex h-12 w-12 items-center justify-center overflow-hidden rounded-full bg-gradient-to-br from-emerald-400 via-teal-500 to-cyan-500 text-sm font-bold text-white">
                               {primaryChatParticipant?.avatar ? (
@@ -4253,7 +4253,7 @@ export function ProductWorkspaceDetail({
                         >
                           <div className="space-y-1">
                             {chat.messages.length === 0 ? (
-                              <div className="mx-auto max-w-md rounded-2xl border border-slate-700 bg-slate-900/95 px-4 py-3 text-center text-sm text-slate-300 shadow-sm">
+                              <div className="mx-auto max-w-md rounded-2xl border border-slate-700 bg-slate-900 px-4 py-3 text-center text-sm text-slate-300 shadow-sm">
                                 Start the thread with an update, an image, a
                                 document, or a code snippet.
                               </div>
@@ -4437,7 +4437,7 @@ export function ProductWorkspaceDetail({
                                     onClick={() =>
                                       imageAttachmentInputRef.current?.click()
                                     }
-                                    className="inline-flex items-center gap-2 rounded-full border border-slate-700 bg-slate-900/80 px-3 py-2 text-xs font-semibold text-white transition hover:border-slate-500"
+                                    className="inline-flex items-center gap-2 rounded-full border border-slate-700 bg-slate-900 px-3 py-2 text-xs font-semibold text-white transition hover:border-slate-500"
                                   >
                                     <ImagePlus className="h-3.5 w-3.5 text-sky-300" />
                                     Upload Image
@@ -4447,14 +4447,14 @@ export function ProductWorkspaceDetail({
                                     onClick={() =>
                                       docAttachmentInputRef.current?.click()
                                     }
-                                    className="inline-flex items-center gap-2 rounded-full border border-slate-700 bg-slate-900/80 px-3 py-2 text-xs font-semibold text-white transition hover:border-slate-500"
+                                    className="inline-flex items-center gap-2 rounded-full border border-slate-700 bg-slate-900 px-3 py-2 text-xs font-semibold text-white transition hover:border-slate-500"
                                   >
                                     <FileText className="h-3.5 w-3.5 text-cyan-300" />
                                     Upload Docs
                                   </button>
                                 </>
                               ) : (
-                                <span className="rounded-full border border-slate-800 bg-slate-900/80 px-3 py-2 text-xs text-slate-400">
+                                <span className="rounded-full border border-slate-800 bg-slate-900 px-3 py-2 text-xs text-slate-400">
                                   File uploads are limited to workspace student
                                   collaborators.
                                 </span>
@@ -4469,7 +4469,7 @@ export function ProductWorkspaceDetail({
                                 className={`inline-flex items-center gap-2 rounded-full border px-3 py-2 text-xs font-semibold transition ${
                                   chatComposerMode === "code"
                                     ? "border-violet-400/40 bg-violet-500/10 text-violet-100"
-                                    : "border-slate-700 bg-slate-900/80 text-white hover:border-slate-500"
+                                    : "border-slate-700 bg-slate-900 text-white hover:border-slate-500"
                                 }`}
                               >
                                 <Code2 className="h-3.5 w-3.5 text-violet-300" />
@@ -4478,7 +4478,7 @@ export function ProductWorkspaceDetail({
                             </div>
 
                             {chatComposerMode === "code" ? (
-                              <div className="rounded-2xl border border-slate-700 bg-slate-950/70 p-3">
+                              <div className="rounded-2xl border border-slate-700 bg-slate-950 p-3">
                                 <div className="mb-3 flex items-center justify-between gap-3">
                                   <div className="text-sm font-semibold text-white">
                                     Send code safely as plain text
@@ -4735,7 +4735,7 @@ export function ProductWorkspaceDetail({
                             (participant) => (
                               <div
                                 key={participant._id}
-                                className="flex items-center justify-between rounded-xl border border-slate-800 bg-slate-950/70 px-4 py-3"
+                                className="flex items-center justify-between rounded-xl border border-slate-800 bg-slate-950 px-4 py-3"
                               >
                                 <div>
                                   <div className="text-sm font-semibold text-white">

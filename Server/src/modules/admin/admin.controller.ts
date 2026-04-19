@@ -57,6 +57,10 @@ import {
   updateUserRole,
   verifyMilestone,
 } from './admin.service';
+import {
+  listAdminInstitutionPolicySubmissions,
+  reviewInstitutionPolicySubmission,
+} from '../institution/institutionPolicySubmission.service';
 import * as startupService from '../startup/startup.service';
 
 const getParam = (value: string | string[] | undefined) =>
@@ -81,6 +85,22 @@ export const getRegistrationRequestsController = async (req: Request, res: Respo
     status: query.status,
     role: query.role,
   });
+  res.status(200).json(new ApiResponse(data));
+};
+
+export const getComplianceSubmissionsController = async (req: Request, res: Response) => {
+  const data = await listAdminInstitutionPolicySubmissions(req.query);
+  res.status(200).json(new ApiResponse(data));
+};
+
+export const reviewComplianceSubmissionController = async (req: Request, res: Response) => {
+  if (!req.user) throw new ApiError(401, 'UNAUTHORIZED', 'Invalid or expired token');
+  const submissionId = getParam(req.params.id);
+  if (!submissionId || !isObjectId(submissionId)) {
+    throw new ApiError(400, 'INVALID_ID', 'Invalid ID format');
+  }
+
+  const data = await reviewInstitutionPolicySubmission(submissionId, req.user._id, req.body);
   res.status(200).json(new ApiResponse(data));
 };
 

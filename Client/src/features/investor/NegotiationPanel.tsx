@@ -202,7 +202,7 @@ export function NegotiationPanel({ deal, isInvestor }: NegotiationPanelProps) {
       </div>
 
       {/* Current Terms Display */}
-      <Card className="border-slate-800 bg-slate-900/50 p-4">
+      <Card className="border-slate-800 bg-slate-900 p-4">
         <h3 className="mb-4 text-sm font-semibold uppercase tracking-wider text-slate-400">
           Current Investment Terms
         </h3>
@@ -317,7 +317,7 @@ export function NegotiationPanel({ deal, isInvestor }: NegotiationPanelProps) {
       )}
 
       {/* Messages Section */}
-      <Card className="border-slate-800 bg-slate-900/50 p-4">
+      <Card className="border-slate-800 bg-slate-900 p-4">
         <h3 className="mb-4 flex items-center gap-2 text-sm font-semibold uppercase tracking-wider text-slate-400">
           <MessageSquare className="h-4 w-4" />
           Negotiation Messages

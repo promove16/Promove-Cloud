@@ -108,11 +108,11 @@ export function InvestorOutreach() {
       }),
     onSuccess: async (_message, variables) => {
       markInvestorContactStarted(variables.investorId, currentUserId);
-      setFeedback({
-        tone: 'success',
-        message:
-          'Pitch request sent. Continue the investor conversation in Messages.',
-      });
+        setFeedback({
+          tone: 'success',
+          message:
+          'Investor outreach sent. Continue the conversation in Messages.',
+        });
       setSelectedInvestor(null);
       await queryClient.invalidateQueries({
         queryKey: ['dm', 'conversations'],
@@ -124,7 +124,7 @@ export function InvestorOutreach() {
         tone: 'error',
         message: getApiErrorMessage(
           error,
-          'Unable to send the pitch request right now.',
+          'Unable to send the investor outreach right now.',
         ),
       });
     },

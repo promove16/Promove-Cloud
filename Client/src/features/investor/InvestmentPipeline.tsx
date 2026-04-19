@@ -121,7 +121,7 @@ export default function InvestmentPipeline() {
 
     return (
       <Card 
-        className="cursor-pointer border border-slate-800 bg-slate-950/50 p-4 transition-all hover:border-slate-700 hover:bg-slate-900/50"
+        className="cursor-pointer border border-slate-800 bg-slate-950 p-4 transition-all hover:border-slate-700 hover:bg-slate-900"
         onClick={() => handleOpenDeal(deal._id)}
       >
         <div className="flex items-start justify-between gap-4">
@@ -210,13 +210,13 @@ export default function InvestmentPipeline() {
               placeholder="Search startups..."
               value={searchQuery}
               onChange={(e) => setSearchQuery(e.target.value)}
-              className="rounded-xl border border-slate-800 bg-slate-900/80 pl-10 pr-4 py-2 text-sm text-white placeholder:text-slate-500 focus:border-cyan-500 focus:outline-none"
+              className="rounded-xl border border-slate-800 bg-slate-900 pl-10 pr-4 py-2 text-sm text-white placeholder:text-slate-500 focus:border-cyan-500 focus:outline-none"
             />
           </div>
           <select
             value={filterStage}
             onChange={(e) => setFilterStage(e.target.value)}
-            className="rounded-xl border border-slate-800 bg-slate-900/80 px-4 py-2 text-sm text-white focus:border-cyan-500 focus:outline-none"
+            className="rounded-xl border border-slate-800 bg-slate-900 px-4 py-2 text-sm text-white focus:border-cyan-500 focus:outline-none"
           >
             <option value="all">All Stages</option>
             <option value="0">Negotiation</option>
@@ -239,7 +239,7 @@ export default function InvestmentPipeline() {
               className={`rounded-xl border p-4 text-left transition ${
                 filterStage === stage
                   ? 'border-cyan-500 bg-cyan-950/30'
-                  : 'border-slate-800 bg-slate-900/50 hover:border-slate-700'
+                  : 'border-slate-800 bg-slate-900 hover:border-slate-700'
               }`}
             >
               <div className={`text-2xl font-bold ${STAGE_COLORS[parseInt(stage)].split(' ')[2]}`}>
@@ -253,7 +253,7 @@ export default function InvestmentPipeline() {
 
       {/* Deals List */}
       {filteredDeals.length === 0 ? (
-        <Card className="border-dashed border-slate-800 bg-slate-950/50 p-12 text-center">
+        <Card className="border-dashed border-slate-800 bg-slate-950 p-12 text-center">
           <Handshake className="mx-auto mb-4 h-12 w-12 text-slate-600" />
           <h3 className="text-lg font-semibold text-white">No Deals Found</h3>
           <p className="mt-2 text-slate-400">

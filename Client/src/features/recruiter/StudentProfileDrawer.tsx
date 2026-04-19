@@ -71,7 +71,7 @@ export function StudentProfileDrawer({
   };
 
   return (
-    <div className="fixed inset-0 z-50 flex justify-end bg-slate-950/70 backdrop-blur-sm">
+    <div className="fixed inset-0 z-50 flex justify-end bg-slate-950 backdrop-blur-sm">
       <button type="button" aria-label="Close student profile" className="flex-1" onClick={onClose} />
       <aside className="h-full w-full max-w-3xl overflow-y-auto border-l border-slate-800 bg-slate-950 px-6 py-6 shadow-2xl shadow-black/40">
         {profileQuery.isLoading || !profile ? (

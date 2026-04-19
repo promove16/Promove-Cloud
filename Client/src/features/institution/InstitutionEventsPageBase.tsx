@@ -76,12 +76,12 @@ export function InstitutionEventsPageBase({
           <h2 className="text-2xl font-semibold text-white">{selectedEvent.title}</h2>
           <p className="mt-3 text-slate-400">{selectedEvent.description}</p>
           <div className="mt-6 grid gap-4 md:grid-cols-2">
-            <div className="rounded-2xl border border-slate-800 bg-slate-950/80 p-4">
+            <div className="rounded-2xl border border-slate-800 bg-slate-950 p-4">
               <CalendarDays className="h-5 w-5 text-cyan-300" />
               <div className="mt-3 text-xs uppercase tracking-[0.2em] text-slate-500">Scheduled At</div>
               <div className="mt-2 text-lg font-semibold text-white">{formatDate(selectedEvent.scheduledAt)}</div>
             </div>
-            <div className="rounded-2xl border border-slate-800 bg-slate-950/80 p-4">
+            <div className="rounded-2xl border border-slate-800 bg-slate-950 p-4">
               <Users className="h-5 w-5 text-cyan-300" />
               <div className="mt-3 text-xs uppercase tracking-[0.2em] text-slate-500">Participants</div>
               <div className="mt-2 text-lg font-semibold text-white">{selectedEvent.participantsCount}</div>

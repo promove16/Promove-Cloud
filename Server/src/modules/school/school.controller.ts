@@ -46,6 +46,10 @@ import {
   updateComplianceAction,
   updateComplianceIncident,
 } from '../institution/institutionCompliance.service';
+import {
+  getLatestInstitutionPolicySubmission,
+  submitInstitutionPolicySubmission,
+} from '../institution/institutionPolicySubmission.service';
 
 export const getSchoolDashboardController = async (req: Request, res: Response) => {
   const data = await getSchoolDashboard(req.user!._id);
@@ -117,6 +121,16 @@ export const getLatestSchoolComplianceReportController = async (req: Request, re
 
 export const getSchoolComplianceOverviewController = async (req: Request, res: Response) => {
   const data = await getComplianceOverview(req.user!._id, 'school');
+  res.status(200).json(new ApiResponse(data));
+};
+
+export const getSchoolComplianceSubmissionController = async (req: Request, res: Response) => {
+  const data = await getLatestInstitutionPolicySubmission(req.user!._id, 'school');
+  res.status(200).json(new ApiResponse(data));
+};
+
+export const submitSchoolComplianceSubmissionController = async (req: Request, res: Response) => {
+  const data = await submitInstitutionPolicySubmission(req.user!._id, 'school', req.user!._id, req.body);
   res.status(200).json(new ApiResponse(data));
 };
 

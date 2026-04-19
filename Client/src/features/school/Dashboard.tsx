@@ -1,118 +1,280 @@
 import { useQuery } from '@tanstack/react-query';
 import {
   Award,
-  Target,
-  TrendingUp,
+  CalendarClock,
+  FileCheck2,
+  FolderKanban,
+  Handshake,
+  Lightbulb,
+  type LucideIcon,
+  Rocket,
+  ShieldAlert,
   Users,
 } from 'lucide-react';
 import { schoolApi } from '../../api/school.api';
+import type {
+  ComplianceAuditItem,
+  DashboardEvent,
+  RecentProject,
+} from '../../types/school.types';
 import { InstitutionOverviewDashboard } from '../institution/InstitutionOverviewDashboard';
 import { getStudentPortfolioViewPath } from '../marketplace/navigation';
+
+type SortableActivityItem = {
+  id: string;
+  title: string;
+  detail: string;
+  meta: string;
+  icon: LucideIcon;
+  to?: string;
+  iconClassName?: string;
+  sortTime: number;
+};
+
+const formatDate = (value: string) =>
+  new Date(value).toLocaleDateString('en-IN', {
+    day: 'numeric',
+    month: 'short',
+    year: 'numeric',
+  });
+
+const buildSchoolActivityItems = ({
+  recentProjects,
+  upcomingEvents,
+  auditTrail,
+}: {
+  recentProjects: RecentProject[];
+  upcomingEvents: DashboardEvent[];
+  auditTrail: ComplianceAuditItem[];
+}) =>
+  [
+    ...recentProjects.slice(0, 3).map(
+      (project) =>
+        ({
+          id: `project-${project._id}`,
+          title: project.title,
+          detail: `${project.studentName} updated the ${project.stage.toLowerCase()} stage in ${project.category}.`,
+          meta: `Project update - ${formatDate(project.updatedAt)}`,
+          icon: FolderKanban,
+          iconClassName: 'text-cyan-200',
+          sortTime: new Date(project.updatedAt).getTime(),
+        }) satisfies SortableActivityItem,
+    ),
+    ...upcomingEvents.slice(0, 2).map(
+      (event) =>
+        ({
+          id: `event-${event._id}`,
+          title: event.title,
+          detail: `${event.type} is scheduled with ${event.participantsCount} participants.`,
+          meta: `Upcoming event - ${formatDate(event.scheduledAt)}`,
+          icon: CalendarClock,
+          to: '/dashboard/school/events',
+          iconClassName: 'text-violet-200',
+          sortTime: new Date(event.scheduledAt).getTime(),
+        }) satisfies SortableActivityItem,
+    ),
+    ...auditTrail.slice(0, 2).map(
+      (entry) =>
+        ({
+          id: `audit-${entry._id}`,
+          title: entry.title,
+          detail: entry.detail,
+          meta: `Compliance ${entry.type} - ${formatDate(entry.createdAt)}`,
+          icon: ShieldAlert,
+          iconClassName: 'text-amber-200',
+          sortTime: new Date(entry.createdAt).getTime(),
+        }) satisfies SortableActivityItem,
+    ),
+  ]
+    .sort((left, right) => right.sortTime - left.sortTime)
+    .slice(0, 6)
+    .map(({ sortTime: _sortTime, ...item }) => item);
 
 export default function Dashboard() {
   const dashboardQuery = useQuery({
     queryKey: ['school-dashboard'],
     queryFn: schoolApi.getDashboard,
   });
+  const complianceOverviewQuery = useQuery({
+    queryKey: ['school-compliance-overview'],
+    queryFn: schoolApi.getComplianceOverview,
+  });
+  const latestReportQuery = useQuery({
+    queryKey: ['school-latest-report'],
+    queryFn: schoolApi.getLatestComplianceReport,
+  });
+  const investorsQuery = useQuery({
+    queryKey: ['school-investors', 'dashboard'],
+    queryFn: schoolApi.getInvestors,
+  });
 
   const data = dashboardQuery.data;
   const stats = data?.stats;
   const recentActivity = data?.recentActivityCounts;
-  const institutionName = data?.institutionProfile?.institutionName ?? 'School Dashboard';
-  const academicYear = data?.institutionProfile?.academicYear ?? 'Current academic year';
-  const iicRating = (data?.institutionProfile?.iicStarRating ?? 0).toFixed(1);
+  const institutionProfile = data?.institutionProfile;
+  const complianceOverview = complianceOverviewQuery.data;
+  const latestReport = latestReportQuery.data;
+  const investorCount = investorsQuery.data?.length ?? 0;
+  const academicYear = institutionProfile?.academicYear ?? 'Current AY';
+  const iicRating = institutionProfile?.iicStarRating ?? 0;
 
   return (
     <InstitutionOverviewDashboard
-      institutionLabel="School Overview"
-      institutionName={institutionName}
-      subtitle={`Monitor student innovators, patent momentum, and live school activity for ${academicYear}.`}
+      institutionLabel="School Workspace"
+      institutionName={institutionProfile?.institutionName ?? 'School Dashboard'}
+      subtitle="Track innovation output, student roster momentum, and compliance readiness from one operational workspace."
+      academicYear={academicYear}
+      headerAction={
+        latestReport
+          ? {
+              label: 'Download Compliance Report',
+              onClick: () => window.open(latestReport.pdfUrl, '_blank', 'noopener,noreferrer'),
+            }
+          : undefined
+      }
       statCards={[
         {
-          label: 'Total Students',
+          label: 'Student Innovators',
           value: stats?.totalStudents ?? 0,
-          badge: `${stats?.activeProjects ?? 0} active`,
+          helper: 'Verified and active in the institution workspace',
           icon: Users,
-          color: 'from-blue-500 to-cyan-500',
+          iconClassName: 'text-cyan-200',
+          accentClassName: 'bg-cyan-400',
           to: '/dashboard/school/students',
         },
         {
-          label: 'Active Projects',
-          value: stats?.activeProjects ?? 0,
-          badge: `${recentActivity?.scoreEventsLast30Days ?? 0} score events / 30d`,
-          icon: Target,
-          color: 'from-violet-500 to-fuchsia-500',
-          to: '/dashboard/school/projects',
+          label: 'Innovation Activities',
+          value: stats?.totalInnovationActivities ?? 0,
+          helper: `${recentActivity?.scoreEventsLast30Days ?? 0} score events recorded in 30 days`,
+          icon: Lightbulb,
+          iconClassName: 'text-fuchsia-200',
+          accentClassName: 'bg-fuchsia-400',
         },
         {
           label: 'Patents Filed',
           value: stats?.patentsFiled ?? 0,
-          badge: `+${recentActivity?.patentsLast30Days ?? 0} in 30d`,
+          helper: `+${recentActivity?.patentsLast30Days ?? 0} new patent records this month`,
+          icon: FileCheck2,
+          iconClassName: 'text-amber-200',
+          accentClassName: 'bg-amber-400',
+        },
+        {
+          label: 'Mentoring Hours',
+          value: stats?.totalMentoringHours ?? 0,
+          helper: 'Mentor guidance logged across the school pipeline',
           icon: Award,
-          color: 'from-emerald-500 to-teal-500',
-          to: '/dashboard/school/patents',
+          iconClassName: 'text-emerald-200',
+          accentClassName: 'bg-emerald-400',
+          to: '/dashboard/school/events?tab=mentorship',
         },
         {
           label: 'Startups Launched',
           value: stats?.startupsLaunched ?? 0,
-          badge: `+${recentActivity?.startupsLast30Days ?? 0} in 30d`,
-          icon: TrendingUp,
-          color: 'from-amber-500 to-orange-500',
-          to: '/dashboard/school/startups',
+          helper: `+${recentActivity?.startupsLast30Days ?? 0} startup updates in 30 days`,
+          icon: Rocket,
+          iconClassName: 'text-rose-200',
+          accentClassName: 'bg-rose-400',
+        },
+        {
+          label: 'Industry Links',
+          value: stats?.industryCollaborations ?? 0,
+          helper: `${investorCount} investors currently visible to the institution`,
+          icon: Handshake,
+          iconClassName: 'text-blue-200',
+          accentClassName: 'bg-blue-400',
+          to: '/dashboard/school/investors',
         },
       ]}
-      topInnovatorsTitle="Top Student Innovators"
-      topInnovatorsAction={{ label: 'View Students', to: '/dashboard/school/students' }}
-      topInnovatorsEmptyMessage="No ranked student activity is available yet."
-      eventsTitle="Upcoming Events"
-      eventsAction={{ label: 'Open Events', to: '/dashboard/school/events' }}
-      eventsEmptyMessage="No upcoming events are scheduled yet."
-      recentProjectsTitle="Recent Projects"
-      recentProjectsAction={{ label: 'Open Operations', to: '/dashboard/school/operations' }}
-      recentProjectsEmptyMessage="No active student projects are available yet."
-      announcementTitle="Operations workspace is ready"
-      announcementBody={`${recentActivity?.scoreEventsLast30Days ?? 0} score events, ${recentActivity?.patentsLast30Days ?? 0} patents, and ${recentActivity?.startupsLast30Days ?? 0} startups were recorded in the last 30 days. Use the operations workspace for tokens, roster intake, and verification review.`}
-      announcementAction={{ label: 'Open Operations', to: '/dashboard/school/operations' }}
-      showcaseTitle="School Showcase"
-      showcaseDescription="Highlight the institution's innovation credibility through rating, mentorship, and startup delivery signals."
-      showcasePlacement="after-hero"
-      showcaseCards={[
+      connectionTitle="Connected to ProMove Innovation Cloud"
+      connectionDescription="Roster intake, innovation tracking, project delivery, and compliance monitoring are all active for this school workspace."
+      connectionTag="Verified"
+      connectionChips={[
+        { label: 'Investors', value: String(investorCount) },
+        { label: 'Upcoming Events', value: String(data?.upcomingEvents.length ?? 0) },
         {
-          title: 'IIC Rating',
-          value: `${iicRating} / 5`,
-          description: 'Current institution innovation rating visible to the ecosystem.',
-          icon: Award,
-          color: 'from-cyan-500 to-blue-500',
+          label: 'Frameworks',
+          value: String(
+            complianceOverview?.frameworkSummary.total ??
+              institutionProfile?.policies.length ??
+              0,
+          ),
+        },
+      ]}
+      ratingValue={iicRating}
+      ratingUpdatedAt={institutionProfile?.iicLastUpdated}
+      ratingSummary="The score blends the published IIC rating with current project velocity, patent activity, mentorship coverage, and external collaboration signals."
+      ratingBreakdown={[
+        {
+          label: 'Innovation activities completed',
+          value: stats?.totalInnovationActivities ?? 0,
+          helper: 'Signals influencing institutional innovation readiness',
+          icon: Lightbulb,
+          iconClassName: 'text-cyan-200',
         },
         {
-          title: 'Mentorship Hours',
-          value: String(stats?.totalMentoringHours ?? 0),
-          description: 'Recorded mentorship support delivered to student innovators.',
+          label: 'Student innovators onboarded',
+          value: stats?.totalStudents ?? 0,
+          helper: 'Active student roster with visible innovation participation',
           icon: Users,
-          color: 'from-violet-500 to-fuchsia-500',
-          to: '/dashboard/school/events?tab=mentorship',
+          to: '/dashboard/school/students',
+          iconClassName: 'text-blue-200',
         },
         {
-          title: 'Startup Launches',
-          value: String(stats?.startupsLaunched ?? 0),
-          description: 'Student startups launched from the school innovation pipeline.',
-          icon: TrendingUp,
-          color: 'from-amber-500 to-orange-500',
-          to: '/dashboard/school/startups',
+          label: 'Patents filed',
+          value: stats?.patentsFiled ?? 0,
+          helper: 'Institution patent submissions captured in ProMove',
+          icon: FileCheck2,
+          iconClassName: 'text-amber-200',
+        },
+        {
+          label: 'Mentoring hours logged',
+          value: stats?.totalMentoringHours ?? 0,
+          helper: 'Recorded support from the mentorship workflow',
+          icon: Award,
+          to: '/dashboard/school/events?tab=mentorship',
+          iconClassName: 'text-emerald-200',
+        },
+        {
+          label: 'Industry collaborations',
+          value: stats?.industryCollaborations ?? 0,
+          helper: 'Ecosystem partnerships attached to this campus',
+          icon: Handshake,
+          to: '/dashboard/school/investors',
+          iconClassName: 'text-violet-200',
         },
       ]}
-      quickStats={[
-        { label: 'IIC Star Rating', value: `${iicRating} / 5` },
-        { label: 'Mentoring Hours', value: String(stats?.totalMentoringHours ?? 0) },
-        { label: 'Industry Collaborations', value: String(stats?.industryCollaborations ?? 0) },
-      ]}
+      ratingNote="The strongest gains usually come from consistent project updates, patent filings, and verified mentoring coverage."
+      complianceFrameworks={complianceOverview?.frameworks ?? []}
+      complianceSummary={
+        complianceOverview
+          ? {
+              frameworkSummary: complianceOverview.frameworkSummary,
+              incidentSummary: complianceOverview.incidentSummary,
+              alertSummary: complianceOverview.alertSummary,
+              actionSummary: complianceOverview.actionSummary,
+            }
+          : undefined
+      }
+      latestReport={latestReport}
+      complianceAction={{ label: 'View all', to: '/dashboard/school/analytics' }}
+      topInnovatorsTitle="Top Innovators"
+      topInnovatorsAction={{ label: 'View all', to: '/dashboard/school/students' }}
+      topInnovatorsEmptyMessage="No ranked student activity is available yet."
       topStudents={data?.topStudents ?? []}
-      upcomingEvents={data?.upcomingEvents ?? []}
-      recentProjects={data?.recentProjects ?? []}
       studentTo={(student) => getStudentPortfolioViewPath(student._id)}
-      eventTo={(event) => `/dashboard/school/events/${event._id}`}
-      projectTo={(project) => `/dashboard/school/projects/${project._id}`}
-      isLoading={dashboardQuery.isLoading}
+      activityTitle="Recent Activity"
+      activityAction={{ label: 'View all', to: '/dashboard/school/operations' }}
+      activityItems={buildSchoolActivityItems({
+        recentProjects: data?.recentProjects ?? [],
+        upcomingEvents: data?.upcomingEvents ?? [],
+        auditTrail: complianceOverview?.auditTrail ?? [],
+      })}
+      activityEmptyMessage="No recent school activity is available yet."
+      isLoading={
+        dashboardQuery.isLoading ||
+        complianceOverviewQuery.isLoading ||
+        latestReportQuery.isLoading
+      }
     />
   );
 }

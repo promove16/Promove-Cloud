@@ -14,9 +14,9 @@ const MARKETPLACE_DETAIL_NAV_ITEMS = [
 ];
 
 const SURFACE_CLASS =
-  'border border-slate-800/80 bg-slate-900/55 shadow-[0_18px_40px_rgba(2,6,23,0.35)]';
+  'border border-slate-800 bg-slate-900 shadow-[0_18px_40px_rgba(2,6,23,0.35)]';
 const SECONDARY_BUTTON_CLASS =
-  'inline-flex items-center gap-2 rounded-full border border-slate-700 bg-slate-900/80 px-4 py-2 text-sm font-medium text-slate-100 transition hover:border-cyan-400/50 hover:bg-slate-800/90 hover:text-white';
+  'inline-flex items-center gap-2 rounded-full border border-slate-700 bg-slate-900 px-4 py-2 text-sm font-medium text-slate-100 transition hover:border-cyan-400/50 hover:bg-slate-800 hover:text-white';
 const PRIMARY_BUTTON_CLASS =
   'inline-flex items-center gap-2 rounded-full bg-cyan-400 px-4 py-2 text-sm font-semibold text-slate-950 transition hover:bg-cyan-300 disabled:cursor-wait disabled:opacity-60';
 const SCORE_BADGE_CLASS =
@@ -134,7 +134,7 @@ export default function CollegeStudentsPage() {
 
   return (
     <div className={`${RECRUITER_PAGE_CONTENT_CLASS} space-y-6`}>
-      <section className="space-y-4 rounded-3xl border border-slate-800/80 bg-slate-950/45 px-5 py-5 sm:px-6">
+      <section className="space-y-4 rounded-3xl border border-slate-800 bg-slate-950 px-5 py-5 sm:px-6">
         <div className="flex flex-col gap-5 xl:flex-row xl:items-start xl:justify-between">
           <div className="max-w-4xl space-y-3">
             <RecruiterSectionNav items={MARKETPLACE_DETAIL_NAV_ITEMS} />
@@ -144,7 +144,7 @@ export default function CollegeStudentsPage() {
                 <h1 className="text-3xl font-semibold tracking-tight text-white">
                   {(selectedCollege?.displayName ?? institutionName) || 'Institution students'}
                 </h1>
-                <span className="rounded-full border border-slate-800 bg-slate-900/80 px-3 py-1 text-sm text-slate-300">
+                <span className="rounded-full border border-slate-800 bg-slate-900 px-3 py-1 text-sm text-slate-300">
                   {students.length} students
                 </span>
                 <span className={SCORE_BADGE_CLASS}>Top score {topScore}</span>
@@ -178,7 +178,7 @@ export default function CollegeStudentsPage() {
           </div>
         </div>
 
-        <div className="grid gap-4 border-t border-slate-800/80 pt-5 md:grid-cols-2 xl:grid-cols-4">
+        <div className="grid gap-4 border-t border-slate-800 pt-5 md:grid-cols-2 xl:grid-cols-4">
           <div className={`rounded-2xl p-4 ${SURFACE_CLASS}`}>
             <div className="flex items-center gap-3 text-slate-300">
               <Building2 className="h-4 w-4 text-cyan-300" />
@@ -234,7 +234,7 @@ export default function CollegeStudentsPage() {
 
       {institutionName ? (
         <section className={`overflow-hidden rounded-2xl ${SURFACE_CLASS}`}>
-          <div className="flex items-center justify-between border-b border-slate-800/80 bg-slate-900/55 px-4 py-3 text-xs uppercase tracking-[0.2em] text-slate-300 sm:px-6">
+          <div className="flex items-center justify-between border-b border-slate-800 bg-slate-900 px-4 py-3 text-xs uppercase tracking-[0.2em] text-slate-300 sm:px-6">
             <span>Student cohorts</span>
             <span>{students.length}</span>
           </div>
@@ -266,20 +266,20 @@ export default function CollegeStudentsPage() {
             <div className="space-y-6 px-4 py-5 sm:px-6">
               {batchGroups.map((group) => (
                 <section key={group.label} className="space-y-3">
-                  <div className="flex flex-wrap items-center justify-between gap-3 rounded-2xl border border-slate-800 bg-slate-950/70 px-4 py-3">
+                  <div className="flex flex-wrap items-center justify-between gap-3 rounded-2xl border border-slate-800 bg-slate-950 px-4 py-3">
                     <div>
                       <div className="text-xs uppercase tracking-[0.25em] text-cyan-300">Batch</div>
                       <h2 className="mt-1 text-lg font-semibold text-white">{group.label}</h2>
                     </div>
                     <div className="flex flex-wrap items-center gap-2">
-                      <span className="rounded-full border border-slate-700 bg-slate-900/85 px-3 py-1 text-sm text-slate-300">
+                      <span className="rounded-full border border-slate-700 bg-slate-900 px-3 py-1 text-sm text-slate-300">
                         {group.students.length} students
                       </span>
                       <span className={SCORE_BADGE_CLASS}>Highest {group.students[0]?.innovationScore ?? 0}</span>
                     </div>
                   </div>
 
-                  <div className="divide-y divide-slate-800/80 overflow-hidden rounded-2xl border border-slate-800 bg-slate-950/35">
+                  <div className="divide-y divide-slate-800 overflow-hidden rounded-2xl border border-slate-800 bg-slate-950">
                     {group.students.map((student) => {
                       const shortlistInFlight =
                         shortlistMutation.isPending && shortlistMutation.variables === student._id;
@@ -287,7 +287,7 @@ export default function CollegeStudentsPage() {
                       return (
                         <article
                           key={student._id}
-                          className="flex flex-col gap-4 px-4 py-5 transition hover:bg-slate-900/35 lg:flex-row lg:items-center lg:justify-between"
+                          className="flex flex-col gap-4 px-4 py-5 transition hover:bg-slate-900 lg:flex-row lg:items-center lg:justify-between"
                         >
                           <div className="min-w-0 space-y-3">
                             <div className="flex items-start gap-4">
@@ -322,18 +322,18 @@ export default function CollegeStudentsPage() {
                                   {student.activeProject?.stage ? `• ${student.activeProject.stage}` : ''}
                                 </p>
                                 <div className="flex flex-wrap gap-2 text-xs text-slate-400">
-                                  <span className="rounded-full border border-slate-800 bg-slate-950/80 px-2.5 py-1">
+                                  <span className="rounded-full border border-slate-800 bg-slate-950 px-2.5 py-1">
                                     {student.institution?.name ?? institutionName}
                                   </span>
                                   {student.activeProject?.category ? (
-                                    <span className="rounded-full border border-slate-800 bg-slate-950/80 px-2.5 py-1">
+                                    <span className="rounded-full border border-slate-800 bg-slate-950 px-2.5 py-1">
                                       {student.activeProject.category}
                                     </span>
                                   ) : null}
                                   {student.skills.slice(0, 3).map((skill) => (
                                     <span
                                       key={`${student._id}-${skill}`}
-                                      className="rounded-full border border-slate-800 bg-slate-950/80 px-2.5 py-1"
+                                      className="rounded-full border border-slate-800 bg-slate-950 px-2.5 py-1"
                                     >
                                       {skill}
                                     </span>
@@ -398,18 +398,18 @@ export default function CollegeStudentsPage() {
       ) : null}
 
       {students.length > 0 ? (
-        <section className="rounded-3xl border border-slate-800/80 bg-slate-950/45 px-5 py-5 sm:px-6">
+        <section className="rounded-3xl border border-slate-800 bg-slate-950 px-5 py-5 sm:px-6">
           <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
             <div>
               <div className="text-xs uppercase tracking-[0.25em] text-cyan-300">Why this view</div>
               <h2 className="mt-1 text-xl font-semibold text-white">Batch-first review for recruiters</h2>
             </div>
-            <div className="rounded-full border border-slate-700 bg-slate-900/80 px-3 py-1.5 text-sm text-slate-300">
+            <div className="rounded-full border border-slate-700 bg-slate-900 px-3 py-1.5 text-sm text-slate-300">
               {contactableStudents} direct contacts ready
             </div>
           </div>
           <div className="mt-4 grid gap-4 md:grid-cols-3">
-            <div className="rounded-2xl border border-slate-800 bg-slate-950/65 p-4">
+            <div className="rounded-2xl border border-slate-800 bg-slate-950 p-4">
               <div className="flex items-center gap-2 text-sm font-medium text-white">
                 <Sparkles className="h-4 w-4 text-cyan-300" />
                 Innovation score ordering
@@ -418,7 +418,7 @@ export default function CollegeStudentsPage() {
                 Each batch is sorted by score so the strongest student innovators remain at the top of every cohort.
               </p>
             </div>
-            <div className="rounded-2xl border border-slate-800 bg-slate-950/65 p-4">
+            <div className="rounded-2xl border border-slate-800 bg-slate-950 p-4">
               <div className="flex items-center gap-2 text-sm font-medium text-white">
                 <Users className="h-4 w-4 text-cyan-300" />
                 Faster cohort scanning
@@ -427,7 +427,7 @@ export default function CollegeStudentsPage() {
                 Batch grouping removes the context switch caused by jumping back into the general students lane.
               </p>
             </div>
-            <div className="rounded-2xl border border-slate-800 bg-slate-950/65 p-4">
+            <div className="rounded-2xl border border-slate-800 bg-slate-950 p-4">
               <div className="flex items-center gap-2 text-sm font-medium text-white">
                 <Mail className="h-4 w-4 text-cyan-300" />
                 Action-ready cards

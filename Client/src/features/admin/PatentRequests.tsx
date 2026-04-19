@@ -359,7 +359,7 @@ function CaseDetailModal({
   };
 
   return (
-    <div className="fixed inset-0 z-50 overflow-y-auto bg-slate-950/80 p-4 backdrop-blur-sm sm:p-6">
+    <div className="fixed inset-0 z-50 overflow-y-auto bg-slate-950 p-4 backdrop-blur-sm sm:p-6">
       <div className="mx-auto flex min-h-full w-full items-start justify-center">
         <Card className="flex w-full max-w-3xl flex-col overflow-hidden p-6 max-h-[calc(100vh-2rem)]">
           {/* Header */}
@@ -443,7 +443,7 @@ function CaseDetailModal({
                     ['IPO Filing Date', formatDate(item.ipoFilingDate)],
                     ['Innovation Score', String(item.student.innovationScore)],
                   ].map(([label, value]) => (
-                    <div key={label} className="rounded-xl border border-slate-800 bg-slate-950/60 px-4 py-3">
+                    <div key={label} className="rounded-xl border border-slate-800 bg-slate-950 px-4 py-3">
                       <div className="text-xs font-medium text-slate-500">{label}</div>
                       <div className="mt-1 text-sm text-white">{value}</div>
                     </div>
@@ -460,7 +460,7 @@ function CaseDetailModal({
                         return (
                           <div
                             key={d.label}
-                            className="flex items-center justify-between rounded-xl border border-slate-800 bg-slate-950/60 px-4 py-3"
+                            className="flex items-center justify-between rounded-xl border border-slate-800 bg-slate-950 px-4 py-3"
                           >
                             <div className="flex items-center gap-2">
                               <Calendar className="h-4 w-4 text-slate-500" />
@@ -487,7 +487,7 @@ function CaseDetailModal({
                     <div className="mb-3 text-xs uppercase tracking-[0.2em] text-cyan-300">
                       Intake Questionnaire
                     </div>
-                    <div className="overflow-hidden rounded-xl border border-slate-800 bg-slate-950/60">
+                    <div className="overflow-hidden rounded-xl border border-slate-800 bg-slate-950">
                       {Object.entries(questionnaire)
                         .filter(([, value]) => value)
                         .map(([key, value], i, arr) => (
@@ -509,14 +509,14 @@ function CaseDetailModal({
                 )}
 
                 {documents.length > 0 ? (
-                  <div className="rounded-xl border border-slate-800 bg-slate-950/60 px-4 py-3 text-sm text-slate-300">
+                  <div className="rounded-xl border border-slate-800 bg-slate-950 px-4 py-3 text-sm text-slate-300">
                     {documents.length} document{documents.length === 1 ? '' : 's'} uploaded.
                     Open the <span className="font-medium text-white">Documents</span> tab to review files.
                   </div>
                 ) : null}
 
                 {item.status === 'granted' ? (
-                  <div className="rounded-xl border border-slate-800 bg-slate-950/60 px-4 py-3 text-sm text-slate-300">
+                  <div className="rounded-xl border border-slate-800 bg-slate-950 px-4 py-3 text-sm text-slate-300">
                     Official document handover:{' '}
                     <span className="font-medium text-white">
                       {handoverAcknowledged
@@ -534,7 +534,7 @@ function CaseDetailModal({
             {activeTab === 'documents' && (
               <div className="space-y-5">
                 {documents.length === 0 ? (
-                  <div className="rounded-xl border border-slate-800 bg-slate-950/60 px-5 py-8 text-center text-sm text-slate-500">
+                  <div className="rounded-xl border border-slate-800 bg-slate-950 px-5 py-8 text-center text-sm text-slate-500">
                     No documents have been uploaded for this patent support case yet.
                   </div>
                 ) : (
@@ -551,7 +551,7 @@ function CaseDetailModal({
                         return (
                           <div
                             key={document._id ?? document.fileUrl}
-                            className="rounded-xl border border-slate-800 bg-slate-950/60 p-4"
+                            className="rounded-xl border border-slate-800 bg-slate-950 p-4"
                           >
                             <div className="flex flex-wrap items-start justify-between gap-3">
                               <div className="min-w-0">
@@ -580,7 +580,7 @@ function CaseDetailModal({
                             </div>
 
                             {document.note ? (
-                              <div className="mt-3 rounded-lg border border-slate-800 bg-slate-900/70 px-3 py-2 text-sm text-slate-300">
+                              <div className="mt-3 rounded-lg border border-slate-800 bg-slate-900 px-3 py-2 text-sm text-slate-300">
                                 Student note: {document.note}
                               </div>
                             ) : null}
@@ -640,7 +640,7 @@ function CaseDetailModal({
             {activeTab === 'handover' && (
               <div className="space-y-5">
                 {item.status !== 'granted' ? (
-                  <div className="rounded-xl border border-slate-800 bg-slate-950/60 px-5 py-8 text-center text-sm text-slate-500">
+                  <div className="rounded-xl border border-slate-800 bg-slate-950 px-5 py-8 text-center text-sm text-slate-500">
                     Official document handover becomes available after the patent is granted.
                   </div>
                 ) : (
@@ -662,7 +662,7 @@ function CaseDetailModal({
                     </div>
 
                     {!handoverAcknowledged ? (
-                      <div className="rounded-xl border border-slate-800 bg-slate-950/60 p-4">
+                      <div className="rounded-xl border border-slate-800 bg-slate-950 p-4">
                         <div className="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
                           <div>
                             <div className="text-xs uppercase tracking-[0.2em] text-cyan-300">
@@ -711,7 +711,7 @@ function CaseDetailModal({
                       </div>
                     ) : null}
 
-                    <div className="overflow-hidden rounded-xl border border-slate-800 bg-slate-950/60">
+                    <div className="overflow-hidden rounded-xl border border-slate-800 bg-slate-950">
                       {handoverDocuments.length === 0 ? (
                         <div className="px-5 py-8 text-center text-sm text-slate-500">
                           No official handover documents uploaded yet.
@@ -761,7 +761,7 @@ function CaseDetailModal({
                       )}
                     </div>
 
-                    <div className="rounded-xl border border-slate-800 bg-slate-950/60 p-4">
+                    <div className="rounded-xl border border-slate-800 bg-slate-950 p-4">
                       <div className="text-xs uppercase tracking-[0.2em] text-cyan-300">Complete Handover</div>
                       <textarea
                         value={handoverNote}
@@ -828,7 +828,7 @@ function CaseDetailModal({
                     </div>
                   </div>
                 ) : (
-                  <div className="rounded-xl border border-slate-800 bg-slate-950/60 px-5 py-6 text-center text-sm text-slate-500">
+                  <div className="rounded-xl border border-slate-800 bg-slate-950 px-5 py-6 text-center text-sm text-slate-500">
                     <CheckCircle2 className="mx-auto mb-2 h-6 w-6 opacity-40" />
                     This case has reached a terminal status. No further transitions available.
                   </div>
@@ -872,7 +872,7 @@ function CaseDetailModal({
             )}
 
             {activeTab === 'conversation' && (
-              <div className="flex flex-col rounded-xl border border-slate-800 bg-slate-950/60 overflow-hidden">
+              <div className="flex flex-col rounded-xl border border-slate-800 bg-slate-950 overflow-hidden">
                 <div className="border-b border-slate-800 px-5 py-3">
                   <div className="flex items-center gap-2">
                     <MessageCircle className="h-4 w-4 text-cyan-400" />
@@ -986,7 +986,7 @@ function CaseDetailModal({
                   )}
                   Add Note
                 </Button>
-                <div className="rounded-xl border border-slate-800 bg-slate-950/60 px-5 py-4 text-sm text-slate-400">
+                <div className="rounded-xl border border-slate-800 bg-slate-950 px-5 py-4 text-sm text-slate-400">
                   Internal notes are stored on the case and are only visible to admins.
                   View full notes and timeline in the detailed case view.
                 </div>
@@ -1048,7 +1048,7 @@ export default function PatentRequests() {
       />
 
       <Card className="overflow-hidden">
-        <div className="grid grid-cols-[1.4fr,0.8fr,140px,140px,120px,100px] border-b border-slate-800 bg-slate-900/70 px-5 py-4 text-xs uppercase tracking-[0.2em] text-slate-400">
+        <div className="grid grid-cols-[1.4fr,0.8fr,140px,140px,120px,100px] border-b border-slate-800 bg-slate-900 px-5 py-4 text-xs uppercase tracking-[0.2em] text-slate-400">
           <div>Student / Invention</div>
           <div>Status</div>
           <div>Submitted</div>
@@ -1075,7 +1075,7 @@ export default function PatentRequests() {
               return (
                 <div
                   key={item._id}
-                  className="grid grid-cols-[1.4fr,0.8fr,140px,140px,120px,100px] items-center gap-4 px-5 py-4 transition-colors hover:bg-slate-900/40"
+                  className="grid grid-cols-[1.4fr,0.8fr,140px,140px,120px,100px] items-center gap-4 px-5 py-4 transition-colors hover:bg-slate-900"
                 >
                   <div className="min-w-0">
                     <div className="truncate font-semibold text-white">{item.inventionTitle}</div>

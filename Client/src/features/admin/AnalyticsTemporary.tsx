@@ -21,7 +21,7 @@ export default function AnalyticsTemporary() {
   return (
     <div className="space-y-8">
       <section className="relative overflow-hidden border border-slate-800 bg-slate-950">
-        <div className="absolute inset-0 bg-[radial-gradient(circle_at_top_left,rgba(34,211,238,0.12),transparent_32%),radial-gradient(circle_at_bottom_right,rgba(59,130,246,0.12),transparent_30%)]" />
+        <div className="absolute inset-0 bg-[radial-gradient(circle_at_top_left,rgba(59,130,246,0.12),transparent_32%),radial-gradient(circle_at_bottom_right,rgba(59,130,246,0.12),transparent_30%)]" />
         <div className="relative space-y-6 px-6 py-8 lg:px-8 lg:py-10">
           <div className="flex h-14 w-14 items-center justify-center rounded-2xl border border-cyan-500/20 bg-cyan-500/10 text-cyan-300">
             <BarChart3 className="h-6 w-6" />
@@ -48,7 +48,7 @@ export default function AnalyticsTemporary() {
           <Link
             key={item.path}
             to={item.path}
-            className="group border border-slate-800 bg-slate-950 px-6 py-5 transition hover:border-cyan-500/40 hover:bg-slate-950/80"
+            className="group border border-slate-800 bg-slate-950 px-6 py-5 transition hover:border-cyan-500/40 hover:bg-slate-950"
           >
             <div className="flex items-start gap-4">
               <div className="flex h-11 w-11 items-center justify-center rounded-2xl border border-slate-800 bg-slate-900 text-cyan-300 transition group-hover:border-cyan-500/30 group-hover:bg-cyan-500/10">
@@ -63,7 +63,7 @@ export default function AnalyticsTemporary() {
         ))}
       </section>
 
-      <Card className="border-slate-800/90 bg-slate-950/85 p-6">
+      <Card className="border-slate-800 bg-slate-950 p-6">
         <div className="text-sm font-semibold text-white">Why this page exists</div>
         <p className="mt-3 max-w-3xl text-sm leading-6 text-slate-400">
           Admin dashboard metrics remain available on the home screen. This route is temporarily reserved so future

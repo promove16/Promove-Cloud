@@ -1,5 +1,4 @@
 import {
-  FolderKanban,
   KeyRound,
   Users,
 } from "lucide-react";
@@ -32,11 +31,6 @@ const INSTITUTION_WORKSPACE_ITEMS: Record<
       path: "/dashboard/school/operations",
       icon: KeyRound,
     },
-    {
-      label: "Innovation Pipeline",
-      path: "/dashboard/school/projects",
-      icon: FolderKanban,
-    },
   ],
   college: [
     {
@@ -48,11 +42,6 @@ const INSTITUTION_WORKSPACE_ITEMS: Record<
       label: "Roster & Onboarding",
       path: "/dashboard/college/operations",
       icon: KeyRound,
-    },
-    {
-      label: "Innovation Pipeline",
-      path: "/dashboard/college/projects",
-      icon: FolderKanban,
     },
   ],
 };

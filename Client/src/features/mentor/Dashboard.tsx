@@ -101,7 +101,7 @@ export default function MentorDashboard() {
           ) : (
             <div className="space-y-3">
               {dashboardQuery.data?.projectAssignments.map((assignment) => (
-                <div key={assignment.workspaceId} className="rounded-2xl border border-slate-800 bg-slate-900/70 p-4">
+                <div key={assignment.workspaceId} className="rounded-2xl border border-slate-800 bg-slate-900 p-4">
                   <div className="font-semibold text-white">{assignment.title}</div>
                   <div className="mt-1 text-sm text-slate-400">
                     {assignment.startupName ?? 'Workspace'} • {assignment.category} • {assignment.stage}
@@ -131,7 +131,7 @@ export default function MentorDashboard() {
           ) : (
             <div className="space-y-3">
               {dashboardQuery.data?.institutionPrograms.map((program) => (
-                <div key={program._id} className="rounded-2xl border border-slate-800 bg-slate-900/70 p-4">
+                <div key={program._id} className="rounded-2xl border border-slate-800 bg-slate-900 p-4">
                   <div className="flex items-start justify-between gap-4">
                     <div>
                       <div className="font-semibold text-white">{program.title}</div>
@@ -178,7 +178,7 @@ export default function MentorDashboard() {
         ) : (
           <div className="space-y-3">
             {liveActivities.map((activity) => (
-              <div key={`${activity.studentId}-${activity.timestamp}`} className="flex items-start gap-4 rounded-2xl border border-slate-800 bg-slate-900/70 p-4">
+              <div key={`${activity.studentId}-${activity.timestamp}`} className="flex items-start gap-4 rounded-2xl border border-slate-800 bg-slate-900 p-4">
                 <div className="flex h-11 w-11 items-center justify-center rounded-full bg-gradient-to-br from-cyan-500 to-emerald-500 text-sm font-bold text-white">
                   {activity.avatar ? (
                     <img src={activity.avatar} alt={activity.studentName} className="h-11 w-11 rounded-full object-cover" />

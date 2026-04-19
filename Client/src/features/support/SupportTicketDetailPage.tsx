@@ -252,7 +252,7 @@ export default function SupportTicketDetailPage({ context }: SupportTicketDetail
         </button>
       </div>
 
-      <Card className="border-slate-800 bg-slate-950/90 p-6">
+      <Card className="border-slate-800 bg-slate-950 p-6">
         <div className="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
           <div className="space-y-3">
             <div className="flex flex-wrap items-center gap-2">
@@ -293,7 +293,7 @@ export default function SupportTicketDetailPage({ context }: SupportTicketDetail
           </div>
         </div>
 
-        <div className="mt-5 rounded-2xl border border-slate-800 bg-slate-900/60 px-4 py-4 text-sm leading-6 text-slate-300 whitespace-pre-wrap">
+        <div className="mt-5 rounded-2xl border border-slate-800 bg-slate-900 px-4 py-4 text-sm leading-6 text-slate-300 whitespace-pre-wrap">
           {ticket.description}
         </div>
 
@@ -301,7 +301,7 @@ export default function SupportTicketDetailPage({ context }: SupportTicketDetail
           <div className="mt-4 grid gap-3 text-xs text-slate-400 sm:grid-cols-2">
             {ticket.relatedEntityType ? (
               <>
-              <div className="rounded-xl border border-slate-800 bg-slate-900/60 px-3 py-2">
+              <div className="rounded-xl border border-slate-800 bg-slate-900 px-3 py-2">
                 <div className="uppercase tracking-[0.22em] text-slate-500">Linked entity</div>
                 <div className="mt-1 text-slate-200">
                   {ticket.relatedEntityType}
@@ -319,7 +319,7 @@ export default function SupportTicketDetailPage({ context }: SupportTicketDetail
               </>
               ) : null}
             {ticket.referenceText ? (
-              <div className="rounded-xl border border-slate-800 bg-slate-900/60 px-3 py-2">
+              <div className="rounded-xl border border-slate-800 bg-slate-900 px-3 py-2">
                 <div className="uppercase tracking-[0.22em] text-slate-500">Reference</div>
                 <div className="mt-1 text-slate-200">{ticket.referenceText}</div>
               </div>
@@ -328,7 +328,7 @@ export default function SupportTicketDetailPage({ context }: SupportTicketDetail
         ) : null}
 
         {ticket.relatedStartup ? (
-          <div className="mt-4 rounded-2xl border border-slate-800 bg-slate-900/60 px-4 py-4">
+          <div className="mt-4 rounded-2xl border border-slate-800 bg-slate-900 px-4 py-4">
             <>
             <div className="text-xs uppercase tracking-[0.22em] text-slate-500">Linked startup</div>
             <div className="mt-2 flex flex-wrap items-center gap-2">
@@ -375,7 +375,7 @@ export default function SupportTicketDetailPage({ context }: SupportTicketDetail
                 href={file.url}
                 target="_blank"
                 rel="noreferrer"
-                className="inline-flex items-center gap-2 rounded-full border border-slate-700 bg-slate-900/70 px-3 py-1 text-xs text-slate-200 hover:border-cyan-500/40 hover:text-cyan-200"
+                className="inline-flex items-center gap-2 rounded-full border border-slate-700 bg-slate-900 px-3 py-1 text-xs text-slate-200 hover:border-cyan-500/40 hover:text-cyan-200"
               >
                 {file.name}
               </a>
@@ -385,7 +385,7 @@ export default function SupportTicketDetailPage({ context }: SupportTicketDetail
       </Card>
 
       <div className="grid gap-6 xl:grid-cols-[minmax(0,1.4fr),minmax(280px,0.6fr)]">
-        <Card className="border-slate-800 bg-slate-950/90 p-6">
+        <Card className="border-slate-800 bg-slate-950 p-6">
           <div className="flex items-center gap-2 text-xs uppercase tracking-[0.3em] text-cyan-300">
             <MessageSquare className="h-4 w-4" />
             Conversation
@@ -400,7 +400,7 @@ export default function SupportTicketDetailPage({ context }: SupportTicketDetail
             )}
           </div>
 
-          <div className="mt-6 rounded-2xl border border-slate-800 bg-slate-900/60 p-4">
+          <div className="mt-6 rounded-2xl border border-slate-800 bg-slate-900 p-4">
             {ticket.status === 'closed' && context === 'user' ? (
               <div className="flex items-center gap-2 text-sm text-slate-400">
                 <Lock className="h-4 w-4" /> This ticket is closed. Reopen it to continue the conversation.
@@ -490,7 +490,7 @@ export default function SupportTicketDetailPage({ context }: SupportTicketDetail
 
         <div className="space-y-4">
           {context === 'admin' ? (
-            <Card className="border-slate-800 bg-slate-950/90 p-5">
+            <Card className="border-slate-800 bg-slate-950 p-5">
               <div className="flex items-center gap-2 text-xs uppercase tracking-[0.3em] text-cyan-300">
                 <UserCog className="h-4 w-4" /> Admin actions
               </div>
@@ -508,7 +508,7 @@ export default function SupportTicketDetailPage({ context }: SupportTicketDetail
                         className={`rounded-xl border px-3 py-1.5 text-xs font-semibold uppercase tracking-wide transition ${
                           ticket.status === status
                             ? 'border-cyan-500/40 bg-cyan-500/10 text-cyan-200'
-                            : 'border-slate-800 bg-slate-900/70 text-slate-300 hover:border-slate-700'
+                            : 'border-slate-800 bg-slate-900 text-slate-300 hover:border-slate-700'
                         }`}
                       >
                         {SUPPORT_STATUS_LABELS[status]}
@@ -536,7 +536,7 @@ export default function SupportTicketDetailPage({ context }: SupportTicketDetail
                         className={`rounded-xl border px-3 py-1.5 text-xs font-semibold uppercase tracking-wide transition ${
                           ticket.priority === priority
                             ? 'border-cyan-500/40 bg-cyan-500/10 text-cyan-200'
-                            : 'border-slate-800 bg-slate-900/70 text-slate-300 hover:border-slate-700'
+                            : 'border-slate-800 bg-slate-900 text-slate-300 hover:border-slate-700'
                         }`}
                       >
                         {SUPPORT_PRIORITY_LABELS[priority]}
@@ -589,7 +589,7 @@ export default function SupportTicketDetailPage({ context }: SupportTicketDetail
                     <div className="text-xs uppercase tracking-[0.22em] text-slate-500">
                       Startup edit unlock
                     </div>
-                    <div className="mt-2 rounded-xl border border-slate-800 bg-slate-900/60 p-3">
+                    <div className="mt-2 rounded-xl border border-slate-800 bg-slate-900 p-3">
                       <div className="text-xs leading-5 text-slate-400">
                         Approve a temporary edit window only when the student should be allowed to change the locked startup and resubmit it for review.
                       </div>
@@ -623,7 +623,7 @@ export default function SupportTicketDetailPage({ context }: SupportTicketDetail
           ) : null}
 
           {context === 'user' && isAuthor ? (
-            <Card className="border-slate-800 bg-slate-950/90 p-5">
+            <Card className="border-slate-800 bg-slate-950 p-5">
               <div className="flex items-center gap-2 text-xs uppercase tracking-[0.3em] text-cyan-300">
                 <CheckCircle2 className="h-4 w-4" /> Your actions
               </div>
@@ -640,7 +640,7 @@ export default function SupportTicketDetailPage({ context }: SupportTicketDetail
                     </Button>
 
                     {!ticket.feedback ? (
-                      <div className="rounded-xl border border-slate-800 bg-slate-900/60 p-3">
+                      <div className="rounded-xl border border-slate-800 bg-slate-900 p-3">
                         <div className="text-xs uppercase tracking-[0.22em] text-slate-500">Rate resolution</div>
                         <div className="mt-2 flex gap-1">
                           {[1, 2, 3, 4, 5].map((star) => (
@@ -687,7 +687,7 @@ export default function SupportTicketDetailPage({ context }: SupportTicketDetail
             </Card>
           ) : null}
 
-          <Card className="border-slate-800 bg-slate-950/90 p-5">
+          <Card className="border-slate-800 bg-slate-950 p-5">
             <div className="flex items-center gap-2 text-xs uppercase tracking-[0.3em] text-cyan-300">
               <History className="h-4 w-4" /> Activity log
             </div>
@@ -699,7 +699,7 @@ export default function SupportTicketDetailPage({ context }: SupportTicketDetail
                   .slice()
                   .reverse()
                   .map((entry) => (
-                    <div key={entry._id} className="rounded-xl border border-slate-800 bg-slate-900/60 px-3 py-2">
+                    <div key={entry._id} className="rounded-xl border border-slate-800 bg-slate-900 px-3 py-2">
                       <div className="uppercase tracking-[0.22em] text-slate-500">
                         {entry.type.replace(/_/g, ' ')}
                       </div>
@@ -732,7 +732,7 @@ function ConversationBubble({ message }: { message: SupportMessage }) {
       className={`rounded-2xl border px-4 py-3 ${
         isAdmin
           ? 'border-cyan-500/20 bg-cyan-500/5'
-          : 'border-slate-800 bg-slate-900/60'
+          : 'border-slate-800 bg-slate-900'
       }`}
     >
       <div className="flex items-center justify-between text-xs uppercase tracking-[0.22em] text-slate-500">

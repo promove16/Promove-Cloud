@@ -510,7 +510,7 @@ function ProfileLinkChips({
           className={`inline-flex items-center gap-2 rounded-full px-3 py-2 text-xs font-medium transition ${
             tone === 'light'
               ? 'border border-slate-200 bg-slate-50 text-slate-700 hover:border-slate-300 hover:text-slate-950'
-              : 'border border-slate-700 bg-slate-900/70 text-slate-200 hover:border-cyan-500/40 hover:text-white'
+              : 'border border-slate-700 bg-slate-900 text-slate-200 hover:border-cyan-500/40 hover:text-white'
           }`}
         >
           {link.icon}
@@ -565,7 +565,7 @@ function MarketplaceProfileDrawer({
   }
 
   return (
-    <div className="fixed inset-0 z-50 flex justify-end bg-slate-950/80 backdrop-blur-sm">
+    <div className="fixed inset-0 z-50 flex justify-end bg-slate-950 backdrop-blur-sm">
       <button type="button" aria-label="Close profile" className="flex-1" onClick={onClose} />
       <aside className="h-full w-full max-w-2xl overflow-y-auto border-l border-slate-800 bg-slate-950 px-6 py-6 shadow-2xl shadow-black/40">
         {profileQuery.isLoading || !profile || !counts ? (
@@ -671,7 +671,7 @@ function MarketplaceProfileDrawer({
                   {profile.experienceHighlights?.map((experience) => (
                     <div
                       key={`${experience.title}-${experience.company}`}
-                      className="rounded-2xl border border-slate-800 bg-slate-900/60 p-4"
+                      className="rounded-2xl border border-slate-800 bg-slate-900 p-4"
                     >
                       <div className="flex flex-col gap-2 md:flex-row md:items-start md:justify-between">
                         <div>
@@ -713,7 +713,7 @@ function MarketplaceProfileDrawer({
                   {profile.educationHighlights?.map((education) => (
                     <div
                       key={`${education.institution}-${education.degree ?? ''}`}
-                      className="rounded-2xl border border-slate-800 bg-slate-900/60 p-4"
+                      className="rounded-2xl border border-slate-800 bg-slate-900 p-4"
                     >
                       <div className="text-base font-semibold text-white">{education.institution}</div>
                       <div className="mt-1 text-sm text-cyan-300">
@@ -733,7 +733,7 @@ function MarketplaceProfileDrawer({
               <ProfileSection title="Projects" icon={<FolderKanban className="h-4 w-4" />}>
                 <div className="space-y-3">
                   {profile.portfolioHighlights?.map((project) => (
-                    <div key={project.title} className="rounded-2xl border border-slate-800 bg-slate-900/60 p-4">
+                    <div key={project.title} className="rounded-2xl border border-slate-800 bg-slate-900 p-4">
                       <div className="flex flex-col gap-3 md:flex-row md:items-start md:justify-between">
                         <div>
                           <div className="text-base font-semibold text-white">{project.title}</div>
@@ -798,19 +798,19 @@ function MarketplaceProfileDrawer({
             {profile.githubStats ? (
               <ProfileSection title="GitHub Footprint" icon={<Github className="h-4 w-4" />}>
                 <div className="grid gap-3 md:grid-cols-4">
-                  <div className="rounded-2xl border border-slate-800 bg-slate-900/60 p-4">
+                  <div className="rounded-2xl border border-slate-800 bg-slate-900 p-4">
                     <div className="text-xs uppercase tracking-[0.18em] text-slate-400">Repos</div>
                     <div className="mt-2 text-xl font-semibold text-white">{profile.githubStats.totalRepos}</div>
                   </div>
-                  <div className="rounded-2xl border border-slate-800 bg-slate-900/60 p-4">
+                  <div className="rounded-2xl border border-slate-800 bg-slate-900 p-4">
                     <div className="text-xs uppercase tracking-[0.18em] text-slate-400">Stars</div>
                     <div className="mt-2 text-xl font-semibold text-white">{profile.githubStats.totalStars}</div>
                   </div>
-                  <div className="rounded-2xl border border-slate-800 bg-slate-900/60 p-4">
+                  <div className="rounded-2xl border border-slate-800 bg-slate-900 p-4">
                     <div className="text-xs uppercase tracking-[0.18em] text-slate-400">Forks</div>
                     <div className="mt-2 text-xl font-semibold text-white">{profile.githubStats.totalForks}</div>
                   </div>
-                  <div className="rounded-2xl border border-slate-800 bg-slate-900/60 p-4">
+                  <div className="rounded-2xl border border-slate-800 bg-slate-900 p-4">
                     <div className="text-xs uppercase tracking-[0.18em] text-slate-400">1Y Contributions</div>
                     <div className="mt-2 text-xl font-semibold text-white">{profile.githubStats.contributionsLastYear}</div>
                   </div>
@@ -882,7 +882,7 @@ function RecruiterJobCard({
   }
 
   return (
-    <div className="mt-6 space-y-3 border-t border-slate-800/80 pt-4">
+    <div className="mt-6 space-y-3 border-t border-slate-800 pt-4">
       <div className="text-xs uppercase tracking-[0.25em] text-cyan-300">Open Job Posts</div>
       {(jobsQuery.data ?? []).length > 0 ? (
         (jobsQuery.data ?? []).map((job) => {
@@ -891,7 +891,7 @@ function RecruiterJobCard({
           const actionLabel = isPending ? 'Applying...' : getApplicationButtonLabel(job);
 
           return (
-            <div key={job._id} className="border-b border-slate-800/80 py-4 last:border-b-0">
+            <div key={job._id} className="border-b border-slate-800 py-4 last:border-b-0">
               <div className="flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
                 <div className="min-w-0">
                   <div className="font-semibold text-white">{job.title}</div>
@@ -908,7 +908,7 @@ function RecruiterJobCard({
                     className={
                       hasApplied
                         ? 'border-emerald-500/40 bg-emerald-500/10 text-emerald-200 hover:border-emerald-500/40 hover:text-emerald-200'
-                        : 'border-slate-700 bg-transparent text-slate-200 hover:border-slate-500 hover:bg-slate-900/40'
+                        : 'border-slate-700 bg-transparent text-slate-200 hover:border-slate-500 hover:bg-slate-900'
                     }
                   >
                     {actionLabel}
@@ -971,7 +971,7 @@ function MarketplaceRecruiterJobCard({
     : 'Apply now';
 
   return (
-    <article className="border-b border-slate-800/80 py-6 last:border-b-0">
+    <article className="border-b border-slate-800 py-6 last:border-b-0">
       <div className="flex flex-col gap-5">
         <div className="flex flex-col gap-4 xl:flex-row xl:items-start xl:justify-between">
           <div className="min-w-0 xl:flex-1">
@@ -1082,14 +1082,14 @@ function MarketplaceRecruiterJobCard({
             </Button>
             <Button
               variant="secondary"
-              className="h-10 rounded-full border-slate-700 bg-transparent px-4 py-0 text-sm text-slate-200 hover:border-slate-500 hover:bg-slate-900/40"
+              className="h-10 rounded-full border-slate-700 bg-transparent px-4 py-0 text-sm text-slate-200 hover:border-slate-500 hover:bg-slate-900"
               onClick={() => onOpenDetails(job._id)}
             >
               View details
             </Button>
             <Button
               variant="secondary"
-              className="h-10 rounded-full border-slate-700 bg-transparent px-4 py-0 text-sm text-slate-200 hover:border-slate-500 hover:bg-slate-900/40"
+              className="h-10 rounded-full border-slate-700 bg-transparent px-4 py-0 text-sm text-slate-200 hover:border-slate-500 hover:bg-slate-900"
               onClick={() => onOpenRecruiter(recruiterProfileId)}
             >
               <Eye className="mr-2 h-4 w-4" />
@@ -1097,7 +1097,7 @@ function MarketplaceRecruiterJobCard({
             </Button>
             <Button
               variant="secondary"
-              className="h-10 rounded-full border-slate-700 bg-transparent px-4 py-0 text-sm text-slate-200 hover:border-slate-500 hover:bg-slate-900/40"
+              className="h-10 rounded-full border-slate-700 bg-transparent px-4 py-0 text-sm text-slate-200 hover:border-slate-500 hover:bg-slate-900"
               onClick={() => onMessageRecruiter(recruiterProfileId)}
             >
               <MessageCircle className="mr-2 h-4 w-4" />
@@ -1515,7 +1515,7 @@ export function Marketplace() {
     <DashboardLayout role="student">
       <div className="flex h-full min-h-0 w-full flex-col gap-4 overflow-hidden text-white">
         <section className="flex-none overflow-x-auto">
-          <div className="flex min-w-max items-center gap-10 border-b border-slate-800/90">
+          <div className="flex min-w-max items-center gap-10 border-b border-slate-800">
             {tabs.map((tab) => {
               const isActive = tab.id === role;
 
@@ -1546,8 +1546,8 @@ export function Marketplace() {
           </div>
         </section>
 
-        <section className="flex min-h-0 flex-1 overflow-hidden border-y border-slate-800/80 bg-[linear-gradient(180deg,#101624_0%,#0c1220_100%)] text-slate-100">
-          <div className="grid min-h-0 w-full gap-0 xl:grid-cols-[300px,minmax(0,1fr)] xl:divide-x xl:divide-slate-800/80">
+        <section className="flex min-h-0 flex-1 overflow-hidden border-y border-slate-800 bg-[linear-gradient(180deg,#101624_0%,#0c1220_100%)] text-slate-100">
+          <div className="grid min-h-0 w-full gap-0 xl:grid-cols-[300px,minmax(0,1fr)] xl:divide-x xl:divide-slate-800">
             <aside className="flex min-h-0 flex-col px-5 py-4 xl:pr-6">
               <div className="flex min-h-0 flex-1 flex-col rounded-[28px] border border-[#dfe2f2] bg-white px-6 py-7 text-slate-900 shadow-[0_24px_60px_rgba(15,23,42,0.08)]">
                 <div className="flex items-start justify-between gap-3">
@@ -1765,7 +1765,7 @@ export function Marketplace() {
             </aside>
 
             <div className="flex min-h-0 flex-col px-5 py-4">
-              <div className="flex-none border-b border-slate-800/80 pb-5">
+              <div className="flex-none border-b border-slate-800 pb-5">
                 <div className="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
                   <div>
                     <div className="text-sm text-slate-500">
@@ -1789,7 +1789,7 @@ export function Marketplace() {
                         : roleCopy[role]}
                     </p>
                     {role === 'recruiter' ? (
-                      <div className="mt-4 inline-flex rounded-full border border-slate-800 bg-slate-950/70 p-1">
+                      <div className="mt-4 inline-flex rounded-full border border-slate-800 bg-slate-950 p-1">
                         {([
                           { id: 'jobs', label: 'Jobs' },
                           { id: 'recruiters', label: 'Recruiters' },
@@ -1828,7 +1828,7 @@ export function Marketplace() {
                             ? 'Search job title, company or recruiter'
                             : `Search ${activeTab.label.toLowerCase()}, company or skill`
                         }
-                        className="h-11 rounded-full border-slate-700 bg-slate-950/70 pl-10 text-slate-100 placeholder:text-slate-500 focus:border-cyan-400"
+                        className="h-11 rounded-full border-slate-700 bg-slate-950 pl-10 text-slate-100 placeholder:text-slate-500 focus:border-cyan-400"
                       />
                     </label>
                     <div className="rounded-full border border-slate-700 bg-transparent px-4 py-2 text-sm text-slate-300">
@@ -1919,7 +1919,7 @@ export function Marketplace() {
                 {role === 'recruiter' && recruiterBrowseMode === 'jobs' ? (
                   <>
                     {recruiterJobsQuery.isLoading ? (
-                      <div className="flex items-center justify-center border-b border-slate-800/80 px-6 py-16">
+                      <div className="flex items-center justify-center border-b border-slate-800 px-6 py-16">
                         <Spinner />
                       </div>
                     ) : null}
@@ -1931,7 +1931,7 @@ export function Marketplace() {
                     ) : null}
 
                     {!recruiterJobsQuery.isLoading && !recruiterJobsQuery.isError && recruiterJobList.length === 0 ? (
-                      <div className="border-b border-slate-800/80 px-8 py-10">
+                      <div className="border-b border-slate-800 px-8 py-10">
                         <div className="max-w-2xl space-y-3">
                           <div className="text-sm font-semibold text-cyan-300">No jobs found</div>
                           <h2 className="text-2xl font-semibold text-white">No recruiter jobs match these filters.</h2>
@@ -1965,7 +1965,7 @@ export function Marketplace() {
                 ) : (
                   <>
                     {profilesQuery.isLoading ? (
-                      <div className="flex items-center justify-center border-b border-slate-800/80 px-6 py-16">
+                      <div className="flex items-center justify-center border-b border-slate-800 px-6 py-16">
                         <Spinner />
                       </div>
                     ) : null}
@@ -1977,7 +1977,7 @@ export function Marketplace() {
                     ) : null}
 
                     {!profilesQuery.isLoading && !profilesQuery.isError && profileList.length === 0 ? (
-                      <div className="border-b border-slate-800/80 px-8 py-10">
+                      <div className="border-b border-slate-800 px-8 py-10">
                         <div className="max-w-2xl space-y-3">
                           <div className="text-sm font-semibold text-cyan-300">No profiles found</div>
                           <h2 className="text-2xl font-semibold text-white">No marketplace members match these filters.</h2>
@@ -1997,7 +1997,7 @@ export function Marketplace() {
                         return (
                           <article
                             key={profile._id}
-                            className="border-b border-slate-800/80 py-6 [content-visibility:auto] last:border-b-0"
+                            className="border-b border-slate-800 py-6 [content-visibility:auto] last:border-b-0"
                           >
                             <div className="flex flex-col gap-5">
                               <div className="flex flex-col gap-4 xl:flex-row xl:items-start xl:justify-between">
@@ -2053,7 +2053,7 @@ export function Marketplace() {
                                     </Button>
                                     <Button
                                       variant="secondary"
-                                      className="h-10 rounded-full border-slate-700 bg-transparent px-4 py-0 text-sm text-slate-200 hover:border-slate-500 hover:bg-slate-900/40"
+                                      className="h-10 rounded-full border-slate-700 bg-transparent px-4 py-0 text-sm text-slate-200 hover:border-slate-500 hover:bg-slate-900"
                                       onClick={() => setSelectedProfileId(profile._id)}
                                     >
                                       <Eye className="mr-2 h-4 w-4" />
@@ -2062,7 +2062,7 @@ export function Marketplace() {
                                     {role === 'recruiter' ? (
                                       <Button
                                         variant="secondary"
-                                        className="h-10 rounded-full border-slate-700 bg-transparent px-4 py-0 text-sm text-slate-200 hover:border-slate-500 hover:bg-slate-900/40"
+                                        className="h-10 rounded-full border-slate-700 bg-transparent px-4 py-0 text-sm text-slate-200 hover:border-slate-500 hover:bg-slate-900"
                                         onClick={() =>
                                           setExpandedRecruiterId(expandedRecruiterId === profile._id ? null : profile._id)
                                         }

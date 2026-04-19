@@ -253,7 +253,7 @@ export function ProductWorkspaceManager() {
   return (
     <DashboardLayout role={currentUser?.role ?? UserRole.STUDENT}>
       <div className="-mx-4 -my-6 min-h-full space-y-6 bg-black px-4 py-6 lg:-mx-8 lg:px-8">
-        <section className="rounded-[28px] border border-slate-800 bg-[radial-gradient(circle_at_top_left,_rgba(34,211,238,0.16),_transparent_38%),linear-gradient(180deg,_rgba(15,23,42,0.96),_rgba(2,6,23,0.96))] p-6 sm:p-8">
+        <section className="rounded-[28px] border border-slate-800 bg-[radial-gradient(circle_at_top_left,_rgba(59,130,246,0.16),_transparent_38%),linear-gradient(180deg,_rgba(15,23,42,0.96),_rgba(2,6,23,0.96))] p-6 sm:p-8">
           <div className="flex flex-col gap-6 lg:flex-row lg:items-end lg:justify-between">
             <div className="max-w-3xl">
               <div className="inline-flex items-center gap-2 rounded-full border border-cyan-500/20 bg-cyan-500/10 px-3 py-1 text-xs font-semibold uppercase tracking-[0.28em] text-cyan-200">
@@ -304,7 +304,7 @@ export function ProductWorkspaceManager() {
             ].map((item) => (
               <div
                 key={item.label}
-                className="rounded-2xl border border-slate-800 bg-slate-950/80 p-5"
+                className="rounded-2xl border border-slate-800 bg-slate-950 p-5"
               >
                 <div className="flex items-center justify-between gap-3">
                   <div>
@@ -326,7 +326,7 @@ export function ProductWorkspaceManager() {
         </section>
 
         {editorMode && canManageWorkspaces ? (
-          <section className="rounded-[28px] border border-slate-800 bg-slate-950/90 p-6">
+          <section className="rounded-[28px] border border-slate-800 bg-slate-950 p-6">
             <div className="flex flex-col gap-6 lg:flex-row lg:items-start lg:justify-between">
               <div className="max-w-2xl">
                 <div className="text-xs uppercase tracking-[0.24em] text-slate-500">
@@ -444,7 +444,7 @@ export function ProductWorkspaceManager() {
           </section>
         ) : null}
 
-        <section className="rounded-[28px] border border-slate-800 bg-slate-950/80 p-6">
+        <section className="rounded-[28px] border border-slate-800 bg-slate-950 p-6">
           <div className="flex flex-col gap-4 md:flex-row md:items-center md:justify-between">
             <div>
               <h2 className="text-xl font-semibold text-white">
@@ -544,7 +544,7 @@ export function ProductWorkspaceManager() {
                             <h3 className="truncate text-lg font-semibold text-white">
                               {workspace.title}
                             </h3>
-                            <span className="rounded-full border border-slate-700 bg-slate-900/80 px-2.5 py-1 text-[11px] uppercase tracking-[0.2em] text-slate-300">
+                            <span className="rounded-full border border-slate-700 bg-slate-900 px-2.5 py-1 text-[11px] uppercase tracking-[0.2em] text-slate-300">
                               {getWorkspaceSourceLabel(workspace)}
                             </span>
                             <span

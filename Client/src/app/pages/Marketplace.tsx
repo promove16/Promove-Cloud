@@ -1,10 +1,11 @@
 import { useDeferredValue, useEffect, useMemo, useRef, useState } from "react";
 import { useNavigate, useSearchParams } from "react-router-dom";
-import { useQuery, useQueryClient } from "@tanstack/react-query";
+import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import {
   ArrowRight,
   BriefcaseBusiness,
   Building2,
+  CalendarDays,
   ChevronDown,
   ChevronUp,
   Compass,
@@ -37,6 +38,7 @@ import {
   MarketplaceUserItem,
   marketplaceApi,
 } from "../../api/marketplace.api";
+import { requestApi } from "../../api/request.api";
 import { recruiterApi } from "../../api/recruiter.api";
 import { useAuthStore } from "../../store/authStore";
 import type { RecruiterJobView } from "../../types/recruiter.types";
@@ -145,7 +147,7 @@ const allTabs: MarketplaceTab[] = [
     label: "Investors",
     filterLabel: "Capital",
     description:
-      "Sort investors by sector lens, location, activity, and public profile strength.",
+      "Review investors by focus, location, experience, and public proof before you reach out.",
     icon: Building2,
   },
   {
@@ -359,6 +361,34 @@ const getRangeStep = (value: number) => {
   return 50000;
 };
 
+const joinLabelParts = (parts: Array<string | undefined>) =>
+  parts.filter((part): part is string => Boolean(part?.trim())).join(" | ");
+
+const getInvestorFocusAreas = (item: MarketplaceUserItem) =>
+  item.entityType === "investor"
+    ? uniqueValues([item.domain, ...(item.skills ?? []).map((skill) => skill.name)])
+    : [];
+
+const getInvestorFitReasons = (item: MarketplaceUserItem) => {
+  if (item.entityType !== "investor") {
+    return [];
+  }
+
+  return [
+    item.domain ? `Focuses on ${item.domain}` : "",
+    item.relatedCounts.startups > 0
+      ? `${item.relatedCounts.startups} startup connections visible on profile`
+      : "",
+    item.insightCounts.experience > 0
+      ? `${item.insightCounts.experience} experience entries listed`
+      : "",
+    item.insightCounts.portfolioProjects > 0
+      ? `${item.insightCounts.portfolioProjects} public proof items available`
+      : "",
+    item.location ? `Location shared: ${item.location}` : "",
+  ].filter(Boolean);
+};
+
 const getSearchText = (item: MarketplaceDirectoryItem) => {
   if (isStartupItem(item)) {
     return [
@@ -434,6 +464,35 @@ const getDetailChips = (item: MarketplaceDirectoryItem) =>
           item.location ?? "",
           ...(item.skills ?? []).slice(0, 4).map((skill) => skill.name),
         ];
+
+const getCardSubtitle = (item: MarketplaceDirectoryItem) =>
+  isStartupItem(item)
+    ? joinLabelParts([item.category, item.stage])
+    : joinLabelParts([
+        formatRoleLabel(item.entityType),
+        item.headline,
+        item.entityType === "investor" && !item.headline ? item.domain : undefined,
+      ]);
+
+const getCardDescription = (item: MarketplaceDirectoryItem) =>
+  isStartupItem(item)
+    ? item.tagline
+    : item.entityType === "investor"
+      ? (item.bio ??
+        "Review this investor's focus, location, and public proof before reaching out.")
+      : (item.bio ??
+        "Public profile details will appear here as more marketplace members complete their profiles.");
+
+const getCardDetailChips = (item: MarketplaceDirectoryItem) =>
+  isStartupItem(item)
+    ? getDetailChips(item)
+    : item.entityType === "investor"
+      ? [
+          ...getInvestorFocusAreas(item).slice(0, 4),
+          item.location ?? "",
+          item.relatedCounts.startups > 0 ? "Portfolio Linked" : "",
+        ]
+      : getDetailChips(item);
 
 const buildStatList = (item: MarketplaceDirectoryItem) => {
   if (isStartupItem(item)) {
@@ -534,6 +593,19 @@ const buildStatList = (item: MarketplaceDirectoryItem) => {
   ];
 };
 
+const buildCardStatList = (item: MarketplaceDirectoryItem) => {
+  if (!isStartupItem(item) && item.entityType === "investor") {
+    return [
+      { label: "Portfolio", value: String(item.relatedCounts.startups) },
+      { label: "Focus", value: String(getInvestorFocusAreas(item).length) },
+      { label: "Experience", value: String(item.insightCounts.experience) },
+      { label: "Proof", value: String(item.insightCounts.portfolioProjects) },
+    ];
+  }
+
+  return buildStatList(item);
+};
+
 const buildMetaList = (item: MarketplaceDirectoryItem) => {
   if (isStartupItem(item)) {
     return [
@@ -560,6 +632,12 @@ const buildMetaList = (item: MarketplaceDirectoryItem) => {
       return [
         userItem.domain ?? "",
         `${userItem.relatedCounts.startups} portfolio startups`,
+        userItem.insightCounts.experience > 0
+          ? `${userItem.insightCounts.experience} experience entries`
+          : "",
+        userItem.insightCounts.portfolioProjects > 0
+          ? `${userItem.insightCounts.portfolioProjects} proof items`
+          : "",
       ].filter(Boolean);
     case "mentor":
       return [
@@ -620,7 +698,9 @@ const getItemSkills = (item: MarketplaceDirectoryItem) => {
     return [];
   }
 
-  return uniqueValues((userItem.skills ?? []).map((skill) => skill.name));
+  return userItem.entityType === "investor"
+    ? getInvestorFocusAreas(userItem)
+    : uniqueValues((userItem.skills ?? []).map((skill) => skill.name));
 };
 
 const getInstitutionSpecialties = (item: MarketplaceDirectoryItem) => {
@@ -690,11 +770,18 @@ const getItemSignals = (item: MarketplaceDirectoryItem) => {
 
   return uniqueValues([
     userItem.insightCounts.portfolioProjects > 0 ? "Portfolio Ready" : "",
-    userItem.entityType !== "investor" && userItem.insightCounts.experience > 0
-      ? "Experience Listed"
+    userItem.insightCounts.experience > 0
+      ? userItem.entityType === "investor"
+        ? "Operating Experience"
+        : "Experience Listed"
       : "",
     userItem.relatedCounts.startups > 0 ? "Startup Linked" : "",
-    (userItem.githubStats?.totalRepos ?? 0) > 0 ? "GitHub Proof" : "",
+    userItem.entityType === "investor" && getInvestorFocusAreas(userItem).length > 0
+      ? "Focus Shared"
+      : "",
+    userItem.entityType !== "investor" && (userItem.githubStats?.totalRepos ?? 0) > 0
+      ? "GitHub Proof"
+      : "",
     userItem.entityType === "recruiter" && userItem.relatedCounts.jobs > 0
       ? "Hiring Now"
       : "",
@@ -705,7 +792,6 @@ const getUserExperienceCount = (item: MarketplaceDirectoryItem) => {
   const userItem = getUserItem(item);
   if (
     !userItem ||
-    userItem.entityType === "investor" ||
     userItem.entityType === "school" ||
     userItem.entityType === "college"
   ) {
@@ -725,7 +811,9 @@ const getUserPortfolioCount = (item: MarketplaceDirectoryItem) => {
     return 0;
   }
 
-  return userItem.insightCounts.portfolioProjects;
+  return userItem.entityType === "investor"
+    ? userItem.relatedCounts.startups
+    : userItem.insightCounts.portfolioProjects;
 };
 
 const getRecruiterOpenJobCount = (item: MarketplaceDirectoryItem) => {
@@ -779,6 +867,27 @@ const getStartupFunding = (item: MarketplaceDirectoryItem) =>
   isStartupItem(item) ? (item.fundingNeeded ?? 0) : 0;
 const getStartupTeamSize = (item: MarketplaceDirectoryItem) =>
   isStartupItem(item) ? item.teamSize : 0;
+
+const getSignalSortValue = (item: MarketplaceDirectoryItem) => {
+  if (isStartupItem(item)) {
+    return item.innovationScoreAtLaunch;
+  }
+
+  if (item.entityType === "school" || item.entityType === "college") {
+    return item.institutionProfile?.stats?.startupsLaunched ?? 0;
+  }
+
+  if (item.entityType === "investor") {
+    return (
+      item.relatedCounts.startups * 3 +
+      item.insightCounts.experience * 2 +
+      getInvestorFocusAreas(item).length +
+      item.insightCounts.portfolioProjects
+    );
+  }
+
+  return item.insightCounts.portfolioProjects;
+};
 
 const matchesSelectedOptions = (selected: string[], values: string[]) =>
   selected.length === 0 || selected.some((value) => values.includes(value));
@@ -1207,6 +1316,7 @@ export function Marketplace() {
 
 function GeneralMarketplace({ dashboardRole }: { dashboardRole: UserRole }) {
   const navigate = useNavigate();
+  const queryClient = useQueryClient();
   const authUser = useAuthStore((state) => state.user);
   const sortMenuRef = useRef<HTMLDivElement | null>(null);
   const [searchParams, setSearchParams] = useSearchParams();
@@ -1730,13 +1840,18 @@ function GeneralMarketplace({ dashboardRole }: { dashboardRole: UserRole }) {
       {
         kind: "checkbox",
         id: "domain",
-        title: entityType === "recruiter" ? "Department" : "Domain",
+        title:
+          entityType === "recruiter"
+            ? "Department"
+            : entityType === "investor"
+              ? "Sector lens"
+              : "Domain",
         filterKey: "domain",
         options: buildFacetOptions(sourceItems, getItemDomains),
       },
     );
 
-    if (entityType !== "investor" && experienceMax > 0) {
+    if (entityType !== "recruiter" && entityType !== "investor" && experienceMax > 0) {
       sections.primary.push({
         kind: "range",
         id: "experience",
@@ -1754,14 +1869,14 @@ function GeneralMarketplace({ dashboardRole }: { dashboardRole: UserRole }) {
       {
         kind: "checkbox",
         id: "skills",
-        title: "Skills",
+        title: entityType === "investor" ? "Investment focus" : "Skills",
         filterKey: "skills",
         options: buildFacetOptions(sourceItems, getItemSkills),
       },
       {
         kind: "checkbox",
         id: "signals",
-        title: "More filters",
+        title: entityType === "investor" ? "Investor signals" : "More filters",
         filterKey: "signals",
         options: buildFacetOptions(sourceItems, getItemSignals),
       },
@@ -1771,7 +1886,7 @@ function GeneralMarketplace({ dashboardRole }: { dashboardRole: UserRole }) {
       sections.advanced.push({
         kind: "range",
         id: "portfolio",
-        title: "Portfolio projects",
+        title: entityType === "investor" ? "Portfolio startups" : "Portfolio projects",
         filterKey: "portfolio",
         max: portfolioMax,
         step: 1,
@@ -1974,6 +2089,7 @@ function GeneralMarketplace({ dashboardRole }: { dashboardRole: UserRole }) {
       }
 
       if (
+        entityType !== "recruiter" &&
         entityType !== "investor" &&
         rangeFilters.experience > 0 &&
         getUserExperienceCount(userItem) < rangeFilters.experience
@@ -2008,23 +2124,9 @@ function GeneralMarketplace({ dashboardRole }: { dashboardRole: UserRole }) {
     }
 
     if (sort === "signal") {
-      sorted.sort((left, right) => {
-        const leftSignal = isStartupItem(left)
-          ? left.innovationScoreAtLaunch
-          : (left as MarketplaceUserItem).entityType === "school" ||
-              (left as MarketplaceUserItem).entityType === "college"
-            ? ((left as MarketplaceUserItem).institutionProfile?.stats
-                ?.startupsLaunched ?? 0)
-            : (left as MarketplaceUserItem).insightCounts.portfolioProjects;
-        const rightSignal = isStartupItem(right)
-          ? right.innovationScoreAtLaunch
-          : (right as MarketplaceUserItem).entityType === "school" ||
-              (right as MarketplaceUserItem).entityType === "college"
-            ? ((right as MarketplaceUserItem).institutionProfile?.stats
-                ?.startupsLaunched ?? 0)
-            : (right as MarketplaceUserItem).insightCounts.portfolioProjects;
-        return rightSignal - leftSignal;
-      });
+      sorted.sort(
+        (left, right) => getSignalSortValue(right) - getSignalSortValue(left),
+      );
     }
 
     return sorted;
@@ -2096,6 +2198,42 @@ function GeneralMarketplace({ dashboardRole }: { dashboardRole: UserRole }) {
     navigate(`/dashboard/messages/${targetId}`);
   };
 
+  const requestHiringEventMutation = useMutation({
+    mutationFn: async (item: MarketplaceUserItem) =>
+      requestApi.create({
+        requestType: "college_event_invite",
+        actionType: "approve",
+        toUserId: item._id,
+        targetEntityType: "recruiter",
+        targetEntityId: item._id,
+        targetEntityTitle: item.displayName,
+        targetRole: "recruiter",
+        requestedRole: "hiring_event_partner",
+        requestedPermission: "college_hiring_event_request",
+        message: `We would like to coordinate a hiring event with ${item.displayName}. Please review this request and connect on the event format, roles, and timeline.`,
+        metadata: {
+          recruiterId: item._id,
+          recruiterName: item.displayName,
+          requestOrigin: "college_marketplace",
+          eventRequestKind: "hiring_event",
+        },
+        deepLink: "/dashboard/invitations",
+        acceptRedirect: "/dashboard/messages",
+        declineRedirect: "/dashboard/invitations",
+      }),
+    onSuccess: async (_request, item) => {
+      setInviteFeedback(`Hiring event request sent to ${item.displayName}.`);
+      await queryClient.invalidateQueries({ queryKey: ["requests", "outgoing"] });
+    },
+    onError: (error) => {
+      setInviteFeedback(
+        error instanceof Error
+          ? error.message
+          : "Unable to send the hiring event request right now.",
+      );
+    },
+  });
+
   const openStartupInvite = (item: MarketplaceUserItem) => {
     if (!isStartupInviteTargetType(item.entityType) || item._id === authUser?._id) {
       return;
@@ -2111,6 +2249,12 @@ function GeneralMarketplace({ dashboardRole }: { dashboardRole: UserRole }) {
       location: item.location,
     });
   };
+
+  const canRequestHiringEvent = (item: MarketplaceDirectoryItem) =>
+    !isStartupItem(item) &&
+    dashboardRole === UserRole.COLLEGE &&
+    item.entityType === "recruiter" &&
+    item._id !== authUser?._id;
 
   const renderActions = (item: MarketplaceDirectoryItem) => {
     if (isStartupItem(item)) {
@@ -2158,6 +2302,13 @@ function GeneralMarketplace({ dashboardRole }: { dashboardRole: UserRole }) {
       );
     }
 
+    const profileActionLabel =
+      item.entityType === "investor"
+        ? "View thesis"
+        : item.entityType === "school" || item.entityType === "college"
+          ? "View institution"
+          : "View portfolio";
+
     return (
       <div className="flex flex-wrap items-center gap-2">
         <button
@@ -2167,13 +2318,26 @@ function GeneralMarketplace({ dashboardRole }: { dashboardRole: UserRole }) {
           <MessageCircle className="h-4 w-4" />
           Message
         </button>
-        {isStartupInviteTargetType(item.entityType) && item._id !== authUser?._id ? (
+        {isStartupInviteTargetType(item.entityType) &&
+        item.entityType !== "investor" &&
+        item._id !== authUser?._id ? (
           <button
             onClick={() => openStartupInvite(item)}
             className={secondaryActionClassName}
           >
             <Send className="h-4 w-4" />
             {getStartupInviteActionLabel(item.entityType)}
+          </button>
+        ) : null}
+        {canRequestHiringEvent(item) ? (
+          <button
+            onClick={() =>
+              void requestHiringEventMutation.mutateAsync(item as MarketplaceUserItem)
+            }
+            className={secondaryActionClassName}
+          >
+            <CalendarDays className="h-4 w-4" />
+            Request Hiring Event
           </button>
         ) : null}
         <button
@@ -2188,7 +2352,7 @@ function GeneralMarketplace({ dashboardRole }: { dashboardRole: UserRole }) {
           }
           className={primaryActionClassName}
         >
-          View portfolio
+          {profileActionLabel}
           <ArrowRight className="h-4 w-4" />
         </button>
       </div>
@@ -2547,17 +2711,21 @@ function GeneralMarketplace({ dashboardRole }: { dashboardRole: UserRole }) {
                     />
                   ))
                 : items.map((item) => {
-                    const stats = buildStatList(item);
+                    const stats = buildCardStatList(item);
                     const metaList = buildMetaList(item);
                     const title = getTitle(item);
-                    const subtitle = getSubtitle(item);
-                    const description = getDescription(item);
-                    const chips = getDetailChips(item)
+                    const subtitle = getCardSubtitle(item);
+                    const description = getCardDescription(item);
+                    const chips = getCardDetailChips(item)
                       .filter(Boolean)
                       .slice(0, 6);
                     const trustSignals = isStartupItem(item)
                       ? getStartupTrustSignals(item).slice(0, 5)
                       : [];
+                    const investorFitReasons =
+                      !isStartupItem(item) && item.entityType === "investor"
+                        ? getInvestorFitReasons(item).slice(0, 3)
+                        : [];
                     const avatarLabel = title.slice(0, 1).toUpperCase();
                     const itemTypeLabel = isStartupItem(item)
                       ? "Startup"
@@ -2642,6 +2810,24 @@ function GeneralMarketplace({ dashboardRole }: { dashboardRole: UserRole }) {
                                     {signal}
                                   </span>
                                 ))}
+                              </div>
+                            ) : null}
+
+                            {investorFitReasons.length ? (
+                              <div className="mt-5 rounded-2xl border border-cyan-500/20 bg-cyan-500/5 p-4">
+                                <div className="text-xs font-semibold uppercase tracking-[0.2em] text-cyan-300">
+                                  Why This Investor May Fit
+                                </div>
+                                <div className="mt-3 flex flex-wrap gap-2">
+                                  {investorFitReasons.map((reason) => (
+                                    <span
+                                      key={`${item._id}-fit-${reason}`}
+                                      className="rounded-full border border-cyan-500/20 bg-slate-950/70 px-3 py-1.5 text-xs font-medium text-slate-200"
+                                    >
+                                      {reason}
+                                    </span>
+                                  ))}
+                                </div>
                               </div>
                             ) : null}
                           </div>

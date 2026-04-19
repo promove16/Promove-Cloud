@@ -591,11 +591,11 @@ const THEME = {
   accent: "var(--dashboard-active-text)",
   accentBg: "var(--dashboard-active-bg)",
   accentRing: "var(--dashboard-active-ring)",
-  accentGradient: "linear-gradient(135deg, #22d3ee 0%, #0ea5e9 55%, #2563eb 100%)",
+  accentGradient: "linear-gradient(135deg, #3b82f6 0%, #0ea5e9 55%, #2563eb 100%)",
   accentGradientSoft:
     "linear-gradient(160deg, rgba(12, 74, 110, 0.92), rgba(2, 6, 23, 0.98))",
   accentGlow:
-    "radial-gradient(ellipse at 50% 80%, rgba(34, 211, 238, 0.18) 0%, transparent 72%)",
+    "radial-gradient(ellipse at 50% 80%, rgba(59, 130, 246, 0.18) 0%, transparent 72%)",
 };
 
 const formatDateRange = (
@@ -1226,7 +1226,7 @@ function RecentWorksSection({ works }: { works: RecentWork[] }) {
                 ...styles.mockCard,
                 background:
                   work.kind === "workspace"
-                    ? `linear-gradient(135deg, rgba(34, 211, 238, 0.16), ${THEME.surfaceSolid})`
+                    ? `linear-gradient(135deg, rgba(59, 130, 246, 0.16), ${THEME.surfaceSolid})`
                     : `linear-gradient(135deg, rgba(59, 130, 246, 0.16), ${THEME.surfaceSolid})`,
                 minHeight: 260,
               }}
@@ -1235,7 +1235,7 @@ function RecentWorksSection({ works }: { works: RecentWork[] }) {
                 <span
                   style={{
                     ...styles.workCategory,
-                    color: work.kind === "workspace" ? "#22d3ee" : "#60a5fa",
+                    color: work.kind === "workspace" ? "#3b82f6" : "#60a5fa",
                   }}
                 >
                   {work.kind === "workspace" ? "Product Workspace" : "Startup"}
@@ -2954,7 +2954,7 @@ const styles: Record<string, CSSProperties> = {
   serviceRowActive: {
     background:
       "linear-gradient(90deg, rgba(14, 165, 233, 0.18), rgba(8, 47, 73, 0.18) 42%, rgba(15, 23, 42, 0.08) 100%)",
-    boxShadow: "inset 3px 0 0 rgba(34, 211, 238, 0.95)",
+    boxShadow: "inset 3px 0 0 rgba(59, 130, 246, 0.95)",
   },
   serviceIconWrap: {
     width: 34,

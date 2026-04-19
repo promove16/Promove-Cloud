@@ -426,7 +426,7 @@ export function SignupPage() {
               Institution Token <span className="text-red-400">*</span>
             </label>
             {isInviteFlow ? (
-              <div className="rounded-2xl border border-slate-800 bg-slate-950/70 p-4 text-sm text-slate-300">
+              <div className="rounded-2xl border border-slate-800 bg-slate-950 p-4 text-sm text-slate-300">
                 Your invitation includes the institution token. You do not need to enter it.
                 <div className="mt-3 font-mono text-xs text-cyan-300">
                   {formData.institutionToken}

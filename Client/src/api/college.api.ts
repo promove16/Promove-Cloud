@@ -24,6 +24,8 @@ import {
   ComplianceReportRecord,
   ComplianceOverviewData,
   DirectoryInvestor,
+  InstitutionPolicy,
+  InstitutionPolicySubmissionRecord,
   LeaderboardPage,
   StudentJourney,
   TemporaryStudentCredentials,
@@ -124,6 +126,22 @@ export const collegeApi = {
   async getComplianceOverview() {
     const response = await api.get<ApiSuccessResponse<ComplianceOverviewData>>(
       '/api/college/compliance/overview',
+    );
+    return response.data.data;
+  },
+  async getComplianceSubmission() {
+    const response = await api.get<ApiSuccessResponse<InstitutionPolicySubmissionRecord | null>>(
+      '/api/college/compliance/submission',
+    );
+    return response.data.data;
+  },
+  async submitComplianceSubmission(payload: {
+    policies: InstitutionPolicy[];
+    summaryNote?: string;
+  }) {
+    const response = await api.put<ApiSuccessResponse<InstitutionPolicySubmissionRecord>>(
+      '/api/college/compliance/submission',
+      payload,
     );
     return response.data.data;
   },

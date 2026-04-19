@@ -86,30 +86,30 @@ export default function Portfolio() {
                   </div>
                 </div>
                 <div className="mt-4 grid gap-2 sm:grid-cols-2">
-                  <div className="rounded-2xl border border-slate-800 bg-slate-900/80 p-4">
+                  <div className="rounded-2xl border border-slate-800 bg-slate-900 p-4">
                     <div className="text-xs uppercase tracking-[0.2em] text-slate-500">Founding student</div>
                     <div className="mt-2 font-semibold text-white">{item.studentDisplayName}</div>
                   </div>
-                  <div className="rounded-2xl border border-slate-800 bg-slate-900/80 p-4">
+                  <div className="rounded-2xl border border-slate-800 bg-slate-900 p-4">
                     <div className="text-xs uppercase tracking-[0.2em] text-slate-500">Snapshot at entry</div>
                     <div className="mt-2 font-semibold text-white">{item.innovationScoreSnapshot}</div>
                   </div>
                 </div>
                 <div className="mt-4 grid gap-2 sm:grid-cols-3">
-                  <div className="rounded-2xl border border-slate-800 bg-slate-900/80 p-4">
+                  <div className="rounded-2xl border border-slate-800 bg-slate-900 p-4">
                     <div className="text-xs uppercase tracking-[0.2em] text-slate-500">Equity</div>
                     <div className="mt-2 font-semibold text-white">{item.equityPercent}%</div>
                   </div>
-                  <div className="rounded-2xl border border-slate-800 bg-slate-900/80 p-4">
+                  <div className="rounded-2xl border border-slate-800 bg-slate-900 p-4">
                     <div className="text-xs uppercase tracking-[0.2em] text-slate-500">Shares</div>
                     <div className="mt-2 font-semibold text-white">{item.sharesAllocated}</div>
                   </div>
-                  <div className="rounded-2xl border border-slate-800 bg-slate-900/80 p-4">
+                  <div className="rounded-2xl border border-slate-800 bg-slate-900 p-4">
                     <div className="text-xs uppercase tracking-[0.2em] text-slate-500">Financial Access</div>
                     <div className="mt-2 font-semibold text-white">{item.canAccessFinancials ? 'Full' : 'Limited'}</div>
                   </div>
                 </div>
-                <div className="mt-4 rounded-2xl border border-slate-800 bg-slate-900/80 p-4">
+                <div className="mt-4 rounded-2xl border border-slate-800 bg-slate-900 p-4">
                   <div className="flex items-center justify-between text-xs uppercase tracking-[0.2em] text-slate-500">
                     <span>Voting Weight</span>
                     <span>{item.votingWeight}%</span>

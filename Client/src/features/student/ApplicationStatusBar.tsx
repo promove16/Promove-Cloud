@@ -5,7 +5,7 @@ import type { RecruiterStudentApplicationView } from '../../types/recruiter.type
 const TONE_CLASSES = {
   default: {
     connector: 'bg-cyan-400/70',
-    current: 'border-cyan-400 bg-cyan-400 shadow-[0_0_0_4px_rgba(34,211,238,0.14)]',
+    current: 'border-cyan-400 bg-cyan-400 shadow-[0_0_0_4px_rgba(59,130,246,0.14)]',
     detail: 'text-slate-300',
   },
   success: {
@@ -29,7 +29,7 @@ export function ApplicationStatusBar({
   const tone = TONE_CLASSES[progress.tone];
 
   return (
-    <div className="rounded-2xl border border-slate-800/80 bg-slate-950/60 px-4 py-4">
+    <div className="rounded-2xl border border-slate-800 bg-slate-950 px-4 py-4">
       <div className="flex flex-col gap-3 lg:flex-row lg:items-start lg:justify-between">
         <div className="min-w-0">
           <div className="text-[11px] uppercase tracking-[0.24em] text-slate-500">Application progress</div>

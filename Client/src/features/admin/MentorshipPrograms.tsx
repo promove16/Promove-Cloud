@@ -46,19 +46,19 @@ export default function MentorshipPrograms() {
             </div>
 
             <div className="grid gap-3 sm:grid-cols-2 xl:min-w-[32rem]">
-              <div className="border border-slate-800/80 bg-slate-950/80 px-4 py-3">
+              <div className="border border-slate-800 bg-slate-950 px-4 py-3">
                 <div className="text-[11px] uppercase tracking-[0.25em] text-slate-500">Mentors</div>
                 <div className="mt-2 text-sm font-medium text-white">{summary.mentors}</div>
               </div>
-              <div className="border border-slate-800/80 bg-slate-950/80 px-4 py-3">
+              <div className="border border-slate-800 bg-slate-950 px-4 py-3">
                 <div className="text-[11px] uppercase tracking-[0.25em] text-slate-500">Pending requests</div>
                 <div className="mt-2 text-sm font-medium text-white">{summary.pendingPrograms}</div>
               </div>
-              <div className="border border-slate-800/80 bg-slate-950/80 px-4 py-3">
+              <div className="border border-slate-800 bg-slate-950 px-4 py-3">
                 <div className="text-[11px] uppercase tracking-[0.25em] text-slate-500">Assigned programs</div>
                 <div className="mt-2 text-sm font-medium text-white">{summary.assignedPrograms}</div>
               </div>
-              <div className="border border-slate-800/80 bg-slate-950/80 px-4 py-3">
+              <div className="border border-slate-800 bg-slate-950 px-4 py-3">
                 <div className="text-[11px] uppercase tracking-[0.25em] text-slate-500">Projects awaiting mentor</div>
                 <div className="mt-2 text-sm font-medium text-white">{summary.unassignedProjects}</div>
               </div>

@@ -62,7 +62,7 @@ export function Sidebar({ roleLabel, roleDescription, items, onLogout }: Sidebar
           const isActive = isPathActive(item.path);
           const className = `group flex w-full items-center gap-3 rounded-2xl px-4 py-3 text-sm font-medium transition-all duration-200 ${
             isActive
-              ? "bg-cyan-500/15 text-cyan-200 shadow-[0_0_0_1px_rgba(34,211,238,0.2)]"
+              ? "bg-cyan-500/15 text-cyan-200 shadow-[0_0_0_1px_rgba(59,130,246,0.2)]"
               : "text-slate-400 hover:bg-slate-900 hover:text-slate-100"
           }`;
 

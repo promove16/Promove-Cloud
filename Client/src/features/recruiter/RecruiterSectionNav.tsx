@@ -24,7 +24,7 @@ export function RecruiterSectionNav({ items }: { items: RecruiterSectionNavItem[
     <div className="overflow-x-auto pb-1">
       <nav
         aria-label="Recruiter section navigation"
-        className="inline-flex min-w-max items-center gap-1 rounded-full border border-slate-800 bg-slate-950/85 p-1"
+        className="inline-flex min-w-max items-center gap-1 rounded-full border border-slate-800 bg-slate-950 p-1"
       >
         {items.map((item) => (
           <NavLink
@@ -34,7 +34,7 @@ export function RecruiterSectionNav({ items }: { items: RecruiterSectionNavItem[
             className={({ isActive }) =>
               `inline-flex items-center rounded-full px-4 py-2 text-sm font-medium whitespace-nowrap transition ${
                 isActive
-                  ? 'bg-cyan-400 text-slate-950 shadow-[0_0_0_1px_rgba(34,211,238,0.16)]'
+                  ? 'bg-cyan-400 text-slate-950 shadow-[0_0_0_1px_rgba(59,130,246,0.16)]'
                   : 'text-slate-300 hover:bg-slate-900 hover:text-white'
               }`
             }
@@ -59,7 +59,7 @@ export function RecruiterSectionHeader({
   navItems: RecruiterSectionNavItem[];
 }) {
   return (
-    <section className="rounded-3xl border border-slate-800 bg-slate-950/55 px-5 py-5 sm:px-6">
+    <section className="rounded-3xl border border-slate-800 bg-slate-950 px-5 py-5 sm:px-6">
       <div className="flex flex-col gap-5 xl:flex-row xl:items-start xl:justify-between">
         <div className="max-w-3xl space-y-2">
           <div className="text-xs uppercase tracking-[0.3em] text-cyan-300">{eyebrow}</div>

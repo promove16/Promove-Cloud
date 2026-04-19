@@ -50,15 +50,15 @@ export default function Analytics() {
 
             {analyticsQuery.data ? (
               <div className="grid gap-3 sm:grid-cols-3 xl:min-w-[30rem]">
-                <div className="border border-slate-800/80 bg-slate-950/80 px-4 py-3">
+                <div className="border border-slate-800 bg-slate-950 px-4 py-3">
                   <div className="text-[11px] uppercase tracking-[0.25em] text-slate-500">Platform users</div>
                   <div className="mt-2 text-sm font-medium text-white">{analyticsQuery.data.totalUsers}</div>
                 </div>
-                <div className="border border-slate-800/80 bg-slate-950/80 px-4 py-3">
+                <div className="border border-slate-800 bg-slate-950 px-4 py-3">
                   <div className="text-[11px] uppercase tracking-[0.25em] text-slate-500">Active this week</div>
                   <div className="mt-2 text-sm font-medium text-white">{analyticsQuery.data.activeThisWeek}</div>
                 </div>
-                <div className="border border-slate-800/80 bg-slate-950/80 px-4 py-3">
+                <div className="border border-slate-800 bg-slate-950 px-4 py-3">
                   <div className="text-[11px] uppercase tracking-[0.25em] text-slate-500">Deal completion</div>
                   <div className="mt-2 text-sm font-medium text-white">{analyticsQuery.data.dealConversionRate}%</div>
                 </div>

@@ -72,7 +72,7 @@ function PennyPoolSection({ board, onBid }: { board: NonNullable<ReturnType<type
   const userInPool = currentUserBid?.investorType === 'penny';
 
   return (
-    <div className="rounded-2xl border border-slate-800 bg-slate-900/60 p-5">
+    <div className="rounded-2xl border border-slate-800 bg-slate-900 p-5">
       <div className="mb-4 flex items-center justify-between">
         <div className="flex items-center gap-2">
           <Users className="h-5 w-5 text-cyan-400" />
@@ -120,7 +120,7 @@ function PennyPoolSection({ board, onBid }: { board: NonNullable<ReturnType<type
                   className={`flex items-center justify-between rounded-lg px-3 py-2 text-sm ${
                     c.isCurrentUser
                       ? 'border border-cyan-500/30 bg-cyan-500/10'
-                      : 'bg-slate-800/60'
+                      : 'bg-slate-800'
                   }`}
                 >
                   <div className="flex items-center gap-2">
@@ -153,7 +153,7 @@ function PennyPoolSection({ board, onBid }: { board: NonNullable<ReturnType<type
           Join Penny Pool
         </Button>
       ) : (
-        <div className="rounded-lg bg-slate-800/60 px-4 py-3 text-center text-sm text-slate-500">
+        <div className="rounded-lg bg-slate-800 px-4 py-3 text-center text-sm text-slate-500">
           Penny investor pool is full
         </div>
       )}
@@ -191,7 +191,7 @@ function SoleBidCard({
           ? 'border-cyan-500/40 bg-cyan-500/5'
           : bid.founderDecisionStatus === 'accepted'
             ? 'border-emerald-500/40 bg-emerald-500/5'
-            : 'border-slate-800 bg-slate-900/40'
+            : 'border-slate-800 bg-slate-900'
       }`}
     >
       <div className="flex items-start justify-between gap-3">
@@ -351,7 +351,7 @@ export function StartupBidDrawer({ startupId, open, isFounder = false, onClose }
             <div className="space-y-6">
               {/* Funding target banner */}
               {board.fundingTarget && (
-                <div className="flex items-center gap-3 rounded-xl border border-slate-800 bg-slate-900/60 px-4 py-3 text-sm">
+                <div className="flex items-center gap-3 rounded-xl border border-slate-800 bg-slate-900 px-4 py-3 text-sm">
                   <TrendingUp className="h-4 w-4 text-cyan-400" />
                   <span className="text-slate-300">
                     Funding target:{' '}
@@ -361,7 +361,7 @@ export function StartupBidDrawer({ startupId, open, isFounder = false, onClose }
               )}
 
               {/* Upwork-style workflow strip */}
-              <div className="flex items-center gap-2 rounded-xl border border-slate-800 bg-slate-900/40 px-4 py-3 text-xs text-slate-400">
+              <div className="flex items-center gap-2 rounded-xl border border-slate-800 bg-slate-900 px-4 py-3 text-xs text-slate-400">
                 <span className="font-medium text-cyan-300">Bid Placed</span>
                 <span className="text-slate-600">→</span>
                 <span>Founder Reviews</span>
@@ -380,7 +380,7 @@ export function StartupBidDrawer({ startupId, open, isFounder = false, onClose }
               />
 
               {/* Sole Investor Bids */}
-              <div className="rounded-2xl border border-slate-800 bg-slate-900/60 p-5">
+              <div className="rounded-2xl border border-slate-800 bg-slate-900 p-5">
                 <div className="mb-4 flex items-center justify-between">
                   <div className="flex items-center gap-2">
                     <User className="h-5 w-5 text-amber-400" />

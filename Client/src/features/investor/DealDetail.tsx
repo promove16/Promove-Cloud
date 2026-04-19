@@ -180,7 +180,7 @@ export function DealDetail({ dealId, open, onOpenChange }: Props) {
   }
 
   return (
-    <div className="fixed inset-0 z-50 flex justify-end bg-slate-950/80 backdrop-blur-sm">
+    <div className="fixed inset-0 z-50 flex justify-end bg-slate-950 backdrop-blur-sm">
       <div className="h-full w-full max-w-3xl overflow-y-auto border-l border-slate-800 bg-slate-950 px-6 py-6 text-white">
         <div className="mb-6 flex items-start justify-between gap-4 border-b border-slate-800 pb-4">
           <div>
@@ -366,7 +366,7 @@ export function DealDetail({ dealId, open, onOpenChange }: Props) {
                       </div>
                     </div>
                     {deal.stockTransfer.reviewNotes ? (
-                      <div className="rounded-2xl border border-slate-800 bg-slate-900/80 px-4 py-3 text-sm text-slate-300">
+                      <div className="rounded-2xl border border-slate-800 bg-slate-900 px-4 py-3 text-sm text-slate-300">
                         Admin notes: {deal.stockTransfer.reviewNotes}
                       </div>
                     ) : null}
@@ -418,7 +418,7 @@ export function DealDetail({ dealId, open, onOpenChange }: Props) {
             </Card>
 
             {deal.currentStage === 0 && !canAdvanceFromNegotiation ? (
-              <div className="rounded-xl border border-slate-800 bg-slate-900/60 px-4 py-3 text-sm text-slate-400">
+              <div className="rounded-xl border border-slate-800 bg-slate-900 px-4 py-3 text-sm text-slate-400">
                 Complete the negotiation above and agree on terms before advancing to Due Diligence.
               </div>
             ) : deal.currentStage === 4 ? null : (

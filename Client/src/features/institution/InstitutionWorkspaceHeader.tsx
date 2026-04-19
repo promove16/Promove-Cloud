@@ -32,9 +32,19 @@ export function InstitutionWorkspaceHeader({
       </div>
 
       {showMenu || tabsAction ? (
-        <div className="flex flex-col gap-4 border-b border-slate-800/80 pb-4 xl:flex-row xl:items-end xl:justify-between">
-          {showMenu ? <InstitutionWorkspaceMenu mode={mode} className="min-w-0 flex-1" /> : <div className="min-w-0 flex-1" />}
-          {tabsAction ? <div className="shrink-0">{tabsAction}</div> : null}
+        <div
+          className={`flex flex-col gap-4 border-b border-slate-800 pb-4 ${
+            showMenu
+              ? 'xl:flex-row xl:items-end xl:justify-between'
+              : 'xl:items-end'
+          }`}
+        >
+          {showMenu ? (
+            <InstitutionWorkspaceMenu mode={mode} className="min-w-0 flex-1" />
+          ) : null}
+          {tabsAction ? (
+            <div className={showMenu ? 'shrink-0' : 'flex justify-end'}>{tabsAction}</div>
+          ) : null}
         </div>
       ) : null}
     </section>

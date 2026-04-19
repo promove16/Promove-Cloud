@@ -18,6 +18,7 @@ import {
   createSchoolComplianceIncidentController,
   createSchoolEventController,
   getLatestSchoolComplianceReportController,
+  getSchoolComplianceSubmissionController,
   getSchoolComplianceOverviewController,
   getSchoolDashboardController,
   getSchoolEventRankingsController,
@@ -39,6 +40,7 @@ import {
   listSchoolStudentsController,
   markSchoolComplianceAlertReadController,
   reviewSchoolStudentVerificationController,
+  submitSchoolComplianceSubmissionController,
   updateSchoolComplianceActionController,
   updateSchoolComplianceIncidentController,
 } from './school.controller';
@@ -88,6 +90,8 @@ router.get(
   asyncHandler(getLatestSchoolComplianceReportController),
 );
 router.get('/compliance/overview', asyncHandler(getSchoolComplianceOverviewController));
+router.get('/compliance/submission', asyncHandler(getSchoolComplianceSubmissionController));
+router.put('/compliance/submission', asyncHandler(submitSchoolComplianceSubmissionController));
 router.get('/compliance/incidents', asyncHandler(listSchoolComplianceIncidentsController));
 router.post('/compliance/incidents', asyncHandler(createSchoolComplianceIncidentController));
 router.patch(

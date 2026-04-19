@@ -110,7 +110,7 @@ export function InstitutionProjectsPageBase({
               { label: 'Stage', value: selectedProject.stage, Icon: FolderKanban },
               { label: 'Progress', value: `${selectedProject.progressPercent}%`, Icon: Gauge },
             ].map(({ label, value, Icon }) => (
-              <div key={label} className="rounded-2xl border border-slate-800 bg-slate-950/80 p-4">
+              <div key={label} className="rounded-2xl border border-slate-800 bg-slate-950 p-4">
                 <Icon className="h-5 w-5 text-cyan-300" />
                 <div className="mt-3 text-xs uppercase tracking-[0.2em] text-slate-500">{label}</div>
                 <div className="mt-2 text-lg font-semibold text-white">{value}</div>

@@ -17,6 +17,7 @@ import {
   getHelpDeskTicketsController,
   getAnalyticsUserDetailController,
   getAnalyticsUsersController,
+  getComplianceSubmissionsController,
   getInvestmentTypeAnalyticsController,
   getMentorsController,
   getMentorshipProgramsController,
@@ -34,6 +35,7 @@ import {
   rejectPatentController,
   resolveHelpDeskTicketController,
   reviewDealController,
+  reviewComplianceSubmissionController,
   reviewRegistrationRequestController,
   reviewStartupController,
   unlockLaunchFormController,
@@ -98,6 +100,8 @@ router.delete('/problems/:id', asyncHandler(deleteAdminProblemController));
 router.get('/problems/review-requests', asyncHandler(listProblemReviewRequestsController));
 router.patch('/problems/review-requests/:submissionId', asyncHandler(reviewProblemSubmissionController));
 router.get('/registration-requests', asyncHandler(getRegistrationRequestsController));
+router.get('/compliance-submissions', asyncHandler(getComplianceSubmissionsController));
+router.patch('/compliance-submissions/:id/review', asyncHandler(reviewComplianceSubmissionController));
 router.patch('/registration-requests/:id/approve', asyncHandler(approveRegistrationRequestController));
 router.patch('/registration-requests/:id/reject', asyncHandler(rejectRegistrationRequestController));
 router.patch('/users/:id/role', asyncHandler(updateUserRoleController));

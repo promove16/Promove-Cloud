@@ -206,7 +206,7 @@ export function QueryTypeModal({
                 <button
                   key={template.type}
                   onClick={() => handleTypeSelect(template)}
-                  className="flex w-full items-center gap-4 rounded-xl border border-slate-700 bg-slate-800/50 p-4 text-left transition hover:border-slate-600 hover:bg-slate-800"
+                  className="flex w-full items-center gap-4 rounded-xl border border-slate-700 bg-slate-800 p-4 text-left transition hover:border-slate-600 hover:bg-slate-800"
                 >
                   <div className={`flex h-12 w-12 items-center justify-center rounded-xl bg-gradient-to-br ${template.color} text-white`}>
                     {template.icon}
@@ -228,7 +228,7 @@ export function QueryTypeModal({
                 Back
               </button>
 
-              <div className={`flex items-center gap-3 rounded-xl border border-slate-700 bg-slate-800/50 p-3`}>
+              <div className={`flex items-center gap-3 rounded-xl border border-slate-700 bg-slate-800 p-3`}>
                 <div className={`flex h-10 w-10 items-center justify-center rounded-lg bg-gradient-to-br ${selectedType?.color} text-white`}>
                   {selectedType?.icon}
                 </div>
@@ -245,7 +245,7 @@ export function QueryTypeModal({
                     <button
                       key={idx}
                       onClick={() => handleSend(msg)}
-                      className="w-full rounded-xl border border-slate-700 bg-slate-800/50 p-3 text-left text-sm text-slate-300 transition hover:border-cyan-500/50 hover:bg-slate-800"
+                      className="w-full rounded-xl border border-slate-700 bg-slate-800 p-3 text-left text-sm text-slate-300 transition hover:border-cyan-500/50 hover:bg-slate-800"
                     >
                       {msg}
                     </button>

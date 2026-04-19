@@ -159,7 +159,7 @@ export function TermsAcceptanceGate() {
         </div>
 
         <div className="space-y-6 px-6 py-6 sm:px-8 sm:py-8">
-          <div className="rounded-2xl border border-slate-800 bg-slate-900/60 p-4 text-sm text-slate-300">
+          <div className="rounded-2xl border border-slate-800 bg-slate-900 p-4 text-sm text-slate-300">
             Access is blocked until you accept the current version of the Terms &amp; Conditions for your
             sector.
             <span className="ml-2 font-semibold text-white">Version {user.termsCurrentVersion}</span>

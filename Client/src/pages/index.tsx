@@ -49,26 +49,18 @@ function LazyPage({ component: Component }: { component: LazyExoticComponent<Com
 const SchoolDashboard = lazy(() => import("../features/school/Dashboard"));
 const SchoolEventsPage = lazy(() => import("../features/school/EventsPage"));
 const SchoolOperationsPage = lazy(() => import("../features/school/OperationsPage"));
-const SchoolPatentsPage = lazy(() => import("../features/school/PatentsPage"));
-const SchoolProjectsPage = lazy(() => import("../features/school/ProjectsPage"));
-const SchoolStartupsPage = lazy(() => import("../features/school/StartupsPage"));
 const SchoolStudentLeaderboard = lazy(() => import("../features/school/StudentLeaderboard"));
 const SchoolInvestorDirectory = lazy(() => import("../features/school/InvestorDirectory"));
 const SchoolAnalyticsPage = lazy(() => import("../features/school/AnalyticsPage"));
-const SchoolComplianceReport = lazy(() => import("../features/school/ComplianceReport"));
 
 const CollegeDashboard = lazy(() => import("../features/college/Dashboard"));
 const CollegeOperationsPage = lazy(() => import("../features/college/OperationsPage"));
-const CollegePatentsPage = lazy(() => import("../features/college/PatentsPage"));
-const CollegeProjectsPage = lazy(() => import("../features/college/ProjectsPage"));
-const CollegeStartupsPage = lazy(() => import("../features/college/StartupsPage"));
 const CollegeStudentLeaderboard = lazy(() => import("../features/college/StudentLeaderboard"));
 const CollegeInvestorDirectory = lazy(() => import("../features/college/InvestorDirectory"));
 const RecruiterDirectory = lazy(() => import("../features/college/RecruiterDirectory"));
 const PlacementTracker = lazy(() => import("../features/college/PlacementTracker"));
 const EventManager = lazy(() => import("../features/college/EventManager"));
 const CollegeAnalyticsPage = lazy(() => import("../features/college/AnalyticsPage"));
-const CollegeComplianceReport = lazy(() => import("../features/college/ComplianceReport"));
 
 const MentorDashboard = lazy(() => import("../features/mentor/Dashboard"));
 const MentorStudentFeed = lazy(() => import("../features/mentor/StudentFeed"));
@@ -899,12 +891,12 @@ export const router = createBrowserRouter([
             children: [
               { index: true, element: <LazyPage component={SchoolDashboard} /> },
               { path: "operations", element: <LazyPage component={SchoolOperationsPage} /> },
-              { path: "projects", element: <LazyPage component={SchoolProjectsPage} /> },
-              { path: "projects/:projectId", element: <LazyPage component={SchoolProjectsPage} /> },
-              { path: "patents", element: <LazyPage component={SchoolPatentsPage} /> },
-              { path: "patents/:patentId", element: <LazyPage component={SchoolPatentsPage} /> },
-              { path: "startups", element: <LazyPage component={SchoolStartupsPage} /> },
-              { path: "startups/:startupId", element: <LazyPage component={SchoolStartupsPage} /> },
+              { path: "projects", element: <Navigate to="/dashboard/school/students" replace /> },
+              { path: "projects/:projectId", element: <Navigate to="/dashboard/school/students" replace /> },
+              { path: "patents", element: <Navigate to="/dashboard/school/students" replace /> },
+              { path: "patents/:patentId", element: <Navigate to="/dashboard/school/students" replace /> },
+              { path: "startups", element: <Navigate to="/dashboard/school/students" replace /> },
+              { path: "startups/:startupId", element: <Navigate to="/dashboard/school/students" replace /> },
               { path: "events", element: <LazyPage component={SchoolEventsPage} /> },
               { path: "events/:eventId", element: <LazyPage component={SchoolEventsPage} /> },
               { path: "students", element: <LazyPage component={SchoolStudentLeaderboard} /> },
@@ -912,7 +904,7 @@ export const router = createBrowserRouter([
               { path: "investors", element: <LazyPage component={SchoolInvestorDirectory} /> },
               { path: "mentors", element: <Navigate to="/dashboard/school/events?tab=mentorship" replace /> },
               { path: "analytics", element: <LazyPage component={SchoolAnalyticsPage} /> },
-              { path: "compliance", element: <LazyPage component={SchoolComplianceReport} /> },
+              { path: "compliance", element: <Navigate to="/dashboard/school/analytics" replace /> },
             ],
           },
           {
@@ -923,12 +915,12 @@ export const router = createBrowserRouter([
               { path: "marketplace", element: <LazyPage component={Marketplace} /> },
               { path: "marketplace/view/:entityType/:entityId", element: <LazyPage component={MarketplaceDetail} /> },
               { path: "operations", element: <LazyPage component={CollegeOperationsPage} /> },
-              { path: "projects", element: <LazyPage component={CollegeProjectsPage} /> },
-              { path: "projects/:projectId", element: <LazyPage component={CollegeProjectsPage} /> },
-              { path: "patents", element: <LazyPage component={CollegePatentsPage} /> },
-              { path: "patents/:patentId", element: <LazyPage component={CollegePatentsPage} /> },
-              { path: "startups", element: <LazyPage component={CollegeStartupsPage} /> },
-              { path: "startups/:startupId", element: <LazyPage component={CollegeStartupsPage} /> },
+              { path: "projects", element: <Navigate to="/dashboard/college/students" replace /> },
+              { path: "projects/:projectId", element: <Navigate to="/dashboard/college/students" replace /> },
+              { path: "patents", element: <Navigate to="/dashboard/college/students" replace /> },
+              { path: "patents/:patentId", element: <Navigate to="/dashboard/college/students" replace /> },
+              { path: "startups", element: <Navigate to="/dashboard/college/students" replace /> },
+              { path: "startups/:startupId", element: <Navigate to="/dashboard/college/students" replace /> },
               { path: "students", element: <LazyPage component={CollegeStudentLeaderboard} /> },
               { path: "students/:id", element: <StudentPortfolioRedirect /> },
               { path: "recruiters", element: <LazyPage component={RecruiterDirectory} /> },
@@ -937,7 +929,7 @@ export const router = createBrowserRouter([
               { path: "placement", element: <LazyPage component={PlacementTracker} /> },
               { path: "events", element: <LazyPage component={EventManager} /> },
               { path: "analytics", element: <LazyPage component={CollegeAnalyticsPage} /> },
-              { path: "compliance", element: <LazyPage component={CollegeComplianceReport} /> },
+              { path: "compliance", element: <Navigate to="/dashboard/college/analytics" replace /> },
             ],
           },
         ],

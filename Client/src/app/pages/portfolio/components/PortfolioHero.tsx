@@ -44,7 +44,7 @@ export function PortfolioHero({
   const hasInnovationScoreStat = visibleStats.some((stat) => stat.label === "Innovation Score");
 
   return (
-    <section className="border-b border-slate-800/80 pb-8">
+    <section className="border-b border-slate-800 pb-8">
       <div className="grid gap-6 sm:grid-cols-[140px_minmax(0,1fr)] sm:items-start sm:gap-8">
         <div className="mx-auto flex h-28 w-28 items-center justify-center overflow-hidden rounded-full border-4 border-slate-700 bg-black text-3xl font-semibold text-white sm:h-32 sm:w-32 sm:text-4xl">
           {avatarUrl ? (
@@ -68,7 +68,7 @@ export function PortfolioHero({
           </div>
 
           {visibleDetails.length > 0 ? (
-            <div className="mt-4 border-t border-slate-800/80 pt-4">
+            <div className="mt-4 border-t border-slate-800 pt-4">
               {detailsLabel ? (
                 <div className="text-[10px] uppercase tracking-[0.35em] text-slate-500">{detailsLabel}</div>
               ) : null}
@@ -82,7 +82,7 @@ export function PortfolioHero({
               </div>
             </div>
           ) : visibleEntries.length > 0 ? (
-            <div className="mt-4 border-t border-slate-800/80 pt-4">
+            <div className="mt-4 border-t border-slate-800 pt-4">
               <div className="text-[10px] uppercase tracking-[0.35em] text-slate-500">Previously</div>
               <div className="mt-3 space-y-1.5 text-xs sm:text-sm">
                 {visibleEntries.map((entry) => (
@@ -96,16 +96,16 @@ export function PortfolioHero({
           ) : null}
 
           {innovationScore !== undefined && !hasInnovationScoreStat ? (
-            <div className="mt-4 border-t border-slate-800/80 pt-4 text-base font-semibold text-slate-100 sm:text-lg">
+            <div className="mt-4 border-t border-slate-800 pt-4 text-base font-semibold text-slate-100 sm:text-lg">
               Innovation Score <span className="text-[#48a9e6]">{innovationScore}</span>
             </div>
           ) : null}
 
           {visibleStats.length > 0 ? (
-            <div className="mt-4 border-t border-slate-800/80 pt-4">
+            <div className="mt-4 border-t border-slate-800 pt-4">
               <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
                 {visibleStats.map((stat) => (
-                  <div key={stat.label} className="border-l border-slate-800/80 pl-3 first:border-l-0 first:pl-0">
+                  <div key={stat.label} className="border-l border-slate-800 pl-3 first:border-l-0 first:pl-0">
                     <div className="text-[11px] uppercase tracking-[0.2em] text-slate-500">{stat.label}</div>
                     <div className="mt-1 text-lg font-semibold text-white">{stat.value}</div>
                   </div>

@@ -149,7 +149,7 @@ function ChecklistItem({
           ? step.claimed
             ? "border-emerald-800/30 bg-emerald-950/20"
             : "border-cyan-700/40 bg-cyan-950/20"
-          : "border-slate-800 bg-slate-900/50 hover:border-slate-700"
+          : "border-slate-800 bg-slate-900 hover:border-slate-700"
       }`}
     >
       {/* Check icon */}

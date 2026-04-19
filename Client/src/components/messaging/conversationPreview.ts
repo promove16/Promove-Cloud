@@ -24,7 +24,7 @@ const getStartupHandshakePreview = (message: string) => {
   const startupName = fields.startup?.trim();
 
   if (action === 'investor') {
-    return startupName ? `Pitch request: ${startupName}` : 'Startup pitch request';
+    return startupName ? `Investor outreach: ${startupName}` : 'Startup investor outreach';
   }
 
   if (action === 'mentor') {

@@ -152,7 +152,7 @@ function RecruiterOpenRoleCard({
           </div>
           {applyError ? <div className="mt-3 text-sm text-rose-300">{applyError}</div> : null}
         </div>
-        <div className="grid grid-cols-3 gap-3 border-t border-slate-800/80 pt-4 xl:grid-cols-1 xl:border-l xl:border-t-0 xl:pl-6 xl:pt-0">
+        <div className="grid grid-cols-3 gap-3 border-t border-slate-800 pt-4 xl:grid-cols-1 xl:border-l xl:border-t-0 xl:pl-6 xl:pt-0">
           <div>
             <div className="text-[11px] uppercase tracking-[0.22em] text-slate-500">Score</div>
             <div className="mt-1 text-2xl font-semibold text-white">{job.minimumInnovationScore}+</div>

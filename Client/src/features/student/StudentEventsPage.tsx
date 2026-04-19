@@ -148,7 +148,7 @@ export default function StudentEventsPage() {
               </div>
 
               {event.rankings.length > 0 ? (
-                <div className="mt-5 rounded-2xl border border-slate-800 bg-slate-950/70 p-4">
+                <div className="mt-5 rounded-2xl border border-slate-800 bg-slate-950 p-4">
                   <div className="mb-3 text-xs uppercase tracking-[0.28em] text-cyan-300">Leaderboard Snapshot</div>
                   <div className="space-y-2">
                     {event.rankings.slice(0, 3).map((ranking) => (

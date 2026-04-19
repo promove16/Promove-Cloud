@@ -543,7 +543,7 @@ const PATENT_REQUEST_DOCUMENT_OPTIONS: Array<{
 ];
 
 const fieldCls =
-  "w-full rounded-lg border border-slate-800 bg-slate-950/90 px-3 py-2.5 text-white outline-none transition focus:border-cyan-400/60";
+  "w-full rounded-lg border border-slate-800 bg-slate-950 px-3 py-2.5 text-white outline-none transition focus:border-cyan-400/60";
 const textAreaCls = `${fieldCls} min-h-20`;
 
 // ─── Upload slot state ────────────────────────────────────────────────────────
@@ -593,7 +593,7 @@ function DocsPreviewPane({
             className={`flex w-full items-start gap-2 rounded-xl border px-3 py-2 text-left transition ${
               i === activeIndex
                 ? "border-cyan-500/50 bg-cyan-500/10 text-white"
-                : "border-slate-800 bg-slate-900/60 text-slate-300 hover:border-slate-700"
+                : "border-slate-800 bg-slate-900 text-slate-300 hover:border-slate-700"
             }`}
           >
             {doc.fileType === "image" ? (
@@ -612,7 +612,7 @@ function DocsPreviewPane({
           </button>
         ))}
       </div>
-      <div className="flex flex-col overflow-hidden rounded-2xl border border-slate-800 bg-slate-950/60">
+      <div className="flex flex-col overflow-hidden rounded-2xl border border-slate-800 bg-slate-950">
         <div className="flex items-center justify-between gap-4 border-b border-slate-800 px-4 py-3">
           <div>
             <div className="font-semibold text-white">{active.fileName}</div>
@@ -659,7 +659,7 @@ function PatentDetailModal({
   onClose: () => void;
 }) {
   return (
-    <div className="fixed inset-0 z-50 overflow-y-auto bg-slate-950/80 p-4 backdrop-blur-sm sm:p-6">
+    <div className="fixed inset-0 z-50 overflow-y-auto bg-slate-950 p-4 backdrop-blur-sm sm:p-6">
       <div className="mx-auto flex min-h-full w-full items-start justify-center">
         <div className="flex w-full max-w-5xl flex-col overflow-hidden rounded-3xl border border-slate-800 bg-slate-900 p-6 max-h-[calc(100vh-2rem)]">
           {/* Header */}
@@ -700,7 +700,7 @@ function PatentDetailModal({
 
           {/* Admin notes if reviewed */}
           {patent.adminNotes && (
-            <div className="mt-5 rounded-2xl border border-slate-700 bg-slate-800/60 p-4 text-sm text-slate-300">
+            <div className="mt-5 rounded-2xl border border-slate-700 bg-slate-800 p-4 text-sm text-slate-300">
               <div className="mb-1 text-xs font-semibold uppercase tracking-widest text-slate-400">
                 Admin notes
               </div>
@@ -714,7 +714,7 @@ function PatentDetailModal({
               <div className="text-xs uppercase tracking-[0.3em] text-cyan-300">
                 Questionnaire
               </div>
-              <div className="overflow-hidden rounded-2xl border border-slate-800 bg-slate-950/60">
+              <div className="overflow-hidden rounded-2xl border border-slate-800 bg-slate-950">
                 {patent.questionnaire ? (
                   Object.entries(patent.questionnaire).map(
                     ([key, value], i, arr) => (
@@ -742,7 +742,7 @@ function PatentDetailModal({
                 Legacy Filing Checklist
               </div>
               {patent.filingDocuments ? (
-                <div className="overflow-hidden rounded-2xl border border-slate-800 bg-slate-950/60">
+                <div className="overflow-hidden rounded-2xl border border-slate-800 bg-slate-950">
                   {[
                     [
                       "Invention category",
@@ -908,13 +908,13 @@ function StartupPatentRequestOverview({
         {["Patent Request", "Review", "Uploaded Data"].map((label) => (
           <div
             key={label}
-            className="rounded-2xl border border-slate-800 bg-slate-900/60 p-5"
+            className="rounded-2xl border border-slate-800 bg-slate-900 p-5"
           >
             <div className="text-xs uppercase tracking-[0.24em] text-slate-500">
               {label}
             </div>
             <div className="mt-4 h-5 w-2/3 rounded bg-slate-800" />
-            <div className="mt-3 h-4 w-full rounded bg-slate-800/70" />
+            <div className="mt-3 h-4 w-full rounded bg-slate-800" />
           </div>
         ))}
       </section>
@@ -923,7 +923,7 @@ function StartupPatentRequestOverview({
 
   return (
     <section className="grid gap-4 border-b border-slate-800 pb-5 lg:grid-cols-3">
-      <div className="rounded-2xl border border-slate-800 bg-slate-900/60 p-5">
+      <div className="rounded-2xl border border-slate-800 bg-slate-900 p-5">
         <div className="text-xs uppercase tracking-[0.24em] text-cyan-300">
           Patent Request
         </div>
@@ -955,7 +955,7 @@ function StartupPatentRequestOverview({
         ) : null}
       </div>
 
-      <div className="rounded-2xl border border-slate-800 bg-slate-900/60 p-5">
+      <div className="rounded-2xl border border-slate-800 bg-slate-900 p-5">
         <div className="text-xs uppercase tracking-[0.24em] text-cyan-300">
           Review
         </div>
@@ -996,7 +996,7 @@ function StartupPatentRequestOverview({
         </div>
       </div>
 
-      <div className="rounded-2xl border border-slate-800 bg-slate-900/60 p-5">
+      <div className="rounded-2xl border border-slate-800 bg-slate-900 p-5">
         <div className="text-xs uppercase tracking-[0.24em] text-cyan-300">
           Uploaded Data
         </div>
@@ -1011,7 +1011,7 @@ function StartupPatentRequestOverview({
                 href={document.fileUrl}
                 target="_blank"
                 rel="noreferrer"
-                className="flex items-start justify-between gap-3 rounded-xl border border-slate-800 bg-slate-950/60 px-3 py-2 transition hover:border-cyan-500/40"
+                className="flex items-start justify-between gap-3 rounded-xl border border-slate-800 bg-slate-950 px-3 py-2 transition hover:border-cyan-500/40"
               >
                 <span className="min-w-0">
                   <span className="block truncate text-sm font-semibold text-white">
@@ -1190,7 +1190,7 @@ function SelfUploadPatentForm(props: SelfUploadPatentFormProps) {
 
   if (submitSuccess) {
     return (
-      <div className="rounded-2xl border border-slate-800 bg-slate-900/60 p-8 text-center">
+      <div className="rounded-2xl border border-slate-800 bg-slate-900 p-8 text-center">
         <div className="mx-auto mb-4 flex h-16 w-16 items-center justify-center rounded-full bg-green-500/10">
           <CheckCircle className="h-8 w-8 text-green-500" />
         </div>
@@ -1422,7 +1422,7 @@ function PatentConversationPanel({ requestId }: { requestId: string }) {
   );
 
   return (
-    <div className="flex flex-col rounded-2xl border border-slate-800 bg-slate-900/60 overflow-hidden">
+    <div className="flex flex-col rounded-2xl border border-slate-800 bg-slate-900 overflow-hidden">
       <div className="border-b border-slate-800 px-5 py-3">
         <div className="text-xs uppercase tracking-[0.28em] text-cyan-300">
           Conversation with Admin
@@ -1600,7 +1600,7 @@ function PatentRequestDocumentsPanel({
   return (
     <div className="space-y-4">
       {canEdit ? (
-        <div className="rounded-xl border border-slate-800 bg-slate-900/60 p-5">
+        <div className="rounded-xl border border-slate-800 bg-slate-900 p-5">
           <div className="mb-4 flex items-center justify-between gap-3">
             <div>
               <div className="text-xs uppercase tracking-[0.28em] text-cyan-300">
@@ -1657,12 +1657,12 @@ function PatentRequestDocumentsPanel({
           ) : null}
         </div>
       ) : (
-        <div className="rounded-xl border border-slate-800 bg-slate-900/60 px-5 py-4 text-sm text-slate-400">
+        <div className="rounded-xl border border-slate-800 bg-slate-900 px-5 py-4 text-sm text-slate-400">
           Document uploads are locked after the case reaches a final status.
         </div>
       )}
 
-      <div className="overflow-hidden rounded-xl border border-slate-800 bg-slate-900/60">
+      <div className="overflow-hidden rounded-xl border border-slate-800 bg-slate-900">
         {sortedDocuments.length > 0 ? (
           sortedDocuments.map((document, index) => {
             const reviewStatus = document.reviewStatus ?? "pending";
@@ -1708,7 +1708,7 @@ function PatentRequestDocumentsPanel({
                       </div>
                     ) : null}
                     {document.reviewNote ? (
-                      <div className="mt-2 rounded-lg border border-slate-800 bg-slate-950/70 px-3 py-2 text-sm text-slate-300">
+                      <div className="mt-2 rounded-lg border border-slate-800 bg-slate-950 px-3 py-2 text-sm text-slate-300">
                         <span className="text-xs uppercase tracking-wider text-slate-500">
                           Admin review
                         </span>
@@ -1798,7 +1798,7 @@ function OfficialHandoverPanel({
             ? "border-emerald-500/20 bg-emerald-500/10 text-emerald-200"
             : handoverCompleted
               ? "border-cyan-500/20 bg-cyan-500/10 text-cyan-100"
-              : "border-slate-800 bg-slate-900/60 text-slate-400"
+              : "border-slate-800 bg-slate-900 text-slate-400"
         }`}
       >
         {handoverAcknowledged
@@ -1813,7 +1813,7 @@ function OfficialHandoverPanel({
       </div>
 
       {handover?.note ? (
-        <div className="rounded-xl border border-slate-800 bg-slate-900/60 px-5 py-4">
+        <div className="rounded-xl border border-slate-800 bg-slate-900 px-5 py-4">
           <div className="mb-1 text-xs font-semibold uppercase tracking-widest text-slate-400">
             Handover Note
           </div>
@@ -1821,7 +1821,7 @@ function OfficialHandoverPanel({
         </div>
       ) : null}
 
-      <div className="overflow-hidden rounded-xl border border-slate-800 bg-slate-900/60">
+      <div className="overflow-hidden rounded-xl border border-slate-800 bg-slate-900">
         {sortedDocuments.length > 0 ? (
           sortedDocuments.map((document, index) => (
             <div
@@ -2254,7 +2254,7 @@ function AdminAssistPatentForm({
 
   if (submitSuccess && !activeRequest) {
     return (
-      <div className="rounded-2xl border border-slate-800 bg-slate-900/60 p-8 text-center">
+      <div className="rounded-2xl border border-slate-800 bg-slate-900 p-8 text-center">
         <div className="mx-auto mb-4 flex h-16 w-16 items-center justify-center rounded-full bg-green-500/10">
           <CheckCircle className="h-8 w-8 text-green-500" />
         </div>
@@ -2457,7 +2457,7 @@ const canEditDocuments = !!activeRequest &&
                               className={`flex w-full cursor-pointer items-center justify-center gap-2 rounded-lg border border-dashed px-3 py-2 text-center transition md:w-[220px] ${
                                 isDisabled
                                   ? "cursor-not-allowed border-slate-800 opacity-50"
-                                  : "border-slate-700 hover:border-cyan-500/50 hover:bg-slate-950/40"
+                                  : "border-slate-700 hover:border-cyan-500/50 hover:bg-slate-950"
                               }`}
                             >
                               {isUploading ? (
@@ -2610,7 +2610,7 @@ const canEditDocuments = !!activeRequest &&
       {activeRequest && (
         <div className="space-y-4">
           {/* Request Header */}
-          <div className="rounded-xl border border-slate-800 bg-slate-900/60 p-5">
+          <div className="rounded-xl border border-slate-800 bg-slate-900 p-5">
             <div className="flex items-center justify-between">
               <div>
                 <div className="text-lg font-semibold text-white">
@@ -2671,7 +2671,7 @@ const canEditDocuments = !!activeRequest &&
           {/* Tracking Tab */}
           {activeTab === "tracking" && (
             <div className="space-y-4">
-              <div className="rounded-xl border border-slate-800 bg-slate-900/60 p-5">
+              <div className="rounded-xl border border-slate-800 bg-slate-900 p-5">
                 <div className="space-y-0">
                   {TRACKING_STAGES.map((stage, index) => {
                     const isCompleted = index < currentStageIndex;
@@ -2727,7 +2727,7 @@ const canEditDocuments = !!activeRequest &&
 
               {/* Admin notes if available */}
               {activeRequest.adminNotes && (
-                <div className="rounded-xl border border-slate-700 bg-slate-800/60 p-4">
+                <div className="rounded-xl border border-slate-700 bg-slate-800 p-4">
                   <div className="mb-1 text-xs font-semibold uppercase tracking-widest text-slate-400">
                     Admin Notes
                   </div>
@@ -2740,7 +2740,7 @@ const canEditDocuments = !!activeRequest &&
               {/* IPO details if available */}
               {activeRequest.ipoApplicationNumber && (
                 <div className="grid gap-3 sm:grid-cols-2">
-                  <div className="rounded-xl border border-slate-800 bg-slate-950/60 px-4 py-3">
+                  <div className="rounded-xl border border-slate-800 bg-slate-950 px-4 py-3">
                     <div className="text-xs font-medium text-slate-500">
                       IPO Application
                     </div>
@@ -2749,7 +2749,7 @@ const canEditDocuments = !!activeRequest &&
                     </div>
                   </div>
                   {activeRequest.ipoFilingDate && (
-                    <div className="rounded-xl border border-slate-800 bg-slate-950/60 px-4 py-3">
+                    <div className="rounded-xl border border-slate-800 bg-slate-950 px-4 py-3">
                       <div className="text-xs font-medium text-slate-500">
                         Filing Date
                       </div>
@@ -2762,7 +2762,7 @@ const canEditDocuments = !!activeRequest &&
               )}
 
               {activeRequest.status === "granted" ? (
-                <div className="rounded-xl border border-slate-800 bg-slate-900/60 px-5 py-4">
+                <div className="rounded-xl border border-slate-800 bg-slate-900 px-5 py-4">
                   <div className="mb-1 text-xs font-semibold uppercase tracking-widest text-slate-400">
                     Official Document Handover
                   </div>
@@ -2805,7 +2805,7 @@ const canEditDocuments = !!activeRequest &&
 
             {/* Questionnaire Tab - read-only view of submitted answers */}
             {activeTab === "questionnaire" && (
-              <div className="rounded-xl border border-slate-800 bg-slate-900/60 overflow-hidden">
+              <div className="rounded-xl border border-slate-800 bg-slate-900 overflow-hidden">
                 {hasAnyPatentAnswer(activeRequestQuestionnaire) ? (
                   Object.entries(activeRequestQuestionnaire).map(
                     ([key, value], i, arr) => (
@@ -2853,7 +2853,7 @@ const canEditDocuments = !!activeRequest &&
               .map((request) => (
                 <div
                   key={request._id}
-                  className="flex items-center justify-between rounded-lg border border-slate-800 bg-slate-900/40 p-3"
+                  className="flex items-center justify-between rounded-lg border border-slate-800 bg-slate-900 p-3"
                 >
                   <div>
                     <div className="text-sm font-medium text-white">
@@ -3350,7 +3350,7 @@ export function PatentSupport() {
               <button
                 type="button"
                 onClick={() => setPatentOption("self-upload")}
-                className="flex flex-col items-start gap-4 rounded-2xl border border-slate-800 bg-slate-900/60 p-6 text-left transition hover:border-cyan-500/50 hover:bg-slate-900"
+                className="flex flex-col items-start gap-4 rounded-2xl border border-slate-800 bg-slate-900 p-6 text-left transition hover:border-cyan-500/50 hover:bg-slate-900"
               >
                 <div className="flex h-12 w-12 items-center justify-center rounded-xl bg-cyan-500/10">
                   <Upload className="h-6 w-6 text-cyan-400" />
@@ -3371,7 +3371,7 @@ export function PatentSupport() {
               <button
                 type="button"
                 onClick={() => setPatentOption("admin-assist")}
-                className="flex flex-col items-start gap-4 rounded-2xl border border-slate-800 bg-slate-900/60 p-6 text-left transition hover:border-amber-500/50 hover:bg-slate-900"
+                className="flex flex-col items-start gap-4 rounded-2xl border border-slate-800 bg-slate-900 p-6 text-left transition hover:border-amber-500/50 hover:bg-slate-900"
               >
                 <div className="flex h-12 w-12 items-center justify-center rounded-xl bg-amber-500/10">
                   <Handshake className="h-6 w-6 text-amber-400" />
@@ -3464,7 +3464,7 @@ export function PatentSupport() {
         {/* Original Patent Intake - only show when no option selected */}
         {false && !patentOption && hasPatentEligibleWorkspaces ? (
           submitted ? (
-            <div className="rounded-lg border border-slate-800 bg-slate-900/60 p-8 text-center">
+            <div className="rounded-lg border border-slate-800 bg-slate-900 p-8 text-center">
               <div className="mx-auto mb-4 flex h-16 w-16 items-center justify-center rounded-full bg-green-500/10">
                 <CheckCircle className="h-8 w-8 text-green-500" />
               </div>
@@ -3610,7 +3610,7 @@ export function PatentSupport() {
                                 className={`flex w-full cursor-pointer items-center justify-center gap-2 rounded-lg border border-dashed px-3 py-2 text-center transition md:w-[220px] ${
                                   isDisabled
                                     ? "cursor-not-allowed border-slate-800 opacity-50"
-                                    : "border-slate-700 hover:border-cyan-500/50 hover:bg-slate-950/40"
+                                    : "border-slate-700 hover:border-cyan-500/50 hover:bg-slate-950"
                                 }`}
                               >
                                 {isUploading ? (
@@ -3739,7 +3739,7 @@ export function PatentSupport() {
                     </div>
                   </section>
 
-                  <div className="rounded-3xl border border-slate-800 bg-slate-900/90 p-5">
+                  <div className="rounded-3xl border border-slate-800 bg-slate-900 p-5">
                     <div className="mb-4 flex items-center justify-between gap-4">
                       <div>
                         <div className="text-xs uppercase tracking-[0.3em] text-cyan-300">
@@ -3994,7 +3994,7 @@ export function PatentSupport() {
                         </div>
 
                         {/* Declarations checklist */}
-                        <div className="rounded-2xl border border-slate-800 bg-slate-950/70 p-4 space-y-3">
+                        <div className="rounded-2xl border border-slate-800 bg-slate-950 p-4 space-y-3">
                           {[
                             {
                               key: "drawingsPrepared",
@@ -4064,7 +4064,7 @@ export function PatentSupport() {
                         </div>
                       </div>
                     ) : (
-                      <div className="rounded-2xl border border-dashed border-slate-800 bg-slate-950/50 px-4 py-5 text-sm text-slate-400">
+                      <div className="rounded-2xl border border-dashed border-slate-800 bg-slate-950 px-4 py-5 text-sm text-slate-400">
                         Filing readiness details stay collapsed until you need
                         them. The main intake form above is enough to submit a
                         patent request.

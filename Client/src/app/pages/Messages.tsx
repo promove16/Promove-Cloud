@@ -459,17 +459,17 @@ function InvestorPitchCard({
         {details.category || details.fundingNeeded || details.teamSize ? (
           <div className="flex flex-wrap gap-2">
             {details.category ? (
-              <span className="rounded-full border border-slate-700 bg-slate-900/70 px-3 py-1 text-xs font-medium text-slate-200">
+              <span className="rounded-full border border-slate-700 bg-slate-900 px-3 py-1 text-xs font-medium text-slate-200">
                 {details.category}
               </span>
             ) : null}
             {details.fundingNeeded ? (
-              <span className="rounded-full border border-slate-700 bg-slate-900/70 px-3 py-1 text-xs font-medium text-slate-200">
+              <span className="rounded-full border border-slate-700 bg-slate-900 px-3 py-1 text-xs font-medium text-slate-200">
                 Seeking {details.fundingNeeded}
               </span>
             ) : null}
             {details.teamSize ? (
-              <span className="rounded-full border border-slate-700 bg-slate-900/70 px-3 py-1 text-xs font-medium text-slate-200">
+              <span className="rounded-full border border-slate-700 bg-slate-900 px-3 py-1 text-xs font-medium text-slate-200">
                 Team size {details.teamSize}
               </span>
             ) : null}
@@ -680,17 +680,17 @@ function StartupHandshakeCard({
         {details.category || details.stage || details.fundingNeeded ? (
           <div className="flex flex-wrap gap-2">
             {details.category ? (
-              <span className="rounded-full border border-slate-700 bg-slate-900/70 px-3 py-1 text-xs font-medium text-slate-200">
+              <span className="rounded-full border border-slate-700 bg-slate-900 px-3 py-1 text-xs font-medium text-slate-200">
                 {details.category}
               </span>
             ) : null}
             {details.stage ? (
-              <span className="rounded-full border border-slate-700 bg-slate-900/70 px-3 py-1 text-xs font-medium text-slate-200">
+              <span className="rounded-full border border-slate-700 bg-slate-900 px-3 py-1 text-xs font-medium text-slate-200">
                 {details.stage}
               </span>
             ) : null}
             {details.fundingNeeded ? (
-              <span className="rounded-full border border-slate-700 bg-slate-900/70 px-3 py-1 text-xs font-medium text-slate-200">
+              <span className="rounded-full border border-slate-700 bg-slate-900 px-3 py-1 text-xs font-medium text-slate-200">
                 {details.fundingNeeded}
               </span>
             ) : null}
@@ -752,7 +752,7 @@ function ConversationItem({
       className={`flex w-full items-center gap-3 px-4 py-3 text-left transition-all ${
         isActive
           ? "bg-cyan-500/10 ring-1 ring-cyan-500/30"
-          : "hover:bg-slate-800/60"
+          : "hover:bg-slate-800"
       }`}
     >
       <div className="relative flex-shrink-0">
@@ -952,7 +952,7 @@ function FirstContactPanel({
             <button
               key={qt.type}
               onClick={() => setSelectedType(qt.type)}
-              className="flex flex-col items-center gap-2 rounded-xl border border-slate-700 bg-slate-800/50 p-4 transition hover:border-slate-600 hover:bg-slate-800"
+              className="flex flex-col items-center gap-2 rounded-xl border border-slate-700 bg-slate-800 p-4 transition hover:border-slate-600 hover:bg-slate-800"
             >
               <div
                 className={`flex h-12 w-12 items-center justify-center rounded-xl bg-gradient-to-br ${qt.color} text-white`}
@@ -993,7 +993,7 @@ function FirstContactPanel({
           <button
             key={idx}
             onClick={() => handleSend(msg)}
-            className="w-full rounded-xl border border-slate-700 bg-slate-800/50 p-3 text-left text-sm text-slate-300 transition hover:border-cyan-500/50 hover:bg-slate-800"
+            className="w-full rounded-xl border border-slate-700 bg-slate-800 p-3 text-left text-sm text-slate-300 transition hover:border-cyan-500/50 hover:bg-slate-800"
           >
             {msg}
           </button>
@@ -1046,7 +1046,7 @@ function ConversationRequestStateCard({
   const isExpired = request.status === "expired";
 
   return (
-    <div className="mx-auto flex w-full max-w-xl flex-col gap-4 rounded-[1.5rem] border border-slate-800 bg-slate-900/60 px-6 py-6 text-center">
+    <div className="mx-auto flex w-full max-w-xl flex-col gap-4 rounded-[1.5rem] border border-slate-800 bg-slate-900 px-6 py-6 text-center">
       <div className="mx-auto flex h-14 w-14 items-center justify-center rounded-2xl bg-gradient-to-br from-cyan-500/20 to-emerald-500/20 text-cyan-300">
         <UserPlus className="h-7 w-7" />
       </div>
@@ -1060,7 +1060,7 @@ function ConversationRequestStateCard({
             : `Request sent to ${partnerName}`}
         </h3>
         {request.message ? (
-          <div className="mt-4 rounded-2xl border border-slate-800 bg-slate-950/70 px-4 py-3 text-left text-sm leading-6 text-slate-200">
+          <div className="mt-4 rounded-2xl border border-slate-800 bg-slate-950 px-4 py-3 text-left text-sm leading-6 text-slate-200">
             {request.message}
           </div>
         ) : null}
@@ -1085,7 +1085,7 @@ function ConversationRequestStateCard({
               type="button"
               onClick={() => onDecline(request)}
               disabled={isUpdating}
-              className="rounded-xl border border-slate-700 bg-slate-800/70 px-4 py-2 text-sm font-semibold text-slate-200 transition hover:bg-slate-800 disabled:opacity-50"
+              className="rounded-xl border border-slate-700 bg-slate-800 px-4 py-2 text-sm font-semibold text-slate-200 transition hover:bg-slate-800 disabled:opacity-50"
             >
               Decline
             </button>
@@ -1107,7 +1107,7 @@ function ConversationRequestStateCard({
               type="button"
               onClick={() => onWithdraw(request)}
               disabled={isUpdating}
-              className="rounded-xl border border-slate-700 bg-slate-800/70 px-4 py-2 text-sm font-semibold text-slate-200 transition hover:bg-slate-800 disabled:opacity-50"
+              className="rounded-xl border border-slate-700 bg-slate-800 px-4 py-2 text-sm font-semibold text-slate-200 transition hover:bg-slate-800 disabled:opacity-50"
             >
               Withdraw
             </button>
@@ -1179,7 +1179,7 @@ function MessageBubble({
     />
   ) : null;
   const attachmentDocument = (
-    <div className="flex items-center gap-3 rounded-2xl border border-slate-700 bg-slate-800/80 p-3">
+    <div className="flex items-center gap-3 rounded-2xl border border-slate-700 bg-slate-800 p-3">
       <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-red-500/20 text-red-400">
         <FileText className="h-5 w-5" />
       </div>
@@ -1240,7 +1240,7 @@ function MessageBubble({
               <button
                 type="button"
                 onClick={onRemoveAttachment}
-                className="absolute right-2 top-2 flex h-7 w-7 items-center justify-center rounded-full bg-slate-950/80 text-white transition hover:bg-slate-900"
+                className="absolute right-2 top-2 flex h-7 w-7 items-center justify-center rounded-full bg-slate-950 text-white transition hover:bg-slate-900"
                 aria-label="Remove attachment"
               >
                 <X className="h-4 w-4" />
@@ -1397,14 +1397,14 @@ function PendingAttachmentDraftCard({
         <button
           type="button"
           onClick={onRemove}
-          className="flex h-8 w-8 flex-shrink-0 items-center justify-center rounded-full bg-slate-900/80 text-slate-300 transition hover:bg-slate-800 hover:text-white"
+          className="flex h-8 w-8 flex-shrink-0 items-center justify-center rounded-full bg-slate-900 text-slate-300 transition hover:bg-slate-800 hover:text-white"
           aria-label="Remove attachment draft"
         >
           <X className="h-4 w-4" />
         </button>
       </div>
 
-      <div className="rounded-2xl border border-slate-800 bg-slate-950/80 p-3">
+      <div className="rounded-2xl border border-slate-800 bg-slate-950 p-3">
         {isImage ? (
           <>
             <img
@@ -1420,7 +1420,7 @@ function PendingAttachmentDraftCard({
             </div>
           </>
         ) : (
-          <div className="flex items-center gap-3 rounded-xl border border-slate-800 bg-slate-900/80 p-3">
+          <div className="flex items-center gap-3 rounded-xl border border-slate-800 bg-slate-900 p-3">
             <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-red-500/20 text-red-400">
               <FileText className="h-5 w-5" />
             </div>
@@ -1919,7 +1919,7 @@ function ChatPanel({
               <button
                 onClick={() => fileInputRef.current?.click()}
                 disabled={isUploading}
-                className="flex flex-col items-center gap-1 rounded-xl bg-slate-800/50 p-3 text-slate-400 hover:bg-slate-800 hover:text-white transition disabled:opacity-50"
+                className="flex flex-col items-center gap-1 rounded-xl bg-slate-800 p-3 text-slate-400 hover:bg-slate-800 hover:text-white transition disabled:opacity-50"
               >
                 <Image className="h-6 w-6" />
                 <span className="text-xs">Photo</span>
@@ -1927,7 +1927,7 @@ function ChatPanel({
               <button
                 onClick={() => fileInputRef.current?.click()}
                 disabled={isUploading}
-                className="flex flex-col items-center gap-1 rounded-xl bg-slate-800/50 p-3 text-slate-400 hover:bg-slate-800 hover:text-white transition disabled:opacity-50"
+                className="flex flex-col items-center gap-1 rounded-xl bg-slate-800 p-3 text-slate-400 hover:bg-slate-800 hover:text-white transition disabled:opacity-50"
               >
                 <FileText className="h-6 w-6" />
                 <span className="text-xs">Document</span>
@@ -2052,7 +2052,7 @@ function RequestSidebarItem({
       type="button"
       onClick={() => onClick(request)}
       className={`flex w-full items-center gap-3 border-b border-slate-800/60 px-4 py-3 text-left transition ${
-        isActive ? "bg-slate-800/70" : "hover:bg-slate-800/40"
+        isActive ? "bg-slate-800" : "hover:bg-slate-800/40"
       }`}
     >
       <div className="flex h-10 w-10 flex-shrink-0 items-center justify-center rounded-full bg-gradient-to-br from-slate-700 to-slate-600 text-sm font-bold text-white">
@@ -2602,7 +2602,7 @@ export function MessagesPage() {
     <div className="-mx-4 -my-6 flex h-[calc(100%+3rem)] min-h-0 overflow-hidden bg-slate-950 lg:-mx-8">
       {/* Sidebar — conversation list */}
       <div
-        className={`flex min-h-0 w-80 flex-shrink-0 flex-col border-r border-slate-800 bg-slate-900/50 ${
+        className={`flex min-h-0 w-80 flex-shrink-0 flex-col border-r border-slate-800 bg-slate-900 ${
           partnerId && view === "chats"
             ? "hidden lg:flex"
             : view === "requests"
@@ -2728,7 +2728,7 @@ export function MessagesPage() {
                           onClick={() =>
                             handleSelect(user._id, user.displayName, user.role)
                           }
-                          className="flex w-full items-center gap-3 rounded-2xl px-4 py-3 text-left transition-all hover:bg-slate-800/60"
+                          className="flex w-full items-center gap-3 rounded-2xl px-4 py-3 text-left transition-all hover:bg-slate-800"
                         >
                           <div className="flex h-11 w-11 items-center justify-center rounded-full bg-gradient-to-br from-cyan-500 to-emerald-500 text-sm font-bold text-white">
                             {user.avatar ? (
@@ -3171,7 +3171,7 @@ export function MessagesPage() {
                 </button>
               </div>
             ) : null}
-            <div className="flex h-20 w-20 items-center justify-center rounded-full bg-slate-800/60">
+            <div className="flex h-20 w-20 items-center justify-center rounded-full bg-slate-800">
               <MessageCircle className="h-10 w-10 text-slate-600" />
             </div>
             <div>

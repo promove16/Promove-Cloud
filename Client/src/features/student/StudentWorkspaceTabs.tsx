@@ -12,7 +12,7 @@ export function StudentWorkspaceTabs({ className }: StudentWorkspaceTabsProps) {
 
   return (
     <div className={twMerge(clsx("overflow-x-auto", className))}>
-      <div className="flex min-w-max items-center gap-8 border-b border-slate-800/90">
+      <div className="flex min-w-max items-center gap-8 border-b border-slate-800">
         {STUDENT_SECTION_LINKS.map((link) => {
           const isActive = isStudentSectionActive(location.pathname, link);
 

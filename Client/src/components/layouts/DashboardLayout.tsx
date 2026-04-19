@@ -65,17 +65,11 @@ const SHARED_ROUTE_LABELS = [
 const SIDEBAR_PARENT_PATH_ALIASES: Partial<Record<UserRole, Record<string, string[]>>> = {
   [UserRole.SCHOOL]: {
     '/dashboard/school/students': [
-      '/dashboard/school/projects',
-      '/dashboard/school/patents',
-      '/dashboard/school/startups',
       '/dashboard/school/operations',
     ],
   },
   [UserRole.COLLEGE]: {
     '/dashboard/college/students': [
-      '/dashboard/college/projects',
-      '/dashboard/college/patents',
-      '/dashboard/college/startups',
       '/dashboard/college/operations',
     ],
   },
@@ -378,7 +372,7 @@ function NotificationBell({
           <button
             type="button"
             onClick={() => markAllReadMutation.mutate()}
-            className="text-xs font-semibold text-cyan-700 hover:text-cyan-600 dark:text-cyan-300 dark:hover:text-cyan-200"
+            className="text-xs font-semibold text-blue-600 hover:text-blue-500 dark:text-blue-300 dark:hover:text-blue-200"
           >
             Mark all read
           </button>
@@ -386,7 +380,7 @@ function NotificationBell({
         <DropdownMenuSeparator className="dashboard-theme-separator" />
         {inviteFeedback ? (
           <>
-            <div className="px-3 py-2 text-xs text-cyan-700 dark:text-cyan-200">{inviteFeedback}</div>
+            <div className="px-3 py-2 text-xs text-blue-600 dark:text-blue-300">{inviteFeedback}</div>
             <DropdownMenuSeparator className="dashboard-theme-separator" />
           </>
         ) : null}
@@ -435,7 +429,7 @@ function NotificationBell({
                         });
                       }}
                       disabled={teamInviteActionMutation.isPending}
-                      className="rounded-lg bg-cyan-500 px-3 py-1.5 text-xs font-semibold text-slate-950 disabled:opacity-60"
+                      className="rounded-lg bg-gradient-to-r from-blue-600 to-purple-600 px-3 py-1.5 text-xs font-semibold text-white disabled:opacity-60"
                     >
                       Accept
                     </button>
@@ -681,7 +675,7 @@ export function DashboardLayout({ children, role }: PropsWithChildren<DashboardL
         <>
           <span
             aria-hidden="true"
-            className="ml-auto inline-flex h-2.5 w-2.5 rounded-full bg-cyan-400 shadow-[0_0_10px_rgba(34,211,238,0.7)]"
+            className="ml-auto inline-flex h-2.5 w-2.5 rounded-full bg-blue-500 shadow-[0_0_10px_rgba(59,130,246,0.7)]"
           />
           <span className="sr-only">{getNavNotificationText(label)}</span>
         </>
@@ -775,7 +769,7 @@ export function DashboardLayout({ children, role }: PropsWithChildren<DashboardL
             aria-label="Open account menu"
             className="group flex items-center gap-3 rounded-2xl px-1 py-1 text-left transition hover:bg-white/5 data-[state=open]:bg-white/5"
           >
-            <div className="relative flex h-12 w-12 shrink-0 items-center justify-center rounded-[0.3rem] bg-gradient-to-br from-[#3fe0d0] via-[#34d399] to-[#22c55e] text-base font-black tracking-tight text-[#02131e]">
+            <div className="relative flex h-12 w-12 shrink-0 items-center justify-center rounded-[0.3rem] bg-gradient-to-br from-blue-500 via-violet-500 to-purple-600 text-base font-black tracking-tight text-white">
               {initials}
               <span className="absolute -bottom-0.5 -right-0.5 h-3.5 w-3.5 rounded-[2px] border-2 border-[#020817] bg-[#22c55e]" />
             </div>
@@ -792,7 +786,7 @@ export function DashboardLayout({ children, role }: PropsWithChildren<DashboardL
                 </span>
               </div>
             </div>
-            <ChevronDown className="h-4 w-4 shrink-0 text-slate-500 transition group-data-[state=open]:rotate-180 group-hover:text-cyan-300" />
+            <ChevronDown className="h-4 w-4 shrink-0 text-slate-500 transition group-data-[state=open]:rotate-180 group-hover:text-blue-300" />
           </button>
         </DropdownMenuTrigger>
         <DropdownMenuContent
@@ -812,7 +806,7 @@ export function DashboardLayout({ children, role }: PropsWithChildren<DashboardL
                 }}
                 className={`group flex min-h-12 items-center gap-3 rounded-xl px-3 py-3 text-sm text-slate-50 focus:bg-white/5 focus:text-slate-50 ${
                   isPathActive(item.path, shouldMatchExactly(item.path))
-                    ? 'bg-white/5 text-cyan-100 ring-1 ring-cyan-400/20'
+                    ? 'bg-white/5 text-blue-100 ring-1 ring-blue-400/20'
                     : ''
                 }`}
               >

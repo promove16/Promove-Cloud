@@ -84,15 +84,15 @@ const WorkshopCard = ({
           <div className="mt-4 grid gap-3 sm:grid-cols-3">
             {deal.productWorkshop && (
               <>
-                <div className="rounded-2xl border border-slate-800 bg-slate-900/80 p-4">
+                <div className="rounded-2xl border border-slate-800 bg-slate-900 p-4">
                   <div className="text-xs uppercase tracking-[0.2em] text-slate-500">Workshop</div>
                   <div className="mt-2 font-semibold text-white">{deal.productWorkshop.title}</div>
                 </div>
-                <div className="rounded-2xl border border-slate-800 bg-slate-900/80 p-4">
+                <div className="rounded-2xl border border-slate-800 bg-slate-900 p-4">
                   <div className="text-xs uppercase tracking-[0.2em] text-slate-500">Workspace Stage</div>
                   <div className="mt-2 font-semibold text-white">{deal.productWorkshop.stage}</div>
                 </div>
-                <div className="rounded-2xl border border-slate-800 bg-slate-900/80 p-4">
+                <div className="rounded-2xl border border-slate-800 bg-slate-900 p-4">
                   <div className="text-xs uppercase tracking-[0.2em] text-slate-500">Progress</div>
                   <div className="mt-2 font-semibold text-white">{deal.productWorkshop.progressPercent}%</div>
                 </div>
@@ -122,7 +122,7 @@ const PortfolioCompanyCard = ({
   workshopDeal?: DealSummaryView;
   onOpen: (workspaceId: string) => void;
 }) => (
-  <Card className="overflow-hidden border border-slate-800 bg-slate-950/50 transition-all hover:border-slate-700">
+  <Card className="overflow-hidden border border-slate-800 bg-slate-950 transition-all hover:border-slate-700">
     <div className="flex flex-col lg:flex-row">
       {/* Left Section - Main Info */}
       <div className="flex-1 p-6">
@@ -163,28 +163,28 @@ const PortfolioCompanyCard = ({
 
         {/* Quick Stats Grid */}
         <div className="mt-6 grid grid-cols-2 gap-4 md:grid-cols-4">
-          <div className="rounded-xl bg-slate-900/60 p-4">
+          <div className="rounded-xl bg-slate-900 p-4">
             <div className="flex items-center gap-2 text-xs text-slate-500">
               <Users className="h-3.5 w-3.5" />
               Founder
             </div>
             <div className="mt-1.5 font-semibold text-white truncate">{item.studentDisplayName}</div>
           </div>
-          <div className="rounded-xl bg-slate-900/60 p-4">
+          <div className="rounded-xl bg-slate-900 p-4">
             <div className="flex items-center gap-2 text-xs text-slate-500">
               <DollarSign className="h-3.5 w-3.5" />
               Equity
             </div>
             <div className="mt-1.5 font-semibold text-white">{item.equityPercent}%</div>
           </div>
-          <div className="rounded-xl bg-slate-900/60 p-4">
+          <div className="rounded-xl bg-slate-900 p-4">
             <div className="flex items-center gap-2 text-xs text-slate-500">
               <BarChart3 className="h-3.5 w-3.5" />
               Shares
             </div>
             <div className="mt-1.5 font-semibold text-white">{item.sharesAllocated}</div>
           </div>
-          <div className="rounded-xl bg-slate-900/60 p-4">
+          <div className="rounded-xl bg-slate-900 p-4">
             <div className="flex items-center gap-2 text-xs text-slate-500">
               <TrendingUp className="h-3.5 w-3.5" />
               Entry Score
@@ -243,7 +243,7 @@ const PortfolioCompanyCard = ({
 
           {workshopDeal?.productWorkshop && (
             <div className="mt-6 space-y-3">
-              <div className="rounded-xl bg-slate-900/80 p-3">
+              <div className="rounded-xl bg-slate-900 p-3">
                 <div className="flex items-center justify-between text-xs text-slate-500">
                   <span>Workshop Progress</span>
                   <span className="font-semibold text-white">{workshopDeal.productWorkshop.progressPercent}%</span>
@@ -255,7 +255,7 @@ const PortfolioCompanyCard = ({
                   />
                 </div>
               </div>
-              <div className="rounded-xl bg-slate-900/80 p-3">
+              <div className="rounded-xl bg-slate-900 p-3">
                 <div className="flex items-center justify-between text-xs text-slate-500">
                   <span>Stage</span>
                   <span className="font-semibold text-white">{workshopDeal.productWorkshop.stage}</span>
@@ -447,7 +447,7 @@ export default function ProductWorkshop() {
                       </div>
                     </div>
                     <div className="shrink-0">
-                      <div className="rounded-xl border border-slate-800 bg-slate-900/80 px-4 py-3 text-sm text-slate-400">
+                      <div className="rounded-xl border border-slate-800 bg-slate-900 px-4 py-3 text-sm text-slate-400">
                         Waiting for founder to link workshop
                       </div>
                     </div>
@@ -472,7 +472,7 @@ export default function ProductWorkshop() {
               
               {filteredAndSortedPortfolioItems.length > 0 && (
                 <div className="flex items-center gap-3">
-                  <div className="flex items-center gap-2 rounded-xl border border-slate-800 bg-slate-900/80 px-4 py-2">
+                  <div className="flex items-center gap-2 rounded-xl border border-slate-800 bg-slate-900 px-4 py-2">
                     <Filter className="h-4 w-4 text-slate-400" />
                     <select 
                       value={portfolioFilter} 
@@ -484,7 +484,7 @@ export default function ProductWorkshop() {
                       <option value="penny">Penny Investor</option>
                     </select>
                   </div>
-                  <div className="flex items-center gap-2 rounded-xl border border-slate-800 bg-slate-900/80 px-4 py-2">
+                  <div className="flex items-center gap-2 rounded-xl border border-slate-800 bg-slate-900 px-4 py-2">
                     <ArrowUpDown className="h-4 w-4 text-slate-400" />
                     <select 
                       value={portfolioSortBy} 
@@ -501,7 +501,7 @@ export default function ProductWorkshop() {
             </div>
 
             {filteredAndSortedPortfolioItems.length === 0 ? (
-              <Card className="border-dashed border-slate-800 bg-slate-950/50 p-12 text-center">
+              <Card className="border-dashed border-slate-800 bg-slate-950 p-12 text-center">
                 <div className="mx-auto mb-4 flex h-16 w-16 items-center justify-center rounded-full bg-slate-900">
                   <Briefcase className="h-8 w-8 text-slate-600" />
                 </div>

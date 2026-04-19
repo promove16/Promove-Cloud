@@ -8,6 +8,8 @@ import {
   BulkCredentialImportResult,
   ComplianceReportRecord,
   DirectoryInvestor,
+  InstitutionPolicy,
+  InstitutionPolicySubmissionRecord,
   InstitutionPatent,
   InstitutionStartup,
   LeaderboardPage,
@@ -96,6 +98,22 @@ export const schoolApi = {
   async getComplianceOverview() {
     const response = await api.get<ApiSuccessResponse<ComplianceOverviewData>>(
       '/api/school/compliance/overview',
+    );
+    return response.data.data;
+  },
+  async getComplianceSubmission() {
+    const response = await api.get<ApiSuccessResponse<InstitutionPolicySubmissionRecord | null>>(
+      '/api/school/compliance/submission',
+    );
+    return response.data.data;
+  },
+  async submitComplianceSubmission(payload: {
+    policies: InstitutionPolicy[];
+    summaryNote?: string;
+  }) {
+    const response = await api.put<ApiSuccessResponse<InstitutionPolicySubmissionRecord>>(
+      '/api/school/compliance/submission',
+      payload,
     );
     return response.data.data;
   },

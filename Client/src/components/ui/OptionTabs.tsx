@@ -27,7 +27,7 @@ export const getOptionTabsListClassName = ({
 } = {}) =>
   twMerge(
     clsx(
-      'flex min-w-max items-stretch gap-2 border-b border-slate-200 dark:border-slate-800/90',
+      'flex min-w-max items-stretch gap-2 border-b border-slate-200 dark:border-slate-800',
       stretch && 'min-w-0 w-full gap-0',
     ),
     className,

@@ -112,7 +112,7 @@ export default function DealsOverview() {
           ) : (
             <div className="space-y-4">
               {urgentDeals.map((deal) => (
-                <div key={deal._id} className="rounded-3xl border border-slate-800 bg-slate-950/70 p-5">
+                <div key={deal._id} className="rounded-3xl border border-slate-800 bg-slate-950 p-5">
                   <div className="flex flex-col gap-4 xl:flex-row xl:items-start xl:justify-between">
                     <div className="space-y-3">
                       <div className="flex flex-wrap gap-2">
@@ -173,7 +173,7 @@ export default function DealsOverview() {
                   key={deal._id}
                   type="button"
                   onClick={() => navigate(`/dashboard/admin/deals/${deal._id}`)}
-                  className="w-full rounded-2xl border border-slate-800 bg-slate-950/70 px-4 py-4 text-left transition hover:border-cyan-500/40"
+                  className="w-full rounded-2xl border border-slate-800 bg-slate-950 px-4 py-4 text-left transition hover:border-cyan-500/40"
                 >
                   <div className="flex items-start justify-between gap-4">
                     <div>

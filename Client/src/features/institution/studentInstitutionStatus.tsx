@@ -23,14 +23,14 @@ type StudentInstitutionStatusSummary = {
 };
 
 const toneClassMap: Record<StatusTone, string> = {
-  slate: 'border-slate-800 bg-slate-950/60',
+  slate: 'border-slate-800 bg-slate-950',
   amber: 'border-amber-500/20 bg-amber-500/10',
   emerald: 'border-emerald-500/20 bg-emerald-500/10',
   rose: 'border-rose-500/20 bg-rose-500/10',
 };
 
 const badgeToneMap: Record<StatusTone, string> = {
-  slate: 'border-slate-700 bg-slate-900/70 text-slate-200',
+  slate: 'border-slate-700 bg-slate-900 text-slate-200',
   amber: 'border-amber-500/30 bg-amber-500/10 text-amber-200',
   emerald: 'border-emerald-500/30 bg-emerald-500/10 text-emerald-200',
   rose: 'border-rose-500/30 bg-rose-500/10 text-rose-200',
@@ -177,14 +177,14 @@ export function StudentInstitutionStatusPanel({
             <span className={`rounded-full border px-3 py-1 text-xs font-semibold uppercase tracking-[0.16em] ${badgeToneClass}`}>
               Institution link {summary.institutionStatusLabel}
             </span>
-            <span className="rounded-full border border-slate-700 bg-slate-900/70 px-3 py-1 text-xs font-semibold uppercase tracking-[0.16em] text-slate-200">
+            <span className="rounded-full border border-slate-700 bg-slate-900 px-3 py-1 text-xs font-semibold uppercase tracking-[0.16em] text-slate-200">
               Account approval {summary.approvalStatusLabel}
             </span>
             <span className={`rounded-full border px-3 py-1 text-xs font-semibold uppercase tracking-[0.16em] ${badgeToneClass}`}>
               {summary.escalationLabel}
             </span>
             {summary.accessSourceLabel ? (
-              <span className="rounded-full border border-slate-700 bg-slate-900/70 px-3 py-1 text-xs font-semibold uppercase tracking-[0.16em] text-slate-200">
+              <span className="rounded-full border border-slate-700 bg-slate-900 px-3 py-1 text-xs font-semibold uppercase tracking-[0.16em] text-slate-200">
                 Access via {summary.accessSourceLabel}
               </span>
             ) : null}
@@ -215,7 +215,7 @@ export function StudentInstitutionStatusPanel({
         {showSettingsLink ? (
           <Link
             to="/dashboard/settings?tab=role"
-            className="inline-flex shrink-0 items-center gap-2 rounded-xl border border-slate-700 bg-slate-900/70 px-4 py-2 text-sm font-semibold text-slate-100 transition hover:border-slate-500 hover:text-white"
+            className="inline-flex shrink-0 items-center gap-2 rounded-xl border border-slate-700 bg-slate-900 px-4 py-2 text-sm font-semibold text-slate-100 transition hover:border-slate-500 hover:text-white"
           >
             Manage institution link
             <ArrowRight className="h-4 w-4" />
@@ -223,7 +223,7 @@ export function StudentInstitutionStatusPanel({
         ) : null}
       </div>
 
-      <div className="mt-4 flex items-start gap-2 rounded-xl border border-slate-800/80 bg-slate-950/50 px-4 py-3 text-sm text-slate-300">
+      <div className="mt-4 flex items-start gap-2 rounded-xl border border-slate-800 bg-slate-950 px-4 py-3 text-sm text-slate-300">
         <ShieldCheck className="mt-0.5 h-4 w-4 shrink-0 text-cyan-300" />
         <span>
           Student institution approvals live with the linked school or college dashboard. The admin queue is for institution and operator sign-up requests, not day-to-day student roster verification.

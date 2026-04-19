@@ -993,7 +993,7 @@ export function SettingsPage() {
                   <div className="space-y-5">
                     <StudentInstitutionStatusPanel user={authUser} />
 
-                    <div className="rounded-xl border border-slate-800 bg-slate-950/60 p-4">
+                    <div className="rounded-xl border border-slate-800 bg-slate-950 p-4">
                       <div className="text-sm font-semibold text-white">Institution-managed education lock</div>
                       <p className="mt-2 text-sm leading-6 text-slate-400">
                         Institution-managed education is controlled by the linked school or college after approval. You can still add separate past or future education entries in your portfolio editor without changing this managed record.
@@ -1036,7 +1036,7 @@ export function SettingsPage() {
                       ) : null}
                     </div>
 
-                    <div className="rounded-xl border border-slate-800 bg-slate-950/60 p-4">
+                    <div className="rounded-xl border border-slate-800 bg-slate-950 p-4">
                       <div className="text-sm font-semibold text-white">Institution-managed education</div>
                       {profileQuery.isLoading ? (
                         <p className="mt-2 text-sm text-slate-400">Loading linked education...</p>
@@ -1175,7 +1175,7 @@ export function SettingsPage() {
 
         {showStickySaveBar ? (
           <div className="pointer-events-none fixed inset-x-0 bottom-0 z-40 px-4 pb-4">
-            <div className="mx-auto flex max-w-4xl items-center justify-between gap-4 rounded-2xl border border-cyan-400/20 bg-slate-950/95 px-5 py-4 shadow-[0_-12px_40px_rgba(2,6,23,0.55)] backdrop-blur pointer-events-auto">
+            <div className="mx-auto flex max-w-4xl items-center justify-between gap-4 rounded-2xl border border-cyan-400/20 bg-slate-950 px-5 py-4 shadow-[0_-12px_40px_rgba(2,6,23,0.55)] backdrop-blur pointer-events-auto">
               <div>
                 <div className="text-sm font-semibold text-white">Unsaved changes in {TAB_LABELS[activeTab]}</div>
                 <p className="mt-1 text-sm text-slate-400">

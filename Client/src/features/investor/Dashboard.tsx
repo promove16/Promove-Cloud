@@ -122,12 +122,12 @@ export default function InvestorDashboard() {
       id: `pitch-${request._id}`,
       title:
         request.status === 'pending'
-          ? `New pitch request from ${request.startupName}`
-          : `${request.startupName} pitch ${request.status}`,
+          ? `New founder outreach from ${request.startupName}`
+          : `${request.startupName} outreach ${request.status}`,
       description:
         request.status === 'pending'
           ? 'Review the founder request and decide whether to engage.'
-          : request.responseNote ?? 'Pitch request state changed.',
+          : request.responseNote ?? 'Outreach state changed.',
       occurredAt: request.respondedAt ?? request.requestedAt,
       tone: 'pitch' as const,
     }));
@@ -186,7 +186,7 @@ export default function InvestorDashboard() {
                     key={link.path}
                     type="button"
                     onClick={() => navigate(link.path)}
-                    className="rounded-3xl border border-slate-800 bg-slate-950/60 p-5 text-left transition hover:border-cyan-500/30 hover:bg-slate-900/70"
+                    className="rounded-3xl border border-slate-800 bg-slate-950 p-5 text-left transition hover:border-cyan-500/30 hover:bg-slate-900"
                   >
                     <div className="flex items-center justify-between gap-3">
                       <div className="flex h-12 w-12 items-center justify-center rounded-2xl bg-slate-900 text-cyan-300">
@@ -225,7 +225,7 @@ export default function InvestorDashboard() {
                           key={deal._id}
                           type="button"
                           onClick={() => setSelectedDealId(deal._id)}
-                          className="w-full rounded-2xl border border-slate-800 bg-slate-900/80 p-4 text-left transition hover:border-cyan-500/30 hover:bg-slate-900"
+                          className="w-full rounded-2xl border border-slate-800 bg-slate-900 p-4 text-left transition hover:border-cyan-500/30 hover:bg-slate-900"
                         >
                           <div className="flex items-start justify-between gap-3">
                             <div>
@@ -249,7 +249,7 @@ export default function InvestorDashboard() {
                         </button>
                       ))}
                       {group.deals.length === 0 ? (
-                        <div className="rounded-2xl border border-dashed border-slate-800 bg-slate-950/60 p-4 text-sm text-slate-500">
+                        <div className="rounded-2xl border border-dashed border-slate-800 bg-slate-950 p-4 text-sm text-slate-500">
                           No deals in this stage.
                         </div>
                       ) : null}
@@ -272,12 +272,12 @@ export default function InvestorDashboard() {
               <Card className="p-5">
                 <div className="space-y-4">
                   {recentActivity.length === 0 ? (
-                    <div className="rounded-2xl border border-dashed border-slate-800 bg-slate-950/60 p-4 text-sm text-slate-500">
+                    <div className="rounded-2xl border border-dashed border-slate-800 bg-slate-950 p-4 text-sm text-slate-500">
                       Activity will appear here after your first pitch response or deal movement.
                     </div>
                   ) : (
                     recentActivity.map((item) => (
-                      <div key={item.id} className="rounded-2xl border border-slate-800 bg-slate-950/50 p-4">
+                      <div key={item.id} className="rounded-2xl border border-slate-800 bg-slate-950 p-4">
                         <div className="flex items-start justify-between gap-4">
                           <div>
                             <div className="font-semibold text-white">{item.title}</div>

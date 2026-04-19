@@ -53,7 +53,7 @@ const trigger = (value: string) =>
 
 function Stat({ label, value, detail }: { label: string; value: string; detail?: string }) {
   return (
-    <div className="border border-slate-800 bg-slate-950/80 px-4 py-4">
+    <div className="border border-slate-800 bg-slate-950 px-4 py-4">
       <div className="text-[11px] uppercase tracking-[0.26em] text-slate-500">{label}</div>
       <div className="mt-3 text-2xl font-semibold text-white">{value}</div>
       {detail ? <div className="mt-2 text-sm text-slate-400">{detail}</div> : null}
@@ -251,7 +251,7 @@ export default function DealReview() {
           description="Admin approval state, transfer metadata, and current cap-table position."
         >
           <div className="space-y-4">
-            <div className="border border-slate-800 bg-slate-950/80 px-4 py-4">
+            <div className="border border-slate-800 bg-slate-950 px-4 py-4">
               <div className="text-[11px] uppercase tracking-[0.25em] text-slate-500">Next action</div>
               <div className="mt-2 text-lg font-semibold text-white">{deal.nextActionLabel}</div>
               <div className="mt-2 text-sm text-slate-400">Requested {dt(deal.stockTransfer.requestedAt ?? deal.createdAt)}</div>
@@ -261,7 +261,7 @@ export default function DealReview() {
               <Stat label="Founder retained" value={pct(capTableQuery.data?.founderRetained.equityPercent ?? 0)} detail={`${number.format(capTableQuery.data?.founderRetained.sharesAllocated ?? 0)} shares`} />
               <Stat label="Investor equity" value={pct(capTableQuery.data?.totalInvestorEquity ?? 0)} detail={`${number.format(capTableQuery.data?.availableShares ?? deal.startup.sharePool.availableShares)} shares left`} />
             </div>
-            <div className="border border-slate-800 bg-slate-950/80 px-4 py-4 text-sm text-slate-300">
+            <div className="border border-slate-800 bg-slate-950 px-4 py-4 text-sm text-slate-300">
               Review notes: {deal.stockTransfer.reviewNotes?.trim() || 'No admin notes added yet.'}
             </div>
             <textarea
@@ -292,7 +292,7 @@ export default function DealReview() {
 
               <div className="space-y-3">
                 {deal.workspace.milestones.map((milestone) => (
-                  <div key={milestone._id} className="border border-slate-800 bg-slate-950/80 px-4 py-4">
+                  <div key={milestone._id} className="border border-slate-800 bg-slate-950 px-4 py-4">
                     <div className="mb-2 flex items-center justify-between gap-4">
                       <div className="font-medium text-white">{milestone.name}</div>
                       <div className="text-sm text-slate-400">{milestone.completionPercent}%</div>
@@ -311,7 +311,7 @@ export default function DealReview() {
                     <div className="border border-dashed border-slate-800 px-4 py-8 text-sm text-slate-400">No progress updates logged yet.</div>
                   ) : (
                     deal.workspace.progressUpdates.map((update) => (
-                      <div key={update._id} className="border border-slate-800 bg-slate-950/80 px-4 py-4">
+                      <div key={update._id} className="border border-slate-800 bg-slate-950 px-4 py-4">
                         <div className="text-sm leading-6 text-slate-200">{update.note}</div>
                         <div className="mt-3 text-xs uppercase tracking-[0.2em] text-slate-500">
                           {update.milestoneRef ?? 'General update'} | {dt(update.submittedAt)}
@@ -327,7 +327,7 @@ export default function DealReview() {
                     <div className="border border-dashed border-slate-800 px-4 py-8 text-sm text-slate-400">No repository links attached.</div>
                   ) : (
                     deal.workspace.repoSubmissions.map((repo) => (
-                      <a key={repo._id} href={repo.repoUrl} target="_blank" rel="noreferrer" className="block border border-slate-800 bg-slate-950/80 px-4 py-4 transition-colors hover:border-slate-700">
+                      <a key={repo._id} href={repo.repoUrl} target="_blank" rel="noreferrer" className="block border border-slate-800 bg-slate-950 px-4 py-4 transition-colors hover:border-slate-700">
                         <div className="flex items-start justify-between gap-4">
                           <div>
                             <div className="flex items-center gap-2 font-semibold text-white">
@@ -362,7 +362,7 @@ export default function DealReview() {
         >
           <div className="space-y-5">
             <div className="grid gap-4 md:grid-cols-2">
-              <div className="border border-slate-800 bg-slate-950/80 px-4 py-4">
+              <div className="border border-slate-800 bg-slate-950 px-4 py-4">
                 <div className="flex items-start justify-between gap-4">
                   <div>
                     <div className="text-[11px] uppercase tracking-[0.25em] text-slate-500">Pitch deck</div>
@@ -381,7 +381,7 @@ export default function DealReview() {
                 ) : null}
               </div>
 
-              <div className="border border-slate-800 bg-slate-950/80 px-4 py-4">
+              <div className="border border-slate-800 bg-slate-950 px-4 py-4">
                 <div className="text-[11px] uppercase tracking-[0.25em] text-slate-500">Evidence snapshot</div>
                 <div className="mt-4 space-y-3 text-sm">
                   <div className="flex items-center justify-between text-slate-400"><span>Uploads</span><span className="font-semibold text-white">{number.format(deal.workspace?.evidenceSummary.uploadsCount ?? 0)}</span></div>
@@ -396,7 +396,7 @@ export default function DealReview() {
               <div className="text-sm font-semibold uppercase tracking-[0.22em] text-slate-500">Recent uploaded files</div>
               {deal.workspace?.uploads.length ? (
                 deal.workspace.uploads.map((upload) => (
-                  <a key={upload._id} href={upload.fileUrl} target="_blank" rel="noreferrer" className="block border border-slate-800 bg-slate-950/80 px-4 py-4 transition-colors hover:border-slate-700">
+                  <a key={upload._id} href={upload.fileUrl} target="_blank" rel="noreferrer" className="block border border-slate-800 bg-slate-950 px-4 py-4 transition-colors hover:border-slate-700">
                     <div className="flex items-start justify-between gap-4">
                       <div>
                         <div className="font-semibold text-white">{upload.fileName}</div>
@@ -434,7 +434,7 @@ export default function DealReview() {
               <div className="border border-dashed border-slate-800 px-4 py-8 text-sm text-slate-400">No founder profiles attached yet.</div>
             ) : (
               deal.startup.founders.map((founder) => (
-                <div key={founder._id} className="border border-slate-800 bg-slate-950/80 px-4 py-4">
+                <div key={founder._id} className="border border-slate-800 bg-slate-950 px-4 py-4">
                   <div className="flex items-center justify-between gap-4">
                     <div>
                       <div className="text-lg font-semibold text-white">{founder.displayName}</div>
@@ -447,7 +447,7 @@ export default function DealReview() {
                       <div className="text-sm text-slate-500">No score breakdown submitted.</div>
                     ) : (
                       Object.entries(founder.scoreBreakdown).map(([key, value]) => (
-                        <div key={key} className="flex items-center justify-between border border-slate-800 bg-slate-900/70 px-3 py-3 text-sm">
+                        <div key={key} className="flex items-center justify-between border border-slate-800 bg-slate-900 px-3 py-3 text-sm">
                           <span className="text-slate-400">{breakdownLabels[key] ?? key}</span>
                           <span className="font-semibold text-white">{number.format(value)}</span>
                         </div>
@@ -470,7 +470,7 @@ export default function DealReview() {
           ) : (
             <div className="grid gap-4 md:grid-cols-2">
               {deal.scoreEvents.map((event) => (
-                <div key={event._id} className="border border-slate-800 bg-slate-950/80 px-4 py-4">
+                <div key={event._id} className="border border-slate-800 bg-slate-950 px-4 py-4">
                   <div className="flex items-start justify-between gap-4">
                     <div>
                       <div className="font-semibold text-white">{trigger(event.trigger)}</div>

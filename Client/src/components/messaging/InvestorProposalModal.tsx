@@ -296,7 +296,7 @@ export function InvestorProposalModal({
                 <button
                   key={idx}
                   onClick={() => handleSend(msg)}
-                  className="w-full rounded-xl border border-slate-700 bg-slate-800/50 p-3 text-left text-sm text-slate-300 transition hover:border-emerald-500/50 hover:bg-slate-800"
+                  className="w-full rounded-xl border border-slate-700 bg-slate-800 p-3 text-left text-sm text-slate-300 transition hover:border-emerald-500/50 hover:bg-slate-800"
                 >
                   {msg}
                 </button>
@@ -342,7 +342,7 @@ export function InvestorProposalModal({
                     setSelectedStartupId(startup._id);
                     setSelectedProjectId(null);
                   }}
-                  className="w-full rounded-xl border border-slate-700 bg-slate-800/50 p-4 text-left transition hover:border-emerald-500/40 hover:bg-slate-800"
+                  className="w-full rounded-xl border border-slate-700 bg-slate-800 p-4 text-left transition hover:border-emerald-500/40 hover:bg-slate-800"
                 >
                   <div className="flex items-start justify-between gap-3">
                     <div className="min-w-0 flex-1">
@@ -374,7 +374,7 @@ export function InvestorProposalModal({
                     setSelectedProjectId(project._id);
                     setSelectedStartupId(null);
                   }}
-                  className="w-full rounded-xl border border-slate-700 bg-slate-800/50 p-4 text-left transition hover:border-emerald-500/40 hover:bg-slate-800"
+                  className="w-full rounded-xl border border-slate-700 bg-slate-800 p-4 text-left transition hover:border-emerald-500/40 hover:bg-slate-800"
                 >
                   <div className="flex items-start justify-between gap-3">
                     <div className="min-w-0 flex-1">
@@ -513,7 +513,7 @@ export function InvestorProposalModal({
                     <button
                       key={idx}
                       onClick={() => handleSend(msg)}
-                      className="w-full rounded-xl border border-slate-700 bg-slate-800/50 p-3 text-left text-sm text-slate-300 transition hover:border-emerald-500/50 hover:bg-slate-800"
+                      className="w-full rounded-xl border border-slate-700 bg-slate-800 p-3 text-left text-sm text-slate-300 transition hover:border-emerald-500/50 hover:bg-slate-800"
                     >
                       {msg.replace(/\*\*/g, '')}
                     </button>

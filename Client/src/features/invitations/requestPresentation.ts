@@ -31,9 +31,9 @@ export const REQUEST_STATUS_COLOR_CLASSES: Record<WorkflowRequest['status'], str
   pending: 'text-amber-300 border-amber-500/30 bg-amber-500/10',
   accepted: 'text-emerald-300 border-emerald-500/30 bg-emerald-500/10',
   declined: 'text-rose-300 border-rose-500/30 bg-rose-500/10',
-  withdrawn: 'text-slate-300 border-slate-700 bg-slate-800/60',
-  expired: 'text-slate-300 border-slate-700 bg-slate-800/60',
-  cancelled: 'text-slate-300 border-slate-700 bg-slate-800/60',
+  withdrawn: 'text-slate-300 border-slate-700 bg-slate-800',
+  expired: 'text-slate-300 border-slate-700 bg-slate-800',
+  cancelled: 'text-slate-300 border-slate-700 bg-slate-800',
   completed: 'text-cyan-300 border-cyan-500/30 bg-cyan-500/10',
 };
 

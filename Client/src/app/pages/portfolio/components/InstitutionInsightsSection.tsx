@@ -159,7 +159,7 @@ export function InstitutionInsightsSection({
           </div>
 
           {labels.length > 0 && series.length > 0 ? (
-            <div className="mt-4 rounded-2xl bg-slate-950/60 px-3 py-4">
+            <div className="mt-4 rounded-2xl bg-slate-950 px-3 py-4">
               <div className="mb-4 flex flex-wrap gap-3">
                 <div className="rounded-full border border-slate-800 px-3 py-1 text-xs text-slate-300">
                   Total Events <span className="ml-1 font-semibold text-slate-100">{totalEvents}</span>
@@ -256,7 +256,7 @@ export function InstitutionInsightsSection({
               </div>
             </div>
           ) : (
-            <div className="mt-4 rounded-2xl border border-slate-800 bg-slate-950/60 px-4 py-6 text-sm text-slate-400">
+            <div className="mt-4 rounded-2xl border border-slate-800 bg-slate-950 px-4 py-6 text-sm text-slate-400">
               No historical activity data is available yet.
             </div>
           )}

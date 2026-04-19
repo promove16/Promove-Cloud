@@ -119,7 +119,7 @@ function SupportingDocsModal({
   const active = documents[activeIndex];
 
   return (
-    <div className="fixed inset-0 z-[60] overflow-y-auto bg-slate-950/80 p-4 backdrop-blur-sm sm:p-6">
+    <div className="fixed inset-0 z-[60] overflow-y-auto bg-slate-950 p-4 backdrop-blur-sm sm:p-6">
       <div className="mx-auto flex min-h-full w-full items-start justify-center">
         <Card className="flex w-full max-w-5xl flex-col overflow-hidden p-6 max-h-[calc(100vh-2rem)] sm:max-h-[calc(100vh-3rem)]">
           <div className="flex items-start justify-between gap-4">
@@ -149,7 +149,7 @@ function SupportingDocsModal({
                     className={`flex w-full items-start gap-3 rounded-2xl border px-4 py-3 text-left transition-colors ${
                       i === activeIndex
                         ? 'border-cyan-500/50 bg-cyan-500/10 text-white'
-                        : 'border-slate-800 bg-slate-900/60 text-slate-300 hover:border-slate-700'
+                        : 'border-slate-800 bg-slate-900 text-slate-300 hover:border-slate-700'
                     }`}
                   >
                     {doc.fileType === 'image' ? (
@@ -168,7 +168,7 @@ function SupportingDocsModal({
               </div>
 
               {/* Preview pane */}
-              <div className="flex min-h-0 flex-col overflow-hidden rounded-3xl border border-slate-800 bg-slate-950/60">
+              <div className="flex min-h-0 flex-col overflow-hidden rounded-3xl border border-slate-800 bg-slate-950">
                 <div className="flex items-center justify-between gap-4 border-b border-slate-800 px-5 py-4">
                   <div>
                     <div className="font-semibold text-white">{active.fileName}</div>
@@ -260,7 +260,7 @@ function ReviewModal({
   if (!open || !patent) return null;
 
   return (
-    <div className="fixed inset-0 z-50 overflow-y-auto bg-slate-950/70 p-4 backdrop-blur-sm sm:p-6">
+    <div className="fixed inset-0 z-50 overflow-y-auto bg-slate-950 p-4 backdrop-blur-sm sm:p-6">
       <div className="mx-auto flex min-h-full w-full items-start justify-center">
         <Card className="flex w-full max-w-4xl flex-col overflow-hidden p-6 max-h-[calc(100vh-2rem)] sm:max-h-[calc(100vh-3rem)]">
           <div className="flex items-start justify-between gap-4">
@@ -277,7 +277,7 @@ function ReviewModal({
             <section className="min-w-0 space-y-6">
               <div>
                 <div className="mb-4 text-xs uppercase tracking-[0.3em] text-cyan-300">Questionnaire</div>
-                <div className="overflow-hidden rounded-3xl border border-slate-800 bg-slate-950/60">
+                <div className="overflow-hidden rounded-3xl border border-slate-800 bg-slate-950">
                   {Object.entries(patent.questionnaire).map(([label, value], index, entries) => (
                     <div
                       key={label}
@@ -292,7 +292,7 @@ function ReviewModal({
 
               <div>
                 <div className="mb-4 text-xs uppercase tracking-[0.3em] text-cyan-300">Filing Checklist</div>
-                <div className="overflow-hidden rounded-3xl border border-slate-800 bg-slate-950/60">
+                <div className="overflow-hidden rounded-3xl border border-slate-800 bg-slate-950">
                   {!patent.filingDocuments ? (
                     <div className="px-5 py-5 text-base text-slate-500">No filing documents submitted.</div>
                   ) : [
@@ -331,14 +331,14 @@ function ReviewModal({
             <section className="min-w-0 space-y-6">
               <div>
                 <div className="mb-4 text-xs uppercase tracking-[0.3em] text-cyan-300">Student Score</div>
-                <div className="rounded-3xl border border-slate-800 bg-slate-950/60 p-5">
+                <div className="rounded-3xl border border-slate-800 bg-slate-950 p-5">
                   <div className="text-5xl font-bold leading-none text-white">{patent.student.innovationScore}</div>
                   <div className="mt-3 text-sm text-slate-400">Full score breakdown is visible before review.</div>
                   <div className="mt-6 space-y-2">
                     {Object.entries(patent.student.scoreBreakdown).map(([label, value]) => (
                       <div
                         key={label}
-                        className="flex items-center justify-between rounded-xl border border-slate-800 bg-slate-900/60 px-4 py-3 text-sm"
+                        className="flex items-center justify-between rounded-xl border border-slate-800 bg-slate-900 px-4 py-3 text-sm"
                       >
                         <span className="text-slate-300">{formatKey(label)}</span>
                         <span className="font-semibold text-white">{value}</span>
@@ -350,7 +350,7 @@ function ReviewModal({
 
               <div>
                 <div className="mb-4 text-xs uppercase tracking-[0.3em] text-cyan-300">Supporting Documents</div>
-                <div className="rounded-3xl border border-slate-800 bg-slate-950/60 p-5">
+                <div className="rounded-3xl border border-slate-800 bg-slate-950 p-5">
                   {!patent.supportingDocuments?.length ? (
                     <div className="text-sm text-slate-500">No supporting documents were attached.</div>
                   ) : (
@@ -376,7 +376,7 @@ function ReviewModal({
           )}
 
           {patent && ['submitted', 'under_review'].includes(patent.status) ? (
-            <div className="mt-6 flex shrink-0 flex-col gap-4 border-t border-slate-800 bg-slate-900/95 pt-5 lg:flex-row lg:items-end lg:justify-between">
+            <div className="mt-6 flex shrink-0 flex-col gap-4 border-t border-slate-800 bg-slate-900 pt-5 lg:flex-row lg:items-end lg:justify-between">
               <div className="w-full max-w-xl">
                 <div className="text-sm text-slate-400">Approve will award {PATENT_APPROVAL_SCORE} Innovation Score.</div>
                 <textarea
@@ -449,7 +449,7 @@ export default function Patents() {
       />
 
       <Card className="overflow-hidden">
-        <div className="grid grid-cols-[1.4fr,1fr,160px,120px,100px,140px] border-b border-slate-800 bg-slate-900/70 px-5 py-4 text-xs uppercase tracking-[0.3em] text-slate-400">
+        <div className="grid grid-cols-[1.4fr,1fr,160px,120px,100px,140px] border-b border-slate-800 bg-slate-900 px-5 py-4 text-xs uppercase tracking-[0.3em] text-slate-400">
           <div>Student</div>
           <div>Project</div>
           <div>Submitted</div>
@@ -475,7 +475,7 @@ export default function Patents() {
                   {patent.supportingDocuments?.length ? (
                     <button
                       onClick={() => setDocsPatent(patent)}
-                      className="flex items-center gap-1.5 rounded-xl border border-slate-700 bg-slate-800/60 px-3 py-1.5 text-xs font-medium text-slate-300 hover:border-cyan-500/50 hover:text-cyan-300 transition-colors"
+                      className="flex items-center gap-1.5 rounded-xl border border-slate-700 bg-slate-800 px-3 py-1.5 text-xs font-medium text-slate-300 hover:border-cyan-500/50 hover:text-cyan-300 transition-colors"
                     >
                       <Files className="h-3.5 w-3.5" />
                       {patent.supportingDocuments.length}

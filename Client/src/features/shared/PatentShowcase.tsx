@@ -27,7 +27,7 @@ function PatentDetailModal({
   onClose: () => void;
 }) {
   return (
-    <div className="fixed inset-0 z-50 overflow-y-auto bg-slate-950/70 p-4 backdrop-blur-sm sm:p-6">
+    <div className="fixed inset-0 z-50 overflow-y-auto bg-slate-950 p-4 backdrop-blur-sm sm:p-6">
       <div className="mx-auto flex min-h-full w-full max-w-2xl items-start justify-center">
         <Card className="w-full p-6">
           <div className="flex items-start justify-between gap-4">
@@ -42,7 +42,7 @@ function PatentDetailModal({
 
           <div className="mt-6 space-y-5">
             {/* Student info */}
-            <div className="flex items-center gap-4 rounded-2xl border border-slate-800 bg-slate-950/60 p-4">
+            <div className="flex items-center gap-4 rounded-2xl border border-slate-800 bg-slate-950 p-4">
               <div className="flex h-12 w-12 shrink-0 items-center justify-center rounded-full bg-gradient-to-br from-blue-500 to-purple-500 text-lg font-bold text-white">
                 {patent.student.avatar ? (
                   <img src={patent.student.avatar} alt={patent.student.displayName} className="h-12 w-12 rounded-full object-cover" />
@@ -62,7 +62,7 @@ function PatentDetailModal({
             <div className="space-y-3">
               <div className="flex flex-wrap gap-2">
                 {patent.inventionCategory && (
-                  <span className="rounded-full border border-slate-700 bg-slate-800/60 px-3 py-1 text-xs font-medium text-slate-300">
+                  <span className="rounded-full border border-slate-700 bg-slate-800 px-3 py-1 text-xs font-medium text-slate-300">
                     {INVENTION_CATEGORY_LABELS[patent.inventionCategory] ?? patent.inventionCategory}
                   </span>
                 )}
@@ -77,7 +77,7 @@ function PatentDetailModal({
               </div>
 
               {patent.abstract && (
-                <div className="rounded-2xl border border-slate-800 bg-slate-950/60 px-5 py-4">
+                <div className="rounded-2xl border border-slate-800 bg-slate-950 px-5 py-4">
                   <div className="mb-2 text-xs uppercase tracking-[0.3em] text-slate-500">Abstract</div>
                   <p className="text-sm leading-7 text-slate-300">{patent.abstract}</p>
                 </div>
@@ -154,7 +154,7 @@ export function PatentShowcase() {
                         </div>
                         <span className="text-sm font-medium text-slate-300 truncate">{patent.student.displayName}</span>
                         {patent.student.domain && (
-                          <span className="shrink-0 rounded-full border border-slate-700 bg-slate-800/60 px-2 py-0.5 text-xs text-slate-400">
+                          <span className="shrink-0 rounded-full border border-slate-700 bg-slate-800 px-2 py-0.5 text-xs text-slate-400">
                             {patent.student.domain}
                           </span>
                         )}
@@ -168,7 +168,7 @@ export function PatentShowcase() {
                     </div>
                     <button
                       onClick={() => setSelected(patent)}
-                      className="shrink-0 rounded-xl border border-slate-700 bg-slate-800/60 px-3 py-1.5 text-xs font-medium text-slate-300 hover:border-cyan-500/50 hover:text-cyan-300 transition-colors"
+                      className="shrink-0 rounded-xl border border-slate-700 bg-slate-800 px-3 py-1.5 text-xs font-medium text-slate-300 hover:border-cyan-500/50 hover:text-cyan-300 transition-colors"
                     >
                       View
                     </button>

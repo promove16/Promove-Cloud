@@ -102,19 +102,19 @@ const startupInviteConfigs: Record<StartupInviteTargetType, StartupInviteConfig>
     icon: Sparkles,
   },
   investor: {
-    title: "Startup pitch request",
-    actionLabel: "Pitch request",
-    submitLabel: "Send pitch request",
+    title: "Investor outreach",
+    actionLabel: "Connect",
+    submitLabel: "Send outreach",
     requestType: "investor_startup_access",
     actionType: "invest",
     targetRole: "investor",
-    roleLabel: "Pitch ask",
+    roleLabel: "Outreach purpose",
     rolePlaceholder: "e.g. Seed pitch, Discovery call, Strategic investor intro",
-    messageLabel: "Pitch note",
+    messageLabel: "Investor note",
     messagePlaceholder:
-      "Summarize the startup, traction, and why this investor is a fit for the pitch conversation.",
+      "Summarize the startup, traction, and why this investor is a fit for the conversation.",
     helperText:
-      "This sends a structured pitch request. The investor can accept or decline before the conversation advances.",
+      "This sends a structured investor outreach note. The investor can accept or decline before the conversation advances.",
     suggestions: [
       "Discovery call",
       "Pitch deck review",
@@ -173,7 +173,7 @@ const modalSectionClassName =
 const modalEyebrowClassName =
   "text-[11px] font-semibold uppercase tracking-[0.24em] text-slate-500";
 const fieldClassName =
-  "w-full rounded-2xl border border-slate-700/80 bg-slate-950/80 px-4 text-sm text-white outline-none transition placeholder:text-slate-500 focus:border-cyan-400 focus:bg-slate-950";
+  "w-full rounded-2xl border border-slate-700/80 bg-slate-950 px-4 text-sm text-white outline-none transition placeholder:text-slate-500 focus:border-cyan-400 focus:bg-slate-950";
 
 export const isStartupInviteTargetType = (
   entityType: MarketplaceEntityType,
@@ -193,7 +193,7 @@ const buildRequestMessage = (
   const roleText = requestedRole.trim();
   const opener =
     target.entityType === "investor"
-      ? `I would like to send a pitch request for ${startup.name} around ${roleText}.`
+      ? `I would like to reach out about ${startup.name} around ${roleText}.`
       : target.entityType === "mentor"
         ? `I would like to invite you to mentor ${startup.name} as ${roleText}.`
         : `I would like to invite you to join ${startup.name} as ${roleText}.`;
@@ -329,7 +329,7 @@ export function StartupInviteModal({
       });
       onSent?.(
         target.entityType === "investor"
-          ? `Pitch request sent to ${target.displayName}.`
+          ? `Investor outreach sent to ${target.displayName}.`
           : `Startup invite sent to ${target.displayName}.`,
       );
       onClose();
@@ -352,7 +352,7 @@ export function StartupInviteModal({
     !sendInviteMutation.isPending;
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-950/85 px-4 py-4 backdrop-blur-md sm:px-6">
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-950 px-4 py-4 backdrop-blur-md sm:px-6">
       <div className="flex max-h-[min(92vh,860px)] w-full max-w-[720px] flex-col overflow-hidden rounded-[30px] border border-white/10 bg-[#070816]/95 shadow-[0_30px_120px_rgba(15,23,42,0.65)]">
         <div className="flex shrink-0 items-start justify-between gap-4 border-b border-white/10 px-5 py-4 sm:px-6">
           <div className="flex min-w-0 items-start gap-4">
@@ -413,7 +413,7 @@ export function StartupInviteModal({
                 <div className="font-semibold">Founder-managed startup required</div>
                 <p className="mt-2 leading-6 text-amber-100/90">
                   Create or open a startup you own before sending team invites,
-                  mentor requests, or investor pitch requests from the marketplace.
+                  mentor requests, or investor outreach from the marketplace.
                 </p>
               </div>
             ) : (
@@ -465,13 +465,13 @@ export function StartupInviteModal({
                         </div>
                       </div>
                       <div className="mt-3 flex flex-wrap gap-2 text-xs text-slate-300">
-                        <span className="rounded-full border border-slate-700 bg-slate-950/70 px-3 py-1.5">
+                        <span className="rounded-full border border-slate-700 bg-slate-950 px-3 py-1.5">
                           {selectedStartup.category}
                         </span>
-                        <span className="rounded-full border border-slate-700 bg-slate-950/70 px-3 py-1.5">
+                        <span className="rounded-full border border-slate-700 bg-slate-950 px-3 py-1.5">
                           Team {selectedStartup.teamSize}
                         </span>
-                        <span className="rounded-full border border-slate-700 bg-slate-950/70 px-3 py-1.5">
+                        <span className="rounded-full border border-slate-700 bg-slate-950 px-3 py-1.5">
                           Funding {formatFundingNeeded(selectedStartup.fundingNeeded)}
                         </span>
                       </div>
@@ -492,7 +492,7 @@ export function StartupInviteModal({
                         className={`rounded-full border px-3 py-1.5 text-xs font-medium transition ${
                           requestedRole === suggestion
                             ? "border-cyan-400/40 bg-cyan-400/10 text-cyan-100"
-                            : "border-slate-700 bg-slate-900/80 text-slate-300 hover:border-slate-500 hover:text-white"
+                            : "border-slate-700 bg-slate-900 text-slate-300 hover:border-slate-500 hover:text-white"
                         }`}
                       >
                         {suggestion}
@@ -542,7 +542,7 @@ export function StartupInviteModal({
             <button
               type="button"
               onClick={onClose}
-              className="inline-flex items-center gap-2 rounded-full border border-slate-700 bg-slate-900/80 px-4 py-2.5 text-sm font-medium text-slate-100 transition hover:border-slate-500 hover:bg-slate-800"
+              className="inline-flex items-center gap-2 rounded-full border border-slate-700 bg-slate-900 px-4 py-2.5 text-sm font-medium text-slate-100 transition hover:border-slate-500 hover:bg-slate-800"
             >
               Cancel
             </button>

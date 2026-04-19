@@ -67,7 +67,7 @@ export default function SupportHelpDeskPage() {
     <div className="space-y-5">
       {/* ── Hero ─────────────────────────────────────────────────────────────── */}
       <section className="relative overflow-hidden rounded-3xl border border-slate-800 bg-slate-950">
-        <div className="absolute inset-x-0 top-0 h-44 bg-[radial-gradient(circle_at_top_left,rgba(34,211,238,0.15),transparent_35%),radial-gradient(circle_at_top_right,rgba(99,102,241,0.12),transparent_28%)]" />
+        <div className="absolute inset-x-0 top-0 h-44 bg-[radial-gradient(circle_at_top_left,rgba(59,130,246,0.15),transparent_35%),radial-gradient(circle_at_top_right,rgba(99,102,241,0.12),transparent_28%)]" />
         <div className="relative flex flex-col gap-5 px-6 py-7 lg:flex-row lg:items-end lg:justify-between lg:px-10">
           <div className="max-w-2xl">
             <div className={`text-[11px] uppercase tracking-[0.32em] ${accentColor}`}>
@@ -114,7 +114,7 @@ export default function SupportHelpDeskPage() {
                   className={`group rounded-2xl border px-4 py-4 text-left transition-all ${
                     isActive
                       ? 'border-cyan-500/40 bg-cyan-500/10'
-                      : 'border-slate-800 bg-slate-900/60 hover:border-slate-700 hover:bg-slate-900'
+                      : 'border-slate-800 bg-slate-900 hover:border-slate-700 hover:bg-slate-900'
                   }`}
                 >
                   <div className={`text-sm font-semibold transition-colors ${isActive ? 'text-white' : 'text-slate-200 group-hover:text-white'}`}>
@@ -133,7 +133,7 @@ export default function SupportHelpDeskPage() {
       {/* ── Search + FAQ ─────────────────────────────────────────────────────── */}
       <section id="faq-section" className="space-y-3">
         {/* Search bar */}
-        <div className="flex items-center gap-3 rounded-2xl border border-slate-800 bg-slate-900/80 px-4 py-3">
+        <div className="flex items-center gap-3 rounded-2xl border border-slate-800 bg-slate-900 px-4 py-3">
           <Search className="h-4 w-4 shrink-0 text-slate-500" />
           <Input
             value={search}
@@ -175,7 +175,7 @@ export default function SupportHelpDeskPage() {
               return (
                 <div
                   key={faq.id}
-                  className={`rounded-2xl border transition-colors ${open ? 'border-slate-700 bg-slate-900' : 'border-slate-800 bg-slate-900/50 hover:border-slate-700'}`}
+                  className={`rounded-2xl border transition-colors ${open ? 'border-slate-700 bg-slate-900' : 'border-slate-800 bg-slate-900 hover:border-slate-700'}`}
                 >
                   <button
                     type="button"
@@ -249,7 +249,7 @@ export default function SupportHelpDeskPage() {
                 className={`rounded-2xl border px-5 py-4 text-left transition-all group ${
                   isActive
                     ? 'border-cyan-500/40 bg-cyan-500/10'
-                    : 'border-slate-800 bg-slate-900/60 hover:border-slate-700'
+                    : 'border-slate-800 bg-slate-900 hover:border-slate-700'
                 }`}
               >
                 <div className="flex items-start justify-between gap-3">
@@ -276,7 +276,7 @@ export default function SupportHelpDeskPage() {
       </section>
 
       {/* ── Recent tickets ───────────────────────────────────────────────────── */}
-      <Card className="border-slate-800 bg-slate-950/90 p-6">
+      <Card className="border-slate-800 bg-slate-950 p-6">
         <div className="flex items-center justify-between gap-3">
           <div>
             <div className="text-xs uppercase tracking-[0.28em] text-slate-500">Activity</div>
@@ -317,7 +317,7 @@ export default function SupportHelpDeskPage() {
               <Link
                 key={ticket._id}
                 to={buildUserTicketPath(ticket._id)}
-                className="flex flex-col gap-2 rounded-2xl border border-slate-800 bg-slate-900/50 px-5 py-4 transition hover:border-slate-700 lg:flex-row lg:items-center lg:justify-between"
+                className="flex flex-col gap-2 rounded-2xl border border-slate-800 bg-slate-900 px-5 py-4 transition hover:border-slate-700 lg:flex-row lg:items-center lg:justify-between"
               >
                 <div className="space-y-1.5">
                   <div className="flex flex-wrap items-center gap-2">

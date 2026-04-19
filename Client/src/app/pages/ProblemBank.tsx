@@ -551,7 +551,7 @@ export function ProblemBank() {
 
         {selectedProblem ? (
           <div
-            className="fixed inset-0 z-50 overflow-y-auto bg-slate-950/80 p-4 backdrop-blur-sm sm:p-6"
+            className="fixed inset-0 z-50 overflow-y-auto bg-slate-950 p-4 backdrop-blur-sm sm:p-6"
             onClick={closeDetails}
           >
             <div

@@ -17,6 +17,7 @@ import {
   createCollegeComplianceIncidentController,
   createCollegeEventController,
   getCollegeComplianceOverviewController,
+  getCollegeComplianceSubmissionController,
   getCollegeDashboardController,
   getCollegeEventRankingsController,
   getCollegePlacementController,
@@ -40,6 +41,7 @@ import {
   listCollegeStudentsController,
   markCollegeComplianceAlertReadController,
   reviewCollegeStudentVerificationController,
+  submitCollegeComplianceSubmissionController,
   updateCollegeComplianceActionController,
   updateCollegeComplianceIncidentController,
   updatePlacementStatusController,
@@ -105,6 +107,16 @@ router.get(
   '/compliance/overview',
   authorize(UserRole.COLLEGE),
   asyncHandler(getCollegeComplianceOverviewController),
+);
+router.get(
+  '/compliance/submission',
+  authorize(UserRole.COLLEGE),
+  asyncHandler(getCollegeComplianceSubmissionController),
+);
+router.put(
+  '/compliance/submission',
+  authorize(UserRole.COLLEGE),
+  asyncHandler(submitCollegeComplianceSubmissionController),
 );
 router.get(
   '/compliance/incidents',

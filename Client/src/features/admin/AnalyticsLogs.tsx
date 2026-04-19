@@ -86,7 +86,7 @@ const AnalyticsLogConsole = memo(function AnalyticsLogConsole({
             {adminLogs.map((action) => (
               <div
                 key={action._id}
-                className="grid grid-cols-[minmax(0,1.2fr)_160px_220px] items-center px-6 py-4 text-sm transition hover:bg-slate-900/60 lg:px-8"
+                className="grid grid-cols-[minmax(0,1.2fr)_160px_220px] items-center px-6 py-4 text-sm transition hover:bg-slate-900 lg:px-8"
               >
                 <div className="font-medium uppercase tracking-[0.12em] text-white">
                   {action.action.replace(/_/g, ' ')}
@@ -109,7 +109,7 @@ const AnalyticsLogConsole = memo(function AnalyticsLogConsole({
             {applicationLogs.map((entry: AdminAnalyticsLogEntry) => (
               <div
                 key={entry._id}
-                className="grid grid-cols-[120px_120px_minmax(0,1fr)_220px] items-center px-6 py-4 transition hover:bg-slate-900/60 lg:px-8"
+                className="grid grid-cols-[120px_120px_minmax(0,1fr)_220px] items-center px-6 py-4 transition hover:bg-slate-900 lg:px-8"
               >
                 <div className="text-cyan-300">{entry.level}</div>
                 <div className="uppercase text-slate-400">{entry.source}</div>

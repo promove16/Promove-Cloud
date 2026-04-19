@@ -6,6 +6,10 @@ import {
   RegistrationRequestStatus,
 } from '../types/auth.types';
 import {
+  InstitutionPolicySubmissionListResponse,
+  InstitutionPolicySubmissionRecord,
+} from '../types/school.types';
+import {
   CapTableResponse,
   DealMediationStatus,
   DealRequestOrigin,
@@ -625,6 +629,23 @@ export const adminApi = {
     const response = await api.get<ApiSuccessResponse<AdminRegistrationRequestsResponse>>(
       '/api/admin/registration-requests',
       { params },
+    );
+    return response.data.data;
+  },
+  async getComplianceSubmissions(params?: { status?: 'pending' | 'approved' | 'rejected' }) {
+    const response = await api.get<ApiSuccessResponse<InstitutionPolicySubmissionListResponse>>(
+      '/api/admin/compliance-submissions',
+      { params },
+    );
+    return response.data.data;
+  },
+  async reviewComplianceSubmission(
+    submissionId: string,
+    payload: { decision: 'approved' | 'rejected'; adminNotes?: string },
+  ) {
+    const response = await api.patch<ApiSuccessResponse<InstitutionPolicySubmissionRecord>>(
+      `/api/admin/compliance-submissions/${submissionId}/review`,
+      payload,
     );
     return response.data.data;
   },

@@ -43,15 +43,15 @@ export default function ProblemBankAdmin() {
             </div>
 
             <div className="grid gap-3 sm:grid-cols-3 xl:min-w-[32rem]">
-              <div className="border border-slate-800/80 bg-slate-950/80 px-4 py-3">
+              <div className="border border-slate-800 bg-slate-950 px-4 py-3">
                 <div className="text-[11px] uppercase tracking-[0.25em] text-slate-500">Total problems</div>
                 <div className="mt-2 text-sm font-medium text-white">{summary.totalProblems}</div>
               </div>
-              <div className="border border-slate-800/80 bg-slate-950/80 px-4 py-3">
+              <div className="border border-slate-800 bg-slate-950 px-4 py-3">
                 <div className="text-[11px] uppercase tracking-[0.25em] text-slate-500">Published</div>
                 <div className="mt-2 text-sm font-medium text-white">{summary.publishedProblems}</div>
               </div>
-              <div className="border border-slate-800/80 bg-slate-950/80 px-4 py-3">
+              <div className="border border-slate-800 bg-slate-950 px-4 py-3">
                 <div className="text-[11px] uppercase tracking-[0.25em] text-slate-500">Pending reviews</div>
                 <div className="mt-2 text-sm font-medium text-white">{summary.pendingReviews}</div>
               </div>

@@ -145,7 +145,7 @@ export function LoginPage() {
         <form
           onSubmit={handleSubmit(onSubmit)}
           noValidate
-          className="rounded-[28px] border border-slate-800 bg-slate-900/80 p-8 shadow-[0_30px_80px_rgba(2,6,23,0.45)] backdrop-blur"
+          className="rounded-[28px] border border-slate-800 bg-slate-900 p-8 shadow-[0_30px_80px_rgba(2,6,23,0.45)] backdrop-blur"
         >
           <div className="mb-6">
             <label htmlFor="login-email" className="mb-3 block text-lg font-semibold text-white">

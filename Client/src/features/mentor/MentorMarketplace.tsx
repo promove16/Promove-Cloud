@@ -74,7 +74,7 @@ function SubmitBidModal({ opportunity, onClose, onSuccess }: SubmitBidModalProps
   };
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-950/80 p-4 backdrop-blur-sm">
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-950 p-4 backdrop-blur-sm">
       <div className="flex w-full max-w-xl flex-col overflow-hidden rounded-2xl border border-slate-800 bg-slate-950 shadow-2xl shadow-black/50">
         {/* Header */}
         <div className="flex shrink-0 items-start justify-between gap-4 border-b border-slate-800 px-6 py-5">

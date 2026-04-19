@@ -9,7 +9,7 @@ import { UserRole } from '../../types/roles.types';
 import { JobPost } from '../recruiter/jobPost.model';
 import { assertRecruiterLinkedToCollege } from '../recruiter/recruiter.drive.service';
 import { createBridge, notifyUser } from '../recruiter/recruiter.mappers';
-import { registerRequestHandler } from '../request/request.service';
+import { createRequestRecord, registerRequestHandler } from '../request/request.service';
 
 export const createEventSchema = z.object({
   title: z.string().trim().min(2).max(160),
@@ -46,6 +46,21 @@ export const createHiringEventSchema = z.object({
 export const selectStudentFromEventSchema = z.object({
   jobId: z.string().regex(/^[0-9a-fA-F]{24}$/, 'Invalid job ID'),
   note: z.string().trim().min(2).max(500).optional(),
+});
+
+export const sendHiringEventInviteSchema = z.object({
+  title: z.string().trim().min(2).max(160),
+  type: z.enum([
+    'Industry Connect Session',
+    'Placement Hackathon',
+    'Innovation Drive',
+    'Other',
+  ]),
+  date: z.string().datetime(),
+  description: z.string().trim().min(10).max(2000),
+  linkedJobId: z.string().regex(/^[0-9a-fA-F]{24}$/).optional(),
+  minimumInnovationScore: z.coerce.number().min(0).default(0),
+  message: z.string().trim().max(500).optional(),
 });
 
 const collegeEventInviteMetadataSchema = z.object({
@@ -469,6 +484,48 @@ export const createHiringEvent = async (
     rankings: [],
     rankingsComputedAt: undefined,
   };
+};
+
+export const sendHiringEventInvite = async (
+  recruiterId: string,
+  collegeId: string,
+  payload: z.infer<typeof sendHiringEventInviteSchema>,
+) => {
+  await assertRecruiterLinkedToCollege(recruiterId, collegeId);
+
+  const college = await User.findOne({ _id: collegeId, role: UserRole.COLLEGE, isActive: true })
+    .select('_id displayName')
+    .lean();
+
+  if (!college) {
+    throw new ApiError(404, 'COLLEGE_NOT_FOUND', 'College not found');
+  }
+
+  const recruiter = await User.findById(recruiterId).select('displayName').lean();
+  const recruiterName = recruiter?.displayName ?? 'A recruiter';
+
+  const { message, ...eventMetadata } = payload;
+  const body = message?.trim() ||
+    `${recruiterName} is requesting to host "${payload.title}" at ${college.displayName}.`;
+
+  await createRequestRecord({
+    type: 'college_event_invite',
+    actionType: 'assign',
+    fromUserId: recruiterId,
+    toUserId: String(college._id),
+    targetEntityType: 'college',
+    targetEntityId: String(college._id),
+    targetEntityTitle: college.displayName,
+    targetRole: UserRole.COLLEGE,
+    requestedRole: 'host',
+    message: body,
+    metadata: eventMetadata,
+    deepLink: '/dashboard/invitations',
+    acceptRedirect: '/dashboard/college/events?tab=hiring',
+    declineRedirect: '/dashboard/college/events',
+  });
+
+  return { sent: true };
 };
 
 export const listRecruiterHiringEvents = async (recruiterId: string) => {

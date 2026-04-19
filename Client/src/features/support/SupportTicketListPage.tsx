@@ -47,7 +47,7 @@ export default function SupportTicketListPage() {
   return (
     <div className="space-y-6">
       <section className="relative overflow-hidden rounded-3xl border border-slate-800 bg-slate-950">
-        <div className="absolute inset-x-0 top-0 h-40 bg-[radial-gradient(circle_at_top_left,rgba(34,211,238,0.18),transparent_35%)]" />
+        <div className="absolute inset-x-0 top-0 h-40 bg-[radial-gradient(circle_at_top_left,rgba(59,130,246,0.18),transparent_35%)]" />
         <div className="relative flex flex-col gap-4 px-6 py-6 lg:flex-row lg:items-end lg:justify-between lg:px-8">
           <div className="max-w-2xl">
             <div className="text-[11px] uppercase tracking-[0.32em] text-cyan-300">Support</div>
@@ -65,7 +65,7 @@ export default function SupportTicketListPage() {
         </div>
       </section>
 
-      <Card className="border-slate-800 bg-slate-950/90 p-5">
+      <Card className="border-slate-800 bg-slate-950 p-5">
         <div className="flex flex-wrap items-center gap-3">
           <div className="flex items-center gap-2 text-xs uppercase tracking-[0.28em] text-slate-500">
             <Filter className="h-3.5 w-3.5" /> Filters
@@ -118,7 +118,7 @@ export default function SupportTicketListPage() {
         </div>
       </Card>
 
-      <Card className="border-slate-800 bg-slate-950/90 p-6">
+      <Card className="border-slate-800 bg-slate-950 p-6">
         {ticketsQuery.isLoading ? (
           <div className="flex min-h-[24vh] items-center justify-center">
             <Spinner />
@@ -137,7 +137,7 @@ export default function SupportTicketListPage() {
               <Link
                 key={ticket._id}
                 to={buildUserTicketPath(ticket._id)}
-                className="block rounded-2xl border border-slate-800 bg-slate-900/60 px-5 py-4 transition hover:border-cyan-500/40"
+                className="block rounded-2xl border border-slate-800 bg-slate-900 px-5 py-4 transition hover:border-cyan-500/40"
               >
                 <div className="flex flex-col gap-3 lg:flex-row lg:items-start lg:justify-between">
                   <div className="space-y-2">

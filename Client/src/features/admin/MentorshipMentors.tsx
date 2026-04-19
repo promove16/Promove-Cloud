@@ -134,7 +134,7 @@ export default function MentorshipMentors() {
             </div>
           ) : (
             mentors.map((mentor) => (
-              <div key={mentor._id} className="rounded-2xl border border-slate-800 bg-slate-900/70 px-4 py-4">
+              <div key={mentor._id} className="rounded-2xl border border-slate-800 bg-slate-900 px-4 py-4">
                 <div className="flex items-start justify-between gap-3">
                   <div>
                     <div className="font-semibold text-white">{mentor.displayName}</div>

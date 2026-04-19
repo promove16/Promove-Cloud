@@ -5,10 +5,10 @@ import { OptionTabs } from '../../components/ui/OptionTabs';
 import { BulkCredentialImportResult, TemporaryStudentCredentials, StudentRosterEntry } from '../../types/school.types';
 
 const rosterTone: Record<StudentRosterEntry['status'], string> = {
-  invited: 'border-cyan-500/30 bg-cyan-500/10 text-cyan-200',
-  registered_pending: 'border-amber-500/30 bg-amber-500/10 text-amber-200',
-  verified: 'border-emerald-500/30 bg-emerald-500/10 text-emerald-200',
-  rejected: 'border-rose-500/30 bg-rose-500/10 text-rose-200',
+  invited: 'border-cyan-700 bg-cyan-900 text-cyan-200',
+  registered_pending: 'border-amber-700 bg-amber-900 text-amber-200',
+  verified: 'border-emerald-700 bg-emerald-900 text-emerald-200',
+  rejected: 'border-rose-700 bg-rose-900 text-rose-200',
 };
 
 const sourceLabel: Record<StudentRosterEntry['source'], string> = {
@@ -46,6 +46,9 @@ type StudentIntakePanelProps = {
   description: string;
   secondaryFieldLabel: string;
   secondaryFieldPlaceholder: string;
+  compactTrigger?: boolean;
+  triggerLabel?: string;
+  showContextNote?: boolean;
   roster: StudentRosterEntry[];
   institutionDomainHint?: string;
   isRosterLoading?: boolean;
@@ -85,6 +88,9 @@ export function StudentIntakePanel({
   description,
   secondaryFieldLabel,
   secondaryFieldPlaceholder,
+  compactTrigger = false,
+  triggerLabel = 'Manage Students',
+  showContextNote = true,
   roster,
   institutionDomainHint,
   isRosterLoading,
@@ -238,33 +244,47 @@ export function StudentIntakePanel({
 
   return (
     <>
-      {/* Compact trigger row */}
-      <div className="flex flex-wrap items-center justify-between gap-4 rounded-xl border border-slate-800 bg-slate-900/40 px-5 py-4">
-        <div className="flex flex-wrap items-center gap-6">
-          <span className="text-xs uppercase tracking-[0.25em] text-slate-400">Student Onboarding</span>
-          <div className="flex items-center gap-4 text-sm">
-            <span>
-              <span className="font-semibold text-cyan-300">{summary.invited}</span>
-              <span className="ml-1.5 text-slate-500">invited</span>
-            </span>
-            <span>
-              <span className="font-semibold text-amber-300">{summary.registeredPending}</span>
-              <span className="ml-1.5 text-slate-500">awaiting review</span>
-            </span>
-            <span>
-              <span className="font-semibold text-emerald-300">{summary.verified}</span>
-              <span className="ml-1.5 text-slate-500">verified</span>
-            </span>
-          </div>
-        </div>
-        <Button onClick={() => setIsOpen(true)}>
+      {compactTrigger ? (
+        <Button
+          variant="outline"
+          className="border-cyan-700 bg-cyan-900 text-cyan-100 hover:border-cyan-500 hover:bg-cyan-800 hover:text-white"
+          onClick={() => setIsOpen(true)}
+        >
           <UserPlus className="mr-2 h-4 w-4" />
-          Manage Students
+          {triggerLabel}
         </Button>
-      </div>
-      <div className="rounded-xl border border-slate-800 bg-slate-950/40 px-5 py-3 text-sm text-slate-400">
-        The roster tracks invite and registration progress. Use the approval queue above for explicit approve or reject actions when they are required.
-      </div>
+      ) : (
+        <>
+          <div className="flex flex-wrap items-center justify-between gap-4 rounded-xl border border-slate-800 bg-slate-900 px-5 py-4">
+            <div className="flex flex-wrap items-center gap-6">
+              <span className="text-xs uppercase tracking-[0.25em] text-slate-400">Student Onboarding</span>
+              <div className="flex items-center gap-4 text-sm">
+                <span>
+                  <span className="font-semibold text-cyan-300">{summary.invited}</span>
+                  <span className="ml-1.5 text-slate-500">invited</span>
+                </span>
+                <span>
+                  <span className="font-semibold text-amber-300">{summary.registeredPending}</span>
+                  <span className="ml-1.5 text-slate-500">awaiting review</span>
+                </span>
+                <span>
+                  <span className="font-semibold text-emerald-300">{summary.verified}</span>
+                  <span className="ml-1.5 text-slate-500">verified</span>
+                </span>
+              </div>
+            </div>
+            <Button onClick={() => setIsOpen(true)}>
+              <UserPlus className="mr-2 h-4 w-4" />
+              {triggerLabel}
+            </Button>
+          </div>
+          {showContextNote ? (
+            <div className="rounded-xl border border-slate-800 bg-slate-950 px-5 py-3 text-sm text-slate-400">
+              The roster tracks invite and registration progress. Use the approval queue above for explicit approve or reject actions when they are required.
+            </div>
+          ) : null}
+        </>
+      )}
 
       {/* Sidebar drawer */}
       {isOpen && (
@@ -354,11 +374,11 @@ export function StudentIntakePanel({
                 <div className="space-y-4">
 
                   {/* Column Name Guide */}
-                  <div className="overflow-hidden rounded-xl border border-slate-700/60 bg-slate-900/40">
+                  <div className="overflow-hidden rounded-xl border border-slate-700 bg-slate-900">
                     <button
                       type="button"
                       onClick={() => setIsHelperOpen((v) => !v)}
-                      className="flex w-full items-center justify-between px-4 py-3 text-left transition hover:bg-slate-800/40"
+                      className="flex w-full items-center justify-between px-4 py-3 text-left transition hover:bg-slate-800"
                     >
                       <div className="flex items-center gap-2 text-xs font-medium text-slate-300">
                         <Info className="h-3.5 w-3.5 text-cyan-400" />
@@ -381,11 +401,11 @@ export function StudentIntakePanel({
                             <div className="flex items-center gap-2">
                               <span className="text-xs font-semibold text-white">{field.label}</span>
                               {field.required ? (
-                                <span className="rounded-full bg-rose-500/15 px-1.5 py-0.5 text-[10px] font-medium text-rose-400">
+                                <span className="rounded-full bg-rose-900 px-1.5 py-0.5 text-[10px] font-medium text-rose-400">
                                   Required
                                 </span>
                               ) : (
-                                <span className="rounded-full bg-slate-700/50 px-1.5 py-0.5 text-[10px] text-slate-500">
+                                <span className="rounded-full bg-slate-700 px-1.5 py-0.5 text-[10px] text-slate-400">
                                   Optional
                                 </span>
                               )}
@@ -404,7 +424,7 @@ export function StudentIntakePanel({
                           </div>
                         ))}
 
-                        <div className="rounded-lg border border-slate-700/50 bg-slate-950/50 px-3 py-2.5">
+                        <div className="rounded-lg border border-slate-700 bg-slate-950 px-3 py-2.5">
                           <div className="mb-1.5 text-[10px] font-semibold uppercase tracking-widest text-slate-500">
                             Sample row
                           </div>
@@ -449,7 +469,7 @@ export function StudentIntakePanel({
                   </div>
 
                   {/* Toggle: with or without credentials */}
-                  <label className="flex cursor-pointer items-start gap-3 rounded-xl border border-slate-700 bg-slate-900/60 p-4">
+                  <label className="flex cursor-pointer items-start gap-3 rounded-xl border border-slate-700 bg-slate-900 p-4">
                     <div className="relative mt-0.5 flex-shrink-0">
                       <input
                         type="checkbox"
@@ -473,7 +493,7 @@ export function StudentIntakePanel({
                     </div>
                   </label>
 
-                  <label className={`flex cursor-pointer flex-col items-center justify-center gap-3 rounded-xl border border-dashed px-6 py-10 text-center transition ${withCredentials ? 'border-cyan-500/50 bg-cyan-500/5 hover:border-cyan-400/60' : 'border-slate-700 bg-slate-900/70 hover:border-cyan-500/40'}`}>
+                  <label className={`flex cursor-pointer flex-col items-center justify-center gap-3 rounded-xl border border-dashed px-6 py-10 text-center transition ${withCredentials ? 'border-cyan-700 bg-cyan-950 hover:border-cyan-500' : 'border-slate-700 bg-slate-900 hover:border-cyan-700'}`}>
                     <Upload className={`h-7 w-7 ${withCredentials ? 'text-cyan-400' : 'text-cyan-300'}`} />
                     <div className="text-sm font-medium text-white">
                       {(isImportSubmitting || isImportWithCredentialsSubmitting) ? 'Processing...' : (withCredentials ? 'Choose file & create logins' : 'Choose roster file')}
@@ -489,13 +509,13 @@ export function StudentIntakePanel({
                   </label>
 
                   {lastImportMessage && !bulkCredentialResult && (
-                    <div className="rounded-lg border border-cyan-500/20 bg-cyan-500/10 px-4 py-3 text-xs text-cyan-100">
+                    <div className="rounded-lg border border-cyan-700 bg-cyan-900 px-4 py-3 text-xs text-cyan-100">
                       {lastImportMessage}
                     </div>
                   )}
 
                   {!bulkCredentialResult && !withCredentials ? (
-                    <div className="rounded-lg border border-slate-800 bg-slate-950/70 px-4 py-3 text-xs text-slate-400">
+                    <div className="rounded-lg border border-slate-800 bg-slate-950 px-4 py-3 text-xs text-slate-400">
                       Roster imports send email invites automatically. Students who register with the same email move into the institution onboarding flow and should be tracked here until verification is complete.
                     </div>
                   ) : null}
@@ -515,13 +535,13 @@ export function StudentIntakePanel({
                         </div>
                       </div>
 
-                      <div className="rounded-lg border border-amber-500/20 bg-amber-500/10 px-4 py-3 text-xs text-amber-200">
+                      <div className="rounded-lg border border-amber-700 bg-amber-900 px-4 py-3 text-xs text-amber-200">
                         These passwords were emailed to students. Save them only if your institution needs a backup handoff.
                       </div>
 
                       <div className="max-h-64 space-y-2 overflow-y-auto">
                         {bulkCredentialResult.results.map((r) => (
-                          <div key={r.student._id} className="rounded-lg border border-slate-800 bg-slate-900/70 px-4 py-3">
+                          <div key={r.student._id} className="rounded-lg border border-slate-800 bg-slate-900 px-4 py-3">
                             <div className="flex items-start justify-between gap-3">
                               <div className="min-w-0">
                                 <div className="truncate text-sm font-medium text-white">{r.student.displayName}</div>
@@ -550,7 +570,7 @@ export function StudentIntakePanel({
                             Failed rows
                           </div>
                           {bulkCredentialResult.errors.map((e) => (
-                            <div key={e.row} className="rounded-lg border border-rose-500/20 bg-rose-500/10 px-3 py-2 text-xs text-rose-300">
+                            <div key={e.row} className="rounded-lg border border-rose-700 bg-rose-900 px-3 py-2 text-xs text-rose-300">
                               Row {e.row}{e.email ? ` (${e.email})` : ''}: {e.message}
                             </div>
                           ))}
@@ -566,7 +586,7 @@ export function StudentIntakePanel({
                         { label: 'Awaiting Review', value: summary.registeredPending, color: 'text-amber-300' },
                         { label: 'Verified', value: summary.verified, color: 'text-emerald-300' },
                       ].map((s) => (
-                        <div key={s.label} className="rounded-lg border border-slate-800 bg-slate-900/70 p-3 text-center">
+                        <div key={s.label} className="rounded-lg border border-slate-800 bg-slate-900 p-3 text-center">
                           <div className={`text-xl font-bold ${s.color}`}>{s.value}</div>
                           <div className="mt-1 text-xs text-slate-500">{s.label}</div>
                         </div>
@@ -641,12 +661,12 @@ export function StudentIntakePanel({
                   </Button>
 
                   {temporaryCredential && (
-                    <div className="rounded-xl border border-cyan-500/20 bg-cyan-500/10 p-4">
+                    <div className="rounded-xl border border-cyan-700 bg-cyan-900 p-4">
                       <div className="text-xs uppercase tracking-[0.25em] text-cyan-200">Credential issued</div>
                       <div className="mt-3 space-y-2">
                         <div className="text-sm font-semibold text-white">{temporaryCredential.student.displayName}</div>
                         <div className="text-xs text-cyan-50/70">{temporaryCredential.student.email}</div>
-                        <div className="mt-2 break-all rounded-lg border border-cyan-500/20 bg-slate-950 px-3 py-2 font-mono text-sm font-semibold text-white">
+                        <div className="mt-2 break-all rounded-lg border border-cyan-700 bg-slate-950 px-3 py-2 font-mono text-sm font-semibold text-white">
                           {temporaryCredential.temporaryPassword}
                         </div>
                         <div className="text-xs text-cyan-50/60">Credentials emailed. Student must change the password on first login.</div>
@@ -672,7 +692,7 @@ export function StudentIntakePanel({
                       {roster.map((entry) => (
                         <div
                           key={entry._id}
-                          className="rounded-lg border border-slate-800 bg-slate-900/60 px-4 py-3"
+                          className="rounded-lg border border-slate-800 bg-slate-900 px-4 py-3"
                         >
                           <div className="flex items-start justify-between gap-2">
                             <div className="min-w-0">
@@ -706,7 +726,7 @@ export function StudentIntakePanel({
                                   type="button"
                                   onClick={() => onCancelInvite(entry._id)}
                                   disabled={cancellingInviteId === entry._id}
-                                  className="mt-3 rounded-md border border-rose-500/30 bg-rose-500/10 px-2.5 py-1 text-xs font-medium text-rose-300 transition hover:border-rose-400/50 hover:bg-rose-500/15 disabled:cursor-not-allowed disabled:opacity-60"
+                                  className="mt-3 rounded-md border border-rose-700 bg-rose-900 px-2.5 py-1 text-xs font-medium text-rose-300 transition hover:border-rose-500 hover:bg-rose-800 disabled:cursor-not-allowed disabled:opacity-60"
                                 >
                                   {cancellingInviteId === entry._id ? 'Cancelling...' : 'Cancel Invite'}
                                 </button>

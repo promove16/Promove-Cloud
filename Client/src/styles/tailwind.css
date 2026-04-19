@@ -10,7 +10,7 @@
     --dashboard-bg: #020617;
     --dashboard-sidebar-bg: rgba(2, 6, 23, 0.95);
     --dashboard-header-bg: rgba(2, 6, 23, 0.85);
-    --dashboard-surface: rgba(15, 23, 42, 0.7);
+    --dashboard-surface: #0f172a;
     --dashboard-surface-solid: #0f172a;
     --dashboard-surface-hover: #0f172a;
     --dashboard-popover: #020617;
@@ -20,9 +20,9 @@
     --dashboard-text-muted: #cbd5e1;
     --dashboard-text-subtle: #94a3b8;
     --dashboard-text-faint: #64748b;
-    --dashboard-active-bg: rgba(34, 211, 238, 0.1);
-    --dashboard-active-text: #a5f3fc;
-    --dashboard-active-ring: rgba(34, 211, 238, 0.3);
+    --dashboard-active-bg: rgba(59, 130, 246, 0.12);
+    --dashboard-active-text: #93c5fd;
+    --dashboard-active-ring: rgba(59, 130, 246, 0.3);
     --dashboard-overlay: rgba(2, 6, 23, 0.6);
   }
 
@@ -42,9 +42,9 @@
     --dashboard-text-muted: #334155;
     --dashboard-text-subtle: #64748b;
     --dashboard-text-faint: #94a3b8;
-    --dashboard-active-bg: rgba(8, 145, 178, 0.12);
-    --dashboard-active-text: #0e7490;
-    --dashboard-active-ring: rgba(8, 145, 178, 0.35);
+    --dashboard-active-bg: rgba(59, 130, 246, 0.12);
+    --dashboard-active-text: #2563eb;
+    --dashboard-active-ring: rgba(59, 130, 246, 0.35);
     --dashboard-overlay: rgba(15, 23, 42, 0.36);
   }
 
@@ -75,7 +75,7 @@
   }
 
   *::-webkit-scrollbar-thumb:hover {
-    background-color: rgba(34, 211, 238, 0.58);
+    background-color: rgba(59, 130, 246, 0.58);
   }
 
   *::-webkit-scrollbar-corner {

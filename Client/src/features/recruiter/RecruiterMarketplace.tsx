@@ -171,13 +171,13 @@ const getStudentTags = (student: RecruiterTalentSummary) => [
 ];
 
 const surfaceClass =
-  "border border-slate-800/80 bg-slate-900/55 shadow-[0_18px_40px_rgba(2,6,23,0.35)]";
+  "border border-slate-800 bg-slate-900 shadow-[0_18px_40px_rgba(2,6,23,0.35)]";
 const secondaryButtonClass =
-  "inline-flex items-center gap-2 rounded-full border border-slate-700 bg-slate-900/80 px-4 py-2 text-sm font-medium text-slate-100 transition hover:border-cyan-400/50 hover:bg-slate-800/90 hover:text-white disabled:cursor-not-allowed disabled:border-slate-800 disabled:bg-slate-900/30 disabled:text-slate-500";
+  "inline-flex items-center gap-2 rounded-full border border-slate-700 bg-slate-900 px-4 py-2 text-sm font-medium text-slate-100 transition hover:border-cyan-400/50 hover:bg-slate-800 hover:text-white disabled:cursor-not-allowed disabled:border-slate-800 disabled:bg-slate-900 disabled:text-slate-500";
 const primaryButtonClass =
   "inline-flex items-center gap-2 rounded-full bg-cyan-400 px-4 py-2 text-sm font-semibold text-slate-950 transition hover:bg-cyan-300 disabled:cursor-wait disabled:opacity-60";
 const subtleTagClass =
-  "rounded-full border border-slate-700 bg-slate-900/75 px-2.5 py-1 text-xs text-slate-200";
+  "rounded-full border border-slate-700 bg-slate-900 px-2.5 py-1 text-xs text-slate-200";
 
 const createInitialHiringEventPlan = (college?: RecruiterCollegeCard): HiringEventPlanFormState => ({
   collegeId: college?._id ?? "",
@@ -260,7 +260,7 @@ function RecruiterStudentCard({
       };
 
   return (
-    <article className="px-4 py-5 transition hover:bg-slate-900/35 sm:px-6">
+    <article className="px-4 py-5 transition hover:bg-slate-900 sm:px-6">
       <div className="flex flex-col gap-4 xl:flex-row xl:items-start xl:justify-between">
         <div className="min-w-0 space-y-3">
           <div className="flex items-start gap-4">
@@ -395,7 +395,7 @@ function InviteStudentModal({
   const safeActiveJobs = activeJobs ?? [];
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-950/75 px-4 backdrop-blur-sm">
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-950 px-4 backdrop-blur-sm">
       <div className="w-full max-w-3xl rounded-3xl border border-slate-800 bg-slate-950 shadow-2xl shadow-black/40">
         <div className="flex items-start justify-between gap-4 border-b border-slate-800 px-6 py-5">
           <div>
@@ -429,7 +429,7 @@ function InviteStudentModal({
           </div>
 
           {isLoadingJobs ? (
-            <div className="flex items-center gap-3 rounded-2xl border border-slate-800 bg-slate-900/60 px-4 py-5 text-sm text-slate-300">
+            <div className="flex items-center gap-3 rounded-2xl border border-slate-800 bg-slate-900 px-4 py-5 text-sm text-slate-300">
               <Loader2 className="h-4 w-4 animate-spin text-cyan-300" />
               Loading active jobs...
             </div>
@@ -438,7 +438,7 @@ function InviteStudentModal({
               {safeActiveJobs.map((job) => (
                 <div
                   key={job._id}
-                  className="flex flex-col gap-4 rounded-2xl border border-slate-800 bg-slate-900/60 p-4 lg:flex-row lg:items-center lg:justify-between"
+                  className="flex flex-col gap-4 rounded-2xl border border-slate-800 bg-slate-900 p-4 lg:flex-row lg:items-center lg:justify-between"
                 >
                   <div className="min-w-0">
                     <div className="text-lg font-semibold text-white">{job.title}</div>
@@ -509,7 +509,7 @@ function PlanHiringEventModal({
     Boolean(form.description.trim());
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-950/75 px-4 backdrop-blur-sm">
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-950 px-4 backdrop-blur-sm">
       <div className="w-full max-w-3xl rounded-3xl border border-slate-800 bg-slate-950 shadow-2xl shadow-black/40">
         <div className="flex items-start justify-between gap-4 border-b border-slate-800 px-6 py-5">
           <div>
@@ -658,7 +658,7 @@ function RecruiterCollegeCardView({
     : null;
 
   return (
-    <article className="px-4 py-5 transition hover:bg-slate-900/35 sm:px-6">
+    <article className="px-4 py-5 transition hover:bg-slate-900 sm:px-6">
       <div className="flex flex-col gap-4 xl:flex-row xl:items-start xl:justify-between">
         <div className="min-w-0 space-y-3">
           <div className="flex items-start gap-4">
@@ -673,7 +673,7 @@ function RecruiterCollegeCardView({
                   Velocity {college.placementVelocity}%
                 </span>
                 {statusPill ? (
-                  <span className="rounded-full border border-slate-700 bg-slate-900/80 px-2.5 py-1 text-xs font-medium text-slate-200">
+                  <span className="rounded-full border border-slate-700 bg-slate-900 px-2.5 py-1 text-xs font-medium text-slate-200">
                     {statusPill}
                   </span>
                 ) : null}
@@ -1027,7 +1027,7 @@ export function RecruiterMarketplace({ dashboardRole: _dashboardRole }: { dashbo
   return (
     <>
       <div className={`${RECRUITER_PAGE_CONTENT_CLASS} space-y-6`}>
-        <section className="space-y-4 rounded-3xl border border-slate-800/80 bg-slate-950/45 px-5 py-5 sm:px-6">
+        <section className="space-y-4 rounded-3xl border border-slate-800 bg-slate-950 px-5 py-5 sm:px-6">
           <div className="flex flex-col gap-5 xl:flex-row xl:items-start xl:justify-between">
             <div className="max-w-3xl space-y-3">
               <RecruiterSectionNav items={recruiterMarketplaceSectionItems} />
@@ -1035,7 +1035,7 @@ export function RecruiterMarketplace({ dashboardRole: _dashboardRole }: { dashbo
                 <div className="text-xs uppercase tracking-[0.28em] text-cyan-300/80">{activeTab.eyebrow}</div>
                 <div className="flex flex-wrap items-center gap-x-4 gap-y-2">
                   <h1 className="text-3xl font-semibold tracking-tight text-white">{activeTab.label}</h1>
-                  <span className="rounded-full border border-slate-800 bg-slate-900/80 px-3 py-1 text-sm text-slate-300">
+                  <span className="rounded-full border border-slate-800 bg-slate-900 px-3 py-1 text-sm text-slate-300">
                     {formatCompactNumber(totalCount)} results
                   </span>
                   {focusedInstitution && lane === "students" ? (
@@ -1049,7 +1049,7 @@ export function RecruiterMarketplace({ dashboardRole: _dashboardRole }: { dashbo
             </div>
 
             <div className="w-full max-w-xl xl:pt-8">
-              <div className="rounded-3xl border border-slate-800/80 bg-slate-950/80 p-4 shadow-[0_16px_32px_rgba(2,6,23,0.18)]">
+              <div className="rounded-3xl border border-slate-800 bg-slate-950 p-4 shadow-[0_16px_32px_rgba(2,6,23,0.18)]">
                 <div className="mb-3 text-xs uppercase tracking-[0.24em] text-slate-500">Search Directory</div>
                 <label className="relative block">
                   <Search className="pointer-events-none absolute left-4 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400" />
@@ -1057,14 +1057,14 @@ export function RecruiterMarketplace({ dashboardRole: _dashboardRole }: { dashbo
                     value={query}
                     onChange={(event) => updateSearch(event.target.value)}
                     placeholder={lane === "students" ? "Search students, domains, or institutions" : "Search colleges or locations"}
-                    className="w-full rounded-2xl border border-slate-700 bg-slate-900/90 py-3 pl-11 pr-4 text-sm text-slate-100 outline-none transition placeholder:text-slate-400 focus:border-cyan-400/60"
+                    className="w-full rounded-2xl border border-slate-700 bg-slate-900 py-3 pl-11 pr-4 text-sm text-slate-100 outline-none transition placeholder:text-slate-400 focus:border-cyan-400/60"
                   />
                 </label>
               </div>
             </div>
           </div>
 
-          <div className="grid gap-4 border-t border-slate-800/80 pt-5 lg:grid-cols-[minmax(0,1fr)_auto] lg:items-end">
+          <div className="grid gap-4 border-t border-slate-800 pt-5 lg:grid-cols-[minmax(0,1fr)_auto] lg:items-end">
             <div className="grid gap-3 sm:grid-cols-2">
               {recruiterTabs.map((tab) => {
                 const Icon = tab.icon;
@@ -1077,7 +1077,7 @@ export function RecruiterMarketplace({ dashboardRole: _dashboardRole }: { dashbo
                     className={`group rounded-3xl border p-4 text-left transition ${
                       isActive
                         ? "border-cyan-400/45 bg-cyan-400/10 shadow-[0_20px_40px_rgba(8,145,178,0.15)]"
-                        : "border-slate-800 bg-slate-950/75 hover:border-slate-700 hover:bg-slate-900/85"
+                        : "border-slate-800 bg-slate-950 hover:border-slate-700 hover:bg-slate-900"
                     }`}
                   >
                     <div className="flex items-start justify-between gap-3">
@@ -1095,7 +1095,7 @@ export function RecruiterMarketplace({ dashboardRole: _dashboardRole }: { dashbo
                         className={`rounded-full px-2.5 py-1 text-[11px] font-medium uppercase tracking-[0.2em] ${
                           isActive
                             ? "bg-cyan-950/60 text-cyan-100 ring-1 ring-inset ring-cyan-400/30"
-                            : "bg-slate-900/90 text-slate-400 ring-1 ring-inset ring-slate-800"
+                            : "bg-slate-900 text-slate-400 ring-1 ring-inset ring-slate-800"
                         }`}
                       >
                         {isActive ? "Active" : "Browse"}
@@ -1120,13 +1120,13 @@ export function RecruiterMarketplace({ dashboardRole: _dashboardRole }: { dashbo
                 <span className="rounded-full border border-cyan-400/20 bg-cyan-400/10 px-3 py-1.5 text-sm text-cyan-100">
                   {activeTab.helper}
                 </span>
-                <span className="rounded-full border border-slate-700 bg-slate-900/80 px-3 py-1.5 text-sm text-slate-300">
+                <span className="rounded-full border border-slate-700 bg-slate-900 px-3 py-1.5 text-sm text-slate-300">
                   {formatCompactNumber(totalCount)} results in view
                 </span>
                 {focusedInstitution && lane === "students" ? (
                   <button
                     onClick={() => setSearchParams(buildSearchParams({ lane: "students", query }))}
-                    className="rounded-full border border-slate-700 bg-slate-900/70 px-3 py-1.5 text-sm text-slate-200 transition hover:border-cyan-400/50 hover:bg-slate-800/80"
+                    className="rounded-full border border-slate-700 bg-slate-900 px-3 py-1.5 text-sm text-slate-200 transition hover:border-cyan-400/50 hover:bg-slate-800"
                   >
                     Clear institution
                   </button>
@@ -1167,7 +1167,7 @@ export function RecruiterMarketplace({ dashboardRole: _dashboardRole }: { dashbo
         ) : null}
 
         <section className={`overflow-hidden rounded-2xl ${surfaceClass}`}>
-          <div className="flex items-center justify-between border-b border-slate-800/80 bg-slate-900/55 px-4 py-3 text-xs uppercase tracking-[0.2em] text-slate-300 sm:px-6">
+          <div className="flex items-center justify-between border-b border-slate-800 bg-slate-900 px-4 py-3 text-xs uppercase tracking-[0.2em] text-slate-300 sm:px-6">
             <span>{lane === "students" ? "Student Results" : "College Results"}</span>
             <span>{formatCompactNumber(totalCount)}</span>
           </div>
@@ -1184,7 +1184,7 @@ export function RecruiterMarketplace({ dashboardRole: _dashboardRole }: { dashbo
 
           {!isLoading && !isError && totalCount === 0 ? (
             <div className="px-4 py-10 sm:px-6">
-              <div className="rounded-2xl border border-dashed border-slate-800 bg-slate-950/60 px-5 py-6">
+              <div className="rounded-2xl border border-dashed border-slate-800 bg-slate-950 px-5 py-6">
                 <div className="text-sm font-medium text-white">
                   {lane === "students" ? "No talent found" : "No colleges found"}
                 </div>
@@ -1197,7 +1197,7 @@ export function RecruiterMarketplace({ dashboardRole: _dashboardRole }: { dashbo
                   <button
                     type="button"
                     onClick={() => setSearchParams(buildSearchParams({ lane }))}
-                    className="rounded-full border border-slate-700 bg-slate-900/80 px-4 py-2 text-sm font-medium text-slate-100 transition hover:border-cyan-400/50 hover:bg-slate-800/90 hover:text-white"
+                    className="rounded-full border border-slate-700 bg-slate-900 px-4 py-2 text-sm font-medium text-slate-100 transition hover:border-cyan-400/50 hover:bg-slate-800 hover:text-white"
                   >
                     Reset search
                   </button>
@@ -1214,7 +1214,7 @@ export function RecruiterMarketplace({ dashboardRole: _dashboardRole }: { dashbo
           ) : null}
 
           {!isLoading && !isError && totalCount > 0 ? (
-            <div className="divide-y divide-slate-800/80">
+            <div className="divide-y divide-slate-800">
               {lane === "students"
                 ? students.map((student) => (
                     <RecruiterStudentCard

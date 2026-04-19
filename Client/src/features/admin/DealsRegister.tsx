@@ -48,7 +48,7 @@ export default function DealsRegister() {
               !deal.adminApprovedAt;
 
             return (
-              <div key={deal._id} className="rounded-3xl border border-slate-800 bg-slate-950/70 p-5">
+              <div key={deal._id} className="rounded-3xl border border-slate-800 bg-slate-950 p-5">
                 <div className="flex flex-col gap-4 xl:flex-row xl:items-start xl:justify-between">
                   <div className="space-y-4">
                     <div className="flex flex-wrap gap-2">
@@ -76,17 +76,17 @@ export default function DealsRegister() {
                     </div>
 
                     <div className="grid gap-3 md:grid-cols-3">
-                      <div className="rounded-2xl border border-slate-800 bg-slate-900/70 px-4 py-3">
+                      <div className="rounded-2xl border border-slate-800 bg-slate-900 px-4 py-3">
                         <div className="text-xs uppercase tracking-[0.2em] text-slate-500">Transfer Value</div>
                         <div className="mt-2 font-semibold text-white">
                           {formatCurrency.format(deal.stockDetails.transferValueInr)}
                         </div>
                       </div>
-                      <div className="rounded-2xl border border-slate-800 bg-slate-900/70 px-4 py-3">
+                      <div className="rounded-2xl border border-slate-800 bg-slate-900 px-4 py-3">
                         <div className="text-xs uppercase tracking-[0.2em] text-slate-500">Equity</div>
                         <div className="mt-2 font-semibold text-white">{deal.equityPercent ?? 0}%</div>
                       </div>
-                      <div className="rounded-2xl border border-slate-800 bg-slate-900/70 px-4 py-3">
+                      <div className="rounded-2xl border border-slate-800 bg-slate-900 px-4 py-3">
                         <div className="text-xs uppercase tracking-[0.2em] text-slate-500">ProMove Royalty</div>
                         <div className="mt-2 font-semibold text-white">
                           {formatCurrency.format(deal.royalty.promoveAmountINR)}
@@ -95,7 +95,7 @@ export default function DealsRegister() {
                     </div>
 
                     {deal.stockTransfer.requestSummary ? (
-                      <div className="rounded-2xl border border-slate-800 bg-slate-900/70 px-4 py-3 text-sm text-slate-400">
+                      <div className="rounded-2xl border border-slate-800 bg-slate-900 px-4 py-3 text-sm text-slate-400">
                         {deal.stockTransfer.requestSummary}
                       </div>
                     ) : null}

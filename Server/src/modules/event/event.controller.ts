@@ -14,6 +14,8 @@ import {
   listStudentInstitutionEvents,
   selectStudentFromEventSchema,
   selectStudentFromHiringEvent,
+  sendHiringEventInvite,
+  sendHiringEventInviteSchema,
 } from './event.service';
 
 export const joinEventController = async (req: Request, res: Response) => {
@@ -103,4 +105,10 @@ export const selectStudentFromHiringEventController = async (req: Request, res: 
     note,
   );
   res.status(200).json(new ApiResponse(data));
+};
+
+export const sendHiringEventInviteController = async (req: Request, res: Response) => {
+  const payload = sendHiringEventInviteSchema.parse(req.body);
+  const data = await sendHiringEventInvite(req.user!._id, String(req.params.collegeId), payload);
+  res.status(201).json(new ApiResponse(data));
 };

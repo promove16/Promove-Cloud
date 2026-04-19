@@ -10,7 +10,7 @@ export function PortfolioViewerSection({
   children: ReactNode;
 }) {
   return (
-    <section className="rounded-[24px] border border-slate-800 bg-slate-900/90 p-5 text-slate-100 shadow-sm sm:p-6">
+    <section className="rounded-[24px] border border-slate-800 bg-slate-900 p-5 text-slate-100 shadow-sm sm:p-6">
       <h2 className="text-xl font-semibold text-white">{title}</h2>
       <div className="mt-5">{children}</div>
     </section>
@@ -23,7 +23,7 @@ export function PortfolioViewerEmpty({
   children: ReactNode;
 }) {
   return (
-    <div className="rounded-[20px] border border-dashed border-slate-700 bg-slate-950/70 px-5 py-4 text-sm text-slate-400 sm:px-6">
+    <div className="rounded-[20px] border border-dashed border-slate-700 bg-slate-950 px-5 py-4 text-sm text-slate-400 sm:px-6">
       {children}
     </div>
   );
@@ -37,7 +37,7 @@ export function PortfolioViewerStatCard({
   value: string | number;
 }) {
   return (
-    <div className="rounded-[20px] border border-slate-800 bg-slate-950/70 p-5">
+    <div className="rounded-[20px] border border-slate-800 bg-slate-950 p-5">
       <div className="text-xs uppercase tracking-[0.18em] text-slate-400">{label}</div>
       <div className="mt-2 text-xl font-bold text-white">{value}</div>
     </div>
@@ -52,7 +52,7 @@ export function PortfolioViewerSidebarRow({
   value: string | number;
 }) {
   return (
-    <div className="flex items-center justify-between gap-3 rounded-[20px] border border-slate-800 bg-slate-950/70 px-5 py-3.5">
+    <div className="flex items-center justify-between gap-3 rounded-[20px] border border-slate-800 bg-slate-950 px-5 py-3.5">
       <span className="text-slate-400">{label}</span>
       <span className="text-right font-medium text-white">{value}</span>
     </div>
@@ -129,7 +129,7 @@ export function PortfolioViewerPageShell({
         </div>
 
         {loading ? (
-          <div className="rounded-[28px] border border-white/10 bg-slate-900/90 px-6 py-8 text-sm text-slate-400">
+          <div className="rounded-[28px] border border-white/10 bg-slate-900 px-6 py-8 text-sm text-slate-400">
             {loadingLabel}
           </div>
         ) : null}
@@ -168,7 +168,7 @@ export function PortfolioViewerHero({
   aside?: ReactNode;
 }) {
   return (
-    <section className="w-full rounded-[28px] border border-slate-800 bg-slate-900/90 shadow-sm">
+    <section className="w-full rounded-[28px] border border-slate-800 bg-slate-900 shadow-sm">
       <div className="relative">
         {cover}
         <div className="pointer-events-none absolute bottom-0 left-6 z-10 translate-y-1/2 sm:left-8">

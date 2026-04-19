@@ -57,7 +57,7 @@ export function StudentProfileDrawer({ open, studentId, onClose, onSchedule }: P
   }
 
   return (
-    <div className="fixed inset-0 z-50 flex justify-end bg-slate-950/70 backdrop-blur-sm">
+    <div className="fixed inset-0 z-50 flex justify-end bg-slate-950 backdrop-blur-sm">
       <div className="h-full w-full max-w-4xl overflow-y-auto border-l border-slate-800 bg-slate-950 px-6 py-6">
         <div className="mb-6 flex items-start justify-between gap-4">
           <div>
@@ -152,7 +152,7 @@ export function StudentProfileDrawer({ open, studentId, onClose, onSchedule }: P
                     <div className="text-sm text-slate-500">No workspaces available.</div>
                   ) : (
                     profileQuery.data.workspaces.map((workspace) => (
-                      <div key={workspace._id} className="rounded-2xl border border-slate-800 bg-slate-900/70 p-4">
+                      <div key={workspace._id} className="rounded-2xl border border-slate-800 bg-slate-900 p-4">
                         <div className="flex items-center justify-between gap-3">
                           <div>
                             <div className="font-semibold text-white">{workspace.title}</div>
@@ -176,7 +176,7 @@ export function StudentProfileDrawer({ open, studentId, onClose, onSchedule }: P
                     <div className="text-sm text-slate-500">No score events yet.</div>
                   ) : (
                     profileQuery.data.scoreEvents.map((event) => (
-                      <div key={event._id} className="rounded-2xl border border-slate-800 bg-slate-900/70 p-4">
+                      <div key={event._id} className="rounded-2xl border border-slate-800 bg-slate-900 p-4">
                         <div className="flex items-center justify-between gap-3">
                           <div className="font-semibold text-white">{event.trigger.replace(/_/g, ' ')}</div>
                           <Badge>+{event.delta}</Badge>
@@ -197,7 +197,7 @@ export function StudentProfileDrawer({ open, studentId, onClose, onSchedule }: P
                     <div className="text-sm text-slate-500">No patents yet.</div>
                   ) : (
                     profileQuery.data.patents.map((patent) => (
-                      <div key={patent._id} className="rounded-2xl border border-slate-800 bg-slate-900/70 p-4">
+                      <div key={patent._id} className="rounded-2xl border border-slate-800 bg-slate-900 p-4">
                         <div className="font-semibold text-white">{patent.projectTitle}</div>
                         <div className="mt-2 text-sm text-slate-400">{patent.status}</div>
                       </div>
@@ -213,7 +213,7 @@ export function StudentProfileDrawer({ open, studentId, onClose, onSchedule }: P
                     <div className="text-sm text-slate-500">No startups yet.</div>
                   ) : (
                     profileQuery.data.startups.map((startup) => (
-                      <div key={startup._id} className="rounded-2xl border border-slate-800 bg-slate-900/70 p-4">
+                      <div key={startup._id} className="rounded-2xl border border-slate-800 bg-slate-900 p-4">
                         <div className="font-semibold text-white">{startup.name}</div>
                         <div className="mt-2 flex flex-wrap gap-2">
                           <Badge>{startup.category}</Badge>

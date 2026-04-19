@@ -110,7 +110,7 @@ const DEFAULT_IDENTITY: IdentityForm = {
 };
 
 const fieldCls =
-  "w-full border border-slate-800 bg-slate-950/80 px-3 py-2 text-sm text-white outline-none transition focus:border-cyan-400/60";
+  "w-full border border-slate-800 bg-slate-950 px-3 py-2 text-sm text-white outline-none transition focus:border-cyan-400/60";
 
 const REVIEW_BADGE: Record<
   Startup["reviewStatus"],
@@ -707,7 +707,7 @@ export function StartupLaunch() {
       ) : null}
 
       {hasSavedSetup ? (
-        <div className="flex items-center justify-between border border-slate-800 bg-slate-950/40 px-4 py-2.5">
+        <div className="flex items-center justify-between border border-slate-800 bg-slate-950 px-4 py-2.5">
           <span className="text-xs uppercase tracking-[0.2em] text-slate-400">
             Editing Setup
           </span>
@@ -744,7 +744,7 @@ export function StartupLaunch() {
             value={String((startup?.documents ?? []).length)}
           />
         </div>
-        <div className="border border-slate-800 bg-slate-950/40 p-5">
+        <div className="border border-slate-800 bg-slate-950 p-5">
           <div className="flex items-center justify-between">
             <h2 className="text-sm font-semibold uppercase tracking-[0.2em] text-cyan-300">
               Readiness
@@ -764,13 +764,13 @@ export function StartupLaunch() {
               missingItems.slice(0, 6).map((item) => (
                 <div
                   key={item}
-                  className="border border-slate-800 bg-slate-900/70 px-3 py-2"
+                  className="border border-slate-800 bg-slate-900 px-3 py-2"
                 >
                   {item}
                 </div>
               ))
             ) : (
-              <div className="border border-slate-800 bg-slate-900/70 px-3 py-2 text-emerald-200">
+              <div className="border border-slate-800 bg-slate-900 px-3 py-2 text-emerald-200">
                 No missing items detected in the current startup profile.
               </div>
             )}
@@ -778,7 +778,7 @@ export function StartupLaunch() {
         </div>
       </section>
 
-      <section className="grid gap-4 border border-slate-800 bg-slate-950/40 p-5 md:grid-cols-2">
+      <section className="grid gap-4 border border-slate-800 bg-slate-950 p-5 md:grid-cols-2">
         <label className="space-y-1.5">
           <span className="text-xs uppercase tracking-[0.2em] text-slate-400">
             Startup Name
@@ -879,7 +879,7 @@ export function StartupLaunch() {
         </label>
       </section>
 
-      <section className="space-y-4 border border-slate-800 bg-slate-950/40 p-5">
+      <section className="space-y-4 border border-slate-800 bg-slate-950 p-5">
         <div className="flex items-center justify-between">
           <h2 className="text-sm font-semibold uppercase tracking-[0.2em] text-cyan-300">
             Category 1: Company Profile (250 Points)
@@ -1131,7 +1131,7 @@ export function StartupLaunch() {
         </div>
       </section>
 
-      <section className="space-y-4 border border-slate-800 bg-slate-950/40 p-5">
+      <section className="space-y-4 border border-slate-800 bg-slate-950 p-5">
         <h2 className="text-sm font-semibold uppercase tracking-[0.2em] text-cyan-300">
           Category 2: Health & Traction (750 Points)
         </h2>
@@ -1521,7 +1521,7 @@ function PitchUploadSlot({
   onFileSelected: (file: File | null) => void;
 }) {
   return (
-    <div className="border border-slate-800 bg-slate-900/60 p-4">
+    <div className="border border-slate-800 bg-slate-900 p-4">
       <div className="flex items-start justify-between gap-3">
         <div>
           <div className="text-sm font-semibold text-white">
@@ -1588,7 +1588,7 @@ function DocumentUploadSlot({
   controls?: React.ReactNode;
 }) {
   return (
-    <div className="border border-slate-800 bg-slate-900/60 p-4">
+    <div className="border border-slate-800 bg-slate-900 p-4">
       <div className="flex items-start justify-between gap-3">
         <div>
           <div className="text-sm font-semibold text-white">{label}</div>
@@ -1723,7 +1723,7 @@ function StartupDashboard({
     );
     const available = cap.availableShares ?? 0;
     return [
-      { name: "Founder", shares: founder, color: "#22d3ee" },
+      { name: "Founder", shares: founder, color: "#3b82f6" },
       { name: "Sole Investor", shares: sole, color: "#a855f7" },
       { name: "Penny Pool", shares: penny, color: "#f59e0b" },
       { name: "Available", shares: available, color: "#475569" },
@@ -1760,7 +1760,7 @@ function StartupDashboard({
 
   return (
     <div className="space-y-6">
-      <section className="flex flex-col gap-4 border border-slate-800 bg-slate-950/40 p-5 md:flex-row md:items-center md:justify-between">
+      <section className="flex flex-col gap-4 border border-slate-800 bg-slate-950 p-5 md:flex-row md:items-center md:justify-between">
         <div className="flex items-start gap-4">
           <div className="flex h-14 w-14 items-center justify-center bg-gradient-to-br from-cyan-500 to-purple-500 text-xl font-bold text-white">
             {startup.name?.slice(0, 1).toUpperCase() ?? (
@@ -1831,14 +1831,14 @@ function StartupDashboard({
       </section>
 
       <section className="grid gap-4 lg:grid-cols-[2fr_1fr]">
-        <div className="border border-slate-800 bg-slate-950/40 p-5">
+        <div className="border border-slate-800 bg-slate-950 p-5">
           <div className="flex items-center justify-between">
             <div className="flex items-center gap-2 text-sm font-semibold text-white">
               <TrendingUp className="h-4 w-4 text-cyan-300" />
               Investor Interest (last 8 weeks)
             </div>
             <div className="text-xs text-slate-400">
-              {totalRequestsInWindow} pitch requests
+              {totalRequestsInWindow} investor outreach requests
             </div>
           </div>
           <div className="mt-4 h-64 w-full">
@@ -1855,8 +1855,8 @@ function StartupDashboard({
                     x2="0"
                     y2="1"
                   >
-                    <stop offset="0%" stopColor="#22d3ee" stopOpacity={0.45} />
-                    <stop offset="100%" stopColor="#22d3ee" stopOpacity={0} />
+                    <stop offset="0%" stopColor="#3b82f6" stopOpacity={0.45} />
+                    <stop offset="100%" stopColor="#3b82f6" stopOpacity={0} />
                   </linearGradient>
                 </defs>
                 <CartesianGrid strokeDasharray="3 3" stroke="#1e293b" />
@@ -1887,7 +1887,7 @@ function StartupDashboard({
                   type="monotone"
                   dataKey="cumulative"
                   name="Cumulative"
-                  stroke="#22d3ee"
+                  stroke="#3b82f6"
                   strokeWidth={2}
                   fill="url(#colorCumulative)"
                 />
@@ -1903,19 +1903,19 @@ function StartupDashboard({
             </ResponsiveContainer>
           </div>
           <div className="mt-3 grid grid-cols-3 gap-3 text-center text-xs text-slate-400">
-            <div className="border border-slate-800 bg-slate-900/50 py-2">
+            <div className="border border-slate-800 bg-slate-900 py-2">
               <div className="text-lg font-semibold text-white">
                 {pitchRequests.length}
               </div>
               <div>Total requests</div>
             </div>
-            <div className="border border-slate-800 bg-slate-900/50 py-2">
+            <div className="border border-slate-800 bg-slate-900 py-2">
               <div className="text-lg font-semibold text-amber-300">
                 {pendingRequests}
               </div>
               <div>Pending</div>
             </div>
-            <div className="border border-slate-800 bg-slate-900/50 py-2">
+            <div className="border border-slate-800 bg-slate-900 py-2">
               <div className="text-lg font-semibold text-emerald-300">
                 {acceptedRequests}
               </div>
@@ -1924,7 +1924,7 @@ function StartupDashboard({
           </div>
         </div>
 
-        <div className="border border-slate-800 bg-slate-950/40 p-5">
+        <div className="border border-slate-800 bg-slate-950 p-5">
           <div className="flex items-center gap-2 text-sm font-semibold text-white">
             <PieIcon className="h-4 w-4 text-cyan-300" />
             Equity Distribution
@@ -2003,7 +2003,7 @@ function StartupDashboard({
       </section>
 
       <section className="grid gap-4 lg:grid-cols-3">
-        <div className="border border-slate-800 bg-slate-950/40 p-5">
+        <div className="border border-slate-800 bg-slate-950 p-5">
           <div className="flex items-center gap-2 text-sm font-semibold text-white">
             <Flag className="h-4 w-4 text-cyan-300" />
             Traction
@@ -2012,7 +2012,7 @@ function StartupDashboard({
             {tractionItems.map((item) => (
               <li
                 key={item.label}
-                className="flex items-center justify-between border border-slate-800 bg-slate-900/60 px-3 py-2 text-sm text-slate-300"
+                className="flex items-center justify-between border border-slate-800 bg-slate-900 px-3 py-2 text-sm text-slate-300"
               >
                 <span>{item.label}</span>
                 <CheckCircle2
@@ -2021,7 +2021,7 @@ function StartupDashboard({
               </li>
             ))}
             {startup.traction?.usersCount ? (
-              <li className="flex items-center justify-between border border-slate-800 bg-slate-900/60 px-3 py-2 text-sm text-slate-300">
+              <li className="flex items-center justify-between border border-slate-800 bg-slate-900 px-3 py-2 text-sm text-slate-300">
                 <span>Users</span>
                 <span className="text-white">
                   {startup.traction.usersCount.toLocaleString()}
@@ -2031,7 +2031,7 @@ function StartupDashboard({
           </ul>
         </div>
 
-        <div className="border border-slate-800 bg-slate-950/40 p-5">
+        <div className="border border-slate-800 bg-slate-950 p-5">
           <div className="flex items-center gap-2 text-sm font-semibold text-white">
             <Rocket className="h-4 w-4 text-cyan-300" />
             Launch Visibility
@@ -2040,7 +2040,7 @@ function StartupDashboard({
             {launchItems.map((item) => (
               <li
                 key={item.label}
-                className="flex items-center justify-between border border-slate-800 bg-slate-900/60 px-3 py-2 text-sm text-slate-300"
+                className="flex items-center justify-between border border-slate-800 bg-slate-900 px-3 py-2 text-sm text-slate-300"
               >
                 <span>{item.label}</span>
                 <span
@@ -2050,7 +2050,7 @@ function StartupDashboard({
                 </span>
               </li>
             ))}
-            <li className="flex items-center justify-between border border-slate-800 bg-slate-900/60 px-3 py-2 text-sm text-slate-300">
+            <li className="flex items-center justify-between border border-slate-800 bg-slate-900 px-3 py-2 text-sm text-slate-300">
               <span>Launched at</span>
               <span className="text-white">
                 {formatDate(startup.launchedAt)}
@@ -2059,7 +2059,7 @@ function StartupDashboard({
           </ul>
         </div>
 
-        <div className="border border-slate-800 bg-slate-950/40 p-5">
+        <div className="border border-slate-800 bg-slate-950 p-5">
           <div className="flex items-center gap-2 text-sm font-semibold text-white">
             <FolderKanban className="h-4 w-4 text-cyan-300" />
             Workspace Progress
@@ -2089,13 +2089,13 @@ function StartupDashboard({
                 </div>
               </div>
               <div className="grid grid-cols-2 gap-3 text-xs">
-                <div className="border border-slate-800 bg-slate-900/60 p-2 text-center">
+                <div className="border border-slate-800 bg-slate-900 p-2 text-center">
                   <div className="text-lg font-semibold text-white">
                     {completedMilestones}/{totalMilestones}
                   </div>
                   <div className="text-slate-400">Milestones</div>
                 </div>
-                <div className="border border-slate-800 bg-slate-900/60 p-2 text-center">
+                <div className="border border-slate-800 bg-slate-900 p-2 text-center">
                   <div className="text-lg font-semibold text-white">
                     {completedTasks}/{totalTasks}
                   </div>
@@ -2111,7 +2111,7 @@ function StartupDashboard({
       </section>
 
       <section className="grid gap-4 lg:grid-cols-[2fr_1fr]">
-        <div className="border border-slate-800 bg-slate-950/40 p-5">
+        <div className="border border-slate-800 bg-slate-950 p-5">
           <div className="flex items-center justify-between gap-3">
             <div className="flex items-center gap-2 text-sm font-semibold text-white">
               <Sparkles className="h-4 w-4 text-cyan-300" />
@@ -2145,7 +2145,7 @@ function StartupDashboard({
             {trustSummary.proofRows.map((row) => (
               <div
                 key={row.label}
-                className="flex items-center justify-between border border-slate-800 bg-slate-900/60 px-3 py-2 text-sm text-slate-300"
+                className="flex items-center justify-between border border-slate-800 bg-slate-900 px-3 py-2 text-sm text-slate-300"
               >
                 <span>{row.label}</span>
                 <CheckCircle2
@@ -2156,7 +2156,7 @@ function StartupDashboard({
           </div>
         </div>
 
-        <div className="border border-slate-800 bg-slate-950/40 p-5">
+        <div className="border border-slate-800 bg-slate-950 p-5">
           <div className="flex items-center gap-2 text-sm font-semibold text-white">
             <Award className="h-4 w-4 text-cyan-300" />
             Credibility Snapshot
@@ -2166,7 +2166,7 @@ function StartupDashboard({
             {trustSummary.credentialRows.map((row) => (
               <div
                 key={row.label}
-                className="flex items-center justify-between border border-slate-800 bg-slate-900/60 px-3 py-2 text-sm text-slate-300"
+                className="flex items-center justify-between border border-slate-800 bg-slate-900 px-3 py-2 text-sm text-slate-300"
               >
                 <span>{row.label}</span>
                 <span className={row.done ? "text-white" : "text-slate-500"}>
@@ -2176,7 +2176,7 @@ function StartupDashboard({
             ))}
           </div>
 
-          <div className="mt-4 border border-slate-800 bg-slate-900/60 p-3">
+          <div className="mt-4 border border-slate-800 bg-slate-900 p-3">
             <div className="text-xs uppercase tracking-[0.18em] text-slate-500">
               Public presence
             </div>
@@ -2204,14 +2204,14 @@ function StartupDashboard({
       </section>
 
       <section className="grid gap-4 lg:grid-cols-[2fr_1fr]">
-        <div className="border border-slate-800 bg-slate-950/40 p-5">
+        <div className="border border-slate-800 bg-slate-950 p-5">
           <div className="flex items-center gap-2 text-sm font-semibold text-white">
             <Boxes className="h-4 w-4 text-cyan-300" />
             Recent Pitch Requests
           </div>
           {pitchRequests.length === 0 ? (
             <div className="mt-4 text-sm text-slate-500">
-              No pitch requests yet.
+              No investor outreach yet.
             </div>
           ) : (
             <ul className="mt-3 divide-y divide-slate-800">
@@ -2247,13 +2247,13 @@ function StartupDashboard({
           )}
         </div>
 
-        <div className="border border-slate-800 bg-slate-950/40 p-5">
+        <div className="border border-slate-800 bg-slate-950 p-5">
           <div className="flex items-center gap-2 text-sm font-semibold text-white">
             <FileText className="h-4 w-4 text-cyan-300" />
             Documents
           </div>
           <div className="mt-4 text-sm text-slate-300">
-            <div className="flex items-center justify-between border border-slate-800 bg-slate-900/60 px-3 py-2">
+            <div className="flex items-center justify-between border border-slate-800 bg-slate-900 px-3 py-2">
               <span>Pitch deck</span>
               {startup.pitchDeckUrl ? (
                 <a
@@ -2268,13 +2268,13 @@ function StartupDashboard({
                 <span className="text-xs text-slate-500">Not uploaded</span>
               )}
             </div>
-            <div className="mt-2 flex items-center justify-between border border-slate-800 bg-slate-900/60 px-3 py-2">
+            <div className="mt-2 flex items-center justify-between border border-slate-800 bg-slate-900 px-3 py-2">
               <span>Uploaded files</span>
               <span className="text-white">
                 {(startup.documents ?? []).length}
               </span>
             </div>
-            <div className="mt-2 flex items-center justify-between border border-slate-800 bg-slate-900/60 px-3 py-2">
+            <div className="mt-2 flex items-center justify-between border border-slate-800 bg-slate-900 px-3 py-2">
               <span>Readiness</span>
               <span
                 className={
@@ -2303,7 +2303,7 @@ function KpiCard({
   value: string;
 }) {
   return (
-    <div className="border border-slate-800 bg-slate-950/40 p-4">
+    <div className="border border-slate-800 bg-slate-950 p-4">
       <div className="flex items-center gap-2 text-xs uppercase tracking-[0.2em] text-slate-400">
         <span className="text-cyan-300">{icon}</span>
         {label}

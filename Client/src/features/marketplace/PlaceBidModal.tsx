@@ -281,7 +281,7 @@ export function PlaceBidModal({ startupId, startupName, board, defaultType = 'pe
           </div>
 
           {/* Upwork-style info strip */}
-          <div className="rounded-lg border border-slate-800 bg-slate-900/50 px-4 py-3 text-xs text-slate-400">
+          <div className="rounded-lg border border-slate-800 bg-slate-900 px-4 py-3 text-xs text-slate-400">
             <div className="flex items-start gap-2">
               <TrendingUp className="mt-0.5 h-3.5 w-3.5 shrink-0 text-cyan-400" />
               <span>

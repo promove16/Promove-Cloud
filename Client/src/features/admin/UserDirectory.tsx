@@ -44,7 +44,7 @@ function ConfirmModal({
   if (!open) return null;
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-950/70 p-4 backdrop-blur-sm">
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-950 p-4 backdrop-blur-sm">
       <Card className="w-full max-w-lg p-6">
         <h3 className="text-2xl font-bold text-white">{title}</h3>
         <p className="mt-3 text-sm leading-6 text-slate-400">{description}</p>
@@ -80,7 +80,7 @@ function ActivityDrawer({
   if (!open || !user) return null;
 
   return (
-    <div className="fixed inset-0 z-50 flex justify-end bg-slate-950/70 backdrop-blur-sm">
+    <div className="fixed inset-0 z-50 flex justify-end bg-slate-950 backdrop-blur-sm">
       <div className="h-full w-full max-w-2xl overflow-y-auto border-l border-slate-800 bg-slate-950 px-6 py-6">
         <div className="flex items-start justify-between gap-4">
           <div>
@@ -102,7 +102,7 @@ function ActivityDrawer({
             </div>
           ) : (
             (activityQuery.data ?? []).map((event) => (
-              <div key={event._id} className="rounded-2xl border border-slate-800 bg-slate-900/70 p-4">
+              <div key={event._id} className="rounded-2xl border border-slate-800 bg-slate-900 p-4">
                 <div className="flex items-center justify-between gap-3">
                   <div className="font-semibold text-white">{event.trigger.replace(/_/g, ' ')}</div>
                   <Badge>+{event.delta}</Badge>
@@ -286,7 +286,7 @@ export default function UserDirectory() {
       </div>
 
       <Card className="overflow-hidden">
-        <div className="grid grid-cols-[minmax(180px,1.1fr)_minmax(240px,1.5fr)_88px_72px_132px_108px_96px_72px] gap-4 border-b border-slate-800 bg-slate-900/70 px-5 py-4 text-xs uppercase tracking-[0.3em] text-slate-400">
+        <div className="grid grid-cols-[minmax(180px,1.1fr)_minmax(240px,1.5fr)_88px_72px_132px_108px_96px_72px] gap-4 border-b border-slate-800 bg-slate-900 px-5 py-4 text-xs uppercase tracking-[0.3em] text-slate-400">
           <div>Name</div>
           <div>Email</div>
           <div>Role</div>

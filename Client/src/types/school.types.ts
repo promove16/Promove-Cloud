@@ -4,6 +4,45 @@ export interface InstitutionPolicy {
   lastUpdated?: string;
 }
 
+export interface InstitutionPolicySubmissionRecord {
+  _id: string;
+  institutionId: string;
+  institutionType: 'school' | 'college';
+  institution?: {
+    _id: string;
+    displayName: string;
+    email: string;
+    role: 'school' | 'college';
+    institutionName?: string;
+    location?: string;
+  };
+  policies: InstitutionPolicy[];
+  summaryNote?: string;
+  status: 'pending' | 'approved' | 'rejected';
+  submittedAt: string;
+  submittedBy: string;
+  submittedByUser?: {
+    _id: string;
+    displayName: string;
+    email: string;
+  };
+  reviewedAt?: string;
+  reviewedBy?: string;
+  reviewedByUser?: {
+    _id: string;
+    displayName: string;
+    email: string;
+  };
+  adminNotes?: string;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface InstitutionPolicySubmissionListResponse {
+  items: InstitutionPolicySubmissionRecord[];
+  total: number;
+}
+
 export interface InstitutionStats {
   totalInnovationActivities: number;
   patentsFiled: number;
@@ -199,6 +238,11 @@ export interface DirectoryInvestor {
   avatar?: string;
   bio?: string;
   domain?: string;
+  headline?: string;
+  location?: string;
+  focusAreas: string[];
+  experienceCount: number;
+  profileProofCount: number;
   contactPreference: string;
 }
 

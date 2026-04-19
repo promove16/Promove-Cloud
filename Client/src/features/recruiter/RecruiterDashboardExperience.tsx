@@ -1949,7 +1949,7 @@ export function RecruiterDashboardExperience({ initialView = "home" }: Recruiter
               </thead>
               <tbody>
                 {activeDrives.map((drive) => (
-                  <tr key={drive.id} className="border-t border-slate-800 hover:bg-slate-800/50 transition-colors">
+                  <tr key={drive.id} className="border-t border-slate-800 hover:bg-slate-800 transition-colors">
                     <td className="px-6 py-4 text-white font-semibold">{drive.name}</td>
                     <td className="px-6 py-4 text-slate-400">{drive.college}</td>
                     <td className="px-6 py-4 text-center text-white">{drive.applications}</td>

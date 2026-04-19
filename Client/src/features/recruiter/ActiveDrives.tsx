@@ -245,7 +245,7 @@ export default function ActiveDrives({ embedded = false }: ActiveDrivesProps) {
               )}
             </div>
           </div>
-          <div className="sticky bottom-0 -mx-6 mt-6 border-t border-slate-800 bg-slate-900/95 px-6 py-4 backdrop-blur">
+          <div className="sticky bottom-0 -mx-6 mt-6 border-t border-slate-800 bg-slate-900 px-6 py-4 backdrop-blur">
             <div className="flex items-center justify-between gap-3">
               <p className="text-sm text-slate-400">
                 Review the schedule and threshold, then create the drive.
@@ -363,7 +363,7 @@ export default function ActiveDrives({ embedded = false }: ActiveDrivesProps) {
                   </div>
 
                   <div className="grid gap-6 xl:grid-cols-[minmax(0,1fr),320px]">
-                    <div className="rounded-2xl border border-slate-800 bg-slate-950/70">
+                    <div className="rounded-2xl border border-slate-800 bg-slate-950">
                       <div className="border-b border-slate-800 px-5 py-4">
                         <div className="text-sm font-semibold uppercase tracking-[0.28em] text-cyan-300">
                           Registrations

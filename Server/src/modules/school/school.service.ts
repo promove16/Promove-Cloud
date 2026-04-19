@@ -692,7 +692,7 @@ export const getStudentLeaderboard = async (
 };
 
 export const getInvestorDirectory = async (): Promise<InvestorProfileView[]> => {
-  const cacheKey = 'school:investors';
+  const cacheKey = 'school:investors:v2';
   const cached = await redis.get<string>(cacheKey);
 
   const cachedDirectory = readRedisJson<InvestorProfileView[]>(cached);
@@ -704,18 +704,35 @@ export const getInvestorDirectory = async (): Promise<InvestorProfileView[]> => 
     role: UserRole.INVESTOR,
     isActive: true,
   })
-    .select('_id displayName avatar bio domain email')
+    .select(
+      '_id displayName avatar bio domain headline location email skills experience portfolioProjects',
+    )
     .sort({ updatedAt: -1 })
     .lean();
 
-  const payload = investors.map((investor) => ({
-    _id: String(investor._id),
-    displayName: investor.displayName,
-    ...(investor.avatar ? { avatar: investor.avatar } : {}),
-    ...(investor.bio ? { bio: investor.bio } : {}),
-    ...(investor.domain ? { domain: investor.domain } : {}),
-    contactPreference: investor.email ? `Email: ${investor.email}` : 'Platform intro only',
-  }));
+  const payload = investors.map((investor) => {
+    const focusAreas = Array.from(
+      new Set(
+        [investor.domain, ...(investor.skills ?? []).map((skill) => skill.name)]
+          .map((value) => value?.trim())
+          .filter((value): value is string => Boolean(value)),
+      ),
+    ).slice(0, 4);
+
+    return {
+      _id: String(investor._id),
+      displayName: investor.displayName,
+      ...(investor.avatar ? { avatar: investor.avatar } : {}),
+      ...(investor.bio ? { bio: investor.bio } : {}),
+      ...(investor.domain ? { domain: investor.domain } : {}),
+      ...(investor.headline ? { headline: investor.headline } : {}),
+      ...(investor.location ? { location: investor.location } : {}),
+      focusAreas,
+      experienceCount: investor.experience?.length ?? 0,
+      profileProofCount: investor.portfolioProjects?.length ?? 0,
+      contactPreference: investor.email ? `Email: ${investor.email}` : 'Platform intro only',
+    };
+  });
 
   await redis.set(cacheKey, JSON.stringify(payload), { ex: INVESTORS_TTL_SECONDS });
 

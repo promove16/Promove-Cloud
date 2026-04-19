@@ -70,7 +70,7 @@ function SessionCard({
       </div>
 
       <div className="mt-5 grid gap-4 lg:grid-cols-[1fr,260px]">
-        <div className="rounded-2xl border border-slate-800 bg-slate-900/70 p-4">
+        <div className="rounded-2xl border border-slate-800 bg-slate-900 p-4">
           <div className="mb-3 text-xs uppercase tracking-[0.3em] text-cyan-300">Mentor Notes</div>
           <textarea
             className="min-h-28 w-full rounded-xl border border-slate-800 bg-slate-950 px-4 py-3 text-white placeholder:text-slate-500 disabled:opacity-60"
@@ -89,7 +89,7 @@ function SessionCard({
           </div>
         </div>
 
-        <div className="rounded-2xl border border-slate-800 bg-slate-900/70 p-4">
+        <div className="rounded-2xl border border-slate-800 bg-slate-900 p-4">
           <div className="mb-3 text-xs uppercase tracking-[0.3em] text-cyan-300">Session Details</div>
           <div className="space-y-3 text-sm text-slate-300">
             <div>
@@ -273,7 +273,7 @@ export default function Sessions() {
       </div>
 
       {showCreate ? (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-950/70 p-4 backdrop-blur-sm">
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-950 p-4 backdrop-blur-sm">
           <Card className="w-full max-w-2xl p-6">
             <div className="flex items-start justify-between gap-4">
               <div>

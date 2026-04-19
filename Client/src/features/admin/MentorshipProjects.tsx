@@ -58,7 +58,7 @@ export default function MentorshipProjects() {
             { label: 'Assigned', value: projectMentorshipsQuery.data?.stats.assigned ?? 0 },
             { label: 'Unassigned', value: projectMentorshipsQuery.data?.stats.unassigned ?? 0 },
           ].map((stat) => (
-            <div key={stat.label} className="rounded-2xl border border-slate-800 bg-slate-900/70 px-4 py-4">
+            <div key={stat.label} className="rounded-2xl border border-slate-800 bg-slate-900 px-4 py-4">
               <div className="mb-3 flex h-10 w-10 items-center justify-center rounded-2xl bg-slate-950">
                 <BriefcaseBusiness className="h-5 w-5 text-cyan-300" />
               </div>
@@ -83,7 +83,7 @@ export default function MentorshipProjects() {
             const selectedMentorId = getProjectDraft(assignment.workspaceId);
 
             return (
-              <div key={assignment.workspaceId} className="rounded-2xl border border-slate-800 bg-slate-900/70 p-4">
+              <div key={assignment.workspaceId} className="rounded-2xl border border-slate-800 bg-slate-900 p-4">
                 <div className="flex flex-wrap items-start justify-between gap-4">
                   <div className="max-w-3xl">
                     <div className="font-semibold text-white">{assignment.title}</div>

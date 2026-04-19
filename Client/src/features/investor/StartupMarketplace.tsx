@@ -190,7 +190,7 @@ export default function StartupMarketplace() {
         </div>
       </div>
 
-      <div className="flex flex-wrap items-center gap-2 rounded-xl border border-slate-800 bg-slate-900/60 px-4 py-3 text-sm text-slate-400">
+      <div className="flex flex-wrap items-center gap-2 rounded-xl border border-slate-800 bg-slate-900 px-4 py-3 text-sm text-slate-400">
         <span className="font-medium text-cyan-300">Express Interest</span>
         <span className="text-slate-600">&rarr;</span>
         <span>Start Negotiating</span>

@@ -81,7 +81,7 @@ export default function MentorshipRequests() {
           { label: 'Pending', value: programsQuery.data?.stats.pending ?? 0, icon: GraduationCap },
           { label: 'Assigned', value: programsQuery.data?.stats.assigned ?? 0, icon: Users },
         ].map((stat) => (
-          <div key={stat.label} className="rounded-2xl border border-slate-800 bg-slate-900/70 p-4">
+          <div key={stat.label} className="rounded-2xl border border-slate-800 bg-slate-900 p-4">
             <div className="mb-3 flex h-10 w-10 items-center justify-center rounded-2xl bg-slate-950">
               <stat.icon className="h-5 w-5 text-cyan-300" />
             </div>
@@ -116,7 +116,7 @@ export default function MentorshipRequests() {
           pendingPrograms.map((program) => {
             const draft = getDraft(program._id);
             return (
-              <div key={program._id} className="rounded-2xl border border-slate-800 bg-slate-900/70 p-4">
+              <div key={program._id} className="rounded-2xl border border-slate-800 bg-slate-900 p-4">
                 <div className="flex flex-wrap items-start justify-between gap-3">
                   <div>
                     <div className="font-semibold text-white">{program.title}</div>

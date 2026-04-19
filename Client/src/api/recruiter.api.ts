@@ -341,6 +341,24 @@ export const recruiterApi = {
     );
     return response.data.data;
   },
+  async sendHiringEventInvite(
+    collegeId: string,
+    payload: {
+      title: string;
+      type: 'Industry Connect Session' | 'Placement Hackathon' | 'Innovation Drive' | 'Other';
+      date: string;
+      description: string;
+      linkedJobId?: string;
+      minimumInnovationScore: number;
+      message?: string;
+    },
+  ) {
+    const response = await api.post<ApiSuccessResponse<{ sent: boolean; alreadyPending?: boolean }>>(
+      `/api/events/hiring-invite/${collegeId}`,
+      payload,
+    );
+    return response.data.data;
+  },
   async createDrive(payload: {
     title: string;
     collegeId: string;

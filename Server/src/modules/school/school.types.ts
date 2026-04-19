@@ -29,6 +29,11 @@ export interface InvestorProfileView {
   avatar?: string;
   bio?: string;
   domain?: string;
+  headline?: string;
+  location?: string;
+  focusAreas: string[];
+  experienceCount: number;
+  profileProofCount: number;
   contactPreference: string;
 }
 

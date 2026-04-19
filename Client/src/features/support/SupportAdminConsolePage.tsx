@@ -98,7 +98,7 @@ export default function SupportAdminConsolePage() {
   return (
     <div className="space-y-6">
       <section className="relative overflow-hidden rounded-3xl border border-slate-800 bg-slate-950">
-        <div className="absolute inset-x-0 top-0 h-44 bg-[radial-gradient(circle_at_top_left,rgba(34,211,238,0.18),transparent_35%),radial-gradient(circle_at_top_right,rgba(59,130,246,0.14),transparent_28%)]" />
+        <div className="absolute inset-x-0 top-0 h-44 bg-[radial-gradient(circle_at_top_left,rgba(59,130,246,0.18),transparent_35%),radial-gradient(circle_at_top_right,rgba(59,130,246,0.14),transparent_28%)]" />
         <div className="relative flex flex-col gap-4 px-6 py-6 lg:flex-row lg:items-end lg:justify-between lg:px-8">
           <div className="max-w-2xl">
             <div className="text-[11px] uppercase tracking-[0.32em] text-cyan-300">Admin · Support</div>
@@ -108,7 +108,7 @@ export default function SupportAdminConsolePage() {
               from open through resolved.
             </p>
           </div>
-          <div className="flex items-center gap-2 rounded-2xl border border-slate-800 bg-slate-900/70 px-3 py-2 text-xs text-slate-300">
+          <div className="flex items-center gap-2 rounded-2xl border border-slate-800 bg-slate-900 px-3 py-2 text-xs text-slate-300">
             <LifeBuoy className="h-4 w-4 text-cyan-300" />
             Support Agents respond during IST working hours
           </div>
@@ -117,7 +117,7 @@ export default function SupportAdminConsolePage() {
 
       <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-6">
         {summaryCards.map((card) => (
-          <Card key={card.label} className="border-slate-800 bg-slate-950/90 p-5">
+          <Card key={card.label} className="border-slate-800 bg-slate-950 p-5">
             <div className="flex items-start justify-between gap-3">
               <div>
                 <div className="text-xs uppercase tracking-[0.22em] text-slate-500">{card.label}</div>
@@ -136,7 +136,7 @@ export default function SupportAdminConsolePage() {
 
       {analytics ? (
         <div className="grid gap-4 xl:grid-cols-2">
-          <Card className="border-slate-800 bg-slate-950/90 p-5">
+          <Card className="border-slate-800 bg-slate-950 p-5">
             <div className="text-xs uppercase tracking-[0.22em] text-slate-500">Volume by category</div>
             <div className="mt-3 space-y-2">
               {SUPPORT_CATEGORIES.map((category) => {
@@ -150,7 +150,7 @@ export default function SupportAdminConsolePage() {
               })}
             </div>
           </Card>
-          <Card className="border-slate-800 bg-slate-950/90 p-5">
+          <Card className="border-slate-800 bg-slate-950 p-5">
             <div className="text-xs uppercase tracking-[0.22em] text-slate-500">Volume by priority</div>
             <div className="mt-3 space-y-2">
               {SUPPORT_PRIORITIES.map((priority) => {
@@ -167,7 +167,7 @@ export default function SupportAdminConsolePage() {
         </div>
       ) : null}
 
-      <Card className="border-slate-800 bg-slate-950/90 p-5">
+      <Card className="border-slate-800 bg-slate-950 p-5">
         <div className="flex flex-wrap items-center gap-2">
           {QUEUE_TABS.map((tab) => {
             const active = activeTab === tab.id;
@@ -179,7 +179,7 @@ export default function SupportAdminConsolePage() {
                 className={`rounded-xl border px-3 py-1.5 text-xs font-semibold uppercase tracking-wide transition ${
                   active
                     ? 'border-cyan-500/40 bg-cyan-500/10 text-cyan-200'
-                    : 'border-slate-800 bg-slate-900/70 text-slate-300 hover:border-slate-700'
+                    : 'border-slate-800 bg-slate-900 text-slate-300 hover:border-slate-700'
                 }`}
               >
                 {tab.label}
@@ -234,7 +234,7 @@ export default function SupportAdminConsolePage() {
         </div>
       </Card>
 
-      <Card className="border-slate-800 bg-slate-950/90 p-6">
+      <Card className="border-slate-800 bg-slate-950 p-6">
         {ticketsQuery.isLoading ? (
           <div className="flex min-h-[24vh] items-center justify-center">
             <Spinner />
@@ -253,7 +253,7 @@ export default function SupportAdminConsolePage() {
               <Link
                 key={ticket._id}
                 to={buildAdminTicketPath(ticket._id)}
-                className="block rounded-2xl border border-slate-800 bg-slate-900/60 px-5 py-4 transition hover:border-cyan-500/40"
+                className="block rounded-2xl border border-slate-800 bg-slate-900 px-5 py-4 transition hover:border-cyan-500/40"
               >
                 <div className="flex flex-col gap-3 lg:flex-row lg:items-start lg:justify-between">
                   <div className="space-y-2">

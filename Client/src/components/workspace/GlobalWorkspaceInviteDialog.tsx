@@ -128,7 +128,7 @@ export function GlobalWorkspaceInviteDialog() {
     <>
       <Button
         variant="secondary"
-        className="h-11 gap-2 rounded-2xl border-slate-700 bg-slate-950/70 px-4 text-white hover:border-slate-600 hover:bg-slate-900"
+        className="h-11 gap-2 rounded-2xl border-slate-700 bg-slate-950 px-4 text-white hover:border-slate-600 hover:bg-slate-900"
         onClick={() => setOpen(true)}
       >
         <UserPlus className="h-4 w-4" />

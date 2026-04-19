@@ -140,7 +140,7 @@ export function InviteModal({
               <button
                 type="button"
                 onClick={() => setInviteType('workspace')}
-                className="flex w-full items-center gap-3 rounded-xl border border-slate-700 bg-slate-800/50 p-4 text-left transition hover:border-cyan-500/50"
+                className="flex w-full items-center gap-3 rounded-xl border border-slate-700 bg-slate-800 p-4 text-left transition hover:border-cyan-500/50"
               >
                 <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-cyan-500/20 text-cyan-400">
                   <UserPlus className="h-5 w-5" />
@@ -155,7 +155,7 @@ export function InviteModal({
               <button
                 type="button"
                 onClick={() => setInviteType('startup')}
-                className="flex w-full items-center gap-3 rounded-xl border border-slate-700 bg-slate-800/50 p-4 text-left transition hover:border-emerald-500/50"
+                className="flex w-full items-center gap-3 rounded-xl border border-slate-700 bg-slate-800 p-4 text-left transition hover:border-emerald-500/50"
               >
                 <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-emerald-500/20 text-emerald-400">
                   <Briefcase className="h-5 w-5" />

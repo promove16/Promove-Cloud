@@ -54,6 +54,8 @@ type HiringEventsProps = {
   embedded?: boolean;
 };
 
+type CreateMode = 'direct' | 'invite';
+
 export default function HiringEvents({ embedded = false }: HiringEventsProps) {
   const navigate = useNavigate();
   const [searchParams, setSearchParams] = useSearchParams();
@@ -62,6 +64,9 @@ export default function HiringEvents({ embedded = false }: HiringEventsProps) {
   const [scoreDraft, setScoreDraft] = useState({ studentId: '', score: '' });
   const [selectionDraft, setSelectionDraft] = useState({ studentId: '', jobId: '', note: '' });
   const [form, setForm] = useState<HiringEventFormState>(createInitialForm);
+  const [createMode, setCreateMode] = useState<CreateMode>('direct');
+  const [inviteMessage, setInviteMessage] = useState('');
+  const [inviteSentNotice, setInviteSentNotice] = useState('');
 
   const hiringEventsQuery = useQuery({
     queryKey: ['recruiter', 'hiring-events'],
@@ -140,6 +145,22 @@ export default function HiringEvents({ embedded = false }: HiringEventsProps) {
     },
   });
 
+  const inviteMutation = useMutation({
+    mutationFn: ({ collegeId, payload }: {
+      collegeId: string;
+      payload: Parameters<typeof recruiterApi.sendHiringEventInvite>[1];
+    }) => recruiterApi.sendHiringEventInvite(collegeId, payload),
+    onSuccess: (result) => {
+      setInviteSentNotice(
+        result.alreadyPending
+          ? 'An invite for this event title is already pending with this college.'
+          : 'Invite sent! The college will see it in their invitations center.',
+      );
+      setForm(createInitialForm());
+      setInviteMessage('');
+    },
+  });
+
   const scoreMutation = useMutation({
     mutationFn: ({ eventId, studentId, score }: { eventId: string; studentId: string; score: number }) =>
       eventApi.addSubmissionScore(eventId, studentId, score),
@@ -198,7 +219,9 @@ export default function HiringEvents({ embedded = false }: HiringEventsProps) {
         <Card className="p-6">
           <div className="flex items-start justify-between gap-3">
             <div>
-              <div className="text-xs uppercase tracking-[0.3em] text-cyan-300">Create Event</div>
+              <div className="text-xs uppercase tracking-[0.3em] text-cyan-300">
+                {createMode === 'invite' ? 'Request Event Approval' : 'Create Event'}
+              </div>
               <h2 className="mt-2 text-2xl font-semibold text-white">Launch a hiring event</h2>
               <p className="mt-2 text-sm leading-6 text-slate-400">
                 Events work best once a college partnership is active and at least one job is open.
@@ -209,9 +232,38 @@ export default function HiringEvents({ embedded = false }: HiringEventsProps) {
             </Badge>
           </div>
 
+          <div className="mt-4 inline-flex rounded-full border border-slate-800 bg-slate-950 p-1">
+            <button
+              type="button"
+              onClick={() => { setCreateMode('direct'); setInviteSentNotice(''); }}
+              className={`rounded-full px-4 py-1.5 text-xs font-semibold transition ${createMode === 'direct' ? 'bg-slate-100 text-slate-950' : 'text-slate-400 hover:text-white'}`}
+            >
+              Create Directly
+            </button>
+            <button
+              type="button"
+              onClick={() => { setCreateMode('invite'); setInviteSentNotice(''); }}
+              className={`rounded-full px-4 py-1.5 text-xs font-semibold transition ${createMode === 'invite' ? 'bg-slate-100 text-slate-950' : 'text-slate-400 hover:text-white'}`}
+            >
+              Send Invite for Approval
+            </button>
+          </div>
+
+          {createMode === 'invite' ? (
+            <div className="mt-3 rounded-2xl border border-cyan-500/20 bg-cyan-500/5 px-4 py-3 text-sm text-cyan-200">
+              The college will receive this as an invitation in their invitations center. The event is only created after they accept.
+            </div>
+          ) : null}
+
           {availableColleges.length === 0 ? (
             <div className="mt-5 rounded-2xl border border-amber-500/20 bg-amber-500/10 px-4 py-3 text-sm text-amber-100">
               No linked colleges yet. Ask a college to accept your partnership request before creating hiring events.
+            </div>
+          ) : null}
+
+          {inviteSentNotice ? (
+            <div className="mt-5 rounded-2xl border border-emerald-500/20 bg-emerald-500/10 px-4 py-3 text-sm text-emerald-200">
+              {inviteSentNotice}
             </div>
           ) : null}
 
@@ -281,22 +333,52 @@ export default function HiringEvents({ embedded = false }: HiringEventsProps) {
               placeholder="Describe the hiring event"
               className="min-h-32 rounded-lg border border-slate-800 bg-slate-950 px-4 py-3 text-white"
             />
-            <Button
-              onClick={() =>
-                createMutation.mutate({
-                  title: form.title,
-                  collegeId: form.collegeId,
-                  type: form.type,
-                  date: new Date(form.date).toISOString(),
-                  description: form.description,
-                  minimumInnovationScore: Number(form.minimumInnovationScore || '0'),
-                  ...(form.linkedJobId ? { linkedJobId: form.linkedJobId } : {}),
-                })
-              }
-              disabled={createMutation.isPending || !canCreateEvent}
-            >
-              {createMutation.isPending ? 'Creating...' : 'Create Hiring Event'}
-            </Button>
+            {createMode === 'invite' ? (
+              <textarea
+                value={inviteMessage}
+                onChange={(event) => setInviteMessage(event.target.value)}
+                placeholder="Optional message to the college (e.g. why this event benefits their students)"
+                className="min-h-20 rounded-lg border border-slate-800 bg-slate-950 px-4 py-3 text-white"
+              />
+            ) : null}
+            {createMode === 'direct' ? (
+              <Button
+                onClick={() =>
+                  createMutation.mutate({
+                    title: form.title,
+                    collegeId: form.collegeId,
+                    type: form.type,
+                    date: new Date(form.date).toISOString(),
+                    description: form.description,
+                    minimumInnovationScore: Number(form.minimumInnovationScore || '0'),
+                    ...(form.linkedJobId ? { linkedJobId: form.linkedJobId } : {}),
+                  })
+                }
+                disabled={createMutation.isPending || !canCreateEvent}
+              >
+                {createMutation.isPending ? 'Creating...' : 'Create Hiring Event'}
+              </Button>
+            ) : (
+              <Button
+                onClick={() =>
+                  inviteMutation.mutate({
+                    collegeId: form.collegeId,
+                    payload: {
+                      title: form.title,
+                      type: form.type,
+                      date: new Date(form.date).toISOString(),
+                      description: form.description,
+                      minimumInnovationScore: Number(form.minimumInnovationScore || '0'),
+                      ...(form.linkedJobId ? { linkedJobId: form.linkedJobId } : {}),
+                      ...(inviteMessage.trim() ? { message: inviteMessage.trim() } : {}),
+                    },
+                  })
+                }
+                disabled={inviteMutation.isPending || !canCreateEvent}
+              >
+                {inviteMutation.isPending ? 'Sending...' : 'Send Event Invite to College'}
+              </Button>
+            )}
           </div>
         </Card>
 
@@ -449,7 +531,7 @@ export default function HiringEvents({ embedded = false }: HiringEventsProps) {
 
           <div className="mt-6 grid gap-6 xl:grid-cols-[minmax(0,1.3fr),360px]">
             <div className="space-y-4">
-              <div className="rounded-2xl border border-slate-800 bg-slate-950/70 p-4">
+              <div className="rounded-2xl border border-slate-800 bg-slate-950 p-4">
                 <div className="mb-3 text-sm font-semibold uppercase tracking-[0.3em] text-cyan-300">
                   Participants
                 </div>
@@ -494,7 +576,7 @@ export default function HiringEvents({ embedded = false }: HiringEventsProps) {
                 )}
               </div>
 
-              <div className="rounded-2xl border border-slate-800 bg-slate-950/70 p-4">
+              <div className="rounded-2xl border border-slate-800 bg-slate-950 p-4">
                 <div className="mb-3 text-sm font-semibold uppercase tracking-[0.3em] text-cyan-300">
                   Rankings
                 </div>
@@ -519,7 +601,7 @@ export default function HiringEvents({ embedded = false }: HiringEventsProps) {
             </div>
 
             <div className="space-y-4">
-              <div className="rounded-2xl border border-slate-800 bg-slate-950/70 p-4">
+              <div className="rounded-2xl border border-slate-800 bg-slate-950 p-4">
                 <div className="mb-3 text-sm font-semibold uppercase tracking-[0.3em] text-cyan-300">
                   Submission Score
                 </div>
@@ -565,7 +647,7 @@ export default function HiringEvents({ embedded = false }: HiringEventsProps) {
                 </div>
               </div>
 
-              <div className="rounded-2xl border border-slate-800 bg-slate-950/70 p-4">
+              <div className="rounded-2xl border border-slate-800 bg-slate-950 p-4">
                 <div className="mb-3 flex items-center gap-2 text-sm font-semibold uppercase tracking-[0.3em] text-cyan-300">
                   <BriefcaseBusiness className="h-4 w-4" />
                   Pipeline Selection

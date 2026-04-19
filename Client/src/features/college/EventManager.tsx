@@ -2,7 +2,14 @@ import { useEffect, useMemo, useState } from 'react';
 import { isAxiosError } from 'axios';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { zodResolver } from '@hookform/resolvers/zod';
-import { CalendarDays } from 'lucide-react';
+import {
+  BriefcaseBusiness,
+  CalendarDays,
+  Clock3,
+  Sparkles,
+  Trophy,
+  Users,
+} from 'lucide-react';
 import { useForm } from 'react-hook-form';
 import { useSearchParams } from 'react-router-dom';
 import { z } from 'zod';
@@ -11,7 +18,6 @@ import { eventApi } from '../../api/event.api';
 import { schoolApi } from '../../api/school.api';
 import { Badge } from '../../components/ui/Badge';
 import { Button } from '../../components/ui/Button';
-import { Card } from '../../components/ui/Card';
 import { Input } from '../../components/ui/Input';
 import { ApiErrorResponse } from '../../types/auth.types';
 import type { CollegeEvent } from '../../types/college.types';
@@ -108,34 +114,30 @@ const defaultEventFormValues: EventFormValues = {
   description: '',
 };
 
-const fieldLabelClassName = 'mb-2 block text-sm font-medium text-slate-300';
+const fieldLabelClassName = 'mb-2 block text-xs font-semibold uppercase tracking-[0.24em] text-slate-400';
 const fieldErrorClassName = 'mt-2 text-xs text-rose-300';
 const inputErrorClassName =
-  'border-rose-500/70 focus:border-rose-400';
-
-const getDescription = (
-  mode: InstitutionEventManagerMode,
-  tab: EventManagerTab,
-) => {
-  if (tab === 'mentorship') {
-    return mode === 'school'
-      ? 'Plan mentorship programs, send requests for admin approval, and track mentor assignment from the same workspace as your events.'
-      : 'Plan mentorship programs, route them for admin approval, and manage mentor scheduling without leaving the events workspace.';
-  }
-
-  if (mode === 'school') {
-    return 'Create and track internal school events, submissions, and rankings.';
-  }
-
-  return tab === 'internal'
-    ? 'Create internal college events, collect submissions, and compute student rankings.'
-    : 'Review recruiter-led hiring events hosted for your college students.';
-};
+  'border-rose-500/70 focus:border-rose-400 focus:ring-rose-500/20';
+const studioPanelClassName =
+  'overflow-hidden rounded-2xl border border-slate-800 bg-[#07111d]';
+const insetPanelClassName = 'rounded-2xl border border-slate-800 bg-[#0c1728]';
+const workspaceStatSurfaceClassNames = [
+  'bg-[#0a1826]',
+  'bg-[#0c1823]',
+  'bg-[#101725]',
+  'bg-[#0b1720]',
+] as const;
+const eventMetaSurfaceClassNames = [
+  'bg-[#0a1320]',
+  'bg-[#0b1624]',
+  'bg-[#101421]',
+  'bg-[#0b1720]',
+] as const;
 
 const getCategoryBadgeClass = (event: CollegeEvent) =>
   event.category === 'hiring'
-    ? 'border-amber-500/30 bg-amber-500/10 text-amber-300'
-    : 'border-cyan-500/30 bg-cyan-500/10 text-cyan-300';
+    ? 'border-amber-700/80 bg-amber-950/60 text-amber-200'
+    : 'border-cyan-700/80 bg-cyan-950/60 text-cyan-200';
 
 function getErrorMessage(error: unknown, fallback: string) {
   return isAxiosError<ApiErrorResponse>(error) &&
@@ -161,6 +163,26 @@ const getTabFromSearchParams = (
   return 'internal';
 };
 
+const formatDateTime = (value: string) =>
+  new Date(value).toLocaleString('en-IN', {
+    dateStyle: 'medium',
+    timeStyle: 'short',
+  });
+
+const formatDateOnly = (value: string) =>
+  new Date(value).toLocaleDateString('en-IN', {
+    day: 'numeric',
+    month: 'short',
+    year: 'numeric',
+  });
+
+const getTabButtonClassName = (active: boolean) =>
+  `rounded-full px-4 py-2 text-sm font-medium transition ${
+    active
+      ? 'bg-slate-100 text-slate-950'
+      : 'text-slate-400 hover:bg-slate-900 hover:text-white'
+  }`;
+
 export default function EventManager({
   mode = 'college',
 }: {
@@ -173,6 +195,7 @@ export default function EventManager({
     getTabFromSearchParams(mode, searchParams),
   );
   const [showCreate, setShowCreate] = useState(false);
+  const [showCreateRequest, setShowCreateRequest] = useState(false);
   const [createError, setCreateError] = useState('');
   const [scoringEventId, setScoringEventId] = useState<string | null>(null);
   const [scoreDraft, setScoreDraft] = useState<{
@@ -263,7 +286,58 @@ export default function EventManager({
     );
   }, [activeTab, eventsQuery.data, hiringEventsQuery.data, mode]);
 
+  const workspaceStats = useMemo(() => {
+    const participants = visibleEvents.reduce(
+      (total, event) => total + event.participantsCount,
+      0,
+    );
+    const rankedParticipants = visibleEvents.reduce(
+      (total, event) => total + event.rankings.length,
+      0,
+    );
+    const rankedEvents = visibleEvents.filter(
+      (event) => event.rankings.length > 0,
+    ).length;
+
+    return [
+      {
+        label: activeTab === 'hiring' ? 'Recruiter Sessions' : 'Live Sessions',
+        value: String(visibleEvents.length),
+        accent: 'text-cyan-300',
+        icon: CalendarDays,
+      },
+      {
+        label: 'Participants',
+        value: String(participants),
+        accent: 'text-emerald-300',
+        icon: Users,
+      },
+      {
+        label: activeTab === 'hiring' ? 'Ranked Candidates' : 'Ranked Students',
+        value: String(rankedParticipants),
+        accent: 'text-amber-300',
+        icon: Trophy,
+      },
+      {
+        label: 'Boards Ready',
+        value: String(rankedEvents),
+        accent: 'text-fuchsia-300',
+        icon: Sparkles,
+      },
+    ];
+  }, [activeTab, visibleEvents]);
+
   const canCreateInternalEvent = mode === 'school' || activeTab === 'internal';
+  const isEventsLoading =
+    activeTab !== 'mentorship' &&
+    (eventsQuery.isLoading ||
+      (mode === 'college' &&
+        activeTab === 'hiring' &&
+        hiringEventsQuery.isLoading));
+  const hasNoVisibleEvents =
+    activeTab !== 'mentorship' &&
+    !isEventsLoading &&
+    visibleEvents.length === 0;
 
   useEffect(() => {
     setActiveTab(getTabFromSearchParams(mode, searchParams));
@@ -272,6 +346,7 @@ export default function EventManager({
   const selectTab = (tab: EventManagerTab) => {
     setActiveTab(tab);
     setShowCreate(false);
+    setShowCreateRequest(false);
     setCreateError('');
     reset(defaultEventFormValues);
 
@@ -313,21 +388,39 @@ export default function EventManager({
     <div className="space-y-6">
       <InstitutionWorkspaceHeader
         mode={config.headerMode}
-        eyebrow="Events"
+        eyebrow="Events Studio"
         title="Events"
-        description={getDescription(mode, activeTab)}
+        description={
+          activeTab === 'mentorship'
+            ? undefined
+            : 'Manage sessions, participants, and rankings.'
+        }
         showMenu={false}
-        tabsAction={
-          <div className="flex flex-wrap gap-3">
-            <div className="flex rounded-xl border border-slate-800 bg-slate-950 p-1">
+        headerAction={
+          <div className="flex flex-wrap items-center justify-end gap-4">
+            {activeTab === 'mentorship' ? (
+              <Button
+                variant="secondary"
+                onClick={() => setShowCreateRequest((current) => !current)}
+                className="rounded-full border border-slate-700 bg-slate-900 px-5 py-2.5 text-sm font-semibold text-slate-100 hover:border-slate-600 hover:bg-slate-800"
+              >
+                {showCreateRequest ? 'Close Request' : 'Create Request'}
+              </Button>
+            ) : canCreateInternalEvent ? (
+              <Button
+                variant="secondary"
+                onClick={toggleCreateForm}
+                className="rounded-full border border-slate-700 bg-slate-900 px-5 py-2.5 text-sm font-semibold text-slate-100 hover:border-slate-600 hover:bg-slate-800"
+              >
+                {showCreate ? 'Close Form' : 'Create Event'}
+              </Button>
+            ) : null}
+
+            <div className="inline-flex w-fit rounded-full border border-slate-800 bg-[#0a1524] p-1">
               <button
                 type="button"
                 onClick={() => selectTab('internal')}
-                className={`rounded-lg px-4 py-2 text-sm font-medium transition ${
-                  activeTab === 'internal'
-                    ? 'bg-cyan-500/10 text-cyan-300'
-                    : 'text-slate-400 hover:text-white'
-                }`}
+                className={getTabButtonClassName(activeTab === 'internal')}
               >
                 Internal Events
               </button>
@@ -335,11 +428,7 @@ export default function EventManager({
                 <button
                   type="button"
                   onClick={() => selectTab('hiring')}
-                  className={`rounded-lg px-4 py-2 text-sm font-medium transition ${
-                    activeTab === 'hiring'
-                      ? 'bg-amber-500/10 text-amber-300'
-                      : 'text-slate-400 hover:text-white'
-                  }`}
+                  className={getTabButtonClassName(activeTab === 'hiring')}
                 >
                   Hiring Events
                 </button>
@@ -347,24 +436,37 @@ export default function EventManager({
               <button
                 type="button"
                 onClick={() => selectTab('mentorship')}
-                className={`rounded-lg px-4 py-2 text-sm font-medium transition ${
-                  activeTab === 'mentorship'
-                    ? 'bg-violet-500/10 text-violet-300'
-                    : 'text-slate-400 hover:text-white'
-                }`}
+                className={getTabButtonClassName(activeTab === 'mentorship')}
               >
                 Mentorship
               </button>
             </div>
-
-            {canCreateInternalEvent ? (
-              <Button onClick={toggleCreateForm}>
-                {showCreate ? 'Close Form' : '+ Create Event'}
-              </Button>
-            ) : null}
           </div>
         }
       />
+
+      {activeTab !== 'mentorship' ? (
+        <section className={studioPanelClassName}>
+          <div className="grid gap-px overflow-hidden rounded-xl border border-slate-800 bg-slate-800 lg:grid-cols-4">
+            {workspaceStats.map((stat, index) => (
+              <div
+                key={stat.label}
+                className={`${workspaceStatSurfaceClassNames[index % workspaceStatSurfaceClassNames.length]} px-4 py-5 sm:px-5`}
+              >
+                <div className="flex items-center justify-between gap-3">
+                  <span className="text-xs font-semibold uppercase tracking-[0.28em] text-slate-500">
+                    {stat.label}
+                  </span>
+                  <stat.icon className={`h-4 w-4 ${stat.accent}`} />
+                </div>
+                <div className={`mt-4 text-2xl font-semibold ${stat.accent}`}>
+                  {stat.value}
+                </div>
+              </div>
+            ))}
+          </div>
+        </section>
+      ) : null}
 
       {activeTab === 'mentorship' ? (
         <MentorshipProgramPanel
@@ -373,360 +475,459 @@ export default function EventManager({
           description={config.mentorshipDescription}
           fetchPrograms={config.fetchPrograms}
           createProgram={config.createProgram}
+          compact
+          showCreateRequest={showCreateRequest}
+          onShowCreateRequestChange={setShowCreateRequest}
+          hideCreateTrigger
         />
       ) : null}
 
       {showCreate && canCreateInternalEvent && activeTab !== 'mentorship' ? (
-        <Card className="p-6">
-          <form onSubmit={onSubmit} noValidate>
-            <div className="grid gap-4 md:grid-cols-2">
-              <div>
-                <label htmlFor="event-title" className={fieldLabelClassName}>
-                  Event Title *
-                </label>
-                <Input
-                  id="event-title"
-                  placeholder="Event title"
-                  aria-invalid={Boolean(errors.title)}
-                  className={errors.title ? inputErrorClassName : undefined}
-                  {...register('title')}
-                />
-                {errors.title ? (
-                  <p className={fieldErrorClassName}>{errors.title.message}</p>
-                ) : null}
-              </div>
-
-              <div>
-                <label htmlFor="event-type" className={fieldLabelClassName}>
-                  Event Type *
-                </label>
-                <select
-                  id="event-type"
-                  aria-invalid={Boolean(errors.type)}
-                  className={`w-full rounded-lg border bg-slate-950 px-4 py-3 text-white ${
-                    errors.type
-                      ? inputErrorClassName
-                      : 'border-slate-800'
-                  }`}
-                  {...register('type')}
-                >
-                  {eventTypes.map((type) => (
-                    <option key={type} value={type}>
-                      {type}
-                    </option>
-                  ))}
-                </select>
-                {errors.type ? (
-                  <p className={fieldErrorClassName}>{errors.type.message}</p>
-                ) : null}
-              </div>
-
-              <div>
-                <label htmlFor="event-date" className={fieldLabelClassName}>
-                  Date And Time *
-                </label>
-                <Input
-                  id="event-date"
-                  type="datetime-local"
-                  aria-invalid={Boolean(errors.date)}
-                  className={errors.date ? inputErrorClassName : undefined}
-                  {...register('date')}
-                />
-                {errors.date ? (
-                  <p className={fieldErrorClassName}>{errors.date.message}</p>
-                ) : null}
-              </div>
-
-              <div className="rounded-2xl border border-slate-800 bg-slate-950/60 px-4 py-4">
-                <div className="text-sm font-medium text-white">
-                  Required fields
+        <section className={studioPanelClassName}>
+          <div className="grid gap-px bg-slate-800 xl:grid-cols-[minmax(0,1.45fr)_320px]">
+            <div className="bg-[#08131f] p-5 sm:p-7">
+              <div className="flex items-center justify-between gap-3 border-b border-slate-800 pb-4">
+                <div>
+                  <div className="text-xs font-semibold uppercase tracking-[0.28em] text-slate-500">
+                    Create Event
+                  </div>
+                  <div className="mt-2 text-2xl font-semibold text-white">
+                    Add a new session
+                  </div>
                 </div>
-                <p className="mt-2 text-sm leading-6 text-slate-400">
-                  Title, event type, date and time, and a meaningful description
-                  are all required before the event can be created.
-                </p>
-              </div>
-
-              <div className="md:col-span-2">
-                <label
-                  htmlFor="event-description"
-                  className={fieldLabelClassName}
-                >
-                  Description *
-                </label>
-                <textarea
-                  id="event-description"
-                  placeholder="Describe the event"
-                  aria-invalid={Boolean(errors.description)}
-                  className={`min-h-32 w-full rounded-lg border bg-slate-950 px-4 py-3 text-white ${
-                    errors.description
-                      ? inputErrorClassName
-                      : 'border-slate-800'
-                  }`}
-                  {...register('description')}
-                />
-                {errors.description ? (
-                  <p className={fieldErrorClassName}>
-                    {errors.description.message}
-                  </p>
-                ) : null}
-              </div>
-            </div>
-
-            {createError ? (
-              <div className="mt-4 rounded-2xl border border-rose-500/30 bg-rose-500/10 px-4 py-3 text-sm text-rose-200">
-                {createError}
-              </div>
-            ) : null}
-
-            <div className="mt-4 flex justify-end">
-              <Button type="submit" disabled={createMutation.isPending}>
-                {createMutation.isPending ? 'Creating...' : 'Create Event'}
-              </Button>
-            </div>
-          </form>
-        </Card>
-      ) : null}
-
-      {activeTab !== 'mentorship' &&
-      (eventsQuery.isLoading ||
-        (mode === 'college' &&
-          activeTab === 'hiring' &&
-          hiringEventsQuery.isLoading)) ? (
-        <Card className="p-6 text-sm text-slate-400">Loading events...</Card>
-      ) : null}
-
-      {activeTab !== 'mentorship' &&
-      !eventsQuery.isLoading &&
-      visibleEvents.length === 0 ? (
-        <Card className="p-8 text-center">
-          <div className="text-lg font-semibold text-white">
-            {mode === 'college' && activeTab === 'hiring'
-              ? 'No hiring events yet'
-              : 'No events yet'}
-          </div>
-          <p className="mt-2 text-sm text-slate-400">
-            {mode === 'college' && activeTab === 'hiring'
-              ? 'Recruiter-hosted hiring events for this college will appear here.'
-              : 'Create your first event to start registrations and rankings.'}
-          </p>
-        </Card>
-      ) : null}
-
-      {activeTab !== 'mentorship' ? <div className="space-y-4">
-        {visibleEvents.map((event) => (
-          <Card
-            key={event._id}
-            className={`p-6 ${
-              focusedEventId === event._id
-                ? 'border-cyan-400/40 bg-cyan-400/5'
-                : ''
-            }`}
-          >
-            <div className="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
-              <div>
-                <div className="mb-2 flex flex-wrap items-center gap-2 text-xs uppercase tracking-[0.3em] text-cyan-300">
-                  <CalendarDays className="h-4 w-4" />
-                  <span>{event.type}</span>
-                  <Badge className={getCategoryBadgeClass(event)}>
-                    {event.category === 'hiring'
-                      ? 'Hiring Event'
-                      : 'Internal Event'}
-                  </Badge>
-                </div>
-                <h2 className="text-2xl font-semibold text-white">
-                  {event.title}
-                </h2>
-                <p className="mt-3 max-w-3xl text-slate-400">
-                  {event.description}
-                </p>
-                <div className="mt-4 flex flex-wrap gap-3 text-sm text-slate-500">
-                  <span>
-                    {new Date(event.scheduledAt).toLocaleString('en-IN')}
-                  </span>
-                  <span>{event.participantsCount} participants</span>
-                  {event.recruiterName ? (
-                    <span>Hosted by {event.recruiterName}</span>
-                  ) : null}
-                  {typeof event.minimumInnovationScore === 'number' &&
-                  event.category === 'hiring' ? (
-                    <span>Minimum score {event.minimumInnovationScore}</span>
-                  ) : null}
+                <div className="rounded-full border border-slate-700 bg-[#0d1828] px-3 py-1 text-xs font-semibold uppercase tracking-[0.24em] text-slate-300">
+                  Students
                 </div>
               </div>
-              <div className="flex flex-wrap gap-3">
-                <Button
-                  variant="secondary"
-                  onClick={() => computeMutation.mutate(event._id)}
-                >
-                  Compute Rankings
-                </Button>
-                <Button
-                  variant="secondary"
-                  disabled={event.participants.length === 0}
-                  onClick={() => {
-                    const isClosing = scoringEventId === event._id;
-                    setScoringEventId(isClosing ? null : event._id);
-                    setScoreDraft({
-                      studentId: isClosing
-                        ? ''
-                        : event.participants[0]?.studentId ?? '',
-                      score: '',
-                    });
-                  }}
-                >
-                  {event.participants.length === 0
-                    ? 'No Participants Yet'
-                    : scoringEventId === event._id
-                      ? 'Hide Score Form'
-                      : 'Add Submission Score'}
-                </Button>
-              </div>
-            </div>
 
-            <div className="mt-6 rounded-2xl border border-slate-800 bg-slate-900/60 p-4">
-              <div className="mb-3 text-sm font-semibold uppercase tracking-[0.3em] text-cyan-300">
-                Participants
-              </div>
-              {event.participants.length === 0 ? (
-                <div className="text-sm text-slate-500">
-                  No students have joined this event yet.
-                </div>
-              ) : (
-                <div className="space-y-3">
-                  {event.participants.map((participant) => (
-                    <div
-                      key={`${event._id}-${participant.studentId}`}
-                      className="flex flex-col gap-2 rounded-2xl border border-slate-800 bg-slate-950 px-4 py-4 md:flex-row md:items-center md:justify-between"
-                    >
-                      <div>
-                        <div className="font-semibold text-white">
-                          {participant.studentName}
-                        </div>
-                        <div className="mt-1 text-sm text-slate-400">
-                          Score {participant.innovationScore} | Joined{' '}
-                          {new Date(
-                            participant.registeredAt,
-                          ).toLocaleDateString('en-IN')}
-                        </div>
-                      </div>
-                      <div className="text-sm text-slate-400">
-                        {typeof participant.submissionScore === 'number'
-                          ? `Submission score: ${participant.submissionScore}`
-                          : 'Submission score pending'}
-                      </div>
-                    </div>
-                  ))}
-                </div>
-              )}
+              <form onSubmit={onSubmit} noValidate className="mt-6 space-y-5">
+                <div className="grid gap-5 md:grid-cols-2">
+                  <div>
+                    <label htmlFor="event-title" className={fieldLabelClassName}>
+                      Event Title
+                    </label>
+                    <Input
+                      id="event-title"
+                      placeholder="Innovation Sprint"
+                      aria-invalid={Boolean(errors.title)}
+                      className={errors.title ? inputErrorClassName : undefined}
+                      {...register('title')}
+                    />
+                    {errors.title ? (
+                      <p className={fieldErrorClassName}>{errors.title.message}</p>
+                    ) : null}
+                  </div>
 
-              {scoringEventId === event._id && event.participants.length > 0 ? (
-                <>
-                  <div className="mt-5 grid gap-4 lg:grid-cols-2">
+                  <div>
+                    <label htmlFor="event-type" className={fieldLabelClassName}>
+                      Event Type
+                    </label>
                     <select
-                      value={scoreDraft.studentId}
-                      onChange={(currentEvent) =>
-                        setScoreDraft((current) => ({
-                          ...current,
-                          studentId: currentEvent.target.value,
-                        }))
-                      }
-                      className="rounded-lg border border-slate-800 bg-slate-950 px-4 py-3 text-white"
+                      id="event-type"
+                      aria-invalid={Boolean(errors.type)}
+                      className={`w-full rounded-2xl border bg-slate-950 px-4 py-3 text-white focus:outline-none focus:ring-2 focus:ring-cyan-500/20 ${
+                        errors.type ? inputErrorClassName : 'border-slate-700'
+                      }`}
+                      {...register('type')}
                     >
-                      {event.participants.map((participant) => (
-                        <option
-                          key={participant.studentId}
-                          value={participant.studentId}
-                        >
-                          {participant.studentName}
+                      {eventTypes.map((type) => (
+                        <option key={type} value={type}>
+                          {type}
                         </option>
                       ))}
                     </select>
+                    {errors.type ? (
+                      <p className={fieldErrorClassName}>{errors.type.message}</p>
+                    ) : null}
+                  </div>
+
+                  <div className="md:col-span-2">
+                    <label htmlFor="event-date" className={fieldLabelClassName}>
+                      Date And Time
+                    </label>
                     <Input
-                      type="number"
-                      min={0}
-                      max={100}
-                      value={scoreDraft.score}
-                      onChange={(currentEvent) =>
-                        setScoreDraft((current) => ({
-                          ...current,
-                          score: currentEvent.target.value,
-                        }))
-                      }
-                      placeholder="Submission score"
+                      id="event-date"
+                      type="datetime-local"
+                      aria-invalid={Boolean(errors.date)}
+                      className={errors.date ? inputErrorClassName : undefined}
+                      {...register('date')}
                     />
+                    {errors.date ? (
+                      <p className={fieldErrorClassName}>{errors.date.message}</p>
+                    ) : null}
                   </div>
-                  <div className="mt-3 text-sm text-slate-400">
-                    Save the participant score first, then recompute rankings to
-                    refresh the leaderboard.
-                  </div>
-                  <div className="mt-4 flex justify-end">
-                    <Button
-                      onClick={() =>
-                        submissionMutation.mutate({
-                          eventId: event._id,
-                          studentId: scoreDraft.studentId,
-                          score: Number(scoreDraft.score),
-                        })
-                      }
-                      disabled={
-                        submissionMutation.isPending ||
-                        !scoreDraft.studentId ||
-                        scoreDraft.score.trim() === '' ||
-                        Number(scoreDraft.score) < 0 ||
-                        Number(scoreDraft.score) > 100
-                      }
+
+                  <div className="md:col-span-2">
+                    <label
+                      htmlFor="event-description"
+                      className={fieldLabelClassName}
                     >
-                      {submissionMutation.isPending
-                        ? 'Saving...'
-                        : 'Save Submission Score'}
-                    </Button>
+                      Description
+                    </label>
+                    <textarea
+                      id="event-description"
+                      placeholder="Add the event flow, goals, and what students submit."
+                      aria-invalid={Boolean(errors.description)}
+                      className={`min-h-36 w-full rounded-[24px] border bg-slate-950 px-4 py-3 text-white focus:outline-none focus:ring-2 focus:ring-cyan-500/20 ${
+                        errors.description
+                          ? inputErrorClassName
+                          : 'border-slate-700'
+                      }`}
+                      {...register('description')}
+                    />
+                    {errors.description ? (
+                      <p className={fieldErrorClassName}>
+                        {errors.description.message}
+                      </p>
+                    ) : null}
                   </div>
-                </>
-              ) : null}
+                </div>
+
+                {createError ? (
+                  <div className="rounded-2xl border border-rose-700 bg-rose-900 px-4 py-3 text-sm text-rose-200">
+                    {createError}
+                  </div>
+                ) : null}
+
+                <div className="flex justify-end">
+                  <Button type="submit" disabled={createMutation.isPending}>
+                    {createMutation.isPending ? 'Creating...' : 'Create Event'}
+                  </Button>
+                </div>
+              </form>
             </div>
 
-            <div className="mt-6 rounded-2xl border border-slate-800 bg-slate-900/60 p-4">
-              <div className="mb-3 text-sm font-semibold uppercase tracking-[0.3em] text-cyan-300">
-                Event Rankings
+            <div className="bg-[#0a1624] p-5 sm:p-7">
+              <div className="text-xs font-semibold uppercase tracking-[0.28em] text-slate-500">
+                Notes
               </div>
-              <div className="mb-4 text-sm text-slate-400">
-                Composite = (Submission x 60%) + (Innovation Score x 40%)
-              </div>
-              <div className="space-y-3">
-                {event.rankings.length === 0 ? (
-                  <div className="text-sm text-slate-500">
-                    Rankings will appear here after computation.
-                  </div>
-                ) : (
-                  event.rankings.map((ranking) => (
-                    <div
-                      key={`${event._id}-${ranking.studentId}`}
-                      className="grid grid-cols-1 gap-3 rounded-2xl border border-slate-800 bg-slate-950 px-4 py-4 text-sm md:grid-cols-[80px,1fr,140px,140px,140px]"
-                    >
-                      <div className="font-semibold text-white">
-                        #{ranking.rank}
-                      </div>
-                      <div className="font-semibold text-white">
-                        {ranking.studentName}
-                      </div>
-                      <div className="text-slate-300">
-                        Composite {ranking.compositeScore}
-                      </div>
-                      <div className="text-slate-400">
-                        Innovation {ranking.innovationScore}
-                      </div>
-                      <div className="text-slate-400">
-                        Submission {ranking.submissionScore}
-                      </div>
+              <div className="mt-6 space-y-4">
+                {[
+                  'Keep the event name specific.',
+                  'Set the exact schedule before publishing.',
+                  'Explain what students need to submit.',
+                  'Compute rankings after submissions are added.',
+                ].map((item, index) => (
+                  <div
+                    key={item}
+                    className={`${insetPanelClassName} flex items-center gap-4 px-4 py-4`}
+                  >
+                    <div className="flex h-10 w-10 items-center justify-center rounded-full border border-slate-700 bg-[#08131f] text-sm font-semibold text-slate-300">
+                      0{index + 1}
                     </div>
-                  ))
-                )}
+                    <div className="text-sm font-medium text-slate-200">
+                      {item}
+                    </div>
+                  </div>
+                ))}
               </div>
             </div>
-          </Card>
-        ))}
-      </div> : null}
+          </div>
+        </section>
+      ) : null}
+
+      {isEventsLoading ? (
+        <section className={`${studioPanelClassName} px-5 py-8 text-sm text-slate-400 sm:px-7`}>
+          Loading events...
+        </section>
+      ) : null}
+
+      {hasNoVisibleEvents ? (
+        <section className={studioPanelClassName}>
+          <div className="px-5 py-10 text-center sm:px-7">
+            <div className="text-xs font-semibold uppercase tracking-[0.3em] text-slate-500">
+              {mode === 'college' && activeTab === 'hiring'
+                ? 'Hiring Board'
+                : 'Event Feed'}
+            </div>
+            <div className="mt-4 text-2xl font-semibold text-white">
+              {mode === 'college' && activeTab === 'hiring'
+                ? 'No recruiter sessions yet'
+                : 'No live events yet'}
+            </div>
+          </div>
+        </section>
+      ) : null}
+
+      {activeTab !== 'mentorship' && !isEventsLoading && visibleEvents.length > 0 ? (
+        <div className={studioPanelClassName}>
+          <div className="divide-y divide-slate-800">
+            {visibleEvents.map((event) => {
+              const computedAtLabel = event.rankingsComputedAt
+                ? formatDateTime(event.rankingsComputedAt)
+                : null;
+
+              return (
+                <article
+                  key={event._id}
+                  className={`transition ${
+                    focusedEventId === event._id
+                      ? 'bg-[#0b1726]'
+                      : 'bg-[#08121e]'
+                  }`}
+                >
+                  <div className="grid gap-8 p-5 sm:p-7 xl:grid-cols-[minmax(0,1.4fr)_minmax(250px,0.8fr)]">
+                    <div>
+                      <div className="flex flex-wrap items-center gap-2">
+                        <Badge className={getCategoryBadgeClass(event)}>
+                          {event.category === 'hiring'
+                            ? 'Hiring Event'
+                            : 'Internal Event'}
+                        </Badge>
+                        <div className="inline-flex items-center gap-2 rounded-full border border-slate-700 bg-[#0e1828] px-3 py-1 text-xs font-semibold uppercase tracking-[0.24em] text-slate-300">
+                          <CalendarDays className="h-3.5 w-3.5" />
+                          {event.type}
+                        </div>
+                      </div>
+
+                      <h2 className="mt-5 text-3xl font-semibold tracking-tight text-white">
+                        {event.title}
+                      </h2>
+                      <div className="mt-3 max-w-3xl text-sm leading-7 text-slate-300">
+                        {event.description}
+                      </div>
+
+                      <div className="mt-6 grid gap-px overflow-hidden rounded-xl border border-slate-800 bg-slate-800 sm:grid-cols-2 xl:grid-cols-4">
+                        <div className={`${eventMetaSurfaceClassNames[0]} px-4 py-4`}>
+                          <div className="flex items-center gap-2 text-xs font-semibold uppercase tracking-[0.24em] text-slate-500">
+                            <Clock3 className="h-3.5 w-3.5" />
+                            Schedule
+                          </div>
+                          <div className="mt-3 text-sm font-medium text-slate-100">
+                            {formatDateTime(event.scheduledAt)}
+                          </div>
+                        </div>
+                        <div className={`${eventMetaSurfaceClassNames[1]} px-4 py-4`}>
+                          <div className="flex items-center gap-2 text-xs font-semibold uppercase tracking-[0.24em] text-slate-500">
+                            <Users className="h-3.5 w-3.5" />
+                            Participants
+                          </div>
+                          <div className="mt-3 text-sm font-medium text-slate-100">
+                            {event.participantsCount} joined
+                          </div>
+                        </div>
+                        <div className={`${eventMetaSurfaceClassNames[2]} px-4 py-4`}>
+                          <div className="flex items-center gap-2 text-xs font-semibold uppercase tracking-[0.24em] text-slate-500">
+                            <Trophy className="h-3.5 w-3.5" />
+                            Rankings
+                          </div>
+                          <div className="mt-3 text-sm font-medium text-slate-100">
+                            {event.rankings.length > 0
+                              ? `${event.rankings.length} positions ready`
+                              : 'Waiting for compute'}
+                          </div>
+                        </div>
+                        <div className={`${eventMetaSurfaceClassNames[3]} px-4 py-4`}>
+                          <div className="flex items-center gap-2 text-xs font-semibold uppercase tracking-[0.24em] text-slate-500">
+                            <BriefcaseBusiness className="h-3.5 w-3.5" />
+                            Host
+                          </div>
+                          <div className="mt-3 text-sm font-medium text-slate-100">
+                            {event.recruiterName ?? 'Institution managed'}
+                          </div>
+                          {typeof event.minimumInnovationScore === 'number' &&
+                          event.category === 'hiring' ? (
+                            <div className="mt-1 text-xs text-amber-300">
+                              Minimum score {event.minimumInnovationScore}
+                            </div>
+                          ) : null}
+                        </div>
+                      </div>
+                    </div>
+
+                    <div className="flex flex-col gap-3 xl:items-end">
+                      <Button
+                        variant="secondary"
+                        onClick={() => computeMutation.mutate(event._id)}
+                        className="w-full rounded-full border border-slate-700 bg-slate-900 text-white hover:border-slate-600 hover:bg-slate-800 xl:w-auto"
+                      >
+                        Compute Rankings
+                      </Button>
+                      <Button
+                        variant="secondary"
+                        disabled={event.participants.length === 0}
+                        onClick={() => {
+                          const isClosing = scoringEventId === event._id;
+                          setScoringEventId(isClosing ? null : event._id);
+                          setScoreDraft({
+                            studentId: isClosing
+                              ? ''
+                              : event.participants[0]?.studentId ?? '',
+                            score: '',
+                          });
+                        }}
+                        className="w-full rounded-full border border-slate-700 bg-slate-900 text-white hover:border-slate-600 hover:bg-slate-800 xl:w-auto"
+                      >
+                        {event.participants.length === 0
+                          ? 'No Participants Yet'
+                          : scoringEventId === event._id
+                            ? 'Hide Score Form'
+                            : 'Add Submission Score'}
+                      </Button>
+                      {computedAtLabel ? (
+                        <div className="text-xs font-medium uppercase tracking-[0.22em] text-slate-500 xl:text-right">
+                          Updated {computedAtLabel}
+                        </div>
+                      ) : null}
+                    </div>
+                  </div>
+
+                  <div className="grid gap-px border-t border-slate-800 bg-slate-800 xl:grid-cols-2">
+                    <section className="bg-[#081321] p-5 sm:p-7">
+                      <div className="flex items-center justify-between gap-3">
+                        <div className="text-xs font-semibold uppercase tracking-[0.28em] text-cyan-300">
+                          Participants
+                        </div>
+                        <div className="text-sm text-slate-500">
+                          {event.participants.length} entries
+                        </div>
+                      </div>
+
+                      {event.participants.length === 0 ? (
+                        <div className="mt-5 rounded-2xl border border-dashed border-slate-800 px-4 py-6 text-sm text-slate-500">
+                          No students have joined this event yet.
+                        </div>
+                      ) : (
+                        <div className="mt-5 divide-y divide-slate-800">
+                          {event.participants.map((participant) => (
+                            <div
+                              key={`${event._id}-${participant.studentId}`}
+                              className="grid gap-3 py-4 md:grid-cols-[minmax(0,1fr)_auto]"
+                            >
+                              <div>
+                                <div className="text-base font-semibold text-white">
+                                  {participant.studentName}
+                                </div>
+                                <div className="mt-2 flex flex-wrap gap-4 text-sm text-slate-400">
+                                  <span>
+                                    Innovation {participant.innovationScore}
+                                  </span>
+                                  <span>
+                                    Joined {formatDateOnly(participant.registeredAt)}
+                                  </span>
+                                </div>
+                              </div>
+                              <div className="text-sm text-slate-300 md:text-right">
+                                {typeof participant.submissionScore === 'number'
+                                  ? `Submission ${participant.submissionScore}`
+                                  : 'Submission pending'}
+                              </div>
+                            </div>
+                          ))}
+                        </div>
+                      )}
+
+                      {scoringEventId === event._id &&
+                      event.participants.length > 0 ? (
+                        <div className={`${insetPanelClassName} mt-6 p-4`}>
+                          <div className="grid gap-4 lg:grid-cols-2">
+                            <select
+                              value={scoreDraft.studentId}
+                              onChange={(currentEvent) =>
+                                setScoreDraft((current) => ({
+                                  ...current,
+                                  studentId: currentEvent.target.value,
+                                }))
+                              }
+                              className="rounded-2xl border border-slate-700 bg-slate-950 px-4 py-3 text-white focus:outline-none focus:ring-2 focus:ring-cyan-500/20"
+                            >
+                              {event.participants.map((participant) => (
+                                <option
+                                  key={participant.studentId}
+                                  value={participant.studentId}
+                                >
+                                  {participant.studentName}
+                                </option>
+                              ))}
+                            </select>
+                            <Input
+                              type="number"
+                              min={0}
+                              max={100}
+                              value={scoreDraft.score}
+                              onChange={(currentEvent) =>
+                                setScoreDraft((current) => ({
+                                  ...current,
+                                  score: currentEvent.target.value,
+                                }))
+                              }
+                              placeholder="Submission score"
+                            />
+                          </div>
+                          <div className="mt-4 flex justify-end">
+                            <Button
+                              onClick={() =>
+                                submissionMutation.mutate({
+                                  eventId: event._id,
+                                  studentId: scoreDraft.studentId,
+                                  score: Number(scoreDraft.score),
+                                })
+                              }
+                              disabled={
+                                submissionMutation.isPending ||
+                                !scoreDraft.studentId ||
+                                scoreDraft.score.trim() === '' ||
+                                Number(scoreDraft.score) < 0 ||
+                                Number(scoreDraft.score) > 100
+                              }
+                            >
+                              {submissionMutation.isPending
+                                ? 'Saving...'
+                                : 'Save Submission Score'}
+                            </Button>
+                          </div>
+                        </div>
+                      ) : null}
+                    </section>
+
+                    <section className="bg-[#0b1623] p-5 sm:p-7">
+                      <div className="flex items-center justify-between gap-3">
+                        <div className="text-xs font-semibold uppercase tracking-[0.28em] text-cyan-300">
+                          Rankings
+                        </div>
+                        <div className="text-sm text-slate-500">
+                          60% submission / 40% innovation
+                        </div>
+                      </div>
+
+                      {event.rankings.length === 0 ? (
+                        <div className="mt-5 rounded-2xl border border-dashed border-slate-800 px-4 py-6 text-sm text-slate-500">
+                          Rankings will appear here after computation.
+                        </div>
+                      ) : (
+                        <div className="mt-5 divide-y divide-slate-800">
+                          {event.rankings.map((ranking) => (
+                            <div
+                              key={`${event._id}-${ranking.studentId}`}
+                              className="grid gap-3 py-4 md:grid-cols-[72px,minmax(0,1fr),120px,120px,120px]"
+                            >
+                              <div className="text-lg font-semibold text-cyan-300">
+                                #{ranking.rank}
+                              </div>
+                              <div className="font-semibold text-white">
+                                {ranking.studentName}
+                              </div>
+                              <div className="text-sm text-slate-200">
+                                Composite {ranking.compositeScore}
+                              </div>
+                              <div className="text-sm text-slate-400">
+                                Innovation {ranking.innovationScore}
+                              </div>
+                              <div className="text-sm text-slate-400">
+                                Submission {ranking.submissionScore}
+                              </div>
+                            </div>
+                          ))}
+                        </div>
+                      )}
+                    </section>
+                  </div>
+                </article>
+              );
+            })}
+          </div>
+        </div>
+      ) : null}
     </div>
   );
 }

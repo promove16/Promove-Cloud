@@ -57,7 +57,7 @@ export default function AdminHelpDeskTickets() {
   return (
     <div className="space-y-6">
       <section className="relative overflow-hidden rounded-3xl border border-slate-800 bg-slate-950">
-        <div className="absolute inset-x-0 top-0 h-40 bg-[radial-gradient(circle_at_top_left,rgba(34,211,238,0.18),transparent_35%),radial-gradient(circle_at_top_right,rgba(59,130,246,0.14),transparent_28%)]" />
+        <div className="absolute inset-x-0 top-0 h-40 bg-[radial-gradient(circle_at_top_left,rgba(59,130,246,0.18),transparent_35%),radial-gradient(circle_at_top_right,rgba(59,130,246,0.14),transparent_28%)]" />
         <div className="relative flex flex-col gap-6 px-6 py-6 lg:flex-row lg:items-end lg:justify-between lg:px-8">
           <div className="max-w-3xl">
               <div className="text-[11px] uppercase tracking-[0.32em] text-cyan-300">Admin Help Desk</div>
@@ -80,7 +80,7 @@ export default function AdminHelpDeskTickets() {
                   className={`rounded-2xl border px-4 py-3 text-sm font-semibold transition ${
                     active
                       ? 'border-cyan-500/40 bg-cyan-500/10 text-cyan-200'
-                      : 'border-slate-800 bg-slate-900/80 text-slate-300 hover:border-slate-700'
+                      : 'border-slate-800 bg-slate-900 text-slate-300 hover:border-slate-700'
                   }`}
                 >
                   {option.label}
@@ -91,7 +91,7 @@ export default function AdminHelpDeskTickets() {
         </div>
       </section>
 
-      <Card className="border-slate-800 bg-slate-950/90 p-6">
+      <Card className="border-slate-800 bg-slate-950 p-6">
         <div className="flex items-start justify-between gap-4">
           <div>
             <div className="text-xs uppercase tracking-[0.3em] text-cyan-300">Queue</div>
@@ -115,7 +115,7 @@ export default function AdminHelpDeskTickets() {
               const isCompleted = ticket.status === 'completed';
 
               return (
-                <div key={ticket._id} className="rounded-3xl border border-slate-800 bg-slate-900/70 p-5">
+                <div key={ticket._id} className="rounded-3xl border border-slate-800 bg-slate-900 p-5">
                   <div className="flex flex-col gap-5 xl:flex-row xl:items-start xl:justify-between">
                     <div className="space-y-4">
                       <div className="flex flex-wrap items-center gap-3">
@@ -146,7 +146,7 @@ export default function AdminHelpDeskTickets() {
                         </div>
                       </div>
 
-                      <div className="rounded-2xl border border-slate-800 bg-slate-950/80 px-4 py-4 text-sm leading-6 text-slate-300">
+                      <div className="rounded-2xl border border-slate-800 bg-slate-950 px-4 py-4 text-sm leading-6 text-slate-300">
                         {ticket.message || 'No issue text attached.'}
                       </div>
 
@@ -183,7 +183,7 @@ export default function AdminHelpDeskTickets() {
                       ) : null}
 
                       {!isCompleted ? (
-                        <div className="rounded-2xl border border-slate-800 bg-slate-950/80 p-4">
+                        <div className="rounded-2xl border border-slate-800 bg-slate-950 p-4">
                           <label htmlFor={`resolution-${ticket._id}`} className="text-sm font-medium text-slate-200">
                             Resolution note
                           </label>

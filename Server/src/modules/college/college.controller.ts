@@ -51,6 +51,10 @@ import {
   updateComplianceAction,
   updateComplianceIncident,
 } from '../institution/institutionCompliance.service';
+import {
+  getLatestInstitutionPolicySubmission,
+  submitInstitutionPolicySubmission,
+} from '../institution/institutionPolicySubmission.service';
 
 export const getCollegeDashboardController = async (req: Request, res: Response) => {
   const data = await getCollegeDashboard(req.user!._id);
@@ -151,6 +155,16 @@ export const getLatestCollegeComplianceReportController = async (req: Request, r
 
 export const getCollegeComplianceOverviewController = async (req: Request, res: Response) => {
   const data = await getComplianceOverview(req.user!._id, 'college');
+  res.status(200).json(new ApiResponse(data));
+};
+
+export const getCollegeComplianceSubmissionController = async (req: Request, res: Response) => {
+  const data = await getLatestInstitutionPolicySubmission(req.user!._id, 'college');
+  res.status(200).json(new ApiResponse(data));
+};
+
+export const submitCollegeComplianceSubmissionController = async (req: Request, res: Response) => {
+  const data = await submitInstitutionPolicySubmission(req.user!._id, 'college', req.user!._id, req.body);
   res.status(200).json(new ApiResponse(data));
 };
 

@@ -1,132 +1,287 @@
 import { useQuery } from '@tanstack/react-query';
 import {
-  BarChart3,
-  Building2,
+  BriefcaseBusiness,
+  FileCheck2,
+  FolderKanban,
+  Handshake,
+  LineChart,
+  type LucideIcon,
   Rocket,
-  Target,
+  ShieldAlert,
   TrendingUp,
   Users,
 } from 'lucide-react';
 import { collegeApi } from '../../api/college.api';
+import type { PlacementRecordView } from '../../types/placement.types';
+import type {
+  ComplianceAuditItem,
+  RecentProject,
+} from '../../types/school.types';
 import { InstitutionOverviewDashboard } from '../institution/InstitutionOverviewDashboard';
 import { getStudentPortfolioViewPath } from '../marketplace/navigation';
+
+type SortableActivityItem = {
+  id: string;
+  title: string;
+  detail: string;
+  meta: string;
+  icon: LucideIcon;
+  to?: string;
+  iconClassName?: string;
+  sortTime: number;
+};
+
+const formatDate = (value: string) =>
+  new Date(value).toLocaleDateString('en-IN', {
+    day: 'numeric',
+    month: 'short',
+    year: 'numeric',
+  });
+
+const buildCollegeActivityItems = ({
+  placementRecords,
+  recentProjects,
+  auditTrail,
+}: {
+  placementRecords: PlacementRecordView[];
+  recentProjects: RecentProject[];
+  auditTrail: ComplianceAuditItem[];
+}) =>
+  [
+    ...placementRecords.slice(0, 3).map(
+      (record) =>
+        ({
+          id: `placement-${record._id}`,
+          title: `${record.studentName} marked ${record.status}`,
+          detail: `${record.companyName ?? record.recruiterName ?? 'Placement partner'} updated the hiring outcome for this student innovator.`,
+          meta: `Placement tracker - ${formatDate(record.updatedAt)}`,
+          icon: BriefcaseBusiness,
+          to: '/dashboard/college/placement',
+          iconClassName: 'text-emerald-200',
+          sortTime: new Date(record.updatedAt).getTime(),
+        }) satisfies SortableActivityItem,
+    ),
+    ...recentProjects.slice(0, 2).map(
+      (project) =>
+        ({
+          id: `project-${project._id}`,
+          title: project.title,
+          detail: `${project.studentName} updated the ${project.stage.toLowerCase()} stage in ${project.category}.`,
+          meta: `Project update - ${formatDate(project.updatedAt)}`,
+          icon: FolderKanban,
+          iconClassName: 'text-cyan-200',
+          sortTime: new Date(project.updatedAt).getTime(),
+        }) satisfies SortableActivityItem,
+    ),
+    ...auditTrail.slice(0, 2).map(
+      (entry) =>
+        ({
+          id: `audit-${entry._id}`,
+          title: entry.title,
+          detail: entry.detail,
+          meta: `Compliance ${entry.type} - ${formatDate(entry.createdAt)}`,
+          icon: ShieldAlert,
+          iconClassName: 'text-amber-200',
+          sortTime: new Date(entry.createdAt).getTime(),
+        }) satisfies SortableActivityItem,
+    ),
+  ]
+    .sort((left, right) => right.sortTime - left.sortTime)
+    .slice(0, 6)
+    .map(({ sortTime: _sortTime, ...item }) => item);
 
 export default function Dashboard() {
   const dashboardQuery = useQuery({
     queryKey: ['college-dashboard'],
     queryFn: collegeApi.getDashboard,
   });
+  const complianceOverviewQuery = useQuery({
+    queryKey: ['college-compliance-overview'],
+    queryFn: collegeApi.getComplianceOverview,
+  });
+  const latestReportQuery = useQuery({
+    queryKey: ['college-latest-report'],
+    queryFn: collegeApi.getLatestComplianceReport,
+  });
   const investorsQuery = useQuery({
-    queryKey: ['college-investors', 'showcase'],
+    queryKey: ['college-investors', 'dashboard'],
     queryFn: collegeApi.getInvestors,
+  });
+  const placementQuery = useQuery({
+    queryKey: ['college-placement', 'dashboard'],
+    queryFn: collegeApi.getPlacementTracker,
   });
 
   const data = dashboardQuery.data;
   const stats = data?.stats;
+  const institutionProfile = data?.institutionProfile;
   const recentActivity = data?.recentActivityCounts;
-  const institutionName = data?.institutionProfile?.institutionName ?? 'College Dashboard';
-  const academicYear = data?.institutionProfile?.academicYear ?? 'Current academic year';
-  const iicRating = (data?.institutionProfile?.iicStarRating ?? 0).toFixed(1);
-  const investorConnections = investorsQuery.data?.length ?? 0;
+  const complianceOverview = complianceOverviewQuery.data;
+  const latestReport = latestReportQuery.data;
+  const investors = investorsQuery.data ?? [];
+  const placementData = placementQuery.data;
+  const academicYear = institutionProfile?.academicYear ?? 'Current AY';
+  const iicRating = institutionProfile?.iicStarRating ?? 0;
 
   return (
     <InstitutionOverviewDashboard
-      institutionLabel="College Overview"
-      institutionName={institutionName}
-      subtitle={`Track innovation output, placement momentum, and recruiter activity for ${academicYear}.`}
+      institutionLabel="College Workspace"
+      institutionName={institutionProfile?.institutionName ?? 'College Dashboard'}
+      subtitle="Monitor innovation delivery, placement velocity, recruiter traction, and accreditation signals from a single workspace."
+      academicYear={academicYear}
+      headerAction={
+        latestReport
+          ? {
+              label: 'Download Compliance Report',
+              onClick: () => window.open(latestReport.pdfUrl, '_blank', 'noopener,noreferrer'),
+            }
+          : undefined
+      }
       statCards={[
         {
-          label: 'Total Students',
+          label: 'Student Innovators',
           value: stats?.totalStudents ?? 0,
-          badge: `${stats?.activeProjects ?? 0} active`,
+          helper: 'College students active in the innovation stack',
           icon: Users,
-          color: 'from-blue-500 to-cyan-500',
+          iconClassName: 'text-cyan-200',
+          accentClassName: 'bg-cyan-400',
           to: '/dashboard/college/students',
         },
         {
           label: 'Active Projects',
           value: stats?.activeProjects ?? 0,
-          badge: `${recentActivity?.scoreEventsLast30Days ?? 0} score events / 30d`,
-          icon: Target,
-          color: 'from-violet-500 to-fuchsia-500',
-          to: '/dashboard/college/projects',
+          helper: `${recentActivity?.scoreEventsLast30Days ?? 0} score events recorded in 30 days`,
+          icon: FolderKanban,
+          iconClassName: 'text-blue-200',
+          accentClassName: 'bg-blue-400',
         },
         {
-          label: 'Placement Rate',
+          label: 'Placement Velocity',
           value: `${stats?.placementVelocity ?? 0}%`,
-          badge: `${stats?.studentsPlaced ?? 0} placed`,
+          helper: 'Current rate based on tracked placement outcomes',
           icon: TrendingUp,
-          color: 'from-emerald-500 to-teal-500',
+          iconClassName: 'text-emerald-200',
+          accentClassName: 'bg-emerald-400',
           to: '/dashboard/college/placement',
         },
         {
-          label: 'Active Startups',
+          label: 'Students Placed',
+          value: stats?.studentsPlaced ?? 0,
+          helper: `${placementData?.hiringPartners.length ?? 0} hiring partners active`,
+          icon: BriefcaseBusiness,
+          iconClassName: 'text-amber-200',
+          accentClassName: 'bg-amber-400',
+          to: '/dashboard/college/placement',
+        },
+        {
+          label: 'Startup Launches',
           value: stats?.startupsLaunched ?? 0,
-          badge: `+${recentActivity?.startupsLast30Days ?? 0} in 30d`,
+          helper: `+${recentActivity?.startupsLast30Days ?? 0} startup updates in 30 days`,
           icon: Rocket,
-          color: 'from-amber-500 to-orange-500',
-          to: '/dashboard/college/startups',
+          iconClassName: 'text-rose-200',
+          accentClassName: 'bg-rose-400',
+        },
+        {
+          label: 'Recruiter Partners',
+          value: stats?.activeHRPartners ?? 0,
+          helper: `${investors.length} investors visible to the college ecosystem`,
+          icon: Handshake,
+          iconClassName: 'text-violet-200',
+          accentClassName: 'bg-violet-400',
+          to: '/dashboard/college/recruiters',
         },
       ]}
-      topInnovatorsTitle="Top Student Innovators"
-      topInnovatorsAction={{ label: 'View Students', to: '/dashboard/college/students' }}
-      topInnovatorsEmptyMessage="No ranked student activity is available yet."
-      eventsTitle="Upcoming Events"
-      eventsAction={{ label: 'Open Events', to: '/dashboard/college/events' }}
-      eventsEmptyMessage="No upcoming events are scheduled yet."
-      recentProjectsTitle="Recent Projects"
-      recentProjectsAction={{ label: 'Open Operations', to: '/dashboard/college/operations' }}
-      recentProjectsEmptyMessage="No active student projects are available yet."
-      announcementTitle="Placement pipeline is live"
-      announcementBody={`${stats?.studentsPlaced ?? 0} students are already marked as placed, the current placement rate is ${stats?.placementVelocity ?? 0}%, and ${stats?.startupsLaunched ?? 0} startups are active in the college pipeline. Use the placement tracker for hiring outcomes and the operations hub for students, projects, investors, mentorship, and events.`}
-      announcementAction={{ label: 'Open Placement Tracker', to: '/dashboard/college/placement' }}
-      showcaseTitle="College Showcase"
-      showcaseDescription="Showcase the college's innovation standing across rating, mentorship, startup momentum, and investor access."
-      showcaseCards={[
+      connectionTitle="Connected to ProMove Innovation Cloud"
+      connectionDescription="Placement tracking, recruiter coordination, startup visibility, compliance monitoring, and student innovation operations are all active for this college workspace."
+      connectionTag="Verified"
+      connectionChips={[
+        { label: 'Hiring Partners', value: String(placementData?.hiringPartners.length ?? 0) },
+        { label: 'Investor Access', value: String(investors.length) },
         {
-          title: 'IIC Rating',
-          value: `${iicRating} / 5`,
-          description: 'Institution innovation rating visible on public ecosystem profiles.',
-          icon: BarChart3,
-          color: 'from-cyan-500 to-blue-500',
+          label: 'Frameworks',
+          value: String(
+            complianceOverview?.frameworkSummary.total ??
+              institutionProfile?.policies.length ??
+              0,
+          ),
+        },
+      ]}
+      ratingValue={iicRating}
+      ratingUpdatedAt={institutionProfile?.iicLastUpdated}
+      ratingSummary="The score combines the published IIC rating with project throughput, placement performance, startup launches, mentoring coverage, and employer engagement."
+      ratingBreakdown={[
+        {
+          label: 'Innovation activities completed',
+          value: stats?.totalInnovationActivities ?? 0,
+          helper: 'Innovation activity captured across the college pipeline',
+          icon: LineChart,
+          to: '/dashboard/college/analytics',
+          iconClassName: 'text-cyan-200',
         },
         {
-          title: 'Mentorship Hours',
-          value: String(stats?.totalMentoringHours ?? 0),
-          description: 'Mentor engagement delivered across the student innovation pipeline.',
-          icon: Users,
-          color: 'from-violet-500 to-fuchsia-500',
+          label: 'Students placed',
+          value: stats?.studentsPlaced ?? 0,
+          helper: 'Placement statuses verified in the hiring tracker',
+          icon: BriefcaseBusiness,
+          to: '/dashboard/college/placement',
+          iconClassName: 'text-emerald-200',
+        },
+        {
+          label: 'Active projects',
+          value: stats?.activeProjects ?? 0,
+          helper: 'Innovation workspaces pushing through the pipeline',
+          icon: FolderKanban,
+          iconClassName: 'text-blue-200',
+        },
+        {
+          label: 'Startup launches',
+          value: stats?.startupsLaunched ?? 0,
+          helper: 'College startups currently visible in the ecosystem',
+          icon: Rocket,
+          iconClassName: 'text-rose-200',
+        },
+        {
+          label: 'Mentoring hours logged',
+          value: stats?.totalMentoringHours ?? 0,
+          helper: 'Structured mentor support recorded for innovators',
+          icon: Handshake,
           to: '/dashboard/college/events?tab=mentorship',
-        },
-        {
-          title: 'Startup Launches',
-          value: String(stats?.startupsLaunched ?? 0),
-          description: 'Student startups launched and tracked from this college.',
-          icon: TrendingUp,
-          color: 'from-amber-500 to-orange-500',
-          to: '/dashboard/college/startups',
-        },
-        {
-          title: 'Investor Connections',
-          value: String(investorConnections),
-          description: 'Visible investor relationships available for college startup and innovation outreach.',
-          icon: Building2,
-          color: 'from-emerald-500 to-teal-500',
-          to: '/dashboard/college/investors',
+          iconClassName: 'text-amber-200',
         },
       ]}
-      quickStats={[
-        { label: 'Placement Velocity', value: `${stats?.placementVelocity ?? 0}%` },
-        { label: 'Innovation Activities', value: String(stats?.totalInnovationActivities ?? 0) },
-        { label: 'Mentoring Hours', value: String(stats?.totalMentoringHours ?? 0) },
-      ]}
+      ratingNote="Colleges with strong update cadence across placements, startup proof, and framework reviews usually move the rating faster."
+      complianceFrameworks={complianceOverview?.frameworks ?? []}
+      complianceSummary={
+        complianceOverview
+          ? {
+              frameworkSummary: complianceOverview.frameworkSummary,
+              incidentSummary: complianceOverview.incidentSummary,
+              alertSummary: complianceOverview.alertSummary,
+              actionSummary: complianceOverview.actionSummary,
+            }
+          : undefined
+      }
+      latestReport={latestReport}
+      complianceAction={{ label: 'View all', to: '/dashboard/college/analytics' }}
+      topInnovatorsTitle="Top Innovators"
+      topInnovatorsAction={{ label: 'View all', to: '/dashboard/college/students' }}
+      topInnovatorsEmptyMessage="No ranked student activity is available yet."
       topStudents={data?.topStudents ?? []}
-      upcomingEvents={data?.upcomingEvents ?? []}
-      recentProjects={data?.recentProjects ?? []}
       studentTo={(student) => getStudentPortfolioViewPath(student._id)}
-      eventTo={() => '/dashboard/college/events'}
-      projectTo={(project) => `/dashboard/college/projects/${project._id}`}
-      isLoading={dashboardQuery.isLoading}
+      activityTitle="Recent Activity"
+      activityAction={{ label: 'View all', to: '/dashboard/college/placement' }}
+      activityItems={buildCollegeActivityItems({
+        placementRecords: placementData?.placementTable ?? [],
+        recentProjects: data?.recentProjects ?? [],
+        auditTrail: complianceOverview?.auditTrail ?? [],
+      })}
+      activityEmptyMessage="No recent college activity is available yet."
+      isLoading={
+        dashboardQuery.isLoading ||
+        complianceOverviewQuery.isLoading ||
+        latestReportQuery.isLoading ||
+        placementQuery.isLoading
+      }
     />
   );
 }
