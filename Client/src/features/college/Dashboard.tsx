@@ -154,6 +154,7 @@ export default function Dashboard() {
           icon: FolderKanban,
           iconClassName: 'text-blue-200',
           accentClassName: 'bg-blue-400',
+          to: '/dashboard/college/projects',
         },
         {
           label: 'Placement Velocity',
@@ -162,7 +163,7 @@ export default function Dashboard() {
           icon: TrendingUp,
           iconClassName: 'text-emerald-200',
           accentClassName: 'bg-emerald-400',
-          to: '/dashboard/college/placement',
+          to: '/dashboard/college/placement/velocity',
         },
         {
           label: 'Students Placed',
@@ -171,7 +172,7 @@ export default function Dashboard() {
           icon: BriefcaseBusiness,
           iconClassName: 'text-amber-200',
           accentClassName: 'bg-amber-400',
-          to: '/dashboard/college/placement',
+          to: '/dashboard/college/placement/students-placed',
         },
         {
           label: 'Startup Launches',
@@ -180,6 +181,7 @@ export default function Dashboard() {
           icon: Rocket,
           iconClassName: 'text-rose-200',
           accentClassName: 'bg-rose-400',
+          to: '/dashboard/college/startups',
         },
         {
           label: 'Recruiter Partners',
@@ -223,7 +225,7 @@ export default function Dashboard() {
           value: stats?.studentsPlaced ?? 0,
           helper: 'Placement statuses verified in the hiring tracker',
           icon: BriefcaseBusiness,
-          to: '/dashboard/college/placement',
+          to: '/dashboard/college/placement/students-placed',
           iconClassName: 'text-emerald-200',
         },
         {
@@ -231,6 +233,7 @@ export default function Dashboard() {
           value: stats?.activeProjects ?? 0,
           helper: 'Innovation workspaces pushing through the pipeline',
           icon: FolderKanban,
+          to: '/dashboard/college/projects',
           iconClassName: 'text-blue-200',
         },
         {
@@ -238,6 +241,7 @@ export default function Dashboard() {
           value: stats?.startupsLaunched ?? 0,
           helper: 'College startups currently visible in the ecosystem',
           icon: Rocket,
+          to: '/dashboard/college/startups',
           iconClassName: 'text-rose-200',
         },
         {
@@ -245,7 +249,7 @@ export default function Dashboard() {
           value: stats?.totalMentoringHours ?? 0,
           helper: 'Structured mentor support recorded for innovators',
           icon: Handshake,
-          to: '/dashboard/college/events?tab=mentorship',
+          to: '/dashboard/college/mentors',
           iconClassName: 'text-amber-200',
         },
       ]}

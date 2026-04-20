@@ -6,7 +6,6 @@ import {
   BadgeIndianRupee,
   BriefcaseBusiness,
   Building2,
-  MessageSquare,
   Rocket,
 } from 'lucide-react';
 import { Badge } from '../../components/ui/Badge';
@@ -17,6 +16,7 @@ import { dealApi } from '../../api/deal.api';
 import { startupApi } from '../../api/startup.api';
 import { DealDetail } from './DealDetail';
 import { PatentShowcase } from '../shared/PatentShowcase';
+import { InvestorWorkspaceLayout } from './InvestorWorkspaceLayout';
 
 const formatInvestorTypeLabel = (type: string) =>
   type === 'penny' ? 'Penny Investor' : type === 'sole' ? 'Sole Investor' : type;
@@ -48,12 +48,6 @@ const quickLinks = [
     path: '/dashboard/investor/pipeline',
     description: 'Track active negotiations and stage changes.',
     icon: BriefcaseBusiness,
-  },
-  {
-    label: 'Pitch Requests',
-    path: '/dashboard/investor/pitch-requests',
-    description: 'Review founder-initiated investor outreach.',
-    icon: MessageSquare,
   },
   {
     label: 'Institutions',
@@ -140,13 +134,10 @@ export default function InvestorDashboard() {
   const isLoading = dealsQuery.isLoading || pitchRequestsQuery.isLoading;
 
   return (
-    <div className="space-y-6">
-      <div>
-        <h1 className="text-3xl font-bold text-white">Investor Dashboard</h1>
-        <p className="mt-2 text-slate-400">
-          Watch live deal flow, respond to founder outreach, and move active startups into due diligence.
-        </p>
-      </div>
+    <InvestorWorkspaceLayout
+      title="Investor Dashboard"
+      description="Watch live deal flow, respond to founder outreach, and move active startups into due diligence."
+    >
 
       {isLoading ? (
         <div className="flex justify-center py-12">
@@ -310,10 +301,10 @@ export default function InvestorDashboard() {
                   <div>
                     <div className="text-lg font-semibold text-white">Portfolio at a glance</div>
                     <p className="mt-2 text-sm leading-6 text-slate-400">
-                      Closed deals flow into Product Workshop and the internal portfolio route, keeping public profile pages separate from active investor operations.
+                      Closed deals now feed the shared portfolio page, so your investor profile stays aligned with the same presentation used across other roles.
                     </p>
-                    <Button className="mt-4" onClick={() => navigate('/dashboard/investor/portfolio')}>
-                      Open Portfolio Workspace
+                    <Button className="mt-4" onClick={() => navigate('/portfolio')}>
+                      Open Portfolio
                     </Button>
                   </div>
                 </div>
@@ -334,6 +325,6 @@ export default function InvestorDashboard() {
       />
 
       <PatentShowcase />
-    </div>
+    </InvestorWorkspaceLayout>
   );
 }

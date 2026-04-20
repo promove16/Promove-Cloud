@@ -1,9 +1,11 @@
 import { Types } from 'mongoose';
 import { z } from 'zod';
+import { redis } from '../../config/redis';
 import { sendTeamInviteEmail } from '../../services/emailService';
 import { deleteStoredAsset, uploadFile, validateFileContent } from '../../services/fileStorageService';
 import { generateSignedCloudinaryUrl } from '../../services/cloudinaryService';
 import { applyScoreAsync } from '../../services/scoreEngine';
+import { NotificationService } from '../notification/notification.service';
 import { User } from '../user/user.model';
 import { ChatMessage } from '../chat/chat.model';
 import { TeamRequest } from '../social/teamRequest.model';
@@ -25,6 +27,7 @@ import { ApiError } from '../../utils/ApiError';
 
 const objectId = (value: string) => new Types.ObjectId(value);
 const TEAM_REQUEST_TTL_MS = 7 * 24 * 60 * 60 * 1000;
+const ASSIGNABLE_MENTOR_APPROVAL_STATUSES = new Set(['approved', 'not_required']);
 
 export const createWorkspaceSchema = z.object({
   title: z.string().trim().min(2).max(120),
@@ -379,11 +382,53 @@ export const getWorkspaceForOwner = async (workspaceId: string, userId: string) 
   return workspace;
 };
 
-const assertMentorAssignmentIsAdminManaged = () => {
-  throw new ApiError(
-    403,
-    'MENTOR_ASSIGNMENT_ADMIN_ONLY',
-    'Mentor assignments are managed by admins through project mentorship review.',
+const getWorkspaceStudentIds = (workspace: {
+  ownerId: Types.ObjectId;
+  teamMemberIds: Types.ObjectId[];
+}) =>
+  Array.from(
+    new Set([String(workspace.ownerId), ...workspace.teamMemberIds.map((memberId) => String(memberId))]),
+  );
+
+const addMentorWatchers = async (mentorId: string, studentIds: string[]) => {
+  if (studentIds.length === 0) {
+    return;
+  }
+
+  await Promise.all(
+    studentIds.flatMap((studentId) => [
+      redis.sadd(`mentor:watch:${mentorId}`, studentId),
+      redis.sadd(`student:watchers:${studentId}`, mentorId),
+    ]),
+  );
+};
+
+const removeMentorWatchersForWorkspace = async (
+  mentorId: string,
+  workspaceId: string,
+  studentIds: string[],
+) => {
+  await Promise.all(
+    studentIds.map(async (studentId) => {
+      const stillAssigned = await Workspace.exists({
+        _id: { $ne: new Types.ObjectId(workspaceId) },
+        isActive: true,
+        chatParticipants: {
+          $elemMatch: {
+            userId: new Types.ObjectId(mentorId),
+            role: 'mentor',
+          },
+        },
+        $or: [{ ownerId: new Types.ObjectId(studentId) }, { teamMemberIds: new Types.ObjectId(studentId) }],
+      });
+
+      if (!stillAssigned) {
+        await Promise.all([
+          redis.srem(`mentor:watch:${mentorId}`, studentId),
+          redis.srem(`student:watchers:${studentId}`, mentorId),
+        ]);
+      }
+    }),
   );
 };
 
@@ -967,21 +1012,24 @@ export const addChatParticipant = async (
 ) => {
   const workspace = await getWorkspaceForOwner(workspaceId, ownerId);
 
-  if (payload.role === 'mentor') {
-    assertMentorAssignmentIsAdminManaged();
-  }
-
   let user = payload.userId ? await User.findById(payload.userId) : null;
   if (!user && payload.email) {
     user = await User.findOne({ email: payload.email.toLowerCase() });
   }
 
-  if (!user) {
+  if (!user || !user.isActive) {
     throw new ApiError(404, 'USER_NOT_FOUND', 'User not found');
   }
 
   if (user.role !== payload.role) {
     throw new ApiError(400, 'ROLE_MISMATCH', `User's role is '${user.role}', but '${payload.role}' was specified.`);
+  }
+
+  if (
+    payload.role === 'mentor' &&
+    !ASSIGNABLE_MENTOR_APPROVAL_STATUSES.has(user.adminApprovalStatus ?? 'pending')
+  ) {
+    throw new ApiError(400, 'MENTOR_NOT_AVAILABLE', 'Only approved mentors can be assigned to a project');
   }
 
   const alreadyParticipant = workspace.chatParticipants.some(
@@ -1009,7 +1057,10 @@ export const addChatParticipant = async (
     targetRole: payload.role,
     requestedRole: payload.role,
     requestedPermission: 'workspace_chat_access',
-    message: `Chat-only access to ${workspace.title}`,
+    message:
+      payload.role === 'mentor'
+        ? `Project mentor access to ${workspace.title}`
+        : `Investor chat access to ${workspace.title}`,
     deepLink: `/product-workspace/${workspaceId}`,
     acceptRedirect: `/product-workspace/${workspaceId}`,
     metadata: {
@@ -1017,6 +1068,7 @@ export const addChatParticipant = async (
       targetName: workspace.title,
       workspaceTitle: workspace.title,
       accessScope: 'chat',
+      participantRole: payload.role,
     },
   });
 
@@ -1029,19 +1081,30 @@ export const removeChatParticipant = async (
   participantUserId: string,
 ) => {
   const workspace = await getWorkspaceForOwner(workspaceId, ownerId);
+  const studentIds = getWorkspaceStudentIds(workspace);
   const participant = workspace.chatParticipants.find((p) => String(p.userId) === participantUserId);
   if (!participant) {
     throw new ApiError(404, 'PARTICIPANT_NOT_FOUND', 'Chat participant not found');
-  }
-
-  if (participant.role === 'mentor') {
-    assertMentorAssignmentIsAdminManaged();
   }
 
   workspace.chatParticipants = workspace.chatParticipants.filter(
     (p) => String(p.userId) !== participantUserId,
   );
   await workspace.save();
+
+  if (participant.role === 'mentor') {
+    await Promise.all([
+      removeMentorWatchersForWorkspace(participantUserId, workspaceId, studentIds),
+      NotificationService.create({
+        userId: participantUserId,
+        type: 'system',
+        title: 'Project mentor access removed',
+        body: `A student team removed your mentor access from "${workspace.title}".`,
+        link: '/dashboard/mentor',
+      }),
+    ]);
+  }
+
   return serializeWorkspace(workspace);
 };
 
@@ -1112,20 +1175,42 @@ const grantWorkspaceChatRequest = async (workspaceId: string, userId: string) =>
     });
     await workspace.save();
   }
+
+  if (user.role === 'mentor') {
+    const studentIds = getWorkspaceStudentIds(workspace);
+    const workspacePath = `/product-workspace/${workspaceId}`;
+
+    await Promise.all([
+      addMentorWatchers(userId, studentIds),
+      ...studentIds.map((studentId) =>
+        NotificationService.create({
+          userId: studentId,
+          type: 'system',
+          title: 'Mentor joined your project',
+          body: `${workspace.title} now has an active project mentor.`,
+          link: workspacePath,
+        }),
+      ),
+    ]);
+  }
 };
 
 const validateWorkspaceChatRequest = async (workspaceId: string, userId: string) => {
   const [workspace, user] = await Promise.all([
     Workspace.findById(workspaceId).select('isActive').lean(),
-    User.findById(userId).select('_id role').lean(),
+    User.findById(userId).select('_id role isActive adminApprovalStatus').lean(),
   ]);
 
   if (!workspace || !workspace.isActive) {
     throw new ApiError(404, 'WORKSPACE_NOT_FOUND', 'Workspace not found');
   }
 
-  if (!user || !['mentor', 'investor'].includes(user.role)) {
+  if (!user || !user.isActive || !['mentor', 'investor'].includes(user.role)) {
     throw new ApiError(400, 'ROLE_MISMATCH', 'Only mentors or investors can accept chat access.');
+  }
+
+  if (user.role === 'mentor' && !ASSIGNABLE_MENTOR_APPROVAL_STATUSES.has(user.adminApprovalStatus ?? 'pending')) {
+    throw new ApiError(400, 'MENTOR_NOT_AVAILABLE', 'Only approved mentors can accept project mentor access.');
   }
 };
 

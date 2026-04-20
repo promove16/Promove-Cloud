@@ -4,6 +4,8 @@ export interface InstitutionMentorshipProgram {
     _id: string;
     displayName: string;
     type: 'school' | 'college';
+    location?: string;
+    locations?: string[];
   };
   requestedBy: {
     _id: string;
@@ -109,49 +111,4 @@ export type ReviewMentorshipProgramInput =
       decision: 'rejected';
       rejectionReason: string;
       adminNotes?: string;
-    };
-
-export interface ProjectMentorshipStudent {
-  _id: string;
-  displayName: string;
-  avatar?: string;
-  institutionName?: string;
-}
-
-export interface ProjectMentorshipAssignment {
-  workspaceId: string;
-  title: string;
-  category: string;
-  stage: string;
-  progressPercent: number;
-  updatedAt: string;
-  startupName?: string;
-  preferredExpertise?: string;
-  students: ProjectMentorshipStudent[];
-  mentor?: {
-    _id: string;
-    displayName: string;
-    email: string;
-    avatar?: string;
-    domain?: string;
-    bio?: string;
-  };
-}
-
-export interface ProjectMentorshipView {
-  items: ProjectMentorshipAssignment[];
-  stats: {
-    total: number;
-    assigned: number;
-    unassigned: number;
-  };
-}
-
-export type ReviewProjectMentorAssignmentInput =
-  | {
-      decision: 'assigned';
-      mentorId: string;
-    }
-  | {
-      decision: 'unassigned';
     };

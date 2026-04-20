@@ -209,7 +209,7 @@ export default function Startups() {
 
       {focusedStartupId ? (
         <div className="rounded-2xl border border-cyan-500/20 bg-cyan-500/10 px-4 py-3 text-sm text-cyan-100">
-          Focused on the startup linked from Help Desk. Switch filters if you need the broader review queue.
+          Focused on the linked startup. Switch filters if you need the broader review queue.
         </div>
       ) : null}
 

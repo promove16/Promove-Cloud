@@ -24,9 +24,6 @@ import {
   CreatedMentorProfileResult,
   InstitutionMentorshipProgram,
   InstitutionMentorshipProgramView,
-  ProjectMentorshipAssignment,
-  ProjectMentorshipView,
-  ReviewProjectMentorAssignmentInput,
   ReviewMentorshipProgramInput,
 } from '../types/mentorship.types';
 import { PatentFilingDocuments, PatentSupportingDocument } from '../types/patent.types';
@@ -38,7 +35,6 @@ import {
   PatentRequestQuestionnaire,
 } from '../types/patentRequest.types';
 import { Problem } from '../types/problem.types';
-import { RequestStatus, WorkflowRequest } from '../types/request.types';
 import { UserRole } from '../types/roles.types';
 import { StartupDocument, StartupReadiness, StartupRegistrationProfile, StartupReviewStatus } from '../types/startup.types';
 import { MentorStudentProfile } from './mentor.api';
@@ -771,19 +767,6 @@ export const adminApi = {
     const response = await api.get<ApiSuccessResponse<AdminAnalyticsData>>('/api/admin/analytics');
     return response.data.data;
   },
-  async getHelpDeskTickets(params?: { status?: Extract<RequestStatus, 'pending' | 'completed'> | 'all' }) {
-    const response = await api.get<ApiSuccessResponse<WorkflowRequest[]>>('/api/admin/help-desk', {
-      params,
-    });
-    return response.data.data;
-  },
-  async resolveHelpDeskTicket(requestId: string, payload: { resolutionNotes: string }) {
-    const response = await api.patch<ApiSuccessResponse<WorkflowRequest>>(
-      `/api/admin/help-desk/${requestId}/resolve`,
-      payload,
-    );
-    return response.data.data;
-  },
   async getAnalyticsLogs(params?: { limit?: number }) {
     const response = await api.get<ApiSuccessResponse<AdminAnalyticsLogEntry[]>>('/api/admin/analytics/logs', {
       params,
@@ -816,20 +799,9 @@ export const adminApi = {
     );
     return response.data.data;
   },
-  async getProjectMentorships() {
-    const response = await api.get<ApiSuccessResponse<ProjectMentorshipView>>('/api/admin/project-mentorships');
-    return response.data.data;
-  },
   async reviewMentorshipProgram(programId: string, payload: ReviewMentorshipProgramInput) {
     const response = await api.patch<ApiSuccessResponse<unknown>>(
       `/api/admin/mentorship-programs/${programId}`,
-      payload,
-    );
-    return response.data.data;
-  },
-  async reviewProjectMentorship(workspaceId: string, payload: ReviewProjectMentorAssignmentInput) {
-    const response = await api.patch<ApiSuccessResponse<ProjectMentorshipAssignment>>(
-      `/api/admin/project-mentorships/${workspaceId}`,
       payload,
     );
     return response.data.data;

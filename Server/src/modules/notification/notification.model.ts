@@ -8,7 +8,6 @@ export type NotificationType =
   | 'patent_status'
   | 'deal_interest'
   | 'startup_launch'
-  | 'support'
   | 'system';
 
 export interface INotification {
@@ -42,7 +41,6 @@ const notificationSchema = new Schema<INotification>(
         'patent_status',
         'deal_interest',
         'startup_launch',
-        'support',
         'system',
       ],
     },

@@ -2,7 +2,6 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useNavigate, useParams } from "react-router-dom";
 import {
-  AlertTriangle,
   Check,
   CheckCheck,
   CheckCircle,
@@ -40,9 +39,11 @@ import type {
 import { DashboardLayout } from "../components/DashboardLayout";
 import { workspaceApi } from "../../api/workspace.api";
 import { useWorkspaceChat } from "../../hooks/useWorkspaceChat";
+import { toast } from "../components/ui/sonner";
 import { useAuthStore } from "../../store/authStore";
 import { UserRole } from "../../types/roles.types";
 import { FileViewerModal } from "../../components/file-viewer/FileViewerModal";
+import { getApiErrorMessage } from "../../utils/apiError";
 import { ProductWorkspaceManager } from "./ProductWorkspaceManager";
 
 const d = (value?: string) =>
@@ -314,7 +315,6 @@ export function ProductWorkspaceDetail({
   const queryClient = useQueryClient();
   const currentUser = useAuthStore((state) => state.user);
   const [activeTab, setActiveTab] = useState("chat");
-  const [toast, setToast] = useState("");
   const [showTaskForm, setShowTaskForm] = useState(false);
   const [showInviteForm, setShowInviteForm] = useState(false);
   const [showProgressModal, setShowProgressModal] = useState(false);
@@ -368,8 +368,7 @@ export function ProductWorkspaceDetail({
   const [showNegotiationPanel, setShowNegotiationPanel] = useState(false);
   const [participantForm, setParticipantForm] = useState({
     email: "",
-    message: "",
-    proposedRole: "developer" as const,
+    role: "mentor" as "mentor" | "investor",
   });
   const [selectedWorkspaceId, setSelectedWorkspaceId] = useState<string>("");
   const [selectedUpload, setSelectedUpload] = useState<WorkspaceUpload | null>(
@@ -437,12 +436,6 @@ export function ProductWorkspaceDetail({
     currentUser?.role === "student" && Boolean(workspace);
   const canManageChatAccess = Boolean(isOwner);
   const chat = useWorkspaceChat(workspaceId);
-
-  useEffect(() => {
-    if (!toast) return;
-    const timeout = window.setTimeout(() => setToast(""), 3000);
-    return () => window.clearTimeout(timeout);
-  }, [toast]);
 
   useEffect(() => {
     if (!currentUser?._id) {
@@ -520,7 +513,7 @@ export function ProductWorkspaceDetail({
       });
       setTaskAssigneeDraft("");
       setShowTaskForm(false);
-      setToast("Task added.");
+      toast.success("Task added.");
       await refresh();
     },
   });
@@ -539,7 +532,7 @@ export function ProductWorkspaceDetail({
     mutationFn: (taskId: string) =>
       workspaceApi.deleteTask(workspaceId!, taskId),
     onSuccess: async () => {
-      setToast("Task removed.");
+      toast.success("Task removed.");
       await refresh();
     },
   });
@@ -556,21 +549,18 @@ export function ProductWorkspaceDetail({
       setInviteMessage("");
       setInviteRole("other");
       setShowInviteForm(false);
-      setToast("Student teammate invite sent.");
+      toast.success("Student teammate invite sent.");
       await refresh();
     },
     onError: (error) =>
-      setToast(
-        (error as { response?: { data?: { error?: { message?: string } } } })
-          ?.response?.data?.error?.message ?? "Unable to invite member.",
-      ),
+      toast.error(getApiErrorMessage(error, "Unable to invite member.")),
   });
 
   const removeMember = useMutation({
     mutationFn: (userId: string) =>
       workspaceApi.removeMember(workspaceId!, userId),
     onSuccess: async () => {
-      setToast("Team member removed.");
+      toast.success("Team member removed.");
       await refresh();
     },
   });
@@ -578,7 +568,7 @@ export function ProductWorkspaceDetail({
     mutationFn: (uploadId: string) =>
       workspaceApi.removeUpload(workspaceId!, uploadId),
     onSuccess: async () => {
-      setToast("Upload removed.");
+      toast.success("Upload removed.");
       await refresh();
     },
   });
@@ -593,21 +583,18 @@ export function ProductWorkspaceDetail({
       }),
     onSuccess: async () => {
       setRepoForm({ repoUrl: "", branch: "", commitHash: "", note: "" });
-      setToast("Repository link attached.");
+      toast.success("Repository link attached.");
       await refresh();
     },
     onError: (error) =>
-      setToast(
-        (error as { response?: { data?: { error?: { message?: string } } } })
-          ?.response?.data?.error?.message ?? "Unable to attach repository.",
-      ),
+      toast.error(getApiErrorMessage(error, "Unable to attach repository.")),
   });
 
   const deleteRepo = useMutation({
     mutationFn: (repoId: string) =>
       workspaceApi.removeRepoSubmission(workspaceId!, repoId),
     onSuccess: async () => {
-      setToast("Repository link removed.");
+      toast.success("Repository link removed.");
       await refresh();
     },
   });
@@ -616,21 +603,18 @@ export function ProductWorkspaceDetail({
     mutationFn: () => workspaceApi.addCodeSubmission(workspaceId!, codeForm),
     onSuccess: async () => {
       setCodeForm({ title: "", language: "", summary: "", codeSnippet: "" });
-      setToast("Code snippet saved securely.");
+      toast.success("Code snippet saved securely.");
       await refresh();
     },
     onError: (error) =>
-      setToast(
-        (error as { response?: { data?: { error?: { message?: string } } } })
-          ?.response?.data?.error?.message ?? "Unable to save code snippet.",
-      ),
+      toast.error(getApiErrorMessage(error, "Unable to save code snippet.")),
   });
 
   const deleteCode = useMutation({
     mutationFn: (codeId: string) =>
       workspaceApi.removeCodeSubmission(workspaceId!, codeId),
     onSuccess: async () => {
-      setToast("Code snippet removed.");
+      toast.success("Code snippet removed.");
       await refresh();
     },
   });
@@ -639,29 +623,29 @@ export function ProductWorkspaceDetail({
     mutationFn: () =>
       workspaceApi.addChatParticipant(workspaceId!, {
         email: participantForm.email,
-        role: "investor",
+        role: participantForm.role,
       }),
     onSuccess: async () => {
       setParticipantForm({
         email: "",
-        message: "",
-        proposedRole: "developer",
+        role: "mentor",
       });
-      setToast("Investor chat access request sent.");
+      toast.success(
+        participantForm.role === "mentor"
+          ? "Project mentor invitation sent."
+          : "Investor chat access request sent.",
+      );
       await refresh();
     },
     onError: (error) =>
-      setToast(
-        (error as { response?: { data?: { error?: { message?: string } } } })
-          ?.response?.data?.error?.message ?? "Unable to add participant.",
-      ),
+      toast.error(getApiErrorMessage(error, "Unable to add participant.")),
   });
 
   const removeParticipant = useMutation({
     mutationFn: (userId: string) =>
       workspaceApi.removeChatParticipant(workspaceId!, userId),
     onSuccess: async () => {
-      setToast("Chat participant removed.");
+      toast.success("Chat participant removed.");
       await refresh();
     },
   });
@@ -686,21 +670,19 @@ export function ProductWorkspaceDetail({
     onSuccess: async () => {
       resetProgressForm();
       setShowProgressModal(false);
-      setToast("Progress uploaded! Your Innovation Score is being updated...");
+      toast.success("Progress uploaded. Your Innovation Score is being updated...");
       await refresh();
     },
     onError: (error) =>
-      setToast(
-        (error as { response?: { data?: { error?: { message?: string } } } })
-          ?.response?.data?.error?.message ??
-          "Unable to upload progress right now.",
+      toast.error(
+        getApiErrorMessage(error, "Unable to upload progress right now."),
       ),
   });
 
   const onFile = async (file: File | null) => {
     if (!file) return;
     if (file.size > 10 * 1024 * 1024)
-      return setToast("File size must be 10MB or less.");
+      return toast.error("File size must be 10MB or less.");
 
     try {
       await workspaceApi.upload(
@@ -711,13 +693,10 @@ export function ProductWorkspaceDetail({
       );
       setUploadNote("");
       setUploadCategory("other");
-      setToast("File uploaded.");
+      toast.success("File uploaded.");
       await refresh();
     } catch (error) {
-      setToast(
-        (error as { response?: { data?: { error?: { message?: string } } } })
-          ?.response?.data?.error?.message ?? "Upload failed.",
-      );
+      toast.error(getApiErrorMessage(error, "Upload failed."));
     }
   };
 
@@ -727,7 +706,7 @@ export function ProductWorkspaceDetail({
     }
 
     if (file.size > 10 * 1024 * 1024) {
-      setToast("Chat attachments must be 10MB or less.");
+      toast.error("Chat attachments must be 10MB or less.");
       return;
     }
 
@@ -790,12 +769,13 @@ export function ProductWorkspaceDetail({
         code: "",
       });
     } catch (error) {
-      setToast(
-        (error as { response?: { data?: { error?: { message?: string } } } })
-          ?.response?.data?.error?.message ??
-          (error instanceof Error
+      toast.error(
+        getApiErrorMessage(
+          error,
+          error instanceof Error
             ? error.message
-            : "Unable to send chat attachment."),
+            : "Unable to send chat attachment.",
+        ),
       );
     } finally {
       setIsSendingChat(false);
@@ -869,10 +849,7 @@ export function ProductWorkspaceDetail({
       );
       setChatComposerAction("message");
     } catch (error) {
-      setToast(
-        (error as { response?: { data?: { error?: { message?: string } } } })
-          ?.response?.data?.error?.message ?? "Unable to create task.",
-      );
+      toast.error(getApiErrorMessage(error, "Unable to create task."));
     }
   };
 
@@ -897,20 +874,17 @@ export function ProductWorkspaceDetail({
       setChatDocFile(null);
       setUploadNote("");
       setUploadCategory("other");
-      setToast("Document shared in chat.");
+      toast.success("Document shared in chat.");
       setChatComposerAction("message");
     } catch (error) {
-      setToast(
-        (error as { response?: { data?: { error?: { message?: string } } } })
-          ?.response?.data?.error?.message ?? "Upload failed.",
-      );
+      toast.error(getApiErrorMessage(error, "Upload failed."));
     }
   };
 
   const submitProgressFromChat = async () => {
     if (!workspaceId || !isProgressFormValid) {
       setHasAttemptedProgressSubmit(true);
-      setToast(
+      toast.error(
         Object.values(progressFormErrors)[0] ??
           "Complete the required progress details first.",
       );
@@ -936,7 +910,7 @@ export function ProductWorkspaceDetail({
       });
 
       resetProgressForm();
-      setToast("Progress uploaded! Your Innovation Score is being updated...");
+      toast.success("Progress uploaded. Your Innovation Score is being updated...");
       await refresh();
       sendActivityMessage(
         "progress",
@@ -951,10 +925,8 @@ export function ProductWorkspaceDetail({
       );
       setChatComposerAction("message");
     } catch (error) {
-      setToast(
-        (error as { response?: { data?: { error?: { message?: string } } } })
-          ?.response?.data?.error?.message ??
-          "Unable to upload progress right now.",
+      toast.error(
+        getApiErrorMessage(error, "Unable to upload progress right now."),
       );
     }
   };
@@ -974,10 +946,7 @@ export function ProductWorkspaceDetail({
       );
       setChatComposerAction("message");
     } catch (error) {
-      setToast(
-        (error as { response?: { data?: { error?: { message?: string } } } })
-          ?.response?.data?.error?.message ?? "Unable to invite member.",
-      );
+      toast.error(getApiErrorMessage(error, "Unable to invite member."));
     }
   };
 
@@ -1308,7 +1277,7 @@ export function ProductWorkspaceDetail({
                 onClick={() => {
                   setHasAttemptedProgressSubmit(true);
                   if (!isProgressFormValid) {
-                    setToast(
+                    toast.error(
                       Object.values(progressFormErrors)[0] ??
                         "Complete the required progress details first.",
                     );
@@ -2283,7 +2252,7 @@ export function ProductWorkspaceDetail({
             onChange={(event) => {
               const file = event.target.files?.[0] ?? null;
               if (file && file.size > 10 * 1024 * 1024) {
-                setToast("Chat attachments must be 10MB or less.");
+                toast.error("Chat attachments must be 10MB or less.");
               } else {
                 setChatDocFile(file);
               }
@@ -2298,7 +2267,7 @@ export function ProductWorkspaceDetail({
             onChange={(event) => {
               const file = event.target.files?.[0] ?? null;
               if (file && file.size > 10 * 1024 * 1024) {
-                setToast("Chat attachments must be 10MB or less.");
+                toast.error("Chat attachments must be 10MB or less.");
               } else {
                 setProgressForm((current) => ({
                   ...current,
@@ -3564,12 +3533,6 @@ export function ProductWorkspaceDetail({
           </div>
         </section>
 
-        {toast ? (
-          <div className="fixed bottom-6 right-6 z-50 max-w-sm rounded-2xl border border-sky-500/30 bg-slate-950 px-4 py-3 text-sm text-sky-100 shadow-xl">
-            {toast}
-          </div>
-        ) : null}
-
         {!workspace && !listQuery.isLoading ? (
           <section className="rounded-[28px] border border-dashed border-slate-700 bg-slate-950 p-10 text-center">
             <Rocket className="mx-auto mb-4 h-10 w-10 text-slate-500" />
@@ -4727,9 +4690,8 @@ export function ProductWorkspaceDetail({
                       {showNegotiationPanel ? (
                         <div className="space-y-3 rounded-2xl border border-amber-800/30 bg-amber-950/10 p-4">
                           <div className="text-xs text-amber-200">
-                            Investor participants can be invited here for
-                            chat-only access. Mentor coverage is assigned and
-                            removed by admins from the mentorship workspace.
+                            Invite mentors or investors into the workspace chat
+                            without adding them to the student team.
                           </div>
                           {(workspace?.chatParticipants ?? []).map(
                             (participant) => (
@@ -4743,11 +4705,12 @@ export function ProductWorkspaceDetail({
                                       participant.userId}
                                   </div>
                                   <div className="text-xs capitalize text-slate-400">
-                                    {participant.role}
+                                    {participant.role === "mentor"
+                                      ? "project mentor"
+                                      : participant.role}
                                   </div>
                                 </div>
-                                {canManageChatAccess &&
-                                participant.role !== "mentor" ? (
+                                {canManageChatAccess ? (
                                   <button
                                     onClick={() =>
                                       removeParticipant.mutate(
@@ -4758,16 +4721,27 @@ export function ProductWorkspaceDetail({
                                   >
                                     Remove
                                   </button>
-                                ) : participant.role === "mentor" ? (
-                                  <span className="rounded-lg border border-sky-500/30 bg-sky-500/10 px-3 py-2 text-xs font-semibold text-sky-200">
-                                    Admin managed
-                                  </span>
                                 ) : null}
                               </div>
                             ),
                           )}
                           {canManageChatAccess ? (
-                            <div className="grid gap-3 md:grid-cols-[minmax(0,1fr)_auto]">
+                            <div className="grid gap-3 md:grid-cols-[180px_minmax(0,1fr)_auto]">
+                              <select
+                                value={participantForm.role}
+                                onChange={(event) =>
+                                  setParticipantForm((current) => ({
+                                    ...current,
+                                    role: event.target.value as
+                                      | "mentor"
+                                      | "investor",
+                                  }))
+                                }
+                                className="rounded-xl border border-slate-800 bg-slate-950 px-4 py-3 text-white"
+                              >
+                                <option value="mentor">Project mentor</option>
+                                <option value="investor">Investor</option>
+                              </select>
                               <input
                                 value={participantForm.email}
                                 onChange={(event) =>
@@ -4776,7 +4750,11 @@ export function ProductWorkspaceDetail({
                                     email: event.target.value,
                                   }))
                                 }
-                                placeholder="investor@example.com"
+                                placeholder={
+                                  participantForm.role === "mentor"
+                                    ? "mentor@example.com"
+                                    : "investor@example.com"
+                                }
                                 className="rounded-xl border border-slate-800 bg-slate-950 px-4 py-3 text-white"
                               />
                               <button
@@ -4787,7 +4765,9 @@ export function ProductWorkspaceDetail({
                                 }
                                 className="rounded-xl bg-amber-600 px-4 py-3 text-sm font-semibold text-white disabled:opacity-60"
                               >
-                                Add Investor
+                                {participantForm.role === "mentor"
+                                  ? "Invite Mentor"
+                                  : "Add Investor"}
                               </button>
                             </div>
                           ) : null}
@@ -4798,21 +4778,6 @@ export function ProductWorkspaceDetail({
                 </div>
               </section>
 
-              <div className="grid gap-6 md:grid-cols-2">
-                <div className="rounded-[28px] border border-cyan-500/20 bg-cyan-500/10 p-6">
-                <div className="flex items-start gap-3">
-                  <AlertTriangle className="mt-0.5 h-5 w-5 text-cyan-200" />
-                  <div>
-                    <h3 className="font-bold text-white">Workspace Policy</h3>
-                    <p className="mt-2 text-sm leading-6 text-cyan-100">
-                      Product Workspace is reserved for Problem Bank challenge
-                      delivery and leaderboard progress. Use Startup Launch for
-                      startup drafts, investor launch, and patent support.
-                    </p>
-                  </div>
-                </div>
-              </div>
-            </div>
           </div>
         ) : null}
 

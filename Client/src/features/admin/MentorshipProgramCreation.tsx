@@ -9,9 +9,10 @@ import {
   createPickerOnlyDateTimeInputHandlers,
   emptyProgramForm,
   formLabelClassName,
-  getInstitutionLabel,
   type ProgramFormState,
 } from './mentorshipAdminShared';
+import { InstitutionSearchField } from './InstitutionSearchField';
+import { MentorSearchField } from './MentorSearchField';
 
 export default function MentorshipProgramCreation() {
   const queryClient = useQueryClient();
@@ -66,6 +67,12 @@ export default function MentorshipProgramCreation() {
       (programForm.institutionType === 'school' ? schools : colleges).filter((institution) => institution.isActive),
     [colleges, programForm.institutionType, schools],
   );
+  const canCreateProgram =
+    !createProgramMutation.isPending &&
+    mentors.length > 0 &&
+    institutionOptions.length > 0 &&
+    Boolean(programForm.institutionId) &&
+    Boolean(programForm.mentorId);
 
   const updateProgramForm = (patch: Partial<ProgramFormState>) =>
     setProgramForm((current) => ({ ...current, ...patch }));
@@ -97,13 +104,19 @@ export default function MentorshipProgramCreation() {
   };
 
   return (
-    <Card className="p-6">
-      <div className="max-w-4xl">
-        <div className="text-xs uppercase tracking-[0.3em] text-cyan-300">Admin Created Programs</div>
-        <h2 className="mt-2 text-2xl font-bold text-white">Create for any school or college</h2>
-        <p className="mt-2 text-sm text-slate-400">
-          Build a mentorship programme on behalf of an institution and assign an available mentor in the same step.
-        </p>
+    <Card className="p-5">
+      <div className="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
+        <div className="max-w-4xl">
+          <div className="text-xs uppercase tracking-[0.3em] text-cyan-300">Admin Created Programs</div>
+          <h2 className="mt-2 text-2xl font-bold text-white">Create for any school or college</h2>
+          <p className="mt-2 text-sm text-slate-400">
+            Build a mentorship programme on behalf of an institution and assign an available mentor in the same step.
+          </p>
+        </div>
+
+        <Button type="submit" form="admin-mentorship-program-form" disabled={!canCreateProgram} className="shrink-0">
+          {createProgramMutation.isPending ? 'Creating...' : 'Create Mentorship Programme'}
+        </Button>
       </div>
 
       {feedback ? (
@@ -118,7 +131,7 @@ export default function MentorshipProgramCreation() {
         </div>
       ) : null}
 
-      <form className="mt-6 space-y-4" onSubmit={handleCreateProgram}>
+      <form id="admin-mentorship-program-form" className="mt-4 space-y-3" onSubmit={handleCreateProgram}>
         <div className="grid gap-3 md:grid-cols-2">
           <div>
             <label className={formLabelClassName}>Institution Type</label>
@@ -137,24 +150,16 @@ export default function MentorshipProgramCreation() {
               <option value="college">College</option>
             </select>
           </div>
-          <div>
-            <label className={formLabelClassName}>Institution</label>
-            <select
-              value={programForm.institutionId}
-              onChange={(event) => updateProgramForm({ institutionId: event.target.value })}
-              className="w-full rounded-lg border border-slate-800 bg-slate-950 px-4 py-3 text-white"
-              required
-            >
-              <option value="">
-                {schoolsQuery.isLoading || collegesQuery.isLoading ? 'Loading institutions...' : 'Select institution'}
-              </option>
-              {institutionOptions.map((institution) => (
-                <option key={institution._id} value={institution._id}>
-                  {getInstitutionLabel(institution)}
-                </option>
-              ))}
-            </select>
-          </div>
+          <InstitutionSearchField
+            institutions={institutionOptions}
+            value={programForm.institutionId}
+            onChange={(institutionId) => updateProgramForm({ institutionId })}
+            helperText={
+              schoolsQuery.isLoading || collegesQuery.isLoading
+                ? 'Loading institutions...'
+                : 'Type to search institutions by name, location, or email.'
+            }
+          />
         </div>
 
         <div className="grid gap-3 md:grid-cols-2">
@@ -168,22 +173,13 @@ export default function MentorshipProgramCreation() {
               required
             />
           </div>
-          <div>
-            <label className={formLabelClassName}>Assigned Mentor</label>
-            <select
-              value={programForm.mentorId}
-              onChange={(event) => updateProgramForm({ mentorId: event.target.value })}
-              className="w-full rounded-lg border border-slate-800 bg-slate-950 px-4 py-3 text-white"
-              required
-            >
-              <option value="">Select mentor</option>
-              {mentors.map((mentor) => (
-                <option key={mentor._id} value={mentor._id}>
-                  {mentor.displayName} • {mentor.assignedPrograms} programs • {mentor.assignedProjects} projects
-                </option>
-              ))}
-            </select>
-          </div>
+          <MentorSearchField
+            mentors={mentors}
+            value={programForm.mentorId}
+            onChange={(mentorId) => updateProgramForm({ mentorId })}
+            preferredExpertise={programForm.preferredExpertise}
+            helperText="Type to search mentors instantly. Suggestions favor matching expertise and lower current load."
+          />
         </div>
 
         <div>
@@ -192,7 +188,7 @@ export default function MentorshipProgramCreation() {
             value={programForm.objective}
             onChange={(event) => updateProgramForm({ objective: event.target.value })}
             placeholder="Describe the objective and expected outcomes"
-            className="min-h-28 w-full rounded-lg border border-slate-800 bg-slate-950 px-4 py-3 text-white"
+            className="min-h-24 w-full rounded-lg border border-slate-800 bg-slate-950 px-4 py-3 text-white"
             required
           />
         </div>
@@ -329,23 +325,10 @@ export default function MentorshipProgramCreation() {
               value={programForm.adminNotes}
               onChange={(event) => updateProgramForm({ adminNotes: event.target.value })}
               placeholder="Add internal notes or logistics context"
-              className="min-h-24 w-full rounded-lg border border-slate-800 bg-slate-950 px-4 py-3 text-white"
+              className="min-h-20 w-full rounded-lg border border-slate-800 bg-slate-950 px-4 py-3 text-white"
             />
           </div>
         </div>
-
-        <Button
-          type="submit"
-          disabled={
-            createProgramMutation.isPending ||
-            mentors.length === 0 ||
-            institutionOptions.length === 0 ||
-            !programForm.institutionId ||
-            !programForm.mentorId
-          }
-        >
-          {createProgramMutation.isPending ? 'Creating...' : 'Create Mentorship Programme'}
-        </Button>
       </form>
     </Card>
   );

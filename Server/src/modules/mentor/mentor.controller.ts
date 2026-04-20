@@ -1,18 +1,22 @@
 import { Request, Response } from 'express';
 import { ApiError } from '../../utils/ApiError';
 import { ApiResponse } from '../../utils/ApiResponse';
-import { createMentorSessionSchema, mentorSessionUpdateSchema } from './mentor.validation';
+import { createMentorSessionSchema, mentorSessionUpdateSchema, submitMentorBidSchema } from './mentor.validation';
 import {
   createMentorFeedback,
   createMentorSession,
   deleteMentorSession,
+  getBidOpportunities,
+  getMentorBids,
   getMentorDashboard,
   getMentorSession,
   getMentorStudentProfile,
   getMentorStudents,
   getMentorWorkspace,
   listMentorSessions,
+  submitMentorBid,
   updateMentorSession,
+  withdrawMentorBid,
 } from './mentor.service';
 import { createMentorFeedbackSchema } from './mentor.validation';
 
@@ -97,4 +101,27 @@ export const createMentorFeedbackController = async (req: Request, res: Response
       }),
     ),
   );
+};
+
+export const getBidOpportunitiesController = async (req: Request, res: Response) => {
+  if (!req.user) throw new ApiError(401, 'UNAUTHORIZED', 'Invalid or expired token');
+  res.status(200).json(new ApiResponse(await getBidOpportunities(req.user._id)));
+};
+
+export const getMyBidsController = async (req: Request, res: Response) => {
+  if (!req.user) throw new ApiError(401, 'UNAUTHORIZED', 'Invalid or expired token');
+  res.status(200).json(new ApiResponse(await getMentorBids(req.user._id)));
+};
+
+export const submitBidController = async (req: Request, res: Response) => {
+  if (!req.user) throw new ApiError(401, 'UNAUTHORIZED', 'Invalid or expired token');
+  const payload = submitMentorBidSchema.parse(req.body);
+  res.status(201).json(new ApiResponse(await submitMentorBid(req.user._id, payload)));
+};
+
+export const withdrawBidController = async (req: Request, res: Response) => {
+  if (!req.user) throw new ApiError(401, 'UNAUTHORIZED', 'Invalid or expired token');
+  const bidId = getParam(req.params.id);
+  if (!bidId || !isObjectId(bidId)) throw new ApiError(400, 'INVALID_ID', 'Invalid ID format');
+  res.status(200).json(new ApiResponse(await withdrawMentorBid(req.user._id, bidId)));
 };

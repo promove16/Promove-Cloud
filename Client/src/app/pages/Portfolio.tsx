@@ -24,10 +24,12 @@ import {
   type MarketplaceUserDetail,
   marketplaceApi,
 } from "../../api/marketplace.api";
+import { investorApi } from "../../api/investor.api";
 import { requestApi } from "../../api/request.api";
 import type { QueryType } from "../../api/dm.api";
 import { startupApi } from "../../api/startup.api";
 import { workspaceApi } from "../../api/workspace.api";
+import type { InvestorPortfolioResponse } from "../../types/investor.types";
 import type { Startup } from "../../types/startup.types";
 import type { Workspace } from "../../types/workspace.types";
 import { UserRole } from "../../types/roles.types";
@@ -133,6 +135,8 @@ type PortfolioCopy = {
   ownerHint: string;
   guestHint: string;
 };
+
+type InvestorPortfolioItem = InvestorPortfolioResponse["items"][number];
 
 const PORTFOLIO_ROLE_SET = new Set<PortfolioRole>([
   "student",
@@ -450,6 +454,84 @@ const mapStartupToPortfolioProject = (
   forks: startup.teamSize ?? 0,
   languages: [`${startup.activeProducts} Products`],
 });
+
+const formatInvestorRole = (role: InvestorPortfolioItem["investorRole"]) =>
+  role.charAt(0).toUpperCase() + role.slice(1);
+
+const mapInvestorPortfolioItemToPortfolioProject = (
+  item: InvestorPortfolioItem,
+): PortfolioProject => {
+  const scoreTrendLabel = `${item.scoreTrend >= 0 ? "+" : ""}${item.scoreTrend}`;
+  const summary = [
+    item.startupCategory,
+    `${formatInvestorRole(item.investorRole)} role`,
+    `${item.equityPercent}% equity`,
+    `Live score ${item.liveInnovationScore} (${scoreTrendLabel})`,
+  ].join(" | ");
+
+  return {
+    _id: item._id,
+    title: item.startupName,
+    description: `${summary}. Founded by ${item.studentDisplayName}.`,
+    techStack: [
+      item.startupCategory,
+      item.investorType === "sole" ? "Sole Investor" : "Penny Investor",
+      item.canVeto ? "Veto Rights" : "Board Access",
+    ],
+    repoUrl: null,
+    liveUrl: null,
+    coverImageUrl: null,
+    startDate: item.closedAt ?? null,
+    endDate: null,
+    isCurrent: true,
+    source: "manual",
+    githubRepoId: null,
+    stars: item.liveInnovationScore,
+    forks: item.sharesAllocated,
+    languages: [
+      `${item.sharesAllocated} shares`,
+      `${item.votingWeight}% voting weight`,
+      item.canAccessFinancials ? "Financial access" : "Limited financial access",
+    ],
+  };
+};
+
+const enrichInvestorOwnerProfile = (
+  profile: PortfolioProfile,
+  investorPortfolio?: InvestorPortfolioResponse,
+): PortfolioProfile => {
+  if (normalizePortfolioRole(profile.role) !== "investor") {
+    return profile;
+  }
+
+  const mappedProjects = (investorPortfolio?.items ?? []).map(
+    mapInvestorPortfolioItemToPortfolioProject,
+  );
+  const portfolioCount =
+    mappedProjects.length ||
+    profile.relatedCounts?.startups ||
+    profile.portfolioProjects?.length ||
+    0;
+
+  return {
+    ...profile,
+    portfolioProjects:
+      mappedProjects.length > 0 ? mappedProjects : profile.portfolioProjects ?? [],
+    relatedCounts: {
+      jobs: profile.relatedCounts?.jobs ?? 0,
+      startups: portfolioCount,
+    },
+    insightCounts: {
+      skills: profile.insightCounts?.skills ?? profile.skills?.length ?? 0,
+      experience:
+        profile.insightCounts?.experience ?? profile.experience?.length ?? 0,
+      education:
+        profile.insightCounts?.education ?? profile.education?.length ?? 0,
+      portfolioProjects:
+        profile.insightCounts?.portfolioProjects ?? portfolioCount,
+    },
+  };
+};
 
 const buildRolePortfolioProjects = (entity: MarketplaceUserDetail): PortfolioProject[] => {
   if (entity.entityType === "recruiter" && entity.relatedJobs.length > 0) {
@@ -963,7 +1045,9 @@ function StatsBar({ profile }: { profile: PortfolioProfile }) {
     if (role === "investor") {
       return [
         {
-          value: String(profile.relatedCounts?.startups ?? 0),
+          value: String(
+            profile.relatedCounts?.startups ?? profile.portfolioProjects?.length ?? 0,
+          ),
           label: pc?.statOneLabel || roleCopy.statLabels[0],
         },
         {
@@ -1043,7 +1127,12 @@ function AboutSection({ profile }: { profile: PortfolioProfile }) {
   } else if (role === "investor") {
     details.push({
       label: "Portfolio",
-      value: `${profile.relatedCounts?.startups ?? profile.relatedStartups?.length ?? 0} startup relationships`,
+      value: `${
+        profile.relatedCounts?.startups ??
+        profile.relatedStartups?.length ??
+        profile.portfolioProjects?.length ??
+        0
+      } startup relationships`,
     });
     details.push({
       label: "Experience",
@@ -2478,6 +2567,13 @@ export function Portfolio() {
     enabled: isOwnerView && Boolean(authUser),
   });
 
+  const investorPortfolioQuery = useQuery({
+    queryKey: ["investor", "portfolio"],
+    queryFn: investorApi.getPortfolio,
+    enabled: isOwnerView && authUser?.role === UserRole.INVESTOR,
+    refetchInterval: 60_000,
+  });
+
   const guestProfileQuery = useQuery({
     queryKey: ["portfolio", "student", "viewer", studentId],
     queryFn: () => userApi.getStudentPortfolioView(studentId!),
@@ -2505,6 +2601,22 @@ export function Portfolio() {
     enabled: isPublicSlugView,
   });
 
+  const ownerProfile = useMemo(() => {
+    const baseProfile = (ownProfileQuery.data ?? authUser ?? null) as PortfolioProfile | null;
+    if (!baseProfile) {
+      return null;
+    }
+
+    return authUser?.role === UserRole.INVESTOR && isOwnerView
+      ? enrichInvestorOwnerProfile(baseProfile, investorPortfolioQuery.data)
+      : baseProfile;
+  }, [
+    authUser,
+    investorPortfolioQuery.data,
+    isOwnerView,
+    ownProfileQuery.data,
+  ]);
+
   const profile = (
     isPublicSlugView
       ? publicProfileQuery.data
@@ -2512,7 +2624,7 @@ export function Portfolio() {
         ? marketplaceProfileQuery.data
         : isGuestUserView
         ? guestProfileQuery.data
-        : ownProfileQuery.data ?? authUser ?? null
+        : ownerProfile
   ) as PortfolioProfile | null;
 
   const isLoading = isPublicSlugView
@@ -2521,7 +2633,11 @@ export function Portfolio() {
       ? marketplaceProfileQuery.isLoading
       : isGuestUserView
         ? guestProfileQuery.isLoading
-        : ownProfileQuery.isLoading && !profile;
+        : (ownProfileQuery.isLoading && !profile) ||
+          (isOwnerView &&
+            authUser?.role === UserRole.INVESTOR &&
+            investorPortfolioQuery.isLoading &&
+            !investorPortfolioQuery.data);
 
   const hasError = isPublicSlugView
     ? publicProfileQuery.isError

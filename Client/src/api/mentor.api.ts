@@ -136,6 +136,7 @@ export interface MentorSessionItem {
   mentor: { _id: string; displayName: string; avatar?: string };
   student: { _id: string; displayName: string; avatar?: string };
   workspaceId?: string;
+  workspaceName?: string;
   title: string;
   scheduledAt: string;
   durationMinutes: number;

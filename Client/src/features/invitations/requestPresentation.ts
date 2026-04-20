@@ -2,7 +2,6 @@ import { WorkflowRequest } from '../../types/request.types';
 
 export const REQUEST_TYPE_LABELS: Record<WorkflowRequest['type'], string> = {
   generic: 'Workflow request',
-  helpdesk_ticket: 'Help desk ticket',
   workspace_member: 'Workspace invite',
   workspace_chat_access: 'Workspace chat access',
   startup_member: 'Startup invite',
@@ -53,6 +52,8 @@ const METADATA_LABELS: Record<string, string> = {
   requestedAudience: 'Requested audience',
   recipientName: 'Recipient',
   recruiterName: 'Recruiter',
+  collegeName: 'College',
+  collegeLocation: 'College location',
   queryType: 'Conversation context',
   messageId: 'Message reference',
   recipientRole: 'Recipient role',
@@ -61,6 +62,11 @@ const METADATA_LABELS: Record<string, string> = {
   date: 'Scheduled for',
   description: 'Event brief',
   minimumInnovationScore: 'Minimum score',
+  subject: 'Request subject',
+  innovationThemes: 'Innovation focus',
+  cohortSize: 'Cohort size',
+  targetRoles: 'Target roles',
+  engagementFormat: 'Engagement format',
 };
 
 const HIDDEN_METADATA_KEYS = new Set([
@@ -75,6 +81,8 @@ const HIDDEN_METADATA_KEYS = new Set([
   'deepLink',
   'acceptRedirect',
   'declineRedirect',
+  'requestOrigin',
+  'eventRequestKind',
 ]);
 
 const humanize = (value: string) =>

@@ -13,6 +13,7 @@ import {
 } from './request.model';
 
 const DEFAULT_REQUEST_TTL_MS = 7 * 24 * 60 * 60 * 1000;
+const COLLEGE_HIRING_REQUEST_COOLDOWN_MS = 30 * 24 * 60 * 60 * 1000;
 
 type RequestHandler = {
   validateAccept?: (request: RequestDocument, actorUserId: string) => Promise<void>;
@@ -97,6 +98,22 @@ const getActorEmail = async (userId: string, email?: string) => {
 
 const getUserLabel = (user?: { displayName?: string; email?: string } | null) =>
   user?.displayName || user?.email || 'A ProMove member';
+
+const isCollegeHiringRequestWithCooldown = (params: {
+  type: RequestType;
+  targetEntityType: string;
+  requestedPermission?: string;
+}) =>
+  params.type === 'college_event_invite' &&
+  params.targetEntityType === 'recruiter' &&
+  params.requestedPermission === 'college_hiring_event_request';
+
+const formatRequestCooldownDate = (value: Date) =>
+  value.toLocaleDateString('en-IN', {
+    day: 'numeric',
+    month: 'short',
+    year: 'numeric',
+  });
 
 const assertRecipient = (params: { toUserId?: string; recipientEmail?: string }) => {
   if (!params.toUserId && !normalizeEmail(params.recipientEmail)) {
@@ -336,6 +353,53 @@ const queueRequestResponseNotification = async (
   });
 };
 
+const assertCollegeHiringRequestCooldown = async (params: {
+  type: RequestType;
+  institutionId?: Types.ObjectId | null;
+  fromUserId: string;
+  toUserId?: string;
+  recipientEmail?: string;
+  targetEntityType: string;
+  targetEntityId: string;
+  requestedPermission?: string;
+}) => {
+  if (!isCollegeHiringRequestWithCooldown(params)) {
+    return;
+  }
+
+  assertRecipient(params);
+
+  const cooldownStart = new Date(Date.now() - COLLEGE_HIRING_REQUEST_COOLDOWN_MS);
+  const recentRequest = await RequestRecord.findOne(
+    scopedRequestFilter(
+      {
+        type: params.type,
+        fromUserId: objectId(params.fromUserId),
+        ...(params.toUserId ? { toUserId: objectId(params.toUserId) } : { recipientEmail: normalizeEmail(params.recipientEmail) }),
+        targetEntityType: params.targetEntityType,
+        targetEntityId: params.targetEntityId,
+        requestedPermission: params.requestedPermission,
+        createdAt: { $gte: cooldownStart },
+      },
+      params.institutionId ? String(params.institutionId) : null,
+    ),
+  )
+    .sort({ createdAt: -1 })
+    .select('createdAt')
+    .lean<{ createdAt: Date } | null>();
+
+  if (!recentRequest?.createdAt) {
+    return;
+  }
+
+  const nextAllowedAt = new Date(recentRequest.createdAt.getTime() + COLLEGE_HIRING_REQUEST_COOLDOWN_MS);
+  throw new ApiError(
+    409,
+    'COLLEGE_HIRING_REQUEST_COOLDOWN',
+    `A hiring request was already sent recently. You can send another on ${formatRequestCooldownDate(nextAllowedAt)}.`,
+  );
+};
+
 export const createRequest = async (params: {
   type: RequestType;
   actionType?: RequestActionType;
@@ -359,23 +423,30 @@ export const createRequest = async (params: {
   assertRecipient(params);
   const recipientEmail = normalizeEmail(params.recipientEmail);
   const institutionId = await resolveRequestInstitutionId(params);
+  await assertCollegeHiringRequestCooldown({
+    ...params,
+    institutionId,
+    recipientEmail,
+  });
   if (params.toUserId && params.toUserId === params.fromUserId && params.metadata?.allowSelfRequest !== true) {
     throw new ApiError(400, 'REQUEST_SELF_RECIPIENT', 'Sender and receiver must be different users.');
   }
 
-  const existing = await RequestRecord.findOne(
-    scopedRequestFilter(
-      {
-        type: params.type,
-        fromUserId: objectId(params.fromUserId),
-        ...(params.toUserId ? { toUserId: objectId(params.toUserId) } : { recipientEmail }),
-        targetEntityType: params.targetEntityType,
-        targetEntityId: params.targetEntityId,
-        status: 'pending',
-      },
-      institutionId ? String(institutionId) : null,
-    ),
-  );
+  const existing = isCollegeHiringRequestWithCooldown(params)
+    ? null
+    : await RequestRecord.findOne(
+        scopedRequestFilter(
+          {
+            type: params.type,
+            fromUserId: objectId(params.fromUserId),
+            ...(params.toUserId ? { toUserId: objectId(params.toUserId) } : { recipientEmail }),
+            targetEntityType: params.targetEntityType,
+            targetEntityId: params.targetEntityId,
+            status: 'pending',
+          },
+          institutionId ? String(institutionId) : null,
+        ),
+      );
 
   if (existing) {
     existing.message = params.message?.trim() ?? existing.message;

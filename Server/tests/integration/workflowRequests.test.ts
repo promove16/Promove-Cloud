@@ -1,4 +1,5 @@
 import jwt from 'jsonwebtoken';
+import { Types } from 'mongoose';
 import request from 'supertest';
 import app from '../../src/app';
 import { env } from '../../src/config/env';
@@ -220,5 +221,101 @@ describe('workflow requests', () => {
         eventId: String(events[0]._id),
       }),
     );
+  });
+
+  it('blocks colleges from sending another hiring request to the same recruiter for 30 days', async () => {
+    const recruiter = await createUser(UserRole.RECRUITER, 'Tanisha Mehta');
+    const college = await createUser(UserRole.COLLEGE, 'West Valley College', {
+      institutionProfile: {
+        institutionName: 'West Valley College',
+        location: 'Hyderabad',
+        totalStudentsEnrolled: 1600,
+        academicYear: '2025-26',
+        iicStarRating: 4.2,
+      },
+    });
+
+    const payload = {
+      requestType: 'college_event_invite',
+      actionType: 'approve',
+      toUserId: recruiter._id.toString(),
+      targetEntityType: 'recruiter',
+      targetEntityId: recruiter._id.toString(),
+      targetEntityTitle: recruiter.displayName,
+      targetRole: 'recruiter',
+      requestedRole: 'hiring_event_partner',
+      requestedPermission: 'college_hiring_event_request',
+      message: 'We want to showcase our student innovators for your open hiring roles.',
+      metadata: {
+        recruiterId: recruiter._id.toString(),
+        recruiterName: recruiter.displayName,
+        requestOrigin: 'college_marketplace',
+        eventRequestKind: 'hiring_event',
+        collegeName: 'West Valley College',
+        collegeLocation: 'Hyderabad',
+        subject: 'West Valley College student innovation pitch',
+        innovationThemes: 'Technology recruitment',
+        targetRoles: 'Product engineering',
+        engagementFormat: 'Hiring event / innovation showcase',
+      },
+      deepLink: '/dashboard/invitations',
+      acceptRedirect: `/dashboard/messages/${college._id.toString()}`,
+      declineRedirect: '/dashboard/invitations',
+    };
+
+    const firstResponse = await request(app)
+      .post('/api/workflow-requests')
+      .set(authHeader(college))
+      .send(payload);
+
+    expect(firstResponse.status).toBe(201);
+
+    const duplicateResponse = await request(app)
+      .post('/api/workflow-requests')
+      .set(authHeader(college))
+      .send({
+        ...payload,
+        message: 'Following up on our hiring event request.',
+      });
+
+    expect(duplicateResponse.status).toBe(409);
+    expect(duplicateResponse.body.error).toEqual(
+      expect.objectContaining({
+        code: 'COLLEGE_HIRING_REQUEST_COOLDOWN',
+        message: expect.stringContaining('You can send another on'),
+      }),
+    );
+    expect(
+      await RequestRecord.countDocuments({
+        type: 'college_event_invite',
+        fromUserId: college._id,
+        targetEntityType: 'recruiter',
+        targetEntityId: recruiter._id.toString(),
+      }),
+    ).toBe(1);
+
+    const agedCreatedAt = new Date(Date.now() - 31 * 24 * 60 * 60 * 1000);
+    await RequestRecord.collection.updateOne(
+      { _id: new Types.ObjectId(firstResponse.body.data._id) },
+      {
+        $set: {
+          createdAt: agedCreatedAt,
+          updatedAt: agedCreatedAt,
+        },
+      },
+    );
+    const agedRequest = await RequestRecord.findById(firstResponse.body.data._id).lean();
+    expect(agedRequest?.createdAt.toISOString()).toBe(agedCreatedAt.toISOString());
+
+    const retryResponse = await request(app)
+      .post('/api/workflow-requests')
+      .set(authHeader(college))
+      .send({
+        ...payload,
+        message: 'Retrying after the cooldown window.',
+      });
+
+    expect(retryResponse.status).toBe(201);
+    expect(retryResponse.body.data._id).not.toBe(firstResponse.body.data._id);
   });
 });

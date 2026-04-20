@@ -14,7 +14,6 @@ import { NotificationService } from '../notification/notification.service';
 import { Patent } from '../patent/patent.model';
 import { Startup } from '../startup/startup.model';
 import { User } from '../user/user.model';
-import { RequestRecord, type IRequest } from '../request/request.model';
 import {
   InstitutionRegulatoryBody,
   InstitutionVerificationDocumentCategory,
@@ -51,8 +50,6 @@ import {
   AdminDealReviewItem,
   AdminCreatedMentorProfile,
   AdminMentorListItem,
-  AdminProjectMentorAssignmentPayload,
-  AdminProjectMentorshipsResponse,
   AdminMentorshipProgramReviewPayload,
   AdminMentorshipProgramsResponse,
   AdminPatentItem,
@@ -64,13 +61,10 @@ import {
 } from './admin.types';
 import {
   createAdminInstitutionMentorshipProgram,
-  assignProjectMentor,
-  listAdminProjectMentorships,
   listAdminMentorshipPrograms,
   listAdminMentors,
   reviewInstitutionMentorshipProgram,
 } from '../mentor/mentorshipProgram.service';
-import { serializeRequests } from '../request/request.service';
 
 type AuditAction =
   | 'STARTUP_APPROVED'
@@ -95,7 +89,6 @@ type AuditAction =
   | 'MENTORSHIP_PROGRAM_CREATED'
   | 'MENTORSHIP_REQUEST_ASSIGNED'
   | 'MENTORSHIP_REQUEST_REJECTED'
-  | 'HELPDESK_TICKET_RESOLVED'
   | 'PATENT_REQUEST_STATUS_UPDATED'
   | 'PATENT_REQUEST_ASSIGNED'
   | 'PATENT_REQUEST_IPO_DETAILS_UPDATED'
@@ -989,85 +982,6 @@ export const listRegistrationRequests = async (params: {
   };
 };
 
-export const getHelpDeskTickets = async (status: 'pending' | 'completed' | 'all' = 'pending') => {
-  const filter: Record<string, unknown> = {
-    type: 'helpdesk_ticket',
-  };
-
-  if (status !== 'all') {
-    filter.status = status;
-  }
-
-  const tickets = await RequestRecord.find(filter)
-    .sort({ status: 1, createdAt: -1 })
-    .lean<IRequest[]>();
-
-  return serializeRequests(tickets);
-};
-
-export const resolveHelpDeskTicket = async (
-  adminId: string,
-  requestId: string,
-  payload: { resolutionNotes: string },
-) => {
-  const ticket = await RequestRecord.findOne({
-    _id: requestId,
-    type: 'helpdesk_ticket',
-  });
-
-  if (!ticket) {
-    throw new ApiError(404, 'HELPDESK_TICKET_NOT_FOUND', 'Help desk ticket not found.');
-  }
-
-  if (ticket.status === 'completed') {
-    throw new ApiError(400, 'HELPDESK_TICKET_ALREADY_RESOLVED', 'This help desk ticket is already resolved.');
-  }
-
-  if (ticket.status !== 'pending' && ticket.status !== 'accepted') {
-    throw new ApiError(
-      400,
-      'HELPDESK_TICKET_NOT_ACTIONABLE',
-      'Only pending or accepted help desk tickets can be resolved.',
-    );
-  }
-
-  const resolutionNotes = sanitizePlainText(payload.resolutionNotes).trim();
-  const resolvedAt = new Date();
-  const nextMetadata = {
-    ...(ticket.metadata && typeof ticket.metadata === 'object' ? ticket.metadata : {}),
-    resolutionNotes,
-    resolvedAt: resolvedAt.toISOString(),
-    resolvedByAdminId: adminId,
-  };
-
-  ticket.status = 'completed';
-  ticket.respondedAt = resolvedAt;
-  ticket.toUserId = new Types.ObjectId(adminId);
-  ticket.metadata = nextMetadata;
-  ticket.auditTrail.push({
-    status: 'completed',
-    actorUserId: new Types.ObjectId(adminId),
-    message: resolutionNotes,
-    at: resolvedAt,
-  });
-  await ticket.save();
-
-  await createAudit(adminId, 'HELPDESK_TICKET_RESOLVED', requestId, 'Request', {
-    fromUserId: String(ticket.fromUserId),
-    resolutionNotes,
-  });
-  await pushNotification(
-    String(ticket.fromUserId),
-    'request',
-    'Help desk ticket resolved',
-    'A ProMove admin resolved your help desk ticket and added a resolution note.',
-    '/dashboard/help-desk',
-  );
-
-  const [view] = await serializeRequests([ticket.toObject() as IRequest]);
-  return view;
-};
-
 export const updateUserRole = async (adminId: string, userId: string, role: UserRole) => {
   const user = await findUser(userId);
   const previousRole = user.role;
@@ -1880,9 +1794,6 @@ export const getMentorshipPrograms = async (
   status?: 'Pending' | 'Assigned' | 'Rejected',
 ): Promise<AdminMentorshipProgramsResponse> => listAdminMentorshipPrograms(status);
 
-export const getProjectMentorships = async (): Promise<AdminProjectMentorshipsResponse> =>
-  listAdminProjectMentorships();
-
 export const getMentorDirectory = async (): Promise<AdminMentorListItem[]> => listAdminMentors();
 
 export const createAdminMentorshipProgram = async (
@@ -1977,26 +1888,6 @@ export const reviewMentorshipProgram = async (
     {
       status: updated.status,
       institutionId: updated.institution._id,
-      ...(updated.mentor ? { mentorId: updated.mentor._id } : {}),
-    },
-  );
-  return updated;
-};
-
-export const reviewProjectMentorAssignment = async (
-  adminId: string,
-  workspaceId: string,
-  payload: AdminProjectMentorAssignmentPayload,
-) => {
-  const updated = await assignProjectMentor(adminId, workspaceId, payload);
-  await createAudit(
-    adminId,
-    payload.decision === 'assigned' ? 'PROJECT_MENTOR_ASSIGNED' : 'PROJECT_MENTOR_UNASSIGNED',
-    workspaceId,
-    'Workspace',
-    {
-      title: updated.title,
-      category: updated.category,
       ...(updated.mentor ? { mentorId: updated.mentor._id } : {}),
     },
   );

@@ -96,6 +96,15 @@ const assignedInstitutionMentorshipProgramReviewSchema = z.object({
   adminNotes: z.string().trim().max(1000).optional().or(z.literal('')),
 });
 
+export const submitMentorBidSchema = z.object({
+  opportunityId: z.string().regex(/^[0-9a-fA-F]{24}$/, 'Invalid ID format'),
+  kind: z.enum(['startup', 'problem_bank']),
+  expertise: z.string().trim().min(2).max(400),
+  hoursPerWeek: z.number().int().min(1).max(40),
+  proposedDurationWeeks: z.number().int().min(1).max(52),
+  coverNote: z.string().trim().min(10).max(800),
+});
+
 export const reviewInstitutionMentorshipProgramSchema = z
   .union([
     assignedInstitutionMentorshipProgramReviewSchema,

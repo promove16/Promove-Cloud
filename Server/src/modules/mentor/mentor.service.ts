@@ -13,6 +13,8 @@ import { UserRole } from '../../types/roles.types';
 import { Workspace } from '../workspace/workspace.model';
 import { MentorSession } from './mentorSession.model';
 import { MentorFeedback } from './mentorFeedback.model';
+import { MentorBid } from './mentorBid.model';
+import { Problem } from '../problemBank/problem.model';
 import {
   assertMentorAvailability,
   listMentorAssignedInstitutionPrograms,
@@ -489,16 +491,22 @@ const toSessionViews = async (sessions: Array<{
   createdAt: Date;
 }>) => {
   const participantIds = [...new Set(sessions.flatMap((session) => [String(session.mentorId), String(session.studentId)]))];
-  const users = participantIds.length > 0 ? await User.find({ _id: { $in: participantIds } }).select('_id displayName avatar').lean() : [];
+  const workspaceIds = sessions.map((s) => s.workspaceId).filter((id): id is Types.ObjectId => !!id);
+  const [users, workspaces] = await Promise.all([
+    participantIds.length > 0 ? User.find({ _id: { $in: participantIds } }).select('_id displayName avatar').lean() : Promise.resolve([]),
+    workspaceIds.length > 0 ? Workspace.find({ _id: { $in: workspaceIds } }).select('_id title').lean() : Promise.resolve([]),
+  ]);
   const userMap = new Map(users.map((user) => [String(user._id), user]));
+  const wsMap = new Map(workspaces.map((ws) => [String(ws._id), ws.title]));
 
-  return sessions.map((session) =>
-    mapSession(
+  return sessions.map((session) => ({
+    ...mapSession(
       session,
       userMap.get(String(session.mentorId)) ?? { _id: session.mentorId, displayName: 'Mentor' },
       userMap.get(String(session.studentId)) ?? { _id: session.studentId, displayName: 'Student' },
     ),
-  );
+    ...(session.workspaceId ? { workspaceName: wsMap.get(String(session.workspaceId)) ?? undefined } : {}),
+  }));
 };
 
 export const listMentorSessions = async (mentorId: string): Promise<MentorSessionsResponse> => {
@@ -669,4 +677,146 @@ export const createMentorFeedback = async (
     rating: feedback.rating as 1 | 2 | 3 | 4 | 5,
     createdAt: toIso(feedback.createdAt),
   };
+};
+
+// ---------------------------------------------------------------------------
+// Mentor Bidding / Marketplace
+// ---------------------------------------------------------------------------
+
+export const getBidOpportunities = async (mentorId: string) => {
+  const [startups, problems, existingBids] = await Promise.all([
+    Startup.find({ launchedToMentors: true, isActive: true })
+      .sort({ updatedAt: -1 })
+      .limit(50)
+      .lean(),
+    Problem.find({ publicationStatus: 'published', claimStatus: 'open' })
+      .sort({ createdAt: -1 })
+      .limit(50)
+      .lean(),
+    MentorBid.find({ mentorId, status: { $ne: 'withdrawn' } })
+      .select('opportunityId')
+      .lean(),
+  ]);
+
+  const bidSet = new Set(existingBids.map((bid) => String(bid.opportunityId)));
+
+  const startupOpportunities = startups.map((startup) => ({
+    _id: String(startup._id),
+    kind: 'startup' as const,
+    title: startup.name || 'Untitled Startup',
+    description: startup.businessProfile?.problemStatement || startup.tagline || 'No description available',
+    domain: startup.category || 'General',
+    stage: startup.stage,
+    startupName: startup.name,
+    preferredExpertise: [] as string[],
+    postedAt: toIso(startup.updatedAt),
+    hasBid: bidSet.has(String(startup._id)),
+  }));
+
+  const problemOpportunities = problems.map((problem) => ({
+    _id: String(problem._id),
+    kind: 'problem_bank' as const,
+    title: problem.title,
+    description: problem.description.slice(0, 300),
+    domain: problem.domain || problem.category,
+    stage: problem.difficulty,
+    institution: problem.postedBy,
+    preferredExpertise: problem.tags ?? [],
+    sessionsRequested: undefined as number | undefined,
+    postedAt: toIso(problem.createdAt),
+    hasBid: bidSet.has(String(problem._id)),
+  }));
+
+  return [...startupOpportunities, ...problemOpportunities].sort(
+    (a, b) => Date.parse(b.postedAt) - Date.parse(a.postedAt),
+  );
+};
+
+export const getMentorBids = async (mentorId: string) => {
+  const bids = await MentorBid.find({ mentorId }).sort({ createdAt: -1 }).lean();
+  return bids.map((bid) => ({
+    _id: String(bid._id),
+    opportunityId: String(bid.opportunityId),
+    opportunityTitle: bid.opportunityTitle,
+    kind: bid.kind,
+    expertise: bid.expertise,
+    hoursPerWeek: bid.hoursPerWeek,
+    proposedDurationWeeks: bid.proposedDurationWeeks,
+    coverNote: bid.coverNote,
+    status: bid.status,
+    createdAt: toIso(bid.createdAt),
+  }));
+};
+
+export const submitMentorBid = async (
+  mentorId: string,
+  payload: {
+    opportunityId: string;
+    kind: 'startup' | 'problem_bank';
+    expertise: string;
+    hoursPerWeek: number;
+    proposedDurationWeeks: number;
+    coverNote: string;
+  },
+) => {
+  // Verify opportunity exists
+  let opportunityTitle = 'Unknown';
+  if (payload.kind === 'startup') {
+    const startup = await Startup.findById(payload.opportunityId).select('name').lean();
+    if (!startup) throw new ApiError(404, 'NOT_FOUND', 'Startup not found');
+    opportunityTitle = startup.name || 'Untitled Startup';
+  } else {
+    const problem = await Problem.findById(payload.opportunityId).select('title').lean();
+    if (!problem) throw new ApiError(404, 'NOT_FOUND', 'Problem not found');
+    opportunityTitle = problem.title;
+  }
+
+  // Check for duplicate active bid
+  const existingBid = await MentorBid.findOne({
+    mentorId,
+    opportunityId: payload.opportunityId,
+    status: { $ne: 'withdrawn' },
+  }).lean();
+
+  if (existingBid) {
+    throw new ApiError(409, 'DUPLICATE_BID', 'You have already submitted a bid for this opportunity');
+  }
+
+  const bid = await MentorBid.create({
+    mentorId,
+    opportunityId: payload.opportunityId,
+    opportunityTitle,
+    kind: payload.kind,
+    expertise: payload.expertise,
+    hoursPerWeek: payload.hoursPerWeek,
+    proposedDurationWeeks: payload.proposedDurationWeeks,
+    coverNote: payload.coverNote,
+    status: 'pending',
+  });
+
+  return {
+    _id: String(bid._id),
+    opportunityId: String(bid.opportunityId),
+    opportunityTitle: bid.opportunityTitle,
+    kind: bid.kind,
+    expertise: bid.expertise,
+    hoursPerWeek: bid.hoursPerWeek,
+    proposedDurationWeeks: bid.proposedDurationWeeks,
+    coverNote: bid.coverNote,
+    status: bid.status,
+    createdAt: toIso(bid.createdAt),
+  };
+};
+
+export const withdrawMentorBid = async (mentorId: string, bidId: string) => {
+  const bid = await MentorBid.findById(bidId);
+  if (!bid || String(bid.mentorId) !== mentorId) {
+    throw new ApiError(404, 'BID_NOT_FOUND', 'Bid not found');
+  }
+  if (bid.status !== 'pending') {
+    throw new ApiError(400, 'BID_NOT_WITHDRAWABLE', 'Only pending bids can be withdrawn');
+  }
+  bid.status = 'withdrawn';
+  await bid.save();
+  return { updated: true };
 };

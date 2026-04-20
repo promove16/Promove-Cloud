@@ -13,6 +13,7 @@ import {
 import { Link, useNavigate, useSearchParams } from "react-router-dom";
 import { z } from "zod";
 import { BusinessLogo } from "../../components/branding/BusinessLogo";
+import { toast } from "../../app/components/ui/sonner";
 import { AuthPasswordField } from "./AuthPasswordField";
 import { useSignupMutation } from "./useAuth";
 import { UserRole } from "../../types/roles.types";
@@ -79,6 +80,14 @@ export function SignupPage() {
   const signupMutation = useSignupMutation();
   const [error, setError] = useState("");
   const [notice, setNotice] = useState("");
+  const showError = (message: string) => {
+    setError(message);
+    toast.error(message);
+  };
+  const showNotice = (message: string) => {
+    setNotice(message);
+    toast.success(message);
+  };
   const {
     register,
     control,
@@ -134,7 +143,7 @@ export function SignupPage() {
       });
 
       if ("pendingApproval" in payload) {
-        setNotice(payload.message);
+        showNotice(payload.message);
         reset({
           ...initialFormState,
           email: values.email,
@@ -143,6 +152,7 @@ export function SignupPage() {
         return;
       }
 
+      toast.success("Student account created.");
       navigate(roleRedirect(payload.user.role), { replace: true });
     } catch (submissionError) {
       if (isAxiosError(submissionError)) {
@@ -151,7 +161,7 @@ export function SignupPage() {
           ? `${apiError.details[0].path ? `${apiError.details[0].path}: ` : ""}${apiError.details[0].message}`
           : undefined;
 
-        setError(
+        showError(
           apiError?.code === "INSTITUTION_TOKEN_EXPIRED"
             ? "That institution token has expired. Please ask your school or college for a fresh one."
             : apiError?.code === "INSTITUTION_APPROVAL_PENDING"
@@ -170,7 +180,7 @@ export function SignupPage() {
         return;
       }
 
-      setError("Unable to create your account right now.");
+      showError("Unable to create your account right now.");
     }
   };
 

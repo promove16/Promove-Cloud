@@ -55,6 +55,7 @@ import {
   normalizeStartupRouteId,
 } from "../../features/startup/navigation";
 import { Spinner } from "../../components/ui/Spinner";
+import { toast } from "../components/ui/sonner";
 import { getApiErrorMessage } from "../../utils/apiError";
 import type {
   Startup,
@@ -418,8 +419,6 @@ export function StartupLaunch() {
   const [identity, setIdentity] = useState<IdentityForm>(DEFAULT_IDENTITY);
   const [innovationProfile, setInnovationProfile] =
     useState<StartupInnovationProfile>(DEFAULT_STARTUP_INNOVATION_PROFILE);
-  const [toast, setToast] = useState("");
-  const [error, setError] = useState("");
   const [uploadingKey, setUploadingKey] = useState<string | null>(null);
 
   useEffect(() => {
@@ -445,12 +444,6 @@ export function StartupLaunch() {
       },
     });
   }, [startup]);
-
-  useEffect(() => {
-    if (!toast) return;
-    const timer = setTimeout(() => setToast(""), 2500);
-    return () => clearTimeout(timer);
-  }, [toast]);
 
   const basePayload = useMemo<StartupPayload>(
     () => ({
@@ -513,8 +506,7 @@ export function StartupLaunch() {
       return startupApi.create(basePayload);
     },
     onSuccess: async (saved) => {
-      setError("");
-      setToast("Saved");
+      toast.success(startupId ? "Startup updated." : "Startup created.");
       await Promise.all([
         queryClient.invalidateQueries({ queryKey: ["startup"] }),
         queryClient.invalidateQueries({ queryKey: ["startup", saved._id] }),
@@ -526,7 +518,7 @@ export function StartupLaunch() {
       }
     },
     onError: (err) => {
-      setError(getApiErrorMessage(err, "Unable to save startup."));
+      toast.error(getApiErrorMessage(err, "Unable to save startup."));
     },
   });
 
@@ -534,17 +526,16 @@ export function StartupLaunch() {
     mutationFn: async (file: File) => startupApi.uploadPitch(startupId!, file),
     onMutate: () => {
       setUploadingKey("pitch");
-      setError("");
     },
     onSuccess: async (saved) => {
-      setToast("Pitch deck uploaded");
+      toast.success("Pitch deck uploaded.");
       await Promise.all([
         queryClient.invalidateQueries({ queryKey: ["startup"] }),
         queryClient.invalidateQueries({ queryKey: ["startup", saved._id] }),
       ]);
     },
     onError: (err) => {
-      setError(getApiErrorMessage(err, "Unable to upload pitch deck."));
+      toast.error(getApiErrorMessage(err, "Unable to upload pitch deck."));
     },
     onSettled: () => {
       setUploadingKey(null);
@@ -561,17 +552,16 @@ export function StartupLaunch() {
     }) => startupApi.uploadDocument(startupId!, file, category),
     onMutate: ({ category }) => {
       setUploadingKey(category);
-      setError("");
     },
     onSuccess: async (saved) => {
-      setToast("Proof uploaded");
+      toast.success("Proof uploaded.");
       await Promise.all([
         queryClient.invalidateQueries({ queryKey: ["startup"] }),
         queryClient.invalidateQueries({ queryKey: ["startup", saved._id] }),
       ]);
     },
     onError: (err) => {
-      setError(getApiErrorMessage(err, "Unable to upload document."));
+      toast.error(getApiErrorMessage(err, "Unable to upload document."));
     },
     onSettled: () => {
       setUploadingKey(null);
@@ -588,17 +578,16 @@ export function StartupLaunch() {
     }) => startupApi.deleteDocument(startupId!, documentId),
     onMutate: ({ category }) => {
       setUploadingKey(`delete-${category}`);
-      setError("");
     },
     onSuccess: async (saved) => {
-      setToast("Document removed");
+      toast.success("Document removed.");
       await Promise.all([
         queryClient.invalidateQueries({ queryKey: ["startup"] }),
         queryClient.invalidateQueries({ queryKey: ["startup", saved._id] }),
       ]);
     },
     onError: (err) => {
-      setError(getApiErrorMessage(err, "Unable to remove document."));
+      toast.error(getApiErrorMessage(err, "Unable to remove document."));
     },
     onSettled: () => {
       setUploadingKey(null);
@@ -616,11 +605,11 @@ export function StartupLaunch() {
   const handlePitchSelected = (file: File | null) => {
     if (!file) return;
     if (!startupId) {
-      setError("Save the startup once before uploading pitch files.");
+      toast.error("Save the startup once before uploading pitch files.");
       return;
     }
     if (file.size > STARTUP_RUBRIC_PITCH_MAX_BYTES) {
-      setError(
+      toast.error(
         `Pitch deck must be ${formatFileSize(STARTUP_RUBRIC_PITCH_MAX_BYTES)} or less.`,
       );
       return;
@@ -634,11 +623,11 @@ export function StartupLaunch() {
   ) => {
     if (!file) return;
     if (!startupId) {
-      setError("Save the startup once before uploading proof files.");
+      toast.error("Save the startup once before uploading proof files.");
       return;
     }
     if (file.size > STARTUP_RUBRIC_DOCUMENT_MAX_BYTES) {
-      setError(
+      toast.error(
         `Document must be ${formatFileSize(STARTUP_RUBRIC_DOCUMENT_MAX_BYTES)} or less.`,
       );
       return;
@@ -685,16 +674,6 @@ export function StartupLaunch() {
       }}
       className="space-y-6"
     >
-      {toast ? (
-        <div className="border border-emerald-500/30 bg-emerald-500/10 px-4 py-2 text-sm text-emerald-200">
-          {toast}
-        </div>
-      ) : null}
-      {error ? (
-        <div className="border border-rose-500/30 bg-rose-500/10 px-4 py-2 text-sm text-rose-200">
-          {error}
-        </div>
-      ) : null}
       {startup?.editAccess?.isLocked ? (
         <div className="border border-amber-500/30 bg-amber-500/10 px-4 py-2 text-sm text-amber-200">
           Editing is locked. {startup.editAccess.reason}

@@ -4,7 +4,6 @@ import {
   Bell,
   ChevronDown,
   ChevronRight,
-  HeadphonesIcon,
   LogOut,
   Menu,
   Settings,
@@ -59,7 +58,6 @@ type DashboardAccountMenuItem =
 const SHARED_ROUTE_LABELS = [
   { path: '/dashboard/profile', label: 'Profile' },
   { path: '/dashboard/settings', label: 'Settings' },
-  { path: '/dashboard/help-desk', label: 'Help Desk' },
 ] as const;
 
 const SIDEBAR_PARENT_PATH_ALIASES: Partial<Record<UserRole, Record<string, string[]>>> = {
@@ -79,6 +77,9 @@ const SIDEBAR_PARENT_PATH_ALIASES: Partial<Record<UserRole, Record<string, strin
       '/dashboard/recruiter/hiring-events',
       '/dashboard/recruiter/onboarding',
     ],
+  },
+  [UserRole.INVESTOR]: {
+    '/dashboard/investor/product-workshop': ['/product-workspace'],
   },
 };
 
@@ -133,19 +134,9 @@ const buildAccountMenuItems = (
       path: '/dashboard/settings',
     } as const);
 
-  const helpDeskItem =
-    findNavLinkItem(items, 'Help Desk') ??
-    ({
-      kind: 'link',
-      label: 'Help Desk',
-      icon: HeadphonesIcon,
-      path: '/dashboard/help-desk',
-    } as const);
-
   return [
     primaryItem,
     settingsItem,
-    helpDeskItem,
     {
       kind: 'action',
       label: 'Logout',

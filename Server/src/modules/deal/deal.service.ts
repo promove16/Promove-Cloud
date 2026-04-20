@@ -450,9 +450,8 @@ const fetchDealContext = async (deal: DealDocumentLike) => {
     throw new ApiError(404, 'DEAL_CONTEXT_NOT_FOUND', 'Deal context could not be loaded');
   }
 
-  const productWorkshopWorkspaceId = deal.linkedWorkspaceId || startup.projectId;
-  const productWorkshop = productWorkshopWorkspaceId
-    ? await Workspace.findOne({ _id: productWorkshopWorkspaceId, isActive: true })
+  const productWorkshop = deal.linkedWorkspaceId
+    ? await Workspace.findOne({ _id: deal.linkedWorkspaceId, isActive: true })
         .select('_id title category stage progressPercent')
         .lean<LeanProductWorkshop | null>()
     : null;
@@ -1064,9 +1063,7 @@ export const recordFounderDecision = async (
 
   const acceptedWorkspaceId = deal.linkedWorkspaceId
     ? String(deal.linkedWorkspaceId)
-    : context.startup.projectId
-      ? String(context.startup.projectId)
-      : undefined;
+    : undefined;
 
   if (transactionResult.decision === 'accepted' && acceptedWorkspaceId) {
     await ensureDirectWorkspaceChatAccess(
@@ -1608,7 +1605,9 @@ export const getInvestorPortfolio = async (investorId: string) => {
       ? await Startup.find({ _id: { $in: startupIds } }).select('_id name category projectId').lean<LeanStartup[]>()
       : [];
   const startupMap = new Map(startups.map((startup) => [String(startup._id), startup]));
-  const productWorkshopIds = [...new Set(startups.map((startup) => String(startup.projectId ?? '')).filter(Boolean))];
+  const productWorkshopIds = [
+    ...new Set(deals.map((deal) => String(deal.linkedWorkspaceId ?? '')).filter(Boolean)),
+  ];
   const productWorkshops =
     productWorkshopIds.length > 0
       ? await Workspace.find({ _id: { $in: productWorkshopIds }, isActive: true })
@@ -1640,7 +1639,9 @@ export const getInvestorPortfolio = async (investorId: string) => {
       deal,
       student,
       startup,
-      startup?.projectId ? productWorkshopMap.get(String(startup.projectId)) : undefined,
+      deal.linkedWorkspaceId
+        ? productWorkshopMap.get(String(deal.linkedWorkspaceId))
+        : undefined,
     );
   });
 

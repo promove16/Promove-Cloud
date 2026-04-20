@@ -5,6 +5,8 @@ import { PlacementRecordView } from '../../types/placement.types';
 
 type Props = {
   records: PlacementRecordView[];
+  title?: string;
+  placeholder?: string;
 };
 
 const statusTone: Record<string, string> = {
@@ -15,7 +17,11 @@ const statusTone: Record<string, string> = {
   Discovered: 'text-slate-300 bg-slate-500/10 border-slate-500/30',
 };
 
-export default function PlacementStatusTable({ records }: Props) {
+export default function PlacementStatusTable({
+  records,
+  title = 'Placement Status Table',
+  placeholder = 'Search by student, recruiter, company, or status',
+}: Props) {
   const [search, setSearch] = useState('');
 
   const filteredRecords = useMemo(
@@ -31,11 +37,11 @@ export default function PlacementStatusTable({ records }: Props) {
   return (
     <Card className="overflow-hidden">
       <div className="border-b border-slate-800 px-5 py-4">
-        <div className="mb-3 text-xs uppercase tracking-[0.3em] text-cyan-300">Placement Status Table</div>
+        <div className="mb-3 text-xs uppercase tracking-[0.3em] text-cyan-300">{title}</div>
         <Input
           value={search}
           onChange={(event) => setSearch(event.target.value)}
-          placeholder="Search by student, recruiter, company, or status"
+          placeholder={placeholder}
         />
       </div>
       <div className="grid grid-cols-[1.3fr,180px,160px,1fr,160px] border-b border-slate-800 bg-slate-900 px-5 py-4 text-xs uppercase tracking-[0.3em] text-slate-400">

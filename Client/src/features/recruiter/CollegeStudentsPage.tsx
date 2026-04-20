@@ -1,7 +1,19 @@
 import { useMemo } from 'react';
 import { useNavigate, useParams, useSearchParams } from 'react-router-dom';
 import { useMutation, useQuery } from '@tanstack/react-query';
-import { ArrowLeft, Building2, CalendarRange, Eye, Mail, ShieldCheck, Sparkles, Trophy, Users } from 'lucide-react';
+import {
+  ArrowLeft,
+  BriefcaseBusiness,
+  Building2,
+  CalendarRange,
+  Eye,
+  Files,
+  Mail,
+  ShieldCheck,
+  Sparkles,
+  Trophy,
+  Users,
+} from 'lucide-react';
 import { recruiterApi } from '../../api/recruiter.api';
 import { Spinner } from '../../components/ui/Spinner';
 import { getStudentPortfolioViewPath } from '../marketplace/navigation';
@@ -9,8 +21,19 @@ import { RECRUITER_PAGE_CONTENT_CLASS, RecruiterSectionNav } from './RecruiterSe
 import type { RecruiterTalentSummary } from '../../types/recruiter.types';
 
 const MARKETPLACE_DETAIL_NAV_ITEMS = [
-  { label: 'Marketplace', path: '/dashboard/recruiter/marketplace', end: false },
-  { label: 'Applications', path: '/dashboard/recruiter/applications', end: true },
+  {
+    label: 'Marketplace',
+    path: '/dashboard/recruiter/marketplace',
+    end: false,
+    icon: BriefcaseBusiness,
+    matchPrefixes: ['/dashboard/recruiter/colleges'],
+  },
+  {
+    label: 'Applications',
+    path: '/dashboard/recruiter/applications',
+    end: true,
+    icon: Files,
+  },
 ];
 
 const SURFACE_CLASS =

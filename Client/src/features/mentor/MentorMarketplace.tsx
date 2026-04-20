@@ -1,9 +1,21 @@
 import { useState } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
-import { AlertCircle, BookOpen, CheckCircle2, ChevronRight, Gavel, Lightbulb, Rocket, X } from 'lucide-react';
+import {
+  AlertCircle,
+  BookOpen,
+  CheckCircle2,
+  ChevronRight,
+  Clock3,
+  Gavel,
+  Lightbulb,
+  Rocket,
+  Sparkles,
+  X,
+} from 'lucide-react';
 import { isAxiosError } from 'axios';
 import {
   mentorApi,
+  MentorBid,
   MentorBidOpportunity,
   MentorBidOpportunityKind,
   SubmitMentorBidPayload,
@@ -15,53 +27,309 @@ import { Input } from '../../components/ui/Input';
 import { OptionTabs } from '../../components/ui/OptionTabs';
 import { Spinner } from '../../components/ui/Spinner';
 
-// ─── Submit Proposal Modal ─────────────────────────────────────────────────
-
 interface SubmitBidModalProps {
   opportunity: MentorBidOpportunity;
   onClose: () => void;
   onSuccess: () => void;
 }
 
-const BID_STATUS_COLORS = {
-  pending: 'text-amber-400',
-  accepted: 'text-emerald-400',
-  rejected: 'text-red-400',
-  withdrawn: 'text-slate-400',
+type TabKey = 'opportunities' | 'my_bids';
+type KindFilter = 'all' | MentorBidOpportunityKind;
+
+const tabLabels: Record<TabKey, string> = {
+  opportunities: 'Opportunities',
+  my_bids: 'My Bids',
 };
+
+const BID_STATUS_CLASSNAME: Record<MentorBid['status'], string> = {
+  pending: 'border-amber-500/20 bg-amber-500/10 text-amber-200',
+  accepted: 'border-emerald-500/20 bg-emerald-500/10 text-emerald-200',
+  rejected: 'border-rose-500/20 bg-rose-500/10 text-rose-200',
+  withdrawn: 'border-slate-700 bg-slate-800/80 text-slate-300',
+};
+
+const formatShortDate = (value: string) =>
+  new Date(value).toLocaleDateString('en-IN', {
+    day: 'numeric',
+    month: 'short',
+  });
+
+const formatLongDate = (value: string) =>
+  new Date(value).toLocaleDateString('en-IN', {
+    day: 'numeric',
+    month: 'short',
+    year: 'numeric',
+  });
+
+const getKindConfig = (kind: MentorBidOpportunityKind) =>
+  kind === 'startup'
+    ? {
+        label: 'Startup',
+        icon: Rocket,
+        accentClassName: 'text-cyan-300',
+        surfaceClassName: 'bg-cyan-500/10 text-cyan-300',
+      }
+    : {
+        label: 'Problem Bank',
+        icon: Lightbulb,
+        accentClassName: 'text-violet-300',
+        surfaceClassName: 'bg-violet-500/10 text-violet-300',
+      };
 
 function getApiError(error: unknown) {
   if (isAxiosError<{ error?: { message?: string } }>(error)) {
-    return error.response?.data?.error?.message ?? 'Unable to submit your bid. Please try again.';
+    return (
+      error.response?.data?.error?.message ??
+      'Unable to submit your bid. Please try again.'
+    );
   }
-  return error instanceof Error ? error.message : 'Unable to submit your bid. Please try again.';
+
+  return error instanceof Error
+    ? error.message
+    : 'Unable to submit your bid. Please try again.';
 }
 
-function SubmitBidModal({ opportunity, onClose, onSuccess }: SubmitBidModalProps) {
+function EmptyState({
+  icon: Icon,
+  title,
+  description,
+  action,
+}: {
+  icon: typeof BookOpen;
+  title: string;
+  description: string;
+  action?: React.ReactNode;
+}) {
+  return (
+    <div className="flex min-h-[156px] flex-col items-center justify-center rounded-[24px] border border-dashed border-slate-800 bg-slate-950/40 px-4 py-6 text-center">
+      <div className="flex h-11 w-11 items-center justify-center rounded-xl border border-slate-800 bg-slate-900/80 text-slate-500">
+        <Icon className="h-5 w-5" />
+      </div>
+      <h3 className="mt-3 text-base font-semibold text-white">{title}</h3>
+      <p className="mt-2 max-w-xl text-sm leading-6 text-slate-400">
+        {description}
+      </p>
+      {action ? <div className="mt-4">{action}</div> : null}
+    </div>
+  );
+}
+
+function SummaryCard({
+  icon: Icon,
+  label,
+  toneClassName,
+  value,
+}: {
+  icon: typeof Rocket;
+  label: string;
+  toneClassName: string;
+  value: number;
+}) {
+  return (
+    <Card className="flex min-h-[116px] flex-col gap-4 rounded-[24px] border-slate-800 bg-slate-900/70 p-4">
+      <div className={`flex h-10 w-10 items-center justify-center rounded-xl ${toneClassName}`}>
+        <Icon className="h-4.5 w-4.5" />
+      </div>
+      <div className="space-y-1">
+        <div className="text-2xl font-bold tracking-tight text-white sm:text-3xl">{value}</div>
+        <div className="text-sm text-slate-400">{label}</div>
+      </div>
+    </Card>
+  );
+}
+
+function OpportunityCard({
+  opportunity,
+  onBid,
+}: {
+  opportunity: MentorBidOpportunity;
+  onBid: () => void;
+}) {
+  const kind = getKindConfig(opportunity.kind);
+  const KindIcon = kind.icon;
+  const meta = [
+    opportunity.kind === 'startup'
+      ? opportunity.startupName
+      : opportunity.institution ?? 'Open problem',
+    opportunity.stage,
+    opportunity.domain,
+  ].filter(Boolean);
+
+  return (
+    <Card className="rounded-[24px] border-slate-800 bg-slate-900/70 p-4 sm:p-5">
+      <div className="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
+        <div className="min-w-0 flex-1">
+          <div className="flex items-start gap-3.5">
+            <div className={`flex h-10 w-10 shrink-0 items-center justify-center rounded-xl ${kind.surfaceClassName}`}>
+              <KindIcon className="h-4.5 w-4.5" />
+            </div>
+            <div className="min-w-0 flex-1">
+              <div className="flex flex-wrap items-center gap-2">
+                <span className={`text-xs font-semibold uppercase tracking-[0.26em] ${kind.accentClassName}`}>
+                  {kind.label}
+                </span>
+                <span className="rounded-full border border-slate-700 px-2.5 py-1 text-[11px] font-medium uppercase tracking-[0.18em] text-slate-400">
+                  {formatShortDate(opportunity.postedAt)}
+                </span>
+              </div>
+              <h3 className="mt-2 text-lg font-semibold text-white sm:text-xl">
+                {opportunity.title}
+              </h3>
+              <div className="mt-2.5 flex flex-wrap gap-2">
+                {meta.map((item) => (
+                  <span
+                    key={`${opportunity._id}-${item}`}
+                    className="rounded-full border border-slate-800 bg-slate-950/60 px-3 py-1 text-[11px] text-slate-300"
+                  >
+                    {item}
+                  </span>
+                ))}
+                {typeof opportunity.sessionsRequested === 'number' ? (
+                  <span className="inline-flex items-center gap-1 rounded-full border border-slate-800 bg-slate-950/60 px-3 py-1 text-[11px] text-slate-300">
+                    <Clock3 className="h-3.5 w-3.5 text-slate-500" />
+                    {opportunity.sessionsRequested} sessions
+                  </span>
+                ) : null}
+              </div>
+            </div>
+          </div>
+
+          <p className="mt-3.5 text-sm leading-6 text-slate-300">
+            {opportunity.description}
+          </p>
+
+          {opportunity.preferredExpertise?.length ? (
+            <div className="mt-3 flex flex-wrap gap-1.5">
+              {opportunity.preferredExpertise.map((tag) => (
+                <Badge
+                  key={`${opportunity._id}-${tag}`}
+                  className="border-cyan-500/20 bg-cyan-500/10 px-2.5 py-1 text-[11px] text-cyan-200"
+                >
+                  {tag}
+                </Badge>
+              ))}
+            </div>
+          ) : null}
+        </div>
+
+        <div className="flex shrink-0 flex-col gap-2.5 lg:w-auto lg:min-w-[148px] lg:items-end lg:pl-4">
+          {opportunity.hasBid ? (
+            <div className="inline-flex items-center gap-2 rounded-xl border border-emerald-500/20 bg-emerald-500/10 px-3 py-2 text-sm font-medium text-emerald-200">
+              <CheckCircle2 className="h-4 w-4" />
+              Bid Sent
+            </div>
+          ) : (
+            <Button onClick={onBid} className="w-full px-4 py-2.5 lg:w-auto">
+              <Gavel className="mr-1.5 h-4 w-4" />
+              Submit Bid
+            </Button>
+          )}
+        </div>
+      </div>
+    </Card>
+  );
+}
+
+function BidHistoryCard({
+  bid,
+  onWithdraw,
+  withdrawing,
+}: {
+  bid: MentorBid;
+  onWithdraw: (bidId: string) => void;
+  withdrawing: boolean;
+}) {
+  return (
+    <Card className="rounded-[24px] border-slate-800 bg-slate-900/70 p-4 sm:p-5">
+      <div className="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
+        <div className="min-w-0 flex-1">
+          <div className="flex flex-wrap items-center gap-2">
+            <Badge className="border-slate-700 bg-slate-950/80 text-slate-300">
+              {bid.kind === 'startup' ? 'Startup' : 'Problem Bank'}
+            </Badge>
+            <span
+              className={`rounded-full border px-3 py-1 text-[11px] font-semibold uppercase tracking-[0.2em] ${BID_STATUS_CLASSNAME[bid.status]}`}
+            >
+              {bid.status}
+            </span>
+          </div>
+
+          <h3 className="mt-2.5 text-lg font-semibold text-white">
+            {bid.opportunityTitle}
+          </h3>
+          <p className="mt-2 text-sm leading-6 text-slate-300">{bid.expertise}</p>
+          <div className="mt-3 flex flex-wrap gap-1.5">
+            <span className="rounded-full border border-slate-800 bg-slate-950/60 px-3 py-1 text-[11px] text-slate-300">
+              {bid.hoursPerWeek} hrs / week
+            </span>
+            <span className="rounded-full border border-slate-800 bg-slate-950/60 px-3 py-1 text-[11px] text-slate-300">
+              {bid.proposedDurationWeeks} weeks
+            </span>
+            <span className="rounded-full border border-slate-800 bg-slate-950/60 px-3 py-1 text-[11px] text-slate-400">
+              Submitted {formatLongDate(bid.createdAt)}
+            </span>
+          </div>
+        </div>
+
+        {bid.status === 'pending' ? (
+          <Button
+            variant="secondary"
+            onClick={() => onWithdraw(bid._id)}
+            disabled={withdrawing}
+            className="w-full px-4 py-2.5 lg:w-auto"
+          >
+            Withdraw
+          </Button>
+        ) : null}
+      </div>
+    </Card>
+  );
+}
+
+function SubmitBidModal({
+  opportunity,
+  onClose,
+  onSuccess,
+}: SubmitBidModalProps) {
   const queryClient = useQueryClient();
   const [expertise, setExpertise] = useState('');
   const [hoursPerWeek, setHoursPerWeek] = useState('4');
   const [proposedDurationWeeks, setProposedDurationWeeks] = useState('8');
   const [coverNote, setCoverNote] = useState('');
-  const [errors, setErrors] = useState<{ expertise?: string; coverNote?: string }>({});
+  const [errors, setErrors] = useState<{
+    expertise?: string;
+    coverNote?: string;
+  }>({});
   const [apiError, setApiError] = useState<string | null>(null);
 
   const mutation = useMutation({
     mutationFn: (payload: SubmitMentorBidPayload) => mentorApi.submitBid(payload),
     onSuccess: async () => {
-      await queryClient.invalidateQueries({ queryKey: ['mentor-bid-opportunities'] });
+      await queryClient.invalidateQueries({
+        queryKey: ['mentor-bid-opportunities'],
+      });
       await queryClient.invalidateQueries({ queryKey: ['mentor-my-bids'] });
       await queryClient.invalidateQueries({ queryKey: ['mentor-dashboard'] });
       onSuccess();
     },
-    onError: (err) => setApiError(getApiError(err)),
+    onError: (error) => setApiError(getApiError(error)),
   });
 
   const handleSubmit = () => {
     const nextErrors: typeof errors = {};
-    if (!expertise.trim()) nextErrors.expertise = 'Describe your relevant expertise.';
-    if (!coverNote.trim()) nextErrors.coverNote = 'A cover note is required.';
-    if (Object.keys(nextErrors).length > 0) { setErrors(nextErrors); return; }
+
+    if (!expertise.trim()) {
+      nextErrors.expertise = 'Describe your relevant expertise.';
+    }
+
+    if (!coverNote.trim()) {
+      nextErrors.coverNote = 'A cover note is required.';
+    }
+
+    if (Object.keys(nextErrors).length > 0) {
+      setErrors(nextErrors);
+      return;
+    }
 
     mutation.mutate({
       opportunityId: opportunity._id,
@@ -74,100 +342,138 @@ function SubmitBidModal({ opportunity, onClose, onSuccess }: SubmitBidModalProps
   };
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-950 p-4 backdrop-blur-sm">
-      <div className="flex w-full max-w-xl flex-col overflow-hidden rounded-2xl border border-slate-800 bg-slate-950 shadow-2xl shadow-black/50">
-        {/* Header */}
-        <div className="flex shrink-0 items-start justify-between gap-4 border-b border-slate-800 px-6 py-5">
-          <div>
-            <div className="text-xs uppercase tracking-[0.3em] text-cyan-300">Submit Proposal</div>
-            <h2 className="mt-1 text-xl font-bold text-white">{opportunity.title}</h2>
-            <p className="mt-1 text-sm text-slate-400">
-              {opportunity.kind === 'startup' ? opportunity.startupName : opportunity.institution ?? 'Problem Bank'}
-              {' · '}
-              {opportunity.domain}
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-950/85 p-4 backdrop-blur-sm">
+      <div className="flex w-full max-w-2xl flex-col overflow-hidden rounded-[30px] border border-slate-800 bg-[#070b17] shadow-2xl shadow-black/50">
+        <div className="flex items-start justify-between gap-4 border-b border-slate-800 px-6 py-5">
+          <div className="space-y-2">
+            <div className="text-xs uppercase tracking-[0.3em] text-cyan-300">
+              Submit Proposal
+            </div>
+            <h2 className="text-xl font-bold text-white">{opportunity.title}</h2>
+            <p className="text-sm text-slate-400">
+              {opportunity.kind === 'startup'
+                ? opportunity.startupName
+                : opportunity.institution ?? 'Problem Bank'}{' '}
+              · {opportunity.domain}
             </p>
           </div>
-          <button onClick={onClose} className="rounded-lg p-1 text-slate-400 hover:bg-slate-800 hover:text-white">
+          <button
+            onClick={onClose}
+            className="rounded-xl p-2 text-slate-400 transition hover:bg-slate-900 hover:text-white"
+          >
             <X className="h-4 w-4" />
           </button>
         </div>
 
-        <div className="flex-1 space-y-5 overflow-y-auto px-6 py-5">
-          {/* Relevant Expertise */}
-          <div className="flex flex-col gap-1">
-            <label className="text-xs font-medium text-slate-400">
-              Relevant Expertise <span className="text-red-400">*</span>
-            </label>
-            <Input
-              value={expertise}
-              onChange={(e) => { setExpertise(e.target.value); setErrors((prev) => ({ ...prev, expertise: undefined })); }}
-              placeholder="e.g. Product-Market Fit, EdTech, Full-stack dev"
-              className={errors.expertise ? 'border-red-500' : ''}
-            />
-            {errors.expertise && <span className="text-xs text-red-400">{errors.expertise}</span>}
-          </div>
+        <div className="space-y-5 px-6 py-6">
+          <div className="grid gap-5 md:grid-cols-2">
+            <div className="space-y-1.5 md:col-span-2">
+              <label className="text-xs font-medium uppercase tracking-[0.16em] text-slate-400">
+                Relevant Expertise <span className="text-rose-400">*</span>
+              </label>
+              <Input
+                value={expertise}
+                onChange={(event) => {
+                  setExpertise(event.target.value);
+                  setErrors((current) => ({
+                    ...current,
+                    expertise: undefined,
+                  }));
+                }}
+                placeholder="Product strategy, AI systems, EdTech growth"
+                className={errors.expertise ? 'border-rose-500' : ''}
+              />
+              {errors.expertise ? (
+                <div className="text-xs text-rose-400">{errors.expertise}</div>
+              ) : null}
+            </div>
 
-          {/* Time commitment */}
-          <div className="grid grid-cols-2 gap-4">
-            <div className="flex flex-col gap-1">
-              <label className="text-xs font-medium text-slate-400">Hours / Week</label>
+            <div className="space-y-1.5">
+              <label className="text-xs font-medium uppercase tracking-[0.16em] text-slate-400">
+                Hours / Week
+              </label>
               <select
-                className="rounded-lg border border-slate-800 bg-slate-900 px-4 py-3 text-sm text-white"
+                className="w-full rounded-xl border border-slate-700 bg-slate-900 px-4 py-3 text-sm text-white outline-none transition focus:border-cyan-500"
                 value={hoursPerWeek}
-                onChange={(e) => setHoursPerWeek(e.target.value)}
+                onChange={(event) => setHoursPerWeek(event.target.value)}
               >
-                {[1, 2, 4, 6, 8, 10, 12, 16].map((h) => (
-                  <option key={h} value={h}>{h} hrs / week</option>
+                {[1, 2, 4, 6, 8, 10, 12, 16].map((hours) => (
+                  <option key={hours} value={hours}>
+                    {hours} hrs / week
+                  </option>
                 ))}
               </select>
             </div>
-            <div className="flex flex-col gap-1">
-              <label className="text-xs font-medium text-slate-400">Duration (Weeks)</label>
+
+            <div className="space-y-1.5">
+              <label className="text-xs font-medium uppercase tracking-[0.16em] text-slate-400">
+                Duration
+              </label>
               <select
-                className="rounded-lg border border-slate-800 bg-slate-900 px-4 py-3 text-sm text-white"
+                className="w-full rounded-xl border border-slate-700 bg-slate-900 px-4 py-3 text-sm text-white outline-none transition focus:border-cyan-500"
                 value={proposedDurationWeeks}
-                onChange={(e) => setProposedDurationWeeks(e.target.value)}
+                onChange={(event) =>
+                  setProposedDurationWeeks(event.target.value)
+                }
               >
-                {[2, 4, 6, 8, 12, 16, 24].map((w) => (
-                  <option key={w} value={w}>{w} weeks</option>
+                {[2, 4, 6, 8, 12, 16, 24].map((weeks) => (
+                  <option key={weeks} value={weeks}>
+                    {weeks} weeks
+                  </option>
                 ))}
               </select>
             </div>
           </div>
 
-          {/* Cover Note */}
-          <div className="flex flex-col gap-1">
-            <label className="text-xs font-medium text-slate-400">
-              Cover Note <span className="text-red-400">*</span>{' '}
-              <span className="text-slate-600">(shown to the requester)</span>
+          <div className="space-y-1.5">
+            <label className="text-xs font-medium uppercase tracking-[0.16em] text-slate-400">
+              Cover Note <span className="text-rose-400">*</span>
             </label>
             <textarea
               value={coverNote}
-              onChange={(e) => { setCoverNote(e.target.value); setErrors((prev) => ({ ...prev, coverNote: undefined })); }}
-              rows={4}
+              onChange={(event) => {
+                setCoverNote(event.target.value);
+                setErrors((current) => ({
+                  ...current,
+                  coverNote: undefined,
+                }));
+              }}
+              rows={5}
               maxLength={800}
-              placeholder="Why are you the right mentor for this? What specific value will you bring? What outcome do you commit to?"
-              className={`w-full resize-none rounded-lg border bg-slate-900 px-4 py-3 text-sm text-white placeholder:text-slate-600 focus:border-cyan-500 focus:outline-none focus:ring-1 focus:ring-cyan-500 ${errors.coverNote ? 'border-red-500' : 'border-slate-700'}`}
+              placeholder="Explain why you are the right mentor, the outcome you will drive, and how you will structure the engagement."
+              className={`w-full resize-none rounded-xl border bg-slate-900 px-4 py-3 text-sm leading-6 text-white placeholder:text-slate-600 outline-none transition focus:border-cyan-500 ${
+                errors.coverNote ? 'border-rose-500' : 'border-slate-700'
+              }`}
             />
-            <div className="flex items-center justify-between">
-              {errors.coverNote
-                ? <span className="text-xs text-red-400">{errors.coverNote}</span>
-                : <span />}
-              <span className="text-xs text-slate-600">{coverNote.length}/800</span>
+            <div className="flex items-center justify-between text-xs">
+              <span className="text-rose-400">
+                {errors.coverNote ?? ''}
+              </span>
+              <span className="text-slate-500">{coverNote.length}/800</span>
             </div>
           </div>
 
-          {apiError && (
-            <div className="flex items-start gap-2 rounded-lg border border-red-500/30 bg-red-500/10 px-4 py-3 text-sm text-red-300">
+          {apiError ? (
+            <div className="flex items-start gap-2 rounded-xl border border-rose-500/30 bg-rose-500/10 px-4 py-3 text-sm text-rose-200">
               <AlertCircle className="mt-0.5 h-4 w-4 shrink-0" />
-              {apiError}
+              <span>{apiError}</span>
             </div>
-          )}
+          ) : null}
         </div>
 
-        <div className="flex shrink-0 flex-col-reverse gap-3 border-t border-slate-800 px-6 py-4 sm:flex-row">
-          <Button variant="secondary" onClick={onClose} className="flex-1">Cancel</Button>
-          <Button onClick={handleSubmit} disabled={mutation.isPending} className="flex-1">
+        <div className="flex flex-col-reverse gap-3 border-t border-slate-800 px-6 py-4 sm:flex-row sm:justify-end">
+          <Button
+            variant="secondary"
+            onClick={onClose}
+            className="w-full sm:w-auto"
+          >
+            Cancel
+          </Button>
+          <Button
+            onClick={handleSubmit}
+            disabled={mutation.isPending}
+            className="w-full sm:w-auto"
+          >
             {mutation.isPending ? 'Submitting...' : 'Submit Proposal'}
           </Button>
         </div>
@@ -176,77 +482,12 @@ function SubmitBidModal({ opportunity, onClose, onSuccess }: SubmitBidModalProps
   );
 }
 
-// ─── Opportunity Card ──────────────────────────────────────────────────────
-
-function OpportunityCard({ opp, onBid }: { opp: MentorBidOpportunity; onBid: () => void }) {
-  const kindIcon = opp.kind === 'startup' ? Rocket : Lightbulb;
-  const KindIcon = kindIcon;
-  const kindLabel = opp.kind === 'startup' ? 'Startup' : 'Problem Bank';
-  const kindColor = opp.kind === 'startup' ? 'text-cyan-300' : 'text-violet-300';
-
-  return (
-    <Card className="p-5">
-      <div className="flex items-start justify-between gap-4">
-        <div className="flex items-start gap-4">
-          <div className={`flex h-11 w-11 shrink-0 items-center justify-center rounded-2xl ${opp.kind === 'startup' ? 'bg-cyan-500/10' : 'bg-violet-500/10'}`}>
-            <KindIcon className={`h-5 w-5 ${kindColor}`} />
-          </div>
-          <div>
-            <div className={`text-xs uppercase tracking-[0.25em] ${kindColor}`}>{kindLabel}</div>
-            <h3 className="mt-1 font-semibold text-white">{opp.title}</h3>
-            <p className="mt-1 text-sm text-slate-400">
-              {opp.kind === 'startup' ? opp.startupName : opp.institution ?? 'Open Problem'}
-              {opp.stage ? ` · ${opp.stage}` : ''}
-              {' · '}
-              {opp.domain}
-            </p>
-            {opp.preferredExpertise && opp.preferredExpertise.length > 0 && (
-              <div className="mt-2 flex flex-wrap gap-1">
-                {opp.preferredExpertise.map((tag) => (
-                  <Badge key={tag}>{tag}</Badge>
-                ))}
-              </div>
-            )}
-            <p className="mt-3 text-sm text-slate-300">{opp.description}</p>
-          </div>
-        </div>
-        <div className="flex shrink-0 flex-col items-end gap-2">
-          <div className="text-xs text-slate-500">
-            {new Date(opp.postedAt).toLocaleDateString('en-IN', { day: 'numeric', month: 'short' })}
-          </div>
-          {opp.hasBid ? (
-            <div className="flex items-center gap-1 rounded-lg bg-emerald-500/10 px-3 py-2 text-xs text-emerald-300">
-              <CheckCircle2 className="h-3.5 w-3.5" />
-              Bid Sent
-            </div>
-          ) : (
-            <Button onClick={onBid}>
-              <Gavel className="mr-1.5 h-3.5 w-3.5" />
-              Bid
-            </Button>
-          )}
-        </div>
-      </div>
-    </Card>
-  );
-}
-
-// ─── Main Page ─────────────────────────────────────────────────────────────
-
-type TabKey = 'opportunities' | 'my_bids';
-
-const tabLabels: Record<TabKey, string> = {
-  opportunities: 'Opportunities',
-  my_bids: 'My Bids',
-};
-
-type KindFilter = 'all' | MentorBidOpportunityKind;
-
 export default function MentorMarketplace() {
   const queryClient = useQueryClient();
   const [activeTab, setActiveTab] = useState<TabKey>('opportunities');
   const [kindFilter, setKindFilter] = useState<KindFilter>('all');
-  const [selectedOpp, setSelectedOpp] = useState<MentorBidOpportunity | null>(null);
+  const [selectedOpportunity, setSelectedOpportunity] =
+    useState<MentorBidOpportunity | null>(null);
   const [successMessage, setSuccessMessage] = useState<string | null>(null);
 
   const opportunitiesQuery = useQuery({
@@ -266,86 +507,121 @@ export default function MentorMarketplace() {
     onSuccess: async () => {
       setSuccessMessage('Bid withdrawn successfully.');
       await queryClient.invalidateQueries({ queryKey: ['mentor-my-bids'] });
-      await queryClient.invalidateQueries({ queryKey: ['mentor-bid-opportunities'] });
+      await queryClient.invalidateQueries({
+        queryKey: ['mentor-bid-opportunities'],
+      });
       await queryClient.invalidateQueries({ queryKey: ['mentor-dashboard'] });
     },
   });
 
   const opportunities = opportunitiesQuery.data ?? [];
   const myBids = myBidsQuery.data ?? [];
-
   const filteredOpportunities =
-    kindFilter === 'all' ? opportunities : opportunities.filter((o) => o.kind === kindFilter);
+    kindFilter === 'all'
+      ? opportunities
+      : opportunities.filter((opportunity) => opportunity.kind === kindFilter);
 
-  const startupCount = opportunities.filter((o) => o.kind === 'startup').length;
-  const problemCount = opportunities.filter((o) => o.kind === 'problem_bank').length;
+  const startupCount = opportunities.filter(
+    (opportunity) => opportunity.kind === 'startup',
+  ).length;
+  const problemCount = opportunities.filter(
+    (opportunity) => opportunity.kind === 'problem_bank',
+  ).length;
+  const pendingBidCount = myBids.filter((bid) => bid.status === 'pending').length;
 
   return (
-    <div className="space-y-6">
-      <div>
-        <div className="text-xs uppercase tracking-[0.3em] text-cyan-300">Mentor Marketplace</div>
-        <h1 className="mt-2 text-3xl font-bold text-white">Bidding Opportunities</h1>
-        <p className="mt-2 text-slate-400">
-          Browse active startup and problem bank mentorship requests. Submit proposals to work with founders and student teams.
-        </p>
-      </div>
-
-      {successMessage && (
-        <div className="rounded-2xl border border-emerald-500/20 bg-emerald-500/10 px-4 py-3 text-sm text-emerald-200">
-          {successMessage}
+    <div className="space-y-4 px-4 pb-5 sm:px-6">
+      <section className="space-y-3">
+        <div className="space-y-2">
+          <div className="text-xs uppercase tracking-[0.3em] text-cyan-300">
+            Mentor Marketplace
+          </div>
+          <div className="flex flex-col gap-2 lg:flex-row lg:items-end lg:justify-between">
+            <div className="space-y-2">
+              <h1 className="text-3xl font-bold tracking-tight text-white sm:text-4xl">
+                Bidding Opportunities
+              </h1>
+              <p className="max-w-3xl text-sm leading-6 text-slate-400 sm:text-base">
+                Browse live startup and problem-bank mentorship requests, submit
+                proposals with a clear engagement plan, and track everything
+                from the same workspace.
+              </p>
+            </div>
+            <div className="flex flex-wrap gap-2">
+              <Badge className="border-slate-700 bg-slate-900/70 text-slate-300">
+                {opportunities.length} open requests
+              </Badge>
+              <Badge className="border-cyan-500/20 bg-cyan-500/10 text-cyan-200">
+                {pendingBidCount} pending bids
+              </Badge>
+            </div>
+          </div>
         </div>
-      )}
 
-      {/* Summary row */}
-      <div className="grid gap-4 md:grid-cols-3">
-        <Card className="p-5">
-          <div className="flex h-11 w-11 items-center justify-center rounded-2xl bg-cyan-500/10 text-cyan-300">
-            <Rocket className="h-5 w-5" />
+        {successMessage ? (
+          <div className="rounded-2xl border border-emerald-500/20 bg-emerald-500/10 px-4 py-3 text-sm text-emerald-200">
+            {successMessage}
           </div>
-          <div className="mt-4 text-3xl font-bold text-white">{startupCount}</div>
-          <div className="mt-1 text-sm text-slate-400">Startup Opportunities</div>
-        </Card>
-        <Card className="p-5">
-          <div className="flex h-11 w-11 items-center justify-center rounded-2xl bg-violet-500/10 text-violet-300">
-            <Lightbulb className="h-5 w-5" />
-          </div>
-          <div className="mt-4 text-3xl font-bold text-white">{problemCount}</div>
-          <div className="mt-1 text-sm text-slate-400">Problem Bank Slots</div>
-        </Card>
-        <Card className="p-5">
-          <div className="flex h-11 w-11 items-center justify-center rounded-2xl bg-amber-500/10 text-amber-300">
-            <Gavel className="h-5 w-5" />
-          </div>
-          <div className="mt-4 text-3xl font-bold text-white">{myBids.filter((b) => b.status === 'pending').length}</div>
-          <div className="mt-1 text-sm text-slate-400">Pending Bids</div>
-        </Card>
-      </div>
+        ) : null}
+
+        <div className="grid gap-3 lg:grid-cols-3">
+          <SummaryCard
+            icon={Rocket}
+            label="Startup Opportunities"
+            value={startupCount}
+            toneClassName="bg-cyan-500/10 text-cyan-300"
+          />
+          <SummaryCard
+            icon={Lightbulb}
+            label="Problem Bank Slots"
+            value={problemCount}
+            toneClassName="bg-violet-500/10 text-violet-300"
+          />
+          <SummaryCard
+            icon={Gavel}
+            label="Pending Bids"
+            value={pendingBidCount}
+            toneClassName="bg-amber-500/10 text-amber-300"
+          />
+        </div>
+      </section>
 
       <OptionTabs
-        items={(Object.keys(tabLabels) as TabKey[]).map((t) => ({ id: t, label: tabLabels[t] }))}
+        items={(Object.keys(tabLabels) as TabKey[]).map((tabId) => ({
+          id: tabId,
+          label: tabLabels[tabId],
+        }))}
         activeId={activeTab}
         onChange={setActiveTab}
         aria-label="Mentor marketplace tabs"
+        className="-mt-1"
+        listClassName="gap-4"
       />
 
-      {/* OPPORTUNITIES tab */}
-      {activeTab === 'opportunities' && (
-        <div className="space-y-4">
-          {/* Kind filter */}
-          <div className="flex gap-2">
-            {(['all', 'startup', 'problem_bank'] as const).map((k) => (
-              <button
-                key={k}
-                onClick={() => setKindFilter(k)}
-                className={`rounded-full border px-4 py-1.5 text-xs font-medium transition ${
-                  kindFilter === k
-                    ? 'border-cyan-500 bg-cyan-500/15 text-cyan-300'
-                    : 'border-slate-700 text-slate-400 hover:border-slate-600 hover:text-white'
-                }`}
-              >
-                {k === 'all' ? 'All' : k === 'startup' ? 'Startups' : 'Problem Bank'}
-              </button>
-            ))}
+      {activeTab === 'opportunities' ? (
+        <section className="space-y-3">
+          <div className="flex flex-wrap gap-2">
+            {([
+              { id: 'all', label: 'All' },
+              { id: 'startup', label: 'Startups' },
+              { id: 'problem_bank', label: 'Problem Bank' },
+            ] as const).map((filter) => {
+              const isActive = kindFilter === filter.id;
+
+              return (
+                <button
+                  key={filter.id}
+                  onClick={() => setKindFilter(filter.id)}
+                  className={`rounded-full border px-3.5 py-1.5 text-xs font-medium transition ${
+                    isActive
+                      ? 'border-cyan-500 bg-cyan-500/15 text-cyan-300'
+                      : 'border-slate-700 bg-slate-950/50 text-slate-400 hover:border-slate-600 hover:text-white'
+                  }`}
+                >
+                  {filter.label}
+                </button>
+              );
+            })}
           </div>
 
           {opportunitiesQuery.isLoading ? (
@@ -353,83 +629,71 @@ export default function MentorMarketplace() {
               <Spinner />
             </div>
           ) : filteredOpportunities.length === 0 ? (
-            <div className="rounded-2xl border border-dashed border-slate-800 px-5 py-16 text-center">
-              <BookOpen className="mx-auto mb-3 h-8 w-8 text-slate-600" />
-              <p className="text-slate-400">No opportunities found. Check back soon.</p>
-            </div>
+            <EmptyState
+              icon={BookOpen}
+              title="No opportunities found"
+              description="There are no mentor requests in this segment right now. Check back soon for new startup and problem-bank openings."
+            />
           ) : (
-            filteredOpportunities.map((opp) => (
-              <OpportunityCard key={opp._id} opp={opp} onBid={() => setSelectedOpp(opp)} />
-            ))
+            <div className="space-y-3">
+              {filteredOpportunities.map((opportunity) => (
+                <OpportunityCard
+                  key={opportunity._id}
+                  opportunity={opportunity}
+                  onBid={() => setSelectedOpportunity(opportunity)}
+                />
+              ))}
+            </div>
           )}
-        </div>
-      )}
-
-      {/* MY BIDS tab */}
-      {activeTab === 'my_bids' && (
-        <div className="space-y-4">
+        </section>
+      ) : (
+        <section className="space-y-3">
           {myBidsQuery.isLoading ? (
             <div className="flex items-center justify-center py-20">
               <Spinner />
             </div>
           ) : myBids.length === 0 ? (
-            <div className="rounded-2xl border border-dashed border-slate-800 px-5 py-16 text-center">
-              <Gavel className="mx-auto mb-3 h-8 w-8 text-slate-600" />
-              <p className="text-slate-400">You haven't submitted any bids yet.</p>
-              <button
-                onClick={() => setActiveTab('opportunities')}
-                className="mt-3 inline-flex items-center gap-1 text-sm text-cyan-400 hover:underline"
-              >
-                Browse opportunities <ChevronRight className="h-3.5 w-3.5" />
-              </button>
-            </div>
+            <EmptyState
+              icon={Sparkles}
+              title="No bids yet"
+              description="You have not submitted any mentor proposals yet. Explore the live opportunities and place your first bid."
+              action={
+                <button
+                  onClick={() => setActiveTab('opportunities')}
+                  className="inline-flex items-center gap-1 text-sm font-medium text-cyan-300 hover:text-cyan-200"
+                >
+                  Browse opportunities <ChevronRight className="h-4 w-4" />
+                </button>
+              }
+            />
           ) : (
-            myBids.map((bid) => (
-              <Card key={bid._id} className="p-5">
-                <div className="flex items-start justify-between gap-4">
-                  <div>
-                    <div className="flex items-center gap-2">
-                      <Badge>{bid.kind === 'startup' ? 'Startup' : 'Problem Bank'}</Badge>
-                      <span className={`text-xs font-semibold uppercase tracking-widest ${BID_STATUS_COLORS[bid.status]}`}>
-                        {bid.status}
-                      </span>
-                    </div>
-                    <h3 className="mt-2 font-semibold text-white">{bid.opportunityTitle}</h3>
-                    <p className="mt-1 text-sm text-slate-400">
-                      {bid.expertise} · {bid.hoursPerWeek} hrs/week · {bid.proposedDurationWeeks} weeks
-                    </p>
-                    <p className="mt-1 text-xs text-slate-500">
-                      Submitted {new Date(bid.createdAt).toLocaleDateString('en-IN', { day: 'numeric', month: 'short', year: 'numeric' })}
-                    </p>
-                  </div>
-                  {bid.status === 'pending' && (
-                    <Button
-                      variant="secondary"
-                      onClick={() => withdrawMutation.mutate(bid._id)}
-                      disabled={withdrawMutation.isPending}
-                    >
-                      Withdraw
-                    </Button>
-                  )}
-                </div>
-              </Card>
-            ))
+            <div className="space-y-3">
+              {myBids.map((bid) => (
+                <BidHistoryCard
+                  key={bid._id}
+                  bid={bid}
+                  onWithdraw={(bidId) => withdrawMutation.mutate(bidId)}
+                  withdrawing={withdrawMutation.isPending}
+                />
+              ))}
+            </div>
           )}
-        </div>
+        </section>
       )}
 
-      {/* Submit Bid Modal */}
-      {selectedOpp && (
+      {selectedOpportunity ? (
         <SubmitBidModal
-          opportunity={selectedOpp}
-          onClose={() => setSelectedOpp(null)}
+          opportunity={selectedOpportunity}
+          onClose={() => setSelectedOpportunity(null)}
           onSuccess={() => {
-            setSelectedOpp(null);
-            setSuccessMessage(`Proposal submitted for "${selectedOpp.title}".`);
+            setSelectedOpportunity(null);
+            setSuccessMessage(
+              `Proposal submitted for "${selectedOpportunity.title}".`,
+            );
             setActiveTab('my_bids');
           }}
         />
-      )}
+      ) : null}
     </div>
   );
 }

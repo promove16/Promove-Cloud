@@ -1,6 +1,7 @@
 import { useDeferredValue, useEffect, useMemo, useRef, useState } from "react";
 import { useNavigate, useSearchParams } from "react-router-dom";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+import { isAxiosError } from "axios";
 import {
   ArrowRight,
   BriefcaseBusiness,
@@ -23,6 +24,16 @@ import {
   Users,
 } from "lucide-react";
 import { RecruiterMarketplace } from "../../features/recruiter/RecruiterMarketplace";
+import {
+  buildCollegeHiringRequestPayload,
+  CollegeHiringRequestFormState,
+  CollegeHiringRequestModal,
+} from "../../features/marketplace/CollegeHiringRequestModal";
+import {
+  getCollegeHiringRequestCooldownState,
+  getLatestCollegeHiringRequest,
+  isCollegeHiringRequest,
+} from "../../features/marketplace/collegeHiringRequestCooldown";
 import { getMarketplaceDetailPath } from "../../features/marketplace/navigation";
 import {
   getStartupInviteActionLabel,
@@ -39,6 +50,7 @@ import {
   marketplaceApi,
 } from "../../api/marketplace.api";
 import { requestApi } from "../../api/request.api";
+import { toast } from "../../app/components/ui/sonner";
 import { recruiterApi } from "../../api/recruiter.api";
 import { useAuthStore } from "../../store/authStore";
 import type { RecruiterJobView } from "../../types/recruiter.types";
@@ -230,6 +242,8 @@ const getDashboardRole = (role?: UserRole) => role ?? UserRole.STUDENT;
 
 const secondaryActionClassName =
   "inline-flex items-center gap-2 rounded-full border border-slate-700 bg-slate-900/80 px-4 py-2.5 text-sm font-medium text-slate-100 transition hover:border-cyan-400/50 hover:bg-slate-800 hover:text-white";
+const disabledSecondaryActionClassName =
+  "inline-flex items-center gap-2 rounded-full border border-slate-800 bg-slate-950/80 px-4 py-2.5 text-sm font-medium text-slate-500 transition disabled:cursor-not-allowed";
 const primaryActionClassName =
   "inline-flex items-center gap-2 rounded-full bg-cyan-400 px-4 py-2.5 text-sm font-semibold text-slate-950 transition hover:bg-cyan-300";
 
@@ -366,7 +380,10 @@ const joinLabelParts = (parts: Array<string | undefined>) =>
 
 const getInvestorFocusAreas = (item: MarketplaceUserItem) =>
   item.entityType === "investor"
-    ? uniqueValues([item.domain, ...(item.skills ?? []).map((skill) => skill.name)])
+    ? uniqueValues([
+        item.domain,
+        ...(item.skills ?? []).map((skill) => skill.name),
+      ])
     : [];
 
 const getInvestorFitReasons = (item: MarketplaceUserItem) => {
@@ -471,7 +488,9 @@ const getCardSubtitle = (item: MarketplaceDirectoryItem) =>
     : joinLabelParts([
         formatRoleLabel(item.entityType),
         item.headline,
-        item.entityType === "investor" && !item.headline ? item.domain : undefined,
+        item.entityType === "investor" && !item.headline
+          ? item.domain
+          : undefined,
       ]);
 
 const getCardDescription = (item: MarketplaceDirectoryItem) =>
@@ -776,10 +795,12 @@ const getItemSignals = (item: MarketplaceDirectoryItem) => {
         : "Experience Listed"
       : "",
     userItem.relatedCounts.startups > 0 ? "Startup Linked" : "",
-    userItem.entityType === "investor" && getInvestorFocusAreas(userItem).length > 0
+    userItem.entityType === "investor" &&
+    getInvestorFocusAreas(userItem).length > 0
       ? "Focus Shared"
       : "",
-    userItem.entityType !== "investor" && (userItem.githubStats?.totalRepos ?? 0) > 0
+    userItem.entityType !== "investor" &&
+    (userItem.githubStats?.totalRepos ?? 0) > 0
       ? "GitHub Proof"
       : "",
     userItem.entityType === "recruiter" && userItem.relatedCounts.jobs > 0
@@ -1331,8 +1352,15 @@ function GeneralMarketplace({ dashboardRole }: { dashboardRole: UserRole }) {
   const [inviteTarget, setInviteTarget] = useState<StartupInviteTarget | null>(
     null,
   );
-  const [inviteFeedback, setInviteFeedback] = useState<string | null>(null);
-  const [bidDrawerStartupId, setBidDrawerStartupId] = useState<string | null>(null);
+  const [hiringRequestTarget, setHiringRequestTarget] =
+    useState<MarketplaceUserItem | null>(null);
+  const [inviteFeedback, setInviteFeedback] = useState<{
+    tone: "success" | "error";
+    message: string;
+  } | null>(null);
+  const [bidDrawerStartupId, setBidDrawerStartupId] = useState<string | null>(
+    null,
+  );
   const availableTabs = useMemo(
     () => getTabsForRole(dashboardRole),
     [dashboardRole],
@@ -1457,6 +1485,11 @@ function GeneralMarketplace({ dashboardRole }: { dashboardRole: UserRole }) {
       return recruiterJobs.flat();
     },
     enabled: isStudentRecruiterJobView && recruiterProfiles.length > 0,
+  });
+  const outgoingRequestsQuery = useQuery({
+    queryKey: ["requests", "outgoing", "college-hiring"],
+    queryFn: requestApi.outgoing,
+    enabled: dashboardRole === UserRole.COLLEGE,
   });
 
   const recruiterJobItems = useMemo(() => {
@@ -1635,7 +1668,9 @@ function GeneralMarketplace({ dashboardRole }: { dashboardRole: UserRole }) {
       const fundingMax = maxValue((item) =>
         isStartupItem(item) ? (item.fundingNeeded ?? 0) : 0,
       );
-      const teamMax = maxValue((item) => (isStartupItem(item) ? item.teamSize : 0));
+      const teamMax = maxValue((item) =>
+        isStartupItem(item) ? item.teamSize : 0,
+      );
 
       sections.primary.push(
         {
@@ -1651,7 +1686,9 @@ function GeneralMarketplace({ dashboardRole }: { dashboardRole: UserRole }) {
           title: "Startup stage",
           filterKey: "stage",
           options: buildFacetOptionsFromLists(
-            sourceItems.map((item) => (isStartupItem(item) ? [item.stage] : [])),
+            sourceItems.map((item) =>
+              isStartupItem(item) ? [item.stage] : [],
+            ),
           ),
         },
         {
@@ -1660,7 +1697,9 @@ function GeneralMarketplace({ dashboardRole }: { dashboardRole: UserRole }) {
           title: "Sector",
           filterKey: "category",
           options: buildFacetOptionsFromLists(
-            sourceItems.map((item) => (isStartupItem(item) ? [item.category] : [])),
+            sourceItems.map((item) =>
+              isStartupItem(item) ? [item.category] : [],
+            ),
           ),
         },
       );
@@ -1672,7 +1711,9 @@ function GeneralMarketplace({ dashboardRole }: { dashboardRole: UserRole }) {
           title: "Visible to",
           filterKey: "launchTargets",
           options: buildFacetOptionsFromLists(
-            sourceItems.map((item) => (isStartupItem(item) ? item.launchTargets : [])),
+            sourceItems.map((item) =>
+              isStartupItem(item) ? item.launchTargets : [],
+            ),
           ),
         },
         {
@@ -1851,7 +1892,11 @@ function GeneralMarketplace({ dashboardRole }: { dashboardRole: UserRole }) {
       },
     );
 
-    if (entityType !== "recruiter" && entityType !== "investor" && experienceMax > 0) {
+    if (
+      entityType !== "recruiter" &&
+      entityType !== "investor" &&
+      experienceMax > 0
+    ) {
       sections.primary.push({
         kind: "range",
         id: "experience",
@@ -1886,7 +1931,10 @@ function GeneralMarketplace({ dashboardRole }: { dashboardRole: UserRole }) {
       sections.advanced.push({
         kind: "range",
         id: "portfolio",
-        title: entityType === "investor" ? "Portfolio startups" : "Portfolio projects",
+        title:
+          entityType === "investor"
+            ? "Portfolio startups"
+            : "Portfolio projects",
         filterKey: "portfolio",
         max: portfolioMax,
         step: 1,
@@ -2186,6 +2234,35 @@ function GeneralMarketplace({ dashboardRole }: { dashboardRole: UserRole }) {
   const displayedCount = isStudentRecruiterJobView
     ? recruiterJobItems.length
     : totalCount;
+  const outgoingCollegeHiringRequests = useMemo(
+    () => (outgoingRequestsQuery.data ?? []).filter(isCollegeHiringRequest),
+    [outgoingRequestsQuery.data],
+  );
+  const latestCollegeHiringRequestByRecruiter = useMemo(() => {
+    if (dashboardRole !== UserRole.COLLEGE) {
+      return new Map<
+        string,
+        ReturnType<typeof getLatestCollegeHiringRequest>
+      >();
+    }
+
+    const recruiterIds = items
+      .filter(
+        (item): item is MarketplaceUserItem =>
+          !isStartupItem(item) && item.entityType === "recruiter",
+      )
+      .map((item) => item._id);
+
+    return new Map(
+      recruiterIds.map((recruiterId) => [
+        recruiterId,
+        getLatestCollegeHiringRequest(
+          outgoingCollegeHiringRequests,
+          recruiterId,
+        ),
+      ]),
+    );
+  }, [dashboardRole, items, outgoingCollegeHiringRequests]);
   const hasActiveFilters = activeFilterChips.length > 0;
   const hasFilterSections =
     filterSections.primary.length > 0 || filterSections.advanced.length > 0;
@@ -2199,43 +2276,53 @@ function GeneralMarketplace({ dashboardRole }: { dashboardRole: UserRole }) {
   };
 
   const requestHiringEventMutation = useMutation({
-    mutationFn: async (item: MarketplaceUserItem) =>
-      requestApi.create({
-        requestType: "college_event_invite",
-        actionType: "approve",
-        toUserId: item._id,
-        targetEntityType: "recruiter",
-        targetEntityId: item._id,
-        targetEntityTitle: item.displayName,
-        targetRole: "recruiter",
-        requestedRole: "hiring_event_partner",
-        requestedPermission: "college_hiring_event_request",
-        message: `We would like to coordinate a hiring event with ${item.displayName}. Please review this request and connect on the event format, roles, and timeline.`,
-        metadata: {
-          recruiterId: item._id,
-          recruiterName: item.displayName,
+    mutationFn: async ({
+      form,
+      item,
+    }: {
+      form: CollegeHiringRequestFormState;
+      item: MarketplaceUserItem;
+    }) =>
+      requestApi.create(
+        buildCollegeHiringRequestPayload({
+          collegeUser: authUser,
+          form,
           requestOrigin: "college_marketplace",
-          eventRequestKind: "hiring_event",
-        },
-        deepLink: "/dashboard/invitations",
-        acceptRedirect: "/dashboard/messages",
-        declineRedirect: "/dashboard/invitations",
-      }),
-    onSuccess: async (_request, item) => {
-      setInviteFeedback(`Hiring event request sent to ${item.displayName}.`);
-      await queryClient.invalidateQueries({ queryKey: ["requests", "outgoing"] });
+          target: item,
+        }),
+      ),
+    onSuccess: async (_request, { item }) => {
+      const message = `Hiring request sent to ${item.displayName}.`;
+      setInviteFeedback({
+        tone: "success",
+        message,
+      });
+      toast.success(message);
+      setHiringRequestTarget(null);
+      await queryClient.invalidateQueries({
+        queryKey: ["requests", "outgoing"],
+      });
     },
     onError: (error) => {
-      setInviteFeedback(
-        error instanceof Error
+      const message = isAxiosError<{ error?: { message?: string } }>(error)
+        ? (error.response?.data?.error?.message ??
+          "Unable to send the hiring event request right now.")
+        : error instanceof Error
           ? error.message
-          : "Unable to send the hiring event request right now.",
-      );
+          : "Unable to send the hiring event request right now.";
+      setInviteFeedback({
+        tone: "error",
+        message,
+      });
+      toast.error(message);
     },
   });
 
   const openStartupInvite = (item: MarketplaceUserItem) => {
-    if (!isStartupInviteTargetType(item.entityType) || item._id === authUser?._id) {
+    if (
+      !isStartupInviteTargetType(item.entityType) ||
+      item._id === authUser?._id
+    ) {
       return;
     }
 
@@ -2259,17 +2346,19 @@ function GeneralMarketplace({ dashboardRole }: { dashboardRole: UserRole }) {
   const renderActions = (item: MarketplaceDirectoryItem) => {
     if (isStartupItem(item)) {
       const isOwnStartup = authUser
-        ? item.founders.some((f) => f._id === authUser._id) || item.primaryFounderId === authUser._id
+        ? item.founders.some((f) => f._id === authUser._id) ||
+          item.primaryFounderId === authUser._id
         : false;
       const messageFounderId =
         !isOwnStartup && item.primaryFounderId ? item.primaryFounderId : null;
       const canBid =
         !isOwnStartup &&
-        (dashboardRole === UserRole.STUDENT || dashboardRole === UserRole.INVESTOR) &&
-        item.launchTargets.includes('Investors');
+        (dashboardRole === UserRole.STUDENT ||
+          dashboardRole === UserRole.INVESTOR) &&
+        item.launchTargets.includes("Investors");
 
-        return (
-          <div className="flex flex-wrap items-center gap-2">
+      return (
+        <div className="flex flex-wrap items-center gap-2">
           {messageFounderId ? (
             <button
               onClick={() => handleMessage(messageFounderId)}
@@ -2304,57 +2393,80 @@ function GeneralMarketplace({ dashboardRole }: { dashboardRole: UserRole }) {
 
     const profileActionLabel =
       item.entityType === "investor"
-        ? "View thesis"
+        ? "View Portfolio"
         : item.entityType === "school" || item.entityType === "college"
           ? "View institution"
           : "View portfolio";
+    const hiringRequestState = canRequestHiringEvent(item)
+      ? getCollegeHiringRequestCooldownState(
+          latestCollegeHiringRequestByRecruiter.get(item._id) ?? null,
+        )
+      : null;
 
     return (
-      <div className="flex flex-wrap items-center gap-2">
-        <button
-          onClick={() => handleMessage(item._id)}
-          className={secondaryActionClassName}
-        >
-          <MessageCircle className="h-4 w-4" />
-          Message
-        </button>
-        {isStartupInviteTargetType(item.entityType) &&
-        item.entityType !== "investor" &&
-        item._id !== authUser?._id ? (
+      <div className="flex flex-col items-start gap-2">
+        <div className="flex flex-wrap items-center gap-2">
           <button
-            onClick={() => openStartupInvite(item)}
+            onClick={() => handleMessage(item._id)}
             className={secondaryActionClassName}
           >
-            <Send className="h-4 w-4" />
-            {getStartupInviteActionLabel(item.entityType)}
+            <MessageCircle className="h-4 w-4" />
+            Message
           </button>
-        ) : null}
-        {canRequestHiringEvent(item) ? (
+          {isStartupInviteTargetType(item.entityType) &&
+          item.entityType !== "investor" &&
+          item._id !== authUser?._id ? (
+            <button
+              onClick={() => openStartupInvite(item)}
+              className={secondaryActionClassName}
+            >
+              <Send className="h-4 w-4" />
+              {getStartupInviteActionLabel(item.entityType)}
+            </button>
+          ) : null}
+          {canRequestHiringEvent(item) ? (
+            <button
+              onClick={() => {
+                if (hiringRequestState?.isCoolingDown) {
+                  return;
+                }
+
+                setInviteFeedback(null);
+                setHiringRequestTarget(item as MarketplaceUserItem);
+              }}
+              disabled={hiringRequestState?.isCoolingDown}
+              title={hiringRequestState?.helperText ?? undefined}
+              className={
+                hiringRequestState?.isCoolingDown
+                  ? disabledSecondaryActionClassName
+                  : secondaryActionClassName
+              }
+            >
+              <CalendarDays className="h-4 w-4" />
+              {hiringRequestState?.buttonLabel ?? "Request Hiring Event"}
+            </button>
+          ) : null}
           <button
             onClick={() =>
-              void requestHiringEventMutation.mutateAsync(item as MarketplaceUserItem)
+              navigate(
+                getMarketplaceDetailPath(
+                  dashboardRole,
+                  item.entityType,
+                  item._id,
+                ),
+              )
             }
-            className={secondaryActionClassName}
+            className={primaryActionClassName}
           >
-            <CalendarDays className="h-4 w-4" />
-            Request Hiring Event
+            {profileActionLabel}
+            <ArrowRight className="h-4 w-4" />
           </button>
+        </div>
+        {hiringRequestState?.isCoolingDown ? (
+          <div className="text-xs text-slate-500">
+            {hiringRequestState.helperText}
+          </div>
         ) : null}
-        <button
-          onClick={() =>
-            navigate(
-              getMarketplaceDetailPath(
-                dashboardRole,
-                item.entityType,
-                item._id,
-              ),
-            )
-          }
-          className={primaryActionClassName}
-        >
-          {profileActionLabel}
-          <ArrowRight className="h-4 w-4" />
-        </button>
       </div>
     );
   };
@@ -2435,7 +2547,9 @@ function GeneralMarketplace({ dashboardRole }: { dashboardRole: UserRole }) {
           </div>
         </section>
 
-        <div className={`mt-6 grid gap-6 ${hasFilterSections ? "xl:grid-cols-[320px,minmax(0,1fr)]" : ""}`}>
+        <div
+          className={`mt-6 grid gap-6 ${hasFilterSections ? "xl:grid-cols-[320px,minmax(0,1fr)]" : ""}`}
+        >
           {hasFilterSections ? (
             <aside className="xl:sticky xl:top-4 xl:self-start">
               <div className="pr-4 xl:pr-8">
@@ -2487,7 +2601,9 @@ function GeneralMarketplace({ dashboardRole }: { dashboardRole: UserRole }) {
                     <div className="border-t border-slate-800 pt-5">
                       <button
                         type="button"
-                        onClick={() => setShowMoreFilters((current) => !current)}
+                        onClick={() =>
+                          setShowMoreFilters((current) => !current)
+                        }
                         className="inline-flex items-center gap-2 rounded-full border border-slate-700 bg-slate-900/75 px-4 py-2 text-sm font-semibold text-slate-200 transition hover:border-cyan-400/50 hover:bg-slate-800"
                       >
                         <SlidersHorizontal className="h-4 w-4" />
@@ -2561,7 +2677,9 @@ function GeneralMarketplace({ dashboardRole }: { dashboardRole: UserRole }) {
                   {isStudentRecruiterJobView ? (
                     <button
                       type="button"
-                      onClick={() => navigate("/dashboard/student/applications")}
+                      onClick={() =>
+                        navigate("/dashboard/student/applications")
+                      }
                       className={secondaryActionClassName}
                     >
                       <BriefcaseBusiness className="h-4 w-4" />
@@ -2652,8 +2770,14 @@ function GeneralMarketplace({ dashboardRole }: { dashboardRole: UserRole }) {
               </div>
 
               {inviteFeedback ? (
-                <div className="mt-4 rounded-2xl border border-cyan-500/30 bg-cyan-500/10 px-4 py-3 text-sm text-cyan-100">
-                  {inviteFeedback}
+                <div
+                  className={`mt-4 rounded-2xl px-4 py-3 text-sm ${
+                    inviteFeedback.tone === "success"
+                      ? "border border-cyan-500/30 bg-cyan-500/10 text-cyan-100"
+                      : "border border-rose-500/30 bg-rose-500/10 text-rose-100"
+                  }`}
+                >
+                  {inviteFeedback.message}
                 </div>
               ) : null}
 
@@ -2866,8 +2990,31 @@ function GeneralMarketplace({ dashboardRole }: { dashboardRole: UserRole }) {
         isOpen={Boolean(inviteTarget)}
         onClose={() => setInviteTarget(null)}
         target={inviteTarget}
-        onSent={setInviteFeedback}
+        onSent={(message) =>
+          setInviteFeedback({
+            tone: "success",
+            message,
+          })
+        }
       />
+
+      {hiringRequestTarget ? (
+        <CollegeHiringRequestModal
+          collegeUser={authUser}
+          isSubmitting={requestHiringEventMutation.isPending}
+          onClose={() => {
+            if (requestHiringEventMutation.isPending) return;
+            setHiringRequestTarget(null);
+          }}
+          onSubmit={(form) =>
+            requestHiringEventMutation.mutate({
+              form,
+              item: hiringRequestTarget,
+            })
+          }
+          target={hiringRequestTarget}
+        />
+      ) : null}
 
       <StartupBidDrawer
         startupId={bidDrawerStartupId}

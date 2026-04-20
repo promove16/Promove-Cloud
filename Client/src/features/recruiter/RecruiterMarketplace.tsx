@@ -1,4 +1,4 @@
-import { useDeferredValue, useMemo, useState } from "react";
+import { type ReactNode, useDeferredValue, useMemo, useState } from "react";
 import { isAxiosError } from "axios";
 import { useNavigate, useSearchParams } from "react-router-dom";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
@@ -10,8 +10,10 @@ import {
   Eye,
   Loader2,
   Mail,
+  Plus,
   Search,
   ShieldCheck,
+  SlidersHorizontal,
   Users,
   X,
 } from "lucide-react";
@@ -52,6 +54,34 @@ type HiringEventPlanFormState = {
   linkedJobId: string;
   minimumInnovationScore: string;
   message: string;
+};
+
+type JobFormState = {
+  title: string;
+  company: string;
+  description: string;
+  domain: string;
+  type: "Full-time" | "Internship" | "Contract" | "Part-time";
+  location: string;
+  workMode: "On-site" | "Hybrid" | "Remote";
+  minimumInnovationScore: string;
+  openings: string;
+};
+
+type StudentMarketplaceFilters = {
+  contact: "all" | "open" | "gated";
+  minScore: number;
+  requireActiveProject: boolean;
+  stages: string[];
+  skills: string[];
+};
+
+type CollegeMarketplaceFilters = {
+  minRating: number;
+  minPlacementVelocity: number;
+  minStudents: number;
+  focusLabels: string[];
+  locations: string[];
 };
 
 const recruiterTabs: Array<{
@@ -190,6 +220,80 @@ const createInitialHiringEventPlan = (college?: RecruiterCollegeCard): HiringEve
   minimumInnovationScore: "0",
   message: "",
 });
+
+const createInitialJobForm = (): JobFormState => ({
+  title: "",
+  company: "",
+  description: "",
+  domain: "",
+  type: "Full-time",
+  location: "",
+  workMode: "On-site",
+  minimumInnovationScore: "0",
+  openings: "1",
+});
+
+const createDefaultStudentFilters = (): StudentMarketplaceFilters => ({
+  contact: "all",
+  minScore: 0,
+  requireActiveProject: false,
+  stages: [],
+  skills: [],
+});
+
+const createDefaultCollegeFilters = (): CollegeMarketplaceFilters => ({
+  minRating: 0,
+  minPlacementVelocity: 0,
+  minStudents: 0,
+  focusLabels: [],
+  locations: [],
+});
+
+const toggleStringFilter = (current: string[], value: string) =>
+  current.includes(value)
+    ? current.filter((item) => item !== value)
+    : [...current, value];
+
+function FilterOptionButton({
+  active,
+  label,
+  onClick,
+}: {
+  active: boolean;
+  label: string;
+  onClick: () => void;
+}) {
+  return (
+    <button
+      type="button"
+      onClick={onClick}
+      className={`rounded-full border px-3 py-1.5 text-xs font-medium transition ${
+        active
+          ? "border-cyan-400/30 bg-cyan-400/10 text-cyan-100"
+          : "border-slate-700 bg-slate-900 text-slate-300 hover:border-slate-600 hover:text-white"
+      }`}
+    >
+      {label}
+    </button>
+  );
+}
+
+function FilterSidebarSection({
+  title,
+  children,
+}: {
+  title: string;
+  children: ReactNode;
+}) {
+  return (
+    <section className="border-t border-slate-800 pt-4 first:border-t-0 first:pt-0">
+      <div className="mb-3 text-xs font-semibold uppercase tracking-[0.24em] text-slate-500">
+        {title}
+      </div>
+      <div className="space-y-3">{children}</div>
+    </section>
+  );
+}
 
 const parseRequestDateInput = (value?: string) => {
   if (!value) {
@@ -379,18 +483,18 @@ function InviteStudentModal({
   isLoadingJobs,
   isSubmitting,
   onClose,
+  onCreateJob,
   onNoteChange,
   onInvite,
-  onGoToRecruiterHome,
 }: {
   activeJobs?: RecruiterJobDetail[];
   inviteNote: string;
   isLoadingJobs: boolean;
   isSubmitting: boolean;
   onClose: () => void;
+  onCreateJob: () => void;
   onNoteChange: (value: string) => void;
   onInvite: (jobId: string) => void;
-  onGoToRecruiterHome: () => void;
 }) {
   const safeActiveJobs = activeJobs ?? [];
 
@@ -472,11 +576,11 @@ function InviteStudentModal({
               </p>
               <button
                 type="button"
-                onClick={onGoToRecruiterHome}
+                onClick={onCreateJob}
                 className="mt-4 inline-flex items-center gap-2 rounded-xl border border-slate-700 bg-slate-900 px-4 py-3 text-sm font-medium text-slate-100 transition hover:border-slate-600 hover:bg-slate-800"
               >
-                <BriefcaseBusiness className="h-4 w-4" />
-                Go to recruiter home
+                <Plus className="h-4 w-4" />
+                Create job role
               </button>
             </div>
           )}
@@ -630,6 +734,166 @@ function PlanHiringEventModal({
   );
 }
 
+function PostJobRoleModal({
+  form,
+  error,
+  isSubmitting,
+  onChange,
+  onClose,
+  onSubmit,
+}: {
+  form: JobFormState;
+  error: string | null;
+  isSubmitting: boolean;
+  onChange: (patch: Partial<JobFormState>) => void;
+  onClose: () => void;
+  onSubmit: () => void;
+}) {
+  return (
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-950 px-4 backdrop-blur-sm">
+      <div className="w-full max-w-3xl rounded-3xl border border-slate-800 bg-slate-950 shadow-2xl shadow-black/40">
+        <div className="flex items-start justify-between gap-4 border-b border-slate-800 px-6 py-5">
+          <div>
+            <div className="text-xs uppercase tracking-[0.28em] text-cyan-300">Recruiter Jobs</div>
+            <h2 className="mt-2 text-2xl font-semibold text-white">Post a job role</h2>
+            <p className="mt-2 text-sm text-slate-400">
+              Publish a recruiter role that can be used for direct invites, event-to-pipeline conversion, and student applications.
+            </p>
+          </div>
+          <button
+            type="button"
+            onClick={onClose}
+            className="rounded-xl border border-slate-800 p-2 text-slate-400 transition hover:text-white"
+          >
+            <X className="h-5 w-5" />
+          </button>
+        </div>
+
+        <div className="space-y-5 px-6 py-5">
+          {error ? (
+            <div className="rounded-2xl border border-rose-500/20 bg-rose-500/10 px-4 py-3 text-sm text-rose-100">
+              {error}
+            </div>
+          ) : null}
+
+          <div className="grid gap-4 md:grid-cols-2">
+            <label className="space-y-2">
+              <span className="text-xs uppercase tracking-[0.22em] text-slate-500">Job Title</span>
+              <input
+                value={form.title}
+                onChange={(event) => onChange({ title: event.target.value })}
+                placeholder="Software Engineer"
+                className="w-full rounded-2xl border border-slate-800 bg-slate-900 px-4 py-3 text-sm text-white outline-none transition placeholder:text-slate-500 focus:border-cyan-400/50"
+              />
+            </label>
+
+            <label className="space-y-2">
+              <span className="text-xs uppercase tracking-[0.22em] text-slate-500">Company</span>
+              <input
+                value={form.company}
+                onChange={(event) => onChange({ company: event.target.value })}
+                placeholder="Acme Corp"
+                className="w-full rounded-2xl border border-slate-800 bg-slate-900 px-4 py-3 text-sm text-white outline-none transition placeholder:text-slate-500 focus:border-cyan-400/50"
+              />
+            </label>
+
+            <label className="space-y-2">
+              <span className="text-xs uppercase tracking-[0.22em] text-slate-500">Domain</span>
+              <input
+                value={form.domain}
+                onChange={(event) => onChange({ domain: event.target.value })}
+                placeholder="AI / ML"
+                className="w-full rounded-2xl border border-slate-800 bg-slate-900 px-4 py-3 text-sm text-white outline-none transition placeholder:text-slate-500 focus:border-cyan-400/50"
+              />
+            </label>
+
+            <label className="space-y-2">
+              <span className="text-xs uppercase tracking-[0.22em] text-slate-500">Location</span>
+              <input
+                value={form.location}
+                onChange={(event) => onChange({ location: event.target.value })}
+                placeholder="Bangalore, India"
+                className="w-full rounded-2xl border border-slate-800 bg-slate-900 px-4 py-3 text-sm text-white outline-none transition placeholder:text-slate-500 focus:border-cyan-400/50"
+              />
+            </label>
+
+            <label className="space-y-2">
+              <span className="text-xs uppercase tracking-[0.22em] text-slate-500">Type</span>
+              <select
+                value={form.type}
+                onChange={(event) => onChange({ type: event.target.value as JobFormState["type"] })}
+                className="w-full rounded-2xl border border-slate-800 bg-slate-900 px-4 py-3 text-sm text-white outline-none transition focus:border-cyan-400/50"
+              >
+                <option value="Full-time">Full-time</option>
+                <option value="Internship">Internship</option>
+                <option value="Contract">Contract</option>
+                <option value="Part-time">Part-time</option>
+              </select>
+            </label>
+
+            <label className="space-y-2">
+              <span className="text-xs uppercase tracking-[0.22em] text-slate-500">Work Mode</span>
+              <select
+                value={form.workMode}
+                onChange={(event) => onChange({ workMode: event.target.value as JobFormState["workMode"] })}
+                className="w-full rounded-2xl border border-slate-800 bg-slate-900 px-4 py-3 text-sm text-white outline-none transition focus:border-cyan-400/50"
+              >
+                <option value="On-site">On-site</option>
+                <option value="Hybrid">Hybrid</option>
+                <option value="Remote">Remote</option>
+              </select>
+            </label>
+
+            <label className="space-y-2">
+              <span className="text-xs uppercase tracking-[0.22em] text-slate-500">Openings</span>
+              <input
+                type="number"
+                min={1}
+                value={form.openings}
+                onChange={(event) => onChange({ openings: event.target.value })}
+                className="w-full rounded-2xl border border-slate-800 bg-slate-900 px-4 py-3 text-sm text-white outline-none transition focus:border-cyan-400/50"
+              />
+            </label>
+
+            <label className="space-y-2">
+              <span className="text-xs uppercase tracking-[0.22em] text-slate-500">Minimum Innovation Score</span>
+              <input
+                type="number"
+                min={0}
+                max={1000}
+                value={form.minimumInnovationScore}
+                onChange={(event) => onChange({ minimumInnovationScore: event.target.value })}
+                className="w-full rounded-2xl border border-slate-800 bg-slate-900 px-4 py-3 text-sm text-white outline-none transition focus:border-cyan-400/50"
+              />
+            </label>
+
+            <label className="space-y-2 md:col-span-2">
+              <span className="text-xs uppercase tracking-[0.22em] text-slate-500">Job Description</span>
+              <textarea
+                rows={5}
+                value={form.description}
+                onChange={(event) => onChange({ description: event.target.value })}
+                placeholder="Describe the role, responsibilities, and qualifications."
+                className="w-full rounded-2xl border border-slate-800 bg-slate-900 px-4 py-3 text-sm text-white outline-none transition placeholder:text-slate-500 focus:border-cyan-400/50"
+              />
+            </label>
+          </div>
+        </div>
+
+        <div className="flex justify-end gap-3 border-t border-slate-800 px-6 py-5">
+          <button type="button" onClick={onClose} className={secondaryButtonClass}>
+            Cancel
+          </button>
+          <button type="button" onClick={onSubmit} disabled={isSubmitting} className={primaryButtonClass}>
+            <Plus className="h-4 w-4" />
+            {isSubmitting ? "Posting..." : "Post Job Role"}
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
 function RecruiterCollegeCardView({
   college,
   planningRequest,
@@ -761,6 +1025,15 @@ export function RecruiterMarketplace({ dashboardRole: _dashboardRole }: { dashbo
   const [inviteStudentId, setInviteStudentId] = useState<string | null>(null);
   const [inviteNote, setInviteNote] = useState("");
   const [eventPlanForm, setEventPlanForm] = useState<HiringEventPlanFormState>(createInitialHiringEventPlan());
+  const [showJobModal, setShowJobModal] = useState(false);
+  const [jobForm, setJobForm] = useState<JobFormState>(createInitialJobForm);
+  const [jobFormError, setJobFormError] = useState<string | null>(null);
+  const [studentFilters, setStudentFilters] = useState<StudentMarketplaceFilters>(
+    createDefaultStudentFilters,
+  );
+  const [collegeFilters, setCollegeFilters] = useState<CollegeMarketplaceFilters>(
+    createDefaultCollegeFilters,
+  );
   const [inviteFeedback, setInviteFeedback] = useState<{
     tone: "success" | "error";
     message: string;
@@ -847,9 +1120,149 @@ export function RecruiterMarketplace({ dashboardRole: _dashboardRole }: { dashbo
     return eventMap;
   }, [hiringEventsQuery.data]);
 
-  const totalCount = lane === "students" ? students.length : colleges.length;
+  const studentStageOptions = useMemo(
+    () =>
+      Array.from(
+        new Set(
+          students
+            .map((student) => student.activeProject?.stage?.trim())
+            .filter((value): value is string => Boolean(value)),
+        ),
+      ).sort((left, right) => left.localeCompare(right)),
+    [students],
+  );
+  const studentSkillOptions = useMemo(() => {
+    const counts = new Map<string, number>();
+
+    students.forEach((student) => {
+      (student.skills ?? []).forEach((skill) => {
+        counts.set(skill, (counts.get(skill) ?? 0) + 1);
+      });
+    });
+
+    return Array.from(counts.entries())
+      .sort((left, right) => right[1] - left[1] || left[0].localeCompare(right[0]))
+      .slice(0, 10)
+      .map(([skill]) => skill);
+  }, [students]);
+  const collegeLocationOptions = useMemo(
+    () =>
+      Array.from(
+        new Set(
+          colleges
+            .map((college) => college.location.trim())
+            .filter(Boolean),
+        ),
+      ).sort((left, right) => left.localeCompare(right)),
+    [colleges],
+  );
+  const collegeFocusOptions = useMemo(
+    () =>
+      Array.from(
+        new Set(
+          colleges
+            .map((college) => college.focusLabel.trim())
+            .filter(Boolean),
+        ),
+      ).sort((left, right) => left.localeCompare(right)),
+    [colleges],
+  );
+  const filteredStudents = useMemo(
+    () =>
+      students.filter((student) => {
+        if (studentFilters.contact === "open" && !student.canContact) {
+          return false;
+        }
+
+        if (studentFilters.contact === "gated" && student.canContact) {
+          return false;
+        }
+
+        if (student.innovationScore < studentFilters.minScore) {
+          return false;
+        }
+
+        if (studentFilters.requireActiveProject && !student.activeProject) {
+          return false;
+        }
+
+        if (
+          studentFilters.stages.length > 0 &&
+          !studentFilters.stages.includes(student.activeProject?.stage ?? "")
+        ) {
+          return false;
+        }
+
+        if (
+          studentFilters.skills.length > 0 &&
+          !studentFilters.skills.every((skill) => student.skills.includes(skill))
+        ) {
+          return false;
+        }
+
+        return true;
+      }),
+    [studentFilters, students],
+  );
+  const filteredColleges = useMemo(
+    () =>
+      colleges.filter((college) => {
+        if (college.iicStarRating < collegeFilters.minRating) {
+          return false;
+        }
+
+        if (college.placementVelocity < collegeFilters.minPlacementVelocity) {
+          return false;
+        }
+
+        if (college.studentCount < collegeFilters.minStudents) {
+          return false;
+        }
+
+        if (
+          collegeFilters.focusLabels.length > 0 &&
+          !collegeFilters.focusLabels.includes(college.focusLabel)
+        ) {
+          return false;
+        }
+
+        if (
+          collegeFilters.locations.length > 0 &&
+          !collegeFilters.locations.includes(college.location)
+        ) {
+          return false;
+        }
+
+        return true;
+      }),
+    [collegeFilters, colleges],
+  );
+  const studentActiveFilterCount =
+    (studentFilters.contact !== "all" ? 1 : 0) +
+    (studentFilters.minScore > 0 ? 1 : 0) +
+    (studentFilters.requireActiveProject ? 1 : 0) +
+    studentFilters.stages.length +
+    studentFilters.skills.length;
+  const collegeActiveFilterCount =
+    (collegeFilters.minRating > 0 ? 1 : 0) +
+    (collegeFilters.minPlacementVelocity > 0 ? 1 : 0) +
+    (collegeFilters.minStudents > 0 ? 1 : 0) +
+    collegeFilters.focusLabels.length +
+    collegeFilters.locations.length;
+  const activeFilterCount =
+    lane === "students" ? studentActiveFilterCount : collegeActiveFilterCount;
+
+  const totalCount =
+    lane === "students" ? filteredStudents.length : filteredColleges.length;
   const isLoading = lane === "students" ? studentsQuery.isLoading : collegesQuery.isLoading;
   const isError = lane === "students" ? studentsQuery.isError : collegesQuery.isError;
+  const resultSummaryLabel = `${formatCompactNumber(totalCount)} ${
+    lane === "students" ? "student" : "college"
+  }${totalCount === 1 ? "" : "s"}`;
+  const jobSummaryTitle =
+    activeJobs.length > 0
+      ? `${formatCompactNumber(activeJobs.length)} active ${activeJobs.length === 1 ? "role" : "roles"}`
+      : "No active roles";
 
   const inviteMutation = useMutation({
     mutationFn: (jobId: string) =>
@@ -892,6 +1305,25 @@ export function RecruiterMarketplace({ dashboardRole: _dashboardRole }: { dashbo
         tone: "error",
         message,
       });
+      appToast.error(message);
+    },
+  });
+  const createJobMutation = useMutation({
+    mutationFn: recruiterApi.createJob,
+    onSuccess: async () => {
+      const message = "Job role posted. It is now available for invites and event linking.";
+      setJobForm(createInitialJobForm());
+      setJobFormError(null);
+      setShowJobModal(false);
+      appToast.success(message);
+      await Promise.all([
+        queryClient.invalidateQueries({ queryKey: ["recruiter", "jobs"] }),
+        queryClient.invalidateQueries({ queryKey: ["recruiter", "dashboard"] }),
+      ]);
+    },
+    onError: (error) => {
+      const message = error instanceof Error ? error.message : "Unable to post this job role right now.";
+      setJobFormError(message);
       appToast.error(message);
     },
   });
@@ -964,6 +1396,15 @@ export function RecruiterMarketplace({ dashboardRole: _dashboardRole }: { dashbo
       }),
     );
 
+  const clearFilters = () => {
+    if (lane === "students") {
+      setStudentFilters(createDefaultStudentFilters());
+      return;
+    }
+
+    setCollegeFilters(createDefaultCollegeFilters());
+  };
+
   const handleShortlist = async (studentId: string) => {
     setShortlistingId(studentId);
     try {
@@ -981,6 +1422,36 @@ export function RecruiterMarketplace({ dashboardRole: _dashboardRole }: { dashbo
     navigate(
       `/dashboard/recruiter/colleges/${college._id}/students?institution=${encodeURIComponent(college.displayName)}`,
     );
+
+  const openJobModal = () => {
+    setJobFormError(null);
+    setShowJobModal(true);
+  };
+
+  const submitJob = () => {
+    if (
+      !jobForm.title.trim() ||
+      !jobForm.company.trim() ||
+      !jobForm.description.trim() ||
+      !jobForm.domain.trim() ||
+      !jobForm.location.trim()
+    ) {
+      setJobFormError("Title, company, domain, location and description are required.");
+      return;
+    }
+
+    createJobMutation.mutate({
+      title: jobForm.title.trim(),
+      company: jobForm.company.trim(),
+      description: jobForm.description.trim(),
+      domain: jobForm.domain.trim(),
+      type: jobForm.type,
+      location: jobForm.location.trim(),
+      workMode: jobForm.workMode,
+      minimumInnovationScore: Number(jobForm.minimumInnovationScore) || 0,
+      openings: jobForm.openings ? Number(jobForm.openings) : undefined,
+    });
+  };
 
   const openInviteModal = (studentId: string) => {
     if (jobsQuery.isError) {
@@ -1027,117 +1498,97 @@ export function RecruiterMarketplace({ dashboardRole: _dashboardRole }: { dashbo
   return (
     <>
       <div className={`${RECRUITER_PAGE_CONTENT_CLASS} space-y-6`}>
-        <section className="space-y-4 rounded-3xl border border-slate-800 bg-slate-950 px-5 py-5 sm:px-6">
-          <div className="flex flex-col gap-5 xl:flex-row xl:items-start xl:justify-between">
-            <div className="max-w-3xl space-y-3">
-              <RecruiterSectionNav items={recruiterMarketplaceSectionItems} />
-              <div className="space-y-2">
-                <div className="text-xs uppercase tracking-[0.28em] text-cyan-300/80">{activeTab.eyebrow}</div>
-                <div className="flex flex-wrap items-center gap-x-4 gap-y-2">
-                  <h1 className="text-3xl font-semibold tracking-tight text-white">{activeTab.label}</h1>
-                  <span className="rounded-full border border-slate-800 bg-slate-900 px-3 py-1 text-sm text-slate-300">
-                    {formatCompactNumber(totalCount)} results
+        <RecruiterSectionNav items={recruiterMarketplaceSectionItems} />
+
+        <section className="rounded-3xl border border-slate-800 bg-slate-950/90 px-4 py-4 sm:px-5">
+          <div className="grid gap-4 xl:grid-cols-[minmax(0,1fr),360px] xl:items-center xl:gap-6">
+            <div className="space-y-4">
+              <div className="flex flex-wrap items-center gap-2">
+                <h1 className="text-2xl font-semibold tracking-tight text-white sm:text-[2.1rem]">
+                  {activeTab.label}
+                </h1>
+                <span className="rounded-full bg-slate-900 px-2.5 py-1 text-xs font-medium text-slate-300">
+                  {formatCompactNumber(totalCount)} results
+                </span>
+                {focusedInstitution && lane === "students" ? (
+                  <span className="rounded-full border border-slate-800 bg-slate-900/70 px-2.5 py-1 text-xs text-slate-200">
+                    {focusedInstitution}
                   </span>
-                  {focusedInstitution && lane === "students" ? (
-                    <span className="rounded-full border border-cyan-400/20 bg-cyan-400/10 px-3 py-1 text-xs text-cyan-100">
-                      {focusedInstitution}
-                    </span>
-                  ) : null}
-                </div>
-                <p className="max-w-3xl text-sm leading-6 text-slate-400">{activeTab.description}</p>
+                ) : null}
               </div>
             </div>
 
-            <div className="w-full max-w-xl xl:pt-8">
-              <div className="rounded-3xl border border-slate-800 bg-slate-950 p-4 shadow-[0_16px_32px_rgba(2,6,23,0.18)]">
-                <div className="mb-3 text-xs uppercase tracking-[0.24em] text-slate-500">Search Directory</div>
-                <label className="relative block">
-                  <Search className="pointer-events-none absolute left-4 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400" />
-                  <input
-                    value={query}
-                    onChange={(event) => updateSearch(event.target.value)}
-                    placeholder={lane === "students" ? "Search students, domains, or institutions" : "Search colleges or locations"}
-                    className="w-full rounded-2xl border border-slate-700 bg-slate-900 py-3 pl-11 pr-4 text-sm text-slate-100 outline-none transition placeholder:text-slate-400 focus:border-cyan-400/60"
-                  />
-                </label>
+            <div className="space-y-3 xl:border-l xl:border-slate-800 xl:pl-6">
+              <label className="relative block">
+                <Search className="pointer-events-none absolute left-3.5 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-500" />
+                <input
+                  value={query}
+                  onChange={(event) => updateSearch(event.target.value)}
+                  placeholder={lane === "students" ? "Search students, domains, or institutions" : "Search colleges or locations"}
+                  className="h-10 w-full rounded-full border border-slate-800 bg-slate-900/70 pl-10 pr-4 text-sm text-slate-100 outline-none transition placeholder:text-slate-500 focus:border-cyan-400/45 focus:bg-slate-900"
+                />
+              </label>
+
+              <div className="flex items-center justify-between gap-3 rounded-2xl border border-slate-800 bg-slate-900/45 px-3 py-2.5">
+                <span className="text-sm font-medium text-slate-200">{jobSummaryTitle}</span>
+                <button
+                  type="button"
+                  onClick={openJobModal}
+                  className={`${primaryButtonClass} px-3 py-2 text-xs`}
+                >
+                  <Plus className="h-3.5 w-3.5" />
+                  Post Job
+                </button>
               </div>
             </div>
           </div>
 
-          <div className="grid gap-4 border-t border-slate-800 pt-5 lg:grid-cols-[minmax(0,1fr)_auto] lg:items-end">
-            <div className="grid gap-3 sm:grid-cols-2">
-              {recruiterTabs.map((tab) => {
-                const Icon = tab.icon;
-                const isActive = tab.id === lane;
+          <div className="mt-4 flex flex-wrap items-center gap-2 border-t border-slate-800 pt-4">
+            {recruiterTabs.map((tab) => {
+              const Icon = tab.icon;
+              const isActive = tab.id === lane;
 
-                return (
-                  <button
-                    key={tab.id}
-                    onClick={() => handleLaneChange(tab.id)}
-                    className={`group rounded-3xl border p-4 text-left transition ${
+              return (
+                <button
+                  key={tab.id}
+                  onClick={() => handleLaneChange(tab.id)}
+                  className={`inline-flex items-center gap-2 rounded-full border px-3 py-2 text-sm font-medium transition ${
+                    isActive
+                      ? "border-cyan-400/30 bg-cyan-400/10 text-cyan-100"
+                      : "border-slate-800 bg-slate-950/35 text-slate-300 hover:border-slate-700 hover:bg-slate-900/60 hover:text-white"
+                  }`}
+                >
+                  <span
+                    className={`flex h-7 w-7 items-center justify-center rounded-full border ${
                       isActive
-                        ? "border-cyan-400/45 bg-cyan-400/10 shadow-[0_20px_40px_rgba(8,145,178,0.15)]"
-                        : "border-slate-800 bg-slate-950 hover:border-slate-700 hover:bg-slate-900"
+                        ? "border-cyan-400/30 bg-cyan-400/10 text-cyan-100"
+                        : "border-slate-800 bg-slate-900/70 text-slate-500"
                     }`}
                   >
-                    <div className="flex items-start justify-between gap-3">
-                      <div
-                        className={`flex h-11 w-11 shrink-0 items-center justify-center rounded-2xl ring-1 transition ${
-                          isActive
-                            ? "bg-cyan-400 text-slate-950 ring-cyan-300/40"
-                            : "bg-slate-900 text-slate-300 ring-slate-700 group-hover:text-white"
-                        }`}
-                      >
-                        <Icon className="h-5 w-5" />
-                      </div>
+                    <Icon className="h-3.5 w-3.5" />
+                  </span>
+                  <span>{tab.label}</span>
+                </button>
+              );
+            })}
 
-                      <span
-                        className={`rounded-full px-2.5 py-1 text-[11px] font-medium uppercase tracking-[0.2em] ${
-                          isActive
-                            ? "bg-cyan-950/60 text-cyan-100 ring-1 ring-inset ring-cyan-400/30"
-                            : "bg-slate-900 text-slate-400 ring-1 ring-inset ring-slate-800"
-                        }`}
-                      >
-                        {isActive ? "Active" : "Browse"}
-                      </span>
-                    </div>
-
-                    <div className="mt-4 space-y-2">
-                      <div className={`text-base font-semibold ${isActive ? "text-white" : "text-slate-200"}`}>
-                        {tab.label}
-                      </div>
-                      <p className={`text-sm leading-6 ${isActive ? "text-cyan-50" : "text-slate-400"}`}>
-                        {tab.description}
-                      </p>
-                    </div>
-                  </button>
-                );
-              })}
-            </div>
-
-            <div className="flex flex-col gap-3 lg:items-end">
-              <div className="flex flex-wrap items-center gap-2 lg:justify-end">
-                <span className="rounded-full border border-cyan-400/20 bg-cyan-400/10 px-3 py-1.5 text-sm text-cyan-100">
-                  {activeTab.helper}
+            <div className="flex flex-wrap items-center gap-2 xl:ml-auto">
+              <span className="rounded-full bg-slate-900 px-3 py-2 text-sm font-medium text-slate-200">
+                {resultSummaryLabel}
+              </span>
+              {activeFilterCount > 0 ? (
+                <span className="rounded-full border border-cyan-400/20 bg-cyan-400/10 px-3 py-2 text-sm font-medium text-cyan-100">
+                  {activeFilterCount} active filter{activeFilterCount === 1 ? "" : "s"}
                 </span>
-                <span className="rounded-full border border-slate-700 bg-slate-900 px-3 py-1.5 text-sm text-slate-300">
-                  {formatCompactNumber(totalCount)} results in view
-                </span>
-                {focusedInstitution && lane === "students" ? (
-                  <button
-                    onClick={() => setSearchParams(buildSearchParams({ lane: "students", query }))}
-                    className="rounded-full border border-slate-700 bg-slate-900 px-3 py-1.5 text-sm text-slate-200 transition hover:border-cyan-400/50 hover:bg-slate-800"
-                  >
-                    Clear institution
-                  </button>
-                ) : null}
-              </div>
-
-              <p className="max-w-md text-sm leading-6 text-slate-400 lg:text-right">
-                {lane === "students"
-                  ? "Search by student, domain, or institution while keeping the active review context visible."
-                  : "Review college strength, placement readiness, and innovation activity before opening student cohorts."}
-              </p>
+              ) : null}
+              {focusedInstitution && lane === "students" ? (
+                <button
+                  onClick={() => setSearchParams(buildSearchParams({ lane: "students", query }))}
+                  className="rounded-full border border-slate-700 bg-transparent px-3 py-2 text-sm text-slate-200 transition hover:border-cyan-400/40 hover:text-white"
+                >
+                  Clear
+                </button>
+              ) : null}
             </div>
           </div>
         </section>
@@ -1166,84 +1617,316 @@ export function RecruiterMarketplace({ dashboardRole: _dashboardRole }: { dashbo
           </div>
         ) : null}
 
-        <section className={`overflow-hidden rounded-2xl ${surfaceClass}`}>
-          <div className="flex items-center justify-between border-b border-slate-800 bg-slate-900 px-4 py-3 text-xs uppercase tracking-[0.2em] text-slate-300 sm:px-6">
-            <span>{lane === "students" ? "Student Results" : "College Results"}</span>
-            <span>{formatCompactNumber(totalCount)}</span>
-          </div>
-
-          {isLoading ? (
-            <div className="px-4 py-10 text-sm text-slate-300 sm:px-6">Loading marketplace results...</div>
-          ) : null}
-
-          {isError ? (
-            <div className="px-4 py-5 text-sm text-rose-200 sm:px-6">
-              Unable to load recruiter marketplace items right now.
-            </div>
-          ) : null}
-
-          {!isLoading && !isError && totalCount === 0 ? (
-            <div className="px-4 py-10 sm:px-6">
-              <div className="rounded-2xl border border-dashed border-slate-800 bg-slate-950 px-5 py-6">
-                <div className="text-sm font-medium text-white">
-                  {lane === "students" ? "No talent found" : "No colleges found"}
-                </div>
-                <p className="mt-2 text-sm leading-6 text-slate-300">
-                  {lane === "students"
-                    ? "Try another student, domain, or institution search. You can also reset the current filters and review the full talent pool again."
-                    : "Try another college or location search, or switch back to the student directory."}
-                </p>
-                <div className="mt-4 flex flex-wrap gap-3">
+        <div className="grid gap-6 xl:grid-cols-[280px,minmax(0,1fr)]">
+          <aside className={`h-fit rounded-2xl p-4 ${surfaceClass}`}>
+            <div className="flex items-center justify-between gap-3 border-b border-slate-800 pb-4">
+              <div className="flex items-center gap-2">
+                <SlidersHorizontal className="h-4 w-4 text-cyan-300" />
+                <div className="text-sm font-semibold text-white">Filters</div>
+              </div>
+              <div className="flex items-center gap-3">
+                {activeFilterCount > 0 ? (
+                  <span className="rounded-full border border-cyan-400/20 bg-cyan-400/10 px-2.5 py-1 text-[11px] font-medium text-cyan-100">
+                    {activeFilterCount}
+                  </span>
+                ) : null}
+                {activeFilterCount > 0 ? (
                   <button
                     type="button"
-                    onClick={() => setSearchParams(buildSearchParams({ lane }))}
-                    className="rounded-full border border-slate-700 bg-slate-900 px-4 py-2 text-sm font-medium text-slate-100 transition hover:border-cyan-400/50 hover:bg-slate-800 hover:text-white"
+                    onClick={clearFilters}
+                    className="text-xs font-medium uppercase tracking-[0.18em] text-cyan-300 transition hover:text-cyan-200"
                   >
-                    Reset search
+                    Clear all
                   </button>
-                  <button
-                    type="button"
-                    onClick={() => handleLaneChange(lane === "students" ? "colleges" : "students")}
-                    className="rounded-full border border-cyan-400/30 bg-cyan-400/10 px-4 py-2 text-sm font-medium text-cyan-100 transition hover:border-cyan-300/50 hover:bg-cyan-400/15"
-                  >
-                    Switch directory
-                  </button>
-                </div>
+                ) : null}
               </div>
             </div>
-          ) : null}
 
-          {!isLoading && !isError && totalCount > 0 ? (
-            <div className="divide-y divide-slate-800">
-              {lane === "students"
-                ? students.map((student) => (
-                    <RecruiterStudentCard
-                      key={student._id}
-                      student={student}
-                      activeJobCount={activeJobs.length}
-                      invitingStudentId={inviteMutation.isPending ? inviteStudentId : null}
-                      shortlistingId={shortlistingId}
-                      onInvite={openInviteModal}
-                      onMessage={(studentId) => navigate(`/dashboard/messages/${studentId}`)}
-                      onShortlist={handleShortlist}
-                      onViewProfile={(studentId) => navigate(getStudentPortfolioViewPath(studentId))}
-                    />
-                  ))
-                : colleges.map((college) => (
-                    <RecruiterCollegeCardView
-                      key={college._id}
-                      college={college}
-                      planningRequest={latestPlanningRequestByCollege.get(college._id)}
-                      activeEventId={latestHiringEventByCollege.get(college._id)?._id ?? null}
-                      onViewStudents={handleViewCollegeStudents}
-                      onPlanEvent={openPlanEventModal}
-                      onOpenEvent={(eventId) => navigate(`/dashboard/recruiter/hiring-events?eventId=${eventId}`)}
-                      onOpenRequest={(requestId) => navigate(`/dashboard/invitations?requestId=${requestId}`)}
-                    />
-                  ))}
+            <div className="mt-4 space-y-4">
+              {lane === "students" ? (
+                <>
+                  <FilterSidebarSection title="Contact Access">
+                    <div className="flex flex-wrap gap-2">
+                      {[
+                        { id: "all", label: "All" },
+                        { id: "open", label: "Open" },
+                        { id: "gated", label: "Gated" },
+                      ].map((option) => (
+                        <FilterOptionButton
+                          key={option.id}
+                          active={studentFilters.contact === option.id}
+                          label={option.label}
+                          onClick={() =>
+                            setStudentFilters((current) => ({
+                              ...current,
+                              contact: option.id as StudentMarketplaceFilters["contact"],
+                            }))
+                          }
+                        />
+                      ))}
+                    </div>
+                  </FilterSidebarSection>
+
+                  <FilterSidebarSection title="Minimum Score">
+                    <div className="flex flex-wrap gap-2">
+                      {[0, 150, 300, 500, 700].map((value) => (
+                        <FilterOptionButton
+                          key={value}
+                          active={studentFilters.minScore === value}
+                          label={value === 0 ? "Any" : `${value}+`}
+                          onClick={() =>
+                            setStudentFilters((current) => ({
+                              ...current,
+                              minScore: value,
+                            }))
+                          }
+                        />
+                      ))}
+                    </div>
+                  </FilterSidebarSection>
+
+                  <FilterSidebarSection title="Project Signal">
+                    <label className="flex items-center gap-3 rounded-2xl border border-slate-800 bg-slate-950 px-3 py-3 text-sm text-slate-200">
+                      <input
+                        type="checkbox"
+                        checked={studentFilters.requireActiveProject}
+                        onChange={(event) =>
+                          setStudentFilters((current) => ({
+                            ...current,
+                            requireActiveProject: event.target.checked,
+                          }))
+                        }
+                        className="h-4 w-4 rounded border-slate-600 bg-slate-950 text-cyan-400 focus:ring-cyan-400"
+                      />
+                      Active project only
+                    </label>
+                    {studentStageOptions.length > 0 ? (
+                      <div className="flex flex-wrap gap-2">
+                        {studentStageOptions.map((stage) => (
+                          <FilterOptionButton
+                            key={stage}
+                            active={studentFilters.stages.includes(stage)}
+                            label={stage}
+                            onClick={() =>
+                              setStudentFilters((current) => ({
+                                ...current,
+                                stages: toggleStringFilter(current.stages, stage),
+                              }))
+                            }
+                          />
+                        ))}
+                      </div>
+                    ) : null}
+                  </FilterSidebarSection>
+
+                  {studentSkillOptions.length > 0 ? (
+                    <FilterSidebarSection title="Top Skills">
+                      <div className="flex flex-wrap gap-2">
+                        {studentSkillOptions.map((skill) => (
+                          <FilterOptionButton
+                            key={skill}
+                            active={studentFilters.skills.includes(skill)}
+                            label={skill}
+                            onClick={() =>
+                              setStudentFilters((current) => ({
+                                ...current,
+                                skills: toggleStringFilter(current.skills, skill),
+                              }))
+                            }
+                          />
+                        ))}
+                      </div>
+                    </FilterSidebarSection>
+                  ) : null}
+                </>
+              ) : (
+                <>
+                  <FilterSidebarSection title="IIC Rating">
+                    <div className="flex flex-wrap gap-2">
+                      {[0, 2, 3, 4].map((value) => (
+                        <FilterOptionButton
+                          key={value}
+                          active={collegeFilters.minRating === value}
+                          label={value === 0 ? "Any" : `${value}+`}
+                          onClick={() =>
+                            setCollegeFilters((current) => ({
+                              ...current,
+                              minRating: value,
+                            }))
+                          }
+                        />
+                      ))}
+                    </div>
+                  </FilterSidebarSection>
+
+                  <FilterSidebarSection title="Placement Velocity">
+                    <div className="flex flex-wrap gap-2">
+                      {[0, 25, 50, 75].map((value) => (
+                        <FilterOptionButton
+                          key={value}
+                          active={collegeFilters.minPlacementVelocity === value}
+                          label={value === 0 ? "Any" : `${value}%+`}
+                          onClick={() =>
+                            setCollegeFilters((current) => ({
+                              ...current,
+                              minPlacementVelocity: value,
+                            }))
+                          }
+                        />
+                      ))}
+                    </div>
+                  </FilterSidebarSection>
+
+                  <FilterSidebarSection title="Student Base">
+                    <div className="flex flex-wrap gap-2">
+                      {[0, 250, 500, 1000].map((value) => (
+                        <FilterOptionButton
+                          key={value}
+                          active={collegeFilters.minStudents === value}
+                          label={value === 0 ? "Any" : `${value}+`}
+                          onClick={() =>
+                            setCollegeFilters((current) => ({
+                              ...current,
+                              minStudents: value,
+                            }))
+                          }
+                        />
+                      ))}
+                    </div>
+                  </FilterSidebarSection>
+
+                  {collegeFocusOptions.length > 0 ? (
+                    <FilterSidebarSection title="Focus">
+                      <div className="flex flex-wrap gap-2">
+                        {collegeFocusOptions.map((focus) => (
+                          <FilterOptionButton
+                            key={focus}
+                            active={collegeFilters.focusLabels.includes(focus)}
+                            label={focus}
+                            onClick={() =>
+                              setCollegeFilters((current) => ({
+                                ...current,
+                                focusLabels: toggleStringFilter(current.focusLabels, focus),
+                              }))
+                            }
+                          />
+                        ))}
+                      </div>
+                    </FilterSidebarSection>
+                  ) : null}
+
+                  {collegeLocationOptions.length > 0 ? (
+                    <FilterSidebarSection title="Location">
+                      <div className="flex flex-wrap gap-2">
+                        {collegeLocationOptions.map((location) => (
+                          <FilterOptionButton
+                            key={location}
+                            active={collegeFilters.locations.includes(location)}
+                            label={location}
+                            onClick={() =>
+                              setCollegeFilters((current) => ({
+                                ...current,
+                                locations: toggleStringFilter(current.locations, location),
+                              }))
+                            }
+                          />
+                        ))}
+                      </div>
+                    </FilterSidebarSection>
+                  ) : null}
+                </>
+              )}
             </div>
-          ) : null}
-        </section>
+          </aside>
+
+          <section className={`overflow-hidden rounded-2xl ${surfaceClass}`}>
+            <div className="flex items-center justify-between border-b border-slate-800 bg-slate-900 px-4 py-3 text-xs uppercase tracking-[0.2em] text-slate-300 sm:px-6">
+              <span>{lane === "students" ? "Student Results" : "College Results"}</span>
+              <span>{formatCompactNumber(totalCount)}</span>
+            </div>
+
+            {isLoading ? (
+              <div className="px-4 py-10 text-sm text-slate-300 sm:px-6">Loading marketplace results...</div>
+            ) : null}
+
+            {isError ? (
+              <div className="px-4 py-5 text-sm text-rose-200 sm:px-6">
+                Unable to load recruiter marketplace items right now.
+              </div>
+            ) : null}
+
+            {!isLoading && !isError && totalCount === 0 ? (
+              <div className="px-4 py-10 sm:px-6">
+                <div className="rounded-2xl border border-dashed border-slate-800 bg-slate-950 px-5 py-6">
+                  <div className="text-sm font-medium text-white">
+                    {lane === "students" ? "No talent found" : "No colleges found"}
+                  </div>
+                  <p className="mt-2 text-sm leading-6 text-slate-300">
+                    {lane === "students"
+                      ? "Try another student, domain, or institution search. You can also reset the current filters and review the full talent pool again."
+                      : "Try another college or location search, or switch back to the student directory."}
+                  </p>
+                  <div className="mt-4 flex flex-wrap gap-3">
+                    <button
+                      type="button"
+                      onClick={() => setSearchParams(buildSearchParams({ lane }))}
+                      className="rounded-full border border-slate-700 bg-slate-900 px-4 py-2 text-sm font-medium text-slate-100 transition hover:border-cyan-400/50 hover:bg-slate-800 hover:text-white"
+                    >
+                      Reset search
+                    </button>
+                    {activeFilterCount > 0 ? (
+                      <button
+                        type="button"
+                        onClick={clearFilters}
+                        className="rounded-full border border-slate-700 bg-slate-900 px-4 py-2 text-sm font-medium text-slate-100 transition hover:border-cyan-400/50 hover:bg-slate-800 hover:text-white"
+                      >
+                        Reset filters
+                      </button>
+                    ) : null}
+                    <button
+                      type="button"
+                      onClick={() => handleLaneChange(lane === "students" ? "colleges" : "students")}
+                      className="rounded-full border border-cyan-400/30 bg-cyan-400/10 px-4 py-2 text-sm font-medium text-cyan-100 transition hover:border-cyan-300/50 hover:bg-cyan-400/15"
+                    >
+                      Switch directory
+                    </button>
+                  </div>
+                </div>
+              </div>
+            ) : null}
+
+            {!isLoading && !isError && totalCount > 0 ? (
+              <div className="divide-y divide-slate-800">
+                {lane === "students"
+                  ? filteredStudents.map((student) => (
+                      <RecruiterStudentCard
+                        key={student._id}
+                        student={student}
+                        activeJobCount={activeJobs.length}
+                        invitingStudentId={inviteMutation.isPending ? inviteStudentId : null}
+                        shortlistingId={shortlistingId}
+                        onInvite={openInviteModal}
+                        onMessage={(studentId) => navigate(`/dashboard/messages/${studentId}`)}
+                        onShortlist={handleShortlist}
+                        onViewProfile={(studentId) => navigate(getStudentPortfolioViewPath(studentId))}
+                      />
+                    ))
+                  : filteredColleges.map((college) => (
+                      <RecruiterCollegeCardView
+                        key={college._id}
+                        college={college}
+                        planningRequest={latestPlanningRequestByCollege.get(college._id)}
+                        activeEventId={latestHiringEventByCollege.get(college._id)?._id ?? null}
+                        onViewStudents={handleViewCollegeStudents}
+                        onPlanEvent={openPlanEventModal}
+                        onOpenEvent={(eventId) => navigate(`/dashboard/recruiter/hiring-events?eventId=${eventId}`)}
+                        onOpenRequest={(requestId) => navigate(`/dashboard/invitations?requestId=${requestId}`)}
+                      />
+                    ))}
+              </div>
+            ) : null}
+          </section>
+        </div>
       </div>
 
       {inviteStudentId ? (
@@ -1257,9 +1940,13 @@ export function RecruiterMarketplace({ dashboardRole: _dashboardRole }: { dashbo
             setInviteStudentId(null);
             setInviteNote("");
           }}
+          onCreateJob={() => {
+            setInviteStudentId(null);
+            setInviteNote("");
+            openJobModal();
+          }}
           onNoteChange={setInviteNote}
           onInvite={(jobId) => inviteMutation.mutate(jobId)}
-          onGoToRecruiterHome={() => navigate("/dashboard/recruiter")}
         />
       ) : null}
 
@@ -1274,6 +1961,22 @@ export function RecruiterMarketplace({ dashboardRole: _dashboardRole }: { dashbo
             setEventPlanForm(createInitialHiringEventPlan());
           }}
           onSubmit={() => planEventMutation.mutate()}
+        />
+      ) : null}
+
+      {showJobModal ? (
+        <PostJobRoleModal
+          form={jobForm}
+          error={jobFormError}
+          isSubmitting={createJobMutation.isPending}
+          onChange={(patch) => setJobForm((current) => ({ ...current, ...patch }))}
+          onClose={() => {
+            if (createJobMutation.isPending) return;
+            setShowJobModal(false);
+            setJobForm(createInitialJobForm());
+            setJobFormError(null);
+          }}
+          onSubmit={submitJob}
         />
       ) : null}
     </>

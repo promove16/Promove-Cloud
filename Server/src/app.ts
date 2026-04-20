@@ -27,7 +27,6 @@ import schoolRoutes from './modules/school/school.routes';
 import scoreRoutes from './modules/innovationScore/score.routes';
 import mentorRoutes from './modules/mentor/mentor.routes';
 import startupRoutes from './modules/startup/startup.routes';
-import supportRoutes from './modules/support/support.routes';
 import userRoutes from './modules/user/user.routes';
 import workspaceRoutes from './modules/workspace/workspace.routes';
 import adminRoutes from './modules/admin/admin.routes';
@@ -85,7 +84,6 @@ export const createApp = () => {
   app.use('/api/dm', dmRoutes);
   app.use('/api/report', reportRoutes);
   app.use('/api/settings', settingsRoutes);
-  app.use('/api/support', supportRoutes);
   app.get('/api/health', (_req, res) => {
     res.status(200).json({ success: true, data: { status: 'ok' } });
   });

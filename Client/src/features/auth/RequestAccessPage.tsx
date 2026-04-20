@@ -2,6 +2,7 @@ import { ChangeEvent, FormEvent, useEffect, useMemo, useState } from "react";
 import { isAxiosError } from "axios";
 import { Link, useNavigate, useSearchParams } from "react-router-dom";
 import { BusinessLogo } from "../../components/branding/BusinessLogo";
+import { toast } from "../../app/components/ui/sonner";
 import { AuthPasswordField } from "./AuthPasswordField";
 import { useRegisterRequestMutation } from "./useAuth";
 import {
@@ -141,6 +142,14 @@ export function RequestAccessPage() {
   >({});
   const [error, setError] = useState("");
   const [notice, setNotice] = useState("");
+  const showError = (message: string) => {
+    setError(message);
+    toast.error(message);
+  };
+  const showNotice = (message: string) => {
+    setNotice(message);
+    toast.success(message);
+  };
   const invitedRole = normalizeInvitationRole(searchParams.get("inviteRole"));
   const invitedEmail = searchParams.get("inviteeEmail")?.trim() ?? "";
   const inviterName = searchParams.get("inviterName")?.trim() ?? "";
@@ -227,7 +236,7 @@ export function RequestAccessPage() {
     );
 
     if (missingCategories.length > 0) {
-      setError(
+      showError(
         `Upload all required institution documents before submitting. Missing: ${missingCategories
           .map((category) => INSTITUTION_DOCUMENT_LABELS[category])
           .join(", ")}`,
@@ -237,7 +246,7 @@ export function RequestAccessPage() {
 
     const totalStudents = Number(formData.totalStudentsEnrolled);
     if (!Number.isFinite(totalStudents) || totalStudents < 1) {
-      setError("Total students enrolled must be at least 1.");
+      showError("Total students enrolled must be at least 1.");
       return null;
     }
 
@@ -299,12 +308,12 @@ export function RequestAccessPage() {
     setNotice("");
 
     if (formData.password !== formData.confirmPassword) {
-      setError("Passwords do not match");
+      showError("Passwords do not match");
       return;
     }
 
     if (!formData.role || !NON_STUDENT_ROLES.includes(formData.role as UserRole)) {
-      setError("Please select a valid role.");
+      showError("Please select a valid role.");
       return;
     }
 
@@ -326,7 +335,7 @@ export function RequestAccessPage() {
 
       const response = await registerRequestMutation.mutateAsync(payload);
       if ("pendingApproval" in response) {
-        setNotice(
+        showNotice(
           response.message ||
             "Your request has been submitted for admin approval.",
         );
@@ -336,12 +345,13 @@ export function RequestAccessPage() {
         return;
       }
 
+      toast.success("Access request submitted.");
       navigate("/login");
     } catch (err) {
       if (isAxiosError(err) && err.response?.data?.error?.message) {
-        setError(err.response.data.error.message);
+        showError(err.response.data.error.message);
       } else {
-        setError("An error occurred. Please try again.");
+        showError("An error occurred. Please try again.");
       }
     }
   };

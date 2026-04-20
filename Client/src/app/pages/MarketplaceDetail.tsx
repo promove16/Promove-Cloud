@@ -1,6 +1,7 @@
 import { useMemo, useState } from "react";
 import { Link, Navigate, useNavigate, useParams } from "react-router-dom";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+import { isAxiosError } from "axios";
 import {
   ArrowLeft,
   ArrowRight,
@@ -29,6 +30,17 @@ import {
   marketplaceApi,
 } from "../../api/marketplace.api";
 import { requestApi } from "../../api/request.api";
+import { toast } from "../components/ui/sonner";
+import {
+  buildCollegeHiringRequestPayload,
+  CollegeHiringRequestFormState,
+  CollegeHiringRequestModal,
+} from "../../features/marketplace/CollegeHiringRequestModal";
+import {
+  getCollegeHiringRequestCooldownState,
+  getLatestCollegeHiringRequest,
+  isCollegeHiringRequest,
+} from "../../features/marketplace/collegeHiringRequestCooldown";
 import {
   getStartupInviteActionLabel,
   isStartupInviteTargetType,
@@ -479,7 +491,8 @@ export function ProfileDetailView({
 }) {
   const navigate = useNavigate();
   const queryClient = useQueryClient();
-  const currentUserId = useAuthStore((state) => state.user?._id);
+  const authUser = useAuthStore((state) => state.user);
+  const currentUserId = authUser?._id;
   const links = linkList(entity);
   const isInstitution = isInstitutionEntityType(entity.entityType);
   const institutionProfile = entity.institutionProfile;
@@ -492,44 +505,73 @@ export function ProfileDetailView({
   const [inviteTarget, setInviteTarget] = useState<StartupInviteTarget | null>(
     null,
   );
-  const [inviteFeedback, setInviteFeedback] = useState<string | null>(null);
+  const [hiringRequestTarget, setHiringRequestTarget] =
+    useState<MarketplaceUserDetail | null>(null);
+  const [inviteFeedback, setInviteFeedback] = useState<{
+    tone: "success" | "error";
+    message: string;
+  } | null>(null);
   const inviteEntityType = isStartupInviteTargetType(entity.entityType)
     ? entity.entityType
     : null;
+  const outgoingRequestsQuery = useQuery({
+    queryKey: ["requests", "outgoing", "college-hiring"],
+    queryFn: requestApi.outgoing,
+    enabled:
+      dashboardRole === UserRole.COLLEGE &&
+      entity.entityType === "recruiter" &&
+      entity._id !== currentUserId,
+  });
+  const latestCollegeHiringRequest = useMemo(
+    () =>
+      getLatestCollegeHiringRequest(
+        (outgoingRequestsQuery.data ?? []).filter(isCollegeHiringRequest),
+        entity._id,
+      ),
+    [entity._id, outgoingRequestsQuery.data],
+  );
+  const hiringRequestState = getCollegeHiringRequestCooldownState(
+    latestCollegeHiringRequest,
+  );
 
   const requestHiringEventMutation = useMutation({
-    mutationFn: () =>
-      requestApi.create({
-        requestType: "college_event_invite",
-        actionType: "approve",
-        toUserId: entity._id,
-        targetEntityType: "recruiter",
-        targetEntityId: entity._id,
-        targetEntityTitle: entity.displayName,
-        targetRole: "recruiter",
-        requestedRole: "hiring_event_partner",
-        requestedPermission: "college_hiring_event_request",
-        message: `We would like to coordinate a hiring event with ${entity.displayName}. Please review this request and connect on the event format, roles, and timeline.`,
-        metadata: {
-          recruiterId: entity._id,
-          recruiterName: entity.displayName,
+    mutationFn: async ({
+      form,
+      target,
+    }: {
+      form: CollegeHiringRequestFormState;
+      target: MarketplaceUserDetail;
+    }) =>
+      requestApi.create(
+        buildCollegeHiringRequestPayload({
+          collegeUser: authUser,
+          form,
           requestOrigin: "college_marketplace_detail",
-          eventRequestKind: "hiring_event",
-        },
-        deepLink: "/dashboard/invitations",
-        acceptRedirect: "/dashboard/messages",
-        declineRedirect: "/dashboard/invitations",
-      }),
-    onSuccess: async () => {
-      setInviteFeedback(`Hiring event request sent to ${entity.displayName}.`);
+          target,
+        }),
+      ),
+    onSuccess: async (_request, { target }) => {
+      const message = `Hiring request sent to ${target.displayName}.`;
+      setInviteFeedback({
+        tone: "success",
+        message,
+      });
+      toast.success(message);
+      setHiringRequestTarget(null);
       await queryClient.invalidateQueries({ queryKey: ["requests", "outgoing"] });
     },
     onError: (error) => {
-      setInviteFeedback(
-        error instanceof Error
+      const message = isAxiosError<{ error?: { message?: string } }>(error)
+        ? error.response?.data?.error?.message ??
+          "Unable to send the hiring event request right now."
+        : error instanceof Error
           ? error.message
-          : "Unable to send the hiring event request right now.",
-      );
+          : "Unable to send the hiring event request right now.";
+      setInviteFeedback({
+        tone: "error",
+        message,
+      });
+      toast.error(message);
     },
   });
 
@@ -626,11 +668,24 @@ export function ProfileDetailView({
             ) : null}
             {canRequestHiringEvent ? (
               <button
-                onClick={() => void requestHiringEventMutation.mutateAsync()}
-                className="inline-flex items-center gap-2 rounded-full border border-white/10 bg-white/5 px-4 py-2 text-sm font-medium text-white transition hover:border-white/20 hover:bg-white/10"
+                onClick={() => {
+                  if (hiringRequestState.isCoolingDown) {
+                    return;
+                  }
+
+                  setInviteFeedback(null);
+                  setHiringRequestTarget(entity);
+                }}
+                disabled={hiringRequestState.isCoolingDown}
+                title={hiringRequestState.helperText ?? undefined}
+                className={`inline-flex items-center gap-2 rounded-full border px-4 py-2 text-sm font-medium transition ${
+                  hiringRequestState.isCoolingDown
+                    ? "cursor-not-allowed border-white/5 bg-white/[0.03] text-slate-500"
+                    : "border-white/10 bg-white/5 text-white hover:border-white/20 hover:bg-white/10"
+                }`}
               >
                 <CalendarDays className="h-4 w-4" />
-                Request Hiring Event
+                {hiringRequestState.buttonLabel}
               </button>
             ) : null}
             {links.map((link) => {
@@ -650,11 +705,22 @@ export function ProfileDetailView({
             })}
           </div>
         </div>
+        {canRequestHiringEvent && hiringRequestState.isCoolingDown ? (
+          <div className="relative mt-4 text-sm text-slate-400">
+            {hiringRequestState.helperText}
+          </div>
+        ) : null}
       </section>
 
       {inviteFeedback ? (
-        <div className="rounded-[24px] border border-cyan-500/30 bg-cyan-500/10 px-4 py-3 text-sm text-cyan-100">
-          {inviteFeedback}
+        <div
+          className={`rounded-[24px] px-4 py-3 text-sm ${
+            inviteFeedback.tone === "success"
+              ? "border border-cyan-500/30 bg-cyan-500/10 text-cyan-100"
+              : "border border-rose-500/30 bg-rose-500/10 text-rose-100"
+          }`}
+        >
+          {inviteFeedback.message}
         </div>
       ) : null}
 
@@ -1031,8 +1097,31 @@ export function ProfileDetailView({
         isOpen={Boolean(inviteTarget)}
         onClose={() => setInviteTarget(null)}
         target={inviteTarget}
-        onSent={setInviteFeedback}
+        onSent={(message) =>
+          setInviteFeedback({
+            tone: "success",
+            message,
+          })
+        }
       />
+
+      {hiringRequestTarget ? (
+        <CollegeHiringRequestModal
+          collegeUser={authUser}
+          isSubmitting={requestHiringEventMutation.isPending}
+          onClose={() => {
+            if (requestHiringEventMutation.isPending) return;
+            setHiringRequestTarget(null);
+          }}
+          onSubmit={(form) =>
+            requestHiringEventMutation.mutate({
+              form,
+              target: hiringRequestTarget,
+            })
+          }
+          target={hiringRequestTarget}
+        />
+      ) : null}
     </div>
   );
 }

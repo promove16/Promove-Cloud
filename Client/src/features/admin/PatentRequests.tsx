@@ -17,6 +17,7 @@ import {
   X,
 } from 'lucide-react';
 import { adminApi, AdminPatentRequestDetail, AdminPatentRequestListItem } from '../../api/admin.api';
+import { toast } from '../../app/components/ui/sonner';
 import { Button } from '../../components/ui/Button';
 import { Card } from '../../components/ui/Card';
 import { OptionTabs } from '../../components/ui/OptionTabs';
@@ -208,6 +209,62 @@ function CaseDetailModal({
     queryFn: () => adminApi.getPatentUnreadCount(item._id),
   });
 
+  const savedIpoApplicationNumber = detail?.ipoApplicationNumber?.trim() || item.ipoApplicationNumber?.trim() || '';
+  const savedIpoFilingDate = detail?.ipoFilingDate || item.ipoFilingDate || '';
+
+  const getIpoDetailsValidationMessage = () => {
+    if (!ipoAppNumber.trim() && !ipoFilingDate) {
+      return 'Write the patent number and select the filing date before saving IPO details.';
+    }
+    if (!ipoAppNumber.trim()) {
+      return 'Write the patent number before saving IPO details.';
+    }
+    if (!ipoFilingDate) {
+      return 'Select the filing date before saving IPO details.';
+    }
+
+    const filingDate = new Date(ipoFilingDate);
+    if (Number.isNaN(filingDate.getTime())) {
+      return 'Select a valid filing date before saving IPO details.';
+    }
+
+    return '';
+  };
+
+  const handleSaveIpoDetails = () => {
+    const validationMessage = getIpoDetailsValidationMessage();
+    if (validationMessage) {
+      setActionError(validationMessage);
+      toast.error(validationMessage);
+      return;
+    }
+
+    setActionError('');
+    ipoMutation.mutate();
+  };
+
+  const handleStatusTransition = (status: string) => {
+    if (status === 'granted' && (!savedIpoApplicationNumber || !savedIpoFilingDate)) {
+      const validationMessage =
+        'Write and save the patent number and filing date before marking this patent case as granted.';
+      setActionError(validationMessage);
+      setActiveTab('actions');
+      toast.error(validationMessage);
+      return;
+    }
+
+    if (
+      status === 'abandoned' || status === 'rejected'
+        ? !window.confirm(`Mark as ${STATUS_LABELS[status]}? This is a terminal action.`)
+        : false
+    ) {
+      return;
+    }
+
+    setActionError('');
+    statusMutation.mutate(status);
+  };
+
   const sendMessageMutation = useMutation({
     mutationFn: () => adminApi.sendPatentMessage(item._id, conversationMessage),
     onSuccess: async () => {
@@ -252,7 +309,7 @@ function CaseDetailModal({
   const ipoMutation = useMutation({
     mutationFn: () =>
       adminApi.updatePatentRequestIpoDetails(item._id, {
-        applicationNumber: ipoAppNumber,
+        applicationNumber: ipoAppNumber.trim(),
         filingDate: new Date(ipoFilingDate).toISOString(),
       }),
     onSuccess: async () => {
@@ -810,15 +867,7 @@ function CaseDetailModal({
                         <Button
                           key={status}
                           variant={status === 'abandoned' || status === 'rejected' ? 'secondary' : 'primary'}
-                          onClick={() => {
-                            if (
-                              status === 'abandoned' || status === 'rejected'
-                                ? window.confirm(`Mark as ${STATUS_LABELS[status]}? This is a terminal action.`)
-                                : true
-                            ) {
-                              statusMutation.mutate(status);
-                            }
-                          }}
+                          onClick={() => handleStatusTransition(status)}
                           disabled={statusMutation.isPending}
                         >
                           <ChevronRight className="mr-1 h-3.5 w-3.5" />
@@ -857,8 +906,8 @@ function CaseDetailModal({
                   <Button
                     variant="secondary"
                     className="mt-3"
-                    onClick={() => ipoMutation.mutate()}
-                    disabled={!ipoAppNumber.trim() || !ipoFilingDate || ipoMutation.isPending}
+                    onClick={handleSaveIpoDetails}
+                    disabled={ipoMutation.isPending}
                   >
                     {ipoMutation.isPending ? (
                       <Loader2 className="mr-2 h-4 w-4 animate-spin" />

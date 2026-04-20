@@ -160,7 +160,7 @@ const getTabFromSearchParams = (
     return 'hiring';
   }
 
-  return 'internal';
+  return mode === 'college' ? 'hiring' : 'internal';
 };
 
 const formatDateTime = (value: string) =>
@@ -417,13 +417,6 @@ export default function EventManager({
             ) : null}
 
             <div className="inline-flex w-fit rounded-full border border-slate-800 bg-[#0a1524] p-1">
-              <button
-                type="button"
-                onClick={() => selectTab('internal')}
-                className={getTabButtonClassName(activeTab === 'internal')}
-              >
-                Internal Events
-              </button>
               {mode === 'college' ? (
                 <button
                   type="button"
@@ -433,6 +426,13 @@ export default function EventManager({
                   Hiring Events
                 </button>
               ) : null}
+              <button
+                type="button"
+                onClick={() => selectTab('internal')}
+                className={getTabButtonClassName(activeTab === 'internal')}
+              >
+                Internal Events
+              </button>
               <button
                 type="button"
                 onClick={() => selectTab('mentorship')}
@@ -899,22 +899,26 @@ export default function EventManager({
                           {event.rankings.map((ranking) => (
                             <div
                               key={`${event._id}-${ranking.studentId}`}
-                              className="grid gap-3 py-4 md:grid-cols-[72px,minmax(0,1fr),120px,120px,120px]"
+                              className="grid gap-3 py-4 lg:grid-cols-[72px,minmax(0,1fr)] lg:items-start"
                             >
                               <div className="text-lg font-semibold text-cyan-300">
                                 #{ranking.rank}
                               </div>
-                              <div className="font-semibold text-white">
-                                {ranking.studentName}
-                              </div>
-                              <div className="text-sm text-slate-200">
-                                Composite {ranking.compositeScore}
-                              </div>
-                              <div className="text-sm text-slate-400">
-                                Innovation {ranking.innovationScore}
-                              </div>
-                              <div className="text-sm text-slate-400">
-                                Submission {ranking.submissionScore}
+                              <div className="min-w-0">
+                                <div className="font-semibold text-white">
+                                  {ranking.studentName}
+                                </div>
+                                <div className="mt-2 grid gap-2 text-sm sm:grid-cols-2 xl:grid-cols-3">
+                                  <div className="text-slate-200">
+                                    Composite {ranking.compositeScore}
+                                  </div>
+                                  <div className="text-slate-400">
+                                    Innovation {ranking.innovationScore}
+                                  </div>
+                                  <div className="text-slate-400">
+                                    Submission {ranking.submissionScore}
+                                  </div>
+                                </div>
                               </div>
                             </div>
                           ))}

@@ -91,7 +91,7 @@ export default function MentorDashboard() {
         <Card className="p-6">
           <div className="mb-4">
             <div className="text-xs uppercase tracking-[0.3em] text-cyan-300">Project Assignments</div>
-            <h2 className="mt-2 text-2xl font-semibold text-white">Projects assigned by admin</h2>
+            <h2 className="mt-2 text-2xl font-semibold text-white">Projects where teams invited you</h2>
           </div>
 
           {(dashboardQuery.data?.projectAssignments ?? []).length === 0 ? (

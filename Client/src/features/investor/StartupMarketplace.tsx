@@ -8,6 +8,7 @@ import { Button } from '../../components/ui/Button';
 import { Card } from '../../components/ui/Card';
 import { Input } from '../../components/ui/Input';
 import { Spinner } from '../../components/ui/Spinner';
+import { Slider } from '../../app/components/ui/slider';
 import { investorApi } from '../../api/investor.api';
 import { MAX_INNOVATION_SCORE } from '../../constants/score';
 import { StartupDetailDrawer } from './StartupDetailDrawer';
@@ -135,6 +136,7 @@ export default function StartupMarketplace() {
       }),
     [savedStartupIds, search, showSavedOnly, startupsQuery.data?.items],
   );
+  const scoreRangeValue = useMemo(() => [scoreRange.min, scoreRange.max], [scoreRange.max, scoreRange.min]);
 
   const savedCount = savedStartupIds.size;
 
@@ -252,28 +254,21 @@ export default function StartupMarketplace() {
               {scoreRange.min} - {scoreRange.max}
             </span>
           </div>
-          <div className="space-y-3">
-            <Input
-              aria-label="Minimum innovation score"
-              type="range"
+          <div className="rounded-2xl border border-slate-800 bg-slate-950 px-4 py-4">
+            <Slider
+              aria-label="Innovation score range"
               min={scoreRangeMin}
               max={scoreRangeMax}
-              value={scoreRange.min}
-              onChange={(event) => {
-                const nextValue = Number(event.target.value);
-                setScoreRange((current) => ({ ...current, min: Math.min(nextValue, current.max) }));
+              step={1}
+              value={scoreRangeValue}
+              onValueChange={(nextRange: number[]) => {
+                const [nextMin = scoreRangeMin, nextMax = scoreRangeMax] = nextRange;
+                setScoreRange({
+                  min: Math.min(nextMin, nextMax),
+                  max: Math.max(nextMin, nextMax),
+                });
               }}
-            />
-            <Input
-              aria-label="Maximum innovation score"
-              type="range"
-              min={scoreRangeMin}
-              max={scoreRangeMax}
-              value={scoreRange.max}
-              onChange={(event) => {
-                const nextValue = Number(event.target.value);
-                setScoreRange((current) => ({ ...current, max: Math.max(nextValue, current.min) }));
-              }}
+              className="[&_[data-slot=slider-range]]:bg-gradient-to-r [&_[data-slot=slider-range]]:from-cyan-400 [&_[data-slot=slider-range]]:to-emerald-400 [&_[data-slot=slider-thumb]]:border-cyan-300 [&_[data-slot=slider-thumb]]:bg-white [&_[data-slot=slider-track]]:bg-slate-800"
             />
           </div>
         </div>

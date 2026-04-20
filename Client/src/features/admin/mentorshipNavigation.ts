@@ -21,10 +21,4 @@ export const ADMIN_MENTORSHIP_SECTION_LINKS: ReadonlyArray<AdminSectionLink> = [
     description: 'Create mentorship programs on behalf of schools or colleges with a selected mentor.',
     path: `${ADMIN_MENTORSHIP_BASE_PATH}/programs`,
   },
-  {
-    label: 'Project Assignments',
-    shortLabel: 'Projects',
-    description: 'Assign or reassign mentors directly to live project workspaces that need guidance.',
-    path: `${ADMIN_MENTORSHIP_BASE_PATH}/projects`,
-  },
 ];

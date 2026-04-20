@@ -21,12 +21,10 @@ import {
 } from '../analytics/activity.types';
 import {
   AdminCreateInstitutionMentorshipProgramInput,
-  AdminProjectMentorshipView,
   CreatedMentorProfileResult,
   InstitutionMentorshipProgramListResponse,
   InstitutionMentorshipProgramReviewInput,
   MentorshipAdminMentorItem,
-  ProjectMentorAssignmentInput,
 } from '../mentor/mentor.types';
 
 export interface AdminUserListItem {
@@ -420,5 +418,3 @@ export type AdminCreateMentorshipProgramPayload = AdminCreateInstitutionMentorsh
 export type AdminMentorshipProgramReviewPayload = InstitutionMentorshipProgramReviewInput;
 export type AdminMentorListItem = MentorshipAdminMentorItem;
 export type AdminCreatedMentorProfile = CreatedMentorProfileResult;
-export type AdminProjectMentorshipsResponse = AdminProjectMentorshipView;
-export type AdminProjectMentorAssignmentPayload = ProjectMentorAssignmentInput;

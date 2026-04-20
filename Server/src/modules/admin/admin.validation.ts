@@ -63,14 +63,6 @@ export const analyticsUsersQuerySchema = z.object({
   limit: z.coerce.number().int().positive().max(10).default(8),
 });
 
-export const helpDeskTicketsQuerySchema = z.object({
-  status: z.enum(['pending', 'completed', 'all']).default('pending'),
-});
-
-export const resolveHelpDeskTicketSchema = z.object({
-  resolutionNotes: z.string().trim().min(10).max(1500),
-});
-
 export const dealReviewSchema = z
   .object({
     stockTransferStatus: z.enum(['pending_review', 'under_review', 'rejected']).optional(),

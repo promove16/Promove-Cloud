@@ -4,6 +4,7 @@ import { useSearchParams } from 'react-router-dom';
 import { BadgeCheck, Github, Sparkles, X } from 'lucide-react';
 import { userApi } from '../../api/user.api';
 import { Button } from '../ui/Button';
+import { toast } from '../../app/components/ui/sonner';
 import { useAuthStore } from '../../store/authStore';
 
 const getDismissKey = (userId: string) => `promove-student-proof-dismissed:${userId}`;
@@ -13,7 +14,6 @@ export function StudentGithubProofPrompt() {
   const setUser = useAuthStore((state) => state.setUser);
   const queryClient = useQueryClient();
   const [searchParams, setSearchParams] = useSearchParams();
-  const [toast, setToast] = useState('');
   const [dismissed, setDismissed] = useState(false);
 
   useEffect(() => {
@@ -24,12 +24,6 @@ export function StudentGithubProofPrompt() {
 
     setDismissed(localStorage.getItem(getDismissKey(authUser._id)) === 'true');
   }, [authUser?._id]);
-
-  useEffect(() => {
-    if (!toast) return;
-    const timeout = window.setTimeout(() => setToast(''), 3000);
-    return () => window.clearTimeout(timeout);
-  }, [toast]);
 
   const refreshUserMutation = useMutation({
     mutationFn: userApi.getMe,
@@ -45,10 +39,10 @@ export function StudentGithubProofPrompt() {
     if (!githubStatus) return;
 
     if (githubStatus === 'connected') {
-      setToast('GitHub connected. Your profile can now use your repos, skills, and activity.');
+      toast.success('GitHub connected. Your profile can now use your repos, skills, and activity.');
       void refreshUserMutation.mutateAsync();
     } else if (githubStatus === 'error') {
-      setToast(searchParams.get('message') ?? 'GitHub connection failed.');
+      toast.error(searchParams.get('message') ?? 'GitHub connection failed.');
     }
 
     const next = new URLSearchParams(searchParams);
@@ -63,7 +57,7 @@ export function StudentGithubProofPrompt() {
       window.location.assign(authorizationUrl);
     },
     onError: (error) => {
-      setToast(
+      toast.error(
         (error as { response?: { data?: { error?: { message?: string } } } })?.response?.data?.error?.message ??
           'Unable to start GitHub sign-in right now.',
       );
@@ -81,20 +75,11 @@ export function StudentGithubProofPrompt() {
   }, [authUser, dismissed, searchParams]);
 
   if (!shouldShow || !authUser?._id) {
-    return toast ? (
-      <div className="rounded-2xl border border-cyan-500/20 bg-cyan-950/20 px-4 py-3 text-sm text-cyan-200">
-        {toast}
-      </div>
-    ) : null;
+    return null;
   }
 
   return (
     <div className="rounded-3xl border border-cyan-800/40 bg-gradient-to-br from-slate-900 via-cyan-950/20 to-slate-900 p-6">
-      {toast ? (
-        <div className="mb-4 rounded-2xl border border-cyan-500/20 bg-cyan-950/20 px-4 py-3 text-sm text-cyan-200">
-          {toast}
-        </div>
-      ) : null}
       <div className="flex items-start justify-between gap-4">
         <div>
           <div className="flex items-center gap-2 text-sm font-semibold uppercase tracking-[0.2em] text-cyan-300">

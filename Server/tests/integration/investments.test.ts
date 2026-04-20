@@ -966,6 +966,82 @@ describe('investment workflow integration', () => {
     );
   });
 
+  it('does not expose a startup workspace to investors until the founder explicitly links it to the deal', async () => {
+    const founder = await createUser(UserRole.STUDENT, { displayName: 'Implicit Workspace Founder' });
+    const investor = await createUser(UserRole.INVESTOR, { displayName: 'Implicit Workspace Investor' });
+    const admin = await createUser(UserRole.ADMIN, {
+      displayName: 'Implicit Workspace Admin',
+      accessGrantedBy: 'admin',
+      adminApprovalStatus: 'approved',
+      adminApprovedAt: new Date(),
+    });
+    const startupWorkspace = await Workspace.create({
+      ownerId: founder._id,
+      teamMemberIds: [founder._id],
+      title: 'Startup Execution Workspace',
+      category: 'Software',
+      stage: 'Build',
+      isActive: true,
+    });
+    const startup = await createStartup(founder._id.toString(), {
+      projectId: startupWorkspace._id,
+    });
+
+    const expressResponse = await request(app)
+      .post(`/api/investor/express-interest/${startup._id}`)
+      .set(authHeader(investor))
+      .send({
+        investorType: 'penny',
+        proposedAmountINR: 25000,
+        proposedEquityPercent: 2,
+        chosenRole: 'shareholder',
+      });
+
+    expect(expressResponse.status).toBe(201);
+    const dealId = expressResponse.body.data._id;
+
+    await approveDealThroughAdmin({
+      founder,
+      investor,
+      admin,
+      dealId,
+      amountINR: 25000,
+      equityPercent: 2,
+      investorRole: 'shareholder',
+    });
+
+    const closeResponse = await request(app)
+      .patch(`/api/investor/deals/${dealId}/stage`)
+      .set(authHeader(investor))
+      .send({ newStage: 4 });
+
+    expect(closeResponse.status).toBe(200);
+
+    const detailResponse = await request(app)
+      .get(`/api/investor/deals/${dealId}`)
+      .set(authHeader(investor));
+
+    expect(detailResponse.status).toBe(200);
+    expect(detailResponse.body.data.productWorkshop).toBeUndefined();
+
+    const portfolioResponse = await request(app)
+      .get('/api/investor/portfolio')
+      .set(authHeader(investor));
+
+    expect(portfolioResponse.status).toBe(200);
+    const portfolioItem = portfolioResponse.body.data.items.find(
+      (item: { dealId: string; productWorkshop?: unknown }) => item.dealId === dealId,
+    );
+    expect(portfolioItem).toBeDefined();
+    expect(portfolioItem.productWorkshop).toBeUndefined();
+
+    const workspaceResponse = await request(app)
+      .get(`/api/workspace/${startupWorkspace._id}`)
+      .set(authHeader(investor));
+
+    expect(workspaceResponse.status).toBe(404);
+  });
+
   it('returns a signed pitch deck URL in investor startup detail when cloudinary storage metadata exists', async () => {
     const founder = await createUser(UserRole.STUDENT, { displayName: 'Pitch Founder' });
     const investor = await createUser(UserRole.INVESTOR, { displayName: 'Pitch Investor' });

@@ -2,6 +2,7 @@ import { FormEvent, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { KeyRound } from 'lucide-react';
 import api from '../../api/axiosInstance';
+import { toast } from '../../app/components/ui/sonner';
 import { useAuthStore } from '../../store/authStore';
 import { Button } from '../../components/ui/Button';
 import { Card } from '../../components/ui/Card';
@@ -15,18 +16,22 @@ export function ChangePasswordPage() {
   const [form, setForm] = useState({ currentPassword: '', newPassword: '', confirm: '' });
   const [error, setError] = useState('');
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const showError = (message: string) => {
+    setError(message);
+    toast.error(message);
+  };
 
   const handleSubmit = async (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault();
     setError('');
 
     if (form.newPassword !== form.confirm) {
-      setError('New passwords do not match.');
+      showError('New passwords do not match.');
       return;
     }
 
     if (form.newPassword.length < 8) {
-      setError('New password must be at least 8 characters.');
+      showError('New password must be at least 8 characters.');
       return;
     }
 
@@ -42,11 +47,12 @@ export function ChangePasswordPage() {
         setUser({ ...user, mustChangePasswordOnNextLogin: false });
       }
 
+      toast.success('Password changed successfully.');
       navigate(user ? roleRedirect(user.role) : '/login', { replace: true });
     } catch (err) {
       const apiError = (err as { response?: { data?: { error?: { message?: string } } } })
         ?.response?.data?.error;
-      setError(apiError?.message ?? 'Failed to change password. Please try again.');
+      showError(apiError?.message ?? 'Failed to change password. Please try again.');
     } finally {
       setIsSubmitting(false);
     }

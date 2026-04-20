@@ -117,7 +117,15 @@ const mapProgram = (
     createdAt: Date;
     updatedAt: Date;
   },
-  institution: { _id: Types.ObjectId; displayName: string; institutionProfile?: { institutionName: string } },
+  institution: {
+    _id: Types.ObjectId;
+    displayName: string;
+    institutionProfile?: {
+      institutionName?: string;
+      location?: string;
+      locations?: string[];
+    };
+  },
   requester: { _id: Types.ObjectId; displayName: string; email: string },
   mentor?: { _id: Types.ObjectId; displayName: string; email: string; avatar?: string; domain?: string; bio?: string },
 ): InstitutionMentorshipProgramItem => ({
@@ -126,6 +134,10 @@ const mapProgram = (
     _id: String(institution._id),
     displayName: institution.institutionProfile?.institutionName ?? institution.displayName,
     type: program.institutionType,
+    ...(institution.institutionProfile?.location ? { location: institution.institutionProfile.location } : {}),
+    ...(institution.institutionProfile?.locations?.length
+      ? { locations: institution.institutionProfile.locations }
+      : {}),
   },
   requestedBy: {
     _id: String(requester._id),

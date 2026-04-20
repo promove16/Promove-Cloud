@@ -3,6 +3,7 @@ import { randomUUID } from 'crypto';
 import request from 'supertest';
 import app from '../../src/app';
 import { InstitutionMentorshipProgram } from '../../src/modules/mentor/mentorshipProgram.model';
+import { RequestRecord } from '../../src/modules/request/request.model';
 import { Startup } from '../../src/modules/startup/startup.model';
 import { User } from '../../src/modules/user/user.model';
 import { Workspace } from '../../src/modules/workspace/workspace.model';
@@ -49,11 +50,7 @@ const loginAs = async (email: string) => {
 };
 
 describe('admin mentorship integration', () => {
-  it('keeps mentor project assignment admin-managed and exposes assigned projects to mentors', async () => {
-    const { email: adminEmail } = await createApprovedUser({
-      role: UserRole.ADMIN,
-      displayName: 'Mentorship Admin',
-    });
+  it('lets student workspace owners invite project mentors directly and exposes assigned projects to mentors', async () => {
     const { user: mentorUser, email: mentorEmail } = await createApprovedUser({
       role: UserRole.MENTOR,
       displayName: 'Assigned Mentor',
@@ -87,7 +84,6 @@ describe('admin mentorship integration', () => {
 
     const studentAccessToken = await loginAs(studentEmail);
     const mentorAccessToken = await loginAs(mentorEmail);
-    const adminAccessToken = await loginAs(adminEmail);
 
     const studentAssignAttempt = await request(app)
       .post(`/api/workspace/${workspace._id.toString()}/chat-participants`)
@@ -97,38 +93,24 @@ describe('admin mentorship integration', () => {
         role: 'mentor',
       });
 
-    expect(studentAssignAttempt.status).toBe(403);
-    expect(studentAssignAttempt.body.error.code).toBe('MENTOR_ASSIGNMENT_ADMIN_ONLY');
+    expect(studentAssignAttempt.status).toBe(201);
 
-    const adminQueueResponse = await request(app)
-      .get('/api/admin/project-mentorships')
-      .set('Authorization', `Bearer ${adminAccessToken}`);
+    const mentorRequest = await RequestRecord.findOne({
+      type: 'workspace_chat_access',
+      targetEntityType: 'workspace',
+      targetEntityId: workspace._id.toString(),
+      toUserId: mentorUser._id,
+      requestedRole: 'mentor',
+      status: 'pending',
+    }).lean();
 
-    expect(adminQueueResponse.status).toBe(200);
-    expect(adminQueueResponse.body.data.items).toEqual(
-      expect.arrayContaining([
-        expect.objectContaining({
-          workspaceId: workspace._id.toString(),
-          title: 'Smart Mobility Workspace',
-        }),
-      ]),
-    );
+    expect(mentorRequest?._id).toBeDefined();
 
-    const adminAssignResponse = await request(app)
-      .patch(`/api/admin/project-mentorships/${workspace._id.toString()}`)
-      .set('Authorization', `Bearer ${adminAccessToken}`)
-      .send({
-        decision: 'assigned',
-        mentorId: mentorUser._id.toString(),
-      });
+    const mentorAcceptResponse = await request(app)
+      .post(`/api/requests/${mentorRequest!._id.toString()}/accept`)
+      .set('Authorization', `Bearer ${mentorAccessToken}`);
 
-    expect(adminAssignResponse.status).toBe(200);
-    expect(adminAssignResponse.body.data.mentor).toEqual(
-      expect.objectContaining({
-        _id: mentorUser._id.toString(),
-        displayName: 'Assigned Mentor',
-      }),
-    );
+    expect(mentorAcceptResponse.status).toBe(200);
 
     const updatedWorkspace = await Workspace.findById(workspace._id).lean();
     expect(updatedWorkspace?.chatParticipants).toEqual(
@@ -164,18 +146,23 @@ describe('admin mentorship integration', () => {
     expect(mentorDashboardResponse.body.data.activeStudentCount).toBe(1);
   });
 
-  it('lists project mentorship candidates even when legacy workspaces are missing mentorship arrays', async () => {
+  it('removes admin project mentorship access endpoints', async () => {
     const { email: adminEmail } = await createApprovedUser({
       role: UserRole.ADMIN,
-      displayName: 'Legacy Admin',
+      displayName: 'Mentorship Admin',
     });
     const { user: studentUser } = await createApprovedUser({
       role: UserRole.STUDENT,
-      displayName: 'Legacy Student',
+      displayName: 'Student Builder',
+    });
+    const { user: mentorUser } = await createApprovedUser({
+      role: UserRole.MENTOR,
+      displayName: 'Unavailable Admin Route Mentor',
     });
 
-    const workspace = new Workspace({
+    const workspace = await Workspace.create({
       ownerId: studentUser._id,
+      teamMemberIds: [],
       title: 'Legacy Workspace',
       category: 'DeepTech',
       stage: 'Build',
@@ -183,51 +170,22 @@ describe('admin mentorship integration', () => {
       isActive: true,
     });
 
-    await Workspace.collection.insertOne({
-      _id: workspace._id,
-      ownerId: workspace.ownerId,
-      title: workspace.title,
-      category: workspace.category,
-      stage: workspace.stage,
-      progressPercent: workspace.progressPercent,
-      isActive: true,
-      createdAt: new Date(),
-      updatedAt: new Date(),
-    });
-
-    await Startup.create({
-      founderIds: [studentUser._id],
-      projectId: workspace._id,
-      name: 'Legacy Startup',
-      tagline: 'Built from an older workspace record',
-      category: 'DeepTech',
-      stage: 'MVP',
-      launchedToMentors: true,
-      launchedAt: new Date(),
-      innovationScoreAtLaunch: 96,
-      isActive: true,
-    });
-
     const adminAccessToken = await loginAs(adminEmail);
-    const response = await request(app)
+    const listResponse = await request(app)
       .get('/api/admin/project-mentorships')
       .set('Authorization', `Bearer ${adminAccessToken}`);
 
-    expect(response.status).toBe(200);
-    expect(response.body.data.items).toEqual(
-      expect.arrayContaining([
-        expect.objectContaining({
-          workspaceId: workspace._id.toString(),
-          title: 'Legacy Workspace',
-          students: expect.arrayContaining([
-            expect.objectContaining({
-              _id: studentUser._id.toString(),
-              displayName: 'Legacy Student',
-            }),
-          ]),
-        }),
-      ]),
-    );
+    expect(listResponse.status).toBe(404);
+
+    const patchResponse = await request(app)
+      .patch(`/api/admin/project-mentorships/${workspace._id.toString()}`)
+      .set('Authorization', `Bearer ${adminAccessToken}`)
+      .send({
+        decision: 'assigned',
+        mentorId: mentorUser._id.toString(),
+      });
+
+    expect(patchResponse.status).toBe(404);
   });
 
   it('only allows admin-approved mentors to be assigned to institution mentorship requests', async () => {

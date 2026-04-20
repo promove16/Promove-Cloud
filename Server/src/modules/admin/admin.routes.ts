@@ -14,14 +14,12 @@ import {
   approvePatentController,
   getAnalyticsController,
   getAnalyticsLogsController,
-  getHelpDeskTicketsController,
   getAnalyticsUserDetailController,
   getAnalyticsUsersController,
   getComplianceSubmissionsController,
   getInvestmentTypeAnalyticsController,
   getMentorsController,
   getMentorshipProgramsController,
-  getProjectMentorshipsController,
   getRegistrationRequestsController,
   getStartupCapTableController,
   getStartupReviewsController,
@@ -33,14 +31,12 @@ import {
   rejectRegistrationRequestController,
   rejectAwardController,
   rejectPatentController,
-  resolveHelpDeskTicketController,
   reviewDealController,
   reviewComplianceSubmissionController,
   reviewRegistrationRequestController,
   reviewStartupController,
   unlockLaunchFormController,
   reviewMentorshipProgramController,
-  reviewProjectMentorAssignmentController,
   resetSoleInvestorController,
   updateDealInvestorRoleController,
   updateUserAccessController,
@@ -112,8 +108,6 @@ router.post('/mentors', asyncHandler(createMentorProfileController));
 router.get('/mentorship-programs', asyncHandler(getMentorshipProgramsController));
 router.post('/mentorship-programs', asyncHandler(createAdminMentorshipProgramController));
 router.patch('/mentorship-programs/:id', asyncHandler(reviewMentorshipProgramController));
-router.get('/project-mentorships', asyncHandler(getProjectMentorshipsController));
-router.patch('/project-mentorships/:workspaceId', asyncHandler(reviewProjectMentorAssignmentController));
 router.get('/patents', asyncHandler(getPatentsController));
 router.patch('/patents/:id/approve', asyncHandler(approvePatentController));
 router.patch('/patents/:id/reject', asyncHandler(rejectPatentController));
@@ -153,8 +147,6 @@ router.post('/startups/:id/reset-sole-investor', asyncHandler(resetSoleInvestorC
 router.get('/investments/by-type', asyncHandler(getInvestmentTypeAnalyticsController));
 router.patch('/milestones/:id/verify', asyncHandler(verifyMilestoneController));
 router.get('/analytics', asyncHandler(getAnalyticsController));
-router.get('/help-desk', asyncHandler(getHelpDeskTicketsController));
-router.patch('/help-desk/:id/resolve', asyncHandler(resolveHelpDeskTicketController));
 router.get('/analytics/logs', asyncHandler(getAnalyticsLogsController));
 router.get('/analytics/users', asyncHandler(getAnalyticsUsersController));
 router.get('/analytics/users/:userId', asyncHandler(getAnalyticsUserDetailController));

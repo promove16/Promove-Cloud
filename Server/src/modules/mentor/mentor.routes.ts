@@ -8,13 +8,17 @@ import {
   createMentorFeedbackController,
   createMentorSessionController,
   deleteMentorSessionController,
+  getBidOpportunitiesController,
   getMentorDashboardController,
   getMentorSessionController,
   getMentorStudentProfileController,
   getMentorWorkspaceController,
+  getMyBidsController,
   listMentorSessionsController,
   listMentorStudentsController,
+  submitBidController,
   updateMentorSessionController,
+  withdrawBidController,
 } from './mentor.controller';
 
 const router = Router();
@@ -35,5 +39,9 @@ router.get('/sessions/:id', asyncHandler(getMentorSessionController));
 router.patch('/sessions/:id', asyncHandler(updateMentorSessionController));
 router.delete('/sessions/:id', asyncHandler(deleteMentorSessionController));
 router.post('/feedback/:studentId', connectionGuard(UserRole.STUDENT), asyncHandler(createMentorFeedbackController));
+router.get('/bid-opportunities', asyncHandler(getBidOpportunitiesController));
+router.get('/bids', asyncHandler(getMyBidsController));
+router.post('/bids', asyncHandler(submitBidController));
+router.delete('/bids/:id', asyncHandler(withdrawBidController));
 
 export default router;

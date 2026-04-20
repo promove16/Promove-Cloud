@@ -149,6 +149,7 @@ export default function Dashboard() {
           icon: Lightbulb,
           iconClassName: 'text-fuchsia-200',
           accentClassName: 'bg-fuchsia-400',
+          to: '/dashboard/school/projects',
         },
         {
           label: 'Patents Filed',
@@ -157,6 +158,7 @@ export default function Dashboard() {
           icon: FileCheck2,
           iconClassName: 'text-amber-200',
           accentClassName: 'bg-amber-400',
+          to: '/dashboard/school/patents',
         },
         {
           label: 'Mentoring Hours',
@@ -165,7 +167,7 @@ export default function Dashboard() {
           icon: Award,
           iconClassName: 'text-emerald-200',
           accentClassName: 'bg-emerald-400',
-          to: '/dashboard/school/events?tab=mentorship',
+          to: '/dashboard/school/mentors',
         },
         {
           label: 'Startups Launched',
@@ -174,6 +176,7 @@ export default function Dashboard() {
           icon: Rocket,
           iconClassName: 'text-rose-200',
           accentClassName: 'bg-rose-400',
+          to: '/dashboard/school/startups',
         },
         {
           label: 'Industry Links',
@@ -209,6 +212,7 @@ export default function Dashboard() {
           value: stats?.totalInnovationActivities ?? 0,
           helper: 'Signals influencing institutional innovation readiness',
           icon: Lightbulb,
+          to: '/dashboard/school/projects',
           iconClassName: 'text-cyan-200',
         },
         {
@@ -224,6 +228,7 @@ export default function Dashboard() {
           value: stats?.patentsFiled ?? 0,
           helper: 'Institution patent submissions captured in ProMove',
           icon: FileCheck2,
+          to: '/dashboard/school/patents',
           iconClassName: 'text-amber-200',
         },
         {
@@ -231,7 +236,7 @@ export default function Dashboard() {
           value: stats?.totalMentoringHours ?? 0,
           helper: 'Recorded support from the mentorship workflow',
           icon: Award,
-          to: '/dashboard/school/events?tab=mentorship',
+          to: '/dashboard/school/mentors',
           iconClassName: 'text-emerald-200',
         },
         {

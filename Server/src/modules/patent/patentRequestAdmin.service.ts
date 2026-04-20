@@ -273,6 +273,13 @@ export const updatePatentRequestStatus = async (
     updates.ferResponseDeadline = new Date(now.getTime() + 6 * 30 * 24 * 60 * 60 * 1000);
   }
   if (targetStatus === 'granted') {
+    if (!request.ipoApplicationNumber?.trim() || !request.ipoFilingDate) {
+      throw new ApiError(
+        400,
+        'IPO_DETAILS_REQUIRED_FOR_GRANT',
+        'Add the patent number and filing date before marking this patent request as granted.',
+      );
+    }
     updates.grantDate = now;
   }
 

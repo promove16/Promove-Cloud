@@ -4,6 +4,7 @@ import { Badge } from '../../components/ui/Badge';
 import { Card } from '../../components/ui/Card';
 import { investorApi } from '../../api/investor.api';
 import { Spinner } from '../../components/ui/Spinner';
+import { InvestorWorkspaceLayout } from './InvestorWorkspaceLayout';
 
 const formatRoleLabel = (role: string) => role.charAt(0).toUpperCase() + role.slice(1);
 
@@ -22,11 +23,10 @@ export default function Portfolio() {
   );
 
   return (
-    <div className="space-y-6">
-      <div>
-        <h1 className="text-3xl font-bold text-white">My Portfolio</h1>
-        <p className="mt-2 text-slate-400">Live innovation scores keep the portfolio current after investment.</p>
-      </div>
+    <InvestorWorkspaceLayout
+      title="My Portfolio"
+      description="Live innovation scores keep the portfolio current after investment."
+    >
 
       {portfolioQuery.isLoading ? (
         <div className="flex justify-center py-12">
@@ -129,6 +129,6 @@ export default function Portfolio() {
           </div>
         </>
       )}
-    </div>
+    </InvestorWorkspaceLayout>
   );
 }

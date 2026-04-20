@@ -4,25 +4,21 @@ import { useNavigate } from 'react-router-dom';
 import { 
   Handshake, 
   Clock, 
-  CheckCircle2, 
-  XCircle, 
   MessageSquare,
   TrendingUp,
   DollarSign,
   Users,
-  ArrowRight,
   ChevronRight,
-  Filter,
   Search,
   Building2
 } from 'lucide-react';
 import { dealApi } from '../../api/deal.api';
-import { investorApi } from '../../api/investor.api';
 import { Badge } from '../../components/ui/Badge';
 import { Button } from '../../components/ui/Button';
 import { Card } from '../../components/ui/Card';
 import { Spinner } from '../../components/ui/Spinner';
 import { DealDetail } from './DealDetail';
+import { InvestorWorkspaceLayout } from './InvestorWorkspaceLayout';
 
 const STAGE_LABELS: Record<number, string> = {
   0: 'Negotiation',
@@ -38,6 +34,14 @@ const STAGE_COLORS: Record<number, string> = {
   2: 'border-purple-500/30 bg-purple-500/10 text-purple-300',
   3: 'border-cyan-500/30 bg-cyan-500/10 text-cyan-300',
   4: 'border-emerald-500/30 bg-emerald-500/10 text-emerald-300',
+};
+
+const STAGE_VALUE_COLORS: Record<number, string> = {
+  0: 'text-amber-300',
+  1: 'text-blue-300',
+  2: 'text-purple-300',
+  3: 'text-cyan-300',
+  4: 'text-emerald-300',
 };
 
 const formatInr = (amount: number) =>
@@ -115,29 +119,27 @@ export default function InvestmentPipeline() {
 
   const DealCard = ({ deal }: { deal: any }) => {
     const negStatus = getNegotiationStatus(deal);
-    const isActive = deal.status === 'active';
     const isPendingAcceptance = deal.founderDecision?.status === 'pending';
-    const canAdvance = deal.currentStage === 0 && negStatus?.label === 'Terms Agreed';
 
     return (
       <Card 
-        className="cursor-pointer border border-slate-800 bg-slate-950 p-4 transition-all hover:border-slate-700 hover:bg-slate-900"
+        className="group flex h-full cursor-pointer flex-col border border-slate-800/90 bg-slate-950/90 p-5 transition-all hover:border-slate-700 hover:bg-slate-900"
         onClick={() => handleOpenDeal(deal._id)}
       >
-        <div className="flex items-start justify-between gap-4">
+        <div className="flex h-full items-start justify-between gap-4">
           <div className="min-w-0 flex-1">
-            <div className="flex items-center gap-2">
+            <div className="flex flex-wrap items-center gap-2.5">
               <h3 className="truncate font-semibold text-white">{deal.startupName}</h3>
-              <Badge className={STAGE_COLORS[deal.currentStage]}>
+              <Badge className={`shrink-0 ${STAGE_COLORS[deal.currentStage]}`}>
                 {STAGE_LABELS[deal.currentStage]}
               </Badge>
             </div>
-            <div className="mt-1 flex items-center gap-2 text-sm text-cyan-300">
+            <div className="mt-2 flex items-center gap-2 text-sm text-cyan-300">
               <Building2 className="h-3.5 w-3.5" />
               {deal.startupCategory}
             </div>
             
-            <div className="mt-3 flex flex-wrap gap-3 text-sm">
+            <div className="mt-4 flex flex-wrap gap-x-4 gap-y-2 text-sm">
               <div className="flex items-center gap-1.5 text-slate-400">
                 <Users className="h-3.5 w-3.5" />
                 <span>{deal.studentDisplayName}</span>
@@ -153,7 +155,7 @@ export default function InvestmentPipeline() {
             </div>
 
             {deal.currentStage === 0 && negStatus && (
-              <div className="mt-3 flex items-center gap-2">
+              <div className="mt-4 flex flex-wrap items-center gap-2">
                 <span className={`text-xs font-medium ${negStatus.color}`}>
                   {negStatus.label}
                 </span>
@@ -167,14 +169,14 @@ export default function InvestmentPipeline() {
             )}
 
             {isPendingAcceptance && (
-              <div className="mt-3 flex items-center gap-2 rounded-lg bg-amber-500/10 px-3 py-2">
+              <div className="mt-4 flex items-center gap-2 rounded-xl bg-amber-500/10 px-3 py-2.5">
                 <Clock className="h-4 w-4 text-amber-400" />
                 <span className="text-sm text-amber-300">Awaiting founder response</span>
               </div>
             )}
           </div>
 
-          <ChevronRight className="h-5 w-5 text-slate-600" />
+          <ChevronRight className="mt-0.5 h-5 w-5 shrink-0 text-slate-600 transition group-hover:text-slate-400" />
         </div>
       </Card>
     );
@@ -189,20 +191,12 @@ export default function InvestmentPipeline() {
   }
 
   return (
-    <div className="space-y-6">
-      <div className="flex flex-col gap-4 md:flex-row md:items-center md:justify-between">
-        <div>
-          <div className="flex items-center gap-2 text-xs uppercase tracking-[0.3em] text-cyan-300">
-            <Handshake className="h-4 w-4" />
-            Investment Pipeline
-          </div>
-          <h1 className="mt-2 text-3xl font-bold text-white">Deals & Negotiations</h1>
-          <p className="mt-2 max-w-2xl text-slate-400">
-            Track all your investment deals from initial handshake through closing.
-          </p>
-        </div>
-
-        <div className="flex items-center gap-3">
+    <InvestorWorkspaceLayout
+      title="Deals & Negotiations"
+      description="Track all your investment deals from initial handshake through closing."
+      contentClassName="mx-auto flex w-full max-w-[1440px] flex-col gap-6"
+      headerAction={
+        <div className="flex w-full flex-col gap-3 sm:flex-row lg:w-auto lg:justify-end">
           <div className="relative">
             <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-500" />
             <input
@@ -210,13 +204,13 @@ export default function InvestmentPipeline() {
               placeholder="Search startups..."
               value={searchQuery}
               onChange={(e) => setSearchQuery(e.target.value)}
-              className="rounded-xl border border-slate-800 bg-slate-900 pl-10 pr-4 py-2 text-sm text-white placeholder:text-slate-500 focus:border-cyan-500 focus:outline-none"
+              className="w-full rounded-xl border border-slate-800 bg-slate-900 py-2.5 pl-10 pr-4 text-sm text-white placeholder:text-slate-500 focus:border-cyan-500 focus:outline-none sm:min-w-[18rem] xl:min-w-[20rem]"
             />
           </div>
           <select
             value={filterStage}
             onChange={(e) => setFilterStage(e.target.value)}
-            className="rounded-xl border border-slate-800 bg-slate-900 px-4 py-2 text-sm text-white focus:border-cyan-500 focus:outline-none"
+            className="w-full rounded-xl border border-slate-800 bg-slate-900 px-4 py-2.5 text-sm text-white focus:border-cyan-500 focus:outline-none sm:w-auto"
           >
             <option value="all">All Stages</option>
             <option value="0">Negotiation</option>
@@ -226,26 +220,28 @@ export default function InvestmentPipeline() {
             <option value="4">Portfolio</option>
           </select>
         </div>
-      </div>
+      }
+    >
 
       {/* Stage Summary Cards */}
-      <div className="grid grid-cols-2 gap-4 md:grid-cols-5">
+      <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-5">
         {Object.entries(STAGE_LABELS).map(([stage, label]) => {
           const count = dealsByStage[parseInt(stage)].length;
           return (
             <button
               key={stage}
+              type="button"
               onClick={() => setFilterStage(stage)}
-              className={`rounded-xl border p-4 text-left transition ${
+              className={`rounded-2xl border px-4 py-4 text-left transition ${
                 filterStage === stage
                   ? 'border-cyan-500 bg-cyan-950/30'
                   : 'border-slate-800 bg-slate-900 hover:border-slate-700'
               }`}
             >
-              <div className={`text-2xl font-bold ${STAGE_COLORS[parseInt(stage)].split(' ')[2]}`}>
+              <div className={`text-3xl font-bold ${STAGE_VALUE_COLORS[parseInt(stage)]}`}>
                 {count}
               </div>
-              <div className="mt-1 text-xs uppercase tracking-wider text-slate-500">{label}</div>
+              <div className="mt-2 text-xs uppercase tracking-[0.22em] text-slate-500">{label}</div>
             </button>
           );
         })}
@@ -269,7 +265,7 @@ export default function InvestmentPipeline() {
           </Button>
         </Card>
       ) : (
-        <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-3">
+        <div className="grid auto-rows-fr grid-cols-[repeat(auto-fit,minmax(320px,1fr))] gap-5">
           {filteredDeals.map(deal => (
             <DealCard key={deal._id} deal={deal} />
           ))}
@@ -282,6 +278,6 @@ export default function InvestmentPipeline() {
         open={showDealDetail}
         onOpenChange={setShowDealDetail}
       />
-    </div>
+    </InvestorWorkspaceLayout>
   );
 }

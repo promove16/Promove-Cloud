@@ -6,7 +6,6 @@ import {
   BriefcaseBusiness,
   FileText,
   GraduationCap,
-  LifeBuoy,
   ShieldCheck,
   Sparkles,
   Users,
@@ -83,11 +82,6 @@ export default function Dashboard() {
     queryFn: adminApi.getDeals,
     staleTime: 60_000,
   });
-  const helpDeskQuery = useQuery({
-    queryKey: ['admin-helpdesk', 'dashboard'],
-    queryFn: () => adminApi.getHelpDeskTickets({ status: 'all' }),
-    staleTime: 60_000,
-  });
   const problemReviewsQuery = useQuery({
     queryKey: ['admin-problem-review-requests', 'dashboard'],
     queryFn: () => adminApi.getProblemReviewRequests({ status: 'review_requested' }),
@@ -98,13 +92,11 @@ export default function Dashboard() {
   const mentorshipStats = mentorshipProgramsQuery.data?.stats;
   const activeDeals = dealsQuery.data?.filter((deal) => deal.status === 'active') ?? [];
   const pendingDealReviews = activeDeals.filter((deal) => deal.adminApprovalRequired && !deal.adminApprovedAt).length;
-  const openTickets = helpDeskQuery.data?.filter((ticket) => ticket.status !== 'completed').length ?? 0;
   const dashboardIsRefreshing =
     analyticsQuery.isLoading ||
     mentorshipProgramsQuery.isLoading ||
     registrationRequestsQuery.isLoading ||
     dealsQuery.isLoading ||
-    helpDeskQuery.isLoading ||
     problemReviewsQuery.isLoading;
 
   const metrics = useMemo(
@@ -124,13 +116,6 @@ export default function Dashboard() {
         href: '/dashboard/admin/deals/overview',
       },
       {
-        label: 'Open Tickets',
-        value: openTickets,
-        detail: 'Unresolved help desk requests need a response',
-        icon: LifeBuoy,
-        href: '/dashboard/admin/help-desk',
-      },
-      {
         label: 'Problem Reviews',
         value: problemReviewsQuery.data?.length ?? 0,
         detail: 'Submitted workspaces queued for moderation',
@@ -148,7 +133,6 @@ export default function Dashboard() {
     [
       activeDeals.length,
       analytics?.patentsPending,
-      openTickets,
       pendingDealReviews,
       problemReviewsQuery.data?.length,
       registrationRequestsQuery.data?.total,
@@ -198,14 +182,6 @@ export default function Dashboard() {
         icon: GraduationCap,
       },
       {
-        label: 'Help Desk',
-        path: '/dashboard/admin/help-desk',
-        eyebrow: 'Support queue',
-        description: 'Resolve text-based query tickets and publish admin notes back to the original requester.',
-        meta: 'Ticket queue for platform issues',
-        icon: LifeBuoy,
-      },
-      {
         label: 'Analytics',
         path: '/dashboard/admin/analytics',
         eyebrow: 'Platform insights',
@@ -238,16 +214,13 @@ export default function Dashboard() {
               <Button variant="secondary" onClick={() => navigate('/dashboard/admin/mentorship/requests')}>
                 Institution Requests
               </Button>
-              <Button variant="secondary" onClick={() => navigate('/dashboard/admin/help-desk')}>
-                Open Help Desk
-              </Button>
               <Button onClick={() => navigate('/dashboard/admin/analytics')}>
                 Open Analytics
               </Button>
             </div>
           </div>
 
-          <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-5">
+          <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
             {metrics.map((metric) => (
               <MetricCard
                 key={metric.label}

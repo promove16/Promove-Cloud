@@ -770,6 +770,7 @@ const syncAcceptedInvestorWorkspaceAccess = async (startupId: string, workspaceI
 
   const acceptedDeals = await Deal.find({
     startupId,
+    linkedWorkspaceId: workspaceId,
     status: { $ne: 'cancelled' },
     $or: [{ 'founderDecision.status': 'accepted' }, { stage: { $gte: 2 } }],
   })

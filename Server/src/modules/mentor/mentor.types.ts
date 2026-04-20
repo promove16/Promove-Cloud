@@ -212,6 +212,8 @@ export interface InstitutionMentorshipProgramInstitution {
   _id: string;
   displayName: string;
   type: 'school' | 'college';
+  location?: string;
+  locations?: string[];
 }
 
 export interface InstitutionMentorshipProgramRequester {

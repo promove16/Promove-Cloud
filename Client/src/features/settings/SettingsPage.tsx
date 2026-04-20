@@ -14,7 +14,6 @@ import { OptionTabs } from '../../components/ui/OptionTabs';
 import { toast } from '../../app/components/ui/sonner';
 import { AuthPasswordField } from '../auth/AuthPasswordField';
 import { StudentInstitutionStatusPanel } from '../institution/studentInstitutionStatus';
-import { SupportFloatingWidget } from '../support/SupportFloatingWidget';
 
 // ─── Layout helper ────────────────────────────────────────────────────────────
 
@@ -1199,7 +1198,6 @@ export function SettingsPage() {
           </div>
         ) : null}
       </div>
-      <SupportFloatingWidget />
     </>
   );
 }

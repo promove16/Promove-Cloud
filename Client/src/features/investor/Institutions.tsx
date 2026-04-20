@@ -6,6 +6,7 @@ import { Badge } from '../../components/ui/Badge';
 import { Card } from '../../components/ui/Card';
 import { Input } from '../../components/ui/Input';
 import { investorApi } from '../../api/investor.api';
+import { InvestorWorkspaceLayout } from './InvestorWorkspaceLayout';
 
 const types = ['school', 'college'] as const;
 
@@ -28,16 +29,19 @@ export default function Institutions() {
   );
 
   return (
-    <div className="space-y-6">
-      <div className="flex flex-col gap-4 lg:flex-row lg:items-end lg:justify-between">
-        <div>
-          <h1 className="text-3xl font-bold text-white">Institutions</h1>
-          <p className="mt-2 text-slate-400">Browse schools and colleges seeking investor collaboration.</p>
-        </div>
+    <InvestorWorkspaceLayout
+      title="Institutions"
+      description="Browse schools and colleges seeking investor collaboration."
+      headerAction={
         <div className="w-full max-w-md">
-          <Input value={search} onChange={(event) => setSearch(event.target.value)} placeholder="Search institutions" />
+          <Input
+            value={search}
+            onChange={(event) => setSearch(event.target.value)}
+            placeholder="Search institutions"
+          />
         </div>
-      </div>
+      }
+    >
 
       <div className="flex flex-wrap gap-3">
         {types.map((type) => (
@@ -138,7 +142,7 @@ export default function Institutions() {
         )}
       </div>
       )}
-    </div>
+    </InvestorWorkspaceLayout>
   );
 }
 

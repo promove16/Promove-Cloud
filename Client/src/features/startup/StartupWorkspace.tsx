@@ -8,6 +8,7 @@ import { startupApi } from "../../api/startup.api";
 import { workspaceApi } from "../../api/workspace.api";
 import { useAuthStore } from "../../store/authStore";
 import { useWorkspaceChat } from "../../hooks/useWorkspaceChat";
+import { toast } from "../../app/components/ui/sonner";
 import { getApiErrorMessage } from "../../utils/apiError";
 import { ProductWorkspaceDetail } from "../../app/pages/ProductWorkspace";
 
@@ -35,7 +36,6 @@ export function StartupWorkspace() {
   const startupId = context?.startupId ?? paramId;
 
   const [activeTab, setActiveTab] = useState("chat");
-  const [toast, setToast] = useState("");
   const [showTaskForm, setShowTaskForm] = useState(false);
   const [taskForm, setTaskForm] = useState({ title: "", description: "", priority: "Medium" as WorkspaceTask["priority"], dueDate: "", assignedTo: "" });
   const [inviteEmail, setInviteEmail] = useState("");
@@ -79,12 +79,6 @@ export function StartupWorkspace() {
   const openTaskCount = (workspace?.tasks ?? []).filter((t) => !t.done).length;
 
   useEffect(() => {
-    if (!toast) return;
-    const t = setTimeout(() => setToast(""), 3000);
-    return () => clearTimeout(t);
-  }, [toast]);
-
-  useEffect(() => {
     if (selectedExistingWorkspaceId && availableWorkspaceOptions.some((item) => item._id === selectedExistingWorkspaceId)) {
       return;
     }
@@ -118,7 +112,7 @@ export function StartupWorkspace() {
       return createdWorkspace;
     },
     onSuccess: async (createdWorkspace) => {
-      setToast(`Workspace linked: ${createdWorkspace.title}`);
+      toast.success(`Workspace linked: ${createdWorkspace.title}`);
       await Promise.all([
         queryClient.invalidateQueries({ queryKey: ["startup", startupId] }),
         queryClient.invalidateQueries({ queryKey: ["startup"] }),
@@ -127,7 +121,7 @@ export function StartupWorkspace() {
       ]);
     },
     onError: (error) => {
-      setToast(getActionErrorMessage(error, "Unable to create a workspace right now."));
+      toast.error(getActionErrorMessage(error, "Unable to create a workspace right now."));
     },
   });
 
@@ -149,7 +143,7 @@ export function StartupWorkspace() {
     },
     onSuccess: async (savedStartup) => {
       const linkedWorkspace = availableWorkspaceOptions.find((item) => item._id === savedStartup.projectId);
-      setToast(linkedWorkspace ? `Workspace linked: ${linkedWorkspace.title}` : "Workspace linked.");
+      toast.success(linkedWorkspace ? `Workspace linked: ${linkedWorkspace.title}` : "Workspace linked.");
       await Promise.all([
         queryClient.invalidateQueries({ queryKey: ["startup", startupId] }),
         queryClient.invalidateQueries({ queryKey: ["startup"] }),
@@ -158,7 +152,7 @@ export function StartupWorkspace() {
       ]);
     },
     onError: (error) => {
-      setToast(getActionErrorMessage(error, "Unable to attach the selected workspace."));
+      toast.error(getActionErrorMessage(error, "Unable to attach the selected workspace."));
     },
   });
 
@@ -173,7 +167,7 @@ export function StartupWorkspace() {
     onSuccess: async () => {
       setTaskForm({ title: "", description: "", priority: "Medium", dueDate: "", assignedTo: "" });
       setShowTaskForm(false);
-      setToast("Task added");
+      toast.success("Task added.");
       await refresh();
     },
   });
@@ -185,7 +179,7 @@ export function StartupWorkspace() {
 
   const deleteTask = useMutation({
     mutationFn: (taskId: string) => workspaceApi.deleteTask(workspaceId!, taskId),
-    onSuccess: async () => { setToast("Task removed"); await refresh(); },
+    onSuccess: async () => { toast.success("Task removed."); await refresh(); },
   });
 
   const invite = useMutation({
@@ -193,22 +187,22 @@ export function StartupWorkspace() {
     onSuccess: async () => {
       setInviteEmail("");
       setInviteRole("other");
-      setToast("Invite sent");
+      toast.success("Invite sent.");
       await refresh();
     },
     onError: () => { 
-      setToast("Failed to invite");
+      toast.error("Failed to invite.");
     },
   });
 
   const removeMember = useMutation({
     mutationFn: (userId: string) => workspaceApi.removeMember(workspaceId!, userId),
-    onSuccess: async () => { setToast("Member removed"); await refresh(); },
+    onSuccess: async () => { toast.success("Member removed."); await refresh(); },
   });
 
   const onChatFile = (file: File | null) => {
     if (file && file.size > 10 * 1024 * 1024) {
-      setToast("Max 10MB file");
+      toast.error("Max 10MB file.");
       return;
     }
     setChatAttachment(file);
@@ -232,7 +226,7 @@ export function StartupWorkspace() {
       setChatDraft("");
       setChatAttachment(null);
     } catch (e) { 
-      setToast("Failed to send");
+      toast.error("Failed to send message.");
     } finally {
       setIsSendingChat(false);
     }
@@ -290,8 +284,6 @@ export function StartupWorkspace() {
 
     return (
       <div className="space-y-6 border border-slate-800 bg-slate-950 p-6 sm:p-8">
-        {toast ? <div className="rounded border border-cyan-500/30 bg-cyan-500/10 px-4 py-3 text-sm text-cyan-100">{toast}</div> : null}
-
         <div className="max-w-3xl space-y-3">
           <div className="inline-flex items-center gap-2 text-xs uppercase tracking-[0.24em] text-cyan-300">
             <FolderKanban className="h-4 w-4" />
@@ -380,8 +372,6 @@ export function StartupWorkspace() {
 
   return (
     <div className="space-y-4">
-      {toast && <div className="fixed bottom-4 right-4 z-50 rounded bg-slate-800 px-4 py-2 text-sm text-white">{toast}</div>}
-
       <div className="flex items-center justify-between gap-4">
         <div>
           <h1 className="text-xl font-semibold text-white">{workspace.title}</h1>

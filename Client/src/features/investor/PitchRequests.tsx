@@ -4,6 +4,7 @@ import { Link } from "react-router-dom";
 import { startupApi } from "../../api/startup.api";
 import { Card } from "../../components/ui/Card";
 import { Spinner } from "../../components/ui/Spinner";
+import { InvestorWorkspaceLayout } from "./InvestorWorkspaceLayout";
 
 const statusConfig = {
   pending: { label: "Pending", icon: Clock, color: "text-amber-400" },
@@ -30,11 +31,11 @@ export default function InvestorPitchRequests() {
   const respondedRequests = pitchRequests?.filter(r => r.status !== "pending") ?? [];
 
   return (
-    <div className="mx-auto w-full max-w-5xl space-y-6">
-      <div>
-        <h1 className="text-2xl font-bold text-white">Pitch Requests</h1>
-        <p className="text-slate-400">Startups that have sent you direct investor outreach</p>
-      </div>
+    <InvestorWorkspaceLayout
+      title="Pitch Requests"
+      description="Startups that have sent you direct investor outreach."
+      contentClassName="mx-auto w-full max-w-5xl space-y-6"
+    >
 
       {pitchRequests?.length === 0 ? (
         <Card className="border-slate-800 bg-slate-950 p-12 text-center">
@@ -143,6 +144,6 @@ export default function InvestorPitchRequests() {
           )}
         </>
       )}
-    </div>
+    </InvestorWorkspaceLayout>
   );
 }

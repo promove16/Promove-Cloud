@@ -715,10 +715,11 @@ export default function ApplicationsPipeline() {
 
   return (
     <div className={`${RECRUITER_PAGE_CONTENT_CLASS} space-y-5`}>
+      <RecruiterSectionNav items={recruiterMarketplaceSectionItems} />
+
       <section className="space-y-4 rounded-3xl border border-slate-800 bg-slate-950 px-5 py-5 sm:px-6">
         <div className="flex flex-col gap-4 xl:flex-row xl:items-start xl:justify-between">
           <div className="space-y-3">
-            <RecruiterSectionNav items={recruiterMarketplaceSectionItems} />
             <div className="space-y-2">
               <div className="flex items-center gap-2 text-xs uppercase tracking-[0.3em] text-cyan-300">
                 <Sparkles className="h-4 w-4" />

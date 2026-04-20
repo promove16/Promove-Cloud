@@ -4,7 +4,6 @@ import { ApiResponse } from '../../utils/ApiResponse';
 import { UserRole } from '../../types/roles.types';
 import {
   createAdminInstitutionMentorshipProgramSchema,
-  projectMentorAssignmentSchema,
   reviewInstitutionMentorshipProgramSchema,
 } from '../mentor/mentor.validation';
 import {
@@ -13,14 +12,12 @@ import {
   awardRejectSchema,
   createMentorProfileSchema,
   dealReviewSchema,
-  helpDeskTicketsQuerySchema,
   listMentorshipProgramsQuerySchema,
   listRegistrationRequestsQuerySchema,
   listUsersQuerySchema,
   milestoneVerifySchema,
   patentRejectSchema,
   registrationRequestReviewSchema,
-  resolveHelpDeskTicketSchema,
 } from './admin.validation';
 import {
   approveAward,
@@ -30,28 +27,24 @@ import {
   createMentorProfile,
   getMentorDirectory,
   getMentorshipPrograms,
-  getProjectMentorships,
   approveDealStage,
   approvePatent,
   getAnalytics,
   getAnalyticsLogs,
   getAnalyticsUserDetail,
   getAnalyticsUsers,
-  getHelpDeskTickets,
   getInvestmentTypeBreakdown,
   listAwards,
   listDealsAwaitingApproval,
   listPatents,
   listRegistrationRequests,
   listUsers,
-  resolveHelpDeskTicket,
   reviewDeal,
   reviewRegistrationRequest,
   rejectAward,
   rejectPatent,
   resetStartupSoleInvestor,
   reviewMentorshipProgram,
-  reviewProjectMentorAssignment,
   updateDealInvestorRole,
   updateUserAccess,
   updateUserRole,
@@ -308,23 +301,10 @@ export const getAnalyticsUsersController = async (req: Request, res: Response) =
   res.status(200).json(new ApiResponse(await getAnalyticsUsers(query.q, query.limit)));
 };
 
-export const getHelpDeskTicketsController = async (req: Request, res: Response) => {
-  const query = helpDeskTicketsQuerySchema.parse(req.query);
-  res.status(200).json(new ApiResponse(await getHelpDeskTickets(query.status)));
-};
-
 export const getAnalyticsUserDetailController = async (req: Request, res: Response) => {
   const userId = getParam(req.params.userId);
   if (!userId || !isObjectId(userId)) throw new ApiError(400, 'INVALID_ID', 'Invalid ID format');
   res.status(200).json(new ApiResponse(await getAnalyticsUserDetail(userId)));
-};
-
-export const resolveHelpDeskTicketController = async (req: Request, res: Response) => {
-  if (!req.user) throw new ApiError(401, 'UNAUTHORIZED', 'Invalid or expired token');
-  const requestId = getParam(req.params.id);
-  if (!requestId || !isObjectId(requestId)) throw new ApiError(400, 'INVALID_ID', 'Invalid ID format');
-  const payload = resolveHelpDeskTicketSchema.parse(req.body);
-  res.status(200).json(new ApiResponse(await resolveHelpDeskTicket(req.user._id, requestId, payload)));
 };
 
 export const verifyMilestoneController = async (req: Request, res: Response) => {
@@ -339,10 +319,6 @@ export const verifyMilestoneController = async (req: Request, res: Response) => 
 export const getMentorshipProgramsController = async (req: Request, res: Response) => {
   const query = listMentorshipProgramsQuerySchema.parse(req.query);
   res.status(200).json(new ApiResponse(await getMentorshipPrograms(query.status)));
-};
-
-export const getProjectMentorshipsController = async (_req: Request, res: Response) => {
-  res.status(200).json(new ApiResponse(await getProjectMentorships()));
 };
 
 export const getMentorsController = async (_req: Request, res: Response) => {
@@ -367,12 +343,4 @@ export const reviewMentorshipProgramController = async (req: Request, res: Respo
   if (!programId || !isObjectId(programId)) throw new ApiError(400, 'INVALID_ID', 'Invalid ID format');
   const payload = reviewInstitutionMentorshipProgramSchema.parse(req.body);
   res.status(200).json(new ApiResponse(await reviewMentorshipProgram(req.user._id, programId, payload)));
-};
-
-export const reviewProjectMentorAssignmentController = async (req: Request, res: Response) => {
-  if (!req.user) throw new ApiError(401, 'UNAUTHORIZED', 'Invalid or expired token');
-  const workspaceId = getParam(req.params.workspaceId);
-  if (!workspaceId || !isObjectId(workspaceId)) throw new ApiError(400, 'INVALID_ID', 'Invalid ID format');
-  const payload = projectMentorAssignmentSchema.parse(req.body);
-  res.status(200).json(new ApiResponse(await reviewProjectMentorAssignment(req.user._id, workspaceId, payload)));
 };

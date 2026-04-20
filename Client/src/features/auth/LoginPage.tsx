@@ -6,6 +6,7 @@ import { zodResolver } from '@hookform/resolvers/zod';
 import { Link, useNavigate, useSearchParams } from 'react-router-dom';
 import { z } from 'zod';
 import { BusinessLogo } from '../../components/branding/BusinessLogo';
+import { toast } from '../../app/components/ui/sonner';
 import { AuthPasswordField } from './AuthPasswordField';
 import { useLoginMutation } from './useAuth';
 import { getPostLoginRedirect } from '../../utils/postLoginRedirect';
@@ -48,6 +49,10 @@ export function LoginPage() {
   const [searchParams] = useSearchParams();
   const loginMutation = useLoginMutation();
   const [error, setError] = useState('');
+  const showError = (message: string) => {
+    setError(message);
+    toast.error(message);
+  };
   const loginNotice = getLoginNotice(searchParams.get('message'), searchParams.get('intent'));
   const {
     register,
@@ -71,6 +76,7 @@ export function LoginPage() {
         password: values.password,
       });
 
+      toast.success('Signed in successfully.');
       navigate(
         sanitizeNextPath(searchParams.get('next')) ?? getPostLoginRedirect(payload.user),
         { replace: true },
@@ -80,12 +86,12 @@ export function LoginPage() {
         const apiError = submissionError.response?.data?.error;
 
         if (apiError?.code === 'ADMIN_APPROVAL_PENDING') {
-          setError('Your registration request is still waiting for admin approval.');
+          showError('Your registration request is still waiting for admin approval.');
           return;
         }
 
         if (apiError?.code === 'ADMIN_APPROVAL_REJECTED') {
-          setError(
+          showError(
             apiError.message ||
               'Your registration request was rejected. Please contact the ProMove admin team.',
           );
@@ -93,25 +99,25 @@ export function LoginPage() {
         }
 
         if (apiError?.code === 'INSTITUTION_APPROVAL_PENDING') {
-          setError(
+          showError(
             'Your school or college has not approved your student account yet. This step is handled by the institution, not the platform admin.',
           );
           return;
         }
 
         if (apiError?.code === 'INSTITUTION_VERIFICATION_REJECTED') {
-          setError(
+          showError(
             apiError.message ||
               'Your institution could not verify your account. Please contact your school or college for support.',
           );
           return;
         }
 
-        setError(apiError?.message ?? 'Unable to sign in right now.');
+        showError(apiError?.message ?? 'Unable to sign in right now.');
         return;
       }
 
-      setError('Unable to sign in right now.');
+      showError('Unable to sign in right now.');
     }
   };
 

@@ -215,8 +215,8 @@ export default function HiringEvents({ embedded = false }: HiringEventsProps) {
         />
       ) : null}
 
-      <section className="grid gap-6 xl:grid-cols-[420px,minmax(0,1fr)]">
-        <Card className="p-6">
+      <section className="grid items-start gap-6 xl:grid-cols-[minmax(0,420px),minmax(0,1fr)]">
+        <Card className="min-w-0 p-6">
           <div className="flex items-start justify-between gap-3">
             <div>
               <div className="text-xs uppercase tracking-[0.3em] text-cyan-300">
@@ -232,18 +232,18 @@ export default function HiringEvents({ embedded = false }: HiringEventsProps) {
             </Badge>
           </div>
 
-          <div className="mt-4 inline-flex rounded-full border border-slate-800 bg-slate-950 p-1">
+          <div className="mt-4 flex w-full rounded-full border border-slate-800 bg-slate-950 p-1">
             <button
               type="button"
               onClick={() => { setCreateMode('direct'); setInviteSentNotice(''); }}
-              className={`rounded-full px-4 py-1.5 text-xs font-semibold transition ${createMode === 'direct' ? 'bg-slate-100 text-slate-950' : 'text-slate-400 hover:text-white'}`}
+              className={`min-w-0 flex-1 rounded-full px-4 py-1.5 text-center text-xs font-semibold leading-5 transition ${createMode === 'direct' ? 'bg-slate-100 text-slate-950' : 'text-slate-400 hover:text-white'}`}
             >
               Create Directly
             </button>
             <button
               type="button"
               onClick={() => { setCreateMode('invite'); setInviteSentNotice(''); }}
-              className={`rounded-full px-4 py-1.5 text-xs font-semibold transition ${createMode === 'invite' ? 'bg-slate-100 text-slate-950' : 'text-slate-400 hover:text-white'}`}
+              className={`min-w-0 flex-1 rounded-full px-4 py-1.5 text-center text-xs font-semibold leading-5 transition ${createMode === 'invite' ? 'bg-slate-100 text-slate-950' : 'text-slate-400 hover:text-white'}`}
             >
               Send Invite for Approval
             </button>
@@ -276,7 +276,7 @@ export default function HiringEvents({ embedded = false }: HiringEventsProps) {
             <select
               value={form.collegeId}
               onChange={(event) => setForm((current) => ({ ...current, collegeId: event.target.value }))}
-              className="rounded-lg border border-slate-800 bg-slate-950 px-4 py-3 text-white"
+              className="w-full rounded-lg border border-slate-800 bg-slate-950 px-4 py-3 text-white"
             >
               <option value="">Select college</option>
               {availableColleges.map((college) => (
@@ -293,7 +293,7 @@ export default function HiringEvents({ embedded = false }: HiringEventsProps) {
                   type: event.target.value as (typeof eventTypes)[number],
                 }))
               }
-              className="rounded-lg border border-slate-800 bg-slate-950 px-4 py-3 text-white"
+              className="w-full rounded-lg border border-slate-800 bg-slate-950 px-4 py-3 text-white"
             >
               {eventTypes.map((type) => (
                 <option key={type} value={type}>
@@ -309,7 +309,7 @@ export default function HiringEvents({ embedded = false }: HiringEventsProps) {
             <select
               value={form.linkedJobId}
               onChange={(event) => setForm((current) => ({ ...current, linkedJobId: event.target.value }))}
-              className="rounded-lg border border-slate-800 bg-slate-950 px-4 py-3 text-white"
+              className="w-full rounded-lg border border-slate-800 bg-slate-950 px-4 py-3 text-white"
             >
               <option value="">Link to a job later</option>
               {activeJobs.map((job) => (
@@ -331,14 +331,14 @@ export default function HiringEvents({ embedded = false }: HiringEventsProps) {
               value={form.description}
               onChange={(event) => setForm((current) => ({ ...current, description: event.target.value }))}
               placeholder="Describe the hiring event"
-              className="min-h-32 rounded-lg border border-slate-800 bg-slate-950 px-4 py-3 text-white"
+              className="min-h-32 w-full rounded-lg border border-slate-800 bg-slate-950 px-4 py-3 text-white"
             />
             {createMode === 'invite' ? (
               <textarea
                 value={inviteMessage}
                 onChange={(event) => setInviteMessage(event.target.value)}
                 placeholder="Optional message to the college (e.g. why this event benefits their students)"
-                className="min-h-20 rounded-lg border border-slate-800 bg-slate-950 px-4 py-3 text-white"
+                className="min-h-20 w-full rounded-lg border border-slate-800 bg-slate-950 px-4 py-3 text-white"
               />
             ) : null}
             {createMode === 'direct' ? (
@@ -382,7 +382,7 @@ export default function HiringEvents({ embedded = false }: HiringEventsProps) {
           </div>
         </Card>
 
-        <div className="space-y-4">
+        <div className="min-w-0 space-y-4">
           <div className="grid gap-4 md:grid-cols-3">
             <Card className="p-5">
               <div className="flex items-center gap-3">

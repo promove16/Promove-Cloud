@@ -1,47 +1,94 @@
-import { NavLink } from 'react-router-dom';
+import {
+  BriefcaseBusiness,
+  CalendarDays,
+  ClipboardList,
+  Files,
+  type LucideIcon,
+} from 'lucide-react';
+import { NavLink, useLocation } from 'react-router-dom';
+import {
+  getOptionTabClassName,
+  getOptionTabsListClassName,
+} from '../../components/ui/OptionTabs';
 
 type RecruiterSectionNavItem = {
   label: string;
   path: string;
   end?: boolean;
+  icon?: LucideIcon;
+  matchPrefixes?: string[];
 };
 
 export const RECRUITER_PAGE_CONTENT_CLASS = 'w-full';
 
 export const recruiterMarketplaceSectionItems: RecruiterSectionNavItem[] = [
-  { label: 'Marketplace', path: '/dashboard/recruiter/marketplace', end: true },
-  { label: 'Applications', path: '/dashboard/recruiter/applications', end: true },
+  {
+    label: 'Marketplace',
+    path: '/dashboard/recruiter/marketplace',
+    end: true,
+    icon: BriefcaseBusiness,
+  },
+  {
+    label: 'Applications',
+    path: '/dashboard/recruiter/applications',
+    end: true,
+    icon: Files,
+  },
 ];
 
 export const recruiterDriveSectionItems: RecruiterSectionNavItem[] = [
-  { label: 'Active Drives', path: '/dashboard/recruiter/drives', end: true },
-  { label: 'Hiring Events', path: '/dashboard/recruiter/hiring-events', end: true },
-  { label: 'Onboarding Tracker', path: '/dashboard/recruiter/onboarding', end: true },
+  {
+    label: 'Hiring Events',
+    path: '/dashboard/recruiter/hiring-events',
+    end: true,
+    icon: CalendarDays,
+  },
+  {
+    label: 'Onboarding Tracker',
+    path: '/dashboard/recruiter/onboarding',
+    end: true,
+    icon: ClipboardList,
+  },
 ];
 
 export function RecruiterSectionNav({ items }: { items: RecruiterSectionNavItem[] }) {
+  const location = useLocation();
+
   return (
-    <div className="overflow-x-auto pb-1">
-      <nav
-        aria-label="Recruiter section navigation"
-        className="inline-flex min-w-max items-center gap-1 rounded-full border border-slate-800 bg-slate-950 p-1"
-      >
-        {items.map((item) => (
-          <NavLink
-            key={item.path}
-            to={item.path}
-            end={item.end ?? true}
-            className={({ isActive }) =>
-              `inline-flex items-center rounded-full px-4 py-2 text-sm font-medium whitespace-nowrap transition ${
-                isActive
-                  ? 'bg-cyan-400 text-slate-950 shadow-[0_0_0_1px_rgba(59,130,246,0.16)]'
-                  : 'text-slate-300 hover:bg-slate-900 hover:text-white'
-              }`
-            }
-          >
-            {item.label}
-          </NavLink>
-        ))}
+    <div className="overflow-x-auto">
+      <nav aria-label="Recruiter section navigation" className={getOptionTabsListClassName()}>
+        {items.map((item) => {
+          const isPrefixMatch = (item.matchPrefixes ?? []).some((prefix) =>
+            location.pathname === prefix || location.pathname.startsWith(`${prefix}/`),
+          );
+          const isActive =
+            isPrefixMatch ||
+            location.pathname === item.path ||
+            (!(item.end ?? true) && location.pathname.startsWith(`${item.path}/`));
+          const Icon = item.icon;
+
+          return (
+            <NavLink
+              key={item.path}
+              to={item.path}
+              end={item.end ?? true}
+              className={getOptionTabClassName({ active: isActive })}
+            >
+              {Icon ? (
+                <span
+                  className={
+                    isActive
+                      ? 'text-cyan-300'
+                      : 'text-slate-500 group-hover:text-slate-300'
+                  }
+                >
+                  <Icon className="h-4 w-4" />
+                </span>
+              ) : null}
+              <span>{item.label}</span>
+            </NavLink>
+          );
+        })}
       </nav>
     </div>
   );

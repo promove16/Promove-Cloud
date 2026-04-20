@@ -33,6 +33,7 @@ import {
   userApi,
 } from "../../api/user.api";
 import { startupApi } from "../../api/startup.api";
+import { toast } from "../../app/components/ui/sonner";
 import { useAuthStore } from "../../store/authStore";
 import { UserRole } from "../../types/roles.types";
 
@@ -499,7 +500,6 @@ export function UserProfilePage() {
   const [searchParams, setSearchParams] = useSearchParams();
   const setUser = useAuthStore((state) => state.setUser);
   const currentUser = useAuthStore((state) => state.user);
-  const [toast, setToast] = useState("");
   const [confirmLinkedinFetch, setConfirmLinkedinFetch] = useState(false);
   const [selectedRepoIds, setSelectedRepoIds] = useState<string[]>([]);
   const [form, setForm] = useState<ProfileForm>({
@@ -616,12 +616,6 @@ export function UserProfilePage() {
     });
   }, [profileQuery.data]);
 
-  useEffect(() => {
-    if (!toast) return;
-    const timeout = window.setTimeout(() => setToast(""), 3200);
-    return () => window.clearTimeout(timeout);
-  }, [toast]);
-
   const githubOauthAvailable =
     profile?.githubOAuthAvailable ?? currentUser?.githubOAuthAvailable ?? false;
   const githubConnected = Boolean(profile?.connectedAccounts?.github?.userId);
@@ -651,13 +645,13 @@ export function UserProfilePage() {
     if (!githubStatus) return;
 
     if (githubStatus === "connected") {
-      setToast("GitHub connected. Your portfolio data has been refreshed.");
+      toast.success("GitHub connected. Your portfolio data has been refreshed.");
       void queryClient.invalidateQueries({ queryKey: ["profile", "me"] });
       void queryClient.invalidateQueries({
         queryKey: ["profile", "github-repositories"],
       });
     } else if (githubStatus === "error") {
-      setToast(searchParams.get("message") ?? "GitHub connection failed.");
+      toast.error(searchParams.get("message") ?? "GitHub connection failed.");
     }
 
     const next = new URLSearchParams(searchParams);
@@ -671,10 +665,10 @@ export function UserProfilePage() {
     onSuccess: (user) => {
       queryClient.setQueryData(["profile", "me"], user);
       setUser(user);
-      setToast("Portfolio profile saved.");
+      toast.success("Portfolio profile saved.");
     },
     onError: (error) =>
-      setToast(readError(error, "Unable to update your portfolio right now.")),
+      toast.error(readError(error, "Unable to update your portfolio right now.")),
   });
 
   const socialMutation = useMutation({
@@ -683,10 +677,10 @@ export function UserProfilePage() {
       queryClient.setQueryData(["profile", "me"], user);
       setUser(user);
       setConfirmLinkedinFetch(false);
-      setToast(buildSocialToast(summary));
+      toast.success(buildSocialToast(summary));
     },
     onError: (error) =>
-      setToast(readError(error, "Unable to fetch LinkedIn data right now.")),
+      toast.error(readError(error, "Unable to fetch LinkedIn data right now.")),
   });
 
   const startGithubMutation = useMutation({
@@ -694,7 +688,7 @@ export function UserProfilePage() {
     onSuccess: ({ authorizationUrl }) =>
       window.location.assign(authorizationUrl),
     onError: (error) =>
-      setToast(readError(error, "Unable to start GitHub sign-in.")),
+      toast.error(readError(error, "Unable to start GitHub sign-in.")),
   });
 
   const importGithubMutation = useMutation({
@@ -705,10 +699,10 @@ export function UserProfilePage() {
       void queryClient.invalidateQueries({
         queryKey: ["profile", "github-repositories"],
       });
-      setToast(`Imported ${importedCount} repositories into your portfolio.`);
+      toast.success(`Imported ${importedCount} repositories into your portfolio.`);
     },
     onError: (error) =>
-      setToast(readError(error, "Unable to import repositories.")),
+      toast.error(readError(error, "Unable to import repositories.")),
   });
 
   const isBusy =
@@ -1008,12 +1002,6 @@ export function UserProfilePage() {
 
   return (
     <div className="space-y-5">
-      {toast ? (
-        <div className="fixed bottom-6 right-6 z-50 rounded-lg border border-[#0a66c2]/30 bg-white px-4 py-3 text-sm font-semibold text-[#0a66c2] shadow-2xl dark:bg-slate-950">
-          {toast}
-        </div>
-      ) : null}
-
       <form
         className="grid gap-5 xl:grid-cols-[minmax(0,1fr)_320px]"
         onSubmit={saveProfile}
@@ -2747,7 +2735,7 @@ export function UserProfilePage() {
                     type="button"
                     onClick={() => {
                       void navigator.clipboard.writeText(publicProfileUrl);
-                      setToast("Public link copied.");
+                      toast.success("Public link copied.");
                     }}
                     className="inline-flex w-full items-center justify-center gap-2 rounded-full border border-[#0a66c2] px-4 py-2 text-sm font-semibold text-[#0a66c2] transition hover:bg-[#eef3f8]"
                   >
