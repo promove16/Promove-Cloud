@@ -258,8 +258,8 @@ function EquityDistributionCard({
         </div>
       ) : (
         <div className="mt-4 grid gap-4 md:grid-cols-[minmax(0,1fr)_minmax(0,1fr)] md:items-center">
-          <div className="h-56">
-            <ResponsiveContainer width="100%" height="100%">
+          <div className="h-56 min-h-56 min-w-0">
+            <ResponsiveContainer width="100%" height="100%" minWidth={0} minHeight={224}>
               <PieChart>
                 <Pie
                   data={chartData}

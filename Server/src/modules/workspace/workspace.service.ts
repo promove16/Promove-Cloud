@@ -2,12 +2,18 @@ import { Types } from 'mongoose';
 import { z } from 'zod';
 import { redis } from '../../config/redis';
 import { sendTeamInviteEmail } from '../../services/emailService';
-import { deleteStoredAsset, uploadFile, validateFileContent } from '../../services/fileStorageService';
+import {
+  deleteStoredAsset,
+  generatePresignedUrl,
+  uploadFile,
+  validateFileContent,
+} from '../../services/fileStorageService';
 import { generateSignedCloudinaryUrl } from '../../services/cloudinaryService';
 import { applyScoreAsync } from '../../services/scoreEngine';
 import { NotificationService } from '../notification/notification.service';
 import { User } from '../user/user.model';
 import { ChatMessage } from '../chat/chat.model';
+import { serializeChatMessage } from '../chat/chat.serializer';
 import { TeamRequest } from '../social/teamRequest.model';
 import { RequestRecord } from '../request/request.model';
 import {
@@ -156,43 +162,6 @@ const recalcProgressPercent = (workspace: { milestones: Array<{ completionPercen
   return Math.round(total / workspace.milestones.length);
 };
 
-const serializeChatMessageRecord = (message: any) => ({
-  _id: String(message._id),
-  workspaceId: String(message.workspaceId),
-  senderId: String(message.senderId),
-  message: typeof message.message === 'string' ? message.message : '',
-  ...(message.attachmentUrl
-    ? {
-        attachmentUrl: message.attachmentUrl,
-        attachmentType: message.attachmentType,
-        attachmentName: message.attachmentName,
-        attachmentSizeBytes: message.attachmentSizeBytes,
-        attachmentMimeType: message.attachmentMimeType,
-        attachment: {
-          fileUrl: message.attachmentUrl,
-          fileType: message.attachmentType,
-          fileName: message.attachmentName ?? 'Attachment',
-          fileSizeBytes: message.attachmentSizeBytes ?? 0,
-          ...(message.attachmentMimeType ? { mimeType: message.attachmentMimeType } : {}),
-        },
-      }
-    : {}),
-  ...(message.codeSnippet
-    ? {
-        codeSnippet: {
-          title: message.codeSnippet.title,
-          language: message.codeSnippet.language,
-          code: message.codeSnippet.code,
-          lineCount: message.codeSnippet.lineCount,
-        },
-      }
-    : {}),
-  sentAt: message.sentAt instanceof Date ? message.sentAt.toISOString() : message.sentAt,
-  deliveredAt: message.deliveredAt instanceof Date ? message.deliveredAt.toISOString() : message.deliveredAt,
-  seenAt: message.seenAt instanceof Date ? message.seenAt.toISOString() : message.seenAt,
-  seenBy: Array.isArray(message.seenBy) ? message.seenBy.map((entry: unknown) => String(entry)) : [],
-});
-
 type WorkspaceSnapshot = {
   toObject?: () => any;
   _id?: unknown;
@@ -244,7 +213,7 @@ export const serializeWorkspace = async (workspace: WorkspaceSnapshot) => {
   return {
     ...baseWorkspace,
     tasks: baseWorkspace.tasks || [],
-    uploads: (baseWorkspace.uploads || []).map((upload: any) => {
+    uploads: await Promise.all((baseWorkspace.uploads || []).map(async (upload: any) => {
       let signedUrl = upload.fileUrl;
       if (upload.storageProvider === 'cloudinary' && upload.storageKey) {
         try {
@@ -253,12 +222,18 @@ export const serializeWorkspace = async (workspace: WorkspaceSnapshot) => {
         } catch (error) {
           console.error('Error generating signed URL for workspace upload:', error);
         }
+      } else if (upload.storageProvider === 's3' && upload.storageKey) {
+        try {
+          signedUrl = await generatePresignedUrl(upload.storageKey);
+        } catch (error) {
+          console.error('Error generating S3 signed URL for workspace upload:', error);
+        }
       }
       return {
         ...upload,
         fileUrl: signedUrl,
       };
-    }),
+    })),
     repoSubmissions: baseWorkspace.repoSubmissions || [],
     codeSubmissions: baseWorkspace.codeSubmissions || [],
     progressUpdates: baseWorkspace.progressUpdates || [],
@@ -996,13 +971,43 @@ export const declineMemberInvite = async (workspaceId: string, requestId: string
 };
 
 export const getWorkspaceChatHistory = async (workspaceId: string, userId: string, before?: string, limit = 50) => {
-  await getWorkspaceForChatAccess(workspaceId, userId);
+  const workspace = await getWorkspaceForChatAccess(workspaceId, userId);
   const filter: Record<string, unknown> = { workspaceId };
   if (before) {
     filter._id = { $lt: before };
   }
   const messages = await ChatMessage.find(filter).sort({ sentAt: -1 }).limit(limit).lean();
-  return messages.map(serializeChatMessageRecord);
+  const uploads = workspace.uploads || [];
+  const messagesWithStorageMetadata = messages.map((message) => {
+    if (message.attachmentStorageProvider && message.attachmentStorageKey) {
+      return message;
+    }
+
+    const upload = uploads.find((item) => {
+      const sameUrl = message.attachmentUrl && item.fileUrl === message.attachmentUrl;
+      const sameFile =
+        message.attachmentName &&
+        item.fileName === message.attachmentName &&
+        item.fileSizeBytes === message.attachmentSizeBytes &&
+        item.fileType === message.attachmentType;
+
+      return sameUrl || sameFile;
+    });
+
+    if (!upload?.storageProvider || !upload.storageKey) {
+      return message;
+    }
+
+    return {
+      ...message,
+      attachmentUploadId: upload._id,
+      attachmentStorageProvider: upload.storageProvider,
+      attachmentStorageKey: upload.storageKey,
+      attachmentMimeType: message.attachmentMimeType ?? upload.mimeType,
+    };
+  });
+
+  return Promise.all(messagesWithStorageMetadata.map((message) => serializeChatMessage(message)));
 };
 
 export const addChatParticipant = async (
@@ -1256,5 +1261,32 @@ registerRequestHandler('workspace_chat_access', {
       return;
     }
     await grantWorkspaceChatRequest(request.targetEntityId, actorUserId);
+  },
+});
+
+registerRequestHandler('generic', {
+  validateAccept: async (request, actorUserId) => {
+    if (request.actionType !== 'invest' || request.requestedPermission !== 'dm_investor') {
+      return;
+    }
+
+    const workspaceId = typeof request.metadata?.workspaceId === 'string' ? request.metadata.workspaceId : '';
+    if (!workspaceId) {
+      return;
+    }
+
+    await validateWorkspaceChatRequest(workspaceId, actorUserId);
+  },
+  onAccept: async (request, actorUserId) => {
+    if (request.actionType !== 'invest' || request.requestedPermission !== 'dm_investor') {
+      return;
+    }
+
+    const workspaceId = typeof request.metadata?.workspaceId === 'string' ? request.metadata.workspaceId : '';
+    if (!workspaceId) {
+      return;
+    }
+
+    await grantWorkspaceChatRequest(workspaceId, actorUserId);
   },
 });

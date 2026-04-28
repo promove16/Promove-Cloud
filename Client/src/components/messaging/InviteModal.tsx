@@ -52,15 +52,20 @@ export function InviteModal({
   });
 
   const startupInviteMutation = useMutation({
-    mutationFn: async (data: { startupId: string; targetUserId: string; targetRole: string; message?: string }) => {
+    mutationFn: async (data: { startup: Startup; targetUserId: string; targetRole: string; message?: string }) => {
       return requestApi.create({
         requestType: 'startup_member',
         actionType: 'join',
         toUserId: data.targetUserId,
         targetEntityType: 'startup',
-        targetEntityId: data.startupId,
+        targetEntityId: data.startup._id,
+        targetEntityTitle: data.startup.name,
         targetRole: data.targetRole,
         message: data.message,
+        metadata: {
+          startupName: data.startup.name,
+          workspaceId: data.startup.projectId,
+        },
       });
     },
     onSuccess: () => {
@@ -97,7 +102,7 @@ export function InviteModal({
       });
     } else if (inviteType === 'startup' && selectedStartup) {
       startupInviteMutation.mutate({
-        startupId: selectedStartup._id,
+        startup: selectedStartup,
         targetUserId: recipientId,
         targetRole: role,
         message: message || undefined,

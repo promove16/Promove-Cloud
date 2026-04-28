@@ -4,6 +4,7 @@ import { open } from 'fs/promises';
 import path from 'path';
 import { ClientSession, Types } from 'mongoose';
 import { logError } from '../../config/logger';
+import { env } from '../../config/env';
 import { redis } from '../../config/redis';
 import { io } from '../../config/socket';
 import { ApiError } from '../../utils/ApiError';
@@ -81,6 +82,7 @@ type AuditAction =
   | 'USER_ROLE_CHANGED'
   | 'USER_DEACTIVATED'
   | 'USER_ACTIVATED'
+  | 'USER_DELETED'
   | 'DEAL_REJECTED'
   | 'DEAL_REVIEW_UPDATED'
   | 'MENTOR_PROFILE_CREATED'
@@ -322,7 +324,7 @@ const registrationRequestItem = (user: {
       _id: Types.ObjectId;
       category: InstitutionVerificationDocumentCategory;
       fileUrl: string;
-      fileType: 'pdf' | 'image';
+      fileType: 'pdf' | 'image' | 'doc' | 'docx' | 'ppt' | 'pptx' | 'xls' | 'xlsx' | 'video' | 'audio' | 'other';
       fileName: string;
       fileSizeBytes: number;
       uploadedAt: Date;
@@ -698,7 +700,7 @@ const buildAdminDealReviewItem = (
     uploads: Array<{
       _id: Types.ObjectId;
       fileUrl: string;
-      fileType: 'pdf' | 'image';
+      fileType: 'pdf' | 'image' | 'doc' | 'docx' | 'ppt' | 'pptx' | 'xls' | 'xlsx' | 'video' | 'audio' | 'other';
       fileName: string;
       fileSizeBytes: number;
       uploadedAt: Date;
@@ -923,10 +925,14 @@ const deleteRefreshTokensForUser = async (userId: string) => {
   }
 };
 
-const findUser = async (userId: string) => {
-  const user = await User.findById(userId).select(
+const findUser = async (userId: string, session?: ClientSession) => {
+  const query = User.findById(userId).select(
     '_id displayName email role innovationScore isActive profileComplete registrationStage adminApprovalStatus adminApprovalRequestedAt adminApprovedAt adminApprovedBy adminApprovalRejectedAt adminApprovalRejectedReason accessGrantedBy accessExpiresAt createdAt avatar scoreBreakdown institutionProfile',
   );
+  if (session) {
+    query.session(session);
+  }
+  const user = await query;
   if (!user) throw new ApiError(404, 'USER_NOT_FOUND', 'User not found');
   return user;
 };
@@ -1004,6 +1010,36 @@ export const updateUserAccess = async (adminId: string, userId: string, isActive
   await deleteRefreshTokensForUser(userId);
   await createAudit(adminId, isActive ? 'USER_ACTIVATED' : 'USER_DEACTIVATED', userId, 'User', { isActive });
   return userListItem(user.toObject());
+};
+
+export const deleteUser = async (adminId: string, userId: string) => {
+  const result = await runMongoTransaction(async (session) => {
+    const user = await findUser(userId, session);
+
+    if (user.role === UserRole.ADMIN) {
+      throw new ApiError(403, 'ADMIN_USER_DELETE_FORBIDDEN', 'Admin users cannot be deleted.');
+    }
+
+    await createAudit(
+      adminId,
+      'USER_DELETED',
+      userId,
+      'User',
+      {
+        role: user.role,
+        email: user.email,
+        displayName: user.displayName,
+      },
+      session,
+    );
+
+    await User.deleteOne({ _id: user._id }).session(session);
+
+    return { deleted: true as const };
+  });
+
+  await deleteRefreshTokensForUser(userId);
+  return result;
 };
 
 export const reviewRegistrationRequest = async (
@@ -1827,7 +1863,7 @@ export const createMentorProfile = async (
   const displayName = sanitizePlainText(payload.displayName);
   const profileSlug = await generateProfileSlug(displayName);
   const temporaryPassword = generateTemporaryPassword();
-  const passwordHash = await bcrypt.hash(temporaryPassword, 12);
+  const passwordHash = await bcrypt.hash(temporaryPassword, env.BCRYPT_ROUNDS);
 
   const mentor = await User.create({
     email: normalizedEmail,

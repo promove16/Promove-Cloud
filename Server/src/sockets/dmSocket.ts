@@ -5,6 +5,7 @@ import { env } from '../config/env';
 import { DirectMessage } from '../modules/dm/dm.model';
 import { onlineUsers } from '../modules/dm/dm.controller';
 import { ensureDmAccess, ensureDmThreadAccess } from '../modules/dm/dm.permissions';
+import { serializeDirectMessage } from '../modules/dm/dm.serializer';
 
 // Map to store userId -> socket mapping for secure message routing
 const userSockets = new Map<string, Set<Socket>>();
@@ -17,6 +18,34 @@ const allowedQueryTypes = new Set<string>([
   'mentorship_program',
   'general',
 ]);
+
+const validateDmAttachmentStorage = (
+  senderId: string,
+  attachmentStorageProvider?: unknown,
+  attachmentStorageKey?: unknown,
+) => {
+  if (!attachmentStorageProvider && !attachmentStorageKey) {
+    return {};
+  }
+
+  if (attachmentStorageProvider !== 's3' && attachmentStorageProvider !== 'cloudinary') {
+    throw new Error('Attachment storage provider is invalid');
+  }
+
+  if (typeof attachmentStorageKey !== 'string' || !attachmentStorageKey.trim()) {
+    throw new Error('Attachment storage key is invalid');
+  }
+
+  const normalizedKey = attachmentStorageKey.trim();
+  if (!normalizedKey.startsWith(`dm/${senderId}/`)) {
+    throw new Error('Attachment does not belong to this sender');
+  }
+
+  return {
+    attachmentStorageProvider,
+    attachmentStorageKey: normalizedKey,
+  };
+};
 
 export const initDmSocket = (io: Server) => {
   const dm = io.of('/dm');
@@ -60,13 +89,27 @@ export const initDmSocket = (io: Server) => {
       attachmentUrl?: string; 
       attachmentType?: string; 
       attachmentName?: string;
+      attachmentStorageProvider?: string;
+      attachmentStorageKey?: string;
       queryType?: string;
     }) => {
       try {
         // CRITICAL: Use the socket's authenticated userId as sender, NOT from payload
         const senderId = userId;
         
-        const { recipientId, message, messageType, scheduledAt, meetLink, attachmentUrl, attachmentType, attachmentName, queryType } = data;
+        const {
+          recipientId,
+          message,
+          messageType,
+          scheduledAt,
+          meetLink,
+          attachmentUrl,
+          attachmentType,
+          attachmentName,
+          attachmentStorageProvider,
+          attachmentStorageKey,
+          queryType,
+        } = data;
 
         if (!recipientId || !Types.ObjectId.isValid(recipientId)) {
           socket.emit('dm:error', { message: 'Invalid recipient' });
@@ -92,6 +135,11 @@ export const initDmSocket = (io: Server) => {
         }
 
         await ensureDmAccess(senderId, recipientId, (queryType as any) || 'general');
+        const attachmentStorage = validateDmAttachmentStorage(
+          senderId,
+          attachmentStorageProvider,
+          attachmentStorageKey,
+        );
 
         // Create message with verified senderId from socket auth
         const msg = await DirectMessage.create({
@@ -105,13 +153,15 @@ export const initDmSocket = (io: Server) => {
           ...(attachmentUrl ? { attachmentUrl } : {}),
           ...(attachmentType ? { attachmentType } : {}),
           ...(attachmentName ? { attachmentName } : {}),
+          ...attachmentStorage,
         });
+        const serializedMessage = await serializeDirectMessage(msg.toObject());
 
         // Send ONLY to the intended recipient
-        dm.to(`user:${recipientId}`).emit('dm:message', msg);
+        dm.to(`user:${recipientId}`).emit('dm:message', serializedMessage);
         
         // Echo back to sender only (to their own sockets)
-        socket.emit('dm:message', msg);
+        socket.emit('dm:message', serializedMessage);
         
         console.log(`[DM] Message sent from ${senderId} to ${recipientId}`);
       } catch (_err) {

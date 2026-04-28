@@ -1,15 +1,165 @@
+# ProMove — local Docker Compose for testing all services together.
+#
+# Before running:
+#   node generate-local-env.js    # creates Server/.env with RSA keys
+#
+# Then:
+#   docker-compose up --build
+#
+# The MONGODB_URI in Server/.env points to the local 'mongo' service.
+# For Atlas, set MONGODB_URI=mongodb+srv://... in Server/.env instead.
+#
+# Production uses AWS ECS Fargate — see infra/ecs/ for task definitions.
+
 services:
-  server:
-    build: ./Server
+
+  # ── Infrastructure ────────────────────────────────────────────────────────
+
+  mongo:
+    image: mongo:7.0
+    ports:
+      - "27017:27017"
+    environment:
+      MONGO_INITDB_DATABASE: promove
+    volumes:
+      - mongo_data:/data/db
+    healthcheck:
+      test: ["CMD", "mongosh", "--quiet", "--eval", "db.adminCommand('ping').ok"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 20s
+
+  redis:
+    image: redis:7.2-alpine
+    ports:
+      - "6379:6379"
+    volumes:
+      - redis_data:/data
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 5s
+      timeout: 3s
+      retries: 5
+
+  # ── Server services — all built from the same Server/Dockerfile image ─────
+
+  api:
+    build:
+      context: ./Server
+      dockerfile: Dockerfile
     ports:
       - "5000:5000"
     env_file: ./Server/.env
-    depends_on: []
+    environment:
+      # Overrides for local compose — these win over env_file values.
+      MONGODB_URI: mongodb://mongo:27017/promove
+      AWS_REDIS_HOST: redis
+      AWS_REDIS_PORT: "6379"
+      AWS_REDIS_TLS: "false"
+      BULLMQ_USE_REDIS: "true"
+      CLIENT_URL: http://localhost:5173
+      MAIL_TRANSPORT: json
+    command: ["node", "dist/src/api.js"]
+    depends_on:
+      mongo:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "wget", "-qO-", "http://localhost:5000/healthz"]
+      interval: 20s
+      timeout: 5s
+      retries: 3
+      start_period: 30s
+
+  realtime:
+    build:
+      context: ./Server
+      dockerfile: Dockerfile
+    ports:
+      - "5001:5000"
+    env_file: ./Server/.env
+    environment:
+      MONGODB_URI: mongodb://mongo:27017/promove
+      AWS_REDIS_HOST: redis
+      AWS_REDIS_PORT: "6379"
+      AWS_REDIS_TLS: "false"
+      BULLMQ_USE_REDIS: "true"
+      CLIENT_URL: http://localhost:5173
+      MAIL_TRANSPORT: json
+    command: ["node", "dist/src/realtime.js"]
+    depends_on:
+      mongo:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "wget", "-qO-", "http://localhost:5000/healthz"]
+      interval: 20s
+      timeout: 5s
+      retries: 3
+      start_period: 30s
+
+  worker:
+    build:
+      context: ./Server
+      dockerfile: Dockerfile
+    ports:
+      - "9091:9091"
+    env_file: ./Server/.env
+    environment:
+      MONGODB_URI: mongodb://mongo:27017/promove
+      AWS_REDIS_HOST: redis
+      AWS_REDIS_PORT: "6379"
+      AWS_REDIS_TLS: "false"
+      BULLMQ_USE_REDIS: "true"
+      CLIENT_URL: http://localhost:5173
+      MAIL_TRANSPORT: json
+      WORKER_METRICS_PORT: "9091"
+    command: ["node", "dist/src/worker.js"]
+    depends_on:
+      mongo:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+
+  scheduler:
+    build:
+      context: ./Server
+      dockerfile: Dockerfile
+    ports:
+      - "9092:9092"
+    env_file: ./Server/.env
+    environment:
+      MONGODB_URI: mongodb://mongo:27017/promove
+      AWS_REDIS_HOST: redis
+      AWS_REDIS_PORT: "6379"
+      AWS_REDIS_TLS: "false"
+      BULLMQ_USE_REDIS: "true"
+      CLIENT_URL: http://localhost:5173
+      MAIL_TRANSPORT: json
+      SCHEDULER_HEALTH_PORT: "9092"
+    command: ["node", "dist/src/scheduler.js"]
+    depends_on:
+      mongo:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+
+  # ── Frontend ──────────────────────────────────────────────────────────────
 
   client:
     build: ./Client
     ports:
       - "5173:5173"
-    env_file: ./Client/.env.local
+    environment:
+      VITE_API_BASE_URL: http://localhost:5000
+      VITE_SOCKET_URL: http://localhost:5001
     depends_on:
-      - server
+      api:
+        condition: service_healthy
+
+volumes:
+  mongo_data:
+  redis_data:

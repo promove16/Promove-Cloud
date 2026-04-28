@@ -40,6 +40,8 @@ export interface WorkspaceUpload {
   note?: string;
   category?: WorkspaceUploadCategory;
   mimeType?: string;
+  storageProvider?: 'cloudinary' | 's3';
+  storageKey?: string;
 }
 
 export interface WorkspaceRepoSubmission {
@@ -149,6 +151,7 @@ export interface ChatMessage {
   attachmentName?: string;
   attachmentSizeBytes?: number;
   attachmentMimeType?: string;
+  attachmentUploadId?: string;
   attachment?: ChatMessageAttachment;
   codeSnippet?: ChatMessageCodeSnippet;
   sentAt: string;

@@ -2,7 +2,7 @@ import { Types } from 'mongoose';
 import { z } from 'zod';
 import { notificationQueue } from '../../config/bullmq';
 import { applyScoreAsync } from '../../services/scoreEngine';
-import { deleteStoredAsset, uploadFile } from '../../services/fileStorageService';
+import { deleteStoredAsset, generatePresignedUrl, uploadFile } from '../../services/fileStorageService';
 import { generateSignedCloudinaryUrl } from '../../services/cloudinaryService';
 import { User } from '../user/user.model';
 import { Startup } from './startup.model';
@@ -1328,7 +1328,7 @@ const calculateStartupInnovationScoreBreakdown = (
 const calculateStartupInnovationScore = (startup: Record<string, any>) =>
   calculateStartupInnovationScoreBreakdown(startup).total;
 
-const sanitizeStartupForClient = (startup: Record<string, any>) => {
+const sanitizeStartupForClient = async (startup: Record<string, any>) => {
   const editAccess = buildStartupEditAccess(startup);
   const innovationScorePreview = calculateStartupInnovationScoreBreakdown(startup);
 
@@ -1340,6 +1340,8 @@ const sanitizeStartupForClient = (startup: Record<string, any>) => {
         if (storageKey) {
           pitchDeckUrl = generateSignedCloudinaryUrl(storageKey, 'raw');
         }
+      } else if (startup.pitchDeckStorageProvider === 's3' && startup.pitchDeckStorageKey) {
+        pitchDeckUrl = await generatePresignedUrl(startup.pitchDeckStorageKey);
       }
     } catch (error) {
       console.error('Error generating signed URL for pitch deck:', error);
@@ -1376,7 +1378,7 @@ const extractCloudinaryPublicId = (url: string): string | null => {
   return match ? match[1].replace(/\.[^.]+$/, '') : null;
 };
 
-const serializeStartup = (startup: { toObject?: () => Record<string, any> } | Record<string, any>) => {
+const serializeStartup = async (startup: { toObject?: () => Record<string, any> } | Record<string, any>) => {
   const base = typeof (startup as { toObject?: () => Record<string, any> }).toObject === 'function'
     ? (startup as { toObject: () => Record<string, any> }).toObject()
     : (startup as Record<string, any>);
@@ -1405,7 +1407,7 @@ export const getMyStartups = async (userId: string) => {
   const startups = await Startup.find(buildAccessibleStartupQuery(userId, workspaceIds))
     .sort({ updatedAt: -1 })
     .lean();
-  return startups.map((startup) => serializeStartup(startup));
+  return Promise.all(startups.map((startup) => serializeStartup(startup)));
 };
 
 export const getStartupById = async (startupId: string, userId: string) => {

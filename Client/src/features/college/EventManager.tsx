@@ -385,7 +385,7 @@ export default function EventManager({
   );
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-6 pb-24 xl:pb-8">
       <InstitutionWorkspaceHeader
         mode={config.headerMode}
         eyebrow="Events Studio"

@@ -92,7 +92,19 @@ export function PlaceBidModal({ startupId, startupName, board, defaultType = 'pe
 
   const canPenny = board.acceptsPennyInvestors;
   const canSole = board.acceptsSoleInvestor && !board.hasSoleInvestorAccepted;
-  const existingBid = board.currentUserBid;
+  const currentUserPennyBid = board.pennyPool.contributors.find((contributor) => contributor.isCurrentUser);
+  const currentUserSoleBid = board.soleBids.find((bid) => bid.isCurrentUser);
+  const existingBid =
+    board.currentUserBid ??
+    (currentUserPennyBid
+      ? { bidId: currentUserPennyBid.bidId, investorType: 'penny' as const, status: 'pending' as const }
+      : currentUserSoleBid
+        ? {
+            bidId: currentUserSoleBid.bidId,
+            investorType: 'sole' as const,
+            status: currentUserSoleBid.founderDecisionStatus,
+          }
+        : undefined);
 
   if (existingBid) {
     return (

@@ -214,12 +214,12 @@ export function StartupWorkspace() {
     if (!msg && !chatAttachment) return;
     setIsSendingChat(true);
     try {
-      let attachment: { attachmentUrl: string; attachmentType: "image" | "pdf" | "doc" | "ppt" | "xls"; attachmentName: string; attachmentSizeBytes: number; attachmentMimeType?: string } | undefined;
+      let attachment: { attachmentUrl: string; attachmentType: "image" | "pdf" | "doc" | "ppt" | "xls"; attachmentName: string; attachmentSizeBytes: number; attachmentMimeType?: string; attachmentUploadId?: string } | undefined;
       if (chatAttachment) {
         const uploads = await workspaceApi.upload(workspaceId, chatAttachment, "Chat");
         const latest = uploads[uploads.length - 1];
         if (latest?.fileUrl) {
-          attachment = { attachmentUrl: latest.fileUrl, attachmentType: latest.fileType as any, attachmentName: latest.fileName, attachmentSizeBytes: latest.fileSizeBytes };
+          attachment = { attachmentUrl: latest.fileUrl, attachmentType: latest.fileType as any, attachmentName: latest.fileName, attachmentSizeBytes: latest.fileSizeBytes, attachmentUploadId: latest._id };
         }
       }
       chat.sendMessage({ workspaceId, message: msg, ...(attachment ?? {}) });

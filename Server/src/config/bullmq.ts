@@ -2,25 +2,27 @@ import { Job, JobsOptions, Queue, Worker, WorkerOptions } from 'bullmq';
 import IORedis from 'ioredis';
 import { env } from './env';
 import { logError, logger } from './logger';
+import { hasRedisConnectionConfig, resolveRedisOptions } from './redisConnection';
 import { ApiRequestActivityPayload } from '../modules/analytics/activity.types';
+import {
+  queueDepth,
+  queueJobDuration,
+  queueJobsProcessed,
+  queueWaitTime,
+} from '../middleware/metrics';
 
-export const hasBullMqRedisConnection = env.BULLMQ_USE_REDIS && Boolean(env.UPSTASH_REDIS_PASSWORD);
+export const hasBullMqRedisConnection = env.BULLMQ_USE_REDIS && hasRedisConnectionConfig();
 
 const DEFAULT_JOB_OPTIONS: Pick<JobsOptions, 'removeOnComplete' | 'removeOnFail'> = {
   removeOnComplete: 100,
   removeOnFail: 100,
 };
 
-const baseConnection = {
-  host: env.UPSTASH_REDIS_HOST,
-  port: 6379,
-  password: env.UPSTASH_REDIS_PASSWORD ?? env.UPSTASH_REDIS_REST_TOKEN,
-  tls: {},
-  lazyConnect: true,
-  enableOfflineQueue: false,
+const baseConnection = resolveRedisOptions({
+  connectionName: 'promove:bullmq',
   connectTimeout: env.BULLMQ_CONNECT_TIMEOUT_MS,
-  retryStrategy: () => null,
-};
+  commandTimeout: env.BULLMQ_COMMAND_TIMEOUT_MS,
+});
 
 const connection = {
   ...baseConnection,
@@ -30,12 +32,15 @@ const connection = {
 
 export const bullmqConnection = connection;
 
+const { commandTimeout: _workerCommandTimeout, ...workerBaseConnection } = baseConnection;
+void _workerCommandTimeout;
+
 const workerConnection = {
-  ...baseConnection,
+  ...workerBaseConnection,
   maxRetriesPerRequest: null,
 };
 
-const UPSTASH_REQUEST_LIMIT_PATTERN = /max requests limit exceeded/i;
+const REDIS_REQUEST_LIMIT_PATTERN = /max requests limit exceeded/i;
 const NON_RECOVERABLE_REDIS_TRANSPORT_PATTERNS = [
   /stream isn't writeable/i,
   /connection is closed/i,
@@ -86,12 +91,28 @@ const createMockQueue = <T>(): QueueLike<T> => ({
   add: async () => ({ id: 'mock-job' } as never),
 });
 
+const BULLMQ_RESERVED_SEPARATOR_PATTERN = /:/g;
+
+const toBullMqSafeIdentifier = (value: string) =>
+  value.replace(BULLMQ_RESERVED_SEPARATOR_PATTERN, '-');
+
+const sanitizeJobOptions = (opts?: JobsOptions): JobsOptions | undefined => {
+  if (!opts?.jobId) {
+    return opts;
+  }
+
+  return {
+    ...opts,
+    jobId: toBullMqSafeIdentifier(opts.jobId),
+  };
+};
+
 const localProcessors = new Map<string, (job: QueueJob<unknown>, opts?: JobsOptions) => Promise<void>>();
 const localFailedHandlers = new Map<string, Array<FailedHandler<unknown>>>();
 
 const isBullMqRedisRequestLimitError = (error: unknown) => {
   const message = error instanceof Error ? error.message : String(error);
-  return UPSTASH_REQUEST_LIMIT_PATTERN.test(message);
+  return REDIS_REQUEST_LIMIT_PATTERN.test(message);
 };
 
 const isBullMqRedisTransportError = (error: unknown) => {
@@ -268,7 +289,7 @@ const emitLocalFailure = <T>(queueName: string, job: QueueJob<T>, error: Error) 
 };
 
 const withDefaultJobOptions = (opts?: JobsOptions): JobsOptions => ({
-  ...opts,
+  ...sanitizeJobOptions(opts),
   removeOnComplete: opts?.removeOnComplete ?? DEFAULT_JOB_OPTIONS.removeOnComplete,
   removeOnFail: opts?.removeOnFail ?? DEFAULT_JOB_OPTIONS.removeOnFail,
 });
@@ -427,7 +448,26 @@ export const createQueueWorker = <T>(
 
   const worker = new Worker(
     queueName,
-    async (job: Job<T>) => processor({ id: job.id, name: job.name, data: job.data }),
+    async (job: Job<T>) => {
+      // Queue lag = time between enqueue (job.timestamp) and processing start.
+      if (typeof job.timestamp === 'number') {
+        const waitSeconds = Math.max(0, (Date.now() - job.timestamp) / 1000);
+        queueWaitTime.observe({ queue: queueName }, waitSeconds);
+      }
+
+      const start = process.hrtime.bigint();
+      try {
+        await processor({ id: job.id, name: job.name, data: job.data });
+        const seconds = Number(process.hrtime.bigint() - start) / 1e9;
+        queueJobDuration.observe({ queue: queueName }, seconds);
+        queueJobsProcessed.inc({ queue: queueName, status: 'completed' });
+      } catch (error) {
+        const seconds = Number(process.hrtime.bigint() - start) / 1e9;
+        queueJobDuration.observe({ queue: queueName }, seconds);
+        queueJobsProcessed.inc({ queue: queueName, status: 'failed' });
+        throw error;
+      }
+    },
     {
       ...options,
       autorun: false,
@@ -446,15 +486,96 @@ export const createQueueWorker = <T>(
     logError(`BullMQ worker "${queueName}" error`, error);
   });
 
+  // Dead-letter handling: when a job exhausts its retries we forward a snapshot
+  // to a sibling DLQ so it can be inspected and replayed manually. This avoids
+  // silent data loss when a poison-pill payload keeps failing.
+  worker.on('failed', async (job, error) => {
+    if (!job) return;
+    const attemptsMade = job.attemptsMade ?? 0;
+    const attemptsAllowed = job.opts?.attempts ?? 1;
+    if (attemptsMade < attemptsAllowed) return; // will retry — not yet dead
+
+    queueJobsProcessed.inc({ queue: queueName, status: 'dlq' });
+    try {
+      await getDeadLetterQueue(queueName).add(
+        'dead-letter',
+        {
+          originalQueue: queueName,
+          jobId: job.id,
+          name: job.name,
+          data: job.data,
+          failedReason: error.message,
+          stack: error.stack,
+          attemptsMade,
+          enqueuedAt: job.timestamp,
+          failedAt: Date.now(),
+        },
+        { removeOnComplete: 1000, removeOnFail: 1000 },
+      );
+    } catch (dlqError) {
+      logError(`BullMQ DLQ add failed for queue "${queueName}"`, dlqError);
+    }
+  });
+
   startRemoteWorker(queueName, worker);
 
   return worker as QueueWorkerLike<T>;
+};
+
+const deadLetterQueues = new Map<string, Queue>();
+const getDeadLetterQueue = (queueName: string): Queue => {
+  const dlqName = toBullMqSafeIdentifier(`${queueName}-dlq`);
+  let dlq = deadLetterQueues.get(dlqName);
+  if (!dlq) {
+    dlq = new Queue(dlqName, { connection });
+    deadLetterQueues.set(dlqName, dlq);
+    remoteQueues.add(dlq);
+  }
+  return dlq;
+};
+
+/**
+ * Periodically polls queue depth (waiting/active/delayed/failed) and exports as
+ * Prometheus gauges. Call once at startup.
+ */
+let depthPoller: NodeJS.Timeout | null = null;
+export const startQueueDepthPoller = (intervalMs = 15000) => {
+  if (depthPoller || env.NODE_ENV === 'test' || !isRemoteBullMqActive()) {
+    return;
+  }
+
+  const poll = async () => {
+    for (const queue of remoteQueues) {
+      try {
+        const counts = await queue.getJobCounts('waiting', 'active', 'delayed', 'failed');
+        for (const [state, count] of Object.entries(counts)) {
+          queueDepth.set({ queue: queue.name, state }, count as number);
+        }
+      } catch (error) {
+        // Don't crash the app on metric failures.
+        logger.debug(`queue depth poll failed for ${queue.name}: ${(error as Error).message}`);
+      }
+    }
+  };
+
+  depthPoller = setInterval(poll, intervalMs);
+  // Don't keep the event loop alive just for metrics.
+  depthPoller.unref?.();
+  void poll();
+};
+
+export const stopQueueDepthPoller = () => {
+  if (depthPoller) {
+    clearInterval(depthPoller);
+    depthPoller = null;
+  }
 };
 
 export const scoreQueue = createSafeQueue('score-recalc');
 export const notificationQueue = createSafeQueue('notifications');
 export const emailQueue = createSafeQueue('emails');
 export const activityQueue = createSafeQueue<ApiRequestActivityPayload>('activity');
+export const mongoExcelBackupQueue = createSafeQueue('mongo-excel-backup');
 export const institutionVerifyQueue = createSafeQueue<{ userId: string; token: string }>(
   'institution-verify',
 );

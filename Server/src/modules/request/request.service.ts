@@ -14,6 +14,10 @@ import {
 
 const DEFAULT_REQUEST_TTL_MS = 7 * 24 * 60 * 60 * 1000;
 const COLLEGE_HIRING_REQUEST_COOLDOWN_MS = 30 * 24 * 60 * 60 * 1000;
+const ACCEPTED_REQUEST_TYPES_BLOCK_REINVITE = new Set<RequestType>([
+  'workspace_member',
+  'startup_member',
+]);
 
 type RequestHandler = {
   validateAccept?: (request: RequestDocument, actorUserId: string) => Promise<void>;
@@ -400,6 +404,74 @@ const assertCollegeHiringRequestCooldown = async (params: {
   );
 };
 
+const getMetadataString = (metadata: Record<string, unknown> | undefined, key: string) => {
+  const value = metadata?.[key];
+  return typeof value === 'string' ? value.trim() : '';
+};
+
+const assertAcceptedInviteNotRepeated = async (params: {
+  type: RequestType;
+  institutionId?: Types.ObjectId | null;
+  toUserId?: string;
+  recipientEmail?: string;
+  targetEntityType: string;
+  targetEntityId: string;
+  metadata?: Record<string, unknown>;
+}) => {
+  if (!ACCEPTED_REQUEST_TYPES_BLOCK_REINVITE.has(params.type)) {
+    return;
+  }
+
+  assertRecipient(params);
+
+  const recipientEmail = normalizeEmail(params.recipientEmail);
+  const workspaceId =
+    getMetadataString(params.metadata, 'workspaceId') ||
+    (params.targetEntityType === 'workspace' ? params.targetEntityId : '');
+  const acceptedTypes: RequestType[] =
+    workspaceId && ['workspace_member', 'startup_member'].includes(params.type)
+      ? ['workspace_member', 'startup_member']
+      : [params.type];
+  const targetFilters: FilterQuery<IRequest>[] = [
+    {
+      targetEntityType: params.targetEntityType,
+      targetEntityId: params.targetEntityId,
+    },
+  ];
+
+  if (workspaceId) {
+    targetFilters.push({ 'metadata.workspaceId': workspaceId } as FilterQuery<IRequest>);
+    targetFilters.push({
+      targetEntityType: 'workspace',
+      targetEntityId: workspaceId,
+    });
+  }
+
+  const existingAccepted = await RequestRecord.findOne(
+    scopedRequestFilter(
+      {
+        type: acceptedTypes.length === 1 ? acceptedTypes[0] : { $in: acceptedTypes },
+        status: 'accepted',
+        ...(params.toUserId ? { toUserId: objectId(params.toUserId) } : { recipientEmail }),
+        ...(targetFilters.length === 1 ? targetFilters[0] : { $or: targetFilters }),
+      },
+      params.institutionId ? String(params.institutionId) : null,
+    ),
+  )
+    .select('_id')
+    .lean<{ _id: Types.ObjectId } | null>();
+
+  if (!existingAccepted) {
+    return;
+  }
+
+  throw new ApiError(
+    409,
+    'INVITE_ALREADY_ACCEPTED',
+    'This invite was already accepted for this user and workspace.',
+  );
+};
+
 export const createRequest = async (params: {
   type: RequestType;
   actionType?: RequestActionType;
@@ -431,6 +503,11 @@ export const createRequest = async (params: {
   if (params.toUserId && params.toUserId === params.fromUserId && params.metadata?.allowSelfRequest !== true) {
     throw new ApiError(400, 'REQUEST_SELF_RECIPIENT', 'Sender and receiver must be different users.');
   }
+  await assertAcceptedInviteNotRepeated({
+    ...params,
+    institutionId,
+    recipientEmail,
+  });
 
   const existing = isCollegeHiringRequestWithCooldown(params)
     ? null

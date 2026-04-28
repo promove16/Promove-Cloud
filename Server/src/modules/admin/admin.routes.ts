@@ -28,6 +28,7 @@ import {
   getDealsController,
   getPatentsController,
   getUsersController,
+  deleteUserController,
   rejectRegistrationRequestController,
   rejectAwardController,
   rejectPatentController,
@@ -102,6 +103,7 @@ router.patch('/registration-requests/:id/approve', asyncHandler(approveRegistrat
 router.patch('/registration-requests/:id/reject', asyncHandler(rejectRegistrationRequestController));
 router.patch('/users/:id/role', asyncHandler(updateUserRoleController));
 router.patch('/users/:id/access', asyncHandler(updateUserAccessController));
+router.delete('/users/:id', asyncHandler(deleteUserController));
 router.patch('/users/:id/registration-request', asyncHandler(reviewRegistrationRequestController));
 router.get('/mentors', asyncHandler(getMentorsController));
 router.post('/mentors', asyncHandler(createMentorProfileController));

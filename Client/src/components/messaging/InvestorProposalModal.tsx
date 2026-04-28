@@ -14,19 +14,27 @@ import {
 } from 'lucide-react';
 import { startupApi } from '../../api/startup.api';
 import { workspaceApi } from '../../api/workspace.api';
-import { Startup } from '../../types/startup.types';
-import { Workspace } from '../../types/workspace.types';
+import type { Startup } from '../../types/startup.types';
+import type { Workspace } from '../../types/workspace.types';
 
 interface InvestorProposalModalProps {
   isOpen: boolean;
   onClose: () => void;
-  onSend: (message: string) => void;
+  onSend: (payload: InvestorProposalPayload) => void;
   recipientName: string;
   isStudent: boolean;
   preferredStartupId?: string;
 }
 
+export type InvestorProposalPayload = {
+  message: string;
+  startupId?: string;
+  workspaceId?: string;
+};
+
 type ProposalSource = {
+  startupId?: string;
+  workspaceId?: string;
   name: string;
   tagline: string;
   category: string;
@@ -86,6 +94,8 @@ const buildProposalSource = (
 
   if (selectedProject) {
     return {
+      ...(linkedStartupFromProject ? { startupId: linkedStartupFromProject._id } : {}),
+      workspaceId: selectedProject._id,
       name: linkedStartupFromProject?.name || selectedProject.title,
       tagline:
         linkedStartupFromProject?.tagline ||
@@ -105,6 +115,8 @@ const buildProposalSource = (
   }
 
   return {
+    startupId: selectedStartup._id,
+    ...(selectedStartup.projectId ? { workspaceId: selectedStartup.projectId } : {}),
     name: selectedStartup.name,
     tagline: selectedStartup.tagline,
     category: selectedStartup.category,
@@ -239,7 +251,11 @@ export function InvestorProposalModal({
 
   const handleSend = (message: string) => {
     if (!message.trim()) return;
-    onSend(message);
+    onSend({
+      message,
+      ...(proposalSource?.startupId ? { startupId: proposalSource.startupId } : {}),
+      ...(proposalSource?.workspaceId ? { workspaceId: proposalSource.workspaceId } : {}),
+    });
     onClose();
     setCustomNote('');
     setSelectedProjectId(null);

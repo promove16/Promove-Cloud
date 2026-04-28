@@ -670,6 +670,10 @@ export const adminApi = {
     });
     return response.data.data;
   },
+  async deleteUser(userId: string) {
+    const response = await api.delete<ApiSuccessResponse<{ deleted: true }>>(`/api/admin/users/${userId}`);
+    return response.data.data;
+  },
   async reviewRegistrationRequest(
     userId: string,
     payload: { decision: 'approved' | 'rejected'; reason?: string },

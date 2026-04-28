@@ -242,12 +242,12 @@ export function StudentNegotiationCard({ deal, investorIndex }: StudentNegotiati
         <div className="rounded-lg border border-slate-800 bg-slate-950 p-3">
           <div className="flex items-center gap-2 text-xs uppercase tracking-wider text-slate-400 mb-2">
             <MessageSquare className="h-3.5 w-3.5" />
-            Messages
+            Negotiation Room
           </div>
-          <div className="max-h-40 space-y-2 overflow-y-auto mb-3">
+          <div className="max-h-56 space-y-2 overflow-y-auto mb-3">
             {(!negotiation?.messages || negotiation.messages.length === 0) ? (
               <div className="py-2 text-center text-xs text-slate-500">
-                No messages yet.
+                No negotiation messages yet.
               </div>
             ) : (
               negotiation.messages.map((msg) => (
@@ -278,7 +278,7 @@ export function StudentNegotiationCard({ deal, investorIndex }: StudentNegotiati
             <Input
               value={message}
               onChange={(e) => setMessage(e.target.value)}
-              placeholder="Type a message..."
+              placeholder="Write negotiation message..."
               className="h-8 text-sm"
               onKeyDown={(e) => e.key === 'Enter' && handleSendMessage()}
             />

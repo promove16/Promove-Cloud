@@ -45,6 +45,17 @@ const MAX_PENNY_EQUITY_PER_INVESTOR = 5;
 const DEFAULT_PROMOVE_ROYALTY_PERCENTAGE = 5;
 const DEFAULT_SHARE_CLASS_LABEL = 'Common Equity';
 
+const formatNegotiationAmount = (amount: number) => `INR ${amount.toLocaleString('en-IN')}`;
+
+const buildTermsMessage = (
+  senderRole: 'investor' | 'student',
+  amountINR: number,
+  equityPercent: number,
+) =>
+  senderRole === 'investor'
+    ? `Investor proposed terms: ${formatNegotiationAmount(amountINR)} for ${equityPercent}% equity.`
+    : `Student countered: ${formatNegotiationAmount(amountINR)} for ${equityPercent}% equity.`;
+
 export const ExpressInterestSchema = z.object({
   investorType: z.enum(['penny', 'sole']),
   proposedAmountINR: z.number().min(20000),
@@ -82,6 +93,7 @@ export const linkWorkshopSchema = z.object({
 });
 
 type DealDocumentLike = IDeal & { _id: Types.ObjectId };
+type NegotiationParticipantRole = 'investor' | 'student';
 
 type LeanUser = {
   _id: Types.ObjectId;
@@ -132,6 +144,11 @@ type LeanProductWorkshop = {
 };
 
 type ExpressInterestInput = z.infer<typeof ExpressInterestSchema>;
+const BIDDER_ACCOUNT_ROLES = new Set<UserRole>([
+  UserRole.STUDENT,
+  UserRole.INVESTOR,
+  UserRole.MENTOR,
+]);
 
 const capTableCacheKey = (startupId: string) => `cap-table:${startupId}`;
 const pennyEquityCacheKey = (startupId: string) => `penny-equity:${startupId}`;
@@ -471,6 +488,18 @@ const ensureInvestor = async (investorId: string) => {
   return investor;
 };
 
+const ensureBidderAccount = async (userId: string) => {
+  const user = await User.findById(userId)
+    .select('_id displayName role isActive')
+    .lean<LeanUser & { isActive?: boolean }>();
+
+  if (!user || !BIDDER_ACCOUNT_ROLES.has(user.role) || !user.isActive) {
+    throw new ApiError(403, 'FORBIDDEN', 'Only active students, investors, and mentors can bid');
+  }
+
+  return user;
+};
+
 const ensureStudent = async (studentId: string) => {
   const student = await User.findById(studentId)
     .select('_id displayName role isActive')
@@ -501,6 +530,43 @@ const getAccessibleStartupIdsForStudent = async (userId: string) => {
     .lean<Array<{ _id: Types.ObjectId }>>();
 
   return startups.map((startup) => startup._id);
+};
+
+const resolveDealAccessFilter = async (userId: string, role: UserRole) => {
+  if (role === UserRole.ADMIN) {
+    return {};
+  }
+
+  if (role === UserRole.INVESTOR || role === UserRole.MENTOR) {
+    return { investorId: userId };
+  }
+
+  if (role === UserRole.STUDENT) {
+    const startupIds = await getAccessibleStartupIdsForStudent(userId);
+    return {
+      $or: [
+        { investorId: userId },
+        ...(startupIds.length > 0 ? [{ startupId: { $in: startupIds } }] : []),
+      ],
+    };
+  }
+
+  throw new ApiError(403, 'FORBIDDEN', 'You cannot access this deal');
+};
+
+const resolveNegotiationParticipantRole = (
+  deal: Pick<DealDocumentLike, 'investorId' | 'studentId'>,
+  userId: string,
+): NegotiationParticipantRole => {
+  if (String(deal.investorId) === userId) {
+    return 'investor';
+  }
+
+  if (String(deal.studentId) === userId) {
+    return 'student';
+  }
+
+  throw new ApiError(403, 'FORBIDDEN', 'You cannot participate in this negotiation');
 };
 
 const resolveNormalizedRole = (investorType: InvestorType, chosenRole?: InvestorRole): InvestorRole => {
@@ -702,7 +768,7 @@ export const createInvestorDealFromInterest = async (
   payload: ExpressInterestInput,
 ) => {
   const parsed = ExpressInterestSchema.parse(payload);
-  await ensureInvestor(investorId);
+  await ensureBidderAccount(investorId);
 
   const transactionResult = await runMongoTransaction(async (session) => {
     const startup = await Startup.findOne({
@@ -718,6 +784,10 @@ export const createInvestorDealFromInterest = async (
 
     if (!startup) {
       throw new ApiError(404, 'STARTUP_NOT_FOUND', 'Startup not found');
+    }
+
+    if (startup.founderIds.some((id) => String(id) === investorId)) {
+      throw new ApiError(400, 'SELF_BID', 'Founders cannot bid on their own startup');
     }
 
     const studentId = startup.founderIds[0];
@@ -908,23 +978,33 @@ export const listDealsForInvestor = async (investorId: string): Promise<DealGrou
 };
 
 export const listDealsForParticipant = async (userId: string, role: UserRole): Promise<DealSummaryView[]> => {
-  if (role !== UserRole.INVESTOR && role !== UserRole.STUDENT) {
-    throw new ApiError(403, 'FORBIDDEN', 'Only investors and students can access deal lists');
+  if (role === UserRole.INVESTOR || role === UserRole.MENTOR) {
+    await ensureBidderAccount(userId);
+    const deals = await Deal.find({ investorId: userId, status: { $ne: 'cancelled' } })
+      .sort({ updatedAt: -1, createdAt: -1 })
+      .lean<DealDocumentLike[]>();
+
+    const contexts = await Promise.all(deals.map(async (deal) => ({ deal, ...(await fetchDealContext(deal)) })));
+
+    return contexts.map(({ deal, startup, student, investor, productWorkshop }) =>
+      buildSummary(deal, startup, student, investor, investor.displayName, productWorkshop),
+    );
   }
 
-  if (role === UserRole.INVESTOR) {
-    const grouped = await listDealsForInvestor(userId);
-    return grouped.flatMap((group) => group.deals);
+  if (role !== UserRole.STUDENT) {
+    throw new ApiError(403, 'FORBIDDEN', 'Only students, investors, and mentors can access deal lists');
   }
 
   await ensureStudent(userId);
   const startupIds = await getAccessibleStartupIdsForStudent(userId);
 
-  if (startupIds.length === 0) {
-    return [];
-  }
-
-  const deals = await Deal.find({ startupId: { $in: startupIds }, status: { $ne: 'cancelled' } })
+  const deals = await Deal.find({
+    status: { $ne: 'cancelled' },
+    $or: [
+      { investorId: userId },
+      ...(startupIds.length > 0 ? [{ startupId: { $in: startupIds } }] : []),
+    ],
+  })
     .sort({ updatedAt: -1, createdAt: -1 })
     .lean<DealDocumentLike[]>();
 
@@ -943,18 +1023,19 @@ export const listDealsForParticipant = async (userId: string, role: UserRole): P
 };
 
 export const getDealForParticipant = async (userId: string, role: UserRole, dealId: string): Promise<DealDetailView> => {
-  if (role !== UserRole.INVESTOR && role !== UserRole.STUDENT && role !== UserRole.ADMIN) {
+  if (
+    role !== UserRole.INVESTOR &&
+    role !== UserRole.STUDENT &&
+    role !== UserRole.MENTOR &&
+    role !== UserRole.ADMIN
+  ) {
     throw new ApiError(403, 'FORBIDDEN', 'You cannot access this deal');
   }
 
-  const studentStartupIds = role === UserRole.STUDENT ? await getAccessibleStartupIdsForStudent(userId) : [];
+  const accessFilter = await resolveDealAccessFilter(userId, role);
   const deal = await Deal.findOne({
     _id: dealId,
-    ...(role === UserRole.ADMIN
-      ? {}
-      : role === UserRole.INVESTOR
-        ? { investorId: userId }
-        : { startupId: { $in: studentStartupIds } }),
+    ...accessFilter,
   }).lean<DealDocumentLike | null>();
 
   if (!deal || deal.status === 'cancelled') {
@@ -1985,7 +2066,6 @@ export const addNegotiationMessage = async (
   dealId: string,
   userId: string,
   message: string,
-  senderRole: 'investor' | 'student',
 ) => {
   const deal = await Deal.findById(dealId);
   if (!deal || deal.status === 'cancelled') {
@@ -1996,12 +2076,7 @@ export const addNegotiationMessage = async (
     throw new ApiError(400, 'INVALID_STAGE', 'Negotiation is only allowed at Stage 0');
   }
 
-  if (
-    (senderRole === 'investor' && String(deal.investorId) !== userId) ||
-    (senderRole === 'student' && String(deal.studentId) !== userId)
-  ) {
-    throw new ApiError(403, 'FORBIDDEN', 'You cannot participate in this negotiation');
-  }
+  const senderRole = resolveNegotiationParticipantRole(deal, userId);
 
   if (!deal.negotiation) {
     deal.negotiation = {
@@ -2009,6 +2084,7 @@ export const addNegotiationMessage = async (
       messages: [],
     };
   }
+  deal.negotiation.messages = deal.negotiation.messages || [];
 
   deal.negotiation.messages.push({
     _id: new Types.ObjectId(),
@@ -2028,7 +2104,6 @@ export const proposeNegotiationTerms = async (
   userId: string,
   amountINR: number,
   equityPercent: number,
-  senderRole: 'investor' | 'student',
 ) => {
   const deal = await Deal.findById(dealId);
   if (!deal || deal.status === 'cancelled') {
@@ -2039,22 +2114,34 @@ export const proposeNegotiationTerms = async (
     throw new ApiError(400, 'INVALID_STAGE', 'Negotiation is only allowed at Stage 0');
   }
 
+  const senderRole = resolveNegotiationParticipantRole(deal, userId);
+
   if (senderRole === 'investor') {
-    if (String(deal.investorId) !== userId) {
-      throw new ApiError(403, 'FORBIDDEN', 'Only the investor can propose terms');
-    }
     deal.negotiation = deal.negotiation || { status: 'initial', messages: [] };
+    deal.negotiation.messages = deal.negotiation.messages || [];
     deal.negotiation.investorProposedAmount = amountINR;
     deal.negotiation.investorProposedEquity = equityPercent;
     deal.negotiation.status = 'terms_proposed';
+    deal.negotiation.messages.push({
+      _id: new Types.ObjectId(),
+      senderId: new Types.ObjectId(userId),
+      senderRole,
+      message: buildTermsMessage(senderRole, amountINR, equityPercent),
+      timestamp: new Date(),
+    });
   } else {
-    if (String(deal.studentId) !== userId) {
-      throw new ApiError(403, 'FORBIDDEN', 'Only the student can counter-offer');
-    }
     deal.negotiation = deal.negotiation || { status: 'initial', messages: [] };
+    deal.negotiation.messages = deal.negotiation.messages || [];
     deal.negotiation.studentCounterAmount = amountINR;
     deal.negotiation.studentCounterEquity = equityPercent;
     deal.negotiation.status = 'counter_offer';
+    deal.negotiation.messages.push({
+      _id: new Types.ObjectId(),
+      senderId: new Types.ObjectId(userId),
+      senderRole,
+      message: buildTermsMessage(senderRole, amountINR, equityPercent),
+      timestamp: new Date(),
+    });
   }
 
   deal.negotiation.lastUpdatedAt = new Date();
@@ -2065,7 +2152,6 @@ export const proposeNegotiationTerms = async (
 export const agreeNegotiationTerms = async (
   dealId: string,
   userId: string,
-  senderRole: 'investor' | 'student',
 ) => {
   const deal = await Deal.findById(dealId);
   if (!deal || deal.status === 'cancelled') {
@@ -2075,6 +2161,8 @@ export const agreeNegotiationTerms = async (
   if (deal.stage !== 0) {
     throw new ApiError(400, 'INVALID_STAGE', 'Negotiation is only allowed at Stage 0');
   }
+
+  const senderRole = resolveNegotiationParticipantRole(deal, userId);
 
   if (!deal.negotiation?.investorProposedAmount) {
     throw new ApiError(400, 'NO_TERMS', 'No terms have been proposed yet');
@@ -2087,6 +2175,7 @@ export const agreeNegotiationTerms = async (
   }
 
   deal.negotiation = deal.negotiation || { status: 'initial', messages: [] };
+  deal.negotiation.messages = deal.negotiation.messages || [];
   if (
     senderRole === 'investor' &&
     typeof deal.negotiation.studentCounterAmount === 'number' &&
@@ -2101,6 +2190,19 @@ export const agreeNegotiationTerms = async (
   deal.negotiation.status = 'terms_agreed';
   deal.negotiation.termsAgreedAt = new Date();
   deal.negotiation.lastUpdatedAt = new Date();
+  const agreedAmount = deal.negotiation.finalAgreedAmount;
+  const agreedEquity = deal.negotiation.finalAgreedEquity;
+  if (typeof agreedAmount === 'number' && typeof agreedEquity === 'number') {
+    deal.negotiation.messages.push({
+      _id: new Types.ObjectId(),
+      senderId: new Types.ObjectId(userId),
+      senderRole,
+      message: `${senderRole === 'investor' ? 'Investor' : 'Student'} agreed to terms: ${formatNegotiationAmount(
+        agreedAmount,
+      )} for ${agreedEquity}% equity.`,
+      timestamp: new Date(),
+    });
+  }
 
   await deal.save();
   return deal.negotiation;
@@ -2114,6 +2216,17 @@ type LeanBidder = {
   avatar?: string;
   innovationScore: number;
 };
+
+type PopulatedBidDeal = DealDocumentLike & { investorId: LeanBidder | Types.ObjectId | null };
+type BidDealWithInvestor = DealDocumentLike & { investorId: LeanBidder };
+
+const hasPopulatedBidInvestor = (deal: PopulatedBidDeal): deal is BidDealWithInvestor =>
+  Boolean(
+    deal.investorId &&
+      typeof deal.investorId === 'object' &&
+      '_id' in deal.investorId &&
+      'displayName' in deal.investorId,
+  );
 
 type LeanStartupBidInfo = {
   _id: Types.ObjectId;
@@ -2144,20 +2257,23 @@ export const getStartupBidBoard = async (
 
   const [pennyDeals, soleDeals] = await Promise.all([
     Deal.find({ startupId, investorType: 'penny', status: 'active' })
-      .select('_id investorId amountINR equityPercent coverLetter createdAt founderDecision investorRole')
+      .select('_id investorId investorType amountINR equityPercent coverLetter createdAt founderDecision investorRole')
       .populate<{ investorId: LeanBidder }>('investorId', '_id displayName avatar innovationScore')
       .sort({ createdAt: 1 })
-      .lean<Array<DealDocumentLike & { investorId: LeanBidder }>>(),
+      .lean<PopulatedBidDeal[]>(),
     Deal.find({ startupId, investorType: 'sole', status: 'active' })
-      .select('_id investorId amountINR equityPercent coverLetter createdAt founderDecision investorRole')
+      .select('_id investorId investorType amountINR equityPercent coverLetter createdAt founderDecision investorRole')
       .populate<{ investorId: LeanBidder }>('investorId', '_id displayName avatar innovationScore')
       .sort({ amountINR: -1, createdAt: 1 })
-      .lean<Array<DealDocumentLike & { investorId: LeanBidder }>>(),
+      .lean<PopulatedBidDeal[]>(),
   ]);
 
-  const pennyTotal = pennyDeals.reduce((sum, d) => sum + (d.amountINR ?? 0), 0);
+  const validPennyDeals = pennyDeals.filter(hasPopulatedBidInvestor);
+  const validSoleDeals = soleDeals.filter(hasPopulatedBidInvestor);
 
-  const contributors = pennyDeals.map((d) => ({
+  const pennyTotal = validPennyDeals.reduce((sum, d) => sum + (d.amountINR ?? 0), 0);
+
+  const contributors = validPennyDeals.map((d) => ({
     bidId: String(d._id),
     investorId: String(d.investorId._id),
     name: d.investorId.displayName ?? 'Investor',
@@ -2169,7 +2285,7 @@ export const getStartupBidBoard = async (
     isCurrentUser: viewerId ? String(d.investorId._id) === viewerId : false,
   }));
 
-  const soleBidsList = soleDeals.map((d) => ({
+  const soleBidsList = validSoleDeals.map((d) => ({
     bidId: String(d._id),
     investorId: String(d.investorId._id),
     name: d.investorId.displayName ?? 'Investor',
@@ -2184,7 +2300,7 @@ export const getStartupBidBoard = async (
     placedAt: d.createdAt.toISOString(),
   }));
 
-  const allDeals = [...pennyDeals, ...soleDeals];
+  const allDeals = [...validPennyDeals, ...validSoleDeals];
   const currentUserDeal = viewerId
     ? allDeals.find((d) => String(d.investorId._id) === viewerId)
     : undefined;
@@ -2198,7 +2314,7 @@ export const getStartupBidBoard = async (
     acceptsSoleInvestor: !startup.hasSoleInvestor,
     pennyPool: {
       totalRaised: pennyTotal,
-      investorCount: pennyDeals.length,
+      investorCount: validPennyDeals.length,
       maxInvestors: startup.maxPennyInvestors,
       contributors,
     },
@@ -2225,17 +2341,7 @@ export const placeBidFromUser = async (
 ): Promise<DealDetailView> => {
   const parsed = PlaceBidSchema.parse(payload);
 
-  const user = await User.findById(userId)
-    .select('_id displayName role isActive innovationScore')
-    .lean<(LeanUser & { isActive?: boolean }) | null>();
-
-  if (!user || !user.isActive) {
-    throw new ApiError(403, 'FORBIDDEN', 'User not found or inactive');
-  }
-
-  if (user.role !== UserRole.STUDENT && user.role !== UserRole.INVESTOR) {
-    throw new ApiError(403, 'FORBIDDEN', 'Only students and investors can place bids');
-  }
+  await ensureBidderAccount(userId);
 
   const transactionResult = await runMongoTransaction(async (session) => {
     const startup = await Startup.findOne({
@@ -2303,7 +2409,7 @@ export const placeBidFromUser = async (
       });
 
     deal.mediatorLabel = 'ProMove';
-    deal.requestOrigin = user.role === UserRole.INVESTOR ? 'investor' : 'student';
+    deal.requestOrigin = 'investor';
     deal.mediationStatus = 'intake';
     deal.investorType = parsed.investorType;
     deal.stage = 0;

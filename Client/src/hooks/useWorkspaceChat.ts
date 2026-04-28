@@ -186,6 +186,7 @@ export const useWorkspaceChat = (workspaceId?: string) => {
     attachmentName?: string;
     attachmentSizeBytes?: number;
     attachmentMimeType?: string;
+    attachmentUploadId?: string;
     codeSnippet?: ChatMessage['codeSnippet'];
   }) => {
     const socket = getChatSocket();

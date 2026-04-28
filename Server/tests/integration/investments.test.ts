@@ -909,6 +909,101 @@ describe('investment workflow integration', () => {
     );
   });
 
+  it('lets student and mentor accounts bid as investor-side participants and negotiate', async () => {
+    const founder = await createUser(UserRole.STUDENT, { displayName: 'Multi Role Founder' });
+    const studentBidder = await createUser(UserRole.STUDENT, { displayName: 'Student Backer' });
+    const mentorBidder = await createUser(UserRole.MENTOR, { displayName: 'Mentor Backer' });
+    const startup = await createStartup(founder._id.toString(), { maxPennyInvestors: 5 });
+
+    const studentBidResponse = await request(app)
+      .post(`/api/startups/${startup._id}/bid`)
+      .set(authHeader(studentBidder))
+      .send({
+        investorType: 'penny',
+        proposedAmountINR: 22000,
+        proposedEquityPercent: 2,
+        chosenRole: 'shareholder',
+      });
+
+    expect(studentBidResponse.status).toBe(201);
+    expect(studentBidResponse.body.data.requestOrigin).toBe('investor');
+
+    const studentBoardResponse = await request(app)
+      .get(`/api/startups/${startup._id}/bids`)
+      .set(authHeader(studentBidder));
+
+    expect(studentBoardResponse.status).toBe(200);
+    expect(studentBoardResponse.body.data.currentUserBid).toEqual(
+      expect.objectContaining({
+        bidId: studentBidResponse.body.data._id,
+        investorType: 'penny',
+      }),
+    );
+
+    const studentMessageResponse = await request(app)
+      .post(`/api/deals/${studentBidResponse.body.data._id}/negotiation-message`)
+      .set(authHeader(studentBidder))
+      .send({ message: 'Student account bidding as backer.' });
+
+    expect(studentMessageResponse.status).toBe(200);
+    expect(studentMessageResponse.body.data.messages).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({
+          senderRole: 'investor',
+          message: 'Student account bidding as backer.',
+        }),
+      ]),
+    );
+
+    const selfBidResponse = await request(app)
+      .post(`/api/startups/${startup._id}/bid`)
+      .set(authHeader(founder))
+      .send({
+        investorType: 'penny',
+        proposedAmountINR: 22000,
+        proposedEquityPercent: 2,
+        chosenRole: 'shareholder',
+      });
+
+    expect(selfBidResponse.status).toBe(400);
+    expect(selfBidResponse.body.error.code).toBe('SELF_BID');
+
+    const mentorBidResponse = await request(app)
+      .post(`/api/startups/${startup._id}/bid`)
+      .set(authHeader(mentorBidder))
+      .send({
+        investorType: 'penny',
+        proposedAmountINR: 24000,
+        proposedEquityPercent: 2,
+        chosenRole: 'observer',
+      });
+
+    expect(mentorBidResponse.status).toBe(201);
+
+    const mentorDealResponse = await request(app)
+      .get(`/api/deals/${mentorBidResponse.body.data._id}`)
+      .set(authHeader(mentorBidder));
+
+    expect(mentorDealResponse.status).toBe(200);
+    expect(mentorDealResponse.body.data.investor._id).toBe(mentorBidder._id.toString());
+
+    const mentorTermsResponse = await request(app)
+      .post(`/api/deals/${mentorBidResponse.body.data._id}/negotiation-propose`)
+      .set(authHeader(mentorBidder))
+      .send({ amountINR: 26000, equityPercent: 2.5 });
+
+    expect(mentorTermsResponse.status).toBe(200);
+    expect(mentorTermsResponse.body.data.status).toBe('terms_proposed');
+    expect(mentorTermsResponse.body.data.messages).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({
+          senderRole: 'investor',
+          message: 'Investor proposed terms: INR 26,000 for 2.5% equity.',
+        }),
+      ]),
+    );
+  });
+
   it('grants investors access to a linked workshop once an accepted deal is connected', async () => {
     const founder = await createUser(UserRole.STUDENT, { displayName: 'Workshop Founder' });
     const investor = await createUser(UserRole.INVESTOR, { displayName: 'Workshop Investor' });

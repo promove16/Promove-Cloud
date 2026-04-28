@@ -1,4 +1,5 @@
 import nodemailer from 'nodemailer';
+import { SESClient, SendEmailCommand } from '@aws-sdk/client-ses';
 import { env } from '../config/env';
 import { logger } from '../config/logger';
 
@@ -45,21 +46,67 @@ const smtpHost = env.SMTP_HOST ?? (smtpUser ? 'smtp.gmail.com' : undefined);
 const smtpPort = env.SMTP_HOST ? env.SMTP_PORT : smtpUser ? 587 : env.SMTP_PORT;
 const smtpSecure = env.SMTP_HOST ? env.SMTP_SECURE : false;
 
-const transporter = smtpHost
-  ? nodemailer.createTransport({
-      host: smtpHost,
-      port: smtpPort,
-      secure: smtpSecure,
-      ...(smtpUser && smtpPass
-        ? {
-            auth: {
-              user: smtpUser,
-              pass: smtpPass,
-            },
-          }
-        : {}),
-    })
-  : nodemailer.createTransport({ jsonTransport: true });
+type MailTransport = 'json' | 'ses' | 'smtp';
+
+const resolveMailTransport = (): MailTransport => {
+  if (env.MAIL_TRANSPORT === 'json') {
+    return 'json';
+  }
+
+  if (env.MAIL_TRANSPORT === 'smtp') {
+    if (!smtpHost) {
+      throw new Error('MAIL_TRANSPORT=smtp requires SMTP_HOST or EMAIL_USER.');
+    }
+
+    return 'smtp';
+  }
+
+  if (env.MAIL_TRANSPORT === 'ses') {
+    if (!env.AWS_REGION) {
+      throw new Error('MAIL_TRANSPORT=ses requires AWS_REGION.');
+    }
+
+    return 'ses';
+  }
+
+  if (smtpHost) {
+    return 'smtp';
+  }
+
+  if (env.NODE_ENV === 'production') {
+    if (!env.AWS_REGION) {
+      throw new Error('Production email requires SMTP_* credentials or AWS_REGION for SES.');
+    }
+
+    return 'ses';
+  }
+
+  return 'json';
+};
+
+const mailTransport = resolveMailTransport();
+
+const smtpTransporter =
+  mailTransport === 'smtp'
+    ? nodemailer.createTransport({
+        host: smtpHost,
+        port: smtpPort,
+        secure: smtpSecure,
+        ...(smtpUser && smtpPass
+          ? {
+              auth: {
+                user: smtpUser,
+                pass: smtpPass,
+              },
+            }
+          : {}),
+      })
+    : null;
+
+const jsonTransporter =
+  mailTransport === 'json' ? nodemailer.createTransport({ jsonTransport: true }) : null;
+
+const sesClient = mailTransport === 'ses' ? new SESClient({ region: env.AWS_REGION }) : null;
 
 // In development, set DEV_EMAIL_REDIRECT in .env to a real inbox you control.
 // All outgoing emails are then delivered there instead of the (possibly dummy)
@@ -69,15 +116,45 @@ const devRedirect =
 
 export const sendEmail = async ({ toEmail, subject, html }: SendEmailParams): Promise<void> => {
   const recipient = devRedirect ?? toEmail;
+  const resolvedSubject = devRedirect ? `[DEV -> ${toEmail}] ${subject}` : subject;
 
   if (devRedirect) {
-    logger.info(`[EMAIL DEV] Redirecting email originally for <${toEmail}> → <${devRedirect}> | Subject: ${subject}`);
+    logger.info(`[EMAIL DEV] Redirecting email originally for <${toEmail}> -> <${devRedirect}> | Subject: ${subject}`);
+  }
+
+  if (sesClient) {
+    await sesClient.send(
+      new SendEmailCommand({
+        Source: env.FROM_EMAIL,
+        Destination: {
+          ToAddresses: [recipient],
+        },
+        Message: {
+          Subject: {
+            Charset: 'UTF-8',
+            Data: resolvedSubject,
+          },
+          Body: {
+            Html: {
+              Charset: 'UTF-8',
+              Data: html,
+            },
+          },
+        },
+      }),
+    );
+    return;
+  }
+
+  const transporter = smtpTransporter ?? jsonTransporter;
+  if (!transporter) {
+    throw new Error('Email transport is not configured.');
   }
 
   await transporter.sendMail({
     from: env.FROM_EMAIL || smtpUser,
     to: recipient,
-    subject: devRedirect ? `[DEV → ${toEmail}] ${subject}` : subject,
+    subject: resolvedSubject,
     html,
   });
 };
@@ -136,9 +213,9 @@ export const sendTeamInviteEmail = async ({
     html: `
       <div style="font-family: Arial, sans-serif; line-height: 1.6;">
         <h2>You're invited to collaborate on ProMove Innovation Cloud</h2>
-        <p><strong>${inviterName}</strong> has invited you to collaborate on <strong>${workspaceTitle}</strong>.</p>
+        <p><strong>${escapeHtml(inviterName)}</strong> has invited you to collaborate on <strong>${escapeHtml(workspaceTitle)}</strong>.</p>
         <p>Open your invite here:</p>
-        <p><a href="${inviteLink}">${inviteLink}</a></p>
+        <p><a href="${escapeHtml(inviteLink)}">${escapeHtml(inviteLink)}</a></p>
       </div>
     `,
   });
@@ -206,7 +283,7 @@ export const sendInstitutionStudentInviteEmail = async ({
         <h2>Your ProMove student invite is ready</h2>
         <p><strong>${escapeHtml(institutionName)}</strong> added <strong>${escapeHtml(studentEmail)}</strong> to its ProMove ${escapeHtml(institutionLabel)} roster.</p>
         <p>Register with this same email address to claim your student access.</p>
-        <p><a href="${inviteLink}">Open your student invite</a></p>
+        <p><a href="${escapeHtml(inviteLink)}">Open your student invite</a></p>
       </div>
     `,
   });

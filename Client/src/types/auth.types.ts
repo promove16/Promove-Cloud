@@ -280,7 +280,14 @@ export interface ApiErrorResponse {
   error: {
     code: string;
     message: string;
-    details?: Array<{ path?: string; message: string }>;
+    details?: Array<{
+      path?: string | number | Array<string | number>;
+      message: string;
+      service?: string;
+      serviceName?: string;
+      supportEmail?: string;
+      degraded?: boolean;
+    }>;
   };
 }
 

@@ -1,6 +1,6 @@
 import { useMemo, useState, type ReactNode } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
-import { Eye, MoreHorizontal, Search, ShieldCheck, ShieldOff, UserCog } from 'lucide-react';
+import { Eye, MoreHorizontal, Search, ShieldCheck, ShieldOff, Trash2, UserCog } from 'lucide-react';
 import { useSearchParams } from 'react-router-dom';
 import { scoreApi } from '../../api/score.api';
 import { type AdminUserListItem, adminApi } from '../../api/admin.api';
@@ -20,7 +20,7 @@ import {
 import { UserRole } from '../../types/roles.types';
 import { useAdminUsersContext } from './UserManagement';
 
-type ModalMode = 'role' | 'access' | null;
+type ModalMode = 'role' | 'access' | 'delete' | null;
 
 function ConfirmModal({
   open,
@@ -28,6 +28,7 @@ function ConfirmModal({
   description,
   children,
   confirmLabel,
+  confirmVariant = 'primary',
   busy,
   onConfirm,
   onClose,
@@ -37,6 +38,7 @@ function ConfirmModal({
   description: string;
   children?: ReactNode;
   confirmLabel: string;
+  confirmVariant?: 'primary' | 'danger';
   busy: boolean;
   onConfirm: () => void;
   onClose: () => void;
@@ -53,7 +55,7 @@ function ConfirmModal({
           <Button variant="secondary" onClick={onClose}>
             Cancel
           </Button>
-          <Button onClick={onConfirm} disabled={busy}>
+          <Button variant={confirmVariant} onClick={onConfirm} disabled={busy}>
             {busy ? 'Working...' : confirmLabel}
           </Button>
         </div>
@@ -122,12 +124,16 @@ function UserActionMenu({
   onViewActivity,
   onChangeRole,
   onToggleAccess,
+  onDelete,
 }: {
   user: AdminUserListItem;
   onViewActivity: () => void;
   onChangeRole: () => void;
   onToggleAccess: () => void;
+  onDelete: () => void;
 }) {
+  const canDeleteUser = user.role !== UserRole.ADMIN;
+
   return (
     <DropdownMenu>
       <DropdownMenuTrigger asChild>
@@ -160,6 +166,18 @@ function UserActionMenu({
           )}
           {user.isActive ? 'Deactivate User' : 'Activate User'}
         </DropdownMenuItem>
+        {canDeleteUser ? (
+          <>
+            <DropdownMenuSeparator className="bg-slate-800" />
+            <DropdownMenuItem
+              className="cursor-pointer rounded-lg px-3 py-2 text-rose-200 focus:bg-rose-950/40 focus:text-rose-100"
+              onSelect={onDelete}
+            >
+              <Trash2 className="h-4 w-4 text-rose-300" />
+              Delete User
+            </DropdownMenuItem>
+          </>
+        ) : null}
       </DropdownMenuContent>
     </DropdownMenu>
   );
@@ -197,6 +215,15 @@ export default function UserDirectory() {
   const updateAccessMutation = useMutation({
     mutationFn: ({ userId, isActive }: { userId: string; isActive: boolean }) =>
       adminApi.updateUserAccess(userId, isActive),
+    onSuccess: async () => {
+      setModalMode(null);
+      setSelectedUser(null);
+      await queryClient.invalidateQueries({ queryKey: ['admin-users'] });
+    },
+  });
+
+  const deleteUserMutation = useMutation({
+    mutationFn: (userId: string) => adminApi.deleteUser(userId),
     onSuccess: async () => {
       setModalMode(null);
       setSelectedUser(null);
@@ -345,6 +372,10 @@ export default function UserDirectory() {
                       setSelectedUser(user);
                       setModalMode('access');
                     }}
+                    onDelete={() => {
+                      setSelectedUser(user);
+                      setModalMode('delete');
+                    }}
                   />
                 </div>
               </div>
@@ -395,6 +426,24 @@ export default function UserDirectory() {
         onConfirm={() => {
           if (selectedUser) {
             updateAccessMutation.mutate({ userId: selectedUser._id, isActive: !selectedUser.isActive });
+          }
+        }}
+      />
+
+      <ConfirmModal
+        open={modalMode === 'delete' && Boolean(selectedUser)}
+        title="Delete user"
+        description={`This will permanently delete ${selectedUser?.displayName ?? 'the selected user'} from the platform. Admin users cannot be deleted.`}
+        confirmLabel="Delete User"
+        confirmVariant="danger"
+        busy={deleteUserMutation.isPending}
+        onClose={() => {
+          setModalMode(null);
+          setSelectedUser(null);
+        }}
+        onConfirm={() => {
+          if (selectedUser && selectedUser.role !== UserRole.ADMIN) {
+            deleteUserMutation.mutate(selectedUser._id);
           }
         }}
       />

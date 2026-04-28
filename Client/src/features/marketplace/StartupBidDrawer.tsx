@@ -14,13 +14,15 @@ import {
   Star,
   Loader2,
   AlertCircle,
+  MessageSquare,
 } from 'lucide-react';
 import { isAxiosError } from 'axios';
 import { dealApi } from '../../api/deal.api';
 import { Button } from '../../components/ui/Button';
 import { Spinner } from '../../components/ui/Spinner';
 import { PlaceBidModal } from './PlaceBidModal';
-import type { BidBoardSoleBid, InvestorType } from '../../types/deal.types';
+import { NegotiationPanel } from '../investor/NegotiationPanel';
+import type { BidBoardSoleBid, DealDetailView, InvestorType } from '../../types/deal.types';
 
 interface StartupBidDrawerProps {
   startupId: string | null;
@@ -61,7 +63,17 @@ function ScoreBar({ score }: { score: number }) {
   );
 }
 
-function PennyPoolSection({ board, onBid }: { board: NonNullable<ReturnType<typeof useBidBoard>['data']>; onBid: () => void }) {
+function PennyPoolSection({
+  board,
+  onBid,
+  deal,
+  isDealLoading,
+}: {
+  board: NonNullable<ReturnType<typeof useBidBoard>['data']>;
+  onBid: () => void;
+  deal?: DealDetailView | null;
+  isDealLoading?: boolean;
+}) {
   const { pennyPool, acceptsPennyInvestors, currentUserBid } = board;
   const poolPct = pennyPool.maxInvestors > 0 ? Math.round((pennyPool.investorCount / pennyPool.maxInvestors) * 100) : 0;
   const amountPct = board.fundingTarget && board.fundingTarget > 0
@@ -69,7 +81,8 @@ function PennyPoolSection({ board, onBid }: { board: NonNullable<ReturnType<type
     : null;
 
   const [expanded, setExpanded] = useState(false);
-  const userInPool = currentUserBid?.investorType === 'penny';
+  const currentUserPennyContributor = pennyPool.contributors.find((contributor) => contributor.isCurrentUser);
+  const userInPool = currentUserBid?.investorType === 'penny' || Boolean(currentUserPennyContributor);
 
   return (
     <div className="rounded-2xl border border-slate-800 bg-slate-900 p-5">
@@ -144,9 +157,25 @@ function PennyPoolSection({ board, onBid }: { board: NonNullable<ReturnType<type
       )}
 
       {userInPool ? (
-        <div className="flex items-center gap-2 rounded-lg border border-emerald-500/30 bg-emerald-500/10 px-4 py-3 text-sm text-emerald-300">
-          <CheckCircle2 className="h-4 w-4 shrink-0" />
-          You're in the pool. Check Deals for negotiation details.
+        <div className="border-t border-slate-800 pt-4">
+          <div className="mb-4 flex items-center gap-2">
+            <MessageSquare className="h-4 w-4 text-violet-400" />
+            <span className="text-sm font-semibold text-white">Bid Negotiation</span>
+            <span className="ml-auto rounded-full border border-emerald-500/30 bg-emerald-500/10 px-2 py-0.5 text-xs text-emerald-300">
+              In Pool
+            </span>
+          </div>
+          {isDealLoading ? (
+            <div className="flex justify-center py-6">
+              <Spinner />
+            </div>
+          ) : deal ? (
+            <NegotiationPanel deal={deal} isInvestor={true} />
+          ) : (
+            <p className="py-4 text-center text-sm text-slate-500">
+              Could not load negotiation details.
+            </p>
+          )}
         </div>
       ) : acceptsPennyInvestors ? (
         <Button onClick={onBid} className="w-full">
@@ -286,6 +315,23 @@ export function StartupBidDrawer({ startupId, open, isFounder = false, onClose }
 
   const { data: board, isLoading, isError, error } = useBidBoard(startupId);
 
+  const currentUserPennyBid = board?.pennyPool.contributors.find((contributor) => contributor.isCurrentUser);
+  const currentUserSoleBid = board?.soleBids.find((bid) => bid.isCurrentUser);
+  const currentUserBidType =
+    board?.currentUserBid?.investorType ??
+    (currentUserPennyBid ? 'penny' : currentUserSoleBid ? 'sole' : undefined);
+  const currentUserBidStatus =
+    board?.currentUserBid?.status ?? currentUserSoleBid?.founderDecisionStatus ?? 'pending';
+  const dealId = board?.currentUserBid?.bidId ?? currentUserPennyBid?.bidId ?? currentUserSoleBid?.bidId ?? null;
+  const hasCurrentUserBid = Boolean(dealId);
+
+  const { data: deal, isLoading: isDealLoading } = useQuery<DealDetailView>({
+    queryKey: ['deal', dealId],
+    queryFn: () => dealApi.getMyDeal(dealId!),
+    enabled: Boolean(dealId),
+    refetchInterval: 30_000,
+  });
+
   const acceptBidMutation = useMutation({
     mutationFn: (bidId: string) =>
       dealApi.respondToFounderDecision(bidId, { decision: 'accepted' }),
@@ -377,6 +423,8 @@ export function StartupBidDrawer({ startupId, open, isFounder = false, onClose }
               <PennyPoolSection
                 board={board}
                 onBid={() => setBidModalType('penny')}
+                deal={deal}
+                isDealLoading={isDealLoading}
               />
 
               {/* Sole Investor Bids */}
@@ -434,7 +482,7 @@ export function StartupBidDrawer({ startupId, open, isFounder = false, onClose }
                   </div>
                 )}
 
-                {!board.hasSoleInvestorAccepted && board.acceptsSoleInvestor && !board.currentUserBid && (
+                {!board.hasSoleInvestorAccepted && board.acceptsSoleInvestor && !hasCurrentUserBid && (
                   <div className="mt-4">
                     <Button
                       variant="secondary"
@@ -447,14 +495,40 @@ export function StartupBidDrawer({ startupId, open, isFounder = false, onClose }
                   </div>
                 )}
 
-                {board.currentUserBid?.investorType === 'sole' && (
+                {currentUserBidType === 'sole' && (
                   <div className="mt-4 flex items-center gap-2 rounded-lg border border-cyan-500/30 bg-cyan-500/10 px-4 py-3 text-sm text-cyan-300">
                     <CheckCircle2 className="h-4 w-4 shrink-0" />
-                    Your bid is placed. Status:{' '}
-                    <span className="font-semibold capitalize">{board.currentUserBid.status}</span>
+                    Your bid is placed ({' '}
+                    <span className="font-semibold capitalize">{currentUserBidStatus}</span>
+                    {' '}) — negotiate your terms below.
                   </div>
                 )}
               </div>
+              {/* Bid Negotiation — shown below for sole investors (penny handles it inline above) */}
+              {currentUserBidType === 'sole' && (
+                <div className="rounded-2xl border border-violet-500/30 bg-slate-900 p-5">
+                  <div className="mb-5 flex items-center justify-between">
+                    <div className="flex items-center gap-2">
+                      <MessageSquare className="h-5 w-5 text-violet-400" />
+                      <h3 className="font-semibold text-white">Bid Negotiation</h3>
+                    </div>
+                    <span className="rounded-full border border-violet-500/30 bg-violet-500/10 px-3 py-1 text-xs font-medium text-violet-300 capitalize">
+                      sole investor · {currentUserBidStatus}
+                    </span>
+                  </div>
+                  {isDealLoading ? (
+                    <div className="flex justify-center py-8">
+                      <Spinner />
+                    </div>
+                  ) : deal ? (
+                    <NegotiationPanel deal={deal} isInvestor={true} />
+                  ) : (
+                    <p className="py-4 text-center text-sm text-slate-500">
+                      Could not load negotiation details.
+                    </p>
+                  )}
+                </div>
+              )}
             </div>
           ) : null}
         </div>

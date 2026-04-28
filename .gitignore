@@ -9,6 +9,7 @@ temp/
 docs/docs/
 .tmp-*.json
 .postman/
+.playwright-mcp
 postman/
 output/
 test-results/
@@ -29,3 +30,6 @@ Server/scripts/phase*-results.json
 
 # Raw PRD extract scratchpads
 docs/*.txt
+infra/
+.codex-logs
+generate-local-env.js

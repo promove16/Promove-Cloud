@@ -16,6 +16,8 @@ export interface IDirectMessage extends Document {
   attachmentUrl?: string;
   attachmentType?: 'image' | 'pdf';
   attachmentName?: string;
+  attachmentStorageProvider?: 's3' | 'cloudinary';
+  attachmentStorageKey?: string;
   /** ISO string for interview scheduling messages */
   scheduledAt?: Date;
   meetLink?: string;
@@ -33,6 +35,8 @@ const directMessageSchema = new Schema<IDirectMessage>(
     attachmentUrl: { type: String, default: undefined },
     attachmentType: { type: String, enum: ['image', 'pdf'], default: undefined },
     attachmentName: { type: String, default: undefined },
+    attachmentStorageProvider: { type: String, enum: ['s3', 'cloudinary'], default: undefined },
+    attachmentStorageKey: { type: String, default: undefined, trim: true },
     scheduledAt: { type: Date, default: undefined },
     meetLink: { type: String, default: undefined },
     messageType: { type: String, enum: ['text', 'interview_request'], default: 'text' },

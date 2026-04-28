@@ -76,6 +76,7 @@ export function NegotiationPanel({ deal, isInvestor }: NegotiationPanelProps) {
       setFailedMessage(null);
       setOptimisticMessages((prev) => prev.filter((m) => m.message !== sentMsg));
       setFeedback(null);
+      await queryClient.invalidateQueries({ queryKey: ['deal', deal._id] });
       await queryClient.invalidateQueries({ queryKey: ['investor-deal', deal._id] });
       await queryClient.invalidateQueries({ queryKey: ['investor-deals'] });
     },
@@ -99,6 +100,7 @@ export function NegotiationPanel({ deal, isInvestor }: NegotiationPanelProps) {
       setProposedAmount('');
       setProposedEquity('');
       setFeedback({ type: 'success', message: 'Terms updated.' });
+      await queryClient.invalidateQueries({ queryKey: ['deal', deal._id] });
       await queryClient.invalidateQueries({ queryKey: ['investor-deal', deal._id] });
       await queryClient.invalidateQueries({ queryKey: ['investor-deals'] });
     },
@@ -114,6 +116,7 @@ export function NegotiationPanel({ deal, isInvestor }: NegotiationPanelProps) {
     mutationFn: () => dealApi.agreeNegotiationTerms(deal._id),
     onSuccess: async () => {
       setFeedback({ type: 'success', message: 'Terms marked as agreed.' });
+      await queryClient.invalidateQueries({ queryKey: ['deal', deal._id] });
       await queryClient.invalidateQueries({ queryKey: ['investor-deal', deal._id] });
       await queryClient.invalidateQueries({ queryKey: ['investor-deals'] });
     },
@@ -320,13 +323,13 @@ export function NegotiationPanel({ deal, isInvestor }: NegotiationPanelProps) {
       <Card className="border-slate-800 bg-slate-900 p-4">
         <h3 className="mb-4 flex items-center gap-2 text-sm font-semibold uppercase tracking-wider text-slate-400">
           <MessageSquare className="h-4 w-4" />
-          Negotiation Messages
+          Negotiation Room
         </h3>
         
         <div className="mb-4 max-h-64 space-y-3 overflow-y-auto">
           {allMessages.length === 0 ? (
             <div className="py-4 text-center text-sm text-slate-500">
-              No messages yet. Start negotiating!
+              No negotiation messages yet.
             </div>
           ) : (
             allMessages.map((msg) => (
@@ -396,7 +399,7 @@ export function NegotiationPanel({ deal, isInvestor }: NegotiationPanelProps) {
             <Input
               value={message}
               onChange={(e) => setMessage(e.target.value)}
-              placeholder="Type your message..."
+              placeholder="Write negotiation message..."
               onKeyDown={(e) => e.key === 'Enter' && !sendMessageMutation.isPending && handleSendMessage()}
             />
           <Button

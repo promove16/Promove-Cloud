@@ -731,6 +731,7 @@ export function ProductWorkspaceDetail({
             attachmentName: string;
             attachmentSizeBytes: number;
             attachmentMimeType?: string;
+            attachmentUploadId?: string;
           }
         | undefined;
 
@@ -750,6 +751,7 @@ export function ProductWorkspaceDetail({
           attachmentType: latest.fileType,
           attachmentName: latest.fileName,
           attachmentSizeBytes: latest.fileSizeBytes,
+          attachmentUploadId: latest._id,
           ...(latest.mimeType ? { attachmentMimeType: latest.mimeType } : {}),
         };
         await refresh();

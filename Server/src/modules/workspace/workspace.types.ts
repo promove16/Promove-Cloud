@@ -31,7 +31,7 @@ export interface IWorkspace {
   uploads: Array<{
     _id: Types.ObjectId;
     fileUrl: string;
-    fileType: 'pdf' | 'image';
+    fileType: 'pdf' | 'image' | 'doc' | 'docx' | 'ppt' | 'pptx' | 'xls' | 'xlsx' | 'video' | 'audio' | 'other';
     fileName: string;
     fileSizeBytes: number;
     uploadedBy: Types.ObjectId;
@@ -41,6 +41,7 @@ export interface IWorkspace {
     storageProvider?: 'cloudinary' | 's3';
     storageKey?: string;
     cloudinaryPublicId?: string;
+    mimeType?: string;
   }>;
   repoSubmissions: Array<{
     _id: Types.ObjectId;

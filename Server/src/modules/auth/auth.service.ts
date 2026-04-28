@@ -3,6 +3,10 @@ import jwt, { SignOptions } from 'jsonwebtoken';
 import { randomBytes, randomUUID } from 'crypto';
 import { env } from '../../config/env';
 import { redis } from '../../config/redis';
+import {
+  getServiceUnavailableDetails,
+  shouldFailOpenForService,
+} from '../../config/serviceAvailability';
 import { User, UserDocument } from '../user/user.model';
 import { AccessGrantedBy, SanitizedUser } from '../user/user.types';
 import { UserRole } from '../../types/roles.types';
@@ -129,9 +133,14 @@ const createAuthSessionStoreError = () =>
     503,
     'AUTH_SESSION_STORE_UNAVAILABLE',
     'Authentication session store is temporarily unavailable. Please try again.',
+    getServiceUnavailableDetails(
+      'auth_session_store',
+      'Authentication session store is temporarily unavailable. Login can continue only when fallback is enabled.',
+    ),
   );
 
-const shouldAllowRedisAuthFallback = () => env.AUTH_ALLOW_REDIS_AUTH_FALLBACK;
+const shouldAllowRedisAuthFallback = () =>
+  env.AUTH_ALLOW_REDIS_AUTH_FALLBACK || shouldFailOpenForService('auth_session_store');
 
 interface CreateTokenPairOptions {
   persistSession?: boolean;
@@ -209,7 +218,7 @@ const createTokenPair = async (
     } catch (error) {
       logError('Failed to persist refresh session in Redis', error);
 
-      if (!env.AUTH_ALLOW_REDIS_AUTH_FALLBACK) {
+      if (!shouldAllowRedisAuthFallback()) {
         throw createAuthSessionStoreError();
       }
     }
@@ -508,7 +517,7 @@ export const registerUser = async (payload: {
     );
   }
 
-  const passwordHash = await bcrypt.hash(payload.password, 12);
+  const passwordHash = await bcrypt.hash(payload.password, env.BCRYPT_ROUNDS);
   const sanitizedDisplayName = sanitizePlainText(payload.displayName);
   const sanitizedBio = payload.bio ? sanitizePlainText(payload.bio) : undefined;
   const profileSlug = await generateProfileSlug(sanitizedDisplayName);
@@ -686,7 +695,7 @@ export const submitRegistrationRequest = async (payload: {
     );
   }
 
-  const passwordHash = await bcrypt.hash(payload.password, 12);
+  const passwordHash = await bcrypt.hash(payload.password, env.BCRYPT_ROUNDS);
   const sanitizedDisplayName = sanitizePlainText(payload.displayName);
   const sanitizedBio = payload.bio ? sanitizePlainText(payload.bio) : undefined;
   const sanitizedDomain = payload.domain ? sanitizePlainText(payload.domain) : undefined;
@@ -919,7 +928,7 @@ export const changePassword = async (
     throw new ApiError(401, 'INVALID_CREDENTIALS', 'Current password is incorrect');
   }
 
-  user.passwordHash = await bcrypt.hash(newPassword, 12);
+  user.passwordHash = await bcrypt.hash(newPassword, env.BCRYPT_ROUNDS);
   user.mustChangePasswordOnNextLogin = false;
   await user.save();
 };

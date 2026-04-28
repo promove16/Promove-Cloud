@@ -15,6 +15,13 @@ const chatMessageSchema = new Schema<IChatMessage>(
     attachmentName: { type: String, default: undefined, trim: true },
     attachmentSizeBytes: { type: Number, default: undefined },
     attachmentMimeType: { type: String, default: undefined, trim: true },
+    attachmentUploadId: { type: Schema.Types.ObjectId, default: undefined },
+    attachmentStorageProvider: {
+      type: String,
+      enum: ['cloudinary', 's3'],
+      default: undefined,
+    },
+    attachmentStorageKey: { type: String, default: undefined, trim: true },
     codeSnippet: {
       type: new Schema(
         {

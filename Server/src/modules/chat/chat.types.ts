@@ -20,6 +20,9 @@ export interface IChatMessage {
   attachmentName?: string;
   attachmentSizeBytes?: number;
   attachmentMimeType?: string;
+  attachmentUploadId?: Types.ObjectId;
+  attachmentStorageProvider?: 's3' | 'cloudinary';
+  attachmentStorageKey?: string;
   codeSnippet?: {
     title: string;
     language: string;

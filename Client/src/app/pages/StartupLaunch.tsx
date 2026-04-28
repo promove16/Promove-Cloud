@@ -1820,8 +1820,8 @@ function StartupDashboard({
               {totalRequestsInWindow} investor outreach requests
             </div>
           </div>
-          <div className="mt-4 h-64 w-full">
-            <ResponsiveContainer width="100%" height="100%">
+          <div className="mt-4 h-64 min-h-64 min-w-0 w-full">
+            <ResponsiveContainer width="100%" height="100%" minWidth={0} minHeight={256}>
               <AreaChart
                 data={activityData}
                 margin={{ top: 10, right: 16, left: 0, bottom: 0 }}
@@ -1919,8 +1919,8 @@ function StartupDashboard({
             </div>
           ) : (
             <>
-              <div className="mt-3 h-44">
-                <ResponsiveContainer width="100%" height="100%">
+              <div className="mt-3 h-44 min-h-44 min-w-0">
+                <ResponsiveContainer width="100%" height="100%" minWidth={0} minHeight={176}>
                   <BarChart
                     data={equityData}
                     layout="vertical"

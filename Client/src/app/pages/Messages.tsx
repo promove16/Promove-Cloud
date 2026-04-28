@@ -66,6 +66,8 @@ import { WorkflowRequest } from "../../types/request.types";
 type PendingAttachmentState = {
   previewUrl: string;
   uploadedUrl?: string;
+  storageProvider?: "cloudinary" | "s3";
+  storageKey?: string;
   localObjectUrl: string;
   fileType: "image" | "pdf";
   fileName: string;
@@ -1687,6 +1689,8 @@ function ChatPanel({
       attachmentUrl: pendingAttachment?.uploadedUrl,
       attachmentType: pendingAttachment?.fileType,
       attachmentName: pendingAttachment?.fileName,
+      attachmentStorageProvider: pendingAttachment?.storageProvider,
+      attachmentStorageKey: pendingAttachment?.storageKey,
     });
     setDraft("");
     removeAttachment();
@@ -1752,6 +1756,8 @@ function ChatPanel({
           ...current,
           previewUrl: upload.url,
           uploadedUrl: upload.url,
+          storageProvider: upload.storageProvider,
+          storageKey: upload.storageKey,
           fileType: upload.fileType,
           fileName: upload.fileName,
           fileSize: upload.fileSize,

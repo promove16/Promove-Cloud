@@ -31,6 +31,8 @@ export interface DMMessage {
   attachmentUrl?: string;
   attachmentType?: 'image' | 'pdf';
   attachmentName?: string;
+  attachmentStorageProvider?: 'cloudinary' | 's3';
+  attachmentStorageKey?: string;
   readAt?: string | null;
   sentAt: string;
   isOptimistic?: boolean;
@@ -39,6 +41,8 @@ export interface DMMessage {
 export interface AttachmentUpload {
   url: string;
   publicId: string;
+  storageProvider?: 'cloudinary' | 's3';
+  storageKey?: string;
   fileType: 'image' | 'pdf';
   fileName: string;
   fileSize: number;
@@ -82,6 +86,12 @@ export const dmApi = {
     attachmentUrl?: string;
     attachmentType?: 'image' | 'pdf';
     attachmentName?: string;
+    attachmentStorageProvider?: 'cloudinary' | 's3';
+    attachmentStorageKey?: string;
+    pitchContext?: {
+      startupId?: string;
+      workspaceId?: string;
+    };
   }) {
     const response = await api.post<ApiSuccessResponse<DMMessage>>(`/api/dm/${userId}`, payload);
     return response.data.data;

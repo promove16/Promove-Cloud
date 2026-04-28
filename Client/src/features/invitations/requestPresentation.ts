@@ -139,6 +139,21 @@ export function formatRequestStatus(status: WorkflowRequest['status']) {
   return humanize(status);
 }
 
+const getAcceptedPitchWorkspacePath = (request: WorkflowRequest) => {
+  if (request.status !== 'accepted' && request.status !== 'completed') {
+    return null;
+  }
+
+  if (request.actionType !== 'invest' || request.requestedPermission !== 'dm_investor') {
+    return null;
+  }
+
+  const workspaceId = request.metadata?.workspaceId;
+  return typeof workspaceId === 'string' && workspaceId.trim()
+    ? `/product-workspace/${workspaceId.trim()}`
+    : null;
+};
+
 export function getRequestEntityName(request: WorkflowRequest) {
   for (const key of ENTITY_METADATA_KEYS) {
     const metadataValue = request.metadata?.[key];
@@ -158,18 +173,43 @@ export function getRequestActorLabel(request: WorkflowRequest, direction: 'incom
 }
 
 export function getRequestPrimaryLink(request: WorkflowRequest) {
+  const acceptedPitchWorkspacePath = getAcceptedPitchWorkspacePath(request);
+  if (acceptedPitchWorkspacePath) {
+    return acceptedPitchWorkspacePath;
+  }
+
+  if ((request.status === 'accepted' || request.status === 'completed') && request.acceptRedirect) {
+    return request.acceptRedirect;
+  }
+
   return request.deepLink ?? request.acceptRedirect ?? request.declineRedirect ?? null;
 }
 
 export function getRequestLinkTargets(request: WorkflowRequest) {
-  const targets = [
-    request.deepLink ? { label: 'Open linked content', path: request.deepLink } : null,
-    request.acceptRedirect ? { label: 'After acceptance', path: request.acceptRedirect } : null,
-    request.declineRedirect ? { label: 'After decline', path: request.declineRedirect } : null,
-  ].filter((target): target is { label: string; path: string } => Boolean(target?.path));
+  const isAccepted = request.status === 'accepted' || request.status === 'completed';
+  const acceptedPitchWorkspacePath = getAcceptedPitchWorkspacePath(request);
+  const targets = isAccepted
+    ? [
+        acceptedPitchWorkspacePath
+          ? { label: 'Open linked content', path: acceptedPitchWorkspacePath }
+          : request.acceptRedirect
+            ? { label: 'Open linked content', path: request.acceptRedirect }
+            : null,
+        request.deepLink ? { label: 'Original request', path: request.deepLink } : null,
+        request.declineRedirect ? { label: 'After decline', path: request.declineRedirect } : null,
+      ]
+    : [
+        request.deepLink ? { label: 'Open linked content', path: request.deepLink } : null,
+        request.acceptRedirect ? { label: 'After acceptance', path: request.acceptRedirect } : null,
+        request.declineRedirect ? { label: 'After decline', path: request.declineRedirect } : null,
+      ];
 
-  return targets.filter(
-    (target, index) => targets.findIndex((candidate) => candidate.path === target.path) === index,
+  const availableTargets = targets.filter(
+    (target): target is { label: string; path: string } => Boolean(target?.path),
+  );
+
+  return availableTargets.filter(
+    (target, index) => availableTargets.findIndex((candidate) => candidate.path === target.path) === index,
   );
 }
 

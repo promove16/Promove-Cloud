@@ -39,6 +39,7 @@ import {
   listPatents,
   listRegistrationRequests,
   listUsers,
+  deleteUser,
   reviewDeal,
   reviewRegistrationRequest,
   rejectAward,
@@ -116,6 +117,13 @@ export const updateUserAccessController = async (req: Request, res: Response) =>
     throw new ApiError(400, 'INVALID_BODY', 'isActive must be a boolean');
   }
   res.status(200).json(new ApiResponse(await updateUserAccess(req.user._id, userId, req.body.isActive)));
+};
+
+export const deleteUserController = async (req: Request, res: Response) => {
+  if (!req.user) throw new ApiError(401, 'UNAUTHORIZED', 'Invalid or expired token');
+  const userId = getParam(req.params.id);
+  if (!userId || !isObjectId(userId)) throw new ApiError(400, 'INVALID_ID', 'Invalid ID format');
+  res.status(200).json(new ApiResponse(await deleteUser(req.user._id, userId)));
 };
 
 export const reviewRegistrationRequestController = async (req: Request, res: Response) => {

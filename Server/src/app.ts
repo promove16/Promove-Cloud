@@ -11,6 +11,9 @@ import { httpLogStream } from './config/logger';
 import { apiLimiter, withRateLimit } from './middleware/rateLimiter';
 import { errorHandler } from './middleware/errorHandler';
 import { userActivityMiddleware } from './middleware/userActivity';
+import { httpMetricsMiddleware, metricsHandler } from './middleware/metrics';
+import { healthHandler, readinessHandler } from './middleware/health';
+import { backpressureMiddleware } from './middleware/backpressure';
 import authRoutes from './modules/auth/auth.routes';
 import chatRoutes from './modules/chat/chat.routes';
 import collegeRoutes from './modules/college/college.routes';
@@ -46,7 +49,7 @@ export const createApp = () => {
   app.use(helmet());
   app.use(
     cors({
-      origin: env.CLIENT_URL,
+      origin: env.ALLOWED_ORIGINS,
       credentials: true,
     }),
   );
@@ -58,7 +61,17 @@ export const createApp = () => {
       stream: httpLogStream,
     }),
   );
+  app.use(httpMetricsMiddleware);
   app.use(userActivityMiddleware);
+
+  // Operational endpoints outside /api so they bypass auth/rate limiting and
+  // remain scrape-able regardless of API health.
+  app.get('/metrics', metricsHandler);
+  app.get('/health', healthHandler);
+  app.get('/healthz', healthHandler);
+  app.get('/readyz', readinessHandler);
+
+  app.use('/api', backpressureMiddleware);
   app.use('/api', withRateLimit(apiLimiter));
   app.use('/api/auth', authRoutes);
   app.use('/api/users', userRoutes);

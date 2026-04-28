@@ -150,8 +150,7 @@ export const addNegotiationMessageController = async (req: Request, res: Respons
     throw new ApiError(400, 'INVALID_MESSAGE', 'Message is required');
   }
 
-  const senderRole = req.user.role === 'investor' ? 'investor' : 'student';
-  const result = await addNegotiationMessage(dealId, String(req.user._id), message, senderRole);
+  const result = await addNegotiationMessage(dealId, String(req.user._id), message);
   res.status(200).json(new ApiResponse(result));
 };
 
@@ -167,8 +166,7 @@ export const proposeNegotiationTermsController = async (req: Request, res: Respo
     throw new ApiError(400, 'INVALID_TERMS', 'Amount and equity are required');
   }
 
-  const senderRole = req.user.role === 'investor' ? 'investor' : 'student';
-  const result = await proposeNegotiationTerms(dealId, String(req.user._id), amountINR, equityPercent, senderRole);
+  const result = await proposeNegotiationTerms(dealId, String(req.user._id), amountINR, equityPercent);
   res.status(200).json(new ApiResponse(result));
 };
 
@@ -179,8 +177,7 @@ export const agreeNegotiationTermsController = async (req: Request, res: Respons
 
   const dealId = assertObjectId(String(req.params.id), 'Deal id');
 
-  const senderRole = req.user.role === 'investor' ? 'investor' : 'student';
-  const result = await agreeNegotiationTerms(dealId, String(req.user._id), senderRole);
+  const result = await agreeNegotiationTerms(dealId, String(req.user._id));
   res.status(200).json(new ApiResponse(result));
 };
 

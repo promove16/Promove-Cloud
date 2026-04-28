@@ -6,6 +6,7 @@ import {
   lazy,
 } from "react";
 import { TermsAcceptanceGate } from "../features/auth/TermsAcceptanceGate";
+import { GlobalSmartChat } from "../components/smart-chat/GlobalSmartChat";
 import {
   Link,
   Navigate,
@@ -236,6 +237,7 @@ function RootLayout() {
     <>
       <Outlet />
       <TermsAcceptanceGate />
+      <GlobalSmartChat />
     </>
   );
 }

@@ -1,5 +1,8 @@
 import { type ReactNode } from 'react';
-import { InstitutionWorkspaceMenu } from './InstitutionWorkspaceMenu';
+import {
+  hasInstitutionWorkspaceMenuItems,
+  InstitutionWorkspaceMenu,
+} from './InstitutionWorkspaceMenu';
 
 type InstitutionWorkspaceHeaderProps = {
   mode: 'school' | 'college';
@@ -20,6 +23,8 @@ export function InstitutionWorkspaceHeader({
   tabsAction,
   showMenu = true,
 }: InstitutionWorkspaceHeaderProps) {
+  const shouldShowMenu = showMenu && hasInstitutionWorkspaceMenuItems(mode);
+
   return (
     <section className="space-y-5">
       <div className="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
@@ -31,19 +36,19 @@ export function InstitutionWorkspaceHeader({
         {headerAction ? <div className="shrink-0">{headerAction}</div> : null}
       </div>
 
-      {showMenu || tabsAction ? (
+      {shouldShowMenu || tabsAction ? (
         <div
           className={`flex flex-col gap-4 border-b border-slate-800 pb-4 ${
-            showMenu
+            shouldShowMenu
               ? 'xl:flex-row xl:items-end xl:justify-between'
               : 'xl:items-end'
           }`}
         >
-          {showMenu ? (
+          {shouldShowMenu ? (
             <InstitutionWorkspaceMenu mode={mode} className="min-w-0 flex-1" />
           ) : null}
           {tabsAction ? (
-            <div className={showMenu ? 'shrink-0' : 'flex justify-end'}>{tabsAction}</div>
+            <div className={shouldShowMenu ? 'shrink-0' : 'flex justify-end'}>{tabsAction}</div>
           ) : null}
         </div>
       ) : null}

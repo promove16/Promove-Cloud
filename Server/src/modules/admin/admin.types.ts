@@ -81,7 +81,7 @@ export interface AdminRegistrationRequestItem {
       _id: string;
       category: InstitutionVerificationDocumentCategory;
       fileUrl: string;
-      fileType: 'pdf' | 'image';
+      fileType: 'pdf' | 'image' | 'doc' | 'docx' | 'ppt' | 'pptx' | 'xls' | 'xlsx' | 'video' | 'audio' | 'other';
       fileName: string;
       fileSizeBytes: number;
       uploadedAt: string;
@@ -329,7 +329,7 @@ export interface AdminDealReviewItem extends AdminDealItem {
     uploads: Array<{
       _id: string;
       fileUrl: string;
-      fileType: 'pdf' | 'image';
+      fileType: 'pdf' | 'image' | 'doc' | 'docx' | 'ppt' | 'pptx' | 'xls' | 'xlsx' | 'video' | 'audio' | 'other';
       fileName: string;
       fileSizeBytes: number;
       uploadedAt: string;

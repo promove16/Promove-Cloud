@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import {
   BriefcaseBusiness,
@@ -14,6 +14,7 @@ import { MarketplaceEntityType } from "../../api/marketplace.api";
 import { startupApi } from "../../api/startup.api";
 import { useAuthStore } from "../../store/authStore";
 import { Startup } from "../../types/startup.types";
+import { WorkflowRequest } from "../../types/request.types";
 import { getApiErrorMessage } from "../../utils/apiError";
 
 export type StartupInviteTargetType = "student" | "mentor" | "investor";
@@ -137,6 +138,57 @@ const formatFundingNeeded = (value?: number) =>
 const normalizeInlineText = (value: string) =>
   value.replace(/\s+/g, " ").trim();
 
+const getRequestMetadataString = (
+  metadata: WorkflowRequest["metadata"],
+  key: string,
+) => {
+  const value = metadata?.[key];
+  return typeof value === "string" ? value.trim() : "";
+};
+
+const requestTargetsStartupContext = (
+  request: WorkflowRequest,
+  startup: Startup,
+) => {
+  if (request.targetEntityType === "startup" && request.targetEntityId === startup._id) {
+    return true;
+  }
+
+  if (!startup.projectId) {
+    return false;
+  }
+
+  return (
+    (request.targetEntityType === "workspace" &&
+      request.targetEntityId === startup.projectId) ||
+    getRequestMetadataString(request.metadata, "workspaceId") === startup.projectId
+  );
+};
+
+const isAcceptedInviteForTargetStartup = ({
+  request,
+  startup,
+  target,
+  requestType,
+}: {
+  request: WorkflowRequest;
+  startup: Startup;
+  target: StartupInviteTarget;
+  requestType: StartupInviteConfig["requestType"];
+}) => {
+  const normalizedRequestType = request.requestType ?? request.type;
+  const relevantRequestType =
+    normalizedRequestType === requestType ||
+    (target.entityType === "student" && normalizedRequestType === "workspace_member");
+
+  return (
+    request.status === "accepted" &&
+    request.toUserId === target._id &&
+    relevantRequestType &&
+    requestTargetsStartupContext(request, startup)
+  );
+};
+
 export const buildStartupHandshakeDmMessage = ({
   requestId,
   target,
@@ -239,10 +291,52 @@ export function StartupInviteModal({
     staleTime: 60_000,
   });
 
-  const founderStartups =
-    founderStartupsQuery.data?.filter((startup) =>
-      currentUserId ? startup.founderIds.includes(currentUserId) : false,
-    ) ?? [];
+  const outgoingRequestsQuery = useQuery({
+    queryKey: ["requests", "outgoing"],
+    queryFn: requestApi.outgoing,
+    enabled: isOpen && Boolean(currentUserId && target),
+    staleTime: 30_000,
+  });
+
+  const founderManagedStartups = useMemo(
+    () =>
+      founderStartupsQuery.data?.filter((startup) =>
+        currentUserId ? startup.founderIds.includes(currentUserId) : false,
+      ) ?? [],
+    [currentUserId, founderStartupsQuery.data],
+  );
+
+  const founderStartups = useMemo(() => {
+    if (!target || !config) {
+      return founderManagedStartups;
+    }
+
+    const outgoingRequests = outgoingRequestsQuery.data ?? [];
+    return founderManagedStartups.filter((startup) => {
+      const alreadyStartupMember =
+        startup.founderIds.includes(target._id) ||
+        startup.teamMemberIds.includes(target._id);
+
+      if (alreadyStartupMember) {
+        return false;
+      }
+
+      return !outgoingRequests.some((request) =>
+        isAcceptedInviteForTargetStartup({
+          request,
+          startup,
+          target,
+          requestType: config.requestType,
+        }),
+      );
+    });
+  }, [config, founderManagedStartups, outgoingRequestsQuery.data, target]);
+
+  const hasFounderManagedStartups =
+    founderManagedStartups.length > 0;
+
+  const hasOnlyAcceptedInviteContexts =
+    hasFounderManagedStartups && founderStartups.length === 0;
 
   const selectedStartup =
     founderStartups.find((startup) => startup._id === selectedStartupId) ?? null;
@@ -295,6 +389,7 @@ export function StartupInviteModal({
           startupCategory: selectedStartup.category,
           startupTagline: selectedStartup.tagline,
           startupFundingNeeded: selectedStartup.fundingNeeded,
+          workspaceId: selectedStartup.projectId,
           requestedAudience: target.entityType,
           recipientName: target.displayName,
         },
@@ -404,16 +499,24 @@ export function StartupInviteModal({
               </div>
             </div>
 
-            {founderStartupsQuery.isLoading ? (
+            {founderStartupsQuery.isLoading || outgoingRequestsQuery.isLoading ? (
               <div className="rounded-[22px] border border-white/10 bg-white/[0.03] px-4 py-8 text-center text-sm text-slate-400">
                 Loading your founder-managed startups...
               </div>
-            ) : founderStartups.length === 0 ? (
+            ) : !hasFounderManagedStartups ? (
               <div className="rounded-[22px] border border-amber-500/20 bg-amber-500/10 p-5 text-sm text-amber-100">
                 <div className="font-semibold">Founder-managed startup required</div>
                 <p className="mt-2 leading-6 text-amber-100/90">
                   Create or open a startup you own before sending team invites,
                   mentor requests, or investor outreach from the marketplace.
+                </p>
+              </div>
+            ) : hasOnlyAcceptedInviteContexts ? (
+              <div className="rounded-[22px] border border-emerald-500/20 bg-emerald-500/10 p-5 text-sm text-emerald-100">
+                <div className="font-semibold">Invite already accepted</div>
+                <p className="mt-2 leading-6 text-emerald-100/90">
+                  This recipient already accepted an invite for your available
+                  startup or linked workspace context.
                 </p>
               </div>
             ) : (

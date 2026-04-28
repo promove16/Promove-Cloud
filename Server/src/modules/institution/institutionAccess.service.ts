@@ -1,6 +1,7 @@
 import bcrypt from 'bcrypt';
 import { randomBytes } from 'crypto';
 import { z } from 'zod';
+import { env } from '../../config/env';
 import { redis } from '../../config/redis';
 import { UserRole } from '../../types/roles.types';
 import { ApiError } from '../../utils/ApiError';
@@ -370,7 +371,7 @@ export const createManagedStudentCredentials = async (
   const sanitizedBio = payload.bio ? sanitizePlainText(payload.bio) : undefined;
   const sanitizedDomain = payload.domain ? sanitizePlainText(payload.domain) : undefined;
   const temporaryPassword = generateTemporaryPassword();
-  const passwordHash = await bcrypt.hash(temporaryPassword, 12);
+  const passwordHash = await bcrypt.hash(temporaryPassword, env.BCRYPT_ROUNDS);
   const profileSlug = await generateProfileSlug(sanitizedDisplayName);
   const verifiedAt = new Date();
 

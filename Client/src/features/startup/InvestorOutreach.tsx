@@ -14,6 +14,7 @@ import { marketplaceApi, MarketplaceProfile } from '../../api/marketplace.api';
 import { dealApi } from '../../api/deal.api';
 import { startupApi } from '../../api/startup.api';
 import { InvestorProposalModal } from '../../components/messaging/InvestorProposalModal';
+import type { InvestorProposalPayload } from '../../components/messaging/InvestorProposalModal';
 import { Button } from '../../components/ui/Button';
 import { Card } from '../../components/ui/Card';
 import { Input } from '../../components/ui/Input';
@@ -96,15 +97,19 @@ export function InvestorOutreach() {
   const sendPitchMutation = useMutation({
     mutationFn: async ({
       investorId,
-      message,
+      payload,
     }: {
       investorId: string;
-      message: string;
+      payload: InvestorProposalPayload;
     }) =>
       dmApi.send(investorId, {
-        message,
+        message: payload.message,
         messageType: 'text',
         queryType: 'investor',
+        pitchContext: {
+          ...(payload.startupId ? { startupId: payload.startupId } : {}),
+          ...(payload.workspaceId ? { workspaceId: payload.workspaceId } : {}),
+        },
       }),
     onSuccess: async (_message, variables) => {
       markInvestorContactStarted(variables.investorId, currentUserId);
@@ -367,14 +372,14 @@ export function InvestorOutreach() {
           <InvestorProposalModal
             isOpen={Boolean(selectedInvestor)}
             onClose={() => setSelectedInvestor(null)}
-            onSend={(message) => {
+            onSend={(payload) => {
               if (!selectedInvestor) {
                 return;
               }
 
               sendPitchMutation.mutate({
                 investorId: selectedInvestor._id,
-                message,
+                payload,
               });
             }}
             recipientName={selectedInvestor?.displayName ?? 'Investor'}

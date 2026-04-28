@@ -20,31 +20,13 @@ const INSTITUTION_WORKSPACE_ITEMS: Record<
   InstitutionWorkspaceMode,
   WorkspaceMenuItem[]
 > = {
-  school: [
-    {
-      label: "Student Innovators",
-      path: "/dashboard/school/students",
-      icon: Users,
-    },
-    {
-      label: "Roster & Onboarding",
-      path: "/dashboard/school/operations",
-      icon: KeyRound,
-    },
-  ],
-  college: [
-    {
-      label: "Student Innovators",
-      path: "/dashboard/college/students",
-      icon: Users,
-    },
-    {
-      label: "Roster & Onboarding",
-      path: "/dashboard/college/operations",
-      icon: KeyRound,
-    },
-  ],
+  school: [],
+  college: [],
 };
+
+export const hasInstitutionWorkspaceMenuItems = (
+  mode: InstitutionWorkspaceMode,
+) => INSTITUTION_WORKSPACE_ITEMS[mode].length > 0;
 
 const isPathMatch = (pathname: string, path: string) =>
   pathname === path || pathname.startsWith(`${path}/`);
@@ -58,6 +40,10 @@ export function InstitutionWorkspaceMenu({
 }) {
   const location = useLocation();
   const items = INSTITUTION_WORKSPACE_ITEMS[mode];
+
+  if (items.length === 0) {
+    return null;
+  }
 
   return (
     <div className={className}>

@@ -3,8 +3,9 @@ import axios, {
   InternalAxiosRequestConfig,
   isAxiosError,
 } from "axios";
+import { toast } from "../app/components/ui/sonner";
 import { useAuthStore } from "../store/authStore";
-import { ApiSuccessResponse, AuthPayload } from "../types/auth.types";
+import { ApiErrorResponse, ApiSuccessResponse, AuthPayload } from "../types/auth.types";
 import { buildLoginRedirectPath } from "../utils/authRedirect";
 
 interface RetriableRequestConfig extends InternalAxiosRequestConfig {
@@ -50,6 +51,14 @@ refreshClient.interceptors.request.use((config) => {
   return config;
 });
 
+refreshClient.interceptors.response.use(
+  (response) => response,
+  (error: AxiosError) => {
+    showServiceUnavailableToast(error as AxiosError<ApiErrorResponse>);
+    return Promise.reject(error);
+  },
+);
+
 const axiosInstance = axios.create({
   baseURL,
   withCredentials: true,
@@ -57,6 +66,9 @@ const axiosInstance = axios.create({
 
 let refreshPromise: Promise<AuthPayload | null> | null = null;
 let refreshBlocked = false;
+const SUPPORT_EMAIL = "charan.f.sde@gmail.com";
+const SERVICE_TOAST_DEBOUNCE_MS = 30_000;
+const serviceToastLastShownAt = new Map<string, number>();
 
 const isAuthRequest = (url?: string) =>
   Boolean(
@@ -67,6 +79,63 @@ const isAuthRequest = (url?: string) =>
   );
 
 const isRefreshBlocked = () => refreshBlocked && !useAuthStore.getState().accessToken;
+
+const getServiceUnavailableDetails = (error: AxiosError<ApiErrorResponse>) => {
+  const apiError = error.response?.data?.error;
+  const firstDetail = apiError?.details?.find((detail) => detail.service || detail.serviceName);
+
+  if (!error.response) {
+    return {
+      serviceName: "API service",
+      message: "API service is not reachable right now.",
+      supportEmail: SUPPORT_EMAIL,
+    };
+  }
+
+  if (error.response.status !== 503) {
+    return null;
+  }
+
+  return {
+    serviceName:
+      firstDetail?.serviceName ||
+      firstDetail?.service ||
+      (apiError?.code === "AUTH_SESSION_STORE_UNAVAILABLE"
+        ? "Authentication session store"
+        : "Application service"),
+    message: apiError?.message || "A required service is temporarily unavailable.",
+    supportEmail: firstDetail?.supportEmail || SUPPORT_EMAIL,
+  };
+};
+
+const showServiceUnavailableToast = (error: AxiosError<ApiErrorResponse>) => {
+  const details = getServiceUnavailableDetails(error);
+  if (!details) {
+    return;
+  }
+
+  const now = Date.now();
+  const toastKey = details.serviceName;
+  const lastShownAt = serviceToastLastShownAt.get(toastKey) ?? 0;
+  if (now - lastShownAt < SERVICE_TOAST_DEBOUNCE_MS) {
+    return;
+  }
+
+  serviceToastLastShownAt.set(toastKey, now);
+  toast.error(`${details.serviceName} is not working`, {
+    id: `service-unavailable:${toastKey}`,
+    description: `${details.message} Contact ${details.supportEmail}.`,
+    duration: 12_000,
+    action: {
+      label: "Email support",
+      onClick: () => {
+        window.location.href = `mailto:${details.supportEmail}?subject=${encodeURIComponent(
+          `${details.serviceName} unavailable`,
+        )}`;
+      },
+    },
+  });
+};
 
 export const requestAccessTokenRefresh = async (): Promise<AuthPayload | null> => {
   if (isRefreshBlocked()) {
@@ -119,6 +188,8 @@ axiosInstance.interceptors.request.use((config) => {
 axiosInstance.interceptors.response.use(
   (response) => response,
   async (error: AxiosError) => {
+    showServiceUnavailableToast(error as AxiosError<ApiErrorResponse>);
+
     const originalRequest = error.config as RetriableRequestConfig | undefined;
 
     if (!originalRequest || error.response?.status !== 401) {

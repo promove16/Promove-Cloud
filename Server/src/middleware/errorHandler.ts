@@ -3,6 +3,7 @@ import multer from 'multer';
 import { ErrorRequestHandler } from 'express';
 import { ZodError } from 'zod';
 import { env } from '../config/env';
+import { getServiceUnavailableDetails } from '../config/serviceAvailability';
 import { logError } from '../config/logger';
 import { ApiFailure } from '../types/api.types';
 import { ApiError } from '../utils/ApiError';
@@ -18,7 +19,11 @@ const buildFailure = (code: string, message: string, details?: unknown[]): ApiFa
 
 export const errorHandler: ErrorRequestHandler = (error, req, res, _next) => {
   if (error instanceof ApiError) {
-    return res.status(error.statusCode).json(buildFailure(error.code, error.message, error.details));
+    const details =
+      error.statusCode === 503 && !error.details
+        ? getServiceUnavailableDetails('api', error.message)
+        : error.details;
+    return res.status(error.statusCode).json(buildFailure(error.code, error.message, details));
   }
 
   if (error instanceof ZodError) {

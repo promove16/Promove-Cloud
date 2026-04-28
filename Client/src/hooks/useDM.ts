@@ -6,6 +6,25 @@ import { useAuthStore } from '../store/authStore';
 
 const normalizeQueryType = (queryType?: QueryType) => queryType ?? 'general';
 
+const isSameAttachment = (left: DMMessage, right: DMMessage) => {
+  if (left.attachmentStorageKey && right.attachmentStorageKey) {
+    return left.attachmentStorageKey === right.attachmentStorageKey;
+  }
+
+  if (left.attachmentStorageKey || right.attachmentStorageKey) {
+    return (
+      left.attachmentType === right.attachmentType &&
+      left.attachmentName === right.attachmentName
+    );
+  }
+
+  return (
+    left.attachmentUrl === right.attachmentUrl &&
+    left.attachmentType === right.attachmentType &&
+    left.attachmentName === right.attachmentName
+  );
+};
+
 const isSameOutgoingMessage = (left: DMMessage, right: DMMessage) =>
   left.senderId === right.senderId &&
   left.recipientId === right.recipientId &&
@@ -14,9 +33,7 @@ const isSameOutgoingMessage = (left: DMMessage, right: DMMessage) =>
   normalizeQueryType(left.queryType) === normalizeQueryType(right.queryType) &&
   left.scheduledAt === right.scheduledAt &&
   left.meetLink === right.meetLink &&
-  left.attachmentUrl === right.attachmentUrl &&
-  left.attachmentType === right.attachmentType &&
-  left.attachmentName === right.attachmentName;
+  isSameAttachment(left, right);
 
 export const useDM = (partnerId?: string) => {
   const queryClient = useQueryClient();
@@ -199,7 +216,7 @@ export const useDM = (partnerId?: string) => {
 
   // Secure send - use ref for current partnerId
   const sendMessage = useCallback(
-    (payload: { message?: string; messageType?: 'text' | 'interview_request'; scheduledAt?: string; meetLink?: string; queryType?: QueryType; attachmentUrl?: string; attachmentType?: 'image' | 'pdf'; attachmentName?: string }) => {
+    (payload: { message?: string; messageType?: 'text' | 'interview_request'; scheduledAt?: string; meetLink?: string; queryType?: QueryType; attachmentUrl?: string; attachmentType?: 'image' | 'pdf'; attachmentName?: string; attachmentStorageProvider?: 'cloudinary' | 's3'; attachmentStorageKey?: string }) => {
       const currentPartnerId = partnerIdRef.current;
       if (!currentPartnerId) {
         console.error('[DM] Cannot send: no partnerId');
@@ -219,6 +236,8 @@ export const useDM = (partnerId?: string) => {
           attachmentUrl: payload.attachmentUrl,
           attachmentType: payload.attachmentType,
           attachmentName: payload.attachmentName,
+          attachmentStorageProvider: payload.attachmentStorageProvider,
+          attachmentStorageKey: payload.attachmentStorageKey,
           readAt: null,
           sentAt: new Date().toISOString(),
           isOptimistic: true,

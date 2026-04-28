@@ -1,6 +1,7 @@
 import bcrypt from 'bcrypt';
 import { randomBytes } from 'crypto';
 import { Types } from 'mongoose';
+import { env } from '../../config/env';
 import { redis } from '../../config/redis';
 import { io } from '../../config/socket';
 import { UserRole } from '../../types/roles.types';
@@ -1210,7 +1211,7 @@ export const createAdminMentorProfile = async (
   const sanitizedDisplayName = sanitizePlainText(payload.displayName);
   const profileSlug = await generateProfileSlug(sanitizedDisplayName);
   const temporaryPassword = generateTemporaryPassword();
-  const passwordHash = await bcrypt.hash(temporaryPassword, 12);
+  const passwordHash = await bcrypt.hash(temporaryPassword, env.BCRYPT_ROUNDS);
 
   const mentor = await User.create({
     email: normalizedEmail,

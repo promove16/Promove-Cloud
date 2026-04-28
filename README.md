@@ -31,11 +31,11 @@ ProMove provides a unified ecosystem where:
 - **Node.js** with Express 5
 - **TypeScript** for type safety
 - **MongoDB** with Mongoose for persistence
-- **Upstash Redis** for caching, sessions, and queues
+- **AWS ElastiCache Redis/Valkey** for caching, sessions, queues, rate limits, and Socket.IO fanout
 - **BullMQ** for background job processing
 - **Socket.IO** for real-time communication
 - **JWT** access/refresh token authentication
-- **Cloudinary** for file uploads
+- **AWS S3** for file uploads, with Cloudinary kept only as a legacy fallback
 - **AWS SES / Nodemailer** for emails
 - **PDFKit** for document generation
 - **Zod** for validation
@@ -54,7 +54,7 @@ ProMove follows a **layered monorepo architecture**:
 │  ─────────               │  ────────                        │
 │  React SPA               │  Express API                     │
 │  Vite build              │  MongoDB + Mongoose             │
-│  Tailwind CSS            │  Upstash Redis                   │
+│  Tailwind CSS            │  AWS ElastiCache Redis           │
 │  Zustand + TanStack      │  BullMQ workers                  │
 │  Socket.IO client        │  Socket.IO server                │
 └─────────────────────────────────────────────────────────────┘
@@ -140,8 +140,8 @@ The backend is organized into domain modules:
 ### Prerequisites
 - Node.js 20+
 - MongoDB instance
-- Upstash Redis account
-- Cloudinary account (for uploads)
+- AWS ElastiCache Redis/Valkey
+- AWS S3 bucket for uploads
 - AWS SES or SMTP for emails
 
 ### Installation
@@ -176,10 +176,10 @@ docker compose up --build
 
 Required backend variables (see `.env.example`):
 - `MONGODB_URI` - MongoDB connection string
-- `UPSTASH_REDIS_*` - Redis credentials
+- `AWS_REDIS_*` or `REDIS_URL` - ElastiCache Redis connection
 - `JWT_ACCESS_SECRET` / `JWT_REFRESH_SECRET` - Token secrets
-- `CLOUDINARY_*` - Cloudinary upload config
-- `AWS_S3_*` - optional future S3 upload config
+- `AWS_S3_*` - S3 upload bucket config
+- `CLOUDINARY_*` - optional legacy upload fallback
 - `AWS_*` - AWS SES credentials
 
 Frontend:
@@ -226,7 +226,7 @@ The active application follows a layered architecture:
 - React SPA on the client side.
 - Express REST API on the server side.
 - MongoDB for persistent business data.
-- Upstash Redis for caching, sessions, queues, and transient state.
+- AWS ElastiCache Redis/Valkey for caching, sessions, queues, rate limits, and transient state.
 - BullMQ workers for asynchronous jobs.
 - Socket.IO namespaces for live notifications, chat, mentor, and score updates.
 
@@ -253,11 +253,11 @@ The backend is modular by domain. The frontend is role-based and route-driven. B
 - TypeScript
 - Express 5
 - MongoDB + Mongoose
-- Upstash Redis
+- AWS ElastiCache Redis/Valkey
 - BullMQ
 - Socket.IO
 - JWT access/refresh tokens
-- Cloudinary uploads
+- AWS S3 uploads
 - AWS SES / Nodemailer
 - PDFKit
 - Zod validation
@@ -451,10 +451,11 @@ Backend environment values are defined in `.env.example` and validated in `Serve
 
 Important backend variables:
 - `MONGODB_URI`
-- `UPSTASH_REDIS_REST_URL`
-- `UPSTASH_REDIS_REST_TOKEN`
-- `UPSTASH_REDIS_HOST`
-- `UPSTASH_REDIS_PASSWORD` optional for BullMQ TCP mode
+- `AWS_REDIS_HOST`
+- `AWS_REDIS_PORT`
+- `AWS_REDIS_TLS`
+- `AWS_REDIS_AUTH_TOKEN` optional when Redis AUTH is enabled
+- `REDIS_URL` optional alternative to the split Redis fields
 - `BULLMQ_USE_REDIS` optional, defaults to `false` in development and `true` in production
 - `JWT_ACCESS_SECRET`
 - `JWT_REFRESH_SECRET`
@@ -518,12 +519,24 @@ npm run test:local
 
 ## Deployment Model
 
-There are two supported deployment styles:
+There are three supported deployment styles:
 
 - Separate dev containers through `docker-compose.yml`
-- A single production image through the root `Dockerfile`
+- A legacy single production image through the root `Dockerfile`
+- The recommended AWS production model documented in [docs/AWS_ECS_FARGATE_DEPLOYMENT.md](docs/AWS_ECS_FARGATE_DEPLOYMENT.md)
 
 The root Dockerfile builds the server, builds the client, and copies the built frontend into the server runtime so Express can serve both API and static assets from one container.
+
+For the first AWS production deployment, build `Server/Dockerfile` as the backend image and run it as separate ECS Fargate services:
+
+```bash
+npm run start:api
+npm run start:realtime
+npm run start:worker
+npm run start:scheduler
+```
+
+Build `Client/` separately and serve the Vite `dist/` output from S3 + CloudFront.
 
 ## Testing Assets
 
@@ -546,6 +559,7 @@ Current test focus in the active backend:
 - [docs/SRS.md](docs/SRS.md)
 - [docs/ARCHITECTURE_DIAGRAMS.md](docs/ARCHITECTURE_DIAGRAMS.md)
 - [docs/CODE_STRUCTURE.md](docs/CODE_STRUCTURE.md)
+- [docs/AWS_ECS_FARGATE_DEPLOYMENT.md](docs/AWS_ECS_FARGATE_DEPLOYMENT.md)
 - [docs/RBAC_ROADMAP.md](docs/RBAC_ROADMAP.md)
 - `docs/prd_extracted.txt`
 - `docs/student-prd-extract.txt`

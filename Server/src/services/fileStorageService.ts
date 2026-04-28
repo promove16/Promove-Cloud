@@ -1,4 +1,5 @@
 import { DeleteObjectCommand, GetObjectCommand, PutObjectCommand, S3Client } from '@aws-sdk/client-s3';
+import { getSignedUrl } from '@aws-sdk/s3-request-presigner';
 import { randomUUID } from 'crypto';
 import path from 'path';
 import { v2 as cloudinary } from 'cloudinary';
@@ -35,22 +36,22 @@ export interface UploadedFileResult {
 
 const hasS3Config = Boolean(
   env.AWS_REGION &&
-    env.AWS_ACCESS_KEY_ID &&
-    env.AWS_SECRET_ACCESS_KEY &&
     env.AWS_S3_BUCKET_NAME,
 );
 
 const s3Region = hasS3Config ? env.AWS_REGION! : undefined;
-const s3AccessKeyId = hasS3Config ? env.AWS_ACCESS_KEY_ID! : undefined;
-const s3SecretAccessKey = hasS3Config ? env.AWS_SECRET_ACCESS_KEY! : undefined;
-
 const s3 = hasS3Config
   ? new S3Client({
       region: s3Region,
-      credentials: {
-        accessKeyId: s3AccessKeyId!,
-        secretAccessKey: s3SecretAccessKey!,
-      },
+      ...(env.AWS_ACCESS_KEY_ID && env.AWS_SECRET_ACCESS_KEY
+        ? {
+            credentials: {
+              accessKeyId: env.AWS_ACCESS_KEY_ID,
+              secretAccessKey: env.AWS_SECRET_ACCESS_KEY,
+              ...(env.AWS_SESSION_TOKEN ? { sessionToken: env.AWS_SESSION_TOKEN } : {}),
+            },
+          }
+        : {}),
     })
   : null;
 
@@ -125,18 +126,13 @@ export const generatePresignedUrl = async (storageKey: string, expiresInSeconds 
   if (!hasS3Config || !s3) {
     throw new Error('S3 not configured');
   }
-  
+
   const command = new GetObjectCommand({
     Bucket: env.AWS_S3_BUCKET_NAME,
     Key: storageKey,
   });
-  
-  const url = await s3.send(new GetObjectCommand({
-    Bucket: env.AWS_S3_BUCKET_NAME,
-    Key: storageKey,
-  }));
 
-  return `${getPublicBaseUrl()}/${encodeObjectKey(storageKey)}?X-Amz-Algorithm=AWS4-HMAC-SHA256&X-Amz-Credential=${s3AccessKeyId}%2F${s3Region}%2Fs3%2Faws4_request&X-Amz-Date=${Date.now()}&X-Amz-Expires=${expiresInSeconds}&X-Amz-SignedHeaders=host`;
+  return getSignedUrl(s3, command, { expiresIn: expiresInSeconds });
 };
 
 const buildStorageKey = (folder: string, fileName: string) => {
@@ -180,7 +176,7 @@ export const uploadFile = async (input: {
   if (!hasS3Config) {
     if (!hasCloudinaryConfig) {
       throw new Error(
-        'No upload provider is configured. Set Cloudinary credentials now, or add AWS S3 settings later.',
+        'No upload provider is configured. Set AWS S3 settings, or configure Cloudinary as a legacy fallback.',
       );
     }
 

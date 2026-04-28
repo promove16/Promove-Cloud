@@ -4,8 +4,11 @@ import { DirectMessage } from './dm.model';
 import { User } from '../user/user.model';
 import { ApiError } from '../../utils/ApiError';
 import { uploadFile } from '../../services/fileStorageService';
+import { serializeDirectMessage, serializeDirectMessages } from './dm.serializer';
 import { ensureDmAccess, ensureDmThreadAccess } from './dm.permissions';
 import { createRequest } from '../request/request.service';
+import { Startup } from '../startup/startup.model';
+import { Workspace } from '../workspace/workspace.model';
 const allowedMimeTypes = new Set(['image/jpeg', 'image/png', 'image/gif', 'image/webp', 'application/pdf']);
 const pdfFileNamePattern = /\.pdf$/i;
 const allowedQueryTypes = new Set([
@@ -18,6 +21,38 @@ const allowedQueryTypes = new Set([
   'general',
 ] as const);
 
+const validateDmAttachmentStorage = (
+  userId: string,
+  attachmentStorageProvider?: unknown,
+  attachmentStorageKey?: unknown,
+) => {
+  if (!attachmentStorageProvider && !attachmentStorageKey) {
+    return {};
+  }
+
+  if (
+    attachmentStorageProvider !== 's3' &&
+    attachmentStorageProvider !== 'cloudinary'
+  ) {
+    throw new ApiError(400, 'INVALID_ATTACHMENT', 'Attachment storage provider is invalid');
+  }
+
+  if (typeof attachmentStorageKey !== 'string' || !attachmentStorageKey.trim()) {
+    throw new ApiError(400, 'INVALID_ATTACHMENT', 'Attachment storage key is invalid');
+  }
+
+  const normalizedKey = attachmentStorageKey.trim();
+  const expectedPrefix = `dm/${userId}/`;
+  if (!normalizedKey.startsWith(expectedPrefix)) {
+    throw new ApiError(400, 'INVALID_ATTACHMENT', 'Attachment does not belong to this sender');
+  }
+
+  return {
+    attachmentStorageProvider,
+    attachmentStorageKey: normalizedKey,
+  };
+};
+
 const workflowQueryActions = {
   project_mentor: 'mentor',
   project_join: 'join',
@@ -26,6 +61,55 @@ const workflowQueryActions = {
   hiring_event: 'register',
   mentorship_program: 'mentor',
 } as const;
+
+const getPitchContextString = (
+  context: { startupId?: unknown; workspaceId?: unknown } | undefined,
+  key: 'startupId' | 'workspaceId',
+) => {
+  const value = context?.[key];
+  return typeof value === 'string' && Types.ObjectId.isValid(value) ? value : '';
+};
+
+const resolveInvestorPitchContext = async (
+  senderId: string,
+  pitchContext?: { startupId?: unknown; workspaceId?: unknown },
+) => {
+  const startupId = getPitchContextString(pitchContext, 'startupId');
+  const explicitWorkspaceId = getPitchContextString(pitchContext, 'workspaceId');
+
+  if (!startupId && !explicitWorkspaceId) {
+    return {};
+  }
+
+  const startup = startupId
+    ? await Startup.findOne({
+        _id: startupId,
+        isActive: true,
+        founderIds: new Types.ObjectId(senderId),
+      })
+        .select('_id name projectId')
+        .lean()
+    : null;
+
+  const workspaceId = startup?.projectId ? String(startup.projectId) : explicitWorkspaceId;
+  const workspace = workspaceId
+    ? await Workspace.findOne({
+        _id: workspaceId,
+        isActive: true,
+        $or: [
+          { ownerId: new Types.ObjectId(senderId) },
+          { teamMemberIds: new Types.ObjectId(senderId) },
+        ],
+      })
+        .select('_id title')
+        .lean()
+    : null;
+
+  return {
+    ...(startup ? { startupId: String(startup._id), startupName: startup.name } : {}),
+    ...(workspace ? { workspaceId: String(workspace._id), workspaceTitle: workspace.title } : {}),
+  };
+};
 
 /** Shared online-users set — populated by dmSocket */
 export const onlineUsers = new Set<string>();
@@ -64,6 +148,8 @@ export const uploadAttachment = async (req: Request, res: Response) => {
     data: {
       url: upload.url,
       publicId: upload.key,
+      storageProvider: upload.provider,
+      storageKey: upload.key,
       fileType,
       fileName: req.file.originalname,
       fileSize: req.file.size,
@@ -199,7 +285,7 @@ export const getThread = async (req: Request, res: Response) => {
     .limit(200)
     .lean();
 
-  res.json({ success: true, data: messages });
+  res.json({ success: true, data: await serializeDirectMessages(messages) });
 };
 
 /** PATCH /api/dm/:userId/read — mark all messages from a partner as read */
@@ -235,7 +321,8 @@ export const sendMessage = async (req: Request, res: Response) => {
   }
 
   const recipientId = new Types.ObjectId(userId as string);
-  const { message, messageType, scheduledAt, meetLink, attachmentUrl, attachmentType, attachmentName, queryType } = req.body as {
+  const { message, messageType, scheduledAt, meetLink, attachmentUrl, attachmentType, attachmentName, attachmentStorageProvider, attachmentStorageKey, queryType, pitchContext } =
+    req.body as {
     message?: string;
     messageType?: 'text' | 'interview_request';
     scheduledAt?: string;
@@ -243,6 +330,12 @@ export const sendMessage = async (req: Request, res: Response) => {
     attachmentUrl?: string;
     attachmentType?: 'image' | 'pdf';
     attachmentName?: string;
+    attachmentStorageProvider?: 's3' | 'cloudinary';
+    attachmentStorageKey?: string;
+    pitchContext?: {
+      startupId?: string;
+      workspaceId?: string;
+    };
     queryType?:
       | 'project_mentor'
       | 'project_join'
@@ -269,6 +362,11 @@ export const sendMessage = async (req: Request, res: Response) => {
   }
 
   await ensureDmAccess(req.user!._id, userId, queryType || 'general');
+  const attachmentStorage = validateDmAttachmentStorage(
+    req.user!._id,
+    attachmentStorageProvider,
+    attachmentStorageKey,
+  );
 
   const msg = await DirectMessage.create({
     senderId: myId,
@@ -281,10 +379,19 @@ export const sendMessage = async (req: Request, res: Response) => {
     ...(attachmentUrl ? { attachmentUrl } : {}),
     ...(attachmentType ? { attachmentType } : {}),
     ...(attachmentName ? { attachmentName } : {}),
+    ...attachmentStorage,
   });
 
   if (queryType && queryType !== 'general') {
     const recipient = await User.findById(recipientId).select('displayName role').lean();
+    const investorPitchContext =
+      queryType === 'investor'
+        ? await resolveInvestorPitchContext(req.user!._id, pitchContext)
+        : {};
+    const acceptRedirect = investorPitchContext.workspaceId
+      ? `/product-workspace/${investorPitchContext.workspaceId}`
+      : `/dashboard/messages/${String(recipientId)}`;
+
     await createRequest({
       type: 'generic',
       actionType: workflowQueryActions[queryType],
@@ -296,14 +403,15 @@ export const sendMessage = async (req: Request, res: Response) => {
       requestedPermission: `dm_${queryType}`,
       message: normalizedMessage,
       deepLink: `/dashboard/messages/${String(recipientId)}`,
-      acceptRedirect: `/dashboard/messages/${String(recipientId)}`,
+      acceptRedirect,
       metadata: {
         queryType,
         recipientRole: recipient?.role,
         messageId: String(msg._id),
+        ...investorPitchContext,
       },
     });
   }
 
-  res.status(201).json({ success: true, data: msg });
+  res.status(201).json({ success: true, data: await serializeDirectMessage(msg.toObject()) });
 };

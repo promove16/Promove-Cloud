@@ -5,6 +5,7 @@ import { env } from '../config/env';
 import { Workspace } from '../modules/workspace/workspace.model';
 import { ChatMessage } from '../modules/chat/chat.model';
 import type { ChatAttachmentType, IChatMessage } from '../modules/chat/chat.types';
+import { serializeChatMessage } from '../modules/chat/chat.serializer';
 
 const canAccessWorkspace = async (workspaceId: string, userId: string) =>
   Workspace.exists({
@@ -100,11 +101,13 @@ const normalizeCodeSnippet = (value: unknown) => {
 };
 
 const normalizeAttachment = (payload: {
+  workspaceId: string;
   attachmentUrl?: unknown;
   attachmentType?: unknown;
   attachmentName?: unknown;
   attachmentSizeBytes?: unknown;
   attachmentMimeType?: unknown;
+  attachmentUploadId?: unknown;
 }) => {
   const attachmentUrl = typeof payload.attachmentUrl === 'string' ? payload.attachmentUrl.trim() : '';
   if (!attachmentUrl) {
@@ -143,59 +146,58 @@ const normalizeAttachment = (payload: {
   const attachmentMimeType =
     typeof payload.attachmentMimeType === 'string' ? payload.attachmentMimeType.trim() : undefined;
 
-  return {
+  return resolveWorkspaceUploadAttachment({
+    workspaceId: payload.workspaceId,
     attachmentUrl,
     attachmentType,
     attachmentName,
     attachmentSizeBytes: Math.max(0, attachmentSizeBytes),
     attachmentMimeType: attachmentMimeType || undefined,
-  };
+    attachmentUploadId:
+      typeof payload.attachmentUploadId === 'string' && Types.ObjectId.isValid(payload.attachmentUploadId)
+        ? payload.attachmentUploadId
+        : undefined,
+  });
 };
 
-const serializeChatMessage = (message: Partial<IChatMessage> & Record<string, unknown>) => ({
-  _id: String(message._id),
-  workspaceId: String(message.workspaceId),
-  senderId: String(message.senderId),
-  message: typeof message.message === 'string' ? message.message : '',
-  ...(message.attachmentUrl
-    ? {
-        attachmentUrl: String(message.attachmentUrl),
-        attachmentType: message.attachmentType as IChatMessage['attachmentType'],
-        attachmentName: typeof message.attachmentName === 'string' ? message.attachmentName : undefined,
-        attachmentSizeBytes:
-          typeof message.attachmentSizeBytes === 'number' ? message.attachmentSizeBytes : undefined,
-        attachmentMimeType:
-          typeof message.attachmentMimeType === 'string' ? message.attachmentMimeType : undefined,
-        attachment: {
-          fileUrl: String(message.attachmentUrl),
-          fileType: message.attachmentType as IChatMessage['attachmentType'],
-          fileName:
-            typeof message.attachmentName === 'string' ? message.attachmentName : 'Attachment',
-          fileSizeBytes:
-            typeof message.attachmentSizeBytes === 'number' ? message.attachmentSizeBytes : 0,
-          ...(typeof message.attachmentMimeType === 'string'
-            ? { mimeType: message.attachmentMimeType }
-            : {}),
-        },
-      }
-    : {}),
-  ...(message.codeSnippet && typeof message.codeSnippet === 'object'
-    ? {
-        codeSnippet: {
-          title: String((message.codeSnippet as Record<string, unknown>).title ?? ''),
-          language: String((message.codeSnippet as Record<string, unknown>).language ?? ''),
-          code: String((message.codeSnippet as Record<string, unknown>).code ?? ''),
-          lineCount: Number((message.codeSnippet as Record<string, unknown>).lineCount ?? 0),
-        },
-      }
-    : {}),
-  sentAt: serializeDate(message.sentAt as Date) ?? new Date().toISOString(),
-  ...(message.deliveredAt ? { deliveredAt: serializeDate(message.deliveredAt as Date) } : {}),
-  ...(message.seenAt ? { seenAt: serializeDate(message.seenAt as Date) } : {}),
-  seenBy: Array.isArray(message.seenBy)
-    ? message.seenBy.map((entry) => String(entry))
-    : [],
-});
+const resolveWorkspaceUploadAttachment = async (attachment: {
+  workspaceId: string;
+  attachmentUrl: string;
+  attachmentType: ChatAttachmentType;
+  attachmentName: string;
+  attachmentSizeBytes: number;
+  attachmentMimeType?: string;
+  attachmentUploadId?: string;
+}) => {
+  const workspace = await Workspace.findById(attachment.workspaceId).select('uploads').lean();
+  const uploads = workspace?.uploads ?? [];
+  const upload = uploads.find((item) => {
+    const uploadId = String(item._id);
+    const sameUploadId = attachment.attachmentUploadId && uploadId === attachment.attachmentUploadId;
+    const sameUrl = item.fileUrl === attachment.attachmentUrl;
+    const sameFile =
+      item.fileName === attachment.attachmentName &&
+      item.fileSizeBytes === attachment.attachmentSizeBytes &&
+      item.fileType === attachment.attachmentType;
+
+    return sameUploadId || sameUrl || sameFile;
+  });
+
+  if (!upload) {
+    return attachment;
+  }
+
+  return {
+    attachmentUrl: upload.fileUrl,
+    attachmentType: upload.fileType as ChatAttachmentType,
+    attachmentName: upload.fileName,
+    attachmentSizeBytes: upload.fileSizeBytes,
+    attachmentMimeType: upload.mimeType || attachment.attachmentMimeType,
+    attachmentUploadId: upload._id,
+    attachmentStorageProvider: upload.storageProvider,
+    attachmentStorageKey: upload.storageKey,
+  };
+};
 
 export const initChatSocket = (io: Server) => {
   const chat = io.of('/chat');
@@ -258,6 +260,7 @@ export const initChatSocket = (io: Server) => {
         attachmentName,
         attachmentSizeBytes,
         attachmentMimeType,
+        attachmentUploadId,
         codeSnippet,
       }) => {
       try {
@@ -279,12 +282,14 @@ export const initChatSocket = (io: Server) => {
         }
 
         const normalizedMessage = typeof message === 'string' ? message.trim() : '';
-        const normalizedAttachment = normalizeAttachment({
+        const normalizedAttachment = await normalizeAttachment({
+          workspaceId,
           attachmentUrl,
           attachmentType,
           attachmentName,
           attachmentSizeBytes,
           attachmentMimeType,
+          attachmentUploadId,
         });
         const normalizedCodeSnippet = normalizeCodeSnippet(codeSnippet);
 
@@ -303,7 +308,7 @@ export const initChatSocket = (io: Server) => {
 
         chat.to(`ws:${workspaceId}`).emit(
           'chat:message',
-          serializeChatMessage(msg.toObject() as unknown as Partial<IChatMessage> & Record<string, unknown>),
+          await serializeChatMessage(msg.toObject() as unknown as Partial<IChatMessage> & Record<string, unknown>),
         );
       } catch (error) {
         socket.emit('chat:error', {

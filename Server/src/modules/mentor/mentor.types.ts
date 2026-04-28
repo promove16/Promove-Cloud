@@ -161,7 +161,7 @@ export interface MentorWorkspaceDetail {
   uploads: Array<{
     _id: Types.ObjectId | string;
     fileUrl: string;
-    fileType: 'pdf' | 'image';
+    fileType: 'pdf' | 'image' | 'doc' | 'docx' | 'ppt' | 'pptx' | 'xls' | 'xlsx' | 'video' | 'audio' | 'other';
     fileName: string;
     uploadedAt: Date;
   }>;
