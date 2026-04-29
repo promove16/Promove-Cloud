@@ -42,6 +42,16 @@ const hasFileStorageConfig = () =>
 export const getServicePolicy = (service: ServiceKey): ServicePolicy => {
   const mode = env.NODE_ENV;
 
+  if (service === 'auth_session_store') {
+    return {
+      mode,
+      service,
+      serviceName: SERVICE_NAMES[service],
+      required: !env.AUTH_ALLOW_REDIS_AUTH_FALLBACK,
+      supportEmail: env.SUPPORT_EMAIL,
+    };
+  }
+
   if (mode === 'test') {
     return {
       mode,
@@ -58,16 +68,6 @@ export const getServicePolicy = (service: ServiceKey): ServicePolicy => {
       service,
       serviceName: SERVICE_NAMES[service],
       required: service === 'mongodb',
-      supportEmail: env.SUPPORT_EMAIL,
-    };
-  }
-
-  if (service === 'auth_session_store') {
-    return {
-      mode,
-      service,
-      serviceName: SERVICE_NAMES[service],
-      required: !env.AUTH_ALLOW_REDIS_AUTH_FALLBACK,
       supportEmail: env.SUPPORT_EMAIL,
     };
   }

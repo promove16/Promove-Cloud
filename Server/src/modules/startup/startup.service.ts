@@ -1059,6 +1059,12 @@ const buildStartupReadiness = (startup: Record<string, any>): StartupReadiness =
     ? buildInnovationStartupReadiness(startup)
     : buildLegacyStartupReadiness(startup as never);
 
+const formatMissingItems = (items: string[]) => {
+  if (items.length <= 1) return items[0] ?? '';
+  if (items.length === 2) return `${items[0]} and ${items[1]}`;
+  return `${items.slice(0, -1).join(', ')}, and ${items[items.length - 1]}`;
+};
+
 const completionScore = (checks: boolean[], maxScore: number) => {
   if (checks.length === 0) {
     return 0;
@@ -1563,6 +1569,15 @@ export const updateStartupProfile = async (
 export const requestStartupReview = async (startupId: string, userId: string) => {
   const startup = await getStartupForFounder(startupId, userId);
   const readiness = buildStartupReadiness(startup.toObject());
+
+  if (!readiness.isReviewReady) {
+    throw new ApiError(
+      400,
+      'STARTUP_INCOMPLETE',
+      `Complete the startup profile before requesting review. Missing: ${formatMissingItems(readiness.missingItems)}.`,
+      [{ missingItems: readiness.missingItems }],
+    );
+  }
 
   if (startup.reviewStatus === 'approved') {
     throw new ApiError(409, 'STARTUP_ALREADY_APPROVED', 'Startup has already been approved.');
