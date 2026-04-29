@@ -12,6 +12,7 @@ import { Startup } from '../startup/startup.model';
 import { User } from '../user/user.model';
 import { Workspace } from '../workspace/workspace.model';
 import { ensureDirectWorkspaceChatAccess } from '../workspace/workspace.service';
+import { recordStartupLifecycleEvent } from '../startupLifecycle/startupLifecycle.service';
 import { Deal } from './deal.model';
 import {
   CapTableResponse,
@@ -942,6 +943,23 @@ export const createInvestorDealFromInterest = async (
   }
 
   const context = await fetchDealContext(createdDeal);
+  await recordStartupLifecycleEvent({
+    startupId,
+    workspaceId: context.startup.projectId,
+    actorId: investorId,
+    source: 'investor',
+    type: 'INVESTOR_DEAL_CREATED',
+    title: 'Investor deal created',
+    description: `${context.investor.displayName} started a ${parsed.investorType} investor deal.`,
+    status: `stage_${createdDeal.stage}`,
+    metadata: {
+      dealId: String(createdDeal._id),
+      investorId,
+      investorType: parsed.investorType,
+      proposedAmountINR: parsed.proposedAmountINR,
+      proposedEquityPercent: parsed.proposedEquityPercent,
+    },
+  });
   return buildDetail(
     createdDeal,
     context.startup,
@@ -1385,6 +1403,23 @@ export const advanceDealStage = async (
   }
 
   const context = await fetchDealContext(deal);
+
+  await recordStartupLifecycleEvent({
+    startupId: transitionResult.startupId,
+    workspaceId: context.startup.projectId,
+    actorId: investorId,
+    source: 'investor',
+    type: 'INVESTOR_DEAL_STAGE_CHANGED',
+    title: `Investor deal moved to stage ${parsed.newStage}`,
+    description: `${context.investor.displayName} advanced the investor deal.`,
+    status: `stage_${parsed.newStage}`,
+    metadata: {
+      dealId: String(deal._id),
+      investorId,
+      stage: parsed.newStage,
+      status: deal.status,
+    },
+  });
 
   await notificationQueue.add('deal-stage', {
     userId: String(deal.studentId),
@@ -2037,6 +2072,21 @@ export const linkWorkshopToDeal = async (dealId: string, workspaceId: string, us
     await ensureDirectWorkspaceChatAccess(workspaceId, String(deal.investorId), 'investor');
   }
   await invalidateInvestmentCaches(String(deal.startupId));
+  await recordStartupLifecycleEvent({
+    startupId: deal.startupId,
+    workspaceId,
+    actorId: userId,
+    source: 'investor',
+    type: 'INVESTOR_DEAL_WORKSHOP_LINKED',
+    title: 'Investor deal workshop linked',
+    description: `${workspace.title} was linked to an investor deal.`,
+    status: `stage_${deal.stage}`,
+    metadata: {
+      dealId,
+      investorId: String(deal.investorId),
+      workspaceTitle: workspace.title,
+    },
+  });
 
   return {
     message: 'Workshop linked to deal',
@@ -2483,5 +2533,22 @@ export const placeBidFromUser = async (
   }
 
   const context = await fetchDealContext(createdDeal);
+  await recordStartupLifecycleEvent({
+    startupId,
+    workspaceId: context.startup.projectId,
+    actorId: userId,
+    source: 'investor',
+    type: 'INVESTOR_BID_PLACED',
+    title: 'Investor bid placed',
+    description: `${context.investor.displayName} placed a ${parsed.investorType} investor bid.`,
+    status: `stage_${createdDeal.stage}`,
+    metadata: {
+      dealId: String(createdDeal._id),
+      investorId: userId,
+      investorType: parsed.investorType,
+      proposedAmountINR: parsed.proposedAmountINR,
+      proposedEquityPercent: parsed.proposedEquityPercent,
+    },
+  });
   return buildDetail(createdDeal, context.startup, context.student, context.investor, context.investor.displayName, context.productWorkshop);
 };

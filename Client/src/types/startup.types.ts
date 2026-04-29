@@ -8,6 +8,13 @@ export interface StartupTraction {
 }
 
 export type StartupReviewStatus = 'draft' | 'review_requested' | 'changes_requested' | 'approved';
+export type StartupLifecycleSource =
+  | 'startup'
+  | 'workspace'
+  | 'patent'
+  | 'investor'
+  | 'marketplace'
+  | 'admin';
 export type StartupInnovationStage = 'idea' | 'prototype' | 'mvp' | 'market_ready';
 export type StartupInventorOwnership = 'individual' | 'team' | 'organization';
 export type StartupCommercializationStrategy = 'build_startup' | 'license' | 'sell' | 'partnership';
@@ -84,6 +91,21 @@ export interface StartupPitchRequest {
   requestedAt: string;
   respondedAt?: string;
   responseNote?: string;
+}
+
+export interface StartupLifecycleEvent {
+  _id: string;
+  startupId: string;
+  workspaceId?: string;
+  actorId?: string;
+  source: StartupLifecycleSource;
+  type: string;
+  title: string;
+  description?: string;
+  status?: string;
+  metadata: Record<string, unknown>;
+  createdAt: string;
+  updatedAt: string;
 }
 
 export interface StartupBusinessProfile {

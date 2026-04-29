@@ -5,6 +5,8 @@ import { ApiError } from '../../utils/ApiError';
 import { User } from '../user/user.model';
 import { UserRole } from '../../types/roles.types';
 import { Workspace } from '../workspace/workspace.model';
+import { Startup } from '../startup/startup.model';
+import { recordStartupLifecycleEvent } from '../startupLifecycle/startupLifecycle.service';
 import { Patent } from './patent.model';
 
 const filingDocumentsSchema = z
@@ -164,6 +166,37 @@ export const submitPatent = async (userId: string, payload: z.infer<typeof paten
     ...(payload.publicationDate ? { publicationDate: new Date(payload.publicationDate) } : {}),
     ...(payload.grantNumber ? { grantNumber: payload.grantNumber } : {}),
     ...(payload.grantDate ? { grantDate: new Date(payload.grantDate) } : {}),
+  });
+
+  const linkedStartup = await Startup.findOne({ projectId: payload.workspaceId, isActive: true });
+  if (linkedStartup) {
+    linkedStartup.traction = {
+      ...(linkedStartup.traction ?? {}),
+      patentFiled: true,
+      patentType: 'self_filed',
+      patentApplicationId: String(patent._id),
+    };
+    if (linkedStartup.innovationProfile?.tractionProfile) {
+      linkedStartup.innovationProfile.tractionProfile.patentStatus =
+        payload.patentStage === 'published' || payload.patentStage === 'granted' ? 'published' : 'filed';
+    }
+    await linkedStartup.save();
+  }
+
+  await recordStartupLifecycleEvent({
+    startupId: linkedStartup?._id,
+    workspaceId: payload.workspaceId,
+    actorId: userId,
+    source: 'patent',
+    type: 'PATENT_SUBMITTED',
+    title: 'Patent submitted',
+    description: `${payload.projectTitle} was submitted for patent review.`,
+    status: patent.status,
+    metadata: {
+      patentId: String(patent._id),
+      patentStage: payload.patentStage,
+      documentCount: supportingDocuments.length,
+    },
   });
 
   await applyScoreAsync({

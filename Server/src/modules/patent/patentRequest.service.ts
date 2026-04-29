@@ -6,6 +6,8 @@ import { ApiError } from '../../utils/ApiError';
 import { User } from '../user/user.model';
 import { UserRole } from '../../types/roles.types';
 import { Workspace } from '../workspace/workspace.model';
+import { Startup } from '../startup/startup.model';
+import { recordStartupLifecycleEvent } from '../startupLifecycle/startupLifecycle.service';
 import { PatentRequest } from './patentRequest.model';
 import { LEGACY_STATUS_MAP, type PatentRequestStatus } from './patent.types';
 
@@ -227,6 +229,33 @@ export const submitPatentRequest = async (userId: string, payload: z.infer<typeo
     ...(payload.specificationType === 'provisional'
       ? { completeSpecDeadline: new Date(Date.now() + 365 * 24 * 60 * 60 * 1000) }
       : {}),
+  });
+
+  const linkedStartup = await Startup.findOne({ projectId: payload.workspaceId, isActive: true });
+  if (linkedStartup) {
+    linkedStartup.traction = {
+      ...(linkedStartup.traction ?? {}),
+      patentFiled: true,
+      patentType: 'promove_assisted',
+      patentApplicationId: String(patentRequest._id),
+    };
+    await linkedStartup.save();
+  }
+
+  await recordStartupLifecycleEvent({
+    startupId: linkedStartup?._id,
+    workspaceId: payload.workspaceId,
+    actorId: userId,
+    source: 'patent',
+    type: 'PATENT_ASSISTED_FILING_SUBMITTED',
+    title: 'Assisted patent filing submitted',
+    description: `${payload.inventionTitle} was submitted for assisted patent filing.`,
+    status: patentRequest.status,
+    metadata: {
+      patentRequestId: String(patentRequest._id),
+      specificationType: payload.specificationType,
+      documentCount: documents.length,
+    },
   });
 
   await notificationQueue.add('patent-request-submitted', {
@@ -541,6 +570,33 @@ export const createPatentSupportRequest = async (
     status: 'submitted',
     submittedAt: new Date(),
     documents,
+  });
+
+  const linkedStartup = await Startup.findOne({ projectId: payload.workspaceId, isActive: true });
+  if (linkedStartup) {
+    linkedStartup.traction = {
+      ...(linkedStartup.traction ?? {}),
+      patentFiled: true,
+      patentType: 'promove_assisted',
+      patentApplicationId: String(patentRequest._id),
+    };
+    await linkedStartup.save();
+  }
+
+  await recordStartupLifecycleEvent({
+    startupId: linkedStartup?._id,
+    workspaceId: payload.workspaceId,
+    actorId: userId,
+    source: 'patent',
+    type: 'PATENT_SUPPORT_REQUESTED',
+    title: 'Patent support requested',
+    description: `${payload.projectTitle} was submitted for patent support.`,
+    status: patentRequest.status,
+    metadata: {
+      patentRequestId: String(patentRequest._id),
+      patentType: payload.patentType,
+      documentCount: documents.length,
+    },
   });
 
   await notificationQueue.add('patent-request-submitted', {

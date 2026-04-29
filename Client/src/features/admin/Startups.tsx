@@ -300,16 +300,16 @@ export default function Startups() {
                     <div className="rounded-2xl border border-slate-800 bg-slate-950 px-4 py-4">
                       <div className="flex items-center gap-2 text-xs uppercase tracking-[0.22em] text-slate-500">
                         <ShieldCheck className="h-4 w-4" />
-                        Review Readiness
+                        Review Checklist
                       </div>
                       <div className="mt-3">
                         <Badge className={startup.readiness.isReviewReady ? 'border-emerald-500/30 bg-emerald-500/10 text-emerald-300' : 'border-amber-500/30 bg-amber-500/10 text-amber-300'}>
-                          {startup.readiness.isReviewReady ? 'Ready for approval' : 'Readiness incomplete'}
+                          {startup.readiness.isReviewReady ? 'Checklist complete' : 'Checklist gaps noted'}
                         </Badge>
                       </div>
                       <div className="mt-3 text-sm text-slate-300">
                         {startup.readiness.isReviewReady
-                          ? 'All required fields and document categories are satisfied.'
+                          ? 'No checklist gaps detected.'
                           : startup.readiness.missingItems.slice(0, 5).join(', ')}
                         {!startup.readiness.isReviewReady && startup.readiness.missingItems.length > 5
                           ? `, and ${startup.readiness.missingItems.length - 5} more`

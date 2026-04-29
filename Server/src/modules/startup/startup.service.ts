@@ -14,6 +14,7 @@ import { Workspace } from '../workspace/workspace.model';
 import { ensureDirectWorkspaceChatAccess } from '../workspace/workspace.service';
 import { Deal } from '../deal/deal.model';
 import { AdminAuditLog } from '../admin/adminAuditLog.model';
+import { recordStartupLifecycleEvent } from '../startupLifecycle/startupLifecycle.service';
 import type {
   StartupDocumentCategory,
   StartupEditAccess,
@@ -1058,14 +1059,6 @@ const buildStartupReadiness = (startup: Record<string, any>): StartupReadiness =
     ? buildInnovationStartupReadiness(startup)
     : buildLegacyStartupReadiness(startup as never);
 
-const formatReadinessErrorMessage = (readiness: StartupReadiness) => {
-  if (readiness.missingItems.length === 0) return 'Startup profile is incomplete for review.';
-  const topItems = readiness.missingItems.slice(0, 5).join(', ');
-  return readiness.missingItems.length > 5
-    ? `Startup profile is incomplete for review. Complete: ${topItems}, and ${readiness.missingItems.length - 5} more.`
-    : `Startup profile is incomplete for review. Complete: ${topItems}.`;
-};
-
 const completionScore = (checks: boolean[], maxScore: number) => {
   if (checks.length === 0) {
     return 0;
@@ -1399,6 +1392,23 @@ export const createStartupProfile = async (userId: string, payload: z.infer<type
     ...startupPayload,
   });
 
+  await recordStartupLifecycleEvent({
+    startupId: startup._id,
+    workspaceId: startup.projectId,
+    actorId: userId,
+    source: 'startup',
+    type: 'STARTUP_CREATED',
+    title: 'Startup draft created',
+    description: startup.name ? `${startup.name} was created as a startup draft.` : 'A startup draft was created.',
+    status: startup.reviewStatus,
+    metadata: {
+      name: startup.name,
+      category: startup.category,
+      stage: startup.stage,
+      phase: startup.phase,
+    },
+  });
+
   return serializeStartup(startup);
 };
 
@@ -1455,6 +1465,8 @@ export const updateStartupProfile = async (
   payload: Partial<z.infer<typeof startupSchema>>,
 ) => {
   const startup = await getStartupForFounder(startupId, userId);
+  const previousProjectId = startup.projectId ? String(startup.projectId) : undefined;
+  const previousReviewStatus = startup.reviewStatus;
   prepareStartupForEditableMutation(startup);
   const startupSnapshot = startup.toObject();
   const mergedPayload = buildStartupInput({
@@ -1511,16 +1523,46 @@ export const updateStartupProfile = async (
     String(startup._id),
     startup.projectId ? String(startup.projectId) : undefined,
   );
+  const nextProjectId = startup.projectId ? String(startup.projectId) : undefined;
+  await recordStartupLifecycleEvent({
+    startupId: startup._id,
+    workspaceId: startup.projectId,
+    actorId: userId,
+    source: previousProjectId !== nextProjectId ? 'workspace' : 'startup',
+    type:
+      previousProjectId !== nextProjectId
+        ? nextProjectId
+          ? 'WORKSPACE_LINKED'
+          : 'WORKSPACE_UNLINKED'
+        : 'STARTUP_UPDATED',
+    title:
+      previousProjectId !== nextProjectId
+        ? nextProjectId
+          ? 'Workspace linked'
+          : 'Workspace unlinked'
+        : 'Startup profile updated',
+    description:
+      previousProjectId !== nextProjectId
+        ? nextProjectId
+          ? 'A product workspace was linked to this startup.'
+          : 'The linked product workspace was removed from this startup.'
+        : previousReviewStatus !== startup.reviewStatus
+          ? 'Startup profile was updated and moved back to draft.'
+          : 'Startup profile fields were updated.',
+    status: startup.reviewStatus,
+    metadata: {
+      previousProjectId,
+      projectId: nextProjectId,
+      reviewStatus: startup.reviewStatus,
+      phase: startup.phase,
+    },
+  });
   return serializeStartup(startup);
 };
 
 export const requestStartupReview = async (startupId: string, userId: string) => {
   const startup = await getStartupForFounder(startupId, userId);
   const readiness = buildStartupReadiness(startup.toObject());
-
-  if (!readiness.isReviewReady) {
-    throw new ApiError(400, 'STARTUP_INCOMPLETE', formatReadinessErrorMessage(readiness));
-  }
 
   if (startup.reviewStatus === 'approved') {
     throw new ApiError(409, 'STARTUP_ALREADY_APPROVED', 'Startup has already been approved.');
@@ -1538,6 +1580,21 @@ export const requestStartupReview = async (startupId: string, userId: string) =>
   clearAdminEditUnlock(startup);
   await startup.save();
 
+  await recordStartupLifecycleEvent({
+    startupId: startup._id,
+    workspaceId: startup.projectId,
+    actorId: userId,
+    source: 'startup',
+    type: 'STARTUP_REVIEW_REQUESTED',
+    title: 'Startup submitted for review',
+    description: 'The startup profile was submitted for admin review.',
+    status: startup.reviewStatus,
+    metadata: {
+      requiredDocumentCategories: readiness.requiredDocumentCategories,
+      uploadedDocumentCategories: readiness.uploadedDocumentCategories,
+    },
+  });
+
   return serializeStartup(startup);
 };
 
@@ -1547,11 +1604,6 @@ export const launchStartup = async (
   payload: z.infer<typeof launchSchema>,
 ) => {
   const startup = await getStartupForFounder(startupId, userId);
-  const readiness = buildStartupReadiness(startup.toObject());
-
-  if (!readiness.isReviewReady) {
-    throw new ApiError(400, 'STARTUP_INCOMPLETE', formatReadinessErrorMessage(readiness));
-  }
 
   if (startup.reviewStatus !== 'approved') {
     throw new ApiError(
@@ -1563,8 +1615,10 @@ export const launchStartup = async (
 
   const score = calculateStartupInnovationScore(startup.toObject());
 
-startup.launchedToInvestors = startup.launchedToInvestors || payload.launchTo === 'investors' || payload.launchTo === 'both';
-  startup.launchedToMentors = startup.launchedToMentors || payload.launchTo === 'mentors' || payload.launchTo === 'both';
+  startup.launchedToInvestors =
+    startup.launchedToInvestors || payload.launchTo === 'investors' || payload.launchTo === 'both';
+  startup.launchedToMentors =
+    startup.launchedToMentors || payload.launchTo === 'mentors' || payload.launchTo === 'both';
   startup.launchedToRecruiters = startup.launchedToRecruiters || payload.launchTo === 'recruiters';
   startup.launchedAt = new Date();
   startup.innovationScoreAtLaunch = score;
@@ -1665,6 +1719,24 @@ startup.launchedToInvestors = startup.launchedToInvestors || payload.launchTo ==
     ),
   );
 
+  await recordStartupLifecycleEvent({
+    startupId: startup._id,
+    workspaceId: startup.projectId,
+    actorId: userId,
+    source: 'marketplace',
+    type: 'STARTUP_LAUNCHED',
+    title: 'Startup launched',
+    description: `Startup was launched to ${payload.launchTo}.`,
+    status: startup.phase,
+    metadata: {
+      launchTo: payload.launchTo,
+      launchedToInvestors: startup.launchedToInvestors,
+      launchedToMentors: startup.launchedToMentors,
+      launchedToRecruiters: startup.launchedToRecruiters,
+      innovationScoreAtLaunch: startup.innovationScoreAtLaunch,
+    },
+  });
+
   return serializeStartup(startup);
 };
 
@@ -1678,7 +1750,6 @@ export const uploadPitchDeck = async (startupId: string, userId: string, file: E
     throw new ApiError(400, 'INVALID_FILE_TYPE', 'Only PDF, PPT, or PPTX files are allowed');
   }
   const startup = await getStartupForFounder(startupId, userId);
-  prepareStartupForEditableMutation(startup);
 
   await deleteStoredAsset({
     storageProvider: startup.pitchDeckStorageProvider,
@@ -1701,6 +1772,21 @@ export const uploadPitchDeck = async (startupId: string, userId: string, file: E
   startup.pitchDeckCloudinaryPublicId = undefined;
 
   await startup.save();
+  await recordStartupLifecycleEvent({
+    startupId: startup._id,
+    workspaceId: startup.projectId,
+    actorId: userId,
+    source: 'startup',
+    type: 'PITCH_DECK_UPLOADED',
+    title: 'Pitch deck uploaded',
+    description: `${file.originalname} was uploaded as the startup pitch deck.`,
+    status: startup.reviewStatus,
+    metadata: {
+      fileName: file.originalname,
+      fileSizeBytes: file.size,
+      storageProvider: uploaded.provider,
+    },
+  });
   return serializeStartup(startup);
 };
 
@@ -1740,6 +1826,20 @@ export const sendPitchRequest = async (
   });
 
   await startup.save();
+
+  await recordStartupLifecycleEvent({
+    startupId: startup._id,
+    workspaceId: startup.projectId,
+    actorId: studentObjectId,
+    source: 'investor',
+    type: 'INVESTOR_PITCH_REQUEST_SENT',
+    title: 'Investor pitch request sent',
+    description: 'A founder sent an investor pitch request.',
+    status: 'pending',
+    metadata: {
+      investorId: investorObjectId.toString(),
+    },
+  });
 
   await notificationQueue.add('send-pitch-request-notification', {
     recipientId: investorObjectId.toString(),
@@ -1786,6 +1886,22 @@ export const respondToPitchRequest = async (
   }
 
   await startup.save();
+
+  await recordStartupLifecycleEvent({
+    startupId: startup._id,
+    workspaceId: startup.projectId,
+    actorId: studentObjectId,
+    source: 'investor',
+    type: 'INVESTOR_PITCH_REQUEST_RESPONDED',
+    title: 'Investor pitch request updated',
+    description: `A pitch request was ${decision}.`,
+    status: decision,
+    metadata: {
+      requestId,
+      investorId: request.investorId.toString(),
+      ...(note ? { note } : {}),
+    },
+  });
 
   await notificationQueue.add('pitch-request-response-notification', {
     recipientId: request.investorId.toString(),
@@ -1870,7 +1986,6 @@ export const uploadStartupDocument = async (
   payload: z.infer<typeof startupDocumentUploadSchema>,
 ) => {
   const startup = await getStartupForFounder(startupId, userId);
-  prepareStartupForEditableMutation(startup);
   const fileType = file.mimetype === 'application/pdf' ? 'pdf' : 'image';
   const uploaded = await uploadFile({
     buffer: file.buffer,
@@ -1904,13 +2019,27 @@ export const uploadStartupDocument = async (
   });
 
   await startup.save();
+  await recordStartupLifecycleEvent({
+    startupId: startup._id,
+    workspaceId: startup.projectId,
+    actorId: userId,
+    source: 'startup',
+    type: 'STARTUP_DOCUMENT_UPLOADED',
+    title: 'Startup proof uploaded',
+    description: `${file.originalname} was uploaded as ${payload.category.replace(/_/g, ' ')}.`,
+    status: startup.reviewStatus,
+    metadata: {
+      category: payload.category,
+      fileName: file.originalname,
+      fileSizeBytes: file.size,
+      storageProvider: uploaded.provider,
+    },
+  });
   return serializeStartup(startup);
 };
 
 export const deleteStartupDocument = async (startupId: string, userId: string, documentId: string) => {
   const startup = await getStartupForFounder(startupId, userId);
-  prepareStartupForEditableMutation(startup);
-  assertLaunchFormEditable(startup.toObject());
   const document = startup.documents.find((item) => String(item._id) === documentId);
 
   if (!document) {
@@ -1927,6 +2056,21 @@ export const deleteStartupDocument = async (startupId: string, userId: string, d
   startup.documents = startup.documents.filter((item) => String(item._id) !== documentId);
 
   await startup.save();
+  await recordStartupLifecycleEvent({
+    startupId: startup._id,
+    workspaceId: startup.projectId,
+    actorId: userId,
+    source: 'startup',
+    type: 'STARTUP_DOCUMENT_REMOVED',
+    title: 'Startup proof removed',
+    description: `${document.fileName} was removed from startup proof documents.`,
+    status: startup.reviewStatus,
+    metadata: {
+      documentId,
+      category: document.category,
+      fileName: document.fileName,
+    },
+  });
   return serializeStartup(startup);
 };
 
@@ -2192,13 +2336,6 @@ export const reviewStartupSubmission = async (
     throw new ApiError(404, 'STARTUP_NOT_FOUND', 'Startup not found');
   }
 
-  if (payload.decision === 'approved') {
-    const readiness = buildStartupReadiness(startup.toObject());
-    if (!readiness.isReviewReady) {
-      throw new ApiError(400, 'STARTUP_INCOMPLETE', formatReadinessErrorMessage(readiness));
-    }
-  }
-
   startup.reviewStatus = payload.decision;
   startup.adminReviewedAt = new Date();
   startup.adminReviewedBy = new Types.ObjectId(adminId);
@@ -2217,6 +2354,22 @@ export const reviewStartupSubmission = async (
     targetModel: 'Startup',
     metadata: {
       reviewStatus: startup.reviewStatus,
+      ...(startup.adminNotes ? { adminNotes: startup.adminNotes } : {}),
+    },
+  });
+  await recordStartupLifecycleEvent({
+    startupId: startup._id,
+    workspaceId: startup.projectId,
+    actorId: adminId,
+    source: 'admin',
+    type: payload.decision === 'approved' ? 'STARTUP_APPROVED' : 'STARTUP_CHANGES_REQUESTED',
+    title: payload.decision === 'approved' ? 'Startup approved' : 'Startup changes requested',
+    description:
+      payload.decision === 'approved'
+        ? 'Admin approved the startup for launch.'
+        : 'Admin requested changes before launch.',
+    status: startup.reviewStatus,
+    metadata: {
       ...(startup.adminNotes ? { adminNotes: startup.adminNotes } : {}),
     },
   });

@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useNavigate, useOutletContext, useParams } from "react-router-dom";
 import {
@@ -20,6 +20,7 @@ import {
   Banknote,
   Boxes,
   CheckCircle2,
+  Clock,
   CircleDot,
   Edit3,
   FileText,
@@ -600,7 +601,7 @@ export function StartupLaunch() {
     identity.category.trim().length > 0 &&
     !save.isPending;
 
-  const canUpload = Boolean(startupId) && canEditSetup;
+  const canUpload = Boolean(startupId);
 
   const handlePitchSelected = (file: File | null) => {
     if (!file) return;
@@ -1499,6 +1500,9 @@ function PitchUploadSlot({
   isUploading: boolean;
   onFileSelected: (file: File | null) => void;
 }) {
+  const inputRef = useRef<HTMLInputElement | null>(null);
+  const isDisabled = disabled || isUploading;
+
   return (
     <div className="border border-slate-800 bg-slate-900 p-4">
       <div className="flex items-start justify-between gap-3">
@@ -1526,22 +1530,28 @@ function PitchUploadSlot({
         <div className="min-w-0 text-sm text-slate-300">
           {fileName ?? "No pitch deck uploaded yet"}
         </div>
-        <label className="inline-flex cursor-pointer items-center gap-2 border border-slate-700 bg-slate-950 px-3 py-2 text-xs font-semibold text-slate-200 disabled:cursor-not-allowed disabled:opacity-60">
+        <button
+          type="button"
+          disabled={isDisabled}
+          onClick={() => inputRef.current?.click()}
+          className="inline-flex items-center gap-2 border border-slate-700 bg-slate-950 px-3 py-2 text-xs font-semibold text-slate-200 disabled:cursor-not-allowed disabled:opacity-60"
+        >
           {isUploading ? (
             <Loader2 className="h-3.5 w-3.5 animate-spin" />
           ) : null}
           {fileName ? "Replace" : "Upload"}
-          <input
-            type="file"
-            accept={STARTUP_RUBRIC_PITCH_ACCEPT}
-            disabled={disabled || isUploading}
-            className="hidden"
-            onChange={(event) => {
-              onFileSelected(event.target.files?.[0] ?? null);
-              event.currentTarget.value = "";
-            }}
-          />
-        </label>
+        </button>
+        <input
+          ref={inputRef}
+          type="file"
+          accept={STARTUP_RUBRIC_PITCH_ACCEPT}
+          disabled={isDisabled}
+          className="hidden"
+          onChange={(event) => {
+            onFileSelected(event.target.files?.[0] ?? null);
+            event.currentTarget.value = "";
+          }}
+        />
       </div>
     </div>
   );
@@ -1566,6 +1576,9 @@ function DocumentUploadSlot({
   onRemove?: () => void;
   controls?: React.ReactNode;
 }) {
+  const inputRef = useRef<HTMLInputElement | null>(null);
+  const isDisabled = disabled || isUploading;
+
   return (
     <div className="border border-slate-800 bg-slate-900 p-4">
       <div className="flex items-start justify-between gap-3">
@@ -1593,29 +1606,35 @@ function DocumentUploadSlot({
           {document && onRemove ? (
             <button
               type="button"
-              disabled={disabled || isUploading}
+              disabled={isDisabled}
               onClick={onRemove}
               className="border border-slate-700 bg-slate-950 px-3 py-2 text-xs font-semibold text-slate-200 disabled:cursor-not-allowed disabled:opacity-60"
             >
               Remove
             </button>
           ) : null}
-          <label className="inline-flex cursor-pointer items-center gap-2 border border-slate-700 bg-slate-950 px-3 py-2 text-xs font-semibold text-slate-200 disabled:cursor-not-allowed disabled:opacity-60">
+          <button
+            type="button"
+            disabled={isDisabled}
+            onClick={() => inputRef.current?.click()}
+            className="inline-flex items-center gap-2 border border-slate-700 bg-slate-950 px-3 py-2 text-xs font-semibold text-slate-200 disabled:cursor-not-allowed disabled:opacity-60"
+          >
             {isUploading ? (
               <Loader2 className="h-3.5 w-3.5 animate-spin" />
             ) : null}
             {document ? "Replace" : "Upload"}
-            <input
-              type="file"
-              accept=".pdf,image/*"
-              disabled={disabled || isUploading}
-              className="hidden"
-              onChange={(event) => {
-                onFileSelected(event.target.files?.[0] ?? null);
-                event.currentTarget.value = "";
-              }}
-            />
-          </label>
+          </button>
+          <input
+            ref={inputRef}
+            type="file"
+            accept=".pdf,image/*"
+            disabled={isDisabled}
+            className="hidden"
+            onChange={(event) => {
+              onFileSelected(event.target.files?.[0] ?? null);
+              event.currentTarget.value = "";
+            }}
+          />
         </div>
       </div>
     </div>
@@ -1631,7 +1650,35 @@ function StartupDashboard({
   onEdit: () => void;
   canEdit: boolean;
 }) {
+  const queryClient = useQueryClient();
   const reviewBadge = REVIEW_BADGE[startup.reviewStatus] ?? REVIEW_BADGE.draft;
+  const isApproved = startup.reviewStatus === "approved";
+  const isUnderReview = startup.reviewStatus === "review_requested";
+  const canRequestReview =
+    startup.reviewStatus === "draft" ||
+    startup.reviewStatus === "changes_requested";
+
+  const reviewMutation = useMutation({
+    mutationFn: () => startupApi.requestReview(startup._id),
+    onSuccess: async () => {
+      toast.success("Startup submitted for admin review.");
+      await queryClient.invalidateQueries({ queryKey: ["startup", startup._id] });
+    },
+    onError: (err) => {
+      toast.error(getApiErrorMessage(err, "Unable to submit for review."));
+    },
+  });
+
+  const launchMutation = useMutation({
+    mutationFn: (launchTo: "investors" | "mentors" | "recruiters") =>
+      startupApi.launch(startup._id, launchTo),
+    onSuccess: async () => {
+      await queryClient.invalidateQueries({ queryKey: ["startup", startup._id] });
+    },
+    onError: (err) => {
+      toast.error(getApiErrorMessage(err, "Unable to launch right now."));
+    },
+  });
 
   const capTableQuery = useQuery({
     queryKey: ["startup", startup._id, "cap-table"],
@@ -1643,6 +1690,12 @@ function StartupDashboard({
     queryKey: ["workspace", startup.projectId],
     queryFn: () => workspaceApi.getById(startup.projectId!),
     enabled: Boolean(startup.projectId),
+  });
+
+  const lifecycleQuery = useQuery({
+    queryKey: ["startup", startup._id, "timeline"],
+    queryFn: () => startupApi.getTimeline(startup._id, 12),
+    refetchInterval: 30_000,
   });
 
   const pitchRequests = startup.pitchRequests ?? [];
@@ -1771,15 +1824,62 @@ function StartupDashboard({
             </div>
           </div>
         </div>
-        <button
-          type="button"
-          onClick={onEdit}
-          disabled={!canEdit}
-          className="inline-flex items-center gap-2 border border-slate-700 bg-slate-900 px-4 py-2 text-sm font-semibold text-slate-200 transition hover:border-cyan-500/60 hover:text-cyan-200 disabled:cursor-not-allowed disabled:opacity-60"
-        >
-          <Edit3 className="h-4 w-4" />
-          Edit Setup
-        </button>
+        <div className="flex flex-wrap items-center gap-2">
+          <button
+            type="button"
+            onClick={onEdit}
+            disabled={!canEdit}
+            className="inline-flex items-center gap-2 border border-slate-700 bg-slate-900 px-4 py-2 text-sm font-semibold text-slate-200 transition hover:border-cyan-500/60 hover:text-cyan-200 disabled:cursor-not-allowed disabled:opacity-60"
+          >
+            <Edit3 className="h-4 w-4" />
+            Edit Setup
+          </button>
+
+          {startup.launchedToInvestors ? (
+            <span className="inline-flex items-center gap-1.5 border border-emerald-500/30 bg-emerald-500/10 px-4 py-2 text-sm font-semibold text-emerald-200">
+              <Rocket className="h-4 w-4" />
+              Live on Marketplace
+            </span>
+          ) : isApproved ? (
+            <button
+              type="button"
+              disabled={launchMutation.isPending}
+              onClick={() => launchMutation.mutate("investors")}
+              className="inline-flex items-center gap-2 border border-cyan-500/40 bg-cyan-500/10 px-4 py-2 text-sm font-semibold text-cyan-200 transition hover:border-cyan-400 hover:bg-cyan-500/20 disabled:cursor-not-allowed disabled:opacity-40"
+            >
+              <Rocket className="h-4 w-4" />
+              Launch to Marketplace
+            </button>
+          ) : isUnderReview ? (
+            <button
+              type="button"
+              disabled
+              className="inline-flex items-center gap-2 border border-amber-500/30 bg-amber-500/10 px-4 py-2 text-sm font-semibold text-amber-200 disabled:cursor-not-allowed disabled:opacity-70"
+            >
+              <Clock className="h-4 w-4" />
+              Awaiting Admin Review
+            </button>
+          ) : canRequestReview ? (
+            <button
+              type="button"
+              disabled={reviewMutation.isPending}
+              onClick={() => reviewMutation.mutate()}
+              className="inline-flex items-center gap-2 border border-cyan-500/40 bg-cyan-500/10 px-4 py-2 text-sm font-semibold text-cyan-200 transition hover:border-cyan-400 hover:bg-cyan-500/20 disabled:cursor-not-allowed disabled:opacity-40"
+            >
+              {reviewMutation.isPending ? (
+                <Loader2 className="h-4 w-4 animate-spin" />
+              ) : (
+                <CheckCircle2 className="h-4 w-4" />
+              )}
+              Submit for Admin Review
+            </button>
+          ) : (
+            <span className="inline-flex items-center gap-1.5 border border-slate-700 bg-slate-900 px-4 py-2 text-sm font-semibold text-slate-300">
+              <Clock className="h-4 w-4" />
+              Review Required
+            </span>
+          )}
+        </div>
       </section>
 
       <section className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
@@ -2226,6 +2326,47 @@ function StartupDashboard({
           )}
         </div>
 
+        <div className="border border-slate-800 bg-slate-950 p-5">
+          <div className="flex items-center gap-2 text-sm font-semibold text-white">
+            <Clock className="h-4 w-4 text-cyan-300" />
+            Lifecycle Timeline
+          </div>
+          {lifecycleQuery.isLoading ? (
+            <div className="flex h-32 items-center justify-center">
+              <Spinner />
+            </div>
+          ) : (lifecycleQuery.data ?? []).length === 0 ? (
+            <div className="mt-4 text-sm text-slate-500">
+              Timeline events will appear as startup, workspace, patent,
+              investor, and launch activity happens.
+            </div>
+          ) : (
+            <ul className="mt-4 space-y-3">
+              {(lifecycleQuery.data ?? []).slice(0, 6).map((event) => (
+                <li key={event._id} className="border-l border-cyan-500/40 pl-3">
+                  <div className="flex items-center justify-between gap-3">
+                    <div className="text-sm font-medium text-white">{event.title}</div>
+                    <span className="border border-slate-700 bg-slate-900 px-2 py-0.5 text-[10px] uppercase tracking-[0.16em] text-slate-400">
+                      {event.source}
+                    </span>
+                  </div>
+                  {event.description ? (
+                    <div className="mt-1 text-xs text-slate-400">
+                      {event.description}
+                    </div>
+                  ) : null}
+                  <div className="mt-1 text-[11px] text-slate-500">
+                    {formatDate(event.createdAt)}
+                    {event.status ? ` · ${event.status}` : ""}
+                  </div>
+                </li>
+              ))}
+            </ul>
+          )}
+        </div>
+      </section>
+
+      <section className="grid gap-4 lg:grid-cols-[2fr_1fr]">
         <div className="border border-slate-800 bg-slate-950 p-5">
           <div className="flex items-center gap-2 text-sm font-semibold text-white">
             <FileText className="h-4 w-4 text-cyan-300" />

@@ -22,6 +22,7 @@ import {
   respondToPitchRequestController,
   getPitchRequestsController,
 } from './startup.controller';
+import { listStartupLifecycleEventsController } from '../startupLifecycle/startupLifecycle.controller';
 
 const pitchDeckFileNamePattern = /\.(pdf|ppt|pptx)$/i;
 const documentPdfFileNamePattern = /\.pdf$/i;
@@ -64,6 +65,11 @@ router.use(authenticate);
 router.post('/', authorize(UserRole.STUDENT), asyncHandler(createStartup));
 router.get('/mine', authorize(UserRole.STUDENT), asyncHandler(getMyStartupsController));
 router.get('/pitch-requests', authorize(UserRole.INVESTOR), asyncHandler(getPitchRequestsController));
+router.get(
+  '/:id/timeline',
+  authorize(UserRole.STUDENT, UserRole.INVESTOR, UserRole.ADMIN),
+  asyncHandler(listStartupLifecycleEventsController),
+);
 router.get('/:id', authorize(UserRole.STUDENT, UserRole.INVESTOR), asyncHandler(getStartupByIdController));
 router.patch('/:id', authorize(UserRole.STUDENT), asyncHandler(patchStartup));
 router.post('/:id/request-review', authorize(UserRole.STUDENT), asyncHandler(requestStartupReviewController));

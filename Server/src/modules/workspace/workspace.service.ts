@@ -28,6 +28,7 @@ import { PatentRequest } from '../patent/patentRequest.model';
 import { ProblemSubmission } from '../problemBank/problemSubmission.model';
 import { clearProblemCaches } from '../problemBank/problem.service';
 import { Startup } from '../startup/startup.model';
+import { recordStartupLifecycleEvent } from '../startupLifecycle/startupLifecycle.service';
 import { Workspace } from './workspace.model';
 import { ApiError } from '../../utils/ApiError';
 
@@ -446,6 +447,21 @@ export const createWorkspace = async (
     stage: 'Ideation',
   });
 
+  await recordStartupLifecycleEvent({
+    workspaceId: workspace._id,
+    actorId: userId,
+    source: 'workspace',
+    type: 'WORKSPACE_CREATED',
+    title: 'Workspace created',
+    description: `${workspace.title} was created for product execution.`,
+    status: workspace.stage,
+    metadata: {
+      title: workspace.title,
+      category: workspace.category,
+      progressPercent: workspace.progressPercent,
+    },
+  });
+
   return serializeWorkspace(workspace);
 };
 
@@ -532,6 +548,21 @@ export const addProgress = async (
     userId,
     trigger: 'PROGRESS_UPLOADED',
     metadata: { workspaceId, milestoneRef: payload.milestoneRef },
+  });
+
+  await recordStartupLifecycleEvent({
+    workspaceId: workspace._id,
+    actorId: userId,
+    source: 'workspace',
+    type: 'WORKSPACE_PROGRESS_UPDATED',
+    title: 'Workspace progress updated',
+    description: payload.note,
+    status: workspace.stage,
+    metadata: {
+      milestoneRef: payload.milestoneRef,
+      completionPercent: payload.completionPercent,
+      progressPercent: workspace.progressPercent,
+    },
   });
 
   return serializeWorkspace(workspace);
@@ -709,6 +740,21 @@ export const addTask = async (
     createdAt: new Date(),
   });
   await workspace.save();
+  await recordStartupLifecycleEvent({
+    workspaceId: workspace._id,
+    actorId: userId,
+    source: 'workspace',
+    type: 'WORKSPACE_TASK_CREATED',
+    title: 'Task created',
+    description: payload.title,
+    status: payload.priority,
+    metadata: {
+      title: payload.title,
+      priority: payload.priority,
+      assignedTo: payload.assignedTo,
+      dueDate: payload.dueDate,
+    },
+  });
   return workspace.tasks;
 };
 
@@ -731,6 +777,22 @@ export const updateTask = async (
   if (payload.done !== undefined) task.done = payload.done;
 
   await workspace.save();
+  await recordStartupLifecycleEvent({
+    workspaceId: workspace._id,
+    actorId: userId,
+    source: 'workspace',
+    type: payload.done === true ? 'WORKSPACE_TASK_COMPLETED' : 'WORKSPACE_TASK_UPDATED',
+    title: payload.done === true ? 'Task completed' : 'Task updated',
+    description: task.title,
+    status: task.done ? 'done' : 'open',
+    metadata: {
+      taskId,
+      title: task.title,
+      priority: task.priority,
+      assignedTo: task.assignedTo ? String(task.assignedTo) : undefined,
+      dueDate: task.dueDate,
+    },
+  });
   return workspace.tasks;
 };
 
@@ -743,6 +805,19 @@ export const deleteTask = async (workspaceId: string, taskId: string, userId: st
 
   workspace.tasks = workspace.tasks.filter((item) => String(item._id) !== taskId);
   await workspace.save();
+  await recordStartupLifecycleEvent({
+    workspaceId: workspace._id,
+    actorId: userId,
+    source: 'workspace',
+    type: 'WORKSPACE_TASK_REMOVED',
+    title: 'Task removed',
+    description: task.title,
+    status: 'removed',
+    metadata: {
+      taskId,
+      title: task.title,
+    },
+  });
   return workspace.tasks;
 };
 

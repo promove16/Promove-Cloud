@@ -38,31 +38,31 @@ export default function UserManagement() {
     <div className="space-y-6">
       <section className="overflow-hidden border border-slate-800 bg-slate-950">
         <div className="border-b border-slate-800 px-6 py-6 lg:px-8">
-          <div className="flex flex-col gap-6 xl:flex-row xl:items-end xl:justify-between">
-            <div className="max-w-4xl">
+          <div className="flex flex-col gap-5 2xl:flex-row 2xl:items-end 2xl:justify-between">
+            <div className="min-w-0 max-w-4xl">
               <div className="text-[11px] uppercase tracking-[0.35em] text-cyan-300">Admin Users</div>
-              <h1 className="mt-3 text-3xl font-semibold tracking-tight text-white">{activeSection.label}</h1>
+              <h1 className="mt-3 text-2xl font-semibold tracking-tight text-white sm:text-3xl">
+                {activeSection.label}
+              </h1>
               <p className="mt-3 max-w-3xl text-sm leading-6 text-slate-400">{activeSection.description}</p>
             </div>
 
-            <div className="grid gap-3 sm:grid-cols-3 xl:min-w-[32rem]">
-              <div className="border border-slate-800 bg-slate-950 px-4 py-3">
-                <div className="text-[11px] uppercase tracking-[0.25em] text-slate-500">Tracked accounts</div>
+            <div className="grid w-full grid-cols-2 gap-2 sm:grid-cols-4 2xl:max-w-[34rem] 2xl:shrink-0">
+              <div className="min-w-0 border border-slate-800 bg-slate-950 px-3 py-2.5">
+                <div className="truncate text-[10px] uppercase tracking-[0.2em] text-slate-500">Tracked accounts</div>
                 <div className="mt-2 text-sm font-medium text-white">{users.length}</div>
               </div>
-              <div className="border border-slate-800 bg-slate-950 px-4 py-3">
-                <div className="text-[11px] uppercase tracking-[0.25em] text-slate-500">Pending requests</div>
+              <div className="min-w-0 border border-slate-800 bg-slate-950 px-3 py-2.5">
+                <div className="truncate text-[10px] uppercase tracking-[0.2em] text-slate-500">Pending requests</div>
                 <div className="mt-2 text-sm font-medium text-white">{pendingRequests}</div>
               </div>
-              <div className="grid gap-3 sm:grid-cols-2">
-                <div className="border border-slate-800 bg-slate-950 px-4 py-3">
-                  <div className="text-[11px] uppercase tracking-[0.25em] text-slate-500">Active</div>
-                  <div className="mt-2 text-sm font-medium text-white">{activeUsers}</div>
-                </div>
-                <div className="border border-slate-800 bg-slate-950 px-4 py-3">
-                  <div className="text-[11px] uppercase tracking-[0.25em] text-slate-500">Inactive</div>
-                  <div className="mt-2 text-sm font-medium text-white">{inactiveUsers}</div>
-                </div>
+              <div className="min-w-0 border border-slate-800 bg-slate-950 px-3 py-2.5">
+                <div className="truncate text-[10px] uppercase tracking-[0.2em] text-slate-500">Active</div>
+                <div className="mt-2 text-sm font-medium text-white">{activeUsers}</div>
+              </div>
+              <div className="min-w-0 border border-slate-800 bg-slate-950 px-3 py-2.5">
+                <div className="truncate text-[10px] uppercase tracking-[0.2em] text-slate-500">Inactive</div>
+                <div className="mt-2 text-sm font-medium text-white">{inactiveUsers}</div>
               </div>
             </div>
           </div>

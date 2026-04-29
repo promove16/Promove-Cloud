@@ -7,6 +7,7 @@ import {
   StartupDocumentCategory,
   StartupInnovationProfile,
   StartupInitializationProfile,
+  StartupLifecycleEvent,
   StartupPitchRequest,
   StartupRegistrationProfile,
 } from '../types/startup.types';
@@ -45,6 +46,13 @@ export const startupApi = {
   },
   async getById(startupId: string) {
     const response = await api.get<ApiSuccessResponse<Startup>>(`/api/startup/${startupId}`);
+    return response.data.data;
+  },
+  async getTimeline(startupId: string, limit = 100) {
+    const response = await api.get<ApiSuccessResponse<StartupLifecycleEvent[]>>(
+      `/api/startup/${startupId}/timeline`,
+      { params: { limit } },
+    );
     return response.data.data;
   },
   async update(startupId: string, payload: Partial<StartupPayload>) {

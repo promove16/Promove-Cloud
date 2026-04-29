@@ -1985,7 +1985,7 @@ function AdminAssistPatentForm({
   const patentRequestsQuery = useQuery({
     queryKey: ["patent-requests", "mine"],
     queryFn: () => patentRequestApi.mine(),
-    enabled: isStartupScoped,
+    enabled: Boolean(selectedWorkspaceId),
   });
 
   useEffect(() => {
@@ -2223,7 +2223,9 @@ function AdminAssistPatentForm({
     },
   });
 
-  const visibleRequests = patentRequestsQuery.data ?? [];
+  const visibleRequests = (patentRequestsQuery.data ?? []).filter(
+    (r) => !selectedWorkspaceId || r.workspaceId === selectedWorkspaceId,
+  );
   const inProgressRequest = visibleRequests.find(
     (r) =>
       r.status !== "granted" &&
@@ -2958,7 +2960,9 @@ export function PatentSupport() {
   const selectedWorkspaceId = isStartupScoped
     ? (patentEligibleWorkspaces.find(
         (workspace) => workspace._id === startupWorkspaceId,
-      )?._id ?? "")
+      )?._id ??
+      patentEligibleWorkspaces[0]?._id ??
+      "")
     : (patentEligibleWorkspaces.find(
         (workspace) => workspace._id === preferredWorkspaceId,
       )?._id ??
@@ -2971,9 +2975,7 @@ export function PatentSupport() {
       ),
     [patentEligibleWorkspaces, selectedWorkspaceId],
   );
-  const hasPatentEligibleWorkspaces = isStartupScoped
-    ? Boolean(activeWorkspace)
-    : patentEligibleWorkspaces.length > 0;
+  const hasPatentEligibleWorkspaces = patentEligibleWorkspaces.length > 0;
   const visiblePatents = useMemo(() => {
     const patents = patentsQuery.data ?? [];
     if (!isStartupScoped) {
