@@ -44,7 +44,12 @@ export const backpressureMiddleware = (req: Request, res: Response, next: NextFu
   }
 
   inFlight += 1;
+  let released = false;
   const release = () => {
+    if (released) {
+      return;
+    }
+    released = true;
     inFlight = Math.max(0, inFlight - 1);
   };
   res.on('finish', release);

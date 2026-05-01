@@ -24,6 +24,11 @@ const createFixedWindowLimiter = (prefix: string, maxRequests: number, windowSec
 
     if (count === 1) {
       await redis.expire(key, windowSeconds);
+    } else {
+      // Crash recovery: if the EXPIRE after INCR was missed in a prior run,
+      // the key persists with no TTL. Detect and fix it here.
+      const ttl = await redis.ttl(key);
+      if (ttl === -1) await redis.expire(key, windowSeconds);
     }
 
     const reset = (windowId + 1) * windowSeconds * 1000;
@@ -42,18 +47,12 @@ export const authLimiter = createFixedWindowLimiter('rl:auth', 10, 15 * 60);
 export const apiLimiter = createFixedWindowLimiter('rl:api', 100, 60);
 export const writeLimiter = createFixedWindowLimiter('rl:write', 30, 60);
 
-const resolveKey = (req: Request) => {
-  const forwarded = req.headers['x-forwarded-for'];
-
-  if (Array.isArray(forwarded)) {
-    return forwarded[0];
-  }
-
-  if (typeof forwarded === 'string') {
-    return forwarded.split(',')[0]?.trim() || req.ip || 'anonymous';
-  }
-
-  return req.ip || 'anonymous';
+// Prefer authenticated user ID so campus NATs / shared IPs do not bleed limits
+// across users. Falls back to req.ip (Express resolves this correctly via
+// app.set('trust proxy', 1) — never read x-forwarded-for directly).
+const resolveKey = (req: Request): string => {
+  if (req.user?._id) return `user:${req.user._id}`;
+  return `ip:${req.ip ?? 'anonymous'}`;
 };
 
 export const withRateLimit =
@@ -74,6 +73,7 @@ export const withRateLimit =
 
       if (!success) {
         rateLimitDecisions.inc({ limiter: limiter.prefix, decision: 'blocked' });
+        res.setHeader('Retry-After', String(Math.ceil((reset - Date.now()) / 1000)));
         return next(
           new ApiError(429, 'RATE_LIMITED', 'Too many requests. Please try again later.'),
         );

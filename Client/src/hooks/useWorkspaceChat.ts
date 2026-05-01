@@ -136,6 +136,10 @@ export const useWorkspaceChat = (workspaceId?: string) => {
       seenMessageIdsRef.current.clear();
       typingTimers.current.forEach((t) => clearTimeout(t));
       typingTimers.current.clear();
+      if (typingDebounceRef.current) {
+        clearTimeout(typingDebounceRef.current);
+        typingDebounceRef.current = null;
+      }
     };
   }, [workspaceId]);
 

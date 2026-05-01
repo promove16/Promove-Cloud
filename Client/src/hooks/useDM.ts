@@ -182,6 +182,14 @@ export const useDM = (partnerId?: string) => {
       socket.off('dm:presence', handlePresence);
       socket.off('dm:messages-read', handleMessagesRead);
       socket.off('dm:error', handleError);
+      if (typingTimer.current) {
+        clearTimeout(typingTimer.current);
+        typingTimer.current = null;
+      }
+      if (typingDebounce.current) {
+        clearTimeout(typingDebounce.current);
+        typingDebounce.current = null;
+      }
     };
   }, [currentUserId, queryClient]);
 

@@ -78,9 +78,12 @@ const attachRedisAdapter = async (server: SocketServer) => {
     enableReadyCheck: false,
   });
 
+  let pubClient: IORedis | null = null;
+  let subClient: IORedis | null = null;
+
   try {
-    const pubClient = new IORedis(redisOpts);
-    const subClient = pubClient.duplicate();
+    pubClient = new IORedis(redisOpts);
+    subClient = pubClient.duplicate();
 
     pubClient.on('error', (err) => logError('socket.io pub client error', err));
     subClient.on('error', (err) => logError('socket.io sub client error', err));
@@ -95,6 +98,8 @@ const attachRedisAdapter = async (server: SocketServer) => {
     logger.info('Socket.IO Redis adapter attached.');
   } catch (error) {
     logError('Failed to attach Socket.IO Redis adapter; running single-node', error);
+    pubClient?.disconnect();
+    subClient?.disconnect();
   }
 };
 

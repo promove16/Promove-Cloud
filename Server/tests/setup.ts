@@ -37,7 +37,7 @@ process.env.AWS_S3_BUCKET_NAME = 'promove-test-bucket';
 process.env.AWS_S3_PUBLIC_BASE_URL = 'https://promove-test-bucket.s3.ap-south-1.amazonaws.com';
 process.env.FROM_EMAIL = 'noreply@promovecyc.com';
 
-let mongoServer: MongoMemoryReplSet;
+let mongoServer: MongoMemoryReplSet | undefined;
 
 const wait = (ms: number) => new Promise((resolve) => setTimeout(resolve, ms));
 
@@ -60,6 +60,7 @@ const dropDatabaseWithRetry = async (attempts = 5) => {
 
 beforeAll(async () => {
   mongoServer = await MongoMemoryReplSet.create({
+    instanceOpts: [{ launchTimeout: 30_000 }],
     replSet: { count: 1 },
   });
   await mongoose.connect(mongoServer.getUri());
@@ -75,5 +76,5 @@ afterAll(async () => {
   if (mongoose.connection.readyState !== 0) {
     await mongoose.disconnect();
   }
-  await mongoServer.stop();
+  await mongoServer?.stop();
 });

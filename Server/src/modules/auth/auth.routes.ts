@@ -2,7 +2,7 @@ import multer from 'multer';
 import { Router } from 'express';
 import { authenticate } from '../../middleware/authenticate';
 import { authorize } from '../../middleware/authorize';
-import { authLimiter, withRateLimit } from '../../middleware/rateLimiter';
+import { authLimiter, writeLimiter, withRateLimit } from '../../middleware/rateLimiter';
 import { ApiError } from '../../utils/ApiError';
 import { asyncHandler } from '../../utils/asyncHandler';
 import { UserRole } from '../../types/roles.types';
@@ -38,12 +38,13 @@ const institutionDocumentUpload = multer({
   },
 });
 
-router.post('/register', asyncHandler(register));
-router.post('/register-request', institutionDocumentUpload.any(), asyncHandler(registerRequest));
+router.post('/register', withRateLimit(authLimiter), asyncHandler(register));
+router.post('/register-request', withRateLimit(authLimiter), institutionDocumentUpload.any(), asyncHandler(registerRequest));
 router.post('/login', withRateLimit(authLimiter), asyncHandler(login));
-router.post('/refresh', asyncHandler(refresh));
+router.post('/refresh', withRateLimit(authLimiter), asyncHandler(refresh));
 router.post('/logout', authenticate, asyncHandler(logout));
-router.put('/change-password', authenticate, asyncHandler(changePasswordController));
+// writeLimiter is applied after authenticate so the key is scoped to user ID, not IP
+router.put('/change-password', authenticate, withRateLimit(writeLimiter), asyncHandler(changePasswordController));
 router.post(
   '/submit-institution-token',
   authenticate,
