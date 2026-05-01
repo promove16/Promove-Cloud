@@ -28,6 +28,15 @@ const isInstitutionRoleValue = (
 ): role is UserRole.SCHOOL | UserRole.COLLEGE =>
   role === UserRole.SCHOOL || role === UserRole.COLLEGE;
 
+const requiresDomainValue = (role: UserRole | string) =>
+  role === UserRole.MENTOR ||
+  role === UserRole.RECRUITER ||
+  role === UserRole.INVESTOR;
+
+const emailPattern = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+
+const isValidEmailAddress = (value: string) => emailPattern.test(value.trim());
+
 const INSTITUTION_DOCUMENT_LABELS: Record<
   InstitutionVerificationDocumentCategory,
   string
@@ -126,6 +135,27 @@ const initialFormState: FormState = {
   websiteUrl: "",
   referenceCode: "",
   verificationNotes: "",
+};
+
+const getApiErrorMessage = (error: unknown) => {
+  if (!isAxiosError(error)) {
+    return undefined;
+  }
+
+  const apiError = error.response?.data?.error;
+  const firstDetail = apiError?.details?.[0];
+
+  if (firstDetail?.message) {
+    return firstDetail.path
+      ? `${firstDetail.path}: ${firstDetail.message}`
+      : firstDetail.message;
+  }
+
+  if (apiError?.code === "VALIDATION_ERROR") {
+    return "Check the form fields and try again.";
+  }
+
+  return apiError?.message;
 };
 
 export function RequestAccessPage() {
@@ -311,8 +341,28 @@ export function RequestAccessPage() {
       return;
     }
 
+    if (!isValidEmailAddress(formData.email)) {
+      showError("Enter a valid email address.");
+      return;
+    }
+
+    if (formData.displayName.trim().length < 2) {
+      showError("Full name must be at least 2 characters.");
+      return;
+    }
+
+    if (formData.password.length < 8) {
+      showError("Password must be at least 8 characters.");
+      return;
+    }
+
     if (!formData.role || !NON_STUDENT_ROLES.includes(formData.role as UserRole)) {
       showError("Please select a valid role.");
+      return;
+    }
+
+    if (requiresDomainValue(selectedRole) && !formData.domain.trim()) {
+      showError("Domain or focus area is required for this role.");
       return;
     }
 
@@ -324,8 +374,8 @@ export function RequestAccessPage() {
             email: formData.email.trim(),
             password: formData.password,
             role: selectedRole,
-            domain: formData.domain.trim(),
-            bio: formData.bio.trim(),
+            ...(formData.domain.trim() ? { domain: formData.domain.trim() } : {}),
+            ...(formData.bio.trim() ? { bio: formData.bio.trim() } : {}),
           };
 
       if (!payload) {
@@ -347,11 +397,7 @@ export function RequestAccessPage() {
       toast.success("Access request submitted.");
       navigate("/login");
     } catch (err) {
-      if (isAxiosError(err) && err.response?.data?.error?.message) {
-        showError(err.response.data.error.message);
-      } else {
-        showError("An error occurred. Please try again.");
-      }
+      showError(getApiErrorMessage(err) ?? "An error occurred. Please try again.");
     }
   };
 
@@ -459,6 +505,7 @@ export function RequestAccessPage() {
             value={formData.domain}
             onChange={(e) => updateField("domain", e.target.value)}
             className="mt-2 w-full rounded border border-slate-300 p-2.5 text-slate-950"
+            required={requiresDomainValue(selectedRole)}
           />
 
           <textarea
