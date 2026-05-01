@@ -19,7 +19,6 @@ const NON_STUDENT_ROLES = [
   UserRole.MENTOR,
   UserRole.RECRUITER,
   UserRole.INVESTOR,
-  UserRole.ADMIN,
   UserRole.SCHOOL,
   UserRole.COLLEGE,
 ];

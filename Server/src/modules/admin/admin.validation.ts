@@ -37,7 +37,6 @@ export const listRegistrationRequestsQuerySchema = z.object({
       UserRole.MENTOR,
       UserRole.INVESTOR,
       UserRole.RECRUITER,
-      UserRole.ADMIN,
     ])
     .optional(),
 });
