@@ -108,6 +108,7 @@ export function GlobalSmartChat() {
     () => formatRouteLabel(location.pathname),
     [location.pathname],
   );
+  const shouldHideSmartChat = location.pathname.includes('/messages');
 
   const quickPrompts = useMemo(
     () => [
@@ -147,6 +148,10 @@ export function GlobalSmartChat() {
     setMessages((current) => [...current, userMessage, assistantReply]);
     setInput('');
   };
+
+  if (shouldHideSmartChat) {
+    return null;
+  }
 
   return (
     <div className="pointer-events-none fixed bottom-5 right-4 z-50 flex items-end justify-end">
