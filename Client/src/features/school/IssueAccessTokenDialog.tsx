@@ -14,6 +14,7 @@ import { schoolApi } from '../../api/school.api';
 import { Button } from '../../components/ui/Button';
 import { Input } from '../../components/ui/Input';
 import { ApiErrorResponse } from '../../types/auth.types';
+import { copyTextToClipboard } from '../../utils/clipboard';
 
 type IssueAccessTokenDialogProps = {
   open: boolean;
@@ -66,7 +67,7 @@ export function IssueAccessTokenDialog({ open, onOpenChange }: IssueAccessTokenD
 
   const handleCopyToken = async (token: string) => {
     try {
-      await navigator.clipboard.writeText(token);
+      await copyTextToClipboard(token);
       toast.success('Access token copied.');
     } catch (_error) {
       toast.error('Unable to copy this token.');
