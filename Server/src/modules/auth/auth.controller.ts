@@ -20,10 +20,11 @@ import {
 
 const COOKIE_NAME = 'refreshToken';
 const COOKIE_MAX_AGE = 30 * 24 * 60 * 60 * 1000;
+const isHttpsClient = env.CLIENT_URL.trim().toLowerCase().startsWith('https://');
 
 const cookieOptions = {
   httpOnly: true,
-  secure: env.NODE_ENV === 'production',
+  secure: isHttpsClient,
   sameSite: 'strict' as const,
   maxAge: COOKIE_MAX_AGE,
 };
@@ -117,7 +118,7 @@ export const logout = async (req: Request, res: Response) => {
   await logoutUser(req.cookies?.[COOKIE_NAME]);
   res.clearCookie(COOKIE_NAME, {
     httpOnly: true,
-    secure: env.NODE_ENV === 'production',
+    secure: isHttpsClient,
     sameSite: 'strict',
   });
   res.status(200).json(new ApiResponse({ message: 'Logged out successfully' }));
