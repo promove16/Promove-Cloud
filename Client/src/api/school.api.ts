@@ -5,6 +5,7 @@ import {
   ComplianceAlertRecord,
   ComplianceIncidentRecord,
   ComplianceOverviewData,
+  ComplianceEvidenceUploadResponse,
   BulkCredentialImportResult,
   ComplianceReportRecord,
   DirectoryInvestor,
@@ -114,6 +115,28 @@ export const schoolApi = {
     const response = await api.put<ApiSuccessResponse<InstitutionPolicySubmissionRecord>>(
       '/api/school/compliance/submission',
       payload,
+    );
+    return response.data.data;
+  },
+  async requestComplianceEvidenceEdit(payload: {
+    submissionId: string;
+    policyName: string;
+    evidenceTitle: string;
+    evidenceUrl: string;
+  }) {
+    const response = await api.post<ApiSuccessResponse<{ requestedAt: string; submissionId: string }>>(
+      '/api/school/compliance/submission/evidence-edit-request',
+      payload,
+    );
+    return response.data.data;
+  },
+  async uploadComplianceEvidence(file: File) {
+    const formData = new FormData();
+    formData.append('file', file);
+    const response = await api.post<ApiSuccessResponse<ComplianceEvidenceUploadResponse>>(
+      '/api/school/compliance/evidence',
+      formData,
+      { headers: { 'Content-Type': 'multipart/form-data' } },
     );
     return response.data.data;
   },

@@ -48,10 +48,31 @@ export interface ScoreBreakdown {
 
 export type InstitutionPolicyStatus = 'Active' | 'On Track' | 'Pending' | 'Inactive';
 
+export type InstitutionPolicyEvidenceType =
+  | 'policy_document'
+  | 'activity_report'
+  | 'attendance_log'
+  | 'photo'
+  | 'video'
+  | 'meeting_minutes'
+  | 'certificate'
+  | 'mou'
+  | 'external_audit'
+  | 'other';
+
+export interface InstitutionPolicyEvidence {
+  title: string;
+  type: InstitutionPolicyEvidenceType;
+  url: string;
+  notes?: string;
+  submittedAt?: Date;
+}
+
 export interface InstitutionPolicy {
   name: string;
   status: InstitutionPolicyStatus;
   lastUpdated?: Date;
+  evidence: InstitutionPolicyEvidence[];
 }
 
 export interface InstitutionStats {

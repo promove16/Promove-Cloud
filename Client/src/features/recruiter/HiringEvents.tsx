@@ -105,6 +105,7 @@ export default function HiringEvents({ embedded = false }: HiringEventsProps) {
     () => events.find((event) => event._id === selectedEventId) ?? null,
     [events, selectedEventId],
   );
+  const selectedEventRankingsFinalized = Boolean(selectedEvent?.rankingsComputedAt);
 
   const activeJobs = useMemo(
     () => (jobsQuery.data ?? []).filter((job) => job.isActive),
@@ -501,13 +502,15 @@ export default function HiringEvents({ embedded = false }: HiringEventsProps) {
               <h2 className="text-2xl font-semibold text-white">{selectedEvent.title}</h2>
               <p className="mt-2 max-w-3xl text-sm leading-6 text-slate-400">{selectedEvent.description}</p>
             </div>
-            <div className="flex flex-wrap gap-3">
-              <Button variant="secondary" onClick={() => computeMutation.mutate(selectedEvent._id)}>
-                {computeMutation.isPending && computeMutation.variables === selectedEvent._id
-                  ? 'Computing...'
-                  : 'Compute Rankings'}
-              </Button>
-            </div>
+            {!selectedEventRankingsFinalized ? (
+              <div className="flex flex-wrap gap-3">
+                <Button variant="secondary" onClick={() => computeMutation.mutate(selectedEvent._id)}>
+                  {computeMutation.isPending && computeMutation.variables === selectedEvent._id
+                    ? 'Computing...'
+                    : 'Compute Rankings'}
+                </Button>
+              </div>
+            ) : null}
           </div>
 
           <div className="mt-6 grid gap-4 md:grid-cols-4">
@@ -601,51 +604,53 @@ export default function HiringEvents({ embedded = false }: HiringEventsProps) {
             </div>
 
             <div className="space-y-4">
-              <div className="rounded-2xl border border-slate-800 bg-slate-950 p-4">
-                <div className="mb-3 text-sm font-semibold uppercase tracking-[0.3em] text-cyan-300">
-                  Submission Score
+              {!selectedEventRankingsFinalized ? (
+                <div className="rounded-2xl border border-slate-800 bg-slate-950 p-4">
+                  <div className="mb-3 text-sm font-semibold uppercase tracking-[0.3em] text-cyan-300">
+                    Submission Score
+                  </div>
+                  <div className="grid gap-3">
+                    <select
+                      value={scoreDraft.studentId}
+                      onChange={(event) => setScoreDraft((current) => ({ ...current, studentId: event.target.value }))}
+                      className="rounded-lg border border-slate-800 bg-slate-950 px-4 py-3 text-white"
+                    >
+                      <option value="">Select participant</option>
+                      {selectedEvent.participants.map((participant) => (
+                        <option key={participant.studentId} value={participant.studentId}>
+                          {participant.studentName}
+                        </option>
+                      ))}
+                    </select>
+                    <Input
+                      type="number"
+                      min={0}
+                      max={100}
+                      value={scoreDraft.score}
+                      onChange={(event) => setScoreDraft((current) => ({ ...current, score: event.target.value }))}
+                      placeholder="Submission score"
+                    />
+                    <Button
+                      onClick={() =>
+                        scoreMutation.mutate({
+                          eventId: selectedEvent._id,
+                          studentId: scoreDraft.studentId,
+                          score: Number(scoreDraft.score),
+                        })
+                      }
+                      disabled={
+                        scoreMutation.isPending ||
+                        !scoreDraft.studentId ||
+                        scoreDraft.score.trim() === '' ||
+                        Number(scoreDraft.score) < 0 ||
+                        Number(scoreDraft.score) > 100
+                      }
+                    >
+                      {scoreMutation.isPending ? 'Saving...' : 'Save Score'}
+                    </Button>
+                  </div>
                 </div>
-                <div className="grid gap-3">
-                  <select
-                    value={scoreDraft.studentId}
-                    onChange={(event) => setScoreDraft((current) => ({ ...current, studentId: event.target.value }))}
-                    className="rounded-lg border border-slate-800 bg-slate-950 px-4 py-3 text-white"
-                  >
-                    <option value="">Select participant</option>
-                    {selectedEvent.participants.map((participant) => (
-                      <option key={participant.studentId} value={participant.studentId}>
-                        {participant.studentName}
-                      </option>
-                    ))}
-                  </select>
-                  <Input
-                    type="number"
-                    min={0}
-                    max={100}
-                    value={scoreDraft.score}
-                    onChange={(event) => setScoreDraft((current) => ({ ...current, score: event.target.value }))}
-                    placeholder="Submission score"
-                  />
-                  <Button
-                    onClick={() =>
-                      scoreMutation.mutate({
-                        eventId: selectedEvent._id,
-                        studentId: scoreDraft.studentId,
-                        score: Number(scoreDraft.score),
-                      })
-                    }
-                    disabled={
-                      scoreMutation.isPending ||
-                      !scoreDraft.studentId ||
-                      scoreDraft.score.trim() === '' ||
-                      Number(scoreDraft.score) < 0 ||
-                      Number(scoreDraft.score) > 100
-                    }
-                  >
-                    {scoreMutation.isPending ? 'Saving...' : 'Save Score'}
-                  </Button>
-                </div>
-              </div>
+              ) : null}
 
               <div className="rounded-2xl border border-slate-800 bg-slate-950 p-4">
                 <div className="mb-3 flex items-center gap-2 text-sm font-semibold uppercase tracking-[0.3em] text-cyan-300">

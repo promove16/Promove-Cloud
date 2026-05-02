@@ -30,29 +30,22 @@ export default function MentorshipPrograms() {
   );
 
   return (
-    <div className="space-y-6">
-      <section className="overflow-hidden border border-slate-800 bg-slate-950">
-        <div className="border-b border-slate-800 px-6 py-5 lg:px-8">
-          <div className="flex flex-col gap-5 xl:flex-row xl:items-start xl:justify-between">
-            <div className="max-w-4xl">
+    <div className="space-y-8">
+      <section className="border-b border-slate-800/80 pb-3">
+        <div className="px-1 pb-6">
+          <div className="grid gap-5 2xl:grid-cols-[minmax(0,1fr),auto] 2xl:items-end">
+            <div className="min-w-0 max-w-4xl">
               <div className="text-[11px] uppercase tracking-[0.35em] text-cyan-300">Admin Mentorship</div>
-              <h1 className="mt-3 text-3xl font-semibold tracking-tight text-white">{activeSection.label}</h1>
+              <h1 className="mt-3 text-2xl font-semibold tracking-tight text-white sm:text-3xl">{activeSection.label}</h1>
               <p className="mt-3 max-w-3xl text-sm leading-6 text-slate-400">{activeSection.description}</p>
             </div>
 
-            <div className="grid gap-3 self-start sm:grid-cols-2 xl:min-w-[32rem]">
-              <div className="border border-slate-800 bg-slate-950 px-4 py-3">
-                <div className="text-[11px] uppercase tracking-[0.25em] text-slate-500">Mentors</div>
-                <div className="mt-2 text-sm font-medium text-white">{summary.mentors}</div>
-              </div>
-              <div className="border border-slate-800 bg-slate-950 px-4 py-3">
-                <div className="text-[11px] uppercase tracking-[0.25em] text-slate-500">Pending requests</div>
-                <div className="mt-2 text-sm font-medium text-white">{summary.pendingPrograms}</div>
-              </div>
-              <div className="border border-slate-800 bg-slate-950 px-4 py-3">
-                <div className="text-[11px] uppercase tracking-[0.25em] text-slate-500">Assigned programs</div>
-                <div className="mt-2 text-sm font-medium text-white">{summary.assignedPrograms}</div>
-              </div>
+            <div className="text-sm text-slate-400">
+              <span className="font-medium text-slate-100">{summary.mentors}</span> mentors
+              <span className="mx-2 text-slate-700">/</span>
+              <span className="font-medium text-slate-100">{summary.pendingPrograms}</span> pending requests
+              <span className="mx-2 text-slate-700">/</span>
+              <span className="font-medium text-slate-100">{summary.assignedPrograms}</span> assigned
             </div>
           </div>
         </div>

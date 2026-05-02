@@ -3,6 +3,7 @@ import { z } from 'zod';
 import { redis } from '../../config/redis';
 import { ApiError } from '../../utils/ApiError';
 import { readRedisJson } from '../../utils/redisJson';
+import { extractS3KeyFromUrl, generatePresignedUrl } from '../../services/fileStorageService';
 import { Patent } from '../patent/patent.model';
 import { ScoreEvent } from '../innovationScore/score.model';
 import { Startup } from '../startup/startup.model';
@@ -887,7 +888,21 @@ export const getSchoolDashboard = async (institutionId: string): Promise<SchoolD
 export const getLatestComplianceReport = async (
   institutionId: string,
   institutionType: 'school' | 'college',
-) => ComplianceReport.findOne({ institutionId, institutionType }).sort({ generatedAt: -1 }).lean();
+) => {
+  const report = await ComplianceReport.findOne({ institutionId, institutionType }).sort({ generatedAt: -1 }).lean();
+
+  if (!report) {
+    return null;
+  }
+
+  const storageKey = report.storageKey ?? extractS3KeyFromUrl(report.pdfUrl);
+
+  return {
+    ...report,
+    pdfUrl: storageKey ? await generatePresignedUrl(storageKey) : report.pdfUrl,
+    ...(storageKey ? { storageProvider: 's3' as const, storageKey } : {}),
+  };
+};
 
 export const createSchoolStudentAccessToken = (
   schoolId: string,

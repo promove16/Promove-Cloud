@@ -266,7 +266,7 @@ export default function Dashboard() {
           : undefined
       }
       latestReport={latestReport}
-      complianceAction={{ label: 'View all', to: '/dashboard/college/analytics' }}
+      complianceAction={{ label: 'View all', to: '/dashboard/college/compliance' }}
       topInnovatorsTitle="Top Innovators"
       topInnovatorsAction={{ label: 'View all', to: '/dashboard/college/students' }}
       topInnovatorsEmptyMessage="No ranked student activity is available yet."

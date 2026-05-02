@@ -135,6 +135,36 @@ export const generatePresignedUrl = async (storageKey: string, expiresInSeconds 
   return getSignedUrl(s3, command, { expiresIn: expiresInSeconds });
 };
 
+export const extractS3KeyFromUrl = (fileUrl?: string): string | undefined => {
+  if (!fileUrl || !hasS3Config || !env.AWS_S3_BUCKET_NAME || !env.AWS_REGION) {
+    return undefined;
+  }
+
+  try {
+    const parsed = new URL(fileUrl);
+    const publicBaseUrl = new URL(getPublicBaseUrl());
+
+    if (parsed.origin === publicBaseUrl.origin) {
+      return decodeURIComponent(parsed.pathname.replace(/^\/+/, ''));
+    }
+
+    if (parsed.hostname === `${env.AWS_S3_BUCKET_NAME}.s3.${env.AWS_REGION}.amazonaws.com`) {
+      return decodeURIComponent(parsed.pathname.replace(/^\/+/, ''));
+    }
+
+    if (parsed.hostname === `s3.${env.AWS_REGION}.amazonaws.com`) {
+      const bucketPrefix = `/${env.AWS_S3_BUCKET_NAME}/`;
+      if (parsed.pathname.startsWith(bucketPrefix)) {
+        return decodeURIComponent(parsed.pathname.slice(bucketPrefix.length));
+      }
+    }
+  } catch {
+    return undefined;
+  }
+
+  return undefined;
+};
+
 const buildStorageKey = (folder: string, fileName: string) => {
   const normalizedFolder = sanitizeFolder(folder);
   const normalizedFileName = sanitizeFileName(fileName);
@@ -209,6 +239,39 @@ export const uploadFile = async (input: {
   const key = buildStorageKey(input.folder, input.fileName);
 
   await s3!.send(
+    new PutObjectCommand({
+      Bucket: env.AWS_S3_BUCKET_NAME,
+      Key: key,
+      Body: input.buffer,
+      ContentType: input.contentType,
+      ContentDisposition: buildInlineContentDisposition(input.fileName),
+      CacheControl: 'public, max-age=31536000, immutable',
+      Metadata: {
+        originalname: input.fileName.slice(0, 200),
+      },
+    }),
+  );
+
+  return {
+    url: `${getPublicBaseUrl()}/${encodeObjectKey(key)}`,
+    key,
+    provider: 's3' as const,
+  } satisfies UploadedFileResult;
+};
+
+export const uploadFileToS3 = async (input: {
+  buffer: Buffer;
+  folder: string;
+  fileName: string;
+  contentType: string;
+}) => {
+  if (!hasS3Config || !s3) {
+    throw new Error('S3 not configured');
+  }
+
+  const key = buildStorageKey(input.folder, input.fileName);
+
+  await s3.send(
     new PutObjectCommand({
       Bucket: env.AWS_S3_BUCKET_NAME,
       Key: key,

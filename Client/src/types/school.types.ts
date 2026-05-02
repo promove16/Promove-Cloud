@@ -1,7 +1,28 @@
+export type InstitutionPolicyEvidenceType =
+  | 'policy_document'
+  | 'activity_report'
+  | 'attendance_log'
+  | 'photo'
+  | 'video'
+  | 'meeting_minutes'
+  | 'certificate'
+  | 'mou'
+  | 'external_audit'
+  | 'other';
+
+export interface InstitutionPolicyEvidence {
+  title: string;
+  type: InstitutionPolicyEvidenceType;
+  url: string;
+  notes?: string;
+  submittedAt?: string;
+}
+
 export interface InstitutionPolicy {
   name: string;
   status: 'Active' | 'On Track' | 'Pending' | 'Inactive';
   lastUpdated?: string;
+  evidence: InstitutionPolicyEvidence[];
 }
 
 export interface InstitutionPolicySubmissionRecord {
@@ -18,7 +39,7 @@ export interface InstitutionPolicySubmissionRecord {
   };
   policies: InstitutionPolicy[];
   summaryNote?: string;
-  status: 'pending' | 'approved' | 'rejected';
+  status: 'pending' | 'approved' | 'rejected' | 'edit_requested';
   submittedAt: string;
   submittedBy: string;
   submittedByUser?: {
@@ -41,6 +62,15 @@ export interface InstitutionPolicySubmissionRecord {
 export interface InstitutionPolicySubmissionListResponse {
   items: InstitutionPolicySubmissionRecord[];
   total: number;
+}
+
+export interface ComplianceEvidenceUploadResponse {
+  url: string;
+  storageProvider: 's3' | 'cloudinary';
+  storageKey: string;
+  fileName: string;
+  fileSizeBytes: number;
+  contentType: string;
 }
 
 export interface InstitutionStats {

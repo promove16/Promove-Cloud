@@ -57,6 +57,7 @@ const SchoolOperationsPage = lazy(() => import("../features/school/OperationsPag
 const SchoolStudentLeaderboard = lazy(() => import("../features/school/StudentLeaderboard"));
 const SchoolInvestorDirectory = lazy(() => import("../features/school/InvestorDirectory"));
 const SchoolAnalyticsPage = lazy(() => import("../features/school/AnalyticsPage"));
+const SchoolCompliancePage = lazy(() => import("../features/school/CompliancePage"));
 
 const CollegeDashboard = lazy(() => import("../features/college/Dashboard"));
 const CollegeOperationsPage = lazy(() => import("../features/college/OperationsPage"));
@@ -70,6 +71,7 @@ const RecruiterDirectory = lazy(() => import("../features/college/RecruiterDirec
 const PlacementTracker = lazy(() => import("../features/college/PlacementTracker"));
 const EventManager = lazy(() => import("../features/college/EventManager"));
 const CollegeAnalyticsPage = lazy(() => import("../features/college/AnalyticsPage"));
+const CollegeCompliancePage = lazy(() => import("../features/college/CompliancePage"));
 
 const MentorDashboard = lazy(() => import("../features/mentor/Dashboard"));
 const MentorStudentFeed = lazy(() => import("../features/mentor/StudentFeed"));
@@ -892,7 +894,7 @@ export const router = createBrowserRouter([
               { path: "investors", element: <LazyPage component={SchoolInvestorDirectory} /> },
               { path: "mentors", element: <LazyPage component={SchoolMentorshipPage} /> },
               { path: "analytics", element: <LazyPage component={SchoolAnalyticsPage} /> },
-              { path: "compliance", element: <Navigate to="/dashboard/school/analytics" replace /> },
+              { path: "compliance", element: <LazyPage component={SchoolCompliancePage} /> },
             ],
           },
           {
@@ -918,7 +920,7 @@ export const router = createBrowserRouter([
               { path: "placement/:view", element: <LazyPage component={PlacementTracker} /> },
               { path: "events", element: <LazyPage component={EventManager} /> },
               { path: "analytics", element: <LazyPage component={CollegeAnalyticsPage} /> },
-              { path: "compliance", element: <Navigate to="/dashboard/college/analytics" replace /> },
+              { path: "compliance", element: <LazyPage component={CollegeCompliancePage} /> },
             ],
           },
         ],

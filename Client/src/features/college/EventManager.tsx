@@ -656,6 +656,7 @@ export default function EventManager({
               const computedAtLabel = event.rankingsComputedAt
                 ? formatDateTime(event.rankingsComputedAt)
                 : null;
+              const rankingsFinalized = Boolean(event.rankingsComputedAt);
 
               return (
                 <article
@@ -736,34 +737,38 @@ export default function EventManager({
                     </div>
 
                     <div className="flex flex-col gap-3 xl:items-end">
-                      <Button
-                        variant="secondary"
-                        onClick={() => computeMutation.mutate(event._id)}
-                        className="w-full rounded-full border border-slate-700 bg-slate-900 text-white hover:border-slate-600 hover:bg-slate-800 xl:w-auto"
-                      >
-                        Compute Rankings
-                      </Button>
-                      <Button
-                        variant="secondary"
-                        disabled={event.participants.length === 0}
-                        onClick={() => {
-                          const isClosing = scoringEventId === event._id;
-                          setScoringEventId(isClosing ? null : event._id);
-                          setScoreDraft({
-                            studentId: isClosing
-                              ? ''
-                              : event.participants[0]?.studentId ?? '',
-                            score: '',
-                          });
-                        }}
-                        className="w-full rounded-full border border-slate-700 bg-slate-900 text-white hover:border-slate-600 hover:bg-slate-800 xl:w-auto"
-                      >
-                        {event.participants.length === 0
-                          ? 'No Participants Yet'
-                          : scoringEventId === event._id
-                            ? 'Hide Score Form'
-                            : 'Add Submission Score'}
-                      </Button>
+                      {!rankingsFinalized ? (
+                        <>
+                          <Button
+                            variant="secondary"
+                            onClick={() => computeMutation.mutate(event._id)}
+                            className="w-full rounded-full border border-slate-700 bg-slate-900 text-white hover:border-slate-600 hover:bg-slate-800 xl:w-auto"
+                          >
+                            Compute Rankings
+                          </Button>
+                          <Button
+                            variant="secondary"
+                            disabled={event.participants.length === 0}
+                            onClick={() => {
+                              const isClosing = scoringEventId === event._id;
+                              setScoringEventId(isClosing ? null : event._id);
+                              setScoreDraft({
+                                studentId: isClosing
+                                  ? ''
+                                  : event.participants[0]?.studentId ?? '',
+                                score: '',
+                              });
+                            }}
+                            className="w-full rounded-full border border-slate-700 bg-slate-900 text-white hover:border-slate-600 hover:bg-slate-800 xl:w-auto"
+                          >
+                            {event.participants.length === 0
+                              ? 'No Participants Yet'
+                              : scoringEventId === event._id
+                                ? 'Hide Score Form'
+                                : 'Add Submission Score'}
+                          </Button>
+                        </>
+                      ) : null}
                       {computedAtLabel ? (
                         <div className="text-xs font-medium uppercase tracking-[0.22em] text-slate-500 xl:text-right">
                           Updated {computedAtLabel}
@@ -818,7 +823,8 @@ export default function EventManager({
                       )}
 
                       {scoringEventId === event._id &&
-                      event.participants.length > 0 ? (
+                      event.participants.length > 0 &&
+                      !rankingsFinalized ? (
                         <div className={`${insetPanelClassName} mt-6 p-4`}>
                           <div className="grid gap-4 lg:grid-cols-2">
                             <select

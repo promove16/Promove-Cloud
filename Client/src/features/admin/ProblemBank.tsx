@@ -32,29 +32,22 @@ export default function ProblemBankAdmin() {
   );
 
   return (
-    <div className="space-y-6">
-      <section className="overflow-hidden border border-slate-800 bg-slate-950">
-        <div className="border-b border-slate-800 px-6 py-6 lg:px-8">
-          <div className="flex flex-col gap-6 xl:flex-row xl:items-end xl:justify-between">
-            <div className="max-w-4xl">
+    <div className="space-y-8">
+      <section className="border-b border-slate-800/80 pb-3">
+        <div className="px-1 pb-6">
+          <div className="grid gap-5 2xl:grid-cols-[minmax(0,1fr),auto] 2xl:items-end">
+            <div className="min-w-0 max-w-4xl">
               <div className="text-[11px] uppercase tracking-[0.35em] text-cyan-300">Problem Bank Admin</div>
-              <h1 className="mt-3 text-3xl font-semibold tracking-tight text-white">{activeSection.label}</h1>
+              <h1 className="mt-3 text-2xl font-semibold tracking-tight text-white sm:text-3xl">{activeSection.label}</h1>
               <p className="mt-3 max-w-3xl text-sm leading-6 text-slate-400">{activeSection.description}</p>
             </div>
 
-            <div className="grid gap-3 sm:grid-cols-3 xl:min-w-[32rem]">
-              <div className="border border-slate-800 bg-slate-950 px-4 py-3">
-                <div className="text-[11px] uppercase tracking-[0.25em] text-slate-500">Total problems</div>
-                <div className="mt-2 text-sm font-medium text-white">{summary.totalProblems}</div>
-              </div>
-              <div className="border border-slate-800 bg-slate-950 px-4 py-3">
-                <div className="text-[11px] uppercase tracking-[0.25em] text-slate-500">Published</div>
-                <div className="mt-2 text-sm font-medium text-white">{summary.publishedProblems}</div>
-              </div>
-              <div className="border border-slate-800 bg-slate-950 px-4 py-3">
-                <div className="text-[11px] uppercase tracking-[0.25em] text-slate-500">Pending reviews</div>
-                <div className="mt-2 text-sm font-medium text-white">{summary.pendingReviews}</div>
-              </div>
+            <div className="text-sm text-slate-400">
+              <span className="font-medium text-slate-100">{summary.totalProblems}</span> problems
+              <span className="mx-2 text-slate-700">/</span>
+              <span className="font-medium text-slate-100">{summary.publishedProblems}</span> published
+              <span className="mx-2 text-slate-700">/</span>
+              <span className="font-medium text-slate-100">{summary.pendingReviews}</span> pending reviews
             </div>
           </div>
         </div>

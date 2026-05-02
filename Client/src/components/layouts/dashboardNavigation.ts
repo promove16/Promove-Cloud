@@ -10,6 +10,7 @@ import {
   Home,
   MessageCircle,
   Rocket,
+  ShieldCheck,
   Sparkles,
   Users,
   type LucideIcon,
@@ -109,7 +110,7 @@ export const SIDEBAR_CONFIG: Record<UserRole, DashboardNavItem[]> = {
   [UserRole.ADMIN]: [
     { kind: 'link', label: 'Dashboard', icon: Home, path: '/dashboard/admin' },
     { kind: 'link', label: 'Problems', icon: Sparkles, path: '/dashboard/admin/problems' },
-    { kind: 'link', label: 'Users', icon: Users, path: '/dashboard/admin/users' },
+    { kind: 'link', label: 'Access Control', icon: ShieldCheck, path: '/dashboard/admin/users' },
     { kind: 'link', label: 'Patents', icon: FileText, path: '/dashboard/admin/patents' },
     { kind: 'link', label: 'Startups', icon: Rocket, path: '/dashboard/admin/startups' },
     { kind: 'link', label: 'Deals', icon: BriefcaseBusiness, path: '/dashboard/admin/deals' },
@@ -138,6 +139,7 @@ export const DASHBOARD_ROUTE_LABELS: Partial<Record<UserRole, DashboardRouteLabe
     { path: '/dashboard/school/patents', label: 'Innovation Pipeline' },
     { path: '/dashboard/school/startups', label: 'Innovation Pipeline' },
     { path: '/dashboard/school/analytics', label: 'Analytics' },
+    { path: '/dashboard/school/compliance', label: 'Compliance' },
   ],
   [UserRole.COLLEGE]: [
     { path: '/dashboard/college/operations', label: 'Operations' },
@@ -149,6 +151,7 @@ export const DASHBOARD_ROUTE_LABELS: Partial<Record<UserRole, DashboardRouteLabe
     { path: '/dashboard/college/startups', label: 'Innovation Pipeline' },
     { path: '/dashboard/college/placement', label: 'Placement Tracker' },
     { path: '/dashboard/college/analytics', label: 'Analytics' },
+    { path: '/dashboard/college/compliance', label: 'Compliance' },
   ],
   [UserRole.MENTOR]: [{ path: '/product-workspace', label: 'Product Workspace' }],
   [UserRole.INVESTOR]: [{ path: '/product-workspace', label: 'Product Workspace' }],

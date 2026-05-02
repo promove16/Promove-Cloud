@@ -284,6 +284,14 @@ export const addSubmissionScore = async (
     throw new ApiError(404, 'EVENT_NOT_FOUND', 'Event not found');
   }
 
+  if (event.rankingsComputedAt) {
+    throw new ApiError(
+      409,
+      'EVENT_RANKINGS_FINALIZED',
+      'Submission scores cannot be changed after rankings are computed',
+    );
+  }
+
   const participant = event.participants.find(
     (item) => String(item.studentId) === studentId,
   );
@@ -304,6 +312,14 @@ export const computeEventRankings = async (
 
   if (!event) {
     throw new ApiError(404, 'EVENT_NOT_FOUND', 'Event not found');
+  }
+
+  if (event.rankingsComputedAt) {
+    throw new ApiError(
+      409,
+      'EVENT_RANKINGS_FINALIZED',
+      'Rankings have already been computed for this event',
+    );
   }
 
   const participantIds = event.participants.map((participant) => participant.studentId);

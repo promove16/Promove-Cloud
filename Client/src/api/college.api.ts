@@ -23,6 +23,7 @@ import { BulkCredentialImportResult } from '../types/school.types';
 import {
   ComplianceReportRecord,
   ComplianceOverviewData,
+  ComplianceEvidenceUploadResponse,
   DirectoryInvestor,
   InstitutionPolicy,
   InstitutionPolicySubmissionRecord,
@@ -142,6 +143,28 @@ export const collegeApi = {
     const response = await api.put<ApiSuccessResponse<InstitutionPolicySubmissionRecord>>(
       '/api/college/compliance/submission',
       payload,
+    );
+    return response.data.data;
+  },
+  async requestComplianceEvidenceEdit(payload: {
+    submissionId: string;
+    policyName: string;
+    evidenceTitle: string;
+    evidenceUrl: string;
+  }) {
+    const response = await api.post<ApiSuccessResponse<{ requestedAt: string; submissionId: string }>>(
+      '/api/college/compliance/submission/evidence-edit-request',
+      payload,
+    );
+    return response.data.data;
+  },
+  async uploadComplianceEvidence(file: File) {
+    const formData = new FormData();
+    formData.append('file', file);
+    const response = await api.post<ApiSuccessResponse<ComplianceEvidenceUploadResponse>>(
+      '/api/college/compliance/evidence',
+      formData,
+      { headers: { 'Content-Type': 'multipart/form-data' } },
     );
     return response.data.data;
   },

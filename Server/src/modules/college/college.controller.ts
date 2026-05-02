@@ -37,6 +37,7 @@ import {
 } from './college.service';
 import { createEventSchema } from '../event/event.service';
 import { generateCollegeReport } from '../../services/complianceReport';
+import { uploadFile } from '../../services/fileStorageService';
 import { ApiError } from '../../utils/ApiError';
 import { createInstitutionMentorshipProgramSchema } from '../mentor/mentor.validation';
 import {
@@ -53,8 +54,25 @@ import {
 } from '../institution/institutionCompliance.service';
 import {
   getLatestInstitutionPolicySubmission,
+  requestInstitutionPolicyEvidenceEdit,
   submitInstitutionPolicySubmission,
 } from '../institution/institutionPolicySubmission.service';
+
+const complianceEvidenceAllowedMimeTypes = new Set([
+  'application/pdf',
+  'image/jpeg',
+  'image/png',
+  'image/webp',
+  'text/plain',
+  'text/csv',
+  'application/msword',
+  'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
+  'application/vnd.ms-excel',
+  'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+  'application/vnd.ms-powerpoint',
+  'application/vnd.openxmlformats-officedocument.presentationml.presentation',
+]);
+const complianceEvidenceMaxSizeBytes = 50 * 1024 * 1024;
 
 export const getCollegeDashboardController = async (req: Request, res: Response) => {
   const data = await getCollegeDashboard(req.user!._id);
@@ -166,6 +184,43 @@ export const getCollegeComplianceSubmissionController = async (req: Request, res
 export const submitCollegeComplianceSubmissionController = async (req: Request, res: Response) => {
   const data = await submitInstitutionPolicySubmission(req.user!._id, 'college', req.user!._id, req.body);
   res.status(200).json(new ApiResponse(data));
+};
+
+export const requestCollegeComplianceEvidenceEditController = async (req: Request, res: Response) => {
+  const data = await requestInstitutionPolicyEvidenceEdit(req.user!._id, 'college', req.user!._id, req.body);
+  res.status(200).json(new ApiResponse(data));
+};
+
+export const uploadCollegeComplianceEvidenceController = async (req: Request, res: Response) => {
+  if (!req.file) {
+    throw new ApiError(400, 'FILE_REQUIRED', 'A compliance evidence file is required.');
+  }
+
+  if (req.file.size > complianceEvidenceMaxSizeBytes) {
+    throw new ApiError(400, 'FILE_TOO_LARGE', 'Compliance evidence files must be 50MB or smaller.');
+  }
+
+  if (!complianceEvidenceAllowedMimeTypes.has(req.file.mimetype)) {
+    throw new ApiError(400, 'INVALID_FILE_TYPE', 'Upload a PDF, image, document, spreadsheet, presentation, CSV, or text file.');
+  }
+
+  const upload = await uploadFile({
+    buffer: req.file.buffer,
+    folder: `compliance-evidence/college/${req.user!._id}`,
+    fileName: req.file.originalname,
+    contentType: req.file.mimetype,
+  });
+
+  res.status(201).json(
+    new ApiResponse({
+      url: upload.url,
+      storageProvider: upload.provider,
+      storageKey: upload.key,
+      fileName: req.file.originalname,
+      fileSizeBytes: req.file.size,
+      contentType: req.file.mimetype,
+    }),
+  );
 };
 
 export const listCollegeComplianceIncidentsController = async (req: Request, res: Response) => {

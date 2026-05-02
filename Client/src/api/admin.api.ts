@@ -628,7 +628,7 @@ export const adminApi = {
     );
     return response.data.data;
   },
-  async getComplianceSubmissions(params?: { status?: 'pending' | 'approved' | 'rejected' }) {
+  async getComplianceSubmissions(params?: { status?: 'pending' | 'approved' | 'rejected' | 'edit_requested' }) {
     const response = await api.get<ApiSuccessResponse<InstitutionPolicySubmissionListResponse>>(
       '/api/admin/compliance-submissions',
       { params },

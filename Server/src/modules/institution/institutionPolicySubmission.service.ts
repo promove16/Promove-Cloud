@@ -54,6 +54,13 @@ export interface InstitutionPolicySubmissionView {
     name: string;
     status: InstitutionPolicy['status'];
     lastUpdated?: string;
+    evidence: Array<{
+      title: string;
+      type: InstitutionPolicy['evidence'][number]['type'];
+      url: string;
+      notes?: string;
+      submittedAt?: string;
+    }>;
   }>;
   summaryNote?: string;
   status: SubmissionStatus;
@@ -81,10 +88,8 @@ export interface AdminInstitutionPolicySubmissionListResponse {
   total: number;
 }
 
-const submissionPolicySchema = z.object({
-  name: z.string().trim().min(2).max(160),
-  status: z.enum(['Active', 'On Track', 'Pending', 'Inactive']),
-  lastUpdated: z
+const dateStringToDate = (fieldName: string) =>
+  z
     .union([z.string().trim().min(1).max(50), z.literal('')])
     .optional()
     .transform((value) => {
@@ -94,18 +99,78 @@ const submissionPolicySchema = z.object({
 
       const parsed = new Date(value);
       if (Number.isNaN(parsed.getTime())) {
-        throw new Error('Invalid lastUpdated value');
+        throw new Error(`Invalid ${fieldName} value`);
       }
 
       return parsed;
-    }),
+    });
+
+const submissionEvidenceSchema = z.object({
+  title: z.string().trim().max(160).optional().or(z.literal('')),
+  type: z.enum([
+    'policy_document',
+    'activity_report',
+    'attendance_log',
+    'photo',
+    'video',
+    'meeting_minutes',
+    'certificate',
+    'mou',
+    'external_audit',
+    'other',
+  ]),
+  url: z.string().trim().url().max(2048),
+  notes: z.string().trim().max(600).optional(),
+  submittedAt: dateStringToDate('submittedAt'),
 });
 
+const submissionPolicySchema = z.object({
+  name: z.string().trim().min(2).max(160),
+  status: z.enum(['Active', 'On Track', 'Pending', 'Inactive']),
+  lastUpdated: dateStringToDate('lastUpdated'),
+  evidence: z.array(submissionEvidenceSchema).min(1).max(10),
+});
+
+const hasSubmittedEvidence = (policy: unknown) => {
+  if (!policy || typeof policy !== 'object' || !('evidence' in policy)) {
+    return false;
+  }
+
+  const evidence = (policy as { evidence?: unknown }).evidence;
+  if (!Array.isArray(evidence)) {
+    return false;
+  }
+
+  return evidence.some(
+    (item) =>
+      item &&
+      typeof item === 'object' &&
+      typeof (item as { url?: unknown }).url === 'string' &&
+      (item as { url: string }).url.trim().length > 0,
+  );
+};
+
+const stripUnsubmittedPolicyRows = (payload: unknown) => {
+  if (!payload || typeof payload !== 'object' || !('policies' in payload)) {
+    return payload;
+  }
+
+  const policies = (payload as { policies?: unknown }).policies;
+  if (!Array.isArray(policies)) {
+    return payload;
+  }
+
+  return {
+    ...payload,
+    policies: policies.filter(hasSubmittedEvidence),
+  };
+};
+
 export const submitInstitutionPolicySubmissionSchema = z
-  .object({
+  .preprocess(stripUnsubmittedPolicyRows, z.object({
     policies: z.array(submissionPolicySchema).min(1).max(20),
     summaryNote: z.string().trim().max(1500).optional(),
-  })
+  }))
   .superRefine((payload, ctx) => {
     const seen = new Set<string>();
 
@@ -141,18 +206,115 @@ export const reviewInstitutionPolicySubmissionSchema = z
     }
   });
 
+export const requestInstitutionPolicyEvidenceEditSchema = z.object({
+  submissionId: z.string().trim().min(1),
+  policyName: z.string().trim().min(2).max(160),
+  evidenceTitle: z.string().trim().min(1).max(160),
+  evidenceUrl: z.string().trim().url().max(2048),
+});
+
 const toSubmissionPolicy = (
   policies: Array<{
     name: string;
     status: InstitutionPolicy['status'];
     lastUpdated?: Date;
+    evidence: Array<{
+      title?: string;
+      type: InstitutionPolicy['evidence'][number]['type'];
+      url: string;
+      notes?: string;
+      submittedAt?: Date;
+    }>;
   }>,
 ): InstitutionPolicy[] =>
   policies.map((policy) => ({
     name: policy.name,
     status: policy.status,
     ...(policy.lastUpdated ? { lastUpdated: policy.lastUpdated } : {}),
+    evidence: policy.evidence.map((evidence) => ({
+      title: evidence.title || evidence.type.replace(/_/g, ' '),
+      type: evidence.type,
+      url: evidence.url,
+      ...(evidence.notes ? { notes: evidence.notes } : {}),
+      submittedAt: evidence.submittedAt ?? new Date(),
+    })),
   }));
+
+const mergeApprovedPolicies = (
+  currentPolicies: InstitutionPolicy[] = [],
+  approvedPolicies: InstitutionPolicy[],
+): InstitutionPolicy[] => {
+  const approvedByName = new Map(
+    approvedPolicies.map((policy) => [policy.name.trim().toLowerCase(), policy]),
+  );
+  const currentNames = new Set(currentPolicies.map((policy) => policy.name.trim().toLowerCase()));
+  const mergedPolicies = currentPolicies.map((policy) => {
+    const key = policy.name.trim().toLowerCase();
+    return approvedByName.get(key) ?? policy;
+  });
+  const newPolicies = approvedPolicies.filter(
+    (policy) => !currentNames.has(policy.name.trim().toLowerCase()),
+  );
+
+  return [...mergedPolicies, ...newPolicies];
+};
+
+const getEvidenceKey = (url: string) => url.trim().toLowerCase();
+
+const hasNewEvidence = (
+  currentPolicies: InstitutionPolicy[],
+  incomingPolicies: InstitutionPolicy[],
+) => {
+  const existingEvidenceUrls = new Set(
+    currentPolicies.flatMap((policy) =>
+      policy.evidence.map((evidence) => getEvidenceKey(evidence.url)),
+    ),
+  );
+
+  return incomingPolicies.some((policy) =>
+    policy.evidence.some(
+      (evidence) => !existingEvidenceUrls.has(getEvidenceKey(evidence.url)),
+    ),
+  );
+};
+
+const mergePendingSubmissionPolicies = (
+  currentPolicies: InstitutionPolicy[],
+  incomingPolicies: InstitutionPolicy[],
+): InstitutionPolicy[] => {
+  const incomingByName = new Map(
+    incomingPolicies.map((policy) => [policy.name.trim().toLowerCase(), policy]),
+  );
+  const mergedNames = new Set<string>();
+
+  const mergedExisting = currentPolicies.map((currentPolicy) => {
+    const key = currentPolicy.name.trim().toLowerCase();
+    mergedNames.add(key);
+    const incomingPolicy = incomingByName.get(key);
+
+    if (!incomingPolicy) {
+      return currentPolicy;
+    }
+
+    const existingEvidenceUrls = new Set(
+      currentPolicy.evidence.map((evidence) => getEvidenceKey(evidence.url)),
+    );
+    const newEvidence = incomingPolicy.evidence.filter(
+      (evidence) => !existingEvidenceUrls.has(getEvidenceKey(evidence.url)),
+    );
+
+    return {
+      ...incomingPolicy,
+      evidence: [...currentPolicy.evidence, ...newEvidence],
+    };
+  });
+
+  const newPolicies = incomingPolicies.filter(
+    (policy) => !mergedNames.has(policy.name.trim().toLowerCase()),
+  );
+
+  return [...mergedExisting, ...newPolicies];
+};
 
 const toUserSummary = (value?: Types.ObjectId | SubmissionActorUser) => {
   if (!value || value instanceof Types.ObjectId) {
@@ -197,6 +359,13 @@ const mapSubmission = (submission: SubmissionViewSource): InstitutionPolicySubmi
     name: policy.name,
     status: policy.status,
     ...(policy.lastUpdated ? { lastUpdated: new Date(policy.lastUpdated).toISOString() } : {}),
+    evidence: (policy.evidence ?? []).map((evidence) => ({
+      title: evidence.title || evidence.type.replace(/_/g, ' '),
+      type: evidence.type,
+      url: evidence.url,
+      ...(evidence.notes ? { notes: evidence.notes } : {}),
+      ...(evidence.submittedAt ? { submittedAt: new Date(evidence.submittedAt).toISOString() } : {}),
+    })),
   })),
   ...(submission.summaryNote ? { summaryNote: submission.summaryNote } : {}),
   status: submission.status,
@@ -306,13 +475,24 @@ export const submitInstitutionPolicySubmission = async (
     institutionType,
     status: 'pending',
   });
+  const policiesForSave = existingPending
+    ? mergePendingSubmissionPolicies(existingPending.policies, mappedPolicies)
+    : mappedPolicies;
+
+  if (existingPending && !hasNewEvidence(existingPending.policies, mappedPolicies)) {
+    throw new ApiError(
+      409,
+      'COMPLIANCE_SUBMISSION_NO_NEW_EVIDENCE',
+      'This packet is already pending review. Upload new evidence or request edit access for submitted evidence.',
+    );
+  }
 
   const submission = existingPending
     ? await InstitutionPolicySubmission.findByIdAndUpdate(
         existingPending._id,
         {
           $set: {
-            policies: mappedPolicies,
+            policies: policiesForSave,
             status: 'pending',
             submittedBy: new Types.ObjectId(actorId),
             submittedAt,
@@ -330,7 +510,7 @@ export const submitInstitutionPolicySubmission = async (
     : await InstitutionPolicySubmission.create({
         institutionId,
         institutionType,
-        policies: mappedPolicies,
+        policies: policiesForSave,
         ...(parsed.summaryNote ? { summaryNote: parsed.summaryNote } : {}),
         status: 'pending',
         submittedBy: new Types.ObjectId(actorId),
@@ -355,6 +535,77 @@ export const submitInstitutionPolicySubmission = async (
   }
 
   return mapSubmission(hydratedSubmission);
+};
+
+export const requestInstitutionPolicyEvidenceEdit = async (
+  institutionId: string,
+  institutionType: InstitutionType,
+  actorId: string,
+  payload: unknown,
+) => {
+  const institution = await ensureInstitution(institutionId, institutionType);
+  const parsed = requestInstitutionPolicyEvidenceEditSchema.parse(payload);
+  const submission = await InstitutionPolicySubmission.findOne({
+    _id: parsed.submissionId,
+    institutionId,
+    institutionType,
+    status: 'pending',
+  }).lean<SubmissionViewSource | null>();
+
+  if (!submission) {
+    throw new ApiError(
+      404,
+      'COMPLIANCE_SUBMISSION_NOT_FOUND',
+      'Pending compliance submission not found.',
+    );
+  }
+
+  const submittedEvidence = submission.policies
+    .find((policy) => policy.name.trim().toLowerCase() === parsed.policyName.trim().toLowerCase())
+    ?.evidence.find((evidence) => getEvidenceKey(evidence.url) === getEvidenceKey(parsed.evidenceUrl));
+
+  if (!submittedEvidence) {
+    throw new ApiError(
+      404,
+      'COMPLIANCE_EVIDENCE_NOT_FOUND',
+      'Submitted evidence was not found on this pending packet.',
+    );
+  }
+
+  // Update submission status to edit_requested
+  await InstitutionPolicySubmission.updateOne(
+    { _id: parsed.submissionId },
+    { $set: { status: 'edit_requested' } },
+  );
+
+  const admins = await User.find({ role: UserRole.ADMIN }).select('_id').lean<Array<{ _id: Types.ObjectId }>>();
+  const institutionLabel = institution.institutionProfile?.institutionName || institution.displayName;
+  const requestedAt = new Date();
+
+  await Promise.allSettled(
+    admins.map((admin) =>
+      NotificationService.create({
+        userId: String(admin._id),
+        type: 'request',
+        title: 'Compliance evidence edit requested',
+        body: `${institutionLabel} requested edit access for "${parsed.evidenceTitle}" in ${parsed.policyName}.`,
+        link: '/dashboard/admin/requests',
+        metadata: {
+          submissionId: parsed.submissionId,
+          institutionId,
+          actorId,
+          policyName: parsed.policyName,
+          evidenceTitle: parsed.evidenceTitle,
+          evidenceUrl: parsed.evidenceUrl,
+        },
+      }),
+    ),
+  );
+
+  return {
+    requestedAt: requestedAt.toISOString(),
+    submissionId: parsed.submissionId,
+  };
 };
 
 export const listAdminInstitutionPolicySubmissions = async (
@@ -406,15 +657,27 @@ export const reviewInstitutionPolicySubmission = async (
     const reviewedAt = new Date();
 
     if (parsed.decision === 'approved') {
-      const institutionUpdate = await User.updateOne(
-        { _id: submission.institutionId, role: submission.institutionType },
-        { $set: { 'institutionProfile.policies': submission.policies } },
-        { session },
-      );
+      const institution = await User.findOne({ _id: submission.institutionId, role: submission.institutionType })
+        .select('institutionProfile.policies')
+        .session(session)
+        .lean<{ institutionProfile?: { policies?: InstitutionPolicy[] } } | null>();
 
-      if (!institutionUpdate.matchedCount) {
+      if (!institution) {
         throw new ApiError(404, 'INSTITUTION_NOT_FOUND', 'Institution not found');
       }
+
+      await User.updateOne(
+        { _id: submission.institutionId, role: submission.institutionType },
+        {
+          $set: {
+            'institutionProfile.policies': mergeApprovedPolicies(
+              institution.institutionProfile?.policies ?? [],
+              submission.policies,
+            ),
+          },
+        },
+        { session },
+      );
     }
 
     submission.status = parsed.decision;

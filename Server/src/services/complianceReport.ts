@@ -15,7 +15,7 @@ import { getStudentLeaderboard } from '../modules/school/school.service';
 import { UserRole } from '../types/roles.types';
 import { Workspace } from '../modules/workspace/workspace.model';
 import { MAX_INNOVATION_SCORE } from '../modules/innovationScore/score.utils';
-import { uploadFile } from './fileStorageService';
+import { generatePresignedUrl, uploadFileToS3, type UploadedFileResult } from './fileStorageService';
 
 type PolicyStatus = 'Active' | 'On Track' | 'Pending' | 'Inactive';
 
@@ -166,54 +166,265 @@ const loadReportMetrics = async (
   };
 };
 
-const drawHeader = (doc: PDFKit.PDFDocument) => {
+const page = {
+  marginX: 54,
+  top: 52,
+  bottom: 64,
+  width: 487,
+};
+
+const pdfColors = {
+  title: '#2563EB',
+  heading: '#1D4ED8',
+  body: '#1E293B',
+  muted: '#64748B',
+  faint: '#E2E8F0',
+  border: '#CBD5E1',
+  softBorder: '#E2E8F0',
+  panel: '#F8FAFC',
+  panelAlt: '#F1F5F9',
+};
+
+const createReportDocument = () =>
+  new PDFDocument({
+    margin: page.marginX,
+    size: 'A4',
+    bufferPages: true,
+    autoFirstPage: true,
+  });
+
+const pageBottom = (doc: PDFKit.PDFDocument) => doc.page.height - page.bottom;
+
+const usablePageHeight = (doc: PDFKit.PDFDocument) => doc.page.height - page.top - page.bottom;
+
+const addReportPage = (doc: PDFKit.PDFDocument) => {
+  doc.addPage();
+  doc.y = page.top;
+};
+
+const ensureSpace = (doc: PDFKit.PDFDocument, requiredHeight: number) => {
+  const heightToFit = Math.min(requiredHeight, usablePageHeight(doc));
+  if (doc.y + heightToFit <= pageBottom(doc)) {
+    return;
+  }
+
+  addReportPage(doc);
+};
+
+type TableHeaderCell = {
+  label: string;
+  x: number;
+  width: number;
+  align?: 'left' | 'center' | 'right' | 'justify';
+};
+
+const drawTableHeader = (
+  doc: PDFKit.PDFDocument,
+  cells: TableHeaderCell[],
+  headerHeight = 22,
+) => {
+  ensureSpace(doc, headerHeight + 30);
+  const headerY = doc.y;
+  doc.rect(page.marginX, headerY, page.width, headerHeight).fill(pdfColors.panelAlt);
+  doc.fillColor(pdfColors.muted).font('Helvetica-Bold').fontSize(8);
+
+  cells.forEach((cell) => {
+    doc.text(cell.label, cell.x, headerY + 7, {
+      width: cell.width,
+      height: 10,
+      align: cell.align,
+      ellipsis: true,
+      lineBreak: false,
+    });
+  });
+
+  doc.y = headerY + headerHeight;
+};
+
+const ensureTableRowSpace = (
+  doc: PDFKit.PDFDocument,
+  rowHeight: number,
+  headerCells: TableHeaderCell[],
+  headerHeight = 22,
+) => {
+  if (doc.y + rowHeight <= pageBottom(doc)) {
+    return;
+  }
+
+  addReportPage(doc);
+  drawTableHeader(doc, headerCells, headerHeight);
+};
+
+const drawTableRowBackground = (doc: PDFKit.PDFDocument, rowY: number, rowHeight: number, index: number) => {
+  doc.rect(page.marginX, rowY, page.width, rowHeight).fill(index % 2 === 0 ? '#FFFFFF' : pdfColors.panel);
   doc
-    .fillColor('#1A56DB')
-    .fontSize(20)
-    .text('ProMove Innovation Cloud')
-    .moveDown(0.25)
-    .fillColor('#E2E8F0')
-    .fontSize(14)
-    .text('Institutional Compliance Report')
-    .moveDown(0.75)
-    .strokeColor('#334155')
+    .moveTo(page.marginX, rowY + rowHeight)
+    .lineTo(page.marginX + page.width, rowY + rowHeight)
+    .lineWidth(0.5)
+    .strokeColor(pdfColors.softBorder)
+    .stroke();
+};
+
+const drawCellText = (
+  doc: PDFKit.PDFDocument,
+  text: string,
+  x: number,
+  y: number,
+  width: number,
+  options: PDFKit.Mixins.TextOptions = {},
+) => {
+  doc.text(text, x, y, {
+    width,
+    height: 13,
+    ellipsis: true,
+    lineBreak: false,
+    ...options,
+  });
+};
+
+const drawHeader = (doc: PDFKit.PDFDocument, metrics: ReportMetrics) => {
+  doc.y = page.top;
+  doc
+    .fillColor(pdfColors.title)
+    .fontSize(21)
+    .font('Helvetica-Bold')
+    .text('ProMove Innovation Cloud', page.marginX, doc.y, { width: 310 });
+
+  doc
+    .fillColor(pdfColors.muted)
+    .fontSize(9)
+    .font('Helvetica')
+    .text('CONFIDENTIAL REPORT', page.marginX + 340, page.top + 4, {
+      width: 145,
+      align: 'right',
+      characterSpacing: 1.2,
+    });
+
+  doc
+    .fillColor(pdfColors.body)
+    .fontSize(12)
+    .font('Helvetica')
+    .text('Institutional Compliance Report', page.marginX, doc.y + 4, { width: 280 });
+
+  doc
+    .fontSize(9)
+    .fillColor(pdfColors.muted)
+    .text(metrics.generatedAt.toLocaleString('en-IN'), page.marginX + 330, page.top + 28, {
+      width: 155,
+      align: 'right',
+    });
+
+  doc
+    .moveTo(page.marginX, page.top + 64)
+    .lineTo(page.marginX + page.width, page.top + 64)
     .lineWidth(1)
-    .moveTo(50, doc.y)
-    .lineTo(545, doc.y)
-    .stroke()
-    .moveDown();
+    .strokeColor(pdfColors.border)
+    .stroke();
+
+  doc.y = page.top + 82;
 };
 
 const drawInfoBlock = (doc: PDFKit.PDFDocument, metrics: ReportMetrics) => {
+  const y = doc.y;
+  const rowHeight = 33;
+  const columns = [
+    { label: 'Institution', value: metrics.institutionName },
+    { label: 'Location', value: metrics.location },
+    { label: 'Academic year', value: metrics.academicYear },
+    { label: 'IIC rating', value: `${metrics.iicStarRating.toFixed(1)} / 5.0` },
+  ];
+
   doc
-    .fillColor('#FFFFFF')
-    .fontSize(12)
-    .text(`Institution: ${metrics.institutionName}`)
-    .text(`Location: ${metrics.location}`)
-    .text(`Academic Year: ${metrics.academicYear}`)
-    .text(`Generated on: ${metrics.generatedAt.toLocaleString('en-IN')}`)
-    .text(`IIC Star Rating: ${metrics.iicStarRating.toFixed(1)} / 5.0`)
-    .moveDown();
+    .roundedRect(page.marginX, y, page.width, 78, 10)
+    .fillAndStroke(pdfColors.panel, pdfColors.softBorder);
+
+  columns.forEach((item, index) => {
+    const columnWidth = page.width / 2;
+    const x = page.marginX + (index % 2) * columnWidth + 16;
+    const cellY = y + Math.floor(index / 2) * rowHeight + 12;
+
+    doc
+      .fillColor(pdfColors.muted)
+      .font('Helvetica-Bold')
+      .fontSize(8)
+      .text(item.label.toUpperCase(), x, cellY, { width: columnWidth - 32 });
+    doc
+      .fillColor(pdfColors.body)
+      .font('Helvetica')
+      .fontSize(10)
+      .text(item.value, x, cellY + 12, { width: columnWidth - 32, lineGap: 1 });
+  });
+
+  doc.y = y + 98;
 };
 
 const drawSectionTitle = (doc: PDFKit.PDFDocument, title: string) => {
-  doc.moveDown(0.5).fillColor('#93C5FD').fontSize(13).text(title).moveDown(0.35);
+  ensureSpace(doc, 42);
+  doc.y += 4;
+  doc
+    .fillColor(pdfColors.heading)
+    .font('Helvetica-Bold')
+    .fontSize(11)
+    .text(title, page.marginX, doc.y, { width: page.width, characterSpacing: 0.5 });
+  doc
+    .moveTo(page.marginX, doc.y + 17)
+    .lineTo(page.marginX + page.width, doc.y + 17)
+    .lineWidth(0.5)
+    .strokeColor(pdfColors.softBorder)
+    .stroke();
+  doc.y += 28;
+};
+
+const drawParagraph = (doc: PDFKit.PDFDocument, text: string) => {
+  const height = doc.heightOfString(text, { width: page.width, lineGap: 3 });
+  ensureSpace(doc, height + 8);
+  doc
+    .fillColor(pdfColors.body)
+    .font('Helvetica')
+    .fontSize(10)
+    .text(text, page.marginX, doc.y, { width: page.width, lineGap: 3 });
+  doc.y += 8;
 };
 
 const drawKeyValueTable = (
   doc: PDFKit.PDFDocument,
   rows: Array<{ label: string; value: string; change?: string }>,
 ) => {
-  rows.forEach((row) => {
+  const headerHeight = 22;
+  const rowHeight = 30;
+
+  const columns = {
+    label: page.marginX + 12,
+    value: page.marginX + 292,
+    change: page.marginX + 382,
+  };
+  const headerCells: TableHeaderCell[] = [
+    { label: 'METRIC', x: columns.label, width: 250 },
+    { label: 'VALUE', x: columns.value, width: 70, align: 'right' },
+    { label: 'NOTE', x: columns.change, width: 90 },
+  ];
+
+  drawTableHeader(doc, headerCells, headerHeight);
+
+  rows.forEach((row, index) => {
+    ensureTableRowSpace(doc, rowHeight, headerCells, headerHeight);
+    const rowY = doc.y;
+    drawTableRowBackground(doc, rowY, rowHeight, index);
+
     doc
-      .fillColor('#E2E8F0')
-      .fontSize(11)
-      .text(row.label, 50, doc.y, { width: 240, continued: true })
-      .text(row.value, { width: 140, continued: true })
-      .fillColor('#94A3B8')
-      .text(row.change ?? '-');
-    doc.moveDown(0.2);
+      .fillColor(pdfColors.body)
+      .font('Helvetica')
+      .fontSize(9.5);
+    drawCellText(doc, row.label, columns.label, rowY + 9, 250);
+    doc.font('Helvetica-Bold');
+    drawCellText(doc, row.value, columns.value, rowY + 9, 70, { align: 'right' });
+    doc.font('Helvetica').fillColor(pdfColors.muted);
+    drawCellText(doc, row.change ?? '-', columns.change, rowY + 9, 90);
+
+    doc.y = rowY + rowHeight;
   });
+
+  doc.y += 8;
 };
 
 const policyColorMap: Record<PolicyStatus, string> = {
@@ -224,17 +435,118 @@ const policyColorMap: Record<PolicyStatus, string> = {
 };
 
 const drawPolicyTable = (doc: PDFKit.PDFDocument, policies: ReportMetrics['policies']) => {
-  policies.forEach((policy) => {
+  if (policies.length === 0) {
+    drawParagraph(doc, 'No policy rows have been approved for this institution yet.');
+    return;
+  }
+
+  const headerHeight = 22;
+  const rowHeight = 30;
+
+  const columns = {
+    name: page.marginX + 12,
+    status: page.marginX + 290,
+    updated: page.marginX + 385,
+  };
+  const headerCells: TableHeaderCell[] = [
+    { label: 'POLICY', x: columns.name, width: 250 },
+    { label: 'STATUS', x: columns.status, width: 78 },
+    { label: 'UPDATED', x: columns.updated, width: 90 },
+  ];
+
+  drawTableHeader(doc, headerCells, headerHeight);
+
+  policies.forEach((policy, index) => {
+    ensureTableRowSpace(doc, rowHeight, headerCells, headerHeight);
+    const rowY = doc.y;
+    drawTableRowBackground(doc, rowY, rowHeight, index);
+
     doc
-      .fillColor('#E2E8F0')
-      .fontSize(10)
-      .text(policy.name, 50, doc.y, { width: 250, continued: true });
-    doc.fillColor(policyColorMap[policy.status]).text(policy.status, { width: 100, continued: true });
+      .fillColor(pdfColors.body)
+      .font('Helvetica')
+      .fontSize(10);
+    drawCellText(doc, policy.name, columns.name, rowY + 9, 250);
     doc
-      .fillColor('#94A3B8')
-      .text(policy.lastUpdated ? policy.lastUpdated.toLocaleDateString('en-IN') : 'Not updated');
-    doc.moveDown(0.25);
+      .fillColor(policyColorMap[policy.status])
+      .font('Helvetica-Bold')
+      .fontSize(9.5);
+    drawCellText(doc, policy.status, columns.status, rowY + 9, 78);
+    doc
+      .fillColor(pdfColors.muted)
+      .font('Helvetica')
+      .fontSize(9.5);
+    drawCellText(
+      doc,
+      policy.lastUpdated ? policy.lastUpdated.toLocaleDateString('en-IN') : 'Not updated',
+      columns.updated,
+      rowY + 9,
+      90,
+    );
+
+    doc.y = rowY + rowHeight;
   });
+
+  doc.y += 8;
+};
+
+const drawStudentTable = (doc: PDFKit.PDFDocument, students: ReportMetrics['topStudents']) => {
+  if (students.length === 0) {
+    drawParagraph(doc, 'No ranked student innovators are available for this reporting period.');
+    return;
+  }
+
+  drawKeyValueTable(
+    doc,
+    students.map((student) => ({
+      label: `${student.rank}. ${student.name}`,
+      value: `${student.score}/${MAX_INNOVATION_SCORE}`,
+      change: 'Innovation score',
+    })),
+  );
+};
+
+const drawPlacementTable = (doc: PDFKit.PDFDocument, records: ReportMetrics['placementTable']) => {
+  if (records.length === 0) {
+    drawParagraph(doc, 'No hired placement records are available for this reporting period.');
+    return;
+  }
+
+  const headerHeight = 22;
+  const rowHeight = 30;
+
+  const columns = {
+    student: page.marginX + 12,
+    score: page.marginX + 218,
+    status: page.marginX + 288,
+    company: page.marginX + 360,
+  };
+  const headerCells: TableHeaderCell[] = [
+    { label: 'STUDENT', x: columns.student, width: 180 },
+    { label: 'SCORE', x: columns.score, width: 50, align: 'right' },
+    { label: 'STATUS', x: columns.status, width: 60 },
+    { label: 'COMPANY', x: columns.company, width: 115 },
+  ];
+
+  drawTableHeader(doc, headerCells, headerHeight);
+
+  records.forEach((record, index) => {
+    ensureTableRowSpace(doc, rowHeight, headerCells, headerHeight);
+    const rowY = doc.y;
+    drawTableRowBackground(doc, rowY, rowHeight, index);
+
+    doc
+      .fillColor(pdfColors.body)
+      .font('Helvetica')
+      .fontSize(9.5);
+    drawCellText(doc, record.studentName, columns.student, rowY + 9, 180);
+    drawCellText(doc, String(record.score), columns.score, rowY + 9, 50, { align: 'right' });
+    drawCellText(doc, record.status, columns.status, rowY + 9, 60);
+    drawCellText(doc, record.company, columns.company, rowY + 9, 115);
+
+    doc.y = rowY + rowHeight;
+  });
+
+  doc.y += 8;
 };
 
 const finalizeDocument = async (doc: PDFKit.PDFDocument): Promise<Buffer> =>
@@ -248,49 +560,52 @@ const finalizeDocument = async (doc: PDFKit.PDFDocument): Promise<Buffer> =>
     doc.end();
   });
 
-const uploadPdfToStorage = async (doc: PDFKit.PDFDocument, filename: string): Promise<string> => {
+const uploadPdfToStorage = async (doc: PDFKit.PDFDocument, filename: string): Promise<UploadedFileResult> => {
   const buffer = await finalizeDocument(doc);
-  const uploaded = await uploadFile({
+  return uploadFileToS3({
     buffer,
     folder: 'compliance-reports',
     fileName: `${filename}.pdf`,
     contentType: 'application/pdf',
   });
-
-  return uploaded.url;
 };
 
 const addFooter = (doc: PDFKit.PDFDocument) => {
   const range = doc.bufferedPageRange();
   for (let pageIndex = 0; pageIndex < range.count; pageIndex += 1) {
     doc.switchToPage(pageIndex);
+    const footerY = doc.page.height - 72;
     doc
       .fontSize(9)
-      .fillColor('#94A3B8')
-      .text('Generated by ProMove Innovation Cloud | Confidential', 50, doc.page.height - 50)
-      .text(`Page ${pageIndex + 1} of ${range.count}`, 0, doc.page.height - 50, {
+      .font('Helvetica')
+      .fillColor(pdfColors.muted)
+      .text('Generated by ProMove Innovation Cloud | Confidential', page.marginX, footerY, {
+        width: 310,
+        lineBreak: false,
+      });
+    doc.text(`Page ${pageIndex + 1} of ${range.count}`, page.marginX, footerY, {
+        width: page.width,
         align: 'right',
+        lineBreak: false,
       });
   }
 };
 
-const buildSchoolDocument = (metrics: ReportMetrics) => {
-  const doc = new PDFDocument({ margin: 50, size: 'A4', bufferPages: true });
+export const buildSchoolDocument = (metrics: ReportMetrics, shouldAddFooter = true) => {
+  const doc = createReportDocument();
 
-  drawHeader(doc);
+  drawHeader(doc, metrics);
   drawInfoBlock(doc, metrics);
 
   drawSectionTitle(doc, 'SECTION I: EXECUTIVE SUMMARY');
-  doc
-    .fillColor('#E2E8F0')
-    .fontSize(11)
-    .text(
-      `Overall Compliance Status: ON TRACK (${metrics.policies.filter((policy) => policy.status !== 'Inactive').length}/${Math.max(metrics.policies.length, 1)} milestones active or on track).`,
-    )
-    .moveDown(0.7)
-    .text(
-      `${metrics.institutionName} recorded ${metrics.totalInnovationActivities} innovation activities with ${metrics.patentsFiled} patent filings and ${metrics.startupsLaunched} startup launches in ${metrics.academicYear}.`,
-    );
+  drawParagraph(
+    doc,
+    `Overall Compliance Status: ON TRACK (${metrics.policies.filter((policy) => policy.status !== 'Inactive').length}/${Math.max(metrics.policies.length, 1)} milestones active or on track).`,
+  );
+  drawParagraph(
+    doc,
+    `${metrics.institutionName} recorded ${metrics.totalInnovationActivities} innovation activities with ${metrics.patentsFiled} patent filings and ${metrics.startupsLaunched} startup launches in ${metrics.academicYear}.`,
+  );
 
   drawSectionTitle(doc, 'SECTION II: KEY PERFORMANCE INDICATORS');
   drawKeyValueTable(doc, [
@@ -304,19 +619,16 @@ const buildSchoolDocument = (metrics: ReportMetrics) => {
   drawPolicyTable(doc, metrics.policies);
 
   drawSectionTitle(doc, 'SECTION IV: TOP 5 STUDENT INNOVATORS');
-  metrics.topStudents.forEach((student) => {
-    doc
-      .fillColor('#E2E8F0')
-      .fontSize(11)
-      .text(`${student.rank}. ${student.name} - ${student.score}/${MAX_INNOVATION_SCORE}`);
-  });
+  drawStudentTable(doc, metrics.topStudents);
 
-  addFooter(doc);
+  if (shouldAddFooter) {
+    addFooter(doc);
+  }
   return doc;
 };
 
-const buildCollegeDocument = (metrics: ReportMetrics) => {
-  const doc = buildSchoolDocument(metrics);
+export const buildCollegeDocument = (metrics: ReportMetrics) => {
+  const doc = buildSchoolDocument(metrics, false);
 
   drawSectionTitle(doc, 'SECTION V: PLACEMENT METRICS');
   drawKeyValueTable(doc, [
@@ -326,18 +638,9 @@ const buildCollegeDocument = (metrics: ReportMetrics) => {
     { label: 'Placement Velocity', value: `${metrics.placementVelocity}%`, change: metrics.topHiringSector },
   ]);
 
-  metrics.placementTable.forEach((record) => {
-    doc
-      .fillColor('#E2E8F0')
-      .fontSize(10)
-      .text(record.studentName, 50, doc.y, { width: 180, continued: true })
-      .text(`${record.score}`, { width: 80, continued: true })
-      .text(record.status, { width: 90, continued: true })
-      .text(record.company);
-    doc.moveDown(0.2);
-  });
+  drawPlacementTable(doc, metrics.placementTable);
 
-  drawSectionTitle(doc, 'SECTION VI: IPR & INNOVATION METRICS');
+  drawSectionTitle(doc, 'SECTION VI: IPR AND INNOVATION METRICS');
   drawKeyValueTable(doc, [
     { label: 'Total Patents Filed', value: String(metrics.patentsFiled), change: '-' },
     { label: 'MVPs Launched', value: String(metrics.mvpsLaunched), change: '-' },
@@ -351,13 +654,15 @@ const buildCollegeDocument = (metrics: ReportMetrics) => {
 const persistComplianceReport = async (
   institutionId: string,
   metrics: ReportMetrics,
-  pdfUrl: string,
+  uploaded: UploadedFileResult,
 ) => {
   await ComplianceReport.create({
     institutionId,
     institutionType: metrics.institutionType,
     generatedAt: metrics.generatedAt,
-    pdfUrl,
+    pdfUrl: uploaded.url,
+    storageProvider: uploaded.provider,
+    storageKey: uploaded.key,
     academicYear: metrics.academicYear,
     kpis: {
       totalStudents: metrics.totalStudents,
@@ -375,15 +680,15 @@ const persistComplianceReport = async (
 export const generateSchoolReport = async (institutionId: string): Promise<string> => {
   const metrics = await loadReportMetrics(institutionId, 'school');
   const doc = buildSchoolDocument(metrics);
-  const pdfUrl = await uploadPdfToStorage(doc, `school-report-${institutionId}-${Date.now()}`);
-  await persistComplianceReport(institutionId, metrics, pdfUrl);
-  return pdfUrl;
+  const uploaded = await uploadPdfToStorage(doc, `school-report-${institutionId}-${Date.now()}`);
+  await persistComplianceReport(institutionId, metrics, uploaded);
+  return generatePresignedUrl(uploaded.key);
 };
 
 export const generateCollegeReport = async (institutionId: string): Promise<string> => {
   const metrics = await loadReportMetrics(institutionId, 'college');
   const doc = buildCollegeDocument(metrics);
-  const pdfUrl = await uploadPdfToStorage(doc, `college-report-${institutionId}-${Date.now()}`);
-  await persistComplianceReport(institutionId, metrics, pdfUrl);
-  return pdfUrl;
+  const uploaded = await uploadPdfToStorage(doc, `college-report-${institutionId}-${Date.now()}`);
+  await persistComplianceReport(institutionId, metrics, uploaded);
+  return generatePresignedUrl(uploaded.key);
 };

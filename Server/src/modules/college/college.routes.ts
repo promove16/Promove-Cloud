@@ -40,8 +40,10 @@ import {
   listCollegeStartupsController,
   listCollegeStudentsController,
   markCollegeComplianceAlertReadController,
+  requestCollegeComplianceEvidenceEditController,
   reviewCollegeStudentVerificationController,
   submitCollegeComplianceSubmissionController,
+  uploadCollegeComplianceEvidenceController,
   updateCollegeComplianceActionController,
   updateCollegeComplianceIncidentController,
   updatePlacementStatusController,
@@ -52,6 +54,10 @@ const router = Router();
 const rosterUpload = multer({
   storage: multer.memoryStorage(),
   limits: { fileSize: 5 * 1024 * 1024 },
+});
+const complianceEvidenceUpload = multer({
+  storage: multer.memoryStorage(),
+  limits: { fileSize: 50 * 1024 * 1024 },
 });
 
 router.use(authenticate);
@@ -117,6 +123,17 @@ router.put(
   '/compliance/submission',
   authorize(UserRole.COLLEGE),
   asyncHandler(submitCollegeComplianceSubmissionController),
+);
+router.post(
+  '/compliance/submission/evidence-edit-request',
+  authorize(UserRole.COLLEGE),
+  asyncHandler(requestCollegeComplianceEvidenceEditController),
+);
+router.post(
+  '/compliance/evidence',
+  authorize(UserRole.COLLEGE),
+  complianceEvidenceUpload.single('file'),
+  asyncHandler(uploadCollegeComplianceEvidenceController),
 );
 router.get(
   '/compliance/incidents',

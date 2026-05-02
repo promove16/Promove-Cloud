@@ -6,6 +6,8 @@ export interface IComplianceReport {
   institutionType: 'school' | 'college';
   generatedAt: Date;
   pdfUrl: string;
+  storageProvider?: 's3';
+  storageKey?: string;
   academicYear: string;
   kpis: Record<string, number>;
   createdAt: Date;
@@ -33,6 +35,16 @@ const complianceReportSchema = new Schema<IComplianceReport>(
       type: String,
       required: true,
       trim: true,
+    },
+    storageProvider: {
+      type: String,
+      enum: ['s3'],
+      default: undefined,
+    },
+    storageKey: {
+      type: String,
+      trim: true,
+      default: undefined,
     },
     academicYear: {
       type: String,

@@ -87,10 +87,30 @@ const optionalInstitutionYearSchema = z.preprocess(
 
 const stringListSchema = z.array(z.string().trim().min(1).max(100)).max(24).default([]);
 const locationListSchema = z.array(z.string().trim().min(1).max(160)).max(12).default([]);
+const institutionPolicyEvidenceSchema = z.object({
+  title: z.string().trim().min(1).max(160),
+  type: z.enum([
+    'policy_document',
+    'activity_report',
+    'attendance_log',
+    'photo',
+    'video',
+    'meeting_minutes',
+    'certificate',
+    'mou',
+    'external_audit',
+    'other',
+  ]),
+  url: z.string().trim().url().max(2048),
+  notes: z.string().trim().max(600).optional().or(z.literal('')),
+  submittedAt: nullableDateSchema.optional(),
+});
+
 const institutionPolicySchema = z.object({
   name: z.string().trim().min(1).max(160),
   status: z.enum(['Active', 'On Track', 'Pending', 'Inactive']),
   lastUpdated: nullableDateSchema.optional(),
+  evidence: z.array(institutionPolicyEvidenceSchema).max(10).optional(),
 });
 const institutionStatsSchema = z.object({
   totalInnovationActivities: z.coerce.number().int().min(0).optional(),
@@ -1478,6 +1498,13 @@ const normalizeInstitutionPolicies = (
     name: sanitizePlainText(policy.name),
     status: policy.status,
     ...(policy.lastUpdated ? { lastUpdated: policy.lastUpdated } : {}),
+    evidence: (policy.evidence ?? []).map((evidence) => ({
+      title: sanitizePlainText(evidence.title),
+      type: evidence.type,
+      url: evidence.url.trim(),
+      ...(evidence.notes ? { notes: sanitizePlainText(evidence.notes) } : {}),
+      ...(evidence.submittedAt ? { submittedAt: evidence.submittedAt } : {}),
+    })),
   }));
 
 const normalizeInstitutionStats = (

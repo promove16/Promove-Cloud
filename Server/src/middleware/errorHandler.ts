@@ -57,7 +57,7 @@ export const errorHandler: ErrorRequestHandler = (error, req, res, _next) => {
   if (error instanceof multer.MulterError) {
     const message =
       error.code === 'LIMIT_FILE_SIZE'
-        ? 'File exceeds the 10MB size limit'
+        ? 'File exceeds the configured upload size limit'
         : error.message;
     return res.status(400).json(buildFailure('UPLOAD_ERROR', message));
   }

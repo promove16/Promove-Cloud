@@ -39,8 +39,10 @@ import {
   listSchoolStartupsController,
   listSchoolStudentsController,
   markSchoolComplianceAlertReadController,
+  requestSchoolComplianceEvidenceEditController,
   reviewSchoolStudentVerificationController,
   submitSchoolComplianceSubmissionController,
+  uploadSchoolComplianceEvidenceController,
   updateSchoolComplianceActionController,
   updateSchoolComplianceIncidentController,
 } from './school.controller';
@@ -49,6 +51,10 @@ const router = Router();
 const rosterUpload = multer({
   storage: multer.memoryStorage(),
   limits: { fileSize: 5 * 1024 * 1024 },
+});
+const complianceEvidenceUpload = multer({
+  storage: multer.memoryStorage(),
+  limits: { fileSize: 50 * 1024 * 1024 },
 });
 
 const rejectRecruiterTargets = (req: Request, _res: Response, next: NextFunction) => {
@@ -92,6 +98,15 @@ router.get(
 router.get('/compliance/overview', asyncHandler(getSchoolComplianceOverviewController));
 router.get('/compliance/submission', asyncHandler(getSchoolComplianceSubmissionController));
 router.put('/compliance/submission', asyncHandler(submitSchoolComplianceSubmissionController));
+router.post(
+  '/compliance/submission/evidence-edit-request',
+  asyncHandler(requestSchoolComplianceEvidenceEditController),
+);
+router.post(
+  '/compliance/evidence',
+  complianceEvidenceUpload.single('file'),
+  asyncHandler(uploadSchoolComplianceEvidenceController),
+);
 router.get('/compliance/incidents', asyncHandler(listSchoolComplianceIncidentsController));
 router.post('/compliance/incidents', asyncHandler(createSchoolComplianceIncidentController));
 router.patch(
