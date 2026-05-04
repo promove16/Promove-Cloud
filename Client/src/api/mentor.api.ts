@@ -89,6 +89,7 @@ export interface MentorStudentProfile {
     innovationScore: number;
     scoreBreakdown: {
       problemsClaimed: number;
+      problemsCompleted: number;
       skillsCompleted: number;
       progressUploads: number;
       patentsSubmitted: number;
@@ -96,7 +97,6 @@ export interface MentorStudentProfile {
       mvpsVerified: number;
       marketReadyVerified: number;
       startupsLaunched: number;
-      awardsApproved: number;
     };
     institutionName?: string;
   };

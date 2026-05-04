@@ -10,6 +10,7 @@ import {
   AlertCircle,
   Loader2,
   RotateCcw,
+  XCircle,
 } from 'lucide-react';
 import { dealApi } from '../../api/deal.api';
 import { Button } from '../../components/ui/Button';
@@ -54,6 +55,8 @@ export function NegotiationPanel({ deal, isInvestor }: NegotiationPanelProps) {
   const [feedback, setFeedback] = useState<{ type: 'error' | 'success'; message: string } | null>(null);
   const [optimisticMessages, setOptimisticMessages] = useState<OptimisticMessage[]>([]);
   const [failedMessage, setFailedMessage] = useState<string | null>(null);
+  const [cancelReason, setCancelReason] = useState('');
+  const [showCancelForm, setShowCancelForm] = useState(false);
 
   const negotiation = deal.negotiation as DealNegotiation | undefined;
   const statusConfig = negotiation ? NEGOTIATION_STATUS_CONFIG[negotiation.status] : NEGOTIATION_STATUS_CONFIG['initial'];
@@ -115,15 +118,39 @@ export function NegotiationPanel({ deal, isInvestor }: NegotiationPanelProps) {
   const agreeTermsMutation = useMutation({
     mutationFn: () => dealApi.agreeNegotiationTerms(deal._id),
     onSuccess: async () => {
-      setFeedback({ type: 'success', message: 'Terms marked as agreed.' });
+      setFeedback(null);
       await queryClient.invalidateQueries({ queryKey: ['deal', deal._id] });
       await queryClient.invalidateQueries({ queryKey: ['investor-deal', deal._id] });
       await queryClient.invalidateQueries({ queryKey: ['investor-deals'] });
+      await queryClient.invalidateQueries({ queryKey: ['startup-bid-board', deal.startupId] });
+      await queryClient.invalidateQueries({ queryKey: ['startup-bid-board', deal.startupId] });
     },
     onError: (error) => {
       setFeedback({
         type: 'error',
         message: getApiErrorMessage(error, 'Unable to agree to the current terms right now.'),
+      });
+    },
+  });
+
+  const cancelDealMutation = useMutation({
+    mutationFn: () =>
+      dealApi.cancelDeal(deal._id, {
+        reason: cancelReason.trim() || undefined,
+      }),
+    onSuccess: async () => {
+      setShowCancelForm(false);
+      setCancelReason('');
+      setFeedback({ type: 'success', message: 'Deal cancelled.' });
+      await queryClient.invalidateQueries({ queryKey: ['deal', deal._id] });
+      await queryClient.invalidateQueries({ queryKey: ['investor-deal', deal._id] });
+      await queryClient.invalidateQueries({ queryKey: ['investor-deals'] });
+      await queryClient.invalidateQueries({ queryKey: ['startup-bid-board', deal.startupId] });
+    },
+    onError: (error) => {
+      setFeedback({
+        type: 'error',
+        message: getApiErrorMessage(error, 'Unable to cancel this deal right now.'),
       });
     },
   });
@@ -170,18 +197,97 @@ export function NegotiationPanel({ deal, isInvestor }: NegotiationPanelProps) {
     const amount = parseFloat(proposedAmount);
     const equity = parseFloat(proposedEquity);
     
-    if (amount >= 20000 && equity > 0 && equity <= 100) {
-      setFeedback(null);
-      proposeTermsMutation.mutate({ amountINR: amount, equityPercent: equity });
+    if (!(amount >= 20000 && equity > 0 && equity <= 100)) {
+      setFeedback({ type: 'error', message: 'Enter a valid amount and equity split before sending terms.' });
       return;
     }
 
-    setFeedback({ type: 'error', message: 'Enter a valid amount and equity split before sending terms.' });
+    if (deal.investorType === 'penny' && equity > 5) {
+      setFeedback({ type: 'error', message: 'Penny investors cannot request more than 5% equity.' });
+      return;
+    }
+
+    if (deal.investorType === 'sole' && deal.investorRole === 'director' && equity < 51) {
+      setFeedback({ type: 'error', message: 'Director role requires at least 51% equity.' });
+      return;
+    }
+
+    setFeedback(null);
+    proposeTermsMutation.mutate({ amountINR: amount, equityPercent: equity });
   };
 
-  const canPropose = deal.currentStage === 0 && isInvestor;
-  const canAgree = deal.currentStage === 0 && negotiation?.status !== 'terms_agreed';
   const hasAgreed = negotiation?.status === 'terms_agreed';
+  const isCancelled = deal.status === 'cancelled' || negotiation?.status === 'cancelled';
+  const isAdminReviewPending = deal.currentStage === 3 && deal.adminApprovalRequired && !deal.adminApprovedAt;
+  const myAgreed = isInvestor ? negotiation?.investorAgreed : negotiation?.startupAgreed;
+  const isCounterOffer = negotiation?.status === 'counter_offer';
+  const hasCounterOffer =
+    typeof negotiation?.studentCounterAmount === 'number' &&
+    typeof negotiation?.studentCounterEquity === 'number';
+  const hasFinalTerms =
+    typeof negotiation?.finalAgreedAmount === 'number' &&
+    typeof negotiation?.finalAgreedEquity === 'number';
+  const activeTerms = hasFinalTerms
+    ? {
+        amount: negotiation.finalAgreedAmount!,
+        equity: negotiation.finalAgreedEquity!,
+        label: 'Agreed Terms',
+        tone: 'emerald' as const,
+      }
+    : hasCounterOffer
+      ? {
+          amount: negotiation.studentCounterAmount!,
+          equity: negotiation.studentCounterEquity!,
+          label: isInvestor ? 'Startup Counter Offer' : 'Your Counter Offer',
+          tone: 'orange' as const,
+        }
+      : typeof negotiation?.investorProposedAmount === 'number' &&
+          typeof negotiation?.investorProposedEquity === 'number'
+        ? {
+            amount: negotiation.investorProposedAmount,
+            equity: negotiation.investorProposedEquity,
+            label: isInvestor ? 'Your Proposed Terms' : 'Investor Proposed Terms',
+            tone: 'cyan' as const,
+          }
+        : {
+            amount: deal.amountINR,
+            equity: deal.equityPercent,
+            label: 'Initial Bid Terms',
+            tone: 'slate' as const,
+          };
+  const canPropose = deal.currentStage === 0 && !hasAgreed && !isCancelled;
+  const hasTerms =
+    typeof negotiation?.investorProposedAmount === 'number' || hasCounterOffer;
+  const isInvestorCounterOffer = isInvestor && isCounterOffer && hasCounterOffer;
+  const canAgree =
+    deal.currentStage === 0 &&
+    hasTerms &&
+    !hasAgreed &&
+    !myAgreed &&
+    !isCancelled;
+  const canCancel = deal.status === 'active' && deal.currentStage < 4 && !deal.adminApprovedAt;
+  const proposalActionLabel = showProposalForm
+    ? 'Cancel'
+    : isInvestorCounterOffer
+      ? 'Renegotiate'
+      : isInvestor
+        ? hasTerms
+          ? myAgreed
+            ? 'Revise Terms'
+            : 'Update Terms'
+          : 'Propose Terms'
+        : myAgreed
+          ? 'Revise Counter'
+          : isCounterOffer
+          ? 'Counter Again'
+          : 'Make Counter Offer';
+  const proposalFormTitle = isInvestorCounterOffer
+    ? 'Renegotiate Counter Offer'
+    : isInvestor
+      ? hasTerms
+        ? 'Update Proposed Terms'
+        : 'Propose New Terms'
+      : 'Make a Counter Offer';
 
   return (
     <div className="space-y-6">
@@ -189,20 +295,51 @@ export function NegotiationPanel({ deal, isInvestor }: NegotiationPanelProps) {
       <div className={`rounded-xl border border-slate-800 p-4 ${statusConfig.bg}`}>
         <div className="flex items-center justify-between">
           <div className="flex items-center gap-2">
-            {hasAgreed ? (
+            {isCancelled ? (
+              <XCircle className="h-5 w-5 text-red-400" />
+            ) : hasAgreed ? (
               <CheckCircle2 className="h-5 w-5 text-emerald-400" />
             ) : (
               <Clock className="h-5 w-5 text-amber-400" />
             )}
             <span className={`font-medium ${statusConfig.color}`}>{statusConfig.label}</span>
           </div>
-          {hasAgreed && (
-            <span className="text-sm text-emerald-400">
-              Both parties agreed on terms
-            </span>
+          {isCancelled ? (
+            <span className="text-sm text-red-400">Deal cancelled</span>
+          ) : hasAgreed && (
+            <span className="text-sm text-emerald-400">Both parties agreed on terms</span>
           )}
         </div>
       </div>
+
+      {myAgreed && !hasAgreed && !isCancelled && (
+        <div className="flex items-center gap-2 rounded-lg border border-amber-500/30 bg-amber-900/10 px-4 py-3 text-sm text-amber-300">
+          <Clock className="h-4 w-4 shrink-0" />
+          You've accepted. Waiting for the {isInvestor ? 'startup' : 'investor'} to accept.
+        </div>
+      )}
+
+      {hasAgreed && !isCancelled && (
+        <div
+          className={`flex items-center gap-2 rounded-lg border px-4 py-3 text-sm ${
+            isAdminReviewPending
+              ? 'border-violet-500/30 bg-violet-900/10 text-violet-300'
+              : 'border-cyan-500/30 bg-cyan-900/10 text-cyan-300'
+          }`}
+        >
+          <CheckCircle2 className="h-4 w-4 shrink-0" />
+          {isAdminReviewPending
+            ? 'Both parties agreed. Deal submitted to admin approval for share-transfer review.'
+            : 'Both parties agreed. The deal is ready to move into due diligence.'}
+        </div>
+      )}
+
+      {isCancelled && (
+        <div className="flex items-center gap-2 rounded-lg border border-red-500/30 bg-red-900/10 px-4 py-3 text-sm text-red-300">
+          <XCircle className="h-4 w-4 shrink-0" />
+          This deal has been cancelled.
+        </div>
+      )}
 
       {/* Current Terms Display */}
       <Card className="border-slate-800 bg-slate-900 p-4">
@@ -213,45 +350,52 @@ export function NegotiationPanel({ deal, isInvestor }: NegotiationPanelProps) {
           <div className="rounded-lg bg-slate-950 p-3">
             <div className="flex items-center gap-2 text-xs text-slate-500">
               <DollarSign className="h-3.5 w-3.5" />
-              Proposed Amount
+              Amount
             </div>
             <div className="mt-1 text-xl font-bold text-white">
-              {formatInr(negotiation?.investorProposedAmount || deal.amountINR)}
+              {formatInr(activeTerms.amount)}
             </div>
           </div>
           <div className="rounded-lg bg-slate-950 p-3">
             <div className="flex items-center gap-2 text-xs text-slate-500">
               <TrendingUp className="h-3.5 w-3.5" />
-              Proposed Equity
+              Equity
             </div>
             <div className="mt-1 text-xl font-bold text-white">
-              {negotiation?.investorProposedEquity || deal.equityPercent}%
+              {activeTerms.equity}%
             </div>
           </div>
         </div>
 
-        {negotiation?.studentCounterAmount && (
-          <div className="mt-4 rounded-lg border border-orange-500/30 bg-orange-900/10 p-3">
-            <div className="text-xs text-orange-400">Student Counter Offer</div>
-            <div className="mt-1 flex gap-4">
-              <span className="text-white">
-                {formatInr(negotiation.studentCounterAmount)} / {negotiation.studentCounterEquity}%
-              </span>
-            </div>
+        <div
+          className={`mt-4 rounded-lg border p-3 ${
+            activeTerms.tone === 'emerald'
+              ? 'border-emerald-500/30 bg-emerald-900/10'
+              : activeTerms.tone === 'orange'
+                ? 'border-orange-500/30 bg-orange-900/10'
+                : activeTerms.tone === 'cyan'
+                  ? 'border-cyan-500/30 bg-cyan-900/10'
+                  : 'border-slate-700 bg-slate-950'
+          }`}
+        >
+          <div
+            className={`flex items-center gap-2 text-sm ${
+              activeTerms.tone === 'emerald'
+                ? 'text-emerald-400'
+                : activeTerms.tone === 'orange'
+                  ? 'text-orange-400'
+                  : activeTerms.tone === 'cyan'
+                    ? 'text-cyan-400'
+                    : 'text-slate-400'
+            }`}
+          >
+            {activeTerms.tone === 'emerald' ? <CheckCircle2 className="h-4 w-4" /> : null}
+            {activeTerms.label}
           </div>
-        )}
-
-        {negotiation?.finalAgreedAmount && (
-          <div className="mt-4 rounded-lg border border-emerald-500/30 bg-emerald-900/10 p-3">
-            <div className="flex items-center gap-2 text-sm text-emerald-400">
-              <CheckCircle2 className="h-4 w-4" />
-              Agreed Terms
-            </div>
-            <div className="mt-1 flex gap-4 text-lg font-bold text-white">
-              {formatInr(negotiation.finalAgreedAmount)} / {negotiation.finalAgreedEquity}%
-            </div>
+          <div className="mt-1 text-base font-semibold text-white">
+            {formatInr(activeTerms.amount)} / {activeTerms.equity}%
           </div>
-        )}
+        </div>
       </Card>
 
       {feedback?.type === 'success' ? (
@@ -261,30 +405,80 @@ export function NegotiationPanel({ deal, isInvestor }: NegotiationPanelProps) {
       ) : null}
 
       {/* Action Buttons */}
-      {canPropose && !hasAgreed && (
-        <div className="flex gap-3">
-          <Button 
-            onClick={() => setShowProposalForm(!showProposalForm)}
-            className="flex-1"
+      <div className="flex flex-col gap-3 sm:flex-row">
+        {canAgree && (
+          <Button
+            onClick={() => agreeTermsMutation.mutate()}
+            disabled={agreeTermsMutation.isPending}
+            variant="outline"
+            className="w-full flex-1 gap-2 border-emerald-500/30 text-emerald-400 hover:bg-emerald-900/20"
           >
-            {showProposalForm ? 'Cancel' : 'Propose New Terms'}
+            {agreeTermsMutation.isPending ? (
+              <Loader2 className="h-4 w-4 animate-spin" />
+            ) : (
+              <>
+                <CheckCircle2 className="h-4 w-4" />
+                {isInvestorCounterOffer ? 'Accept Counter Offer' : 'Accept Terms'}
+              </>
+            )}
           </Button>
-          {canAgree && (
-            <Button 
-              onClick={() => agreeTermsMutation.mutate()}
-              variant="outline"
-              className="border-emerald-500/30 text-emerald-400 hover:bg-emerald-900/20"
-            >
-              Agree to Current Terms
-            </Button>
-          )}
-        </div>
+        )}
+        {canPropose && (
+          <Button
+            onClick={() => setShowProposalForm(!showProposalForm)}
+            variant={isInvestorCounterOffer ? 'outline' : 'primary'}
+            className="w-full flex-1 gap-2"
+          >
+            {showProposalForm ? (
+              proposalActionLabel
+            ) : isInvestorCounterOffer ? (
+              <>
+                <RotateCcw className="h-4 w-4" />
+                {proposalActionLabel}
+              </>
+            ) : (
+              proposalActionLabel
+            )}
+          </Button>
+        )}
+        {canCancel && (
+          <Button
+            onClick={() => setShowCancelForm((value) => !value)}
+            variant="outline"
+            className="w-full flex-1 gap-2 border-red-500/30 text-red-300 hover:bg-red-900/20"
+          >
+            <XCircle className="h-4 w-4" />
+            {showCancelForm ? 'Keep Deal' : 'Cancel Deal'}
+          </Button>
+        )}
+      </div>
+
+      {showCancelForm && canCancel && (
+        <Card className="border-red-500/30 bg-red-950/10 p-4">
+          <h4 className="mb-3 font-semibold text-white">Cancel Deal</h4>
+          <textarea
+            value={cancelReason}
+            onChange={(event) => setCancelReason(event.target.value)}
+            maxLength={500}
+            rows={3}
+            placeholder="Reason for cancellation (optional)"
+            className="w-full resize-none rounded-lg border border-slate-700 bg-slate-950 px-4 py-3 text-sm text-white placeholder:text-slate-600 focus:border-red-400 focus:outline-none focus:ring-1 focus:ring-red-400"
+          />
+          <Button
+            onClick={() => cancelDealMutation.mutate()}
+            disabled={cancelDealMutation.isPending}
+            variant="outline"
+            className="mt-3 w-full border-red-500/30 text-red-300 hover:bg-red-900/20"
+          >
+            {cancelDealMutation.isPending ? <Loader2 className="h-4 w-4 animate-spin" /> : 'Confirm Cancel'}
+          </Button>
+        </Card>
       )}
 
       {/* Proposal Form */}
       {showProposalForm && (
         <Card className="border-amber-500/30 bg-amber-950/10 p-4">
-          <h4 className="mb-4 font-semibold text-white">Propose New Terms</h4>
+          <h4 className="mb-4 font-semibold text-white">{proposalFormTitle}</h4>
           <div className="grid grid-cols-2 gap-4">
             <div>
               <label className="mb-1 block text-xs text-slate-400">Amount (INR)</label>
@@ -309,12 +503,12 @@ export function NegotiationPanel({ deal, isInvestor }: NegotiationPanelProps) {
               />
             </div>
           </div>
-          <Button 
+          <Button
             onClick={handleProposeTerms}
             disabled={!proposedAmount || !proposedEquity || proposeTermsMutation.isPending}
             className="mt-4 w-full"
           >
-            Submit Proposal
+            {proposeTermsMutation.isPending ? <Loader2 className="h-4 w-4 animate-spin" /> : 'Submit'}
           </Button>
         </Card>
       )}
@@ -349,7 +543,9 @@ export function NegotiationPanel({ deal, isInvestor }: NegotiationPanelProps) {
                       ? 'text-red-400'
                       : msg.senderRole === 'investor' ? 'text-cyan-400' : 'text-amber-400'
                   }`}>
-                    {msg.senderRole === 'investor' ? 'You' : 'Student'}
+                    {msg.senderRole === (isInvestor ? 'investor' : 'student')
+                      ? 'You'
+                      : isInvestor ? 'Student' : 'Investor'}
                     {(msg as OptimisticMessage)._optimistic && !(msg as OptimisticMessage)._failed && (
                       <span className="ml-2 text-slate-500">Sending...</span>
                     )}
@@ -400,11 +596,12 @@ export function NegotiationPanel({ deal, isInvestor }: NegotiationPanelProps) {
               value={message}
               onChange={(e) => setMessage(e.target.value)}
               placeholder="Write negotiation message..."
-              onKeyDown={(e) => e.key === 'Enter' && !sendMessageMutation.isPending && handleSendMessage()}
+              disabled={isCancelled}
+              onKeyDown={(e) => e.key === 'Enter' && !sendMessageMutation.isPending && !isCancelled && handleSendMessage()}
             />
           <Button
             onClick={handleSendMessage}
-            disabled={!message.trim() || sendMessageMutation.isPending}
+            disabled={!message.trim() || sendMessageMutation.isPending || isCancelled}
           >
             {sendMessageMutation.isPending ? (
               <Loader2 className="h-4 w-4 animate-spin" />

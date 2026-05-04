@@ -17,6 +17,10 @@ export interface DealNegotiation {
   studentCounterEquity?: number;
   finalAgreedAmount?: number;
   finalAgreedEquity?: number;
+  investorAgreed?: boolean;
+  startupAgreed?: boolean;
+  investorAgreedAt?: string;
+  startupAgreedAt?: string;
   messages: Array<{
     _id: string;
     senderId: string;
@@ -164,6 +168,10 @@ export interface DealUpdateStagePayload {
 export interface DealFounderDecisionPayload {
   decision: 'accepted' | 'rejected';
   note?: string;
+}
+
+export interface DealCancelPayload {
+  reason?: string;
 }
 
 export interface InvestorAuthorityItem {

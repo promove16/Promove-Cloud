@@ -3,6 +3,7 @@ import { randomUUID } from 'crypto';
 import { Types } from 'mongoose';
 import request from 'supertest';
 import app from '../../src/app';
+import { ScoreEvent } from '../../src/modules/innovationScore/score.model';
 import { Patent } from '../../src/modules/patent/patent.model';
 import { User } from '../../src/modules/user/user.model';
 import { Workspace } from '../../src/modules/workspace/workspace.model';
@@ -206,5 +207,11 @@ describe('patent submission integration', () => {
     const patent = await Patent.findOne({ studentId: studentUser._id }).lean();
     expect(patent).toBeTruthy();
     expect(patent?.filingDocuments).toBeUndefined();
+
+    const scoreEvents = await ScoreEvent.find({ userId: studentUser._id }).lean();
+    const refreshedStudent = await User.findById(studentUser._id).select('innovationScore scoreBreakdown').lean();
+    expect(scoreEvents).toHaveLength(0);
+    expect(refreshedStudent?.innovationScore ?? 0).toBe(0);
+    expect(refreshedStudent?.scoreBreakdown.patentsSubmitted ?? 0).toBe(0);
   });
 });

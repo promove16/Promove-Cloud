@@ -217,6 +217,10 @@ const investmentSchema = new Schema<IInvestment>(
       studentCounterEquity: { type: Number, default: undefined },
       finalAgreedAmount: { type: Number, default: undefined },
       finalAgreedEquity: { type: Number, default: undefined },
+      investorAgreed: { type: Boolean, default: false },
+      startupAgreed: { type: Boolean, default: false },
+      investorAgreedAt: { type: Date, default: undefined },
+      startupAgreedAt: { type: Date, default: undefined },
       messages: {
         type: [
           new Schema(

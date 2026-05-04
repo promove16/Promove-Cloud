@@ -112,7 +112,7 @@ export function StudentProfileDrawer({ open, studentId, onClose, onSchedule }: P
               {metricCards.map((metric) => {
                 const value =
                   metric.label === 'Problems Solved'
-                    ? profileQuery.data.student.scoreBreakdown.problemsClaimed
+                    ? profileQuery.data.student.scoreBreakdown.problemsCompleted
                     : metric.label === 'Innovations Created'
                       ? profileQuery.data.student.scoreBreakdown.skillsCompleted
                       : metric.label === 'Prototypes Built'

@@ -4,6 +4,7 @@ export const MAX_INNOVATION_SCORE = 1000;
 
 export const createDefaultScoreBreakdown = (): ScoreBreakdown => ({
   problemsClaimed: 0,
+  problemsCompleted: 0,
   skillsCompleted: 0,
   progressUploads: 0,
   patentsSubmitted: 0,
@@ -11,7 +12,6 @@ export const createDefaultScoreBreakdown = (): ScoreBreakdown => ({
   mvpsVerified: 0,
   marketReadyVerified: 0,
   startupsLaunched: 0,
-  awardsApproved: 0,
 });
 
 const normalizeBreakdownValue = (value: unknown) => {
@@ -35,6 +35,9 @@ export const normalizeScoreBreakdown = (value: Partial<ScoreBreakdown> | null | 
 
   return {
     problemsClaimed: normalizeBreakdownValue(value?.problemsClaimed ?? defaults.problemsClaimed),
+    problemsCompleted: normalizeBreakdownValue(
+      value?.problemsCompleted ?? defaults.problemsCompleted,
+    ),
     skillsCompleted: normalizeBreakdownValue(value?.skillsCompleted ?? defaults.skillsCompleted),
     progressUploads: normalizeBreakdownValue(value?.progressUploads ?? defaults.progressUploads),
     patentsSubmitted: normalizeBreakdownValue(value?.patentsSubmitted ?? defaults.patentsSubmitted),
@@ -44,6 +47,5 @@ export const normalizeScoreBreakdown = (value: Partial<ScoreBreakdown> | null | 
       value?.marketReadyVerified ?? defaults.marketReadyVerified,
     ),
     startupsLaunched: normalizeBreakdownValue(value?.startupsLaunched ?? defaults.startupsLaunched),
-    awardsApproved: normalizeBreakdownValue(value?.awardsApproved ?? defaults.awardsApproved),
   };
 };

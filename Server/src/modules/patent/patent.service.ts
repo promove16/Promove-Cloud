@@ -1,6 +1,5 @@
 import { z } from 'zod';
 import { notificationQueue } from '../../config/bullmq';
-import { applyScoreAsync } from '../../services/scoreEngine';
 import { ApiError } from '../../utils/ApiError';
 import { User } from '../user/user.model';
 import { UserRole } from '../../types/roles.types';
@@ -197,12 +196,6 @@ export const submitPatent = async (userId: string, payload: z.infer<typeof paten
       patentStage: payload.patentStage,
       documentCount: supportingDocuments.length,
     },
-  });
-
-  await applyScoreAsync({
-    userId,
-    trigger: 'PATENT_SUBMITTED',
-    metadata: { patentId: String(patent._id) },
   });
 
   await notificationQueue.add('patent-submitted', {

@@ -114,6 +114,7 @@ type PublicUser = {
 type PublicStartup = {
   _id: Types.ObjectId;
   founderIds: Types.ObjectId[];
+  teamMemberIds: Types.ObjectId[];
   projectId?: Types.ObjectId;
   name: string;
   tagline: string;
@@ -546,7 +547,7 @@ const toStartupVisibility = (startup: PublicStartup) =>
 
 const mapFounder = (founder: MarketplaceFounder) => ({
   _id: String(founder._id),
-  displayName: founder.displayName,
+  displayName: founder.displayName || 'Team Member',
   ...(founder.avatar ? { avatar: founder.avatar } : {}),
   innovationScore: founder.innovationScore ?? 0,
   ...(compactString(founder.headline) ? { headline: compactString(founder.headline) } : {}),
@@ -781,7 +782,7 @@ const listMarketplaceStartups = async (requesterRole: UserRole, search?: string,
   const [startups, total] = await Promise.all([
     Startup.find(query)
       .select(
-        '_id founderIds projectId name tagline category stage pitchDeckUrl teamSize fundingNeeded activeProducts launchedToInvestors launchedToMentors launchedToRecruiters launchedAt innovationScoreAtLaunch totalShares availableShares reservedForSole maxPennyInvestors currentPennyCount hasSoleInvestor traction innovationProfile documents isActive createdAt updatedAt',
+        '_id founderIds teamMemberIds projectId name tagline category stage pitchDeckUrl teamSize fundingNeeded activeProducts launchedToInvestors launchedToMentors launchedToRecruiters launchedAt innovationScoreAtLaunch totalShares availableShares reservedForSole maxPennyInvestors currentPennyCount hasSoleInvestor traction innovationProfile documents isActive createdAt updatedAt',
       )
       .sort({ launchedAt: -1, innovationScoreAtLaunch: -1, updatedAt: -1 })
       .skip((page - 1) * limit)
@@ -790,12 +791,19 @@ const listMarketplaceStartups = async (requesterRole: UserRole, search?: string,
     Startup.countDocuments(query),
   ]);
 
-  const founderIds = [...new Set(startups.flatMap((startup) => startup.founderIds.map(String)))];
+  const allMemberIds = [
+    ...new Set(
+      startups.flatMap((startup) => [
+        ...(startup.founderIds ?? []).map(String),
+        ...(startup.teamMemberIds ?? []).map(String),
+      ]),
+    ),
+  ];
   const projectIds = [...new Set(startups.map((startup) => String(startup.projectId ?? '')).filter(Boolean))];
 
   const [founders, workspaces] = await Promise.all([
-    founderIds.length > 0
-      ? User.find({ _id: { $in: founderIds } })
+    allMemberIds.length > 0
+      ? User.find({ _id: { $in: allMemberIds } })
           .select('_id displayName avatar headline domain location bio innovationScore')
           .lean<MarketplaceFounder[]>()
       : Promise.resolve([]),
@@ -809,16 +817,23 @@ const listMarketplaceStartups = async (requesterRole: UserRole, search?: string,
   const founderMap = new Map(founders.map((founder) => [String(founder._id), founder]));
   const workspaceMap = new Map(workspaces.map((workspace) => [String(workspace._id), workspace]));
 
-  return startups.map((startup) =>
-    buildStartupView(
+  return startups.map((startup) => {
+    const startupMemberIds = [
+      ...(startup.founderIds ?? []).map(String),
+      ...(startup.teamMemberIds ?? []).map(String),
+    ];
+    const uniqueMemberIds = [...new Set(startupMemberIds)];
+    const startupFounders = uniqueMemberIds
+      .map((id) => founderMap.get(id))
+      .filter((founder): founder is MarketplaceFounder => Boolean(founder));
+
+    return buildStartupView(
       requesterRole,
       startup,
-      startup.founderIds
-        .map((founderId) => founderMap.get(String(founderId)))
-        .filter((founder): founder is MarketplaceFounder => Boolean(founder)),
+      startupFounders,
       startup.projectId ? workspaceMap.get(String(startup.projectId)) : undefined,
-    ),
-  );
+    );
+  });
 };
 
 const getMarketplaceUserDetail = async (
@@ -860,19 +875,26 @@ const getMarketplaceUserDetail = async (
       founderIds: userId,
     })
       .select(
-        '_id founderIds projectId name tagline category stage pitchDeckUrl teamSize fundingNeeded activeProducts launchedToInvestors launchedToMentors launchedToRecruiters launchedAt innovationScoreAtLaunch totalShares availableShares reservedForSole maxPennyInvestors currentPennyCount hasSoleInvestor traction innovationProfile documents isActive createdAt updatedAt',
+        '_id founderIds teamMemberIds projectId name tagline category stage pitchDeckUrl teamSize fundingNeeded activeProducts launchedToInvestors launchedToMentors launchedToRecruiters launchedAt innovationScoreAtLaunch totalShares availableShares reservedForSole maxPennyInvestors currentPennyCount hasSoleInvestor traction innovationProfile documents isActive createdAt updatedAt',
       )
       .sort({ launchedAt: -1, updatedAt: -1 })
       .limit(6)
       .lean<PublicStartup[]>(),
   ]);
 
-  const startupFounderIds = [...new Set(startups.flatMap((startup) => startup.founderIds.map(String)))];
+  const allStartupMemberIds = [
+    ...new Set(
+      startups.flatMap((startup) => [
+        ...(startup.founderIds ?? []).map(String),
+        ...(startup.teamMemberIds ?? []).map(String),
+      ]),
+    ),
+  ];
   const startupProjectIds = [...new Set(startups.map((startup) => String(startup.projectId ?? '')).filter(Boolean))];
 
   const [founders, workspaces] = await Promise.all([
-    startupFounderIds.length > 0
-      ? User.find({ _id: { $in: startupFounderIds } })
+    allStartupMemberIds.length > 0
+      ? User.find({ _id: { $in: allStartupMemberIds } })
           .select('_id displayName avatar headline domain location bio innovationScore')
           .lean<MarketplaceFounder[]>()
       : Promise.resolve([]),
@@ -896,16 +918,20 @@ const getMarketplaceUserDetail = async (
       const hasApplied = getStudentHasAppliedToJob(job, viewerStudentId);
       return mapJob(job, typeof hasApplied === 'boolean' ? { hasApplied } : undefined);
     }),
-    relatedStartups: startups.map((startup) =>
-      buildStartupView(
+    relatedStartups: startups.map((startup) => {
+      const memberIds = [...new Set([
+        ...(startup.founderIds ?? []).map(String),
+        ...(startup.teamMemberIds ?? []).map(String),
+      ])];
+      return buildStartupView(
         requesterRole,
         startup,
-        startup.founderIds
-          .map((founderId) => founderMap.get(String(founderId)))
+        memberIds
+          .map((id) => founderMap.get(id))
           .filter((founder): founder is MarketplaceFounder => Boolean(founder)),
         startup.projectId ? workspaceMap.get(String(startup.projectId)) : undefined,
-      ),
-    ),
+      );
+    }),
   };
 };
 
@@ -915,7 +941,7 @@ const getMarketplaceStartupDetail = async (requesterRole: UserRole, startupId: s
     ...buildStartupVisibilityQuery(requesterRole),
   })
     .select(
-      '_id founderIds projectId name tagline category stage pitchDeckUrl teamSize fundingNeeded activeProducts launchedToInvestors launchedToMentors launchedToRecruiters launchedAt innovationScoreAtLaunch totalShares availableShares reservedForSole maxPennyInvestors currentPennyCount hasSoleInvestor traction innovationProfile documents isActive createdAt updatedAt',
+      '_id founderIds teamMemberIds projectId name tagline category stage pitchDeckUrl teamSize fundingNeeded activeProducts launchedToInvestors launchedToMentors launchedToRecruiters launchedAt innovationScoreAtLaunch totalShares availableShares reservedForSole maxPennyInvestors currentPennyCount hasSoleInvestor traction innovationProfile documents isActive createdAt updatedAt',
     )
     .lean<PublicStartup | null>();
 
@@ -923,9 +949,16 @@ const getMarketplaceStartupDetail = async (requesterRole: UserRole, startupId: s
     throw new ApiError(404, 'STARTUP_NOT_FOUND', 'Startup not found');
   }
 
+  const memberIds = [
+    ...new Set([
+      ...(startup.founderIds ?? []).map(String),
+      ...(startup.teamMemberIds ?? []).map(String),
+    ]),
+  ];
+
   const [founders, workspace] = await Promise.all([
-    startup.founderIds.length > 0
-      ? User.find({ _id: { $in: startup.founderIds } })
+    memberIds.length > 0
+      ? User.find({ _id: { $in: memberIds } })
           .select('_id displayName avatar headline domain location bio innovationScore')
           .lean<MarketplaceFounder[]>()
       : Promise.resolve([]),

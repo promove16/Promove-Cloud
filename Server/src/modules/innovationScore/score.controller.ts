@@ -1,4 +1,5 @@
 import { Request, Response } from 'express';
+import { env } from '../../config/env';
 import { redis } from '../../config/redis';
 import { ApiError } from '../../utils/ApiError';
 import { ApiResponse } from '../../utils/ApiResponse';
@@ -6,6 +7,7 @@ import { readRedisJson } from '../../utils/redisJson';
 import { User } from '../user/user.model';
 import { ScoreEvent } from './score.model';
 import { applyScore, SCORE_DELTAS, ScoreTrigger } from '../../services/scoreEngine';
+import { UserRole } from '../../types/roles.types';
 import {
   normalizeInnovationScore,
   normalizeScoreBreakdown,
@@ -136,6 +138,10 @@ export const getScoreHistory = async (req: Request, res: Response) => {
   const requestedUserId =
     req.params.userId === 'me' || !req.params.userId ? req.user._id : req.params.userId;
 
+  if (req.user.role !== UserRole.ADMIN && requestedUserId !== req.user._id) {
+    throw new ApiError(403, 'SCORE_HISTORY_FORBIDDEN', 'You can only view your own score history');
+  }
+
   const events = await ScoreEvent.find({ userId: requestedUserId })
     .sort({ createdAt: -1 })
     .limit(100)
@@ -192,6 +198,10 @@ export const testScoreTrigger = async (req: Request, res: Response) => {
     throw new ApiError(401, 'UNAUTHORIZED', 'Invalid or expired token');
   }
 
+  if (env.NODE_ENV === 'production') {
+    throw new ApiError(404, 'NOT_FOUND', 'Score test trigger is not available');
+  }
+
   const { userId, trigger } = req.body as { userId?: string; trigger?: string };
 
   if (!userId || !trigger) {
@@ -207,6 +217,7 @@ export const testScoreTrigger = async (req: Request, res: Response) => {
     userId,
     trigger: trigger as ScoreTrigger,
     metadata: { triggeredBy: req.user._id, testMode: true },
+    idempotencyKey: `score-test-trigger:${userId}:${trigger}`,
   });
 
   res.json(new ApiResponse({

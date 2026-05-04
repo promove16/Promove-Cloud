@@ -25,6 +25,7 @@ const normalizeTalentSummary = (student: Partial<RecruiterTalentSummary>): Recru
   innovationScore: student.innovationScore ?? 0,
   scoreBreakdown: {
     problemsClaimed: student.scoreBreakdown?.problemsClaimed ?? 0,
+    problemsCompleted: student.scoreBreakdown?.problemsCompleted ?? 0,
     skillsCompleted: student.scoreBreakdown?.skillsCompleted ?? 0,
     progressUploads: student.scoreBreakdown?.progressUploads ?? 0,
     patentsSubmitted: student.scoreBreakdown?.patentsSubmitted ?? 0,
@@ -32,7 +33,6 @@ const normalizeTalentSummary = (student: Partial<RecruiterTalentSummary>): Recru
     mvpsVerified: student.scoreBreakdown?.mvpsVerified ?? 0,
     marketReadyVerified: student.scoreBreakdown?.marketReadyVerified ?? 0,
     startupsLaunched: student.scoreBreakdown?.startupsLaunched ?? 0,
-    awardsApproved: student.scoreBreakdown?.awardsApproved ?? 0,
   },
   skills: student.skills ?? [],
   ...(student.institution

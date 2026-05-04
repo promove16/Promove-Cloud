@@ -10,6 +10,7 @@ import { IUser } from './user.types';
 const scoreBreakdownSchema = new Schema<IUser['scoreBreakdown']>(
   {
     problemsClaimed: { type: Number, default: 0 },
+    problemsCompleted: { type: Number, default: 0 },
     skillsCompleted: { type: Number, default: 0 },
     progressUploads: { type: Number, default: 0 },
     patentsSubmitted: { type: Number, default: 0 },
@@ -17,7 +18,6 @@ const scoreBreakdownSchema = new Schema<IUser['scoreBreakdown']>(
     mvpsVerified: { type: Number, default: 0 },
     marketReadyVerified: { type: Number, default: 0 },
     startupsLaunched: { type: Number, default: 0 },
-    awardsApproved: { type: Number, default: 0 },
   },
   { _id: false },
 );

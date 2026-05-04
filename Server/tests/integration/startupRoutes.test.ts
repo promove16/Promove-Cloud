@@ -114,6 +114,83 @@ const createApprovedLaunchStartup = async (
     ...overrides,
   });
 
+const rubricText =
+  'This response is intentionally long enough to satisfy the rubric evidence threshold.';
+
+const startupDocument = (
+  founder: CreatedStudent,
+  category: string,
+  fileName = `${category}.pdf`,
+) => ({
+  category,
+  fileUrl: `https://example.com/${fileName}`,
+  fileType: 'pdf',
+  fileName,
+  fileSizeBytes: 1024,
+  uploadedAt: new Date(),
+  uploadedBy: founder._id,
+});
+
+const createRubricStartup = async (
+  founder: CreatedStudent,
+  overrides: Partial<Record<string, any>> = {},
+) => {
+  const baseCompanyProfile = {
+    legalStructure: 'private_limited',
+    cinNumber: 'U12345KA2026PTC000001',
+    dpiitRecognitionNumber: 'DPIIT-2026-12345',
+    msmeUdyamNumber: 'UDYAM-KA-00-1234567',
+    otherGovernmentCertificationName: 'State Startup Mission',
+    otherGovernmentCertificationNumber: 'SSM-7788',
+    websiteUrl: 'https://startup.example.com',
+    productDemoUrl: 'https://demo.example.com',
+    portfolioUrl: 'https://portfolio.example.com',
+  };
+  const baseTractionProfile = {
+    startupStage: 'revenue_generating',
+    problemClarity: rubricText,
+    uniqueSolution: rubricText,
+    marketDifferentiation: rubricText,
+    patentStatus: 'published',
+    hasItrFiling: true,
+    hasRevenueProof: true,
+    hasGovernmentGrant: true,
+    hasAwardRecognition: true,
+    fundingStatus: 'vc',
+    activeUsersCustomers: 850,
+    monthlyGrowthRate: 24,
+    retentionRate: 68,
+  };
+  const innovationProfile = {
+    rubricVersion: 'startup_innovation_1000',
+    ...(overrides.innovationProfile ?? {}),
+    companyProfile: {
+      ...baseCompanyProfile,
+      ...(overrides.innovationProfile?.companyProfile ?? {}),
+    },
+    tractionProfile: {
+      ...baseTractionProfile,
+      ...(overrides.innovationProfile?.tractionProfile ?? {}),
+    },
+  };
+
+  const { innovationProfile: _ignoredInnovationProfile, ...startupOverrides } = overrides;
+
+  return Startup.create({
+    founderIds: [founder._id],
+    name: 'Rubric Edge Startup',
+    tagline: 'A startup for rubric edge case validation',
+    category: 'DeepTech',
+    stage: 'Pre-Launch',
+    activeProducts: 1,
+    teamSize: 1,
+    innovationProfile,
+    reviewStatus: 'draft',
+    isActive: true,
+    ...startupOverrides,
+  });
+};
+
 describe('startup route validation', () => {
   it('rejects non-ObjectId startup ids before mongoose casting', async () => {
     const founder = await createStudent('Startup Founder');
@@ -495,6 +572,228 @@ describe('startup route validation', () => {
       expect.objectContaining({
         launchedToInvestors: true,
         innovationScoreAtLaunch: 1000,
+      }),
+    );
+  });
+
+  it('keeps proof-gated rubric claims at zero when evidence uploads are missing', async () => {
+    const founder = await createStudent('Missing Proof Founder');
+    const startup = await createRubricStartup(founder, {
+      pitchDeckUrl: 'https://example.com/pitch.pdf',
+      documents: [],
+    });
+
+    const response = await request(app)
+      .get(`/api/startup/${startup._id}`)
+      .set(authHeader(founder));
+
+    expect(response.status).toBe(200);
+    expect(response.body.data.innovationScorePreview.companyProfile).toEqual(
+      expect.objectContaining({
+        legalStructure: 50,
+        cinNumber: 0,
+        governmentRecognition: 0,
+      }),
+    );
+    expect(response.body.data.innovationScorePreview.healthAndTraction).toEqual(
+      expect.objectContaining({
+        patentStrength: 0,
+        patentFiled: 0,
+        patentPublished: 0,
+        revenueValidation: 0,
+        grantsAndRecognition: 0,
+        fundingStatus: 0,
+      }),
+    );
+  });
+
+  it('caps government recognition at 100 and accepts Startup India as other government proof', async () => {
+    const founder = await createStudent('Government Cap Founder');
+    const startup = await createRubricStartup(founder, {
+      pitchDeckUrl: 'https://example.com/pitch.pdf',
+      documents: [
+        startupDocument(founder, 'dpiit_certificate'),
+        startupDocument(founder, 'udyam_certificate'),
+        startupDocument(founder, 'government_certificate_other'),
+        startupDocument(founder, 'startup_india_certificate'),
+      ],
+    });
+
+    const response = await request(app)
+      .get(`/api/startup/${startup._id}`)
+      .set(authHeader(founder));
+
+    expect(response.status).toBe(200);
+    expect(response.body.data.innovationScorePreview.companyProfile.governmentRecognition).toBe(100);
+  });
+
+  it('scores patent filed and patent published as separate capped sub-scores', async () => {
+    const founder = await createStudent('Patent Score Founder');
+    const filedStartup = await createRubricStartup(founder, {
+      innovationProfile: {
+        tractionProfile: {
+          patentStatus: 'filed',
+        },
+      },
+      documents: [startupDocument(founder, 'patent_proof')],
+    });
+    const publishedStartup = await createRubricStartup(founder, {
+      innovationProfile: {
+        tractionProfile: {
+          patentStatus: 'published',
+        },
+      },
+      documents: [startupDocument(founder, 'patent_proof')],
+    });
+
+    const filedResponse = await request(app)
+      .get(`/api/startup/${filedStartup._id}`)
+      .set(authHeader(founder));
+    const publishedResponse = await request(app)
+      .get(`/api/startup/${publishedStartup._id}`)
+      .set(authHeader(founder));
+
+    expect(filedResponse.status).toBe(200);
+    expect(filedResponse.body.data.innovationScorePreview.healthAndTraction).toEqual(
+      expect.objectContaining({
+        patentFiled: 40,
+        patentPublished: 0,
+        patentStrength: 40,
+      }),
+    );
+    expect(publishedResponse.status).toBe(200);
+    expect(publishedResponse.body.data.innovationScorePreview.healthAndTraction).toEqual(
+      expect.objectContaining({
+        patentFiled: 40,
+        patentPublished: 80,
+        patentStrength: 120,
+      }),
+    );
+  });
+
+  it('requires proof for Angel/Seed and VC funding while bootstrapped scores without proof', async () => {
+    const founder = await createStudent('Funding Score Founder');
+    const angelWithoutProof = await createRubricStartup(founder, {
+      innovationProfile: {
+        tractionProfile: {
+          fundingStatus: 'angel_seed',
+        },
+      },
+      documents: [],
+    });
+    const angelWithProof = await createRubricStartup(founder, {
+      innovationProfile: {
+        tractionProfile: {
+          fundingStatus: 'angel_seed',
+        },
+      },
+      documents: [startupDocument(founder, 'funding_proof')],
+    });
+    const vcWithProof = await createRubricStartup(founder, {
+      innovationProfile: {
+        tractionProfile: {
+          fundingStatus: 'vc',
+        },
+      },
+      documents: [startupDocument(founder, 'funding_proof')],
+    });
+    const bootstrapped = await createRubricStartup(founder, {
+      innovationProfile: {
+        tractionProfile: {
+          fundingStatus: 'bootstrapped',
+        },
+      },
+      documents: [],
+    });
+
+    const [angelMissingResponse, angelResponse, vcResponse, bootstrappedResponse] =
+      await Promise.all([
+        request(app).get(`/api/startup/${angelWithoutProof._id}`).set(authHeader(founder)),
+        request(app).get(`/api/startup/${angelWithProof._id}`).set(authHeader(founder)),
+        request(app).get(`/api/startup/${vcWithProof._id}`).set(authHeader(founder)),
+        request(app).get(`/api/startup/${bootstrapped._id}`).set(authHeader(founder)),
+      ]);
+
+    expect(angelMissingResponse.status).toBe(200);
+    expect(angelMissingResponse.body.data.innovationScorePreview.healthAndTraction.fundingStatus).toBe(0);
+    expect(angelResponse.status).toBe(200);
+    expect(angelResponse.body.data.innovationScorePreview.healthAndTraction.fundingStatus).toBe(40);
+    expect(vcResponse.status).toBe(200);
+    expect(vcResponse.body.data.innovationScorePreview.healthAndTraction.fundingStatus).toBe(60);
+    expect(bootstrappedResponse.status).toBe(200);
+    expect(bootstrappedResponse.body.data.innovationScorePreview.healthAndTraction.fundingStatus).toBe(20);
+  });
+
+  it('rejects oversized startup pitch decks and proof documents', async () => {
+    const founder = await createStudent('Oversized Upload Founder');
+    const startup = await createRubricStartup(founder);
+
+    const oversizedPitchResponse = await request(app)
+      .post(`/api/startup/${startup._id}/upload-pitch`)
+      .set(authHeader(founder))
+      .attach('file', Buffer.alloc(10 * 1024 * 1024 + 1), {
+        filename: 'pitch.pdf',
+        contentType: 'application/pdf',
+      });
+
+    const oversizedDocumentResponse = await request(app)
+      .post(`/api/startup/${startup._id}/documents`)
+      .set(authHeader(founder))
+      .field('category', 'revenue_proof')
+      .attach('file', Buffer.alloc(3 * 1024 * 1024 + 1), {
+        filename: 'revenue.pdf',
+        contentType: 'application/pdf',
+      });
+
+    expect(oversizedPitchResponse.status).toBe(400);
+    expect(oversizedPitchResponse.body.error).toEqual(
+      expect.objectContaining({
+        code: 'UPLOAD_ERROR',
+        message: 'File exceeds the configured upload size limit',
+      }),
+    );
+    expect(oversizedDocumentResponse.status).toBe(400);
+    expect(oversizedDocumentResponse.body.error).toEqual(
+      expect.objectContaining({
+        code: 'UPLOAD_ERROR',
+        message: 'File exceeds the configured upload size limit',
+      }),
+    );
+  });
+
+  it('rejects empty startup pitch decks and proof documents', async () => {
+    const founder = await createStudent('Empty Upload Founder');
+    const startup = await createRubricStartup(founder);
+
+    const emptyPitchResponse = await request(app)
+      .post(`/api/startup/${startup._id}/upload-pitch`)
+      .set(authHeader(founder))
+      .attach('file', Buffer.alloc(0), {
+        filename: 'pitch.pdf',
+        contentType: 'application/pdf',
+      });
+
+    const emptyDocumentResponse = await request(app)
+      .post(`/api/startup/${startup._id}/documents`)
+      .set(authHeader(founder))
+      .field('category', 'revenue_proof')
+      .attach('file', Buffer.alloc(0), {
+        filename: 'revenue.pdf',
+        contentType: 'application/pdf',
+      });
+
+    expect(emptyPitchResponse.status).toBe(400);
+    expect(emptyPitchResponse.body.error).toEqual(
+      expect.objectContaining({
+        code: 'EMPTY_FILE',
+        message: 'Pitch deck file cannot be empty',
+      }),
+    );
+    expect(emptyDocumentResponse.status).toBe(400);
+    expect(emptyDocumentResponse.body.error).toEqual(
+      expect.objectContaining({
+        code: 'EMPTY_FILE',
+        message: 'Document file cannot be empty',
       }),
     );
   });

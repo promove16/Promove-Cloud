@@ -12,7 +12,6 @@ export interface IAdminAward {
   adminReviewedAt?: Date;
   adminReviewedBy?: Types.ObjectId;
   adminNotes?: string;
-  scoreAwarded: boolean;
   createdAt: Date;
   updatedAt: Date;
 }
@@ -31,7 +30,6 @@ const awardSchema = new Schema<IAdminAward>(
     adminReviewedAt: { type: Date, default: undefined },
     adminReviewedBy: { type: Schema.Types.ObjectId, default: undefined },
     adminNotes: { type: String, default: undefined },
-    scoreAwarded: { type: Boolean, default: false },
   },
   { timestamps: true },
 );

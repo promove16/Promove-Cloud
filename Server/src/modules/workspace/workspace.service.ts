@@ -522,23 +522,32 @@ export const addProgress = async (
   payload: z.infer<typeof addProgressSchema>,
 ) => {
   const workspace = await getWorkspaceForMember(workspaceId, userId);
+  const milestoneRef = payload.milestoneRef?.trim();
+  const milestone = milestoneRef
+    ? workspace.milestones.find((item) => item.name === milestoneRef)
+    : undefined;
+
+  if (milestoneRef && !milestone) {
+    throw new ApiError(
+      400,
+      'INVALID_MILESTONE_REF',
+      'Progress milestone must match an existing workspace milestone.',
+    );
+  }
 
   workspace.progressUpdates.push({
     submittedBy: objectId(userId),
     note: payload.note,
-    milestoneRef: payload.milestoneRef,
+    milestoneRef,
     submittedAt: new Date(),
     _id: new Types.ObjectId(),
   });
 
-  if (payload.milestoneRef && payload.completionPercent !== undefined) {
-    const milestone = workspace.milestones.find((item) => item.name === payload.milestoneRef);
-    if (milestone) {
-      milestone.completionPercent = payload.completionPercent;
-      milestone.isCompleted = payload.completionPercent >= 100;
-      milestone.completedAt = milestone.isCompleted ? new Date() : undefined;
-      milestone.completedBy = milestone.isCompleted ? objectId(userId) : undefined;
-    }
+  if (milestone && payload.completionPercent !== undefined) {
+    milestone.completionPercent = payload.completionPercent;
+    milestone.isCompleted = payload.completionPercent >= 100;
+    milestone.completedAt = milestone.isCompleted ? new Date() : undefined;
+    milestone.completedBy = milestone.isCompleted ? objectId(userId) : undefined;
   }
 
   workspace.progressPercent = recalcProgressPercent(workspace);
@@ -547,7 +556,8 @@ export const addProgress = async (
   await applyScoreAsync({
     userId,
     trigger: 'PROGRESS_UPLOADED',
-    metadata: { workspaceId, milestoneRef: payload.milestoneRef },
+    metadata: { workspaceId, milestoneRef },
+    idempotencyKey: `workspace-progress:${workspaceId}:${milestoneRef ?? 'general'}`,
   });
 
   await recordStartupLifecycleEvent({
@@ -559,7 +569,7 @@ export const addProgress = async (
     description: payload.note,
     status: workspace.stage,
     metadata: {
-      milestoneRef: payload.milestoneRef,
+      milestoneRef,
       completionPercent: payload.completionPercent,
       progressPercent: workspace.progressPercent,
     },

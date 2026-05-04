@@ -17,7 +17,7 @@ type Props = {
 };
 
 const scoreFields = [
-  ['Problems Solved', 'problemsClaimed'],
+  ['Problems Solved', 'problemsCompleted'],
   ['Skills Completed', 'skillsCompleted'],
   ['Progress Uploads', 'progressUploads'],
   ['Patents Filed', 'patentsSubmitted'],
@@ -25,7 +25,6 @@ const scoreFields = [
   ['MVPs Verified', 'mvpsVerified'],
   ['Market Ready', 'marketReadyVerified'],
   ['Startups Launched', 'startupsLaunched'],
-  ['Awards Approved', 'awardsApproved'],
 ] as const;
 
 export function StudentProfileDrawer({

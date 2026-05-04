@@ -20,6 +20,10 @@ export interface DealNegotiation {
   studentCounterEquity?: number;
   finalAgreedAmount?: number;
   finalAgreedEquity?: number;
+  investorAgreed?: boolean;
+  startupAgreed?: boolean;
+  investorAgreedAt?: Date;
+  startupAgreedAt?: Date;
   messages: Array<{
     _id?: Types.ObjectId;
     id?: string;
@@ -188,6 +192,10 @@ export interface DealSummaryView extends InvestmentAuthority {
     studentCounterEquity?: number;
     finalAgreedAmount?: number;
     finalAgreedEquity?: number;
+    investorAgreed?: boolean;
+    startupAgreed?: boolean;
+    investorAgreedAt?: string;
+    startupAgreedAt?: string;
     messages: Array<{
       _id: string;
       senderId: string;

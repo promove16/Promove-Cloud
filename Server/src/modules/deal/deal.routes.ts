@@ -20,6 +20,7 @@ import {
   addNegotiationMessageController,
   proposeNegotiationTermsController,
   agreeNegotiationTermsController,
+  cancelDealController,
 } from './deal.controller';
 import { expressSoleInterestController } from '../investor/investor.controller';
 
@@ -40,6 +41,7 @@ dealsRouter.patch('/:id/unlink-workshop', authorize(UserRole.STUDENT), asyncHand
 dealsRouter.post('/:id/negotiation-message', authorize(UserRole.STUDENT, UserRole.INVESTOR, UserRole.MENTOR), asyncHandler(addNegotiationMessageController));
 dealsRouter.post('/:id/negotiation-propose', authorize(UserRole.STUDENT, UserRole.INVESTOR, UserRole.MENTOR), asyncHandler(proposeNegotiationTermsController));
 dealsRouter.post('/:id/negotiation-agree', authorize(UserRole.STUDENT, UserRole.INVESTOR, UserRole.MENTOR), asyncHandler(agreeNegotiationTermsController));
+dealsRouter.post('/:id/cancel', authorize(UserRole.STUDENT, UserRole.INVESTOR, UserRole.MENTOR), asyncHandler(cancelDealController));
 dealsRouter.get('/portfolio/authority', authorize(UserRole.INVESTOR), asyncHandler(getInvestorAuthorityController));
 
 startupsInvestmentRouter.get('/:id/investors', asyncHandler(getStartupInvestorsController));

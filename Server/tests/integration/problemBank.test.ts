@@ -172,6 +172,47 @@ describe('problem bank integration', () => {
     expect(await Workspace.countDocuments({ claimedProblemId: problemId })).toBe(0);
   });
 
+  it('rejects progress updates with fake milestone names so progress score cannot be farmed', async () => {
+    const { user, email } = await createApprovedUser({
+      role: UserRole.STUDENT,
+      displayName: 'Progress Guard Student',
+    });
+    const token = await loginAs(email);
+
+    const workspaceResponse = await request(app)
+      .post('/api/workspace')
+      .set('Authorization', `Bearer ${token}`)
+      .send({
+        title: 'Progress Guard Workspace',
+        category: 'Technology',
+      });
+
+    expect(workspaceResponse.status).toBe(201);
+    const workspaceId = workspaceResponse.body.data._id as string;
+
+    const invalidProgressResponse = await request(app)
+      .post(`/api/workspace/${workspaceId}/progress`)
+      .set('Authorization', `Bearer ${token}`)
+      .send({
+        note: 'Trying to create a fake milestone score event.',
+        milestoneRef: 'Fake Milestone 001',
+        completionPercent: 100,
+      });
+
+    expect(invalidProgressResponse.status).toBe(400);
+    expect(invalidProgressResponse.body.error).toEqual(
+      expect.objectContaining({
+        code: 'INVALID_MILESTONE_REF',
+      }),
+    );
+
+    const refreshedUser = await User.findById(user._id).select('innovationScore scoreBreakdown').lean();
+    const scoreEvents = await ScoreEvent.find({ userId: user._id }).lean();
+    expect(refreshedUser?.innovationScore ?? 0).toBe(0);
+    expect(refreshedUser?.scoreBreakdown.progressUploads ?? 0).toBe(0);
+    expect(scoreEvents).toHaveLength(0);
+  });
+
   it('supports review requests, admin approval, and problem leaderboard ranking', async () => {
     const { user: studentUser, email: studentEmail } = await createApprovedUser({
       role: UserRole.STUDENT,
@@ -270,5 +311,6 @@ describe('problem bank integration', () => {
 
     const updatedStudent = await User.findById(studentUser._id).lean();
     expect(updatedStudent?.innovationScore).toBe(100);
+    expect(updatedStudent?.scoreBreakdown.problemsCompleted).toBe(1);
   });
 });

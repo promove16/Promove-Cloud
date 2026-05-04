@@ -36,6 +36,7 @@ export type PortfolioProjectSource = 'manual' | 'github';
 
 export interface ScoreBreakdown {
   problemsClaimed: number;
+  problemsCompleted: number;
   skillsCompleted: number;
   progressUploads: number;
   patentsSubmitted: number;
@@ -43,7 +44,6 @@ export interface ScoreBreakdown {
   mvpsVerified: number;
   marketReadyVerified: number;
   startupsLaunched: number;
-  awardsApproved: number;
 }
 
 export type InstitutionPolicyStatus = 'Active' | 'On Track' | 'Pending' | 'Inactive';

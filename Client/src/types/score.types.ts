@@ -1,5 +1,6 @@
 export interface ScoreBreakdown {
   problemsClaimed: number;
+  problemsCompleted: number;
   skillsCompleted: number;
   progressUploads: number;
   patentsSubmitted: number;
@@ -7,7 +8,6 @@ export interface ScoreBreakdown {
   mvpsVerified: number;
   marketReadyVerified: number;
   startupsLaunched: number;
-  awardsApproved: number;
 }
 
 export interface ScoreResponse {
@@ -30,8 +30,6 @@ export interface ScoreEvent {
     | 'MVP_VERIFIED'
     | 'MARKET_READY_VERIFIED'
     | 'STARTUP_LAUNCHED'
-    | 'AWARD_SUBMITTED'
-    | 'AWARD_APPROVED'
     | 'GITHUB_CONNECTED'
     | 'LINKEDIN_CONNECTED'
     | 'RESUME_UPLOADED'
@@ -42,6 +40,7 @@ export interface ScoreEvent {
     | 'ONBOARDING_SHARE';
   delta: number;
   scoreAfter: number;
+  idempotencyKey?: string;
   metadata?: Record<string, unknown>;
   createdAt: string;
 }

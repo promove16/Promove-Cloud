@@ -24,6 +24,7 @@ import type {
 } from './startup.types';
 
 const pitchDeckFileNamePattern = /\.(pdf|ppt|pptx)$/i;
+const MIN_UPLOAD_FILE_BYTES = 1;
 
 const STARTUP_DOCUMENT_CATEGORIES = [
   'business_plan',
@@ -1043,6 +1044,12 @@ const buildInnovationStartupReadiness = (startup: Record<string, any>): StartupR
   }
 
   for (const category of requiredDocumentCategories) {
+    if (
+      category === 'government_certificate_other' &&
+      uploadedCategorySet.has('startup_india_certificate')
+    ) {
+      continue;
+    }
     addMissing(!uploadedCategorySet.has(category), documentLabelMap[category]);
   }
 
@@ -1194,10 +1201,14 @@ const buildRubricInnovationScoreBreakdown = (
     companyProfile.msmeUdyamNumber?.trim() && uploadedDocuments.has('udyam_certificate')
       ? 20
       : 0;
+  const hasOtherGovernmentCertificationProof =
+    uploadedDocuments.has('government_certificate_other') ||
+    uploadedDocuments.has('startup_india_certificate');
   const otherGovernmentCertification =
     (companyProfile.otherGovernmentCertificationName?.trim() ||
-      companyProfile.otherGovernmentCertificationNumber?.trim()) &&
-    uploadedDocuments.has('government_certificate_other')
+      companyProfile.otherGovernmentCertificationNumber?.trim() ||
+      uploadedDocuments.has('startup_india_certificate')) &&
+    hasOtherGovernmentCertificationProof
       ? 10
       : 0;
   const governmentRecognition = Math.min(
@@ -1227,12 +1238,16 @@ const buildRubricInnovationScoreBreakdown = (
   const marketDifferentiation =
     (tractionProfile.marketDifferentiation?.trim().length ?? 0) >= 30 ? 40 : 0;
   const innovationUniqueness = problemClarity + uniqueSolution + marketDifferentiation;
-  const patentStrength =
-    tractionProfile.patentStatus === 'published' && uploadedDocuments.has('patent_proof')
-      ? 120
-      : tractionProfile.patentStatus === 'filed' && uploadedDocuments.has('patent_proof')
-        ? 40
-        : 0;
+  const hasPatentProof = uploadedDocuments.has('patent_proof');
+  const patentFiled =
+    (tractionProfile.patentStatus === 'filed' ||
+      tractionProfile.patentStatus === 'published') &&
+    hasPatentProof
+      ? 40
+      : 0;
+  const patentPublished =
+    tractionProfile.patentStatus === 'published' && hasPatentProof ? 80 : 0;
+  const patentStrength = Math.min(120, patentFiled + patentPublished);
   const itrFiling =
     tractionProfile.hasItrFiling && uploadedDocuments.has('itr_filing') ? 40 : 0;
   const revenueProof =
@@ -1309,6 +1324,8 @@ const buildRubricInnovationScoreBreakdown = (
       startupStage,
       innovationUniqueness,
       patentStrength,
+      patentFiled,
+      patentPublished,
       revenueValidation,
       grantsAndRecognition,
       fundingStatus,
@@ -1682,6 +1699,7 @@ export const launchStartup = async (
       userId,
       trigger: 'STARTUP_LAUNCHED',
       metadata: { startupId, launchTo: payload.launchTo },
+      idempotencyKey: `startup-launched:${startupId}`,
     });
   }
 
@@ -1756,6 +1774,9 @@ export const launchStartup = async (
 };
 
 export const uploadPitchDeck = async (startupId: string, userId: string, file: Express.Multer.File) => {
+  if (file.size < MIN_UPLOAD_FILE_BYTES) {
+    throw new ApiError(400, 'EMPTY_FILE', 'Pitch deck file cannot be empty');
+  }
   const isPdf = file.mimetype === 'application/pdf';
   const isPowerPoint =
     file.mimetype === 'application/vnd.ms-powerpoint' ||
@@ -2000,6 +2021,9 @@ export const uploadStartupDocument = async (
   file: Express.Multer.File,
   payload: z.infer<typeof startupDocumentUploadSchema>,
 ) => {
+  if (file.size < MIN_UPLOAD_FILE_BYTES) {
+    throw new ApiError(400, 'EMPTY_FILE', 'Document file cannot be empty');
+  }
   const startup = await getStartupForFounder(startupId, userId);
   const fileType = file.mimetype === 'application/pdf' ? 'pdf' : 'image';
   const uploaded = await uploadFile({

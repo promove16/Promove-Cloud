@@ -898,7 +898,8 @@ describe('investment workflow integration', () => {
     expect(detailResponse.status).toBe(200);
     expect(detailResponse.body.data.negotiation).toEqual(
       expect.objectContaining({
-        status: 'initial',
+        status: 'terms_proposed',
+        investorAgreed: true,
         messages: expect.arrayContaining([
           expect.objectContaining({
             senderRole: 'investor',
@@ -999,6 +1000,211 @@ describe('investment workflow integration', () => {
         expect.objectContaining({
           senderRole: 'investor',
           message: 'Investor proposed terms: INR 26,000 for 2.5% equity.',
+        }),
+      ]),
+    );
+  });
+
+  it('uses active penny bids to fill pool slots before admin approval', async () => {
+    const founder = await createUser(UserRole.STUDENT, { displayName: 'Slot Founder' });
+    const firstBidder = await createUser(UserRole.INVESTOR, { displayName: 'First Slot' });
+    const secondBidder = await createUser(UserRole.INVESTOR, { displayName: 'Second Slot' });
+    const startup = await createStartup(founder._id.toString(), { maxPennyInvestors: 1 });
+
+    const firstBidResponse = await request(app)
+      .post(`/api/startups/${startup._id}/bid`)
+      .set(authHeader(firstBidder))
+      .send({
+        investorType: 'penny',
+        proposedAmountINR: 25000,
+        proposedEquityPercent: 2,
+        chosenRole: 'shareholder',
+      });
+
+    expect(firstBidResponse.status).toBe(201);
+
+    const boardResponse = await request(app)
+      .get(`/api/startups/${startup._id}/bids`)
+      .set(authHeader(secondBidder));
+
+    expect(boardResponse.status).toBe(200);
+    expect(boardResponse.body.data.acceptsPennyInvestors).toBe(false);
+    expect(boardResponse.body.data.pennyPool.investorCount).toBe(1);
+
+    const secondBidResponse = await request(app)
+      .post(`/api/startups/${startup._id}/bid`)
+      .set(authHeader(secondBidder))
+      .send({
+        investorType: 'penny',
+        proposedAmountINR: 26000,
+        proposedEquityPercent: 2,
+        chosenRole: 'shareholder',
+      });
+
+    expect(secondBidResponse.status).toBe(409);
+    expect(secondBidResponse.body.error.code).toBe('PENNY_SLOTS_FULL');
+
+    const updatedStartup = await Startup.findById(startup._id).lean();
+    expect(updatedStartup?.currentPennyCount).toBe(0);
+  });
+
+  it('sends an accepted startup counter offer directly to admin approval', async () => {
+    const founder = await createUser(UserRole.STUDENT, { displayName: 'Counter Founder' });
+    const investor = await createUser(UserRole.INVESTOR, { displayName: 'Counter Investor' });
+    const startup = await createStartup(founder._id.toString());
+
+    const bidResponse = await request(app)
+      .post(`/api/startups/${startup._id}/bid`)
+      .set(authHeader(investor))
+      .send({
+        investorType: 'penny',
+        proposedAmountINR: 100000,
+        proposedEquityPercent: 10,
+        chosenRole: 'shareholder',
+      });
+
+    expect(bidResponse.status).toBe(400);
+    expect(bidResponse.body.error.code).toBe('PENNY_EQUITY_LIMIT');
+
+    const validBidResponse = await request(app)
+      .post(`/api/startups/${startup._id}/bid`)
+      .set(authHeader(investor))
+      .send({
+        investorType: 'penny',
+        proposedAmountINR: 100000,
+        proposedEquityPercent: 5,
+        chosenRole: 'shareholder',
+      });
+
+    expect(validBidResponse.status).toBe(201);
+
+    const counterResponse = await request(app)
+      .post(`/api/deals/${validBidResponse.body.data._id}/negotiation-propose`)
+      .set(authHeader(founder))
+      .send({ amountINR: 100000, equityPercent: 4 });
+
+    expect(counterResponse.status).toBe(200);
+    expect(counterResponse.body.data).toEqual(
+      expect.objectContaining({
+        status: 'counter_offer',
+        startupAgreed: true,
+        investorAgreed: false,
+        studentCounterAmount: 100000,
+        studentCounterEquity: 4,
+      }),
+    );
+
+    const agreeResponse = await request(app)
+      .post(`/api/deals/${validBidResponse.body.data._id}/negotiation-agree`)
+      .set(authHeader(investor));
+
+    expect(agreeResponse.status).toBe(200);
+    expect(agreeResponse.body.data).toEqual(
+      expect.objectContaining({
+        status: 'terms_agreed',
+        finalAgreedAmount: 100000,
+        finalAgreedEquity: 4,
+      }),
+    );
+
+    const detailResponse = await request(app)
+      .get(`/api/investor/deals/${validBidResponse.body.data._id}`)
+      .set(authHeader(investor));
+
+    expect(detailResponse.status).toBe(200);
+    expect(detailResponse.body.data).toEqual(
+      expect.objectContaining({
+        currentStage: 3,
+        amountINR: 100000,
+        equityPercent: 4,
+        adminApprovalRequired: true,
+        founderDecision: expect.objectContaining({ status: 'accepted' }),
+        mediationStatus: 'under_review',
+        stockTransfer: expect.objectContaining({ status: 'pending_review' }),
+      }),
+    );
+  });
+
+  it('updates bid-board contributor terms during counter offers and renegotiation', async () => {
+    const founder = await createUser(UserRole.STUDENT, { displayName: 'Board Founder' });
+    const investor = await createUser(UserRole.INVESTOR, { displayName: 'Board Investor' });
+    const startup = await createStartup(founder._id.toString(), { maxPennyInvestors: 5 });
+
+    const bidResponse = await request(app)
+      .post(`/api/startups/${startup._id}/bid`)
+      .set(authHeader(investor))
+      .send({
+        investorType: 'penny',
+        proposedAmountINR: 20000,
+        proposedEquityPercent: 2,
+        chosenRole: 'shareholder',
+      });
+
+    expect(bidResponse.status).toBe(201);
+
+    const initialBoardResponse = await request(app)
+      .get(`/api/startups/${startup._id}/bids`)
+      .set(authHeader(investor));
+
+    expect(initialBoardResponse.status).toBe(200);
+    expect(initialBoardResponse.body.data.pennyPool.contributors).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({
+          bidId: bidResponse.body.data._id,
+          amountINR: 20000,
+          equityPercent: 2,
+        }),
+      ]),
+    );
+
+    const counterResponse = await request(app)
+      .post(`/api/deals/${bidResponse.body.data._id}/negotiation-propose`)
+      .set(authHeader(founder))
+      .send({
+        amountINR: 100000,
+        equityPercent: 4,
+      });
+
+    expect(counterResponse.status).toBe(200);
+
+    const counterBoardResponse = await request(app)
+      .get(`/api/startups/${startup._id}/bids`)
+      .set(authHeader(investor));
+
+    expect(counterBoardResponse.status).toBe(200);
+    expect(counterBoardResponse.body.data.pennyPool.totalRaised).toBe(100000);
+    expect(counterBoardResponse.body.data.pennyPool.contributors).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({
+          bidId: bidResponse.body.data._id,
+          amountINR: 100000,
+          equityPercent: 4,
+        }),
+      ]),
+    );
+
+    const renegotiateResponse = await request(app)
+      .post(`/api/deals/${bidResponse.body.data._id}/negotiation-propose`)
+      .set(authHeader(investor))
+      .send({
+        amountINR: 80000,
+        equityPercent: 3,
+      });
+
+    expect(renegotiateResponse.status).toBe(200);
+
+    const renegotiatedBoardResponse = await request(app)
+      .get(`/api/startups/${startup._id}/bids`)
+      .set(authHeader(investor));
+
+    expect(renegotiatedBoardResponse.status).toBe(200);
+    expect(renegotiatedBoardResponse.body.data.pennyPool.totalRaised).toBe(80000);
+    expect(renegotiatedBoardResponse.body.data.pennyPool.contributors).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({
+          bidId: bidResponse.body.data._id,
+          amountINR: 80000,
+          equityPercent: 3,
         }),
       ]),
     );
@@ -1188,6 +1394,180 @@ describe('investment workflow integration', () => {
         currentStage: 1,
         negotiation: expect.objectContaining({
           status: 'terms_agreed',
+        }),
+      }),
+    );
+  });
+
+  it('requires both parties to accept again after renegotiation', async () => {
+    const founder = await createUser(UserRole.STUDENT, { displayName: 'Counter Founder' });
+    const investor = await createUser(UserRole.INVESTOR, { displayName: 'Counter Investor' });
+    const startup = await createStartup(founder._id.toString(), {
+      name: 'Counter Startup',
+      maxPennyInvestors: 5,
+    });
+
+    const bidResponse = await request(app)
+      .post(`/api/startups/${startup._id}/bid`)
+      .set(authHeader(investor))
+      .send({
+        investorType: 'penny',
+        proposedAmountINR: 100000,
+        proposedEquityPercent: 4,
+        chosenRole: 'shareholder',
+      });
+
+    expect(bidResponse.status).toBe(201);
+
+    const counterResponse = await request(app)
+      .post(`/api/deals/${bidResponse.body.data._id}/negotiation-propose`)
+      .set(authHeader(founder))
+      .send({
+        amountINR: 100000,
+        equityPercent: 3,
+      });
+
+    expect(counterResponse.status).toBe(200);
+    expect(counterResponse.body.data).toEqual(
+      expect.objectContaining({
+        status: 'counter_offer',
+        investorAgreed: false,
+        startupAgreed: true,
+        studentCounterAmount: 100000,
+        studentCounterEquity: 3,
+      }),
+    );
+
+    const renegotiateResponse = await request(app)
+      .post(`/api/deals/${bidResponse.body.data._id}/negotiation-propose`)
+      .set(authHeader(investor));
+
+    expect(renegotiateResponse.status).toBe(400);
+
+    const validRenegotiateResponse = await request(app)
+      .post(`/api/deals/${bidResponse.body.data._id}/negotiation-propose`)
+      .set(authHeader(investor))
+      .send({
+        amountINR: 110000,
+        equityPercent: 4,
+      });
+
+    expect(validRenegotiateResponse.status).toBe(200);
+    expect(validRenegotiateResponse.body.data).toEqual(
+      expect.objectContaining({
+        status: 'terms_proposed',
+        investorAgreed: true,
+        startupAgreed: false,
+        investorProposedAmount: 110000,
+        investorProposedEquity: 4,
+      }),
+    );
+
+    const investorAgreeAgainResponse = await request(app)
+      .post(`/api/deals/${bidResponse.body.data._id}/negotiation-agree`)
+      .set(authHeader(investor));
+
+    expect(investorAgreeAgainResponse.status).toBe(200);
+    expect(investorAgreeAgainResponse.body.data.status).toBe('terms_proposed');
+
+    const detailResponse = await request(app)
+      .get(`/api/deals/${bidResponse.body.data._id}`)
+      .set(authHeader(investor));
+
+    expect(detailResponse.status).toBe(200);
+    expect(detailResponse.body.data).toEqual(
+      expect.objectContaining({
+        currentStage: 0,
+        amountINR: 100000,
+        equityPercent: 4,
+        adminApprovalRequired: false,
+        negotiation: expect.objectContaining({
+          status: 'terms_proposed',
+          investorAgreed: true,
+          startupAgreed: false,
+        }),
+        stockTransfer: expect.objectContaining({ status: 'not_started' }),
+      }),
+    );
+
+    const founderAcceptResponse = await request(app)
+      .post(`/api/deals/${bidResponse.body.data._id}/negotiation-agree`)
+      .set(authHeader(founder));
+
+    expect(founderAcceptResponse.status).toBe(200);
+    expect(founderAcceptResponse.body.data).toEqual(
+      expect.objectContaining({
+        status: 'terms_agreed',
+        investorAgreed: true,
+        startupAgreed: true,
+        finalAgreedAmount: 110000,
+        finalAgreedEquity: 4,
+      }),
+    );
+  });
+
+  it('lets either participant cancel an active bid or deal before final closure', async () => {
+    const founder = await createUser(UserRole.STUDENT, { displayName: 'Cancel Founder' });
+    const investor = await createUser(UserRole.INVESTOR, { displayName: 'Cancel Investor' });
+    const studentBidder = await createUser(UserRole.STUDENT, { displayName: 'Cancel Student Bidder' });
+    const startup = await createStartup(founder._id.toString(), { maxPennyInvestors: 5 });
+
+    const investorBidResponse = await request(app)
+      .post(`/api/startups/${startup._id}/bid`)
+      .set(authHeader(investor))
+      .send({
+        investorType: 'penny',
+        proposedAmountINR: 30000,
+        proposedEquityPercent: 2,
+        chosenRole: 'shareholder',
+      });
+
+    expect(investorBidResponse.status).toBe(201);
+
+    const founderCancelResponse = await request(app)
+      .post(`/api/deals/${investorBidResponse.body.data._id}/cancel`)
+      .set(authHeader(founder))
+      .send({ reason: 'Not raising from this investor right now.' });
+
+    expect(founderCancelResponse.status).toBe(200);
+    expect(founderCancelResponse.body.data).toEqual(
+      expect.objectContaining({
+        status: 'cancelled',
+        mediationStatus: 'rejected',
+        founderDecision: expect.objectContaining({
+          status: 'rejected',
+          note: 'Not raising from this investor right now.',
+        }),
+        negotiation: expect.objectContaining({
+          status: 'cancelled',
+        }),
+      }),
+    );
+
+    const studentBidResponse = await request(app)
+      .post(`/api/startups/${startup._id}/bid`)
+      .set(authHeader(studentBidder))
+      .send({
+        investorType: 'penny',
+        proposedAmountINR: 35000,
+        proposedEquityPercent: 2,
+        chosenRole: 'observer',
+      });
+
+    expect(studentBidResponse.status).toBe(201);
+
+    const bidderCancelResponse = await request(app)
+      .post(`/api/deals/${studentBidResponse.body.data._id}/cancel`)
+      .set(authHeader(studentBidder))
+      .send({ reason: 'Withdrawing my bid.' });
+
+    expect(bidderCancelResponse.status).toBe(200);
+    expect(bidderCancelResponse.body.data).toEqual(
+      expect.objectContaining({
+        status: 'cancelled',
+        negotiation: expect.objectContaining({
+          status: 'cancelled',
+          notes: 'Withdrawing my bid.',
         }),
       }),
     );

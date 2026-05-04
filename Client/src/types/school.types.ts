@@ -118,6 +118,7 @@ export interface StudentLeaderboardItem {
   innovationScore: number;
   scoreBreakdown: {
     problemsClaimed: number;
+    problemsCompleted: number;
     skillsCompleted: number;
     progressUploads: number;
     patentsSubmitted: number;
@@ -125,7 +126,6 @@ export interface StudentLeaderboardItem {
     mvpsVerified: number;
     marketReadyVerified: number;
     startupsLaunched: number;
-    awardsApproved: number;
   };
   activeSince: string;
   stage?: string;

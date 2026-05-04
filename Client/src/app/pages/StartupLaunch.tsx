@@ -47,6 +47,7 @@ import {
   STARTUP_PATENT_STATUS_OPTIONS,
   STARTUP_RUBRIC_DOCUMENT_MAX_BYTES,
   STARTUP_RUBRIC_DOCUMENT_SPECS,
+  STARTUP_RUBRIC_MIN_UPLOAD_BYTES,
   STARTUP_RUBRIC_PITCH_ACCEPT,
   STARTUP_RUBRIC_PITCH_MAX_BYTES,
   STARTUP_SCORING_STAGE_OPTIONS,
@@ -234,11 +235,7 @@ const buildStartupTrustSummary = (startup: Startup) => {
         legalStructureLabel ? "Registered Entity" : "",
         companyProfile?.cinNumber ? "CIN Listed" : "",
         companyProfile?.dpiitRecognitionNumber ||
-        hasStartupDocument(
-          startup,
-          "startup_india_certificate",
-          "dpiit_certificate",
-        )
+        hasStartupDocument(startup, "dpiit_certificate")
           ? "DPIIT Recognized"
           : "",
         companyProfile?.msmeUdyamNumber ||
@@ -247,7 +244,11 @@ const buildStartupTrustSummary = (startup: Startup) => {
           : "",
         companyProfile?.otherGovernmentCertificationName ||
         companyProfile?.otherGovernmentCertificationNumber ||
-        hasStartupDocument(startup, "government_certificate_other")
+        hasStartupDocument(
+          startup,
+          "government_certificate_other",
+          "startup_india_certificate",
+        )
           ? "Govt Certified"
           : "",
         startup.pitchDeckUrl ? "Pitch Deck Ready" : "",
@@ -309,20 +310,12 @@ const buildStartupTrustSummary = (startup: Startup) => {
         label: "DPIIT",
         value:
           companyProfile?.dpiitRecognitionNumber ||
-          (hasStartupDocument(
-            startup,
-            "startup_india_certificate",
-            "dpiit_certificate",
-          )
+          (hasStartupDocument(startup, "dpiit_certificate")
             ? "Proof uploaded"
             : "Not added"),
         done: Boolean(
           companyProfile?.dpiitRecognitionNumber ||
-          hasStartupDocument(
-            startup,
-            "startup_india_certificate",
-            "dpiit_certificate",
-          ),
+          hasStartupDocument(startup, "dpiit_certificate"),
         ),
       },
       {
@@ -605,6 +598,10 @@ export function StartupLaunch() {
 
   const handlePitchSelected = (file: File | null) => {
     if (!file) return;
+    if (file.size < STARTUP_RUBRIC_MIN_UPLOAD_BYTES) {
+      toast.error("Pitch deck file cannot be empty.");
+      return;
+    }
     if (!startupId) {
       toast.error("Save the startup once before uploading pitch files.");
       return;
@@ -623,6 +620,10 @@ export function StartupLaunch() {
     file: File | null,
   ) => {
     if (!file) return;
+    if (file.size < STARTUP_RUBRIC_MIN_UPLOAD_BYTES) {
+      toast.error("Document file cannot be empty.");
+      return;
+    }
     if (!startupId) {
       toast.error("Save the startup once before uploading proof files.");
       return;
@@ -1083,7 +1084,7 @@ export function StartupLaunch() {
             isUploading={uploadingKey === "pitch" || uploadPitch.isPending}
             onFileSelected={handlePitchSelected}
           />
-          {STARTUP_RUBRIC_DOCUMENT_SPECS.slice(0, 5).map((spec) => (
+          {STARTUP_RUBRIC_DOCUMENT_SPECS.slice(0, 6).map((spec) => (
             <DocumentUploadSlot
               key={spec.category}
               label={spec.label}
@@ -1287,7 +1288,7 @@ export function StartupLaunch() {
         </div>
 
         <div className="grid gap-4 lg:grid-cols-2">
-          {STARTUP_RUBRIC_DOCUMENT_SPECS.slice(5).map((spec) => (
+          {STARTUP_RUBRIC_DOCUMENT_SPECS.slice(6).map((spec) => (
             <DocumentUploadSlot
               key={spec.category}
               label={spec.label}

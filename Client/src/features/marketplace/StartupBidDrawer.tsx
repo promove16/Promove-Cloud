@@ -68,11 +68,13 @@ function PennyPoolSection({
   onBid,
   deal,
   isDealLoading,
+  isFounder,
 }: {
   board: NonNullable<ReturnType<typeof useBidBoard>['data']>;
   onBid: () => void;
   deal?: DealDetailView | null;
   isDealLoading?: boolean;
+  isFounder?: boolean;
 }) {
   const { pennyPool, acceptsPennyInvestors, currentUserBid } = board;
   const poolPct = pennyPool.maxInvestors > 0 ? Math.round((pennyPool.investorCount / pennyPool.maxInvestors) * 100) : 0;
@@ -170,7 +172,7 @@ function PennyPoolSection({
               <Spinner />
             </div>
           ) : deal ? (
-            <NegotiationPanel deal={deal} isInvestor={true} />
+            <NegotiationPanel deal={deal} isInvestor={!isFounder} />
           ) : (
             <p className="py-4 text-center text-sm text-slate-500">
               Could not load negotiation details.
@@ -425,6 +427,7 @@ export function StartupBidDrawer({ startupId, open, isFounder = false, onClose }
                 onBid={() => setBidModalType('penny')}
                 deal={deal}
                 isDealLoading={isDealLoading}
+                isFounder={isFounder}
               />
 
               {/* Sole Investor Bids */}
@@ -521,7 +524,7 @@ export function StartupBidDrawer({ startupId, open, isFounder = false, onClose }
                       <Spinner />
                     </div>
                   ) : deal ? (
-                    <NegotiationPanel deal={deal} isInvestor={true} />
+                    <NegotiationPanel deal={deal} isInvestor={!isFounder} />
                   ) : (
                     <p className="py-4 text-center text-sm text-slate-500">
                       Could not load negotiation details.

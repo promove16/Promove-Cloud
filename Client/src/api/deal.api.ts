@@ -3,6 +3,7 @@ import { ApiSuccessResponse } from '../types/auth.types';
 import {
   CapTableResponse,
   DealCollectionResponse,
+  DealCancelPayload,
   DealDetailView,
   DealFounderDecisionPayload,
   DealGroupView,
@@ -90,6 +91,13 @@ export const dealApi = {
   async agreeNegotiationTerms(dealId: string) {
     const response = await api.post<ApiSuccessResponse<any>>(
       `/api/deals/${dealId}/negotiation-agree`,
+    );
+    return response.data.data;
+  },
+  async cancelDeal(dealId: string, payload: DealCancelPayload = {}) {
+    const response = await api.post<ApiSuccessResponse<DealDetailView>>(
+      `/api/deals/${dealId}/cancel`,
+      payload,
     );
     return response.data.data;
   },

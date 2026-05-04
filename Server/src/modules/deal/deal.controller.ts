@@ -22,6 +22,9 @@ import {
   addNegotiationMessage,
   proposeNegotiationTerms,
   agreeNegotiationTerms,
+  NegotiationTermsSchema,
+  cancelDealByParticipant,
+  cancelDealSchema,
 } from './deal.service';
 
 const objectIdSchema = /^[0-9a-fA-F]{24}$/;
@@ -160,11 +163,7 @@ export const proposeNegotiationTermsController = async (req: Request, res: Respo
   }
 
   const dealId = assertObjectId(String(req.params.id), 'Deal id');
-  const { amountINR, equityPercent } = req.body;
-  
-  if (!amountINR || !equityPercent) {
-    throw new ApiError(400, 'INVALID_TERMS', 'Amount and equity are required');
-  }
+  const { amountINR, equityPercent } = NegotiationTermsSchema.parse(req.body);
 
   const result = await proposeNegotiationTerms(dealId, String(req.user._id), amountINR, equityPercent);
   res.status(200).json(new ApiResponse(result));
@@ -178,6 +177,16 @@ export const agreeNegotiationTermsController = async (req: Request, res: Respons
   const dealId = assertObjectId(String(req.params.id), 'Deal id');
 
   const result = await agreeNegotiationTerms(dealId, String(req.user._id));
+  res.status(200).json(new ApiResponse(result));
+};
+
+export const cancelDealController = async (req: Request, res: Response) => {
+  if (!req.user) {
+    throw new ApiError(401, 'UNAUTHORIZED', 'Invalid or expired token');
+  }
+
+  const dealId = assertObjectId(String(req.params.id), 'Deal id');
+  const result = await cancelDealByParticipant(dealId, String(req.user._id), cancelDealSchema.parse(req.body ?? {}));
   res.status(200).json(new ApiResponse(result));
 };
 

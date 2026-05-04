@@ -3,6 +3,7 @@ import { JobApplicationSource, JobApplicationStage } from './jobPost.model';
 
 export interface RecruiterTalentScoreBreakdown {
   problemsClaimed: number;
+  problemsCompleted: number;
   skillsCompleted: number;
   progressUploads: number;
   patentsSubmitted: number;
@@ -10,7 +11,6 @@ export interface RecruiterTalentScoreBreakdown {
   mvpsVerified: number;
   marketReadyVerified: number;
   startupsLaunched: number;
-  awardsApproved: number;
 }
 
 export interface RecruiterInstitutionSummary {

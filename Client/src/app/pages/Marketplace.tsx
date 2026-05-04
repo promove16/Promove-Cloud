@@ -2354,7 +2354,8 @@ function GeneralMarketplace({ dashboardRole }: { dashboardRole: UserRole }) {
       const canBid =
         !isOwnStartup &&
         (dashboardRole === UserRole.STUDENT ||
-          dashboardRole === UserRole.INVESTOR) &&
+          dashboardRole === UserRole.INVESTOR ||
+          dashboardRole === UserRole.MENTOR) &&
         item.launchTargets.includes("Investors");
 
       return (

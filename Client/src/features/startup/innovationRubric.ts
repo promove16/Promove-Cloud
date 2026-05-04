@@ -9,6 +9,7 @@ import type {
 } from '../../types/startup.types';
 
 export const STARTUP_RUBRIC_VERSION = 'startup_innovation_1000' as const;
+export const STARTUP_RUBRIC_MIN_UPLOAD_BYTES = 1;
 export const STARTUP_RUBRIC_DOCUMENT_MAX_BYTES = 3 * 1024 * 1024;
 export const STARTUP_RUBRIC_PITCH_MAX_BYTES = 10 * 1024 * 1024;
 export const STARTUP_RUBRIC_PITCH_ACCEPT = '.pdf,.ppt,.pptx';
@@ -111,6 +112,11 @@ export const STARTUP_RUBRIC_DOCUMENT_SPECS: Array<{
     hint: 'State startup mission or sector certification proof.',
   },
   {
+    category: 'startup_india_certificate',
+    label: 'Startup India proof',
+    hint: 'Startup India certificate when claimed as other government recognition.',
+  },
+  {
     category: 'dpr',
     label: 'DPR upload',
     hint: 'Detailed Project Report in PDF.',
@@ -186,10 +192,14 @@ export const buildInnovationScorePreview = (input: {
     companyProfile.msmeUdyamNumber.trim() && uploadedDocuments.has('udyam_certificate')
       ? 20
       : 0;
+  const hasOtherGovernmentCertificationProof =
+    uploadedDocuments.has('government_certificate_other') ||
+    uploadedDocuments.has('startup_india_certificate');
   const otherGovernmentCertification =
     (companyProfile.otherGovernmentCertificationName.trim() ||
-      companyProfile.otherGovernmentCertificationNumber.trim()) &&
-    uploadedDocuments.has('government_certificate_other')
+      companyProfile.otherGovernmentCertificationNumber.trim() ||
+      uploadedDocuments.has('startup_india_certificate')) &&
+    hasOtherGovernmentCertificationProof
       ? 10
       : 0;
   const governmentRecognition = Math.min(
@@ -217,12 +227,16 @@ export const buildInnovationScorePreview = (input: {
   const marketDifferentiation =
     tractionProfile.marketDifferentiation.trim().length >= 30 ? 40 : 0;
   const innovationUniqueness = problemClarity + uniqueSolution + marketDifferentiation;
-  const patentStrength =
-    tractionProfile.patentStatus === 'published' && uploadedDocuments.has('patent_proof')
-      ? 120
-      : tractionProfile.patentStatus === 'filed' && uploadedDocuments.has('patent_proof')
-        ? 40
-        : 0;
+  const hasPatentProof = uploadedDocuments.has('patent_proof');
+  const patentFiled =
+    (tractionProfile.patentStatus === 'filed' ||
+      tractionProfile.patentStatus === 'published') &&
+    hasPatentProof
+      ? 40
+      : 0;
+  const patentPublished =
+    tractionProfile.patentStatus === 'published' && hasPatentProof ? 80 : 0;
+  const patentStrength = Math.min(120, patentFiled + patentPublished);
   const itrFiling =
     tractionProfile.hasItrFiling && uploadedDocuments.has('itr_filing') ? 40 : 0;
   const revenueProof =
@@ -297,6 +311,8 @@ export const buildInnovationScorePreview = (input: {
       startupStage,
       innovationUniqueness,
       patentStrength,
+      patentFiled,
+      patentPublished,
       revenueValidation,
       grantsAndRecognition,
       fundingStatus,

@@ -1,6 +1,7 @@
 import { Server } from 'socket.io';
 import jwt from 'jsonwebtoken';
 import { env } from '../config/env';
+import { UserRole } from '../types/roles.types';
 
 export const initScoreSocket = (io: Server) => {
   const score = io.of('/score');
@@ -14,6 +15,7 @@ export const initScoreSocket = (io: Server) => {
       }) as any;
       socket.data.userId = decoded._id;
       socket.data.role = decoded.role;
+      socket.data.institutionId = decoded.institutionId ?? null;
       next();
     } catch {
       next(new Error('Unauthorized'));
@@ -24,8 +26,20 @@ export const initScoreSocket = (io: Server) => {
     const userId = socket.data.userId;
     socket.join(`user:${userId}`);
 
+    if ([UserRole.SCHOOL, UserRole.COLLEGE].includes(socket.data.role)) {
+      socket.join(`institution:${userId}`);
+    }
+
+    if (socket.data.institutionId) {
+      socket.join(`institution:${socket.data.institutionId}`);
+    }
+
     socket.on('disconnect', () => {
       socket.leave(`user:${userId}`);
+      socket.leave(`institution:${userId}`);
+      if (socket.data.institutionId) {
+        socket.leave(`institution:${socket.data.institutionId}`);
+      }
     });
   });
 };

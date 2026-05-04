@@ -1,15 +1,19 @@
 import { useState } from 'react';
-import { useQuery } from '@tanstack/react-query';
+import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import {
   CheckCircle2,
   Clock,
   Handshake,
   Link2,
   Loader2,
+  TrendingUp,
+  DollarSign,
   X,
   XCircle,
+  RefreshCw,
 } from 'lucide-react';
 import { workspaceApi } from '../../../api/workspace.api';
+import { dealApi } from '../../../api/deal.api';
 import type { DealSummaryView } from '../../../types/deal.types';
 import { DEAL_STAGE_META } from './dealStageMeta';
 
@@ -159,6 +163,9 @@ export interface DealCardProps {
   linkingWorkspaceId?: string;
 }
 
+const formatINRAmount = (value: number) =>
+  new Intl.NumberFormat('en-IN', { style: 'currency', currency: 'INR', maximumFractionDigits: 0 }).format(value);
+
 export function DealCard({
   deal,
   index = 0,
@@ -168,6 +175,12 @@ export function DealCard({
   isLinking = false,
   linkingWorkspaceId,
 }: DealCardProps) {
+  const queryClient = useQueryClient();
+  const [showCounterForm, setShowCounterForm] = useState(false);
+  const [counterAmount, setCounterAmount] = useState('');
+  const [counterEquity, setCounterEquity] = useState('');
+  const [counterError, setCounterError] = useState<string | null>(null);
+
   const stage = DEAL_STAGE_META[deal.currentStage];
   const investorName = deal.investorDisplayName || `Investor #${index + 1}`;
   const canRespond =
@@ -175,6 +188,59 @@ export function DealCard({
     deal.founderDecision.status === 'pending' &&
     deal.status === 'active' &&
     Boolean(onRespond);
+
+  const negotiation = deal.negotiation;
+  const termsAgreed = negotiation?.status === 'terms_agreed';
+  const startupAlreadyAccepted = negotiation?.startupAgreed ?? false;
+  const investorAlreadyAccepted = negotiation?.investorAgreed ?? false;
+  const hasProposedTerms = !!negotiation?.investorProposedAmount;
+  const isCounterOffer = negotiation?.status === 'counter_offer';
+  const canAcceptTerms =
+    deal.currentStage === 0 &&
+    deal.status === 'active' &&
+    hasProposedTerms &&
+    !termsAgreed &&
+    !startupAlreadyAccepted;
+  const canCounter =
+    deal.currentStage === 0 &&
+    deal.status === 'active' &&
+    hasProposedTerms &&
+    !termsAgreed;
+
+  const acceptTermsMutation = useMutation({
+    mutationFn: () => dealApi.agreeNegotiationTerms(deal._id),
+    onSuccess: async () => {
+      await queryClient.invalidateQueries({ queryKey: ['student-deals'] });
+      await queryClient.invalidateQueries({ queryKey: ['deals'] });
+    },
+  });
+
+  const counterMutation = useMutation({
+    mutationFn: (payload: { amountINR: number; equityPercent: number }) =>
+      dealApi.proposeNegotiationTerms(deal._id, payload),
+    onSuccess: async () => {
+      setShowCounterForm(false);
+      setCounterAmount('');
+      setCounterEquity('');
+      setCounterError(null);
+      await queryClient.invalidateQueries({ queryKey: ['student-deals'] });
+      await queryClient.invalidateQueries({ queryKey: ['deals'] });
+    },
+    onError: () => {
+      setCounterError('Unable to submit counter offer. Please try again.');
+    },
+  });
+
+  const handleSubmitCounter = () => {
+    const amount = parseFloat(counterAmount);
+    const equity = parseFloat(counterEquity);
+    if (!counterAmount || !counterEquity || amount < 20000 || equity <= 0 || equity > 100) {
+      setCounterError('Enter a valid amount (min ₹20,000) and equity percentage.');
+      return;
+    }
+    setCounterError(null);
+    counterMutation.mutate({ amountINR: amount, equityPercent: equity });
+  };
   const canLinkWorkshop =
     deal.status === 'active' && deal.currentStage >= 2 && Boolean(onLinkWorkshop);
   const hasLinkedWorkshop = Boolean(deal.productWorkshop);
@@ -261,6 +327,148 @@ export function DealCard({
               <XCircle className="h-4 w-4" />
               Decline proposal
             </button>
+          </div>
+        ) : null}
+
+        {/* Negotiation acceptance — stage 0 */}
+        {deal.currentStage === 0 && hasProposedTerms ? (
+          <div className="mt-4 rounded-xl border border-slate-700 bg-slate-900 p-3">
+            <p className="mb-2 text-[11px] uppercase tracking-wider text-slate-500">Proposed Terms</p>
+            <div className="mb-3 flex gap-4">
+              <span className="flex items-center gap-1 text-sm text-white">
+                <DollarSign className="h-3.5 w-3.5 text-slate-400" />
+                {formatINRAmount(negotiation!.investorProposedAmount!)}
+              </span>
+              <span className="flex items-center gap-1 text-sm text-white">
+                <TrendingUp className="h-3.5 w-3.5 text-slate-400" />
+                {negotiation!.investorProposedEquity}%
+              </span>
+            </div>
+
+            {isCounterOffer && negotiation?.studentCounterAmount ? (
+              <div className="mb-3 rounded-lg border border-orange-500/30 bg-orange-900/10 p-2">
+                <p className="mb-1 text-[10px] uppercase tracking-wider text-orange-400">Your Counter Offer</p>
+                <div className="flex gap-4 text-sm text-white">
+                  <span className="flex items-center gap-1">
+                    <DollarSign className="h-3.5 w-3.5 text-slate-400" />
+                    {formatINRAmount(negotiation.studentCounterAmount)}
+                  </span>
+                  <span className="flex items-center gap-1">
+                    <TrendingUp className="h-3.5 w-3.5 text-slate-400" />
+                    {negotiation.studentCounterEquity}%
+                  </span>
+                </div>
+              </div>
+            ) : null}
+
+            <div className="mb-3 grid grid-cols-2 gap-2">
+              <div className={`rounded-lg border p-2 text-center text-[11px] ${
+                investorAlreadyAccepted
+                  ? 'border-emerald-500/30 bg-emerald-900/10 text-emerald-400'
+                  : 'border-slate-700 text-slate-500'
+              }`}>
+                <CheckCircle2 className={`mx-auto mb-0.5 h-3.5 w-3.5 ${investorAlreadyAccepted ? 'text-emerald-400' : 'text-slate-600'}`} />
+                Investor {investorAlreadyAccepted ? 'accepted' : 'pending'}
+              </div>
+              <div className={`rounded-lg border p-2 text-center text-[11px] ${
+                startupAlreadyAccepted
+                  ? 'border-emerald-500/30 bg-emerald-900/10 text-emerald-400'
+                  : 'border-slate-700 text-slate-500'
+              }`}>
+                <CheckCircle2 className={`mx-auto mb-0.5 h-3.5 w-3.5 ${startupAlreadyAccepted ? 'text-emerald-400' : 'text-slate-600'}`} />
+                You {startupAlreadyAccepted ? 'accepted' : 'pending'}
+              </div>
+            </div>
+
+            {termsAgreed ? (
+              <div className="flex items-center gap-2 rounded-lg bg-cyan-900/10 px-3 py-2 text-xs text-cyan-300">
+                <CheckCircle2 className="h-3.5 w-3.5 shrink-0" />
+                Both agreed — awaiting admin review for share allotment
+              </div>
+            ) : startupAlreadyAccepted ? (
+              <div className="flex items-center gap-2 rounded-lg bg-amber-900/10 px-3 py-2 text-xs text-amber-300">
+                <Clock className="h-3.5 w-3.5 shrink-0" />
+                Waiting for the investor to accept
+              </div>
+            ) : (
+              <div className="flex gap-2">
+                {canAcceptTerms && (
+                  <button
+                    type="button"
+                    disabled={acceptTermsMutation.isPending}
+                    onClick={() => { setShowCounterForm(false); acceptTermsMutation.mutate(); }}
+                    className="inline-flex flex-1 items-center justify-center gap-2 rounded-lg bg-emerald-500/10 px-3 py-2 text-xs font-semibold text-emerald-300 transition hover:bg-emerald-500/20 disabled:opacity-50"
+                  >
+                    {acceptTermsMutation.isPending ? (
+                      <Loader2 className="h-3.5 w-3.5 animate-spin" />
+                    ) : (
+                      <CheckCircle2 className="h-3.5 w-3.5" />
+                    )}
+                    {isCounterOffer ? 'Accept Original' : 'Accept Terms'}
+                  </button>
+                )}
+                {canCounter && (
+                  <button
+                    type="button"
+                    onClick={() => setShowCounterForm((prev) => !prev)}
+                    className="inline-flex flex-1 items-center justify-center gap-2 rounded-lg border border-orange-500/30 bg-orange-500/10 px-3 py-2 text-xs font-semibold text-orange-300 transition hover:bg-orange-500/20"
+                  >
+                    <RefreshCw className="h-3.5 w-3.5" />
+                    {showCounterForm ? 'Cancel' : isCounterOffer ? 'Counter Again' : 'Counter Offer'}
+                  </button>
+                )}
+              </div>
+            )}
+
+            {showCounterForm && !startupAlreadyAccepted && !termsAgreed && (
+              <div className="mt-3 rounded-lg border border-orange-500/20 bg-orange-950/10 p-3">
+                <p className="mb-2 text-[10px] uppercase tracking-wider text-orange-400">
+                  {isCounterOffer ? 'New Counter Offer' : 'Counter Offer'}
+                </p>
+                <div className="grid grid-cols-2 gap-2">
+                  <div>
+                    <label className="mb-1 block text-[10px] text-slate-400">Amount (INR)</label>
+                    <input
+                      type="number"
+                      min="20000"
+                      value={counterAmount}
+                      onChange={(e) => setCounterAmount(e.target.value)}
+                      placeholder="20000"
+                      className="w-full rounded-lg border border-slate-700 bg-slate-950 px-3 py-1.5 text-xs text-white placeholder-slate-500 focus:border-orange-500/50 focus:outline-none"
+                    />
+                  </div>
+                  <div>
+                    <label className="mb-1 block text-[10px] text-slate-400">Equity (%)</label>
+                    <input
+                      type="number"
+                      min="0.01"
+                      max="100"
+                      step="0.01"
+                      value={counterEquity}
+                      onChange={(e) => setCounterEquity(e.target.value)}
+                      placeholder="5"
+                      className="w-full rounded-lg border border-slate-700 bg-slate-950 px-3 py-1.5 text-xs text-white placeholder-slate-500 focus:border-orange-500/50 focus:outline-none"
+                    />
+                  </div>
+                </div>
+                {counterError && (
+                  <p className="mt-2 text-[10px] text-red-400">{counterError}</p>
+                )}
+                <button
+                  type="button"
+                  disabled={!counterAmount || !counterEquity || counterMutation.isPending}
+                  onClick={handleSubmitCounter}
+                  className="mt-3 inline-flex w-full items-center justify-center gap-2 rounded-lg bg-orange-500/10 px-3 py-2 text-xs font-semibold text-orange-300 transition hover:bg-orange-500/20 disabled:opacity-50"
+                >
+                  {counterMutation.isPending ? (
+                    <Loader2 className="h-3.5 w-3.5 animate-spin" />
+                  ) : (
+                    <RefreshCw className="h-3.5 w-3.5" />
+                  )}
+                  Submit Counter Offer
+                </button>
+              </div>
+            )}
           </div>
         ) : null}
       </div>

@@ -2,6 +2,7 @@ import { Types } from 'mongoose';
 
 export interface IScoreBreakdown {
   problemsClaimed: number;
+  problemsCompleted: number;
   skillsCompleted: number;
   progressUploads: number;
   patentsSubmitted: number;
@@ -9,7 +10,6 @@ export interface IScoreBreakdown {
   mvpsVerified: number;
   marketReadyVerified: number;
   startupsLaunched: number;
-  awardsApproved: number;
 }
 
 export interface IScoreEvent {
@@ -18,6 +18,7 @@ export interface IScoreEvent {
   trigger: string;
   delta: number;
   scoreAfter: number;
+  idempotencyKey?: string;
   metadata?: Record<string, unknown>;
   createdAt: Date;
 }

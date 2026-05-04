@@ -195,8 +195,8 @@ export const approveAwardController = async (req: Request, res: Response) => {
   if (!req.user) throw new ApiError(401, 'UNAUTHORIZED', 'Invalid or expired token');
   const awardId = getParam(req.params.id);
   if (!awardId || !isObjectId(awardId)) throw new ApiError(400, 'INVALID_ID', 'Invalid ID format');
-  const newScore = await approveAward(req.user._id, awardId);
-  res.status(200).json(new ApiResponse({ approved: true, newScore }));
+  await approveAward(req.user._id, awardId);
+  res.status(200).json(new ApiResponse({ approved: true }));
 };
 
 export const rejectAwardController = async (req: Request, res: Response) => {

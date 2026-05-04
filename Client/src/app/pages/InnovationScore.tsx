@@ -19,7 +19,7 @@ import { MAX_INNOVATION_SCORE } from "../../constants/score";
 import { useInnovationScore } from "../../hooks/useInnovationScore";
 import { type ScoreBreakdown, type ScoreEvent } from "../../types/score.types";
 
-const eventLabel: Record<ScoreEvent["trigger"], string> = {
+const eventLabel: Record<string, string> = {
   PROBLEM_CLAIMED: "Claimed a problem",
   PROBLEM_COMPLETED: "Completed a problem",
   SKILL_COMPLETED: "Completed a skill milestone",
@@ -29,8 +29,6 @@ const eventLabel: Record<ScoreEvent["trigger"], string> = {
   MVP_VERIFIED: "MVP verified",
   MARKET_READY_VERIFIED: "Market-ready verification awarded",
   STARTUP_LAUNCHED: "Startup launched",
-  AWARD_SUBMITTED: "Submitted an award",
-  AWARD_APPROVED: "Award approved",
   GITHUB_CONNECTED: "Connected GitHub",
   LINKEDIN_CONNECTED: "Connected LinkedIn",
   RESUME_UPLOADED: "Uploaded resume",
@@ -45,6 +43,7 @@ const breakdownCards: Array<{
   key: keyof ScoreBreakdown;
   label: string;
 }> = [
+  { key: "problemsCompleted", label: "Problems Completed" },
   { key: "skillsCompleted", label: "Skills Completed" },
   { key: "progressUploads", label: "Progress Uploads" },
   { key: "patentsSubmitted", label: "Patents Submitted" },
@@ -52,7 +51,6 @@ const breakdownCards: Array<{
   { key: "mvpsVerified", label: "MVPs Verified" },
   { key: "marketReadyVerified", label: "Market Ready" },
   { key: "startupsLaunched", label: "Startups Launched" },
-  { key: "awardsApproved", label: "Awards Approved" },
 ];
 
 const earningRules: Array<{
@@ -70,13 +68,13 @@ const earningRules: Array<{
     points: "+100 after admin approval",
     icon: Trophy,
     href: "/problem-bank",
-    count: (_breakdown, triggerCounts) => triggerCounts.PROBLEM_COMPLETED ?? 0,
+    count: (breakdown, triggerCounts) => breakdown?.problemsCompleted ?? triggerCounts.PROBLEM_COMPLETED ?? 0,
     completedText: (count) => `${count} completed`,
   },
   {
     id: "skill-milestones",
     label: "Complete skill milestones",
-    points: "+8 each",
+    points: "+40 each",
     icon: Sparkles,
     href: "/product-workspace",
     count: (breakdown) => breakdown?.skillsCompleted ?? 0,
@@ -85,7 +83,7 @@ const earningRules: Array<{
   {
     id: "progress-uploads",
     label: "Upload workspace progress",
-    points: "+3 each",
+    points: "+15 per workspace milestone",
     icon: Upload,
     href: "/product-workspace",
     count: (breakdown) => breakdown?.progressUploads ?? 0,
@@ -94,7 +92,7 @@ const earningRules: Array<{
   {
     id: "patent-submission",
     label: "Submit a patent",
-    points: "+15 each",
+    points: "+75 each",
     icon: FileText,
     href: "/startup-launch",
     count: (breakdown) => breakdown?.patentsSubmitted ?? 0,
@@ -103,7 +101,7 @@ const earningRules: Array<{
   {
     id: "patent-approved",
     label: "Get a patent approved",
-    points: "+25 each",
+    points: "+125 each",
     icon: Trophy,
     href: "/startup-launch",
     count: (breakdown) => breakdown?.patentsApproved ?? 0,
@@ -112,7 +110,7 @@ const earningRules: Array<{
   {
     id: "mvp-verified",
     label: "Get MVP verification",
-    points: "+20 each",
+    points: "+100 each",
     icon: Gauge,
     href: "/product-workspace",
     count: (breakdown) => breakdown?.mvpsVerified ?? 0,
@@ -121,7 +119,7 @@ const earningRules: Array<{
   {
     id: "market-ready",
     label: "Earn market-ready verification",
-    points: "+30 each",
+    points: "+150 each",
     icon: TrendingUp,
     href: "/startup-launch",
     count: (breakdown) => breakdown?.marketReadyVerified ?? 0,
@@ -130,7 +128,7 @@ const earningRules: Array<{
   {
     id: "startup-launched",
     label: "Launch your startup",
-    points: "+10 each",
+    points: "+50 each",
     icon: Rocket,
     href: "/startup-launch",
     count: (breakdown) => breakdown?.startupsLaunched ?? 0,

@@ -26,6 +26,7 @@ const transferTone: Record<string, string> = {
 
 const breakdownLabels: Record<string, string> = {
   problemsClaimed: 'Problems Claimed',
+  problemsCompleted: 'Problems Completed',
   skillsCompleted: 'Skills Completed',
   progressUploads: 'Progress Uploads',
   patentsSubmitted: 'Patents Submitted',
@@ -33,7 +34,6 @@ const breakdownLabels: Record<string, string> = {
   mvpsVerified: 'MVPs Verified',
   marketReadyVerified: 'Market Ready',
   startupsLaunched: 'Startups Launched',
-  awardsApproved: 'Awards Approved',
 };
 
 const money = (value?: number | null) => currency.format(value ?? 0);

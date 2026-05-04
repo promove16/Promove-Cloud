@@ -48,7 +48,7 @@ const stageIndex = (stage?: string) => {
 };
 
 const metricCards = [
-  { key: 'problemsClaimed', label: 'Problems', icon: Target },
+  { key: 'problemsCompleted', label: 'Problems', icon: Target },
   { key: 'skillsCompleted', label: 'Innovations', icon: Lightbulb },
   { key: 'progressUploads', label: 'Prototypes', icon: TrendingUp },
   { key: 'patentsSubmitted', label: 'Patents', icon: Award },

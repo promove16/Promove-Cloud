@@ -1148,6 +1148,7 @@ export const listPatents = async (status?: string): Promise<AdminPatentItem[]> =
         ...(student?.avatar ? { avatar: student.avatar } : {}),
         scoreBreakdown: student?.scoreBreakdown ?? {
           problemsClaimed: 0,
+          problemsCompleted: 0,
           skillsCompleted: 0,
           progressUploads: 0,
           patentsSubmitted: 0,
@@ -1155,7 +1156,6 @@ export const listPatents = async (status?: string): Promise<AdminPatentItem[]> =
           mvpsVerified: 0,
           marketReadyVerified: 0,
           startupsLaunched: 0,
-          awardsApproved: 0,
         },
       },
       questionnaire: patent.questionnaire,
@@ -1196,16 +1196,28 @@ export const approvePatent = async (adminId: string, patentId: string, trigger: 
     throw new ApiError(400, 'PATENT_NOT_REVIEWABLE', 'Patent cannot be approved in its current state');
   }
 
+  await applyScore({
+    userId: String(patent.studentId),
+    trigger: 'PATENT_SUBMITTED',
+    metadata: {
+      patentId: String(patent._id),
+      adminId,
+      verifiedByAdmin: true,
+    },
+    idempotencyKey: `patent-submitted:first:${patent.studentId}`,
+  });
+
   const newScore = await applyScore({
     userId: String(patent.studentId),
     trigger,
     metadata: { patentId: String(patent._id), adminId },
+    idempotencyKey: `patent-approved:${patent._id}`,
   });
 
   await pushNotification(
     String(patent.studentId),
     'patent_status',
-    'Patent Approved! +25 Innovation Score',
+    'Patent Approved! Innovation Score updated',
     `Your patent for ${patent.projectTitle} has been approved.`,
   );
 
@@ -1262,7 +1274,6 @@ export const listAwards = async (): Promise<AdminAwardItem[]> => {
       ...(award.adminReviewedAt ? { adminReviewedAt: toIso(award.adminReviewedAt) } : {}),
       ...(award.adminReviewedBy ? { adminReviewedBy: String(award.adminReviewedBy) } : {}),
       ...(award.adminNotes ? { adminNotes: award.adminNotes } : {}),
-      scoreAwarded: award.scoreAwarded,
       student: {
         _id: String(award.studentId),
         displayName: student?.displayName ?? 'Student',
@@ -1282,24 +1293,16 @@ export const approveAward = async (adminId: string, awardId: string) => {
   award.status = 'approved';
   award.adminReviewedAt = new Date();
   award.adminReviewedBy = new Types.ObjectId(adminId);
-  award.scoreAwarded = true;
   await award.save();
-
-  const newScore = await applyScore({
-    userId: String(award.studentId),
-    trigger: 'AWARD_APPROVED',
-    metadata: { awardId: String(award._id), adminId },
-  });
 
   await pushNotification(
     String(award.studentId),
     'system',
-    'Award approved! +15 Innovation Score',
+    'Award approved',
     `${award.title} has been approved by the admin team.`,
   );
 
   await createAudit(adminId, 'AWARD_APPROVED', String(award._id), 'Award', { studentId: String(award.studentId) });
-  return newScore;
 };
 
 export const rejectAward = async (adminId: string, awardId: string, adminNotes: string) => {
@@ -1325,6 +1328,16 @@ export const verifyMilestone = async (adminId: string, milestoneId: string, mile
   );
   if (!milestone) throw new ApiError(404, 'MILESTONE_NOT_FOUND', 'Milestone not found');
 
+  const existingAward = await ScoreEvent.exists({
+    userId: workspace.ownerId,
+    'metadata.milestoneId': milestoneId,
+  });
+
+  if (existingAward) {
+    const user = await User.findById(workspace.ownerId).select('innovationScore').lean();
+    return user?.innovationScore ?? 0;
+  }
+
   milestone.isCompleted = true;
   milestone.completionPercent = 100;
   milestone.completedAt = new Date();
@@ -1336,6 +1349,7 @@ export const verifyMilestone = async (adminId: string, milestoneId: string, mile
     userId: String(workspace.ownerId),
     trigger,
     metadata: { workspaceId: String(workspace._id), milestoneId, milestoneType, adminId },
+    idempotencyKey: `milestone-verified:${milestoneId}:${trigger}`,
   });
 
   await pushNotification(

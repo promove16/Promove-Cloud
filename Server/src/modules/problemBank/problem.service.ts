@@ -1087,6 +1087,7 @@ export const reviewProblemSubmission = async (
             workspaceId: String(workspace._id),
             pointsAwarded: submission.pointsAwarded,
           },
+          idempotencyKey: `problem-completed:${submission._id}:${memberId}`,
         });
         await NotificationService.create({
           userId: memberId,

@@ -20,6 +20,10 @@ const scoreEventSchema = new Schema<IScoreEvent>(
       type: Number,
       required: true,
     },
+    idempotencyKey: {
+      type: String,
+      default: undefined,
+    },
     metadata: {
       type: Schema.Types.Mixed,
       default: undefined,
@@ -31,5 +35,14 @@ const scoreEventSchema = new Schema<IScoreEvent>(
 );
 
 scoreEventSchema.index({ userId: 1, createdAt: -1 });
+scoreEventSchema.index(
+  { userId: 1, idempotencyKey: 1 },
+  {
+    unique: true,
+    partialFilterExpression: {
+      idempotencyKey: { $type: 'string' },
+    },
+  },
+);
 
 export const ScoreEvent = model<IScoreEvent>('ScoreEvent', scoreEventSchema);

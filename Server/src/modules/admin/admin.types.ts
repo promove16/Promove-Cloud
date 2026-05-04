@@ -115,6 +115,7 @@ export interface AdminPatentItem {
     avatar?: string;
     scoreBreakdown: {
       problemsClaimed: number;
+      problemsCompleted: number;
       skillsCompleted: number;
       progressUploads: number;
       patentsSubmitted: number;
@@ -122,7 +123,6 @@ export interface AdminPatentItem {
       mvpsVerified: number;
       marketReadyVerified: number;
       startupsLaunched: number;
-      awardsApproved: number;
     };
   };
   questionnaire: {
@@ -194,7 +194,6 @@ export interface AdminAwardItem {
   adminReviewedAt?: string;
   adminReviewedBy?: string;
   adminNotes?: string;
-  scoreAwarded: boolean;
   student: {
     _id: string;
     displayName: string;

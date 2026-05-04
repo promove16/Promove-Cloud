@@ -101,6 +101,7 @@ describe('score integration', () => {
     expect(response.body.data.rankPercentile).toBe(33);
     expect(response.body.data.breakdown).toEqual({
       problemsClaimed: 0,
+      problemsCompleted: 0,
       skillsCompleted: 0,
       progressUploads: 0,
       patentsSubmitted: 0,
@@ -108,10 +109,35 @@ describe('score integration', () => {
       mvpsVerified: 0,
       marketReadyVerified: 0,
       startupsLaunched: 0,
-      awardsApproved: 0,
     });
 
     const updatedUser = await User.findById(user._id).lean();
     expect(updatedUser?.innovationScore).toBe(1000);
+  });
+
+  it('prevents students from reading another student score history', async () => {
+    const { email } = await createApprovedStudent({
+      displayName: 'History Viewer',
+    });
+    const { user: otherUser } = await createApprovedStudent({
+      displayName: 'Private History Owner',
+    });
+
+    await ScoreEvent.create({
+      userId: otherUser._id,
+      trigger: 'PROGRESS_UPLOADED',
+      delta: 15,
+      scoreAfter: 15,
+      metadata: { workspaceId: 'private-workspace' },
+    });
+
+    const accessToken = await loginAs(email);
+
+    const response = await request(app)
+      .get(`/api/score/history/${otherUser._id}`)
+      .set('Authorization', `Bearer ${accessToken}`);
+
+    expect(response.status).toBe(403);
+    expect(response.body.error.code).toBe('SCORE_HISTORY_FORBIDDEN');
   });
 });

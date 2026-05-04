@@ -28,26 +28,27 @@ const getErrorMessage = (error: unknown) => {
 
 const MIN_AMOUNT = 20_000;
 const MAX_PENNY_AMOUNT = 500_000;
+const MAX_PENNY_EQUITY = 5;
+
+const getDefaultRole = (type: InvestorType): InvestorRole => (type === 'penny' ? 'observer' : 'shareholder');
+const getDefaultEquity = (type: InvestorType) => (type === 'penny' ? '2' : '10');
 
 export function PlaceBidModal({ startupId, startupName, board, defaultType = 'penny', onClose, onSuccess }: PlaceBidModalProps) {
   const queryClient = useQueryClient();
+  const initialInvestorType: InvestorType =
+    !board.acceptsPennyInvestors && board.acceptsSoleInvestor ? 'sole' : defaultType;
 
-  const [investorType, setInvestorType] = useState<InvestorType>(
-    !board.acceptsPennyInvestors && board.acceptsSoleInvestor ? 'sole' : defaultType,
-  );
+  const [investorType, setInvestorType] = useState<InvestorType>(initialInvestorType);
   const [amount, setAmount] = useState('20000');
-  const [equity, setEquity] = useState('2');
-  const [role, setRole] = useState<InvestorRole>('observer');
+  const [equity, setEquity] = useState(() => getDefaultEquity(initialInvestorType));
+  const [role, setRole] = useState<InvestorRole>(() => getDefaultRole(initialInvestorType));
   const [coverLetter, setCoverLetter] = useState('');
   const [error, setError] = useState<string | null>(null);
 
-  // Reset equity when switching types
+  // Reset terms when switching investor type so the form cannot keep an invalid role/equity pair.
   useEffect(() => {
-    if (investorType === 'penny') {
-      setEquity('2');
-    } else {
-      setEquity('10');
-    }
+    setEquity(getDefaultEquity(investorType));
+    setRole(getDefaultRole(investorType));
   }, [investorType]);
 
   const placeBidMutation = useMutation({
@@ -76,8 +77,18 @@ export function PlaceBidModal({ startupId, startupName, board, defaultType = 'pe
       return;
     }
 
-    if (!Number.isFinite(equityNum) || equityNum <= 0 || equityNum > 49) {
-      setError('Equity must be between 0.01% and 49%.');
+    if (!Number.isFinite(equityNum) || equityNum <= 0 || equityNum > 100) {
+      setError('Equity must be between 0.01% and 100%.');
+      return;
+    }
+
+    if (investorType === 'penny' && equityNum > MAX_PENNY_EQUITY) {
+      setError(`Penny investors cannot request more than ${MAX_PENNY_EQUITY}% equity.`);
+      return;
+    }
+
+    if (investorType === 'sole' && role === 'director' && equityNum < 51) {
+      setError('Director role requires at least 51% equity.');
       return;
     }
 
@@ -242,17 +253,22 @@ export function PlaceBidModal({ startupId, startupName, board, defaultType = 'pe
             </div>
             <div>
               <label className="mb-1.5 block text-xs font-medium text-slate-400">
-                Equity % — max 49%
+                Equity %
               </label>
               <Input
                 type="number"
                 min={0.01}
-                max={49}
+                max={investorType === 'penny' ? MAX_PENNY_EQUITY : 100}
                 step={0.01}
                 value={equity}
                 onChange={(e) => setEquity(e.target.value)}
                 placeholder="2"
               />
+              {investorType === 'penny' ? (
+                <div className="mt-1 text-xs text-slate-500">Max: {MAX_PENNY_EQUITY}%</div>
+              ) : role === 'director' ? (
+                <div className="mt-1 text-xs text-slate-500">Director role needs at least 51%.</div>
+              ) : null}
             </div>
           </div>
 
@@ -267,9 +283,17 @@ export function PlaceBidModal({ startupId, startupName, board, defaultType = 'pe
                 onChange={(e) => setRole(e.target.value as InvestorRole)}
                 className="w-full appearance-none rounded-lg border border-slate-700 bg-slate-900 px-4 py-3 pr-10 text-sm text-white focus:outline-none focus:ring-1 focus:ring-cyan-500"
               >
-                <option value="observer">Observer — view progress, no voting</option>
-                <option value="shareholder">Shareholder — voting rights</option>
-                <option value="director">Director — board seat + veto rights</option>
+                {investorType === 'penny' ? (
+                  <>
+                    <option value="observer">Observer — view progress, no voting</option>
+                    <option value="shareholder">Shareholder — voting rights</option>
+                  </>
+                ) : (
+                  <>
+                    <option value="shareholder">Shareholder — voting rights</option>
+                    <option value="director">Director — board seat + veto rights</option>
+                  </>
+                )}
               </select>
               <ChevronDown className="pointer-events-none absolute right-3 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400" />
             </div>

@@ -287,7 +287,7 @@ const normalizeFounderSummary = (
   founder: Partial<MarketplaceFounderSummary>,
 ): MarketplaceFounderSummary => ({
   _id: founder._id ?? '',
-  displayName: founder.displayName ?? 'Founder',
+  displayName: founder.displayName || 'Founder',
   ...(founder.avatar ? { avatar: founder.avatar } : {}),
   innovationScore: founder.innovationScore ?? 0,
   ...(founder.headline ? { headline: founder.headline } : {}),

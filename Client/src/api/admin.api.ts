@@ -110,7 +110,6 @@ export interface AdminPatentItem {
   adminReviewedAt?: string;
   adminReviewedBy?: string;
   adminNotes?: string;
-  scoreAwarded: boolean;
   student: {
     _id: string;
     displayName: string;
