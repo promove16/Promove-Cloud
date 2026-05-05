@@ -169,6 +169,9 @@ const computeShares = (equityPercent: number, totalShares: number) =>
 const currentStage = (deal: DealDocumentLike): DealStage => deal.stage;
 
 const nextActionLabel = (deal: DealDocumentLike): string => {
+  if (deal.cancellationRequest?.status === 'pending') {
+    return 'Cancellation request under admin review';
+  }
   if (deal.stage === 0) {
     return deal.negotiation?.termsAgreedAt ? 'Advance to Due Diligence' : 'Continue negotiation';
   }
@@ -229,6 +232,24 @@ const getFounderDecisionView = (deal: DealDocumentLike) => {
     ...(deal.founderDecision?.respondedAt ? { respondedAt: deal.founderDecision.respondedAt.toISOString() } : {}),
     ...(deal.founderDecision?.respondedBy ? { respondedBy: String(deal.founderDecision.respondedBy) } : {}),
     ...(deal.founderDecision?.note ? { note: deal.founderDecision.note } : {}),
+  };
+};
+
+const getCancellationRequestView = (deal: DealDocumentLike) => {
+  const request = deal.cancellationRequest;
+  if (!request?.status) {
+    return undefined;
+  }
+
+  return {
+    status: request.status,
+    ...(request.reason ? { reason: request.reason } : {}),
+    ...(request.requestedBy ? { requestedBy: String(request.requestedBy) } : {}),
+    ...(request.requestedByRole ? { requestedByRole: request.requestedByRole } : {}),
+    ...(request.requestedAt ? { requestedAt: request.requestedAt.toISOString() } : {}),
+    ...(request.reviewedBy ? { reviewedBy: String(request.reviewedBy) } : {}),
+    ...(request.reviewedAt ? { reviewedAt: request.reviewedAt.toISOString() } : {}),
+    ...(request.reviewNotes ? { reviewNotes: request.reviewNotes } : {}),
   };
 };
 
@@ -428,6 +449,7 @@ const buildSummary = (
     stockTransfer: getStockTransferView(deal),
     royalty: getRoyaltyView(deal),
     founderDecision: getFounderDecisionView(deal),
+    ...(getCancellationRequestView(deal) ? { cancellationRequest: getCancellationRequestView(deal) } : {}),
     ...(getNegotiationView(deal) ? { negotiation: getNegotiationView(deal) } : {}),
     innovationScoreSnapshot: deal.innovationScoreSnapshot,
     nextActionLabel: nextActionLabel(deal),
@@ -2771,6 +2793,76 @@ export const cancelDealByParticipant = async (
   const actorLabel = getCancellationActorLabel(actorRole);
   const now = new Date();
   const reason = parsed.reason?.trim();
+  const requiresAdminCancellation =
+    deal.stage > 0 ||
+    Boolean(deal.adminApprovalRequired) ||
+    deal.mediationStatus === 'under_review' ||
+    Boolean(deal.negotiation?.termsAgreedAt) ||
+    deal.negotiation?.status === 'terms_agreed';
+
+  if (requiresAdminCancellation) {
+    if (deal.cancellationRequest?.status === 'pending') {
+      throw new ApiError(
+        409,
+        'DEAL_CANCELLATION_REQUEST_PENDING',
+        'A cancellation request is already pending admin review',
+      );
+    }
+
+    deal.cancellationRequest = {
+      status: 'pending',
+      ...(reason ? { reason } : {}),
+      requestedBy: new Types.ObjectId(userId),
+      requestedByRole: actorRole,
+      requestedAt: now,
+    };
+    deal.mediationStatus = 'under_review';
+    deal.negotiation = deal.negotiation || { status: 'initial', messages: [] };
+    deal.negotiation.lastUpdatedAt = now;
+    deal.negotiation.messages = deal.negotiation.messages || [];
+    deal.negotiation.messages.push({
+      _id: new Types.ObjectId(),
+      senderId: new Types.ObjectId(userId),
+      senderRole: actorRole,
+      message: reason
+        ? `${actorLabel} requested admin cancellation review: ${reason}`
+        : `${actorLabel} requested admin cancellation review.`,
+      timestamp: now,
+    });
+
+    await deal.save();
+
+    const dealObject = deal.toObject() as DealDocumentLike;
+    const context = await fetchDealContext(dealObject);
+
+    const admins = await User.find({ role: UserRole.ADMIN, isActive: true }).select('_id').lean();
+    await Promise.all(
+      admins.map((admin) =>
+        notificationQueue.add('deal-cancellation-requested', {
+          userId: String(admin._id),
+          type: 'system',
+          title: 'Deal cancellation requested',
+          body: `${actorLabel} requested admin review to cancel the ${context.startup.name} deal.`,
+          link: `/dashboard/admin/deals/${dealId}`,
+          metadata: {
+            dealId,
+            startupId: String(deal.startupId),
+            requestedBy: userId,
+            requestedByRole: actorRole,
+          },
+        }),
+      ),
+    );
+
+    return buildDetail(
+      dealObject,
+      context.startup,
+      context.student,
+      context.investor,
+      context.investor.displayName,
+      context.productWorkshop,
+    );
+  }
 
   deal.status = 'cancelled';
   deal.mediationStatus = 'rejected';

@@ -1572,4 +1572,113 @@ describe('investment workflow integration', () => {
       }),
     );
   });
+
+  it('routes agreed deal cancellation through admin review and locks admin-approved deals', async () => {
+    const founder = await createUser(UserRole.STUDENT, { displayName: 'Admin Cancel Founder' });
+    const investor = await createUser(UserRole.INVESTOR, { displayName: 'Admin Cancel Investor' });
+    const admin = await createUser(UserRole.ADMIN, { displayName: 'Admin Cancel Reviewer' });
+    const startup = await createStartup(founder._id.toString(), { maxPennyInvestors: 5 });
+
+    const bidResponse = await request(app)
+      .post(`/api/startups/${startup._id}/bid`)
+      .set(authHeader(investor))
+      .send({
+        investorType: 'penny',
+        proposedAmountINR: 50000,
+        proposedEquityPercent: 3,
+        chosenRole: 'shareholder',
+      });
+
+    expect(bidResponse.status).toBe(201);
+    await agreeToCurrentTerms({ dealId: bidResponse.body.data._id, participant: founder });
+
+    const cancellationRequestResponse = await request(app)
+      .post(`/api/deals/${bidResponse.body.data._id}/cancel`)
+      .set(authHeader(investor))
+      .send({ reason: 'Investor needs admin-reviewed withdrawal.' });
+
+    expect(cancellationRequestResponse.status).toBe(200);
+    expect(cancellationRequestResponse.body.data).toEqual(
+      expect.objectContaining({
+        status: 'active',
+        mediationStatus: 'under_review',
+        cancellationRequest: expect.objectContaining({
+          status: 'pending',
+          reason: 'Investor needs admin-reviewed withdrawal.',
+          requestedByRole: 'investor',
+        }),
+      }),
+    );
+
+    const duplicateRequestResponse = await request(app)
+      .post(`/api/deals/${bidResponse.body.data._id}/cancel`)
+      .set(authHeader(founder));
+
+    expect(duplicateRequestResponse.status).toBe(409);
+    expect(duplicateRequestResponse.body.error.code).toBe('DEAL_CANCELLATION_REQUEST_PENDING');
+
+    const adminDealsResponse = await request(app)
+      .get('/api/admin/deals')
+      .set(authHeader(admin));
+
+    expect(adminDealsResponse.status).toBe(200);
+    expect(adminDealsResponse.body.data).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({
+          _id: bidResponse.body.data._id,
+          nextActionLabel: 'Review cancellation request',
+          cancellationRequest: expect.objectContaining({ status: 'pending' }),
+        }),
+      ]),
+    );
+
+    const approveCancellationResponse = await request(app)
+      .patch(`/api/admin/deals/${bidResponse.body.data._id}/cancellation`)
+      .set(authHeader(admin))
+      .send({ decision: 'approved', reviewNotes: 'Cancellation approved before transfer approval.' });
+
+    expect(approveCancellationResponse.status).toBe(200);
+    expect(approveCancellationResponse.body.data).toEqual(
+      expect.objectContaining({
+        status: 'cancelled',
+        cancellationRequest: expect.objectContaining({
+          status: 'approved',
+          reviewNotes: 'Cancellation approved before transfer approval.',
+        }),
+      }),
+    );
+
+    const approvedStartup = await createStartup(founder._id.toString(), {
+      name: 'Approved Cancellation Lock',
+      maxPennyInvestors: 5,
+    });
+    const approvedBidResponse = await request(app)
+      .post(`/api/startups/${approvedStartup._id}/bid`)
+      .set(authHeader(investor))
+      .send({
+        investorType: 'penny',
+        proposedAmountINR: 60000,
+        proposedEquityPercent: 3,
+        chosenRole: 'shareholder',
+      });
+
+    expect(approvedBidResponse.status).toBe(201);
+    await approveDealThroughAdmin({
+      founder,
+      investor,
+      admin,
+      dealId: approvedBidResponse.body.data._id,
+      amountINR: 60000,
+      equityPercent: 3,
+      investorRole: 'shareholder',
+    });
+
+    const lockedCancellationResponse = await request(app)
+      .post(`/api/deals/${approvedBidResponse.body.data._id}/cancel`)
+      .set(authHeader(investor))
+      .send({ reason: 'Trying to cancel after approval.' });
+
+    expect(lockedCancellationResponse.status).toBe(400);
+    expect(lockedCancellationResponse.body.error.code).toBe('DEAL_CANCELLATION_LOCKED');
+  });
 });

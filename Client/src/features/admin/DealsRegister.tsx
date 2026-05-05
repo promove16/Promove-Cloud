@@ -45,7 +45,8 @@ export default function DealsRegister() {
               deal.adminApprovalRequired &&
               deal.stockTransfer.status !== 'approved' &&
               deal.stockTransfer.status !== 'rejected' &&
-              !deal.adminApprovedAt;
+              !deal.adminApprovedAt &&
+              deal.cancellationRequest?.status !== 'pending';
 
             return (
               <div key={deal._id} className="rounded-3xl border border-slate-800 bg-slate-950 p-5">
@@ -62,6 +63,11 @@ export default function DealsRegister() {
                       <Badge className="border-emerald-500/30 bg-emerald-500/10 text-emerald-300">
                         {deal.royalty.promovePercentage}% royalty
                       </Badge>
+                      {deal.cancellationRequest?.status === 'pending' ? (
+                        <Badge className="border-rose-500/30 bg-rose-500/10 text-rose-300">
+                          cancellation requested
+                        </Badge>
+                      ) : null}
                     </div>
 
                     <div>
@@ -97,6 +103,11 @@ export default function DealsRegister() {
                     {deal.stockTransfer.requestSummary ? (
                       <div className="rounded-2xl border border-slate-800 bg-slate-900 px-4 py-3 text-sm text-slate-400">
                         {deal.stockTransfer.requestSummary}
+                      </div>
+                    ) : null}
+                    {deal.cancellationRequest?.status === 'pending' ? (
+                      <div className="rounded-2xl border border-rose-500/30 bg-rose-950/10 px-4 py-3 text-sm text-rose-200">
+                        Cancellation reason: {deal.cancellationRequest.reason?.trim() || 'No reason provided.'}
                       </div>
                     ) : null}
                   </div>

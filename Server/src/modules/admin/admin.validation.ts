@@ -78,3 +78,18 @@ export const dealReviewSchema = z
       });
     }
   });
+
+export const dealCancellationReviewSchema = z
+  .object({
+    decision: z.enum(['approved', 'rejected']),
+    reviewNotes: z.string().trim().max(1000).optional(),
+  })
+  .superRefine((value, ctx) => {
+    if (value.decision === 'rejected' && (!value.reviewNotes || value.reviewNotes.length < 10)) {
+      ctx.addIssue({
+        code: z.ZodIssueCode.custom,
+        path: ['reviewNotes'],
+        message: 'Review notes are required when rejecting a cancellation request.',
+      });
+    }
+  });

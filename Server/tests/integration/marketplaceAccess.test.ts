@@ -295,12 +295,42 @@ describe('marketplace access control', () => {
       tagline: 'Built for mentoring and hiring reviews',
       category: 'Robotics',
       stage: 'Launched',
+      pitchDeckUrl: 'https://promove-test-bucket.s3.ap-south-1.amazonaws.com/promove/startups/mentor-visible.pdf',
+      pitchDeckStorageProvider: 's3',
+      pitchDeckStorageKey: 'promove/startups/mentor-visible.pdf',
       launchedToMentors: true,
       launchedToRecruiters: true,
       reviewStatus: 'approved',
       innovationScoreAtLaunch: 91,
       activeProducts: 2,
       teamSize: 1,
+      businessProfile: {
+        problemStatement: 'Schools need safer lab automation review workflows.',
+        solutionSummary: 'A robotics review assistant audits lab setups before live demos.',
+        targetCustomers: 'Institution innovation labs and robotics clubs.',
+        marketAnalysis: 'Campus labs need lightweight safety checks before competitions.',
+        revenueModel: 'Annual lab subscription with paid deployment support.',
+        goToMarketPlan: 'Start with partner institutions and convert mentor-led pilots.',
+      },
+      initializationProfile: {
+        vision: 'Make robotics lab validation easy for student teams.',
+        mission: 'Give mentors a faster way to review prototypes before launch.',
+        productOverview: 'A workspace-linked review layer for robotics prototypes.',
+        currentTraction: 'Pilot customers lined up.',
+        upcomingMilestones: 'Complete the first institution pilot and publish results.',
+        fundingAsk: 'Seeking seed support for pilot hardware kits.',
+      },
+      innovationProfile: {
+        tractionProfile: {
+          startupStage: 'mvp_ready',
+          problemClarity: 'Student teams need clear safety review gates before public demos.',
+          uniqueSolution: 'The product links workspace progress with mentor-reviewed lab checks.',
+          marketDifferentiation: 'It combines project workflow, mentorship and compliance evidence.',
+          patentStatus: 'filed',
+          fundingStatus: 'bootstrapped',
+          hasRevenueProof: true,
+        },
+      },
       totalShares: 1000,
       availableShares: 760,
       reservedForSole: 510,
@@ -323,6 +353,13 @@ describe('marketplace access control', () => {
     expect(recruiterDetailResponse.status).toBe(200);
     expect(recruiterDetailResponse.body.data.project).toBeUndefined();
     expect(recruiterDetailResponse.body.data.sharePool).toBeUndefined();
+    expect(recruiterDetailResponse.body.data.pitchDeckUrl).toContain('X-Amz-Signature=');
+    expect(recruiterDetailResponse.body.data.publicDetails.business).toEqual(
+      expect.objectContaining({
+        problemStatement: 'Schools need safer lab automation review workflows.',
+        solutionSummary: 'A robotics review assistant audits lab setups before live demos.',
+      }),
+    );
 
     expect(mentorDetailResponse.status).toBe(200);
     expect(mentorDetailResponse.body.data.project).toEqual(
@@ -332,6 +369,18 @@ describe('marketplace access control', () => {
       }),
     );
     expect(mentorDetailResponse.body.data.sharePool).toBeUndefined();
+    expect(mentorDetailResponse.body.data.publicDetails.launch).toEqual(
+      expect.objectContaining({
+        currentTraction: 'Pilot customers lined up.',
+        fundingAsk: 'Seeking seed support for pilot hardware kits.',
+      }),
+    );
+    expect(mentorDetailResponse.body.data.publicDetails.innovation).toEqual(
+      expect.objectContaining({
+        fundingStatus: 'bootstrapped',
+        patentStatus: 'filed',
+      }),
+    );
   });
 
   it('shows teammate discovery in the student marketplace', async () => {

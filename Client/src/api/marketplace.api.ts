@@ -166,6 +166,46 @@ export interface MarketplaceStartupTrustProfile {
   fundingStatus?: string;
 }
 
+export interface MarketplaceStartupPublicDetails {
+  business?: {
+    problemStatement?: string;
+    solutionSummary?: string;
+    targetCustomers?: string;
+    marketAnalysis?: string;
+    revenueModel?: string;
+    goToMarketPlan?: string;
+  };
+  launch?: {
+    vision?: string;
+    mission?: string;
+    productStage?: string;
+    productOverview?: string;
+    customerProfile?: string;
+    marketOpportunity?: string;
+    businessModel?: string;
+    currentTraction?: string;
+    upcomingMilestones?: string;
+    fundingAsk?: string;
+  };
+  innovation?: {
+    startupStage?: string;
+    problemClarity?: string;
+    uniqueSolution?: string;
+    marketDifferentiation?: string;
+    patentStatus?: string;
+    fundingStatus?: string;
+    hasItrFiling?: boolean;
+    hasRevenueProof?: boolean;
+    hasGovernmentGrant?: boolean;
+    hasAwardRecognition?: boolean;
+  };
+  publicLinks?: {
+    websiteUrl?: string;
+    productDemoUrl?: string;
+    portfolioUrl?: string;
+  };
+}
+
 export interface MarketplaceStartupItem {
   _id: string;
   entityType: 'startup';
@@ -182,6 +222,7 @@ export interface MarketplaceStartupItem {
   traction: MarketplaceStartupTraction;
   launchTargets: string[];
   trustProfile: MarketplaceStartupTrustProfile;
+  publicDetails?: MarketplaceStartupPublicDetails;
   founders: MarketplaceFounderSummary[];
   primaryFounderId?: string;
   project?: MarketplaceProjectSummary;
@@ -317,28 +358,97 @@ const normalizeStartupTrustProfile = (
   ...(trustProfile?.fundingStatus ? { fundingStatus: trustProfile.fundingStatus } : {}),
 });
 
+const normalizeStartupPublicDetails = (
+  publicDetails?: Partial<MarketplaceStartupPublicDetails>,
+): MarketplaceStartupPublicDetails | undefined => {
+  if (!publicDetails) return undefined;
+
+  const normalized: MarketplaceStartupPublicDetails = {
+    ...(publicDetails.business
+      ? {
+          business: {
+            ...(publicDetails.business.problemStatement ? { problemStatement: publicDetails.business.problemStatement } : {}),
+            ...(publicDetails.business.solutionSummary ? { solutionSummary: publicDetails.business.solutionSummary } : {}),
+            ...(publicDetails.business.targetCustomers ? { targetCustomers: publicDetails.business.targetCustomers } : {}),
+            ...(publicDetails.business.marketAnalysis ? { marketAnalysis: publicDetails.business.marketAnalysis } : {}),
+            ...(publicDetails.business.revenueModel ? { revenueModel: publicDetails.business.revenueModel } : {}),
+            ...(publicDetails.business.goToMarketPlan ? { goToMarketPlan: publicDetails.business.goToMarketPlan } : {}),
+          },
+        }
+      : {}),
+    ...(publicDetails.launch
+      ? {
+          launch: {
+            ...(publicDetails.launch.vision ? { vision: publicDetails.launch.vision } : {}),
+            ...(publicDetails.launch.mission ? { mission: publicDetails.launch.mission } : {}),
+            ...(publicDetails.launch.productStage ? { productStage: publicDetails.launch.productStage } : {}),
+            ...(publicDetails.launch.productOverview ? { productOverview: publicDetails.launch.productOverview } : {}),
+            ...(publicDetails.launch.customerProfile ? { customerProfile: publicDetails.launch.customerProfile } : {}),
+            ...(publicDetails.launch.marketOpportunity ? { marketOpportunity: publicDetails.launch.marketOpportunity } : {}),
+            ...(publicDetails.launch.businessModel ? { businessModel: publicDetails.launch.businessModel } : {}),
+            ...(publicDetails.launch.currentTraction ? { currentTraction: publicDetails.launch.currentTraction } : {}),
+            ...(publicDetails.launch.upcomingMilestones ? { upcomingMilestones: publicDetails.launch.upcomingMilestones } : {}),
+            ...(publicDetails.launch.fundingAsk ? { fundingAsk: publicDetails.launch.fundingAsk } : {}),
+          },
+        }
+      : {}),
+    ...(publicDetails.innovation
+      ? {
+          innovation: {
+            ...(publicDetails.innovation.startupStage ? { startupStage: publicDetails.innovation.startupStage } : {}),
+            ...(publicDetails.innovation.problemClarity ? { problemClarity: publicDetails.innovation.problemClarity } : {}),
+            ...(publicDetails.innovation.uniqueSolution ? { uniqueSolution: publicDetails.innovation.uniqueSolution } : {}),
+            ...(publicDetails.innovation.marketDifferentiation ? { marketDifferentiation: publicDetails.innovation.marketDifferentiation } : {}),
+            ...(publicDetails.innovation.patentStatus ? { patentStatus: publicDetails.innovation.patentStatus } : {}),
+            ...(publicDetails.innovation.fundingStatus ? { fundingStatus: publicDetails.innovation.fundingStatus } : {}),
+            ...(typeof publicDetails.innovation.hasItrFiling === 'boolean' ? { hasItrFiling: publicDetails.innovation.hasItrFiling } : {}),
+            ...(typeof publicDetails.innovation.hasRevenueProof === 'boolean' ? { hasRevenueProof: publicDetails.innovation.hasRevenueProof } : {}),
+            ...(typeof publicDetails.innovation.hasGovernmentGrant === 'boolean' ? { hasGovernmentGrant: publicDetails.innovation.hasGovernmentGrant } : {}),
+            ...(typeof publicDetails.innovation.hasAwardRecognition === 'boolean' ? { hasAwardRecognition: publicDetails.innovation.hasAwardRecognition } : {}),
+          },
+        }
+      : {}),
+    ...(publicDetails.publicLinks
+      ? {
+          publicLinks: {
+            ...(publicDetails.publicLinks.websiteUrl ? { websiteUrl: publicDetails.publicLinks.websiteUrl } : {}),
+            ...(publicDetails.publicLinks.productDemoUrl ? { productDemoUrl: publicDetails.publicLinks.productDemoUrl } : {}),
+            ...(publicDetails.publicLinks.portfolioUrl ? { portfolioUrl: publicDetails.publicLinks.portfolioUrl } : {}),
+          },
+        }
+      : {}),
+  };
+
+  return Object.keys(normalized).length > 0 ? normalized : undefined;
+};
+
 const normalizeStartupItem = (
   startup: Partial<MarketplaceStartupItem>,
-): MarketplaceStartupItem => ({
-  _id: startup._id ?? '',
-  entityType: 'startup',
-  name: startup.name ?? 'Startup',
-  tagline: startup.tagline ?? 'No startup summary available.',
-  category: startup.category ?? 'General',
-  stage: startup.stage ?? 'Ideation',
-  ...(startup.pitchDeckUrl ? { pitchDeckUrl: startup.pitchDeckUrl } : {}),
-  teamSize: startup.teamSize ?? 0,
-  activeProducts: startup.activeProducts ?? 0,
-  innovationScoreAtLaunch: startup.innovationScoreAtLaunch ?? 0,
-  ...(typeof startup.fundingNeeded === 'number' ? { fundingNeeded: startup.fundingNeeded } : {}),
-  ...(startup.launchedAt ? { launchedAt: startup.launchedAt } : {}),
-  traction: normalizeStartupTraction(startup.traction),
-  launchTargets: startup.launchTargets ?? [],
-  trustProfile: normalizeStartupTrustProfile(startup.trustProfile),
-  founders: (startup.founders ?? []).map((founder) => normalizeFounderSummary(founder)),
-  ...(startup.primaryFounderId ? { primaryFounderId: startup.primaryFounderId } : {}),
-  ...(startup.project ? { project: normalizeProjectSummary(startup.project) } : {}),
-});
+): MarketplaceStartupItem => {
+  const publicDetails = normalizeStartupPublicDetails(startup.publicDetails);
+
+  return {
+    _id: startup._id ?? '',
+    entityType: 'startup',
+    name: startup.name ?? 'Startup',
+    tagline: startup.tagline ?? 'No startup summary available.',
+    category: startup.category ?? 'General',
+    stage: startup.stage ?? 'Ideation',
+    ...(startup.pitchDeckUrl ? { pitchDeckUrl: startup.pitchDeckUrl } : {}),
+    teamSize: startup.teamSize ?? 0,
+    activeProducts: startup.activeProducts ?? 0,
+    innovationScoreAtLaunch: startup.innovationScoreAtLaunch ?? 0,
+    ...(typeof startup.fundingNeeded === 'number' ? { fundingNeeded: startup.fundingNeeded } : {}),
+    ...(startup.launchedAt ? { launchedAt: startup.launchedAt } : {}),
+    traction: normalizeStartupTraction(startup.traction),
+    launchTargets: startup.launchTargets ?? [],
+    trustProfile: normalizeStartupTrustProfile(startup.trustProfile),
+    ...(publicDetails ? { publicDetails } : {}),
+    founders: (startup.founders ?? []).map((founder) => normalizeFounderSummary(founder)),
+    ...(startup.primaryFounderId ? { primaryFounderId: startup.primaryFounderId } : {}),
+    ...(startup.project ? { project: normalizeProjectSummary(startup.project) } : {}),
+  };
+};
 
 const normalizeJobSummary = (job: Partial<MarketplaceJobSummary>): MarketplaceJobSummary => ({
   _id: job._id ?? '',

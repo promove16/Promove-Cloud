@@ -8,6 +8,7 @@ export type StockTransferStatus = 'not_started' | 'pending_review' | 'under_revi
 export type RoyaltyStatus = 'pending' | 'invoiced' | 'received';
 export type FounderDecisionStatus = 'pending' | 'accepted' | 'rejected';
 export type NegotiationStatus = 'initial' | 'terms_proposed' | 'counter_offer' | 'terms_agreed' | 'stalled' | 'cancelled';
+export type DealCancellationRequestStatus = 'pending' | 'approved' | 'rejected';
 
 export interface DealNegotiation {
   status: NegotiationStatus;
@@ -67,6 +68,17 @@ export interface DealFounderDecision {
   note?: string;
 }
 
+export interface DealCancellationRequest {
+  status: DealCancellationRequestStatus;
+  reason?: string;
+  requestedBy?: string;
+  requestedByRole?: 'investor' | 'student';
+  requestedAt?: string;
+  reviewedBy?: string;
+  reviewedAt?: string;
+  reviewNotes?: string;
+}
+
 export interface DealProductWorkshopSummary {
   workspaceId: string;
   title: string;
@@ -104,6 +116,7 @@ export interface DealSummaryView {
   stockTransfer: DealStockTransfer;
   royalty: DealRoyalty;
   founderDecision: DealFounderDecision;
+  cancellationRequest?: DealCancellationRequest;
   productWorkshop?: DealProductWorkshopSummary;
   negotiation?: DealNegotiation;
   innovationScoreSnapshot: number;

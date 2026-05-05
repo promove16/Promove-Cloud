@@ -1,4 +1,4 @@
-import { useMemo, useState } from "react";
+import { type ReactNode, useMemo, useState } from "react";
 import { Link, Navigate, useNavigate, useParams } from "react-router-dom";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { isAxiosError } from "axios";
@@ -9,15 +9,20 @@ import {
   BriefcaseBusiness,
   CalendarDays,
   ExternalLink,
+  FileText,
   FolderKanban,
   Globe,
   GraduationCap,
   Handshake,
+  Lightbulb,
   MapPin,
   MessageCircle,
   Send,
+  ShieldCheck,
   Sparkles,
+  Target,
   Users,
+  type LucideIcon,
 } from "lucide-react";
 import {
   MarketplaceEntityDetail,
@@ -85,6 +90,24 @@ const getDashboardRole = (role?: UserRole) => role ?? UserRole.STUDENT;
 const formatDate = (value?: string) => (value ? dateFormatter.format(new Date(value)) : "Not specified");
 
 const formatRole = (value: string) => value.charAt(0).toUpperCase() + value.slice(1);
+const formatLabel = (value?: string) =>
+  value
+    ? value
+        .split("_")
+        .filter(Boolean)
+        .map((part) => part.charAt(0).toUpperCase() + part.slice(1))
+        .join(" ")
+    : "Not specified";
+const formatFundingStatus = (value?: string) => {
+  if (!value || value === "none") return "No funding yet";
+  if (value === "angel_seed") return "Angel / Seed";
+  if (value === "vc") return "VC Funded";
+  return formatLabel(value);
+};
+const formatPatentStatus = (value?: string) => {
+  if (!value || value === "none") return "Not filed";
+  return formatLabel(value);
+};
 
 const isStartupDetail = (entity: MarketplaceEntityDetail): entity is MarketplaceStartupDetail => entity.entityType === "startup";
 const isInstitutionEntityType = (entityType: MarketplaceEntityType) => entityType === "school" || entityType === "college";
@@ -228,6 +251,7 @@ function StartupDetailView({
   const isInvestorView = currentUser?.role === UserRole.INVESTOR;
   const canShowInvestorButton = isInvestorView && (entity.acceptsPennyInvestors || entity.acceptsSoleInvestor);
   const primaryLocation = entity.founders.map((founder) => founder.location).find(Boolean);
+  const fundingLabel = typeof entity.fundingNeeded === "number" ? money.format(entity.fundingNeeded) : "Undisclosed";
   const summaryMeta = [
     primaryLocation,
     ...entity.launchTargets.slice(0, 1),
@@ -243,10 +267,66 @@ function StartupDetailView({
         entity.traction.revenueGenerating ? "Revenue Generating" : "",
         entity.traction.patentFiled ? "Patent Filed" : "",
         entity.launchTargets.includes("Investors") ? "Open for Investment" : "",
-        ...entity.trustProfile.signals.slice(0, 3),
+        ...entity.trustProfile.signals.slice(0, 5),
       ].filter(Boolean),
     ),
   ];
+  const publicDetails = entity.publicDetails ?? {};
+  const questionnaireRows = [
+    {
+      label: "Startup Stage",
+      value: formatLabel(publicDetails.innovation?.startupStage),
+      icon: Sparkles,
+      compact: true,
+    },
+    {
+      label: "Funding Status",
+      value: formatFundingStatus(publicDetails.innovation?.fundingStatus),
+      icon: ShieldCheck,
+      compact: true,
+    },
+    {
+      label: "Patent Status",
+      value: formatPatentStatus(publicDetails.innovation?.patentStatus),
+      icon: FileText,
+      compact: true,
+    },
+    {
+      label: "Problem Clarity",
+      value: publicDetails.innovation?.problemClarity,
+      icon: Target,
+    },
+    {
+      label: "Unique Solution",
+      value: publicDetails.innovation?.uniqueSolution,
+      icon: Lightbulb,
+    },
+    {
+      label: "Market Differentiation",
+      value: publicDetails.innovation?.marketDifferentiation,
+      icon: Globe,
+    },
+  ];
+  const proofItems = [
+    { label: "Website live", active: entity.trustProfile.hasWebsite },
+    { label: "Product demo", active: entity.trustProfile.hasProductDemo },
+    { label: "Portfolio linked", active: entity.trustProfile.hasPortfolio },
+    { label: "ITR filing", active: Boolean(publicDetails.innovation?.hasItrFiling) },
+    { label: "Revenue proof", active: Boolean(publicDetails.innovation?.hasRevenueProof) },
+    { label: "Government grant", active: Boolean(publicDetails.innovation?.hasGovernmentGrant) },
+    { label: "Award recognition", active: Boolean(publicDetails.innovation?.hasAwardRecognition) },
+  ];
+  const publicLinks = [
+    publicDetails.publicLinks?.websiteUrl
+      ? { label: "Website", href: publicDetails.publicLinks.websiteUrl, icon: Globe }
+      : null,
+    publicDetails.publicLinks?.productDemoUrl
+      ? { label: "Product demo", href: publicDetails.publicLinks.productDemoUrl, icon: ExternalLink }
+      : null,
+    publicDetails.publicLinks?.portfolioUrl
+      ? { label: "Portfolio", href: publicDetails.publicLinks.portfolioUrl, icon: ArrowUpRight }
+      : null,
+  ].filter((link): link is { label: string; href: string; icon: LucideIcon } => Boolean(link));
 
   const handleExpressInterest = () => {
     navigate('/dashboard/investor/startups', { state: { highlightStartupId: entity._id } });
@@ -254,36 +334,41 @@ function StartupDetailView({
 
   return (
     <div className="space-y-6">
-      <section className="relative overflow-hidden rounded-[32px] border border-white/10 bg-[#090d1b] px-6 py-6 shadow-[0_30px_120px_rgba(15,23,42,0.32)] sm:px-8 sm:py-7 lg:px-10">
-        <div className="pointer-events-none absolute inset-0 bg-[radial-gradient(circle_at_top_left,rgba(34,211,238,0.12),transparent_34%),radial-gradient(circle_at_top_right,rgba(217,70,239,0.1),transparent_30%)]" />
+      <section className="relative overflow-hidden rounded-[28px] border border-white/10 bg-[#080b16] px-5 py-6 shadow-[0_28px_110px_rgba(2,6,23,0.34)] sm:px-7 lg:px-9">
+        <div className="pointer-events-none absolute inset-0 bg-[radial-gradient(circle_at_top_left,rgba(45,212,191,0.13),transparent_36%),radial-gradient(circle_at_bottom_right,rgba(99,102,241,0.12),transparent_34%)]" />
         <div className="relative flex flex-col gap-8 xl:flex-row xl:items-start xl:justify-between">
           <div className="min-w-0 flex-1">
             <div className="flex items-start gap-4">
-              <div className="flex h-14 w-14 shrink-0 items-center justify-center rounded-[18px] bg-[linear-gradient(135deg,#0f172a_0%,#1e293b_100%)] text-lg font-semibold text-white">
+              <div className="flex h-16 w-16 shrink-0 items-center justify-center rounded-[18px] border border-white/10 bg-[#121827] text-xl font-semibold text-white shadow-[inset_0_1px_0_rgba(255,255,255,0.08)]">
                 {entity.name.slice(0, 1).toUpperCase()}
               </div>
 
               <div className="min-w-0 flex-1">
                 <div className="flex flex-wrap items-center gap-2">
-                  <span className="rounded-full bg-slate-950 px-3 py-1 text-xs font-semibold uppercase tracking-[0.18em] text-white">
+                  <span className="rounded-full bg-white px-3 py-1 text-xs font-semibold uppercase tracking-[0.18em] text-slate-950">
                     Startup
                   </span>
-                  <span className="rounded-full border border-cyan-500/30 bg-cyan-500/10 px-3 py-1 text-xs font-semibold text-cyan-200">
-                    Launch
+                  <span className="rounded-full border border-teal-400/25 bg-teal-400/10 px-3 py-1 text-xs font-semibold text-teal-100">
+                    {entity.stage}
                   </span>
+                  {entity.trustProfile.legalStructure ? (
+                    <span className="rounded-full border border-white/10 bg-white/[0.04] px-3 py-1 text-xs font-semibold text-slate-200">
+                      {entity.trustProfile.legalStructure}
+                    </span>
+                  ) : null}
                 </div>
 
-                <h1 className="mt-4 truncate text-2xl font-semibold tracking-tight text-white sm:text-4xl">
+                <h1 className="mt-4 max-w-4xl break-words text-3xl font-semibold leading-tight text-white sm:text-5xl">
                   {entity.name}
                 </h1>
-                <p className="mt-2 truncate text-sm font-medium text-slate-400 sm:text-base">
+                <p className="mt-2 max-w-3xl text-base font-medium leading-7 text-slate-300">
                   {entity.category} • {entity.stage}
                 </p>
 
                 <div className="mt-4 flex flex-wrap items-center gap-x-4 gap-y-2 text-sm text-slate-400">
                   {primaryLocation ? (
                     <span className="inline-flex items-center gap-1.5">
-                      <MapPin className="h-4 w-4 text-cyan-400" />
+                      <MapPin className="h-4 w-4 text-teal-300" />
                       {primaryLocation}
                     </span>
                   ) : null}
@@ -300,7 +385,14 @@ function StartupDetailView({
               {entity.tagline}
             </p>
 
-            <div className="mt-5 flex flex-wrap gap-2">
+            <div className="mt-6 grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
+              <MetricCard compact label="Launch Score" value={String(entity.innovationScoreAtLaunch)} />
+              <MetricCard compact label="Team Size" value={String(entity.teamSize)} />
+              <MetricCard compact label="Products" value={String(entity.activeProducts)} />
+              <MetricCard compact label="Funding Needed" value={fundingLabel} />
+            </div>
+
+            <div className="mt-6 flex flex-wrap gap-2">
               {snapshotChips.map((chip) => (
                 <span
                   key={chip}
@@ -312,16 +404,32 @@ function StartupDetailView({
             </div>
           </div>
 
-          <div className="w-full max-w-[320px] shrink-0 space-y-5">
-            <div className="grid grid-cols-2 gap-4">
-              <MetricCard compact label="Score" value={String(entity.innovationScoreAtLaunch)} />
-              <MetricCard compact label="Team" value={String(entity.teamSize)} />
-              <MetricCard compact label="Products" value={String(entity.activeProducts)} />
-              <MetricCard
-                compact
-                label="Funding"
-                value={typeof entity.fundingNeeded === "number" ? money.format(entity.fundingNeeded) : "Undisclosed"}
-              />
+          <div className="w-full max-w-[340px] shrink-0 space-y-5 rounded-[24px] border border-white/10 bg-slate-950/35 p-4">
+            <div className="rounded-[20px] border border-white/10 bg-white/[0.04] p-4">
+              <div className="flex items-center gap-2 text-xs uppercase tracking-[0.25em] text-slate-500">
+                <FileText className="h-4 w-4" />
+                Pitch deck
+              </div>
+              <div className="mt-3 text-sm leading-6 text-slate-300">
+                {entity.pitchDeckUrl
+                  ? "The deck opens through a fresh authenticated link."
+                  : "No pitch deck is attached to this startup yet."}
+              </div>
+              {entity.pitchDeckUrl ? (
+                <a
+                  href={entity.pitchDeckUrl}
+                  target="_blank"
+                  rel="noreferrer"
+                  className="mt-4 inline-flex w-full items-center justify-center gap-2 rounded-full bg-white px-4 py-2.5 text-sm font-semibold text-slate-950 transition hover:bg-slate-100 active:scale-[0.98]"
+                >
+                  Open Pitch Deck
+                  <ExternalLink className="h-4 w-4" />
+                </a>
+              ) : (
+                <div className="mt-4 rounded-2xl border border-dashed border-white/10 px-4 py-3 text-sm text-slate-500">
+                  Pitch deck unavailable
+                </div>
+              )}
             </div>
 
             <div className="flex flex-wrap gap-2">
@@ -343,17 +451,6 @@ function StartupDetailView({
                   Message Founder
                 </button>
               ) : null}
-              {entity.pitchDeckUrl ? (
-                <a
-                  href={entity.pitchDeckUrl}
-                  target="_blank"
-                  rel="noreferrer"
-                  className="inline-flex items-center gap-2 rounded-full bg-white px-3.5 py-2 text-sm font-semibold text-slate-950 transition hover:bg-slate-100"
-                >
-                  Open Pitch Deck
-                  <ExternalLink className="h-4 w-4" />
-                </a>
-              ) : null}
             </div>
           </div>
         </div>
@@ -361,6 +458,34 @@ function StartupDetailView({
 
       <section className="grid gap-6 xl:grid-cols-[minmax(0,1fr),300px]">
         <div className="space-y-6 rounded-[32px] border border-white/10 bg-[#090d1b] p-5 shadow-[0_24px_80px_rgba(15,23,42,0.24)] sm:p-6">
+          <StartupPanel title="Startup questionnaire" icon={ShieldCheck}>
+            <div className="grid gap-3 md:grid-cols-3">
+              {questionnaireRows
+                .filter((row) => row.compact)
+                .map((row) => (
+                  <StartupInfoBlock
+                    key={row.label}
+                    compact
+                    label={row.label}
+                    value={row.value ?? "Not answered"}
+                    icon={row.icon}
+                  />
+                ))}
+            </div>
+            <div className="mt-3 grid gap-3">
+              {questionnaireRows
+                .filter((row) => !row.compact)
+                .map((row) => (
+                  <StartupInfoBlock
+                    key={row.label}
+                    label={row.label}
+                    value={row.value ?? "Not answered"}
+                    icon={row.icon}
+                  />
+                ))}
+            </div>
+          </StartupPanel>
+
           <div>
             <div className="text-[11px] uppercase tracking-[0.28em] text-slate-500">Startup signals</div>
             <div className="mt-3 grid gap-2 sm:grid-cols-2 xl:grid-cols-4">
@@ -457,6 +582,7 @@ function StartupDetailView({
             <div className="text-[11px] uppercase tracking-[0.28em] text-slate-500">Traction</div>
             <div className="mt-3 space-y-2">
               <SignalPill compact label="Patent Filed" active={entity.traction.patentFiled} />
+              <SignalPill compact label="Patent Status" value={formatLabel(publicDetails.innovation?.patentStatus)} />
               <SignalPill compact label="MVP Built" active={entity.traction.mvpBuilt} />
               <SignalPill compact label="Revenue Generating" active={entity.traction.revenueGenerating} />
               <SignalPill
@@ -465,6 +591,36 @@ function StartupDetailView({
                 value={typeof entity.traction.usersCount === "number" ? String(entity.traction.usersCount) : "Not shared"}
               />
             </div>
+          </div>
+
+          <div className="border-t border-white/10 pt-5">
+            <div className="text-[11px] uppercase tracking-[0.28em] text-slate-500">Trust proof</div>
+            <div className="mt-3 space-y-2">
+              <SidebarRow compact label="Proof Items" value={String(entity.trustProfile.proofCount)} />
+              <SidebarRow compact label="Funding Status" value={entity.trustProfile.fundingStatus ?? "Not disclosed"} />
+              {proofItems.map((item) => (
+                <SignalPill key={item.label} compact label={item.label} active={item.active} />
+              ))}
+            </div>
+            {publicLinks.length > 0 ? (
+              <div className="mt-4 flex flex-wrap gap-2">
+                {publicLinks.map((link) => {
+                  const Icon = link.icon;
+                  return (
+                    <a
+                      key={link.href}
+                      href={link.href}
+                      target="_blank"
+                      rel="noreferrer"
+                      className="inline-flex items-center gap-2 rounded-full border border-white/10 px-3 py-1.5 text-xs font-semibold text-slate-200 transition hover:border-white/20 hover:bg-white/5"
+                    >
+                      <Icon className="h-3.5 w-3.5" />
+                      {link.label}
+                    </a>
+                  );
+                })}
+              </div>
+            ) : null}
           </div>
 
           {entity.sharePool ? (
@@ -486,6 +642,52 @@ function StartupDetailView({
           ) : null}
         </aside>
       </section>
+    </div>
+  );
+}
+
+function StartupPanel({
+  title,
+  icon: Icon,
+  children,
+}: {
+  title: string;
+  icon: LucideIcon;
+  children: ReactNode;
+}) {
+  return (
+    <div className="rounded-[24px] border border-white/10 bg-white/[0.025] p-4 sm:p-5">
+      <div className="flex items-center gap-2 text-[11px] uppercase tracking-[0.28em] text-slate-500">
+        <Icon className="h-4 w-4" />
+        {title}
+      </div>
+      <div className="mt-4">{children}</div>
+    </div>
+  );
+}
+
+function StartupInfoBlock({
+  label,
+  value,
+  icon: Icon,
+  compact = false,
+}: {
+  label: string;
+  value: string;
+  icon: LucideIcon;
+  compact?: boolean;
+}) {
+  const isUnanswered = value === "Not answered";
+
+  return (
+    <div className="rounded-[20px] border border-white/10 bg-slate-950/30 p-4">
+      <div className="flex items-center gap-2 text-xs font-semibold uppercase tracking-[0.2em] text-slate-500">
+        <Icon className="h-4 w-4 text-teal-300" />
+        {label}
+      </div>
+      <p className={`${compact ? "text-base font-semibold" : "text-sm leading-6"} mt-3 ${isUnanswered ? "text-slate-500" : "text-slate-300"}`}>
+        {value}
+      </p>
     </div>
   );
 }

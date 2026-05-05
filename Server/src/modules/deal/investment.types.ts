@@ -11,6 +11,7 @@ export type StockTransferStatus = 'not_started' | 'pending_review' | 'under_revi
 export type RoyaltyStatus = 'pending' | 'invoiced' | 'received';
 export type FounderDecisionStatus = 'pending' | 'accepted' | 'rejected';
 export type NegotiationStatus = 'initial' | 'terms_proposed' | 'counter_offer' | 'terms_agreed' | 'stalled' | 'cancelled';
+export type DealCancellationRequestStatus = 'pending' | 'approved' | 'rejected';
 
 export interface DealNegotiation {
   status: NegotiationStatus;
@@ -71,6 +72,17 @@ export interface DealFounderDecision {
   note?: string;
 }
 
+export interface DealCancellationRequest {
+  status: DealCancellationRequestStatus;
+  reason?: string;
+  requestedBy?: Types.ObjectId;
+  requestedByRole?: 'investor' | 'student';
+  requestedAt?: Date;
+  reviewedBy?: Types.ObjectId;
+  reviewedAt?: Date;
+  reviewNotes?: string;
+}
+
 export interface InvestmentAuthority {
   investorRole: InvestorRole;
   votingWeight: number;
@@ -100,6 +112,7 @@ export interface IInvestment extends InvestmentAuthority {
   stockTransfer: DealStockTransfer;
   royalty: DealRoyalty;
   founderDecision: DealFounderDecision;
+  cancellationRequest?: DealCancellationRequest;
   fundTransferInitiatedAt?: Date;
   adminApprovalRequired: boolean;
   adminApprovedAt?: Date;
@@ -183,6 +196,16 @@ export interface DealSummaryView extends InvestmentAuthority {
     respondedAt?: string;
     respondedBy?: string;
     note?: string;
+  };
+  cancellationRequest?: {
+    status: DealCancellationRequestStatus;
+    reason?: string;
+    requestedBy?: string;
+    requestedByRole?: 'investor' | 'student';
+    requestedAt?: string;
+    reviewedBy?: string;
+    reviewedAt?: string;
+    reviewNotes?: string;
   };
   negotiation?: {
     status: NegotiationStatus;

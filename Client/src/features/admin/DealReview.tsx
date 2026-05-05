@@ -1,6 +1,6 @@
 import { useMemo, useState, type ReactNode } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
-import { ArrowRight, ExternalLink, FileText, GitBranch, TrendingUp } from 'lucide-react';
+import { ArrowRight, CheckCircle2, ExternalLink, FileText, GitBranch, TrendingUp, XCircle } from 'lucide-react';
 import { useParams } from 'react-router-dom';
 import { adminApi, type AdminDealReviewItem } from '../../api/admin.api';
 import { Badge } from '../../components/ui/Badge';
@@ -88,6 +88,7 @@ export default function DealReview() {
   const { dealId } = useParams<{ dealId: string }>();
   const queryClient = useQueryClient();
   const [reviewNotes, setReviewNotes] = useState('');
+  const [cancellationReviewNotes, setCancellationReviewNotes] = useState('');
 
   const dealQuery = useQuery({
     queryKey: ['admin-deal-review', dealId],
@@ -127,6 +128,20 @@ export default function DealReview() {
     },
   });
 
+  const cancellationMutation = useMutation({
+    mutationFn: (decision: 'approved' | 'rejected') =>
+      adminApi.reviewDealCancellation(dealId!, {
+        decision,
+        reviewNotes: cancellationReviewNotes.trim() || undefined,
+      }),
+    onSuccess: async () => {
+      setCancellationReviewNotes('');
+      await queryClient.invalidateQueries({ queryKey: ['admin-deal-review', dealId] });
+      await queryClient.invalidateQueries({ queryKey: ['admin-deals'] });
+      await queryClient.invalidateQueries({ queryKey: ['admin-analytics'] });
+    },
+  });
+
   const metrics = useMemo(() => {
     if (!deal) return null;
     const amount = deal.amountINR ?? deal.stockDetails.transferValueInr ?? 0;
@@ -142,12 +157,14 @@ export default function DealReview() {
     };
   }, [deal]);
 
+  const canReviewCancellation = deal?.cancellationRequest?.status === 'pending';
   const canApprove = deal
     ? deal.stage === 3 &&
       deal.adminApprovalRequired &&
       deal.stockTransfer.status !== 'approved' &&
       deal.stockTransfer.status !== 'rejected' &&
-      !deal.adminApprovedAt
+      !deal.adminApprovedAt &&
+      !canReviewCancellation
     : false;
   const canReject = deal
     ? deal.stage === 3 &&
@@ -155,8 +172,10 @@ export default function DealReview() {
       deal.stockTransfer.status !== 'approved' &&
       deal.stockTransfer.status !== 'rejected' &&
       !deal.adminApprovedAt &&
+      !canReviewCancellation &&
       reviewNotes.trim().length >= 10
     : false;
+  const canRejectCancellation = canReviewCancellation && cancellationReviewNotes.trim().length >= 10;
 
   if (dealQuery.isLoading) {
     return (
@@ -271,6 +290,57 @@ export default function DealReview() {
               className="w-full border border-slate-800 bg-slate-950 px-4 py-3 text-sm text-white outline-none"
               placeholder="Required when rejecting a transfer"
             />
+            {deal.cancellationRequest ? (
+              <div className="border border-rose-500/30 bg-rose-950/10 px-4 py-4">
+                <div className="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
+                  <div>
+                    <div className="text-[11px] uppercase tracking-[0.25em] text-rose-300">Cancellation Request</div>
+                    <div className="mt-2 text-lg font-semibold capitalize text-white">
+                      {deal.cancellationRequest.status}
+                    </div>
+                    <div className="mt-2 text-sm leading-6 text-slate-300">
+                      {deal.cancellationRequest.reason?.trim() || 'No cancellation reason provided.'}
+                    </div>
+                    <div className="mt-2 text-xs uppercase tracking-[0.18em] text-slate-500">
+                      Requested {dt(deal.cancellationRequest.requestedAt)}
+                    </div>
+                    {deal.cancellationRequest.reviewNotes ? (
+                      <div className="mt-3 text-sm text-slate-400">
+                        Admin note: {deal.cancellationRequest.reviewNotes}
+                      </div>
+                    ) : null}
+                  </div>
+                  {canReviewCancellation ? (
+                    <div className="flex w-full flex-col gap-3 lg:max-w-xs">
+                      <textarea
+                        value={cancellationReviewNotes}
+                        onChange={(event) => setCancellationReviewNotes(event.target.value)}
+                        rows={3}
+                        className="w-full border border-slate-800 bg-slate-950 px-4 py-3 text-sm text-white outline-none"
+                        placeholder="Required when declining cancellation"
+                      />
+                      <Button
+                        onClick={() => cancellationMutation.mutate('approved')}
+                        disabled={cancellationMutation.isPending}
+                        className="w-full justify-center"
+                      >
+                        <CheckCircle2 className="mr-2 h-4 w-4" />
+                        Approve Cancellation
+                      </Button>
+                      <Button
+                        variant="secondary"
+                        onClick={() => cancellationMutation.mutate('rejected')}
+                        disabled={!canRejectCancellation || cancellationMutation.isPending}
+                        className="w-full justify-center"
+                      >
+                        <XCircle className="mr-2 h-4 w-4" />
+                        Decline Cancellation
+                      </Button>
+                    </div>
+                  ) : null}
+                </div>
+              </div>
+            ) : null}
           </div>
         </Section>
       </div>

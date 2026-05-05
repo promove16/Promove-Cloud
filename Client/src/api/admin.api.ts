@@ -14,6 +14,7 @@ import {
   DealMediationStatus,
   DealRequestOrigin,
   DealRoyalty,
+  DealCancellationRequest,
   DealStockDetails,
   DealStockTransfer,
 } from '../types/deal.types';
@@ -200,7 +201,7 @@ export interface AdminDealItem {
   mediatorLabel: string;
   requestOrigin: DealRequestOrigin;
   mediationStatus: DealMediationStatus;
-  stage: 1 | 2 | 3 | 4;
+  stage: 0 | 1 | 2 | 3 | 4;
   amountINR?: number;
   equityPercent?: number;
   investorType?: 'penny' | 'sole';
@@ -214,6 +215,7 @@ export interface AdminDealItem {
   stockDetails: DealStockDetails;
   stockTransfer: DealStockTransfer;
   royalty: DealRoyalty;
+  cancellationRequest?: DealCancellationRequest;
   innovationScoreSnapshot: number;
   status: 'active' | 'closed' | 'cancelled';
   nextActionLabel: string;
@@ -378,6 +380,11 @@ export interface AdminDealReviewPayload {
   reviewNotes?: string;
   royaltyPercentage?: number;
   royaltyStatus?: 'pending' | 'invoiced' | 'received';
+}
+
+export interface AdminDealCancellationReviewPayload {
+  decision: 'approved' | 'rejected';
+  reviewNotes?: string;
 }
 
 export interface AdminAnalyticsData {
@@ -735,6 +742,13 @@ export const adminApi = {
   async updateDealReview(dealId: string, payload: AdminDealReviewPayload) {
     const response = await api.patch<ApiSuccessResponse<AdminDealReviewItem>>(
       `/api/admin/deals/${dealId}/review`,
+      payload,
+    );
+    return response.data.data;
+  },
+  async reviewDealCancellation(dealId: string, payload: AdminDealCancellationReviewPayload) {
+    const response = await api.patch<ApiSuccessResponse<AdminDealReviewItem>>(
+      `/api/admin/deals/${dealId}/cancellation`,
       payload,
     );
     return response.data.data;

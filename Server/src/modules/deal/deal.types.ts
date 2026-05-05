@@ -23,6 +23,8 @@ export type {
   InvestorType,
   RoyaltyStatus,
   DealRoyalty,
+  DealCancellationRequest,
+  DealCancellationRequestStatus,
   StockTransferStatus,
   StartupBidBoardResponse,
   StartupInvestorView,

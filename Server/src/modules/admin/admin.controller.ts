@@ -10,6 +10,7 @@ import {
   analyticsLogsQuerySchema,
   analyticsUsersQuerySchema,
   awardRejectSchema,
+  dealCancellationReviewSchema,
   createMentorProfileSchema,
   dealReviewSchema,
   listMentorshipProgramsQuerySchema,
@@ -41,6 +42,7 @@ import {
   listUsers,
   deleteUser,
   reviewDeal,
+  reviewDealCancellation,
   reviewRegistrationRequest,
   rejectAward,
   rejectPatent,
@@ -264,6 +266,14 @@ export const reviewDealController = async (req: Request, res: Response) => {
   if (!dealId || !isObjectId(dealId)) throw new ApiError(400, 'INVALID_ID', 'Invalid ID format');
   const payload = dealReviewSchema.parse(req.body);
   res.status(200).json(new ApiResponse(await reviewDeal(req.user._id, dealId, payload)));
+};
+
+export const reviewDealCancellationController = async (req: Request, res: Response) => {
+  if (!req.user) throw new ApiError(401, 'UNAUTHORIZED', 'Invalid or expired token');
+  const dealId = getParam(req.params.id);
+  if (!dealId || !isObjectId(dealId)) throw new ApiError(400, 'INVALID_ID', 'Invalid ID format');
+  const payload = dealCancellationReviewSchema.parse(req.body);
+  res.status(200).json(new ApiResponse(await reviewDealCancellation(req.user._id, dealId, payload)));
 };
 
 export const updateDealInvestorRoleController = async (req: Request, res: Response) => {

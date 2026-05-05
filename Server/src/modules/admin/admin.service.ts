@@ -50,6 +50,7 @@ import {
   AdminDealReviewPayload,
   AdminDealReviewItem,
   AdminCreatedMentorProfile,
+  AdminDealCancellationReviewPayload,
   AdminMentorListItem,
   AdminMentorshipProgramReviewPayload,
   AdminMentorshipProgramsResponse,
@@ -495,6 +496,35 @@ const getAdminRoyalty = (deal: {
   };
 };
 
+const getAdminCancellationRequest = (deal: {
+  cancellationRequest?: {
+    status?: 'pending' | 'approved' | 'rejected';
+    reason?: string;
+    requestedBy?: Types.ObjectId;
+    requestedByRole?: 'investor' | 'student';
+    requestedAt?: Date | null;
+    reviewedBy?: Types.ObjectId;
+    reviewedAt?: Date | null;
+    reviewNotes?: string;
+  };
+}) => {
+  const request = deal.cancellationRequest;
+  if (!request?.status) {
+    return undefined;
+  }
+
+  return {
+    status: request.status,
+    ...(request.reason ? { reason: request.reason } : {}),
+    ...(request.requestedBy ? { requestedBy: String(request.requestedBy) } : {}),
+    ...(request.requestedByRole ? { requestedByRole: request.requestedByRole } : {}),
+    ...(request.requestedAt ? { requestedAt: toIso(request.requestedAt) } : {}),
+    ...(request.reviewedBy ? { reviewedBy: String(request.reviewedBy) } : {}),
+    ...(request.reviewedAt ? { reviewedAt: toIso(request.reviewedAt) } : {}),
+    ...(request.reviewNotes ? { reviewNotes: request.reviewNotes } : {}),
+  };
+};
+
 const buildAdminDealItem = (
   deal: {
     _id: Types.ObjectId;
@@ -536,6 +566,16 @@ const buildAdminDealItem = (
       status?: 'pending' | 'invoiced' | 'received';
       settledAt?: Date | null;
     };
+    cancellationRequest?: {
+      status?: 'pending' | 'approved' | 'rejected';
+      reason?: string;
+      requestedBy?: Types.ObjectId;
+      requestedByRole?: 'investor' | 'student';
+      requestedAt?: Date | null;
+      reviewedBy?: Types.ObjectId;
+      reviewedAt?: Date | null;
+      reviewNotes?: string;
+    };
     innovationScoreSnapshot: number;
     status: 'active' | 'closed' | 'cancelled';
   },
@@ -551,7 +591,7 @@ const buildAdminDealItem = (
   requestOrigin: deal.requestOrigin ?? 'investor',
   mediationStatus: deal.mediationStatus ?? (deal.stage >= 3 ? 'under_review' : 'intake'),
   investorType: deal.investorType,
-  stage: deal.stage as 1 | 2 | 3 | 4,
+  stage: deal.stage as 0 | 1 | 2 | 3 | 4,
   ...(deal.amountINR ? { amountINR: deal.amountINR } : {}),
   ...(deal.equityPercent ? { equityPercent: deal.equityPercent } : {}),
   ...(deal.investorRole ? { investorRole: deal.investorRole } : {}),
@@ -564,10 +604,13 @@ const buildAdminDealItem = (
   stockDetails: getAdminStockDetails(deal),
   stockTransfer: getAdminStockTransfer(deal),
   royalty: getAdminRoyalty(deal),
+  ...(getAdminCancellationRequest(deal) ? { cancellationRequest: getAdminCancellationRequest(deal) } : {}),
   innovationScoreSnapshot: deal.innovationScoreSnapshot,
   status: deal.status,
   nextActionLabel:
-    deal.stage < 3
+    deal.cancellationRequest?.status === 'pending'
+      ? 'Review cancellation request'
+      : deal.stage < 3
       ? 'Waiting for stock transfer request'
       : deal.stockTransfer?.status === 'rejected'
         ? 'Transfer rejected - awaiting resubmission'
@@ -619,6 +662,16 @@ const buildAdminDealReviewItem = (
       promoveAmountINR?: number;
       status?: 'pending' | 'invoiced' | 'received';
       settledAt?: Date | null;
+    };
+    cancellationRequest?: {
+      status?: 'pending' | 'approved' | 'rejected';
+      reason?: string;
+      requestedBy?: Types.ObjectId;
+      requestedByRole?: 'investor' | 'student';
+      requestedAt?: Date | null;
+      reviewedBy?: Types.ObjectId;
+      reviewedAt?: Date | null;
+      reviewNotes?: string;
     };
     innovationScoreSnapshot: number;
     status: 'active' | 'closed' | 'cancelled';
@@ -1401,7 +1454,7 @@ export const listDealsAwaitingApproval = async (): Promise<AdminDealItem[]> => {
 
 export const getDealAwaitingApproval = async (dealId: string): Promise<AdminDealReviewItem> => {
   const deal = await Deal.findById(dealId).lean();
-  if (!deal || deal.status === 'cancelled') {
+  if (!deal) {
     throw new ApiError(404, 'DEAL_NOT_FOUND', 'Deal not found');
   }
 
@@ -1455,6 +1508,14 @@ export const reviewDeal = async (
     const deal = await Deal.findById(dealId).session(session);
     if (!deal || deal.status === 'cancelled') {
       throw new ApiError(404, 'DEAL_NOT_FOUND', 'Deal not found');
+    }
+
+    if (deal.cancellationRequest?.status === 'pending') {
+      throw new ApiError(
+        400,
+        'DEAL_CANCELLATION_PENDING',
+        'Resolve the cancellation request before reviewing the transfer',
+      );
     }
 
     if (deal.stage < 2) {
@@ -1565,10 +1626,128 @@ export const reviewDeal = async (
   return getDealAwaitingApproval(reviewResult.dealId);
 };
 
+export const reviewDealCancellation = async (
+  adminId: string,
+  dealId: string,
+  payload: AdminDealCancellationReviewPayload,
+): Promise<AdminDealReviewItem> => {
+  const reviewResult = await runMongoTransaction(async (session) => {
+    const deal = await Deal.findById(dealId).session(session);
+    if (!deal) {
+      throw new ApiError(404, 'DEAL_NOT_FOUND', 'Deal not found');
+    }
+
+    if (deal.status === 'cancelled') {
+      throw new ApiError(400, 'DEAL_ALREADY_CANCELLED', 'This deal is already cancelled');
+    }
+
+    if (deal.cancellationRequest?.status !== 'pending') {
+      throw new ApiError(400, 'DEAL_CANCELLATION_NOT_PENDING', 'This deal is not awaiting cancellation review');
+    }
+
+    if (payload.decision === 'approved' && (deal.status === 'closed' || deal.stage === 4 || deal.adminApprovedAt)) {
+      throw new ApiError(400, 'DEAL_CANCELLATION_LOCKED', 'Admin-approved deals cannot be cancelled');
+    }
+
+    const now = new Date();
+    const reviewNotes = payload.reviewNotes?.trim();
+
+    deal.cancellationRequest = {
+      ...deal.cancellationRequest,
+      status: payload.decision,
+      reviewedBy: new Types.ObjectId(adminId),
+      reviewedAt: now,
+      ...(reviewNotes ? { reviewNotes } : {}),
+    };
+
+    if (payload.decision === 'approved') {
+      const note = reviewNotes || deal.cancellationRequest.reason || 'Cancellation approved by ProMove admin.';
+      deal.status = 'cancelled';
+      deal.mediationStatus = 'rejected';
+      deal.adminApprovalRequired = false;
+      deal.adminApprovedAt = undefined;
+      deal.adminApprovedBy = undefined;
+      deal.closedAt = undefined;
+      deal.founderDecision = {
+        status: 'rejected',
+        respondedAt: now,
+        respondedBy: new Types.ObjectId(adminId),
+        note,
+      };
+      deal.negotiation = deal.negotiation || { status: 'cancelled', messages: [] };
+      deal.negotiation.status = 'cancelled';
+      deal.negotiation.notes = note;
+      deal.negotiation.lastUpdatedAt = now;
+      if (deal.stockTransfer?.status && deal.stockTransfer.status !== 'approved') {
+        deal.stockTransfer = {
+          ...deal.stockTransfer,
+          status: 'rejected',
+          reviewedAt: now,
+          reviewedBy: new Types.ObjectId(adminId),
+          reviewNotes: note,
+        };
+      }
+    } else {
+      deal.mediationStatus = deal.adminApprovedAt
+        ? 'approved'
+        : deal.stage >= 3 || deal.adminApprovalRequired
+          ? 'under_review'
+          : 'intake';
+    }
+
+    await deal.save({ session });
+    await createAudit(
+      adminId,
+      payload.decision === 'approved' ? 'DEAL_REJECTED' : 'DEAL_REVIEW_UPDATED',
+      String(deal._id),
+      'Deal',
+      {
+        cancellationDecision: payload.decision,
+        ...(reviewNotes ? { reviewNotes } : {}),
+      },
+      session,
+    );
+
+    return {
+      dealId: String(deal._id),
+      startupId: String(deal.startupId),
+      investorId: String(deal.investorId),
+      studentId: String(deal.studentId),
+      decision: payload.decision,
+      reviewNotes,
+    };
+  });
+
+  await invalidateInvestmentCaches(reviewResult.startupId, reviewResult.investorId);
+
+  const title =
+    reviewResult.decision === 'approved'
+      ? 'Deal cancellation approved'
+      : 'Deal cancellation declined';
+  const body =
+    reviewResult.decision === 'approved'
+      ? reviewResult.reviewNotes || 'ProMove admin approved the cancellation request.'
+      : reviewResult.reviewNotes || 'ProMove admin declined the cancellation request.';
+
+  await Promise.all([
+    pushNotification(reviewResult.studentId, 'system', title, body),
+    pushNotification(reviewResult.investorId, 'system', title, body),
+  ]);
+
+  return getDealAwaitingApproval(reviewResult.dealId);
+};
+
 export const approveDealStage = async (adminId: string, dealId: string) => {
   const approvalResult = await runMongoTransaction(async (session) => {
     const deal = await Deal.findById(dealId).session(session);
     if (!deal || deal.status === 'cancelled') throw new ApiError(404, 'DEAL_NOT_FOUND', 'Deal not found');
+    if (deal.cancellationRequest?.status === 'pending') {
+      throw new ApiError(
+        400,
+        'DEAL_CANCELLATION_PENDING',
+        'Resolve the cancellation request before approving the transfer',
+      );
+    }
     if (!deal.adminApprovalRequired || deal.stage !== 3) {
       throw new ApiError(400, 'DEAL_NOT_PENDING_APPROVAL', 'Deal is not awaiting admin approval');
     }

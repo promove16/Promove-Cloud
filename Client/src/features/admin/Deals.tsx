@@ -44,11 +44,12 @@ export default function Deals() {
     () =>
       deals.filter(
         (deal) =>
-          deal.stage === 3 &&
-          deal.adminApprovalRequired &&
-          deal.stockTransfer.status !== 'approved' &&
-          deal.stockTransfer.status !== 'rejected' &&
-          !deal.adminApprovedAt,
+          deal.cancellationRequest?.status === 'pending' ||
+          (deal.stage === 3 &&
+            deal.adminApprovalRequired &&
+            deal.stockTransfer.status !== 'approved' &&
+            deal.stockTransfer.status !== 'rejected' &&
+            !deal.adminApprovedAt),
       ),
     [deals],
   );
@@ -75,7 +76,7 @@ export default function Deals() {
             <div className="text-sm text-slate-400">
               <span className="font-medium text-slate-100">{deals.length}</span> deals
               <span className="mx-2 text-slate-700">/</span>
-              <span className="font-medium text-slate-100">{urgentDeals.length}</span> pending transfer
+              <span className="font-medium text-slate-100">{urgentDeals.length}</span> pending review
               <span className="mx-2 text-slate-700">/</span>
               <span className="font-medium text-slate-100">{approvedDeals}</span> approved
             </div>

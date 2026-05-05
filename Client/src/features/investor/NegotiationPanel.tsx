@@ -141,7 +141,10 @@ export function NegotiationPanel({ deal, isInvestor }: NegotiationPanelProps) {
     onSuccess: async () => {
       setShowCancelForm(false);
       setCancelReason('');
-      setFeedback({ type: 'success', message: 'Deal cancelled.' });
+      setFeedback({
+        type: 'success',
+        message: isAdminCancellationReview ? 'Cancellation request sent to admin.' : 'Deal cancelled.',
+      });
       await queryClient.invalidateQueries({ queryKey: ['deal', deal._id] });
       await queryClient.invalidateQueries({ queryKey: ['investor-deal', deal._id] });
       await queryClient.invalidateQueries({ queryKey: ['investor-deals'] });
@@ -219,6 +222,11 @@ export function NegotiationPanel({ deal, isInvestor }: NegotiationPanelProps) {
   const hasAgreed = negotiation?.status === 'terms_agreed';
   const isCancelled = deal.status === 'cancelled' || negotiation?.status === 'cancelled';
   const isAdminReviewPending = deal.currentStage === 3 && deal.adminApprovalRequired && !deal.adminApprovedAt;
+  const isCancellationPending = deal.cancellationRequest?.status === 'pending';
+  const isAdminCancellationReview =
+    hasAgreed || deal.currentStage > 0 || deal.adminApprovalRequired || deal.mediationStatus === 'under_review';
+  const isCancellationLocked =
+    deal.status === 'closed' || deal.currentStage === 4 || Boolean(deal.adminApprovedAt);
   const myAgreed = isInvestor ? negotiation?.investorAgreed : negotiation?.startupAgreed;
   const isCounterOffer = negotiation?.status === 'counter_offer';
   const hasCounterOffer =
@@ -265,7 +273,8 @@ export function NegotiationPanel({ deal, isInvestor }: NegotiationPanelProps) {
     !hasAgreed &&
     !myAgreed &&
     !isCancelled;
-  const canCancel = deal.status === 'active' && deal.currentStage < 4 && !deal.adminApprovedAt;
+  const canCancel = deal.status === 'active' && !isCancellationLocked && !isCancellationPending;
+  const cancelActionLabel = isAdminCancellationReview ? 'Request Cancellation' : 'Cancel Deal';
   const proposalActionLabel = showProposalForm
     ? 'Cancel'
     : isInvestorCounterOffer
@@ -338,6 +347,20 @@ export function NegotiationPanel({ deal, isInvestor }: NegotiationPanelProps) {
         <div className="flex items-center gap-2 rounded-lg border border-red-500/30 bg-red-900/10 px-4 py-3 text-sm text-red-300">
           <XCircle className="h-4 w-4 shrink-0" />
           This deal has been cancelled.
+        </div>
+      )}
+
+      {isCancellationPending && !isCancelled && (
+        <div className="flex items-center gap-2 rounded-lg border border-amber-500/30 bg-amber-900/10 px-4 py-3 text-sm text-amber-300">
+          <Clock className="h-4 w-4 shrink-0" />
+          Cancellation request sent. Waiting for admin review.
+        </div>
+      )}
+
+      {isCancellationLocked && !isCancelled && (
+        <div className="flex items-center gap-2 rounded-lg border border-slate-700 bg-slate-900 px-4 py-3 text-sm text-slate-300">
+          <CheckCircle2 className="h-4 w-4 shrink-0 text-emerald-400" />
+          Admin-approved deals cannot be cancelled.
         </div>
       )}
 
@@ -448,29 +471,38 @@ export function NegotiationPanel({ deal, isInvestor }: NegotiationPanelProps) {
             className="w-full flex-1 gap-2 border-red-500/30 text-red-300 hover:bg-red-900/20"
           >
             <XCircle className="h-4 w-4" />
-            {showCancelForm ? 'Keep Deal' : 'Cancel Deal'}
+            {showCancelForm ? 'Keep Deal' : cancelActionLabel}
           </Button>
         )}
       </div>
 
       {showCancelForm && canCancel && (
         <Card className="border-red-500/30 bg-red-950/10 p-4">
-          <h4 className="mb-3 font-semibold text-white">Cancel Deal</h4>
+          <h4 className="mb-3 font-semibold text-white">{cancelActionLabel}</h4>
           <textarea
             value={cancelReason}
             onChange={(event) => setCancelReason(event.target.value)}
             maxLength={500}
             rows={3}
-            placeholder="Reason for cancellation (optional)"
+            placeholder={
+              isAdminCancellationReview
+                ? 'Reason for admin cancellation review (optional)'
+                : 'Reason for cancellation (optional)'
+            }
             className="w-full resize-none rounded-lg border border-slate-700 bg-slate-950 px-4 py-3 text-sm text-white placeholder:text-slate-600 focus:border-red-400 focus:outline-none focus:ring-1 focus:ring-red-400"
           />
+          {isAdminCancellationReview && (
+            <p className="mt-2 text-xs leading-5 text-slate-400">
+              Terms are already agreed or under review, so admin approval is required before cancellation.
+            </p>
+          )}
           <Button
             onClick={() => cancelDealMutation.mutate()}
             disabled={cancelDealMutation.isPending}
             variant="outline"
             className="mt-3 w-full border-red-500/30 text-red-300 hover:bg-red-900/20"
           >
-            {cancelDealMutation.isPending ? <Loader2 className="h-4 w-4 animate-spin" /> : 'Confirm Cancel'}
+            {cancelDealMutation.isPending ? <Loader2 className="h-4 w-4 animate-spin" /> : `Confirm ${cancelActionLabel}`}
           </Button>
         </Card>
       )}

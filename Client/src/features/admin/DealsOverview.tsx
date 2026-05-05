@@ -72,9 +72,9 @@ export default function DealsOverview() {
         />
         <StatCard
           icon={FileCheck2}
-          label="Pending Transfer Reviews"
+          label="Pending Deal Reviews"
           value={String(urgentDeals.length)}
-          detail="Needs admin sign-off at stage 3"
+          detail="Transfers and cancellation requests needing action"
         />
         <StatCard
           icon={IndianRupee}
@@ -107,7 +107,7 @@ export default function DealsOverview() {
 
           {urgentDeals.length === 0 ? (
             <div className="rounded-2xl border border-dashed border-slate-800 px-4 py-10 text-sm text-slate-400">
-              No deals are waiting for transfer approval right now.
+              No deals are waiting for admin review right now.
             </div>
           ) : (
             <div className="space-y-4">
@@ -123,6 +123,11 @@ export default function DealsOverview() {
                         <Badge className="border-emerald-500/30 bg-emerald-500/10 text-emerald-300">
                           {deal.royalty.promovePercentage}% royalty
                         </Badge>
+                        {deal.cancellationRequest?.status === 'pending' ? (
+                          <Badge className="border-rose-500/30 bg-rose-500/10 text-rose-300">
+                            cancellation requested
+                          </Badge>
+                        ) : null}
                       </div>
 
                       <div>
@@ -141,8 +146,11 @@ export default function DealsOverview() {
                       <Button variant="secondary" onClick={() => navigate(`/dashboard/admin/deals/${deal._id}`)}>
                         Open Review
                       </Button>
-                      <Button onClick={() => approveDeal(deal._id)} disabled={approveBusy}>
-                        Approve Transfer
+                      <Button
+                        onClick={() => approveDeal(deal._id)}
+                        disabled={approveBusy || deal.cancellationRequest?.status === 'pending'}
+                      >
+                        {deal.cancellationRequest?.status === 'pending' ? 'Open Cancellation Review' : 'Approve Transfer'}
                         <ArrowRight className="ml-2 h-4 w-4" />
                       </Button>
                     </div>

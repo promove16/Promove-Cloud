@@ -7,6 +7,8 @@ import { JobPost, type IJobApplicationRecord, type IJobPost } from '../recruiter
 import { mapJob } from '../recruiter/recruiter.mappers';
 import { Startup } from '../startup/startup.model';
 import { Workspace } from '../workspace/workspace.model';
+import { extractS3KeyFromUrl, generatePresignedUrl } from '../../services/fileStorageService';
+import { generateSignedCloudinaryUrl } from '../../services/cloudinaryService';
 
 type PublicLinkSet = {
   websiteUrl?: string;
@@ -121,9 +123,31 @@ type PublicStartup = {
   category: string;
   stage: 'Pre-Idea' | 'Ideation' | 'MVP' | 'Pre-Launch' | 'Launched';
   pitchDeckUrl?: string;
+  pitchDeckStorageProvider?: 'cloudinary' | 's3';
+  pitchDeckStorageKey?: string;
   teamSize: number;
   fundingNeeded?: number;
   activeProducts: number;
+  businessProfile?: {
+    problemStatement?: string;
+    solutionSummary?: string;
+    targetCustomers?: string;
+    marketAnalysis?: string;
+    revenueModel?: string;
+    goToMarketPlan?: string;
+  };
+  initializationProfile?: {
+    vision?: string;
+    mission?: string;
+    productStage?: string;
+    productOverview?: string;
+    customerProfile?: string;
+    marketOpportunity?: string;
+    businessModel?: string;
+    currentTraction?: string;
+    upcomingMilestones?: string;
+    fundingAsk?: string;
+  };
   launchedToInvestors: boolean;
   launchedToMentors: boolean;
   launchedToRecruiters: boolean;
@@ -154,6 +178,10 @@ type PublicStartup = {
       portfolioUrl?: string;
     };
     tractionProfile?: {
+      startupStage?: 'idea' | 'mvp_ready' | 'market_ready' | 'revenue_generating';
+      problemClarity?: string;
+      uniqueSolution?: string;
+      marketDifferentiation?: string;
       patentStatus?: 'none' | 'filed' | 'published';
       hasItrFiling?: boolean;
       hasRevenueProof?: boolean;
@@ -273,6 +301,63 @@ const STARTUP_FUNDING_STATUS_LABELS: Record<string, string> = {
 
 const uniqueStrings = (values: Array<string | undefined>) =>
   Array.from(new Set(values.filter((value): value is string => Boolean(value))));
+
+const mapTextSection = (value?: string | null) => compactString(value);
+
+const mapStartupPublicDetails = (startup: PublicStartup) => {
+  const businessProfile = startup.businessProfile ?? {};
+  const initializationProfile = startup.initializationProfile ?? {};
+  const companyProfile = startup.innovationProfile?.companyProfile ?? {};
+  const tractionProfile = startup.innovationProfile?.tractionProfile ?? {};
+  const publicLinks = {
+    ...(compactString(companyProfile.websiteUrl) ? { websiteUrl: compactString(companyProfile.websiteUrl) } : {}),
+    ...(compactString(companyProfile.productDemoUrl) ? { productDemoUrl: compactString(companyProfile.productDemoUrl) } : {}),
+    ...(compactString(companyProfile.portfolioUrl) ? { portfolioUrl: compactString(companyProfile.portfolioUrl) } : {}),
+  };
+
+  const details = {
+    business: {
+      ...(mapTextSection(businessProfile.problemStatement) ? { problemStatement: mapTextSection(businessProfile.problemStatement) } : {}),
+      ...(mapTextSection(businessProfile.solutionSummary) ? { solutionSummary: mapTextSection(businessProfile.solutionSummary) } : {}),
+      ...(mapTextSection(businessProfile.targetCustomers) ? { targetCustomers: mapTextSection(businessProfile.targetCustomers) } : {}),
+      ...(mapTextSection(businessProfile.marketAnalysis) ? { marketAnalysis: mapTextSection(businessProfile.marketAnalysis) } : {}),
+      ...(mapTextSection(businessProfile.revenueModel) ? { revenueModel: mapTextSection(businessProfile.revenueModel) } : {}),
+      ...(mapTextSection(businessProfile.goToMarketPlan) ? { goToMarketPlan: mapTextSection(businessProfile.goToMarketPlan) } : {}),
+    },
+    launch: {
+      ...(mapTextSection(initializationProfile.vision) ? { vision: mapTextSection(initializationProfile.vision) } : {}),
+      ...(mapTextSection(initializationProfile.mission) ? { mission: mapTextSection(initializationProfile.mission) } : {}),
+      ...(mapTextSection(initializationProfile.productStage) ? { productStage: mapTextSection(initializationProfile.productStage) } : {}),
+      ...(mapTextSection(initializationProfile.productOverview) ? { productOverview: mapTextSection(initializationProfile.productOverview) } : {}),
+      ...(mapTextSection(initializationProfile.customerProfile) ? { customerProfile: mapTextSection(initializationProfile.customerProfile) } : {}),
+      ...(mapTextSection(initializationProfile.marketOpportunity) ? { marketOpportunity: mapTextSection(initializationProfile.marketOpportunity) } : {}),
+      ...(mapTextSection(initializationProfile.businessModel) ? { businessModel: mapTextSection(initializationProfile.businessModel) } : {}),
+      ...(mapTextSection(initializationProfile.currentTraction) ? { currentTraction: mapTextSection(initializationProfile.currentTraction) } : {}),
+      ...(mapTextSection(initializationProfile.upcomingMilestones) ? { upcomingMilestones: mapTextSection(initializationProfile.upcomingMilestones) } : {}),
+      ...(mapTextSection(initializationProfile.fundingAsk) ? { fundingAsk: mapTextSection(initializationProfile.fundingAsk) } : {}),
+    },
+    innovation: {
+      ...(mapTextSection(tractionProfile.startupStage) ? { startupStage: mapTextSection(tractionProfile.startupStage) } : {}),
+      ...(mapTextSection(tractionProfile.problemClarity) ? { problemClarity: mapTextSection(tractionProfile.problemClarity) } : {}),
+      ...(mapTextSection(tractionProfile.uniqueSolution) ? { uniqueSolution: mapTextSection(tractionProfile.uniqueSolution) } : {}),
+      ...(mapTextSection(tractionProfile.marketDifferentiation) ? { marketDifferentiation: mapTextSection(tractionProfile.marketDifferentiation) } : {}),
+      ...(mapTextSection(tractionProfile.patentStatus) ? { patentStatus: mapTextSection(tractionProfile.patentStatus) } : {}),
+      ...(mapTextSection(tractionProfile.fundingStatus) ? { fundingStatus: mapTextSection(tractionProfile.fundingStatus) } : {}),
+      hasItrFiling: Boolean(tractionProfile.hasItrFiling || hasStartupDocument(startup, 'itr_filing')),
+      hasRevenueProof: Boolean(tractionProfile.hasRevenueProof || hasStartupDocument(startup, 'revenue_proof')),
+      hasGovernmentGrant: Boolean(tractionProfile.hasGovernmentGrant || hasStartupDocument(startup, 'grant_certificate')),
+      hasAwardRecognition: Boolean(tractionProfile.hasAwardRecognition || hasStartupDocument(startup, 'award_certificate')),
+    },
+    ...(Object.keys(publicLinks).length > 0 ? { publicLinks } : {}),
+  };
+
+  return {
+    ...(Object.keys(details.business).length > 0 ? { business: details.business } : {}),
+    ...(Object.keys(details.launch).length > 0 ? { launch: details.launch } : {}),
+    ...(Object.keys(details.innovation).length > 0 ? { innovation: details.innovation } : {}),
+    ...(details.publicLinks ? { publicLinks: details.publicLinks } : {}),
+  };
+};
 
 const hasStartupDocument = (startup: PublicStartup, ...categories: string[]) => {
   const uploaded = new Set((startup.documents ?? []).map((document) => document.category));
@@ -644,13 +729,44 @@ const buildStartupVisibilityQuery = (requesterRole: UserRole, search?: string) =
   ],
 });
 
-const buildStartupView = (
+const getSignedPitchDeckUrl = async (startup: PublicStartup) => {
+  if (!startup.pitchDeckUrl) {
+    return undefined;
+  }
+
+  try {
+    if (startup.pitchDeckStorageProvider === 'cloudinary') {
+      const storageKey = startup.pitchDeckStorageKey || extractCloudinaryPublicId(startup.pitchDeckUrl);
+      return storageKey ? generateSignedCloudinaryUrl(storageKey, 'raw') : startup.pitchDeckUrl;
+    }
+
+    const s3Key =
+      startup.pitchDeckStorageProvider === 's3'
+        ? startup.pitchDeckStorageKey || extractS3KeyFromUrl(startup.pitchDeckUrl)
+        : extractS3KeyFromUrl(startup.pitchDeckUrl);
+
+    return s3Key ? await generatePresignedUrl(s3Key) : startup.pitchDeckUrl;
+  } catch (error) {
+    console.error('Error generating signed pitch deck URL for marketplace startup:', error);
+    return startup.pitchDeckUrl;
+  }
+};
+
+const extractCloudinaryPublicId = (url: string): string | null => {
+  if (!url || !url.includes('cloudinary.com')) return null;
+  const match = url.match(/upload\/v\d+\/(.+)$/);
+  return match ? match[1].replace(/\.[^.]+$/, '') : null;
+};
+
+const buildStartupView = async (
   requesterRole: UserRole,
   startup: PublicStartup,
   founders: MarketplaceFounder[],
   workspace?: MarketplaceWorkspace | null,
 ) => {
   const project = mapWorkspace(requesterRole, workspace);
+  const pitchDeckUrl = await getSignedPitchDeckUrl(startup);
+  const publicDetails = mapStartupPublicDetails(startup);
 
   return {
     _id: String(startup._id),
@@ -659,7 +775,7 @@ const buildStartupView = (
     tagline: startup.tagline,
     category: startup.category,
     stage: startup.stage,
-    ...(startup.pitchDeckUrl ? { pitchDeckUrl: startup.pitchDeckUrl } : {}),
+    ...(pitchDeckUrl ? { pitchDeckUrl } : {}),
     teamSize: startup.teamSize || startup.founderIds.length,
     activeProducts: startup.activeProducts,
     innovationScoreAtLaunch: startup.innovationScoreAtLaunch,
@@ -673,6 +789,7 @@ const buildStartupView = (
     },
     launchTargets: toStartupVisibility(startup),
     trustProfile: buildStartupTrustProfile(startup),
+    ...(Object.keys(publicDetails).length > 0 ? { publicDetails } : {}),
     founders: founders.map(mapFounder),
     ...(founders[0] ? { primaryFounderId: String(founders[0]._id) } : {}),
     ...(project ? { project } : {}),
@@ -779,17 +896,14 @@ export const listMarketplaceUsers = async (
 
 const listMarketplaceStartups = async (requesterRole: UserRole, search?: string, page = 1, limit = 20) => {
   const query = buildStartupVisibilityQuery(requesterRole, search);
-  const [startups, total] = await Promise.all([
-    Startup.find(query)
-      .select(
-        '_id founderIds teamMemberIds projectId name tagline category stage pitchDeckUrl teamSize fundingNeeded activeProducts launchedToInvestors launchedToMentors launchedToRecruiters launchedAt innovationScoreAtLaunch totalShares availableShares reservedForSole maxPennyInvestors currentPennyCount hasSoleInvestor traction innovationProfile documents isActive createdAt updatedAt',
-      )
-      .sort({ launchedAt: -1, innovationScoreAtLaunch: -1, updatedAt: -1 })
-      .skip((page - 1) * limit)
-      .limit(limit)
-      .lean<PublicStartup[]>(),
-    Startup.countDocuments(query),
-  ]);
+  const startups = await Startup.find(query)
+    .select(
+      '_id founderIds teamMemberIds projectId name tagline category stage pitchDeckUrl pitchDeckStorageProvider pitchDeckStorageKey teamSize fundingNeeded activeProducts businessProfile initializationProfile launchedToInvestors launchedToMentors launchedToRecruiters launchedAt innovationScoreAtLaunch totalShares availableShares reservedForSole maxPennyInvestors currentPennyCount hasSoleInvestor traction innovationProfile documents isActive createdAt updatedAt',
+    )
+    .sort({ launchedAt: -1, innovationScoreAtLaunch: -1, updatedAt: -1 })
+    .skip((page - 1) * limit)
+    .limit(limit)
+    .lean<PublicStartup[]>();
 
   const allMemberIds = [
     ...new Set(
@@ -817,7 +931,7 @@ const listMarketplaceStartups = async (requesterRole: UserRole, search?: string,
   const founderMap = new Map(founders.map((founder) => [String(founder._id), founder]));
   const workspaceMap = new Map(workspaces.map((workspace) => [String(workspace._id), workspace]));
 
-  return startups.map((startup) => {
+  return Promise.all(startups.map((startup) => {
     const startupMemberIds = [
       ...(startup.founderIds ?? []).map(String),
       ...(startup.teamMemberIds ?? []).map(String),
@@ -833,7 +947,7 @@ const listMarketplaceStartups = async (requesterRole: UserRole, search?: string,
       startupFounders,
       startup.projectId ? workspaceMap.get(String(startup.projectId)) : undefined,
     );
-  });
+  }));
 };
 
 const getMarketplaceUserDetail = async (
@@ -875,7 +989,7 @@ const getMarketplaceUserDetail = async (
       founderIds: userId,
     })
       .select(
-        '_id founderIds teamMemberIds projectId name tagline category stage pitchDeckUrl teamSize fundingNeeded activeProducts launchedToInvestors launchedToMentors launchedToRecruiters launchedAt innovationScoreAtLaunch totalShares availableShares reservedForSole maxPennyInvestors currentPennyCount hasSoleInvestor traction innovationProfile documents isActive createdAt updatedAt',
+        '_id founderIds teamMemberIds projectId name tagline category stage pitchDeckUrl pitchDeckStorageProvider pitchDeckStorageKey teamSize fundingNeeded activeProducts businessProfile initializationProfile launchedToInvestors launchedToMentors launchedToRecruiters launchedAt innovationScoreAtLaunch totalShares availableShares reservedForSole maxPennyInvestors currentPennyCount hasSoleInvestor traction innovationProfile documents isActive createdAt updatedAt',
       )
       .sort({ launchedAt: -1, updatedAt: -1 })
       .limit(6)
@@ -918,7 +1032,7 @@ const getMarketplaceUserDetail = async (
       const hasApplied = getStudentHasAppliedToJob(job, viewerStudentId);
       return mapJob(job, typeof hasApplied === 'boolean' ? { hasApplied } : undefined);
     }),
-    relatedStartups: startups.map((startup) => {
+    relatedStartups: await Promise.all(startups.map((startup) => {
       const memberIds = [...new Set([
         ...(startup.founderIds ?? []).map(String),
         ...(startup.teamMemberIds ?? []).map(String),
@@ -931,7 +1045,7 @@ const getMarketplaceUserDetail = async (
           .filter((founder): founder is MarketplaceFounder => Boolean(founder)),
         startup.projectId ? workspaceMap.get(String(startup.projectId)) : undefined,
       );
-    }),
+    })),
   };
 };
 
@@ -941,7 +1055,7 @@ const getMarketplaceStartupDetail = async (requesterRole: UserRole, startupId: s
     ...buildStartupVisibilityQuery(requesterRole),
   })
     .select(
-      '_id founderIds teamMemberIds projectId name tagline category stage pitchDeckUrl teamSize fundingNeeded activeProducts launchedToInvestors launchedToMentors launchedToRecruiters launchedAt innovationScoreAtLaunch totalShares availableShares reservedForSole maxPennyInvestors currentPennyCount hasSoleInvestor traction innovationProfile documents isActive createdAt updatedAt',
+      '_id founderIds teamMemberIds projectId name tagline category stage pitchDeckUrl pitchDeckStorageProvider pitchDeckStorageKey teamSize fundingNeeded activeProducts businessProfile initializationProfile launchedToInvestors launchedToMentors launchedToRecruiters launchedAt innovationScoreAtLaunch totalShares availableShares reservedForSole maxPennyInvestors currentPennyCount hasSoleInvestor traction innovationProfile documents isActive createdAt updatedAt',
     )
     .lean<PublicStartup | null>();
 
@@ -969,8 +1083,8 @@ const getMarketplaceStartupDetail = async (requesterRole: UserRole, startupId: s
       : Promise.resolve(null),
   ]);
 
-return {
-    ...buildStartupView(requesterRole, startup, founders, workspace),
+  return {
+    ...(await buildStartupView(requesterRole, startup, founders, workspace)),
     ...(requesterRole === UserRole.INVESTOR
       ? {
           sharePool: {

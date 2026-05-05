@@ -1,6 +1,6 @@
 import { useMemo, useState } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
-import { ArrowRight, Clock3, ExternalLink, FileText, Link2, ShieldX } from 'lucide-react';
+import { ArrowRight, Check, FileText, Inbox, SendHorizontal, ShieldX, X } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 import { recruiterApi } from '../../api/recruiter.api';
 import { requestApi } from '../../api/request.api';
@@ -16,13 +16,59 @@ import {
   formatRequestStatus,
   getRequestActorLabel,
   getRequestEntityName,
-  getRequestLinkTargets,
-  getRequestMetadataEntries,
   getRequestPrimaryLink,
 } from './requestPresentation';
 
 const rowClassName =
-  'grid gap-3 border-b border-slate-800 px-3 py-3 lg:grid-cols-[minmax(0,1.2fr)_170px_150px_170px] lg:items-center';
+  'grid gap-4 border-b border-[#334155] px-4 py-4 transition last:border-b-0 lg:grid-cols-[minmax(0,1.7fr)_150px_150px_170px_170px] lg:items-center';
+
+const tableSectionHeaderClassName =
+  'flex items-center justify-between border-b border-[#5b5bd6]/50 bg-[#252c6a] px-4 py-4';
+
+function getRequestInitials(value: string) {
+  const words = value
+    .replace(/[_-]/g, ' ')
+    .split(' ')
+    .map((word) => word.trim())
+    .filter(Boolean);
+
+  if (words.length === 0) {
+    return 'RQ';
+  }
+
+  return words
+    .slice(0, 2)
+    .map((word) => word[0]?.toUpperCase())
+    .join('');
+}
+
+function getActionTypeLabel(request: WorkflowRequest) {
+  return request.actionType ? request.actionType.replace(/_/g, ' ') : request.targetEntityType.replace(/_/g, ' ');
+}
+
+function RequestSummaryCard({
+  label,
+  value,
+  icon: Icon,
+}: {
+  label: string;
+  value: number;
+  icon: typeof Inbox;
+}) {
+  return (
+    <div className="rounded-2xl border border-[#3b4658] bg-[#202938] px-4 py-4 shadow-[0_18px_50px_rgba(2,6,23,0.24)]">
+      <div className="flex items-center justify-between gap-3">
+        <div>
+          <div className="text-2xl font-semibold tabular-nums text-white">{value}</div>
+          <div className="mt-1 text-sm text-slate-400">{label}</div>
+        </div>
+        <div className="grid h-10 w-10 place-items-center rounded-xl border border-[#4b5870] bg-[#2b3547] text-slate-200">
+          <Icon className="h-4 w-4" />
+        </div>
+      </div>
+    </div>
+  );
+}
 
 function getErrorMessage(error: unknown, fallback: string) {
   return (
@@ -82,12 +128,13 @@ function RequestRow({
   const entityName = getRequestEntityName(request);
   const actorLabel = getRequestActorLabel(request, direction);
   const primaryLink = getRequestPrimaryLink(request);
+  const statusClassName = REQUEST_STATUS_COLOR_CLASSES[request.status];
   const isActionable = direction === 'incoming' ? request.status === 'pending' : request.status === 'pending';
 
   return (
     <div
       className={`${rowClassName} transition ${
-        isSelected ? 'bg-slate-900' : 'hover:bg-slate-900'
+        isSelected ? 'bg-[#334155]' : 'bg-[#202938] hover:bg-[#283447]'
       } ${onSelect ? 'cursor-pointer' : ''}`}
       onClick={() => onSelect?.(request)}
       onKeyDown={(event) => {
@@ -102,50 +149,61 @@ function RequestRow({
       role={onSelect ? 'button' : undefined}
       tabIndex={onSelect ? 0 : undefined}
     >
-      <div className="min-w-0">
-        <div className="text-sm font-medium text-white">
-          {getRequestTypeLabel(request)} for {entityName}
+      <div className="flex min-w-0 items-center gap-3">
+        <div className="grid h-11 w-11 flex-shrink-0 place-items-center rounded-xl border border-[#4b5870] bg-[#6d5dfc] text-sm font-semibold text-white shadow-inner shadow-white/10">
+          {getRequestInitials(entityName)}
         </div>
-        <div className="mt-1 text-xs text-slate-500">
-          {direction === 'incoming' ? 'From' : 'To'} {actorLabel}
-          {request.requestedRole ?? request.targetRole ? ` | ${request.requestedRole ?? request.targetRole}` : ''}
-          {request.requestedPermission ? ` | ${request.requestedPermission}` : ''}
-        </div>
-        {request.message ? (
-          <div className="mt-2 rounded border border-slate-800 bg-slate-950 px-3 py-2 text-xs text-slate-300">
-            {request.message}
+        <div className="min-w-0">
+          <div className="truncate text-sm font-semibold text-white">
+            {getRequestTypeLabel(request)} for {entityName}
           </div>
+          <div className="mt-1 truncate text-xs text-slate-400">
+            {direction === 'incoming' ? 'From' : 'To'} {actorLabel}
+          </div>
+          {request.message ? <div className="mt-1 truncate text-xs text-slate-500">{request.message}</div> : null}
+        </div>
+      </div>
+
+      <div className="text-sm capitalize text-slate-300">
+        {getActionTypeLabel(request)}
+        {(request.requestedRole ?? request.targetRole) ? (
+          <div className="mt-1 text-xs text-slate-500">{request.requestedRole ?? request.targetRole}</div>
         ) : null}
       </div>
 
-      <div className="text-xs uppercase tracking-[0.2em] text-slate-500">
-        {formatRequestStatus(request.status)}
-        <div className="mt-1 normal-case tracking-normal text-slate-600">Expires {formatRequestStamp(request.expiresAt)}</div>
+      <div className="text-xs text-slate-400">
+        <div>{formatRequestStamp(request.createdAt)}</div>
+        <div className="mt-1 text-slate-600">Expires {formatRequestStamp(request.expiresAt)}</div>
       </div>
 
-      <div className="text-xs text-slate-500">
-        Created {formatRequestStamp(request.createdAt)}
-        {request.respondedAt ? <div>Responded {formatRequestStamp(request.respondedAt)}</div> : null}
+      <div>
+        <span className={`inline-flex items-center gap-2 rounded-full border px-2.5 py-1 text-[11px] font-semibold ${statusClassName}`}>
+          <span className="h-1.5 w-1.5 rounded-full bg-current" />
+          {formatRequestStatus(request.status)}
+        </span>
+        {request.respondedAt ? <div className="mt-1 text-xs text-slate-600">{formatRequestStamp(request.respondedAt)}</div> : null}
       </div>
 
       <div className="flex flex-wrap gap-2 lg:justify-end" onClick={(event) => event.stopPropagation()}>
         {direction === 'incoming' && isActionable ? (
           <>
-            <Button className="h-9 rounded-none px-3" onClick={() => onAccept(request)} disabled={isUpdating}>
+            <Button className="h-9 rounded-xl px-3" onClick={() => onAccept(request)} disabled={isUpdating}>
+              <Check className="mr-2 h-3.5 w-3.5" />
               Accept
             </Button>
-            <Button variant="secondary" className="h-9 rounded-none px-3" onClick={() => onDecline(request)} disabled={isUpdating}>
+            <Button variant="secondary" className="h-9 rounded-xl px-3" onClick={() => onDecline(request)} disabled={isUpdating}>
+              <X className="mr-2 h-3.5 w-3.5" />
               Decline
             </Button>
           </>
         ) : null}
         {direction === 'outgoing' && isActionable ? (
-          <Button variant="secondary" className="h-9 rounded-none px-3" onClick={() => onWithdraw(request)} disabled={isUpdating}>
+          <Button variant="secondary" className="h-9 rounded-xl px-3" onClick={() => onWithdraw(request)} disabled={isUpdating}>
             Withdraw
           </Button>
         ) : null}
         {primaryLink ? (
-          <Button variant="ghost" className="h-9 rounded-none px-3" onClick={() => onOpen(request)}>
+          <Button variant="ghost" className="h-9 rounded-xl px-3" onClick={() => onOpen(request)}>
             <ArrowRight className="mr-2 h-3.5 w-3.5" />
             Open
           </Button>
@@ -172,64 +230,60 @@ function RequestDetailCard({
   onWithdraw: (request: WorkflowRequest) => void;
   onOpen: (request: WorkflowRequest) => void;
 }) {
-  const navigate = useNavigate();
   const entityName = getRequestEntityName(request);
   const actorLabel = getRequestActorLabel(request, direction);
-  const metadataEntries = getRequestMetadataEntries(request);
-  const linkedTargets = getRequestLinkTargets(request);
   const statusClassName = REQUEST_STATUS_COLOR_CLASSES[request.status];
+  const primaryLink = getRequestPrimaryLink(request);
 
   return (
-    <section className="border border-slate-800">
-      <div className="border-b border-slate-800 px-3 py-2 text-[11px] uppercase tracking-[0.28em] text-slate-500">
-        Request detail
-      </div>
-      <div className="space-y-5 px-3 py-4">
+    <section className="overflow-hidden rounded-2xl border border-[#334155] bg-[#182131] shadow-[0_24px_80px_rgba(2,6,23,0.32)]">
+      <div className="space-y-5 px-5 py-5">
         <div className="flex flex-col gap-3 xl:flex-row xl:items-start xl:justify-between">
-          <div className="min-w-0">
-            <div className="text-lg font-semibold text-white">
-              {getRequestTypeLabel(request)} for {entityName}
+          <div className="flex min-w-0 gap-3">
+            <div className="grid h-12 w-12 flex-shrink-0 place-items-center rounded-2xl border border-[#4b5870] bg-[#6d5dfc] text-sm font-semibold text-white">
+              {getRequestInitials(entityName)}
             </div>
-            <div className="mt-2 flex flex-wrap gap-x-4 gap-y-2 text-sm text-slate-400">
-              <span>{direction === 'incoming' ? 'From' : 'To'} {actorLabel}</span>
-              <span className="text-slate-600">|</span>
-              <span>{request.targetEntityType.replace(/_/g, ' ')}</span>
-              {request.requestedRole ?? request.targetRole ? (
-                <>
-                  <span className="text-slate-600">|</span>
-                  <span>Role {request.requestedRole ?? request.targetRole}</span>
-                </>
-              ) : null}
-              {request.requestedPermission ? (
-                <>
-                  <span className="text-slate-600">|</span>
-                  <span>{request.requestedPermission}</span>
-                </>
-              ) : null}
+            <div className="min-w-0">
+              <div className="text-[11px] font-medium uppercase tracking-[0.24em] text-slate-500">Selected request</div>
+              <div className="mt-1 text-lg font-semibold text-white">
+                {getRequestTypeLabel(request)} for {entityName}
+              </div>
+              <div className="mt-2 flex flex-wrap gap-x-4 gap-y-2 text-sm text-slate-400">
+                <span>{direction === 'incoming' ? 'From' : 'To'} {actorLabel}</span>
+                {request.requestedRole ?? request.targetRole ? (
+                  <>
+                    <span className="text-slate-600">|</span>
+                    <span>Role {request.requestedRole ?? request.targetRole}</span>
+                  </>
+                ) : null}
+                {request.requestedPermission ? (
+                  <>
+                    <span className="text-slate-600">|</span>
+                    <span>{request.requestedPermission}</span>
+                  </>
+                ) : null}
+              </div>
             </div>
           </div>
-          <div className={`inline-flex items-center rounded-full border px-3 py-1 text-xs font-medium uppercase tracking-[0.22em] ${statusClassName}`}>
+          <div className={`inline-flex items-center gap-2 rounded-full border px-3 py-1.5 text-xs font-semibold ${statusClassName}`}>
+            <span className="h-1.5 w-1.5 rounded-full bg-current" />
             {formatRequestStatus(request.status)}
           </div>
         </div>
 
-        <div className="grid gap-3 lg:grid-cols-3">
-          <div className="rounded-xl border border-slate-800 bg-slate-950 px-4 py-3">
+        <div className="grid gap-3 sm:grid-cols-2">
+          <div className="rounded-xl border border-[#3b4658] bg-[#202938] px-4 py-3">
             <div className="text-[11px] uppercase tracking-[0.24em] text-slate-500">Created</div>
             <div className="mt-2 text-sm text-white">{formatRequestStamp(request.createdAt)}</div>
           </div>
-          <div className="rounded-xl border border-slate-800 bg-slate-950 px-4 py-3">
+          <div className="rounded-xl border border-[#3b4658] bg-[#202938] px-4 py-3">
             <div className="text-[11px] uppercase tracking-[0.24em] text-slate-500">Expires</div>
             <div className="mt-2 text-sm text-white">{formatRequestStamp(request.expiresAt)}</div>
-          </div>
-          <div className="rounded-xl border border-slate-800 bg-slate-950 px-4 py-3">
-            <div className="text-[11px] uppercase tracking-[0.24em] text-slate-500">Last response</div>
-            <div className="mt-2 text-sm text-white">{formatRequestStamp(request.respondedAt ?? request.updatedAt)}</div>
           </div>
         </div>
 
         {request.message ? (
-          <div className="rounded-xl border border-slate-800 bg-slate-950 px-4 py-3">
+          <div className="rounded-xl border border-[#3b4658] bg-[#202938] px-4 py-3">
             <div className="flex items-center gap-2 text-[11px] uppercase tracking-[0.24em] text-slate-500">
               <FileText className="h-3.5 w-3.5" />
               Message
@@ -238,92 +292,26 @@ function RequestDetailCard({
           </div>
         ) : null}
 
-        <div className="grid gap-4 xl:grid-cols-[minmax(0,1.1fr)_minmax(0,0.9fr)]">
-          <div className="rounded-xl border border-slate-800 bg-slate-950 px-4 py-3">
-            <div className="flex items-center gap-2 text-[11px] uppercase tracking-[0.24em] text-slate-500">
-              <Link2 className="h-3.5 w-3.5" />
-              Linked content
-            </div>
-            {linkedTargets.length > 0 ? (
-              <div className="mt-3 space-y-2">
-                {linkedTargets.map((target) => (
-                  <button
-                    key={`${target.label}-${target.path}`}
-                    type="button"
-                    onClick={() => navigate(target.path)}
-                    className="flex w-full items-center justify-between rounded-xl border border-slate-800 px-3 py-3 text-left transition hover:border-cyan-500/40 hover:bg-slate-900"
-                  >
-                    <div>
-                      <div className="text-sm font-medium text-white">{target.label}</div>
-                      <div className="mt-1 break-all text-xs text-slate-500">{target.path}</div>
-                    </div>
-                    <ExternalLink className="h-4 w-4 flex-shrink-0 text-slate-500" />
-                  </button>
-                ))}
-              </div>
-            ) : (
-              <div className="mt-3 text-sm text-slate-500">No linked destination was attached to this request.</div>
-            )}
-          </div>
-
-          <div className="rounded-xl border border-slate-800 bg-slate-950 px-4 py-3">
-            <div className="flex items-center gap-2 text-[11px] uppercase tracking-[0.24em] text-slate-500">
-              <Clock3 className="h-3.5 w-3.5" />
-              Request context
-            </div>
-            <div className="mt-3 grid gap-3 sm:grid-cols-2 xl:grid-cols-1">
-              <div>
-                <div className="text-xs text-slate-500">Entity</div>
-                <div className="mt-1 text-sm text-white">{entityName}</div>
-              </div>
-              <div>
-                <div className="text-xs text-slate-500">Direction</div>
-                <div className="mt-1 text-sm capitalize text-white">{direction}</div>
-              </div>
-              <div>
-                <div className="text-xs text-slate-500">Entity type</div>
-                <div className="mt-1 text-sm text-white">{request.targetEntityType.replace(/_/g, ' ')}</div>
-              </div>
-              <div>
-                <div className="text-xs text-slate-500">Request ID</div>
-                <div className="mt-1 break-all text-sm text-white">{request._id}</div>
-              </div>
-            </div>
-          </div>
-        </div>
-
-        {metadataEntries.length > 0 ? (
-          <div className="rounded-xl border border-slate-800 bg-slate-950 px-4 py-3">
-            <div className="text-[11px] uppercase tracking-[0.24em] text-slate-500">Linked details</div>
-            <div className="mt-3 grid gap-3 sm:grid-cols-2 xl:grid-cols-3">
-              {metadataEntries.map((entry) => (
-                <div key={`${entry.label}-${entry.value}`} className="min-w-0 rounded-lg border border-slate-800 px-3 py-2">
-                  <div className="text-xs text-slate-500">{entry.label}</div>
-                  <div className="mt-1 break-words text-sm text-white">{entry.value}</div>
-                </div>
-              ))}
-            </div>
-          </div>
-        ) : null}
-
         <div className="flex flex-wrap gap-2">
           {direction === 'incoming' && request.status === 'pending' ? (
             <>
-              <Button className="h-10 rounded-none px-4" onClick={() => onAccept(request)} disabled={isUpdating}>
+              <Button className="h-10 rounded-xl px-4" onClick={() => onAccept(request)} disabled={isUpdating}>
+                <Check className="mr-2 h-4 w-4" />
                 Accept
               </Button>
-              <Button variant="secondary" className="h-10 rounded-none px-4" onClick={() => onDecline(request)} disabled={isUpdating}>
+              <Button variant="secondary" className="h-10 rounded-xl px-4" onClick={() => onDecline(request)} disabled={isUpdating}>
+                <X className="mr-2 h-4 w-4" />
                 Decline
               </Button>
             </>
           ) : null}
           {direction === 'outgoing' && request.status === 'pending' ? (
-            <Button variant="secondary" className="h-10 rounded-none px-4" onClick={() => onWithdraw(request)} disabled={isUpdating}>
+            <Button variant="secondary" className="h-10 rounded-xl px-4" onClick={() => onWithdraw(request)} disabled={isUpdating}>
               Withdraw
             </Button>
           ) : null}
-          {getRequestPrimaryLink(request) ? (
-            <Button variant="ghost" className="h-10 rounded-none px-4" onClick={() => onOpen(request)}>
+          {primaryLink ? (
+            <Button variant="ghost" className="h-10 rounded-xl px-4" onClick={() => onOpen(request)}>
               <ArrowRight className="mr-2 h-4 w-4" />
               Open linked content
             </Button>
@@ -423,6 +411,7 @@ export function InvitationPage({ selectedRequestId, onSelectRequest }: Invitatio
     ],
     [incomingRequests, outgoingRequests],
   );
+  const pendingRequestCount = requestEntries.filter((entry) => entry.request.status === 'pending').length;
   const selectedEntry = requestEntries.find((entry) => entry.request._id === selectedRequestId) ?? requestEntries[0] ?? null;
   const recruiterEventStats = useMemo(() => {
     const events = recruiterHiringEventsQuery.data ?? [];
@@ -448,15 +437,24 @@ export function InvitationPage({ selectedRequestId, onSelectRequest }: Invitatio
 
   return (
     <div className="space-y-5 pb-6">
-      <section className="border-b border-slate-800 pb-3">
-        <div className="text-[11px] uppercase tracking-[0.28em] text-slate-500">Requests</div>
-        <h1 className="mt-1 text-xl font-semibold text-white">Request inbox</h1>
-        <p className="mt-1 text-sm text-slate-400">
-          Review access requests, invite status, expiry, and the next destination after acceptance.
-        </p>
+      <section className="overflow-hidden rounded-3xl border border-slate-800/80 bg-[radial-gradient(circle_at_top_left,rgba(20,184,166,0.14),transparent_34%),linear-gradient(135deg,rgba(15,23,42,0.96),rgba(2,6,23,0.96))] px-5 py-5 shadow-[0_28px_90px_rgba(2,6,23,0.35)]">
+        <div className="flex flex-col gap-5 xl:flex-row xl:items-end xl:justify-between">
+          <div className="max-w-2xl">
+            <div className="text-[11px] font-medium uppercase tracking-[0.28em] text-cyan-200/70">Requests</div>
+            <h1 className="mt-2 text-3xl font-semibold leading-tight text-white">Request inbox</h1>
+            <p className="mt-2 max-w-xl text-sm leading-6 text-slate-400">
+              Review incoming and outgoing requests with the essential context, status, and available action.
+            </p>
+          </div>
+          <div className="grid gap-3 sm:grid-cols-3 xl:min-w-[520px]">
+            <RequestSummaryCard label="Incoming" value={incomingRequests.length} icon={Inbox} />
+            <RequestSummaryCard label="Outgoing" value={outgoingRequests.length} icon={SendHorizontal} />
+            <RequestSummaryCard label="Pending" value={pendingRequestCount} icon={FileText} />
+          </div>
+        </div>
       </section>
 
-      {feedback ? <div className="border border-cyan-500/30 px-3 py-2 text-sm text-cyan-200">{feedback}</div> : null}
+      {feedback ? <div className="rounded-2xl border border-cyan-500/30 bg-cyan-500/10 px-4 py-3 text-sm text-cyan-100">{feedback}</div> : null}
 
       {currentRole === UserRole.RECRUITER ? (
         <section className="border border-slate-800">
@@ -485,15 +483,15 @@ export function InvitationPage({ selectedRequestId, onSelectRequest }: Invitatio
       ) : null}
 
       {requestEntries.length > 0 && onSelectRequest ? (
-        <section className="border border-slate-800 lg:hidden">
-          <div className="border-b border-slate-800 px-3 py-2 text-[11px] uppercase tracking-[0.28em] text-slate-500">
+        <section className="overflow-hidden rounded-2xl border border-[#334155] bg-[#182131] lg:hidden">
+          <div className="border-b border-[#334155] bg-[#202938] px-4 py-3 text-[11px] uppercase tracking-[0.28em] text-slate-400">
             Choose request
           </div>
-          <div className="px-3 py-3">
+          <div className="px-4 py-4">
             <select
               value={selectedEntry?.request._id ?? ''}
               onChange={(event) => onSelectRequest?.(event.target.value)}
-              className="h-10 w-full rounded-none border border-slate-800 bg-transparent px-3 text-sm text-white focus:border-blue-500 focus:outline-none"
+              className="h-11 w-full rounded-xl border border-[#3b4658] bg-[#202938] px-3 text-sm text-white focus:border-cyan-500 focus:outline-none"
             >
               {requestEntries.map(({ request, direction }) => (
                 <option key={request._id} value={request._id} className="bg-slate-950">
@@ -522,16 +520,28 @@ export function InvitationPage({ selectedRequestId, onSelectRequest }: Invitatio
         />
       ) : null}
 
-      <section className="border border-slate-800">
-        <div className="border-b border-slate-800 px-3 py-2 text-[11px] uppercase tracking-[0.28em] text-slate-500">
-          Incoming
+      <section className="overflow-hidden rounded-2xl border border-[#334155] bg-[#182131] shadow-[0_20px_70px_rgba(2,6,23,0.22)]">
+        <div className={tableSectionHeaderClassName}>
+          <div>
+            <h2 className="text-sm font-semibold text-white">Incoming requests</h2>
+            <p className="mt-1 text-xs text-violet-200/75">Requests waiting for your response.</p>
+          </div>
+          <span className="text-xs tabular-nums text-violet-100/80">{incomingRequests.length} total</span>
+        </div>
+        <div className="grid gap-4 border-b border-[#334155] bg-[#2b3547] px-4 py-3 text-[11px] uppercase tracking-[0.22em] text-slate-300 lg:grid-cols-[minmax(0,1.7fr)_150px_150px_170px_170px]">
+          <div>Request</div>
+          <div>Type</div>
+          <div>Created</div>
+          <div>Status</div>
+          <div className="lg:text-right">Actions</div>
         </div>
         {isLoading ? (
-          <div className="flex items-center justify-center p-8">
+          <div className="flex items-center justify-center gap-3 p-8 text-sm text-slate-400">
             <Spinner />
+            Loading incoming requests
           </div>
         ) : incomingRequests.length === 0 ? (
-          <div className="px-3 py-4 text-sm text-slate-500">No incoming requests.</div>
+          <div className="px-4 py-8 text-sm text-slate-500">No incoming requests.</div>
         ) : (
           incomingRequests.map((request) => (
             <RequestRow
@@ -555,12 +565,23 @@ export function InvitationPage({ selectedRequestId, onSelectRequest }: Invitatio
         )}
       </section>
 
-      <section className="border border-slate-800">
-        <div className="border-b border-slate-800 px-3 py-2 text-[11px] uppercase tracking-[0.28em] text-slate-500">
-          Outgoing
+      <section className="overflow-hidden rounded-2xl border border-[#334155] bg-[#182131] shadow-[0_20px_70px_rgba(2,6,23,0.22)]">
+        <div className={tableSectionHeaderClassName}>
+          <div>
+            <h2 className="text-sm font-semibold text-white">Outgoing requests</h2>
+            <p className="mt-1 text-xs text-violet-200/75">Requests you have sent to other users.</p>
+          </div>
+          <span className="text-xs tabular-nums text-violet-100/80">{outgoingRequests.length} total</span>
+        </div>
+        <div className="grid gap-4 border-b border-[#334155] bg-[#2b3547] px-4 py-3 text-[11px] uppercase tracking-[0.22em] text-slate-300 lg:grid-cols-[minmax(0,1.7fr)_150px_150px_170px_170px]">
+          <div>Request</div>
+          <div>Type</div>
+          <div>Created</div>
+          <div>Status</div>
+          <div className="lg:text-right">Actions</div>
         </div>
         {isLoading ? null : outgoingRequests.length === 0 ? (
-          <div className="px-3 py-4 text-sm text-slate-500">No outgoing requests.</div>
+          <div className="px-4 py-8 text-sm text-slate-500">No outgoing requests.</div>
         ) : (
           outgoingRequests.map((request) => (
             <RequestRow

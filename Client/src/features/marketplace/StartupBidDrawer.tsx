@@ -398,7 +398,7 @@ export function StartupBidDrawer({ startupId, open, isFounder = false, onClose }
           ) : board ? (
             <div className="space-y-6">
               {/* Funding target banner */}
-              {board.fundingTarget && (
+              {typeof board.fundingTarget === 'number' && board.fundingTarget > 0 && (
                 <div className="flex items-center gap-3 rounded-xl border border-slate-800 bg-slate-900 px-4 py-3 text-sm">
                   <TrendingUp className="h-4 w-4 text-cyan-400" />
                   <span className="text-slate-300">

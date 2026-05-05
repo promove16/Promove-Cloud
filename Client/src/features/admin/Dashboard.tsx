@@ -31,17 +31,17 @@ function MetricCard({
 }) {
   const content = (
     <Card
-      className={`border-slate-800 bg-slate-900 p-5 ${
+      className={`flex h-full min-h-[210px] min-w-0 flex-col border-slate-800 bg-slate-900 p-5 ${
         href ? 'transition hover:border-blue-500/40 hover:bg-slate-800' : ''
       }`}
     >
-      <div className="flex items-start justify-between gap-4">
-        <div>
+      <div className="flex h-full items-start justify-between gap-4">
+        <div className="min-w-0">
           <div className="text-xs uppercase tracking-[0.24em] text-slate-500">{label}</div>
           <div className="mt-3 text-3xl font-semibold text-white">{value}</div>
           <div className="mt-2 text-sm text-slate-400">{detail}</div>
         </div>
-        <div className="flex h-11 w-11 items-center justify-center rounded-2xl border border-cyan-500/20 bg-cyan-500/10 text-cyan-300">
+        <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-2xl border border-cyan-500/20 bg-cyan-500/10 text-cyan-300">
           <Icon className="h-5 w-5" />
         </div>
       </div>
@@ -53,7 +53,7 @@ function MetricCard({
   }
 
   return (
-    <Link to={href} className="block">
+    <Link to={href} className="block h-full min-w-0">
       {content}
     </Link>
   );
@@ -91,7 +91,9 @@ export default function Dashboard() {
   const analytics = analyticsQuery.data;
   const mentorshipStats = mentorshipProgramsQuery.data?.stats;
   const activeDeals = dealsQuery.data?.filter((deal) => deal.status === 'active') ?? [];
-  const pendingDealReviews = activeDeals.filter((deal) => deal.adminApprovalRequired && !deal.adminApprovedAt).length;
+  const pendingDealReviews = activeDeals.filter(
+    (deal) => deal.cancellationRequest?.status === 'pending' || (deal.adminApprovalRequired && !deal.adminApprovedAt),
+  ).length;
   const dashboardIsRefreshing =
     analyticsQuery.isLoading ||
     mentorshipProgramsQuery.isLoading ||
@@ -111,7 +113,7 @@ export default function Dashboard() {
       {
         label: 'Active Deals',
         value: activeDeals.length,
-        detail: pendingDealReviews > 0 ? `${pendingDealReviews} awaiting admin approval` : 'No deals blocked on admin review',
+        detail: pendingDealReviews > 0 ? `${pendingDealReviews} awaiting admin review` : 'No deals blocked on admin review',
         icon: BriefcaseBusiness,
         href: '/dashboard/admin/deals/overview',
       },
@@ -194,12 +196,12 @@ export default function Dashboard() {
   );
 
   return (
-    <div className="space-y-8">
-      <section className="relative overflow-hidden border border-slate-800 bg-slate-950">
+    <div className="w-full max-w-full space-y-8 overflow-x-hidden">
+      <section className="relative min-w-0 overflow-hidden border border-slate-800 bg-slate-950">
         <div className="absolute inset-x-0 h-40 bg-[radial-gradient(circle_at_top_left,rgba(59,130,246,0.12),transparent_35%),radial-gradient(circle_at_top_right,rgba(59,130,246,0.1),transparent_28%)]" />
         <div className="relative space-y-6 px-6 py-6 lg:px-8 lg:py-8">
           <div className="flex flex-col gap-6 xl:flex-row xl:items-end xl:justify-between">
-            <div className="max-w-3xl">
+            <div className="min-w-0 max-w-3xl">
               <div className="text-[11px] uppercase tracking-[0.35em] text-cyan-300">Admin Console</div>
               <h1 className="mt-3 text-3xl font-semibold tracking-tight text-white">Platform control center</h1>
               <p className="mt-3 text-sm leading-6 text-slate-400">
@@ -207,20 +209,28 @@ export default function Dashboard() {
                 Deeper analytics and workflow detail still live inside their dedicated admin sections.
               </p>
             </div>
-            <div className="flex flex-wrap gap-3">
-              <Button variant="secondary" onClick={() => navigate('/dashboard/admin/patents')}>
+            <div className="flex w-full min-w-0 flex-col items-stretch gap-3 sm:w-40 xl:shrink-0">
+              <Button
+                className="w-full whitespace-nowrap"
+                variant="secondary"
+                onClick={() => navigate('/dashboard/admin/patents')}
+              >
                 Review Patents
               </Button>
-              <Button variant="secondary" onClick={() => navigate('/dashboard/admin/mentorship/requests')}>
+              <Button
+                className="w-full whitespace-nowrap"
+                variant="secondary"
+                onClick={() => navigate('/dashboard/admin/mentorship/requests')}
+              >
                 Institution Requests
               </Button>
-              <Button onClick={() => navigate('/dashboard/admin/analytics')}>
+              <Button className="w-full whitespace-nowrap" onClick={() => navigate('/dashboard/admin/analytics')}>
                 Open Analytics
               </Button>
             </div>
           </div>
 
-          <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
+          <div className="grid min-w-0 auto-rows-fr items-stretch gap-4 md:grid-cols-2 xl:grid-cols-4">
             {metrics.map((metric) => (
               <MetricCard
                 key={metric.label}
@@ -235,23 +245,23 @@ export default function Dashboard() {
         </div>
       </section>
 
-      <section className="space-y-4">
-        <div className="flex items-end justify-between gap-4">
-          <div>
+      <section className="min-w-0 space-y-4">
+        <div className="flex min-w-0 flex-col gap-3 sm:flex-row sm:items-end sm:justify-between">
+          <div className="min-w-0">
             <div className="text-[11px] uppercase tracking-[0.3em] text-cyan-300">Admin Sections</div>
             <h2 className="mt-2 text-2xl font-semibold text-white">Open the right workspace</h2>
           </div>
-          <div className="text-sm text-slate-500">
+          <div className="shrink-0 text-sm text-slate-500">
             {dashboardIsRefreshing ? 'Refreshing dashboard data...' : 'Live data is up to date.'}
           </div>
         </div>
 
-        <div className="grid gap-4 xl:grid-cols-2">
+        <div className="grid min-w-0 gap-4 xl:grid-cols-2">
           {adminSections.map((section) => (
             <Link
               key={section.path}
               to={section.path}
-              className="group border border-slate-800 bg-slate-900 px-6 py-5 transition hover:border-blue-500/40 hover:bg-slate-800"
+              className="group min-w-0 border border-slate-800 bg-slate-900 px-6 py-5 transition hover:border-blue-500/40 hover:bg-slate-800"
             >
               <div className="flex items-start justify-between gap-4">
                 <div className="min-w-0">
@@ -272,7 +282,7 @@ export default function Dashboard() {
         </div>
       </section>
 
-      <section className="overflow-hidden border border-slate-800 bg-slate-950">
+      <section className="min-w-0 overflow-hidden border border-slate-800 bg-slate-950">
         <div className="border-b border-slate-800 px-6 py-5 lg:px-8">
           <div className="text-[11px] uppercase tracking-[0.3em] text-cyan-300">Analytics Status</div>
           <h2 className="mt-2 text-2xl font-semibold text-white">Analytics workspace is live</h2>

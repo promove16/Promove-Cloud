@@ -7,6 +7,7 @@ import {
   DealMediationStatus,
   DealRequestOrigin,
   DealRoyalty,
+  DealCancellationRequest,
   DealStockDetails,
   DealStockTransfer,
 } from '../deal/deal.types';
@@ -209,7 +210,7 @@ export interface AdminDealItem {
   mediatorLabel: string;
   requestOrigin: DealRequestOrigin;
   mediationStatus: DealMediationStatus;
-  stage: 1 | 2 | 3 | 4;
+  stage: 0 | 1 | 2 | 3 | 4;
   amountINR?: number;
   equityPercent?: number;
   investorType?: 'penny' | 'sole';
@@ -234,6 +235,15 @@ export interface AdminDealItem {
   royalty: Omit<DealRoyalty, 'settledAt'> & {
     status: 'pending' | 'invoiced' | 'received';
     settledAt?: string;
+  };
+  cancellationRequest?: Omit<
+    DealCancellationRequest,
+    'requestedAt' | 'reviewedAt' | 'requestedBy' | 'reviewedBy'
+  > & {
+    requestedBy?: string;
+    requestedAt?: string;
+    reviewedBy?: string;
+    reviewedAt?: string;
   };
   innovationScoreSnapshot: number;
   status: 'active' | 'closed' | 'cancelled';
@@ -410,6 +420,11 @@ export interface AdminDealReviewPayload {
   reviewNotes?: string;
   royaltyPercentage?: number;
   royaltyStatus?: 'pending' | 'invoiced' | 'received';
+}
+
+export interface AdminDealCancellationReviewPayload {
+  decision: 'approved' | 'rejected';
+  reviewNotes?: string;
 }
 
 export type AdminMentorshipProgramsResponse = InstitutionMentorshipProgramListResponse;

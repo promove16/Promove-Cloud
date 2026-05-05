@@ -176,6 +176,48 @@ const investmentSchema = new Schema<IInvestment>(
         default: undefined,
       },
     },
+    cancellationRequest: {
+      status: {
+        type: String,
+        enum: ['pending', 'approved', 'rejected'],
+        default: undefined,
+      },
+      reason: {
+        type: String,
+        trim: true,
+        maxlength: 500,
+        default: undefined,
+      },
+      requestedBy: {
+        type: Schema.Types.ObjectId,
+        ref: 'User',
+        default: undefined,
+      },
+      requestedByRole: {
+        type: String,
+        enum: ['investor', 'student'],
+        default: undefined,
+      },
+      requestedAt: {
+        type: Date,
+        default: undefined,
+      },
+      reviewedBy: {
+        type: Schema.Types.ObjectId,
+        ref: 'User',
+        default: undefined,
+      },
+      reviewedAt: {
+        type: Date,
+        default: undefined,
+      },
+      reviewNotes: {
+        type: String,
+        trim: true,
+        maxlength: 1000,
+        default: undefined,
+      },
+    },
     investorRole: {
       type: String,
       enum: ['shareholder', 'director', 'observer'],
