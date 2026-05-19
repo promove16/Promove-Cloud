@@ -2,6 +2,15 @@ import { defineConfig } from 'vite';
 import react from '@vitejs/plugin-react';
 import { fileURLToPath, URL } from 'node:url';
 
+const vendorChunks: Record<string, string[]> = {
+  'vendor-react': ['react', 'react-dom', 'react-router-dom'],
+  'vendor-state': ['zustand', '@tanstack/react-query'],
+  'vendor-network': ['axios', 'socket.io-client'],
+  'vendor-forms': ['react-hook-form', '@hookform/resolvers', 'zod'],
+  'vendor-ui': ['lucide-react', 'clsx', 'tailwind-merge'],
+  'vendor-export': ['html2canvas', 'jspdf'],
+};
+
 export default defineConfig({
   plugins: [react()],
   resolve: {
@@ -19,13 +28,20 @@ export default defineConfig({
     chunkSizeWarningLimit: 600,
     rollupOptions: {
       output: {
-        manualChunks: {
-          'vendor-react': ['react', 'react-dom', 'react-router-dom'],
-          'vendor-state': ['zustand', '@tanstack/react-query'],
-          'vendor-network': ['axios', 'socket.io-client'],
-          'vendor-forms': ['react-hook-form', '@hookform/resolvers', 'zod'],
-          'vendor-ui': ['lucide-react', 'clsx', 'tailwind-merge'],
-          'vendor-export': ['html2canvas', 'jspdf'],
+        manualChunks(id) {
+          const normalizedId = id.replace(/\\/g, '/');
+
+          if (!normalizedId.includes('/node_modules/')) {
+            return undefined;
+          }
+
+          for (const [chunkName, packages] of Object.entries(vendorChunks)) {
+            if (packages.some((packageName) => normalizedId.includes(`/node_modules/${packageName}/`))) {
+              return chunkName;
+            }
+          }
+
+          return undefined;
         },
       },
     },

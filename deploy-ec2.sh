@@ -50,6 +50,24 @@ step() { echo -e "\n${BOLD}${CYAN}━━━ $* ━━━${NC}"; }
 
 die() { err "$1"; exit 1; }
 
+run_npm_ci() {
+  local workspace_name="$1"
+  local workspace_dir="$2"
+
+  cd "$workspace_dir"
+  local install_log
+  install_log="$(mktemp)"
+
+  if ! sudo -u "$APP_USER" npm ci --prefer-offline --no-audit --no-fund 2>&1 | tee "$install_log"; then
+    err "$workspace_name dependency install failed. Last npm output:"
+    tail -n 40 "$install_log" >&2 || true
+    rm -f "$install_log"
+    exit 1
+  fi
+
+  rm -f "$install_log"
+}
+
 # ─── Must run as root ─────────────────────────────────────────────────────────
 [[ $EUID -eq 0 ]] || die "Run as root: sudo bash deploy-ec2.sh"
 
@@ -262,7 +280,9 @@ dir /var/lib/redis
 
 # Memory
 maxmemory 256mb
-maxmemory-policy allkeys-lru
+# BullMQ requires Redis to reject writes under memory pressure instead of
+# evicting queue/session/socket keys behind the application's back.
+maxmemory-policy noeviction
 
 # Network
 tcp-keepalive 300
@@ -320,6 +340,12 @@ for i in {1..15}; do
 done
 $REDIS_OK || die "Redis failed to start. Check: journalctl -u $REDIS_SERVICE"
 log "Redis is running on 127.0.0.1:$REDIS_PORT"
+
+REDIS_MAXMEMORY_POLICY="$(redis-cli -p "$REDIS_PORT" --raw CONFIG GET maxmemory-policy 2>/dev/null | tail -n 1 || true)"
+if [[ "$REDIS_MAXMEMORY_POLICY" != "noeviction" ]]; then
+  die "Redis maxmemory-policy is '${REDIS_MAXMEMORY_POLICY:-unknown}', expected 'noeviction'. BullMQ queues are unsafe with eviction policies such as allkeys-lru."
+fi
+log "Redis maxmemory-policy verified: noeviction"
 
 # ─── Nginx ────────────────────────────────────────────────────────────────────
 step "Installing Nginx"
@@ -465,9 +491,7 @@ log "Client/.env.production → $PUBLIC_URL"
 
 # ─── Install Server dependencies ──────────────────────────────────────────────
 step "Installing Server npm dependencies"
-cd "$SERVER_DIR"
-sudo -u "$APP_USER" npm ci --prefer-offline --no-audit --no-fund 2>&1 | \
-  grep -E '(added|updated|error|warn)' || true
+run_npm_ci "Server" "$SERVER_DIR"
 log "Server dependencies installed"
 
 # ─── Build Server (TypeScript) ────────────────────────────────────────────────
@@ -478,9 +502,7 @@ log "Server compiled → dist/src/"
 
 # ─── Install Client dependencies ──────────────────────────────────────────────
 step "Installing Client npm dependencies"
-cd "$CLIENT_DIR"
-sudo -u "$APP_USER" npm ci --prefer-offline --no-audit --no-fund 2>&1 | \
-  grep -E '(added|updated|error|warn)' || true
+run_npm_ci "Client" "$CLIENT_DIR"
 log "Client dependencies installed"
 
 # ─── Build Client (Vite) ──────────────────────────────────────────────────────
@@ -773,6 +795,9 @@ echo -e "  ${BOLD}Realtime server:${NC} 127.0.0.1:${PORT_REALTIME}"
 echo ""
 echo -e "  ${BOLD}PM2 status:${NC}      sudo -u ${APP_USER} pm2 status"
 echo -e "  ${BOLD}PM2 logs:${NC}        sudo -u ${APP_USER} pm2 logs"
+echo -e "  ${BOLD}PM2 monitor:${NC}     sudo -u ${APP_USER} pm2 monit"
+echo -e "  ${BOLD}Reset counters:${NC}  sudo -u ${APP_USER} pm2 reset all"
+echo -e "  ${BOLD}Save PM2 state:${NC}  sudo -u ${APP_USER} pm2 save"
 echo -e "  ${BOLD}Restart all:${NC}     sudo -u ${APP_USER} pm2 restart all"
 echo -e "  ${BOLD}App logs:${NC}        ls /var/log/promove/"
 echo ""
