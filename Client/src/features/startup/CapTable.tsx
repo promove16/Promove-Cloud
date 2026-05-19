@@ -199,6 +199,7 @@ function deriveDealMetrics(deals: DealSummaryView[]): DealMetrics {
     totalAmount += deal.amountINR ?? 0;
     if (deal.currentStage === 4) {
       capitalClosed += deal.amountINR ?? 0;
+      capitalCommitted += deal.amountINR ?? 0;
     } else if (deal.currentStage >= 2 && deal.status === 'active') {
       capitalCommitted += deal.amountINR ?? 0;
     }
@@ -226,7 +227,6 @@ function EquityDistributionCard({
   const soleShare = capTable?.soleInvestor?.sharesAllocated ?? 0;
   const pennyShare =
     capTable?.pennyInvestors.reduce((sum, row) => sum + (row.sharesAllocated ?? 0), 0) ?? 0;
-  const availableShare = ownership.availableShares;
 
   const chartData = useMemo(
     () =>
@@ -234,9 +234,8 @@ function EquityDistributionCard({
         { name: 'Founder', value: founderShare, color: '#3b82f6' },
         { name: 'Sole Investor', value: soleShare, color: '#a855f7' },
         { name: 'Penny Pool', value: pennyShare, color: '#f59e0b' },
-        { name: 'Available', value: availableShare, color: '#475569' },
       ].filter((entry) => entry.value > 0),
-    [founderShare, soleShare, pennyShare, availableShare],
+    [founderShare, soleShare, pennyShare],
   );
 
   return (
@@ -399,7 +398,7 @@ function CapitalFlowCard({ metrics }: { metrics: DealMetrics }) {
           <div className="mt-1 text-xl font-semibold text-white">
             {formatINR(metrics.capitalCommitted)}
           </div>
-          <p className="mt-1 text-xs text-slate-500">Active deals at payment or beyond.</p>
+          <p className="mt-1 text-xs text-slate-500">Capital deployed at payment or beyond (including closed).</p>
         </div>
         <div className="rounded-xl border border-emerald-500/20 bg-emerald-500/5 p-4">
           <div className="text-[11px] uppercase tracking-wider text-emerald-400">Closed</div>
@@ -892,7 +891,7 @@ export default function StartupEquityAndDeals() {
           icon={<Wallet className="h-4 w-4" />}
           label="Capital Closed"
           value={formatINR(dealMetrics.capitalClosed)}
-          hint={`${formatINR(dealMetrics.capitalCommitted)} in motion`}
+          hint={`${formatINR(Math.max(dealMetrics.capitalCommitted - dealMetrics.capitalClosed, 0))} in motion`}
           tone="positive"
         />
         <KpiCard

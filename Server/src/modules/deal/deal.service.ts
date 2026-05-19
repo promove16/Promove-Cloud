@@ -2264,19 +2264,19 @@ const getCapTableBase = async (startupId: string): Promise<CapTableResponse> => 
   const pennyDeals = deals.filter((deal) => deal.investorType === 'penny');
   const allocatedShares = deals.reduce((sum, deal) => sum + deal.sharesAllocated, 0);
 
+  const unissuedShares = Math.max(startup.totalShares - allocatedShares, 0);
+
   const capTable: CapTableResponse = {
     startupId: String(startup._id),
     totalShares: startup.totalShares,
-    availableShares: startup.availableShares,
+    availableShares: unissuedShares,
     visibility: 'full',
     soleInvestor: soleDeal ? mapRow(soleDeal) : null,
     pennyInvestors: pennyDeals.map(mapRow),
     founderRetained: {
-      sharesAllocated: Math.max(startup.totalShares - allocatedShares, 0),
+      sharesAllocated: unissuedShares,
       equityPercent:
-        startup.totalShares > 0
-          ? round((Math.max(startup.totalShares - allocatedShares, 0) / startup.totalShares) * 100)
-          : 0,
+        startup.totalShares > 0 ? round((unissuedShares / startup.totalShares) * 100) : 0,
     },
     totalInvestorEquity: round(deals.reduce((sum, deal) => sum + deal.equityPercent, 0)),
   };
