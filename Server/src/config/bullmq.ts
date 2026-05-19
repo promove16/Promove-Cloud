@@ -576,6 +576,7 @@ export const notificationQueue = createSafeQueue('notifications');
 export const emailQueue = createSafeQueue('emails');
 export const activityQueue = createSafeQueue<ApiRequestActivityPayload>('activity');
 export const mongoExcelBackupQueue = createSafeQueue('mongo-excel-backup');
+export const bidExpiryQueue = createSafeQueue('bid-expiry');
 export const institutionVerifyQueue = createSafeQueue<{ userId: string; token: string }>(
   'institution-verify',
 );

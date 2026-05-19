@@ -233,6 +233,9 @@ export interface IStartup {
   launchedToMentors: boolean;
   launchedToRecruiters: boolean;
   launchedAt?: Date;
+  marketplaceTermsAcceptedAt?: Date;
+  marketplaceTermsAcceptedBy?: Types.ObjectId | null;
+  marketplaceTermsVersion?: string;
   launchFormLocked: boolean;
   launchFormLockedAt?: Date;
   launchFormUnlockedByAdmin: boolean;
@@ -265,6 +268,14 @@ export interface IStartup {
   adminEditUnlockApprovedBy?: Types.ObjectId | null;
   adminEditUnlockReason?: string;
   pitchRequests?: StartupPitchRequest[];
+  fundingGoal?: number;
+  currentFunding?: number;
+  availableEquity?: number;
+  investorCount?: number;
+  interestedInvestorCount?: number;
+  trendingScore?: number;
+  fundingStatus?: 'open' | 'partial' | 'fully_funded' | 'closed';
+  lastFundingUpdate?: Date;
   editAccess?: StartupEditAccess;
   readiness?: StartupReadiness;
   innovationScorePreview?: StartupInnovationScoreBreakdown;

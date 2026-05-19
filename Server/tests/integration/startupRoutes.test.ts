@@ -565,7 +565,7 @@ describe('startup route validation', () => {
     const response = await request(app)
       .post(`/api/startup/${startup._id}/launch`)
       .set(authHeader(founder))
-      .send({ launchTo: 'investors' });
+      .send({ launchTo: 'investors', termsAccepted: true });
 
     expect(response.status).toBe(200);
     expect(response.body.data).toEqual(
@@ -955,7 +955,7 @@ describe('startup route validation', () => {
     const response = await request(app)
       .post(`/api/startup/${startup._id}/launch`)
       .set(authHeader(founder))
-      .send({ launchTo: 'recruiters' });
+      .send({ launchTo: 'recruiters', termsAccepted: true });
 
     expect(response.status).toBe(403);
     expect(response.body.error).toEqual(
@@ -972,7 +972,7 @@ describe('startup route validation', () => {
     const response = await request(app)
       .post(`/api/startup/${startup._id}/launch`)
       .set(authHeader(founder))
-      .send({ launchTo: 'investors' });
+      .send({ launchTo: 'investors', termsAccepted: true });
 
     expect(response.status).toBe(200);
     expect(response.body.data).toEqual(
@@ -980,8 +980,51 @@ describe('startup route validation', () => {
         _id: startup._id.toString(),
         launchedToInvestors: true,
         stage: 'Launched',
+        marketplaceTermsVersion: 'marketplace-launch-v1',
       }),
     );
+    expect(response.body.data.marketplaceTermsAcceptedAt).toEqual(expect.any(String));
+    expect(response.body.data.marketplaceTermsAcceptedBy).toBe(founder._id.toString());
+  });
+
+  it('requires marketplace terms acceptance before startup launch', async () => {
+    const founder = await createStudent('Launch Terms Founder');
+    const startup = await createApprovedLaunchStartup(founder);
+
+    const response = await request(app)
+      .post(`/api/startup/${startup._id}/launch`)
+      .set(authHeader(founder))
+      .send({ launchTo: 'investors' });
+
+    expect(response.status).toBe(400);
+    const persisted = await Startup.findById(startup._id).lean();
+    expect(persisted?.launchedToInvestors).toBe(false);
+    expect(persisted?.marketplaceTermsAcceptedAt).toBeUndefined();
+  });
+
+  it('blocks founder deletion after marketplace launch and keeps the startup active', async () => {
+    const founder = await createStudent('Launched Delete Founder');
+    const startup = await createApprovedLaunchStartup(founder);
+
+    const launchResponse = await request(app)
+      .post(`/api/startup/${startup._id}/launch`)
+      .set(authHeader(founder))
+      .send({ launchTo: 'investors', termsAccepted: true });
+
+    expect(launchResponse.status).toBe(200);
+
+    const deleteResponse = await request(app)
+      .delete(`/api/startup/${startup._id}`)
+      .set(authHeader(founder));
+
+    expect(deleteResponse.status).toBe(400);
+    expect(deleteResponse.body.error).toEqual(
+      expect.objectContaining({
+        code: 'STARTUP_LAUNCHED_DELETION_REQUIRES_ADMIN',
+      }),
+    );
+    const persisted = await Startup.findById(startup._id).lean();
+    expect(persisted?.isActive).toBe(true);
   });
 
   it('preserves existing launch channels when adding a recruiter launch', async () => {
@@ -1006,7 +1049,7 @@ describe('startup route validation', () => {
     const investorLaunchResponse = await request(app)
       .post(`/api/startup/${startup._id}/launch`)
       .set(authHeader(founder))
-      .send({ launchTo: 'investors' });
+      .send({ launchTo: 'investors', termsAccepted: true });
 
     expect(investorLaunchResponse.status).toBe(200);
     expect(investorLaunchResponse.body.data.launchedToInvestors).toBe(true);
@@ -1014,7 +1057,7 @@ describe('startup route validation', () => {
     const recruiterLaunchResponse = await request(app)
       .post(`/api/startup/${startup._id}/launch`)
       .set(authHeader(founder))
-      .send({ launchTo: 'recruiters' });
+      .send({ launchTo: 'recruiters', termsAccepted: true });
 
     expect(recruiterLaunchResponse.status).toBe(200);
     expect(recruiterLaunchResponse.body.data).toEqual(
@@ -1070,7 +1113,7 @@ describe('startup route validation', () => {
     const response = await request(app)
       .post(`/api/startup/${startup._id}/launch`)
       .set(authHeader(founder))
-      .send({ launchTo: 'recruiters' });
+      .send({ launchTo: 'recruiters', termsAccepted: true });
 
     expect(response.status).toBe(403);
     expect(response.body.error.code).toBe('STARTUP_REVIEW_REQUIRED');

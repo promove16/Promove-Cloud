@@ -199,7 +199,7 @@ const PortfolioCompanyCard = ({
                 <div className="flex items-center gap-1.5 rounded-full bg-emerald-500/10 px-3 py-1">
                   <CheckCircle2 className="h-3.5 w-3.5 text-emerald-400" />
                   <span className="text-xs font-medium text-emerald-400">
-                    Closed
+                    Active Portfolio
                   </span>
                 </div>
               </div>
@@ -626,12 +626,12 @@ export default function ProductWorkshop() {
                   <Briefcase className="h-4 w-4" />
                   Portfolio
                 </div>
-                <h2 className="mt-2 text-2xl font-semibold text-white">
-                  Closed Investments
+              <h2 className="mt-2 text-2xl font-semibold text-white">
+                  Portfolio Investments
                 </h2>
                 <p className="mt-2 max-w-3xl text-sm text-slate-400">
-                  Monitor and track your closed investments with live innovation
-                  scores.
+                  Monitor active portfolio startups with live innovation scores
+                  after the investment reaches portfolio stage.
                 </p>
               </div>
 
@@ -682,7 +682,7 @@ export default function ProductWorkshop() {
                   No Portfolio Companies Yet
                 </h3>
                 <p className="mx-auto mt-2 max-w-md text-sm text-slate-400">
-                  Your closed investments will appear here automatically once
+                  Your portfolio investments will appear here automatically once
                   deals reach Stage 4 - Portfolio.
                 </p>
               </Card>

@@ -92,7 +92,7 @@ describe('institution policy submissions', () => {
       .send({
         policies: [
           {
-            name: 'IIC (Institution Innovation Council)',
+            name: 'ATL / School Innovation Program',
             status: 'Pending',
             lastUpdated: '2026-05-02',
             evidence: [
@@ -114,7 +114,7 @@ describe('institution policy submissions', () => {
     expect(response.status).toBe(200);
     expect(response.body.data.policies).toHaveLength(1);
     expect(response.body.data.policies[0]).toMatchObject({
-      name: 'IIC (Institution Innovation Council)',
+      name: 'ATL / School Innovation Program',
       status: 'Pending',
       evidence: [
         {
@@ -139,7 +139,7 @@ describe('institution policy submissions', () => {
       .send({
         policies: [
           {
-            name: 'IIC (Institution Innovation Council)',
+            name: 'ATL / School Innovation Program',
             status: 'Pending',
             evidence: [
               {
@@ -160,7 +160,7 @@ describe('institution policy submissions', () => {
       .send({
         policies: [
           {
-            name: 'IIC (Institution Innovation Council)',
+            name: 'ATL / School Innovation Program',
             status: 'Pending',
             evidence: [
               {
@@ -182,7 +182,7 @@ describe('institution policy submissions', () => {
       .send({
         policies: [
           {
-            name: 'IIC (Institution Innovation Council)',
+            name: 'ATL / School Innovation Program',
             status: 'On Track',
             evidence: [
               {
@@ -202,7 +202,7 @@ describe('institution policy submissions', () => {
 
     expect(addEvidenceResponse.status).toBe(200);
     expect(addEvidenceResponse.body.data.policies[0]).toMatchObject({
-      name: 'IIC (Institution Innovation Council)',
+      name: 'ATL / School Innovation Program',
       status: 'On Track',
       evidence: [
         {
@@ -226,7 +226,7 @@ describe('institution policy submissions', () => {
       email: `school-${randomUUID()}@example.com`,
       policies: [
         {
-          name: 'NEP 2020 Compliance',
+          name: 'NEP 2020 School Compliance',
           status: 'Active',
           lastUpdated: existingPolicyDate,
           evidence: [
@@ -253,7 +253,7 @@ describe('institution policy submissions', () => {
       .send({
         policies: [
           {
-            name: 'IIC (Institution Innovation Council)',
+            name: 'ATL / School Innovation Program',
             status: 'On Track',
             evidence: [
               {
@@ -279,11 +279,11 @@ describe('institution policy submissions', () => {
     expect(storedSchool?.institutionProfile?.policies).toEqual(
       expect.arrayContaining([
         expect.objectContaining({
-          name: 'NEP 2020 Compliance',
+          name: 'NEP 2020 School Compliance',
           status: 'Active',
         }),
         expect.objectContaining({
-          name: 'IIC (Institution Innovation Council)',
+          name: 'ATL / School Innovation Program',
           status: 'On Track',
           evidence: [
             expect.objectContaining({
@@ -295,5 +295,59 @@ describe('institution policy submissions', () => {
       ]),
     );
     expect(storedSchool?.institutionProfile?.policies).toHaveLength(2);
+  });
+
+  it('uses role-specific compliance framework defaults for schools and colleges', async () => {
+    const { email: schoolEmail } = await createApprovedUser({
+      role: UserRole.SCHOOL,
+      email: `school-${randomUUID()}@example.com`,
+    });
+    const { email: collegeEmail } = await createApprovedUser({
+      role: UserRole.COLLEGE,
+      email: `college-${randomUUID()}@example.com`,
+    });
+    const schoolAccessToken = await loginAs(schoolEmail);
+    const collegeAccessToken = await loginAs(collegeEmail);
+
+    const [schoolResponse, collegeResponse] = await Promise.all([
+      request(app)
+        .get('/api/school/compliance/overview')
+        .set('Authorization', `Bearer ${schoolAccessToken}`),
+      request(app)
+        .get('/api/college/compliance/overview')
+        .set('Authorization', `Bearer ${collegeAccessToken}`),
+    ]);
+
+    expect(schoolResponse.status).toBe(200);
+    expect(collegeResponse.status).toBe(200);
+
+    const schoolFrameworks = schoolResponse.body.data.frameworks.map(
+      (framework: { name: string }) => framework.name,
+    );
+    const collegeFrameworks = collegeResponse.body.data.frameworks.map(
+      (framework: { name: string }) => framework.name,
+    );
+
+    expect(schoolFrameworks).toEqual([
+      'ATL / School Innovation Program',
+      'SQAAF / School Quality Assurance',
+      'NEP 2020 School Compliance',
+      'Attendance Governance',
+      'Student Safety & Conduct',
+    ]);
+    expect(schoolFrameworks).not.toEqual(expect.arrayContaining([
+      "IIC (Institution's Innovation Council)",
+      'NAAC (Accreditation)',
+      'NIRF (Innovation Ranking)',
+      'AICTE Regulations',
+    ]));
+    expect(collegeFrameworks).toEqual(expect.arrayContaining([
+      "IIC (Institution's Innovation Council)",
+      'NAAC (Accreditation)',
+      'NIRF (Innovation Ranking)',
+      'AICTE Regulations',
+      'NEP 2020 Compliance',
+      'NISP (Innovation Startup Policy)',
+    ]));
   });
 });

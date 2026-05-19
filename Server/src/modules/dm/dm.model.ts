@@ -54,6 +54,5 @@ const directMessageSchema = new Schema<IDirectMessage>(
 // Index for fetching conversation between two users
 directMessageSchema.index({ senderId: 1, recipientId: 1, sentAt: -1 });
 directMessageSchema.index({ recipientId: 1, sentAt: -1 });
-directMessageSchema.index({ sentAt: 1 }, { expireAfterSeconds: 48 * 60 * 60 });
 
 export const DirectMessage = model<IDirectMessage>('DirectMessage', directMessageSchema);

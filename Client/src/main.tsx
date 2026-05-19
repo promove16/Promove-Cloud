@@ -3,10 +3,15 @@ import ReactDOM from 'react-dom/client';
 // Apply stored theme before React mounts to avoid flash
 (function () {
   const root = document.documentElement;
-  // Temporarily force dark mode across the platform for the brutal UI test stability
-  localStorage.setItem('promove-theme', 'dark');
-  root.classList.remove('light');
-  root.classList.add('dark');
+  const theme = localStorage.getItem('promove-theme') ?? 'dark';
+  if (theme === 'system') {
+    const prefersDark = window.matchMedia('(prefers-color-scheme: dark)').matches;
+    root.classList.toggle('dark', prefersDark);
+    root.classList.toggle('light', !prefersDark);
+  } else {
+    root.classList.toggle('dark', theme !== 'light');
+    root.classList.toggle('light', theme === 'light');
+  }
 })();
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import App from './app/App';

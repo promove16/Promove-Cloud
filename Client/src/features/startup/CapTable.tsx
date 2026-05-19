@@ -26,6 +26,7 @@ import { Spinner } from '../../components/ui/Spinner';
 import { OptionTabs, type OptionTabItem } from '../../components/ui/OptionTabs';
 import { startupApi } from '../../api/startup.api';
 import { dealApi } from '../../api/deal.api';
+import { biddingApi } from '../../api/bidding.api';
 import { useAuthStore } from '../../store/authStore';
 import { getApiErrorMessage } from '../../utils/apiError';
 import { normalizeStartupRouteId } from './navigation';
@@ -33,6 +34,7 @@ import { isStartupFounder } from './startupAccess';
 import { StudentNegotiationCard } from '../../app/pages/dashboards/StudentNegotiationCard';
 import { DealCard } from './equity/DealCard';
 import { DEAL_STAGE_META, PIPELINE_ORDER } from './equity/dealStageMeta';
+import FounderBidDashboard from '../bidding/FounderBidDashboard';
 import type {
   CapTableInvestorRow,
   CapTableResponse,
@@ -737,6 +739,23 @@ export default function StartupEquityAndDeals() {
     enabled: Boolean(normalizedStartupId),
   });
 
+  const bidsQuery = useQuery({
+    queryKey: ['startup-bids', normalizedStartupId],
+    queryFn: async () => {
+      const res = await biddingApi.getStartupBids(normalizedStartupId!);
+      return res.data.data;
+    },
+    enabled: Boolean(normalizedStartupId),
+    refetchInterval: 30_000,
+  });
+
+  const bidLinkedDealIds = useMemo(() => {
+    const items = bidsQuery.data?.items ?? [];
+    return new Set(items.map((b) => b.dealId).filter(Boolean) as string[]);
+  }, [bidsQuery.data]);
+
+  const hasBids = (bidsQuery.data?.items?.length ?? 0) > 0;
+
   const respondMutation = useMutation({
     mutationFn: ({
       dealId,
@@ -763,10 +782,13 @@ export default function StartupEquityAndDeals() {
 
   const startupDeals = useMemo(() => {
     const items = dealsQuery.data?.items ?? [];
-    return normalizedStartupId
+    const forStartup = normalizedStartupId
       ? items.filter((deal) => deal.startupId === normalizedStartupId)
       : items;
-  }, [dealsQuery.data, normalizedStartupId]);
+    return forStartup.filter(
+      (deal) => !(deal.currentStage === 0 && bidLinkedDealIds.has(deal._id)),
+    );
+  }, [dealsQuery.data, normalizedStartupId, bidLinkedDealIds]);
 
   const dealMetrics = useMemo(() => deriveDealMetrics(startupDeals), [startupDeals]);
   const ownership = useMemo(
@@ -906,24 +928,27 @@ export default function StartupEquityAndDeals() {
       ) : null}
 
       {activeView === 'pipeline' ? (
-        <DealPipelineSection
-          deals={startupDeals}
-          onRespond={(dealId, decision) => respondMutation.mutate({ dealId, decision })}
-          onLinkWorkshop={(dealId, workspaceId) =>
-            linkWorkshopMutation.mutate({ dealId, workspaceId })
-          }
-          respondingDealId={
-            respondMutation.isPending ? respondMutation.variables?.dealId : undefined
-          }
-          linkingDealId={
-            linkWorkshopMutation.isPending ? linkWorkshopMutation.variables?.dealId : undefined
-          }
-          linkingWorkspaceId={
-            linkWorkshopMutation.isPending
-              ? linkWorkshopMutation.variables?.workspaceId
-              : undefined
-          }
-        />
+        <div className="space-y-8">
+          {hasBids ? <FounderBidDashboard /> : null}
+          <DealPipelineSection
+            deals={startupDeals}
+            onRespond={(dealId, decision) => respondMutation.mutate({ dealId, decision })}
+            onLinkWorkshop={(dealId, workspaceId) =>
+              linkWorkshopMutation.mutate({ dealId, workspaceId })
+            }
+            respondingDealId={
+              respondMutation.isPending ? respondMutation.variables?.dealId : undefined
+            }
+            linkingDealId={
+              linkWorkshopMutation.isPending ? linkWorkshopMutation.variables?.dealId : undefined
+            }
+            linkingWorkspaceId={
+              linkWorkshopMutation.isPending
+                ? linkWorkshopMutation.variables?.workspaceId
+                : undefined
+            }
+          />
+        </div>
       ) : null}
 
       {dealsQuery.isFetching && !dealsQuery.isLoading ? (

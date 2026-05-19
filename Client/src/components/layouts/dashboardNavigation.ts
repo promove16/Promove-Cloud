@@ -57,7 +57,6 @@ export const SIDEBAR_CONFIG: Record<UserRole, DashboardNavItem[]> = {
     { kind: 'link', label: 'Marketplace', icon: Globe, path: getMarketplaceBasePath(UserRole.STUDENT) },
     { kind: 'link', label: 'Events', icon: CalendarDays, path: '/dashboard/student/events' },
     { kind: 'link', label: 'Messages', icon: MessageCircle, path: '/dashboard/messages' },
-    
   ],
   [UserRole.SCHOOL]: [
     { kind: 'link', label: 'Dashboard', icon: Home, path: '/dashboard/school' },
@@ -83,7 +82,6 @@ export const SIDEBAR_CONFIG: Record<UserRole, DashboardNavItem[]> = {
     { kind: 'link', label: 'Student Feed', icon: Users, path: '/dashboard/mentor/students' },
     { kind: 'link', label: 'Sessions', icon: GraduationCap, path: '/dashboard/mentor/sessions' },
     { kind: 'link', label: 'Messages', icon: MessageCircle, path: '/dashboard/messages' },
-    // { kind: 'link', label: 'Profile', icon: User, path: '/dashboard/profile' },
     // { kind: 'link', label: 'Settings', icon: Settings, path: '/dashboard/settings' },
     // { kind: 'action', label: 'Logout', icon: LogOut, action: 'logout' },
   ],
@@ -95,7 +93,6 @@ export const SIDEBAR_CONFIG: Record<UserRole, DashboardNavItem[]> = {
     { kind: 'link', label: 'Product Workshop', icon: FolderKanban, path: '/dashboard/investor/product-workshop' },
     { kind: 'link', label: 'Portfolio', icon: BriefcaseBusiness, path: '/portfolio' },
     { kind: 'link', label: 'Messages', icon: MessageCircle, path: '/dashboard/messages' },
-    // { kind: 'link', label: 'Profile', icon: User, path: '/dashboard/profile' },
     // { kind: 'link', label: 'Settings', icon: Settings, path: '/dashboard/settings' },
     // { kind: 'action', label: 'Logout', icon: LogOut, action: 'logout' },
   ],
@@ -104,7 +101,6 @@ export const SIDEBAR_CONFIG: Record<UserRole, DashboardNavItem[]> = {
     { kind: 'link', label: 'Marketplace', icon: Globe, path: getMarketplaceBasePath(UserRole.RECRUITER) },
     { kind: 'link', label: 'Drive', icon: BarChart3, path: '/dashboard/recruiter/drives' },
     { kind: 'link', label: 'Messages', icon: MessageCircle, path: '/dashboard/messages' },
-    // { kind: 'link', label: 'Profile', icon: User, path: '/dashboard/profile' },
     // { kind: 'action', label: 'Logout', icon: LogOut, action: 'logout' },
   ],
   [UserRole.ADMIN]: [
@@ -113,12 +109,10 @@ export const SIDEBAR_CONFIG: Record<UserRole, DashboardNavItem[]> = {
     { kind: 'link', label: 'Access Control', icon: ShieldCheck, path: '/dashboard/admin/users' },
     { kind: 'link', label: 'Patents', icon: FileText, path: '/dashboard/admin/patents' },
     { kind: 'link', label: 'Startups', icon: Rocket, path: '/dashboard/admin/startups' },
+    { kind: 'link', label: 'Verification', icon: ShieldCheck, path: '/dashboard/admin/verification' },
     { kind: 'link', label: 'Deals', icon: BriefcaseBusiness, path: '/dashboard/admin/deals' },
     { kind: 'link', label: 'Mentorship', icon: GraduationCap, path: '/dashboard/admin/mentorship' },
     { kind: 'link', label: 'Analytics', icon: BarChart3, path: '/dashboard/admin/analytics' },
-    // { kind: 'link', label: 'Profile', icon: User, path: '/dashboard/profile' },
-    // { kind: 'link', label: 'Settings', icon: Settings, path: '/dashboard/settings' },
-    // { kind: 'action', label: 'Logout', icon: LogOut, action: 'logout' },
   ],
 };
 
@@ -153,8 +147,15 @@ export const DASHBOARD_ROUTE_LABELS: Partial<Record<UserRole, DashboardRouteLabe
     { path: '/dashboard/college/analytics', label: 'Analytics' },
     { path: '/dashboard/college/compliance', label: 'Compliance' },
   ],
+  [UserRole.ADMIN]: [
+    { path: '/dashboard/admin/verification', label: 'Verification' },
+    { path: '/dashboard/admin/analytics/platform', label: 'Platform Analytics' },
+  ],
   [UserRole.MENTOR]: [{ path: '/product-workspace', label: 'Product Workspace' }],
-  [UserRole.INVESTOR]: [{ path: '/product-workspace', label: 'Product Workspace' }],
+  [UserRole.INVESTOR]: [
+    { path: '/product-workspace', label: 'Product Workspace' },
+    { path: '/dashboard/investor/pipeline', label: 'Pipeline' },
+  ],
   [UserRole.RECRUITER]: [
     { path: '/dashboard/recruiter/applications', label: 'Applications' },
     { path: '/dashboard/recruiter/colleges', label: 'College Students' },

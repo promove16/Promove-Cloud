@@ -1,8 +1,9 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
-import { MessageCircle, SendHorizontal, Sparkles, X } from 'lucide-react';
+import { SendHorizontal, Sparkles, X } from 'lucide-react';
 import { useLocation } from 'react-router-dom';
 import { useAuthStore } from '../../store/authStore';
 import { UserRole } from '../../types/roles.types';
+import { smartChatApi } from '../../api/smartChat.api';
 
 type SmartChatMessage = {
   id: string;
@@ -95,8 +96,10 @@ export function GlobalSmartChat() {
   const viewportRef = useRef<HTMLDivElement | null>(null);
   const location = useLocation();
   const user = useAuthStore((state) => state.user);
+  const isAuthenticated = useAuthStore((state) => state.isAuthenticated);
   const [isOpen, setIsOpen] = useState(false);
   const [input, setInput] = useState('');
+  const [isSending, setIsSending] = useState(false);
   const [messages, setMessages] = useState<SmartChatMessage[]>([
     createMessage(
       'assistant',
@@ -125,28 +128,62 @@ export function GlobalSmartChat() {
     }
 
     viewportRef.current.scrollTop = viewportRef.current.scrollHeight;
-  }, [isOpen, messages.length]);
+  }, [isOpen, messages.length, isSending]);
 
-  const submitPrompt = (rawPrompt: string) => {
+  const submitPrompt = async (rawPrompt: string) => {
     const prompt = rawPrompt.trim();
 
-    if (!prompt) {
+    if (!prompt || isSending) {
       return;
     }
 
+    const meta = `${routeLabel} | ${getRoleLabel(user?.role)}`;
     const userMessage = createMessage('user', prompt);
-    const assistantReply = createMessage(
-      'assistant',
-      getPromptReply({
+    setMessages((current) => [...current, userMessage]);
+    setInput('');
+
+    if (!isAuthenticated) {
+      setMessages((current) => [
+        ...current,
+        createMessage(
+          'assistant',
+          'Sign in to chat with Smart Chat. While signed out I can only show static page hints.',
+          meta,
+        ),
+      ]);
+      return;
+    }
+
+    setIsSending(true);
+    try {
+      const { reply } = await smartChatApi.sendMessage({
+        message: prompt,
+        context: { pathname: location.pathname, routeLabel },
+      });
+      setMessages((current) => [
+        ...current,
+        createMessage('assistant', reply, meta),
+      ]);
+    } catch (error) {
+      const fallback = getPromptReply({
         prompt,
         pathname: location.pathname,
         role: user?.role,
-      }),
-      `${routeLabel} | ${getRoleLabel(user?.role)}`,
-    );
-
-    setMessages((current) => [...current, userMessage, assistantReply]);
-    setInput('');
+      });
+      setMessages((current) => [
+        ...current,
+        createMessage(
+          'assistant',
+          `${fallback}\n\n(Smart Chat AI is unavailable right now — showing a static hint instead.)`,
+          meta,
+        ),
+      ]);
+      if (import.meta.env.DEV) {
+        console.error('Smart Chat request failed', error);
+      }
+    } finally {
+      setIsSending(false);
+    }
   };
 
   if (shouldHideSmartChat) {
@@ -156,44 +193,40 @@ export function GlobalSmartChat() {
   return (
     <div className="pointer-events-none fixed bottom-5 right-4 z-50 flex items-end justify-end">
       {isOpen ? (
-        <div className="pointer-events-auto w-[calc(100vw-2rem)] max-w-[390px] overflow-hidden rounded-[28px] border border-white/12 bg-[#767b91]/95 shadow-[0_28px_80px_rgba(0,0,0,0.55)] backdrop-blur-xl">
-          <div className="flex items-center justify-between px-4 py-4 text-white">
-            <div>
-              <div className="inline-flex items-center gap-2 text-sm font-semibold">
-                <Sparkles className="h-4 w-4" />
+        <div className="pointer-events-auto flex w-[calc(100vw-2rem)] max-w-[360px] flex-col overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-xl dark:border-white/10 dark:bg-slate-950">
+          <header className="flex items-center justify-between border-b border-slate-100 px-4 py-3 dark:border-white/5">
+            <div className="flex min-w-0 items-center gap-2">
+              <Sparkles className="h-4 w-4 text-slate-500 dark:text-slate-400" />
+              <span className="text-sm font-medium text-slate-900 dark:text-slate-100">
                 Smart Chat
-              </div>
-              <div className="mt-1 text-xs text-white/65">{routeLabel}</div>
+              </span>
+              <span className="truncate text-xs text-slate-400 dark:text-slate-500">
+                · {routeLabel}
+              </span>
             </div>
             <button
               type="button"
               onClick={() => setIsOpen(false)}
-              className="inline-flex h-9 w-9 items-center justify-center rounded-full text-white/70 transition hover:bg-white/10 hover:text-white"
+              className="inline-flex h-7 w-7 items-center justify-center rounded-md text-slate-400 transition hover:bg-slate-100 hover:text-slate-700 dark:text-slate-500 dark:hover:bg-white/5 dark:hover:text-slate-200"
               aria-label="Close Smart Chat"
             >
               <X className="h-4 w-4" />
             </button>
-          </div>
+          </header>
 
-          <div ref={viewportRef} className="h-[420px] overflow-y-auto px-4 pb-4">
+          <div ref={viewportRef} className="h-[420px] overflow-y-auto px-4 py-4">
             <div className="space-y-4">
-              <div className="rounded-[22px] border border-white/12 bg-black/20 p-4 text-white">
-                <div className="text-xs font-semibold uppercase tracking-[0.24em] text-white/60">
-                  Context
-                </div>
-                <div className="mt-3 text-sm leading-6 text-white/85">
-                  {getRouteSummary(location.pathname)}
-                </div>
-              </div>
-
               {messages.length <= 1 ? (
-                <div className="space-y-3">
+                <div className="flex flex-wrap gap-2 pb-1">
                   {quickPrompts.map((prompt) => (
                     <button
                       key={prompt}
                       type="button"
-                      onClick={() => submitPrompt(prompt)}
-                      className="w-full rounded-[20px] border border-white/12 bg-black/20 px-4 py-3 text-left text-sm text-white transition hover:bg-black/28"
+                      onClick={() => {
+                        void submitPrompt(prompt);
+                      }}
+                      disabled={isSending}
+                      className="rounded-full border border-slate-200 px-3 py-1.5 text-xs text-slate-600 transition hover:border-slate-300 hover:bg-slate-50 disabled:cursor-not-allowed disabled:opacity-50 dark:border-white/10 dark:text-slate-300 dark:hover:border-white/20 dark:hover:bg-white/5"
                     >
                       {prompt}
                     </button>
@@ -204,77 +237,73 @@ export function GlobalSmartChat() {
               {messages.map((message) => {
                 const isUser = message.role === 'user';
 
-                return (
-                  <div
-                    key={message.id}
-                    className={`flex ${isUser ? 'justify-end' : 'justify-start'}`}
-                  >
-                    <div
-                      className={`max-w-[86%] rounded-[22px] px-4 py-3 ${
-                        isUser ? 'bg-white text-slate-900' : 'bg-black/28 text-white'
-                      }`}
-                    >
-                      <div
-                        className={`text-[11px] font-semibold uppercase tracking-[0.2em] ${
-                          isUser ? 'text-slate-500' : 'text-white/55'
-                        }`}
-                      >
-                        {isUser ? 'You' : 'Smart Chat'}
+                if (isUser) {
+                  return (
+                    <div key={message.id} className="flex justify-end">
+                      <div className="max-w-[80%] rounded-2xl rounded-br-sm bg-slate-100 px-3.5 py-2 text-sm leading-6 text-slate-800 dark:bg-white/10 dark:text-slate-100">
+                        <div className="whitespace-pre-wrap">{message.content}</div>
                       </div>
-                      <div className="mt-2 whitespace-pre-wrap text-sm leading-6">
-                        {message.content}
-                      </div>
-                      {message.meta ? (
-                        <div
-                          className={`mt-3 text-[11px] ${
-                            isUser ? 'text-slate-500' : 'text-white/45'
-                          }`}
-                        >
-                          {message.meta}
-                        </div>
-                      ) : null}
                     </div>
+                  );
+                }
+
+                return (
+                  <div key={message.id} className="text-sm leading-6 text-slate-700 dark:text-slate-200">
+                    <div className="whitespace-pre-wrap">{message.content}</div>
+                    {message.meta ? (
+                      <div className="mt-1 text-[11px] text-slate-400 dark:text-slate-500">
+                        {message.meta}
+                      </div>
+                    ) : null}
                   </div>
                 );
               })}
+
+              {isSending ? (
+                <div className="flex items-center gap-1.5 text-sm text-slate-400 dark:text-slate-500">
+                  <span className="h-1.5 w-1.5 animate-pulse rounded-full bg-current" />
+                  <span className="h-1.5 w-1.5 animate-pulse rounded-full bg-current [animation-delay:150ms]" />
+                  <span className="h-1.5 w-1.5 animate-pulse rounded-full bg-current [animation-delay:300ms]" />
+                </div>
+              ) : null}
             </div>
           </div>
 
-          <div className="border-t border-white/10 bg-black/10 p-4">
-            <form
-              onSubmit={(event) => {
-                event.preventDefault();
-                submitPrompt(input);
-              }}
-            >
-              <div className="flex items-center gap-3 rounded-full border border-black/45 bg-white px-4 py-2">
-                <input
-                  value={input}
-                  onChange={(event) => setInput(event.target.value)}
-                  placeholder="Type your message..."
-                  className="h-10 flex-1 border-0 bg-transparent text-base text-slate-800 placeholder:text-slate-500 focus:outline-none"
-                />
-                <button
-                  type="submit"
-                  disabled={input.trim() === ''}
-                  className="inline-flex h-10 w-10 items-center justify-center rounded-full text-slate-400 transition hover:bg-slate-100 hover:text-slate-700 disabled:cursor-not-allowed disabled:opacity-40"
-                  aria-label="Send Smart Chat message"
-                >
-                  <SendHorizontal className="h-5 w-5" />
-                </button>
-              </div>
-            </form>
-          </div>
+          <form
+            onSubmit={(event) => {
+              event.preventDefault();
+              void submitPrompt(input);
+            }}
+            className="border-t border-slate-100 px-3 py-3 dark:border-white/5"
+          >
+            <div className="flex items-center gap-2 rounded-full border border-slate-200 bg-white px-3 py-1.5 transition focus-within:border-slate-300 dark:border-white/10 dark:bg-slate-900 dark:focus-within:border-white/20">
+              <input
+                value={input}
+                onChange={(event) => setInput(event.target.value)}
+                placeholder="Message Smart Chat"
+                disabled={isSending}
+                className="h-8 flex-1 border-0 bg-transparent text-sm text-slate-800 placeholder:text-slate-400 focus:outline-none disabled:cursor-not-allowed disabled:opacity-60 dark:text-slate-100 dark:placeholder:text-slate-500"
+              />
+              <button
+                type="submit"
+                disabled={input.trim() === '' || isSending}
+                className="inline-flex h-8 w-8 items-center justify-center rounded-full text-slate-400 transition hover:bg-slate-100 hover:text-slate-700 disabled:cursor-not-allowed disabled:opacity-40 dark:hover:bg-white/5 dark:hover:text-slate-200"
+                aria-label="Send Smart Chat message"
+              >
+                <SendHorizontal className="h-4 w-4" />
+              </button>
+            </div>
+          </form>
         </div>
       ) : (
         <button
           type="button"
           onClick={() => setIsOpen(true)}
-          className="pointer-events-auto inline-flex h-14 w-14 items-center justify-center rounded-full border border-white/10 bg-slate-950/90 text-white shadow-[0_18px_40px_rgba(0,0,0,0.45)] backdrop-blur-xl transition hover:bg-slate-900"
+          className="pointer-events-auto inline-flex h-11 w-11 items-center justify-center rounded-full border border-slate-200 bg-white text-slate-600 shadow-md transition hover:text-slate-900 dark:border-white/10 dark:bg-slate-900 dark:text-slate-300 dark:hover:text-white"
           aria-label="Open Smart Chat"
           title="Smart Chat"
         >
-          <MessageCircle className="h-5 w-5 text-cyan-300" />
+          <Sparkles className="h-4 w-4" />
         </button>
       )}
     </div>

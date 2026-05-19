@@ -60,7 +60,7 @@ export const investorApi = {
     },
   ) {
     const response = await api.post<ApiSuccessResponse<DealDetailView>>(
-      `/api/investor/startups/${startupId}/sole-investor`,
+      `/api/investor/express-interest/${startupId}`,
       { ...payload, investorType: 'sole' },
     );
     return response.data.data;

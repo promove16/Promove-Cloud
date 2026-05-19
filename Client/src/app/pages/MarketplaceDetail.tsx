@@ -134,8 +134,8 @@ const jobStats = (job: MarketplaceJobSummary) => [
 
 const getJobActionLabel = (hasApplied: boolean) => (hasApplied ? "Applied" : "Apply now");
 const marketplaceDetailShellClassName =
-  "min-h-[calc(100vh-7rem)] bg-[radial-gradient(circle_at_top,#16213d_0%,#0a0f1d_34%,#050814_100%)] text-slate-100";
-const marketplaceDetailContentClassName = "w-full px-4 py-5 sm:px-6 lg:px-8";
+  "min-h-[calc(100vh-7rem)] bg-[#060814] bg-[radial-gradient(circle_at_20%_0%,rgba(20,184,166,0.14),transparent_34%),radial-gradient(circle_at_88%_10%,rgba(59,130,246,0.12),transparent_30%)] text-slate-100";
+const marketplaceDetailContentClassName = "w-full px-3 py-5 sm:px-4 lg:px-5 xl:px-6";
 
 export function MarketplaceDetail() {
   const navigate = useNavigate();
@@ -198,11 +198,11 @@ export function MarketplaceDetail() {
   return (
     <div className={marketplaceDetailShellClassName}>
       <div className={marketplaceDetailContentClassName}>
-        <div className="space-y-6">
-          <div className="flex flex-wrap items-center justify-between gap-3">
+        <div className="space-y-8 sm:space-y-10">
+          <div className="flex flex-wrap items-center justify-between gap-3 pt-1 sm:pt-2">
             <Link
               to={`${getMarketplaceBasePath(dashboardRole)}?role=${entityType}`}
-              className="inline-flex items-center gap-2 rounded-full border border-white/10 bg-white/5 px-4 py-2 text-sm font-medium text-slate-200 transition hover:border-white/20 hover:bg-white/10"
+              className="inline-flex items-center gap-2 rounded-full border border-white/10 bg-slate-950/55 px-4 py-2 text-sm font-medium text-slate-200 transition hover:border-white/20 hover:bg-white/10"
             >
               <ArrowLeft className="h-4 w-4" />
               Back to marketplace
@@ -252,61 +252,43 @@ function StartupDetailView({
   const canShowInvestorButton = isInvestorView && (entity.acceptsPennyInvestors || entity.acceptsSoleInvestor);
   const primaryLocation = entity.founders.map((founder) => founder.location).find(Boolean);
   const fundingLabel = typeof entity.fundingNeeded === "number" ? money.format(entity.fundingNeeded) : "Undisclosed";
-  const summaryMeta = [
-    primaryLocation,
-    ...entity.launchTargets.slice(0, 1),
-    `${entity.innovationScoreAtLaunch} score`,
-    `${entity.teamSize} team`,
-  ].filter(Boolean) as string[];
-  const snapshotChips = [
-    ...new Set(
+  const launchTarget = entity.launchTargets[0];
+  const publicDetails = entity.publicDetails ?? {};
+
+  const tags = Array.from(
+    new Set(
       [
         entity.category,
-        entity.stage,
         entity.traction.mvpBuilt ? "MVP Ready" : "",
         entity.traction.revenueGenerating ? "Revenue Generating" : "",
         entity.traction.patentFiled ? "Patent Filed" : "",
         entity.launchTargets.includes("Investors") ? "Open for Investment" : "",
-        ...entity.trustProfile.signals.slice(0, 5),
-      ].filter(Boolean),
+        ...entity.trustProfile.signals.slice(0, 4),
+      ].filter(Boolean) as string[],
     ),
+  );
+
+  const stats = [
+    { label: "Launch Score", value: String(entity.innovationScoreAtLaunch) },
+    { label: "Team Size", value: String(entity.teamSize) },
+    { label: "Products", value: String(entity.activeProducts) },
+    { label: "Funding Needed", value: fundingLabel },
   ];
-  const publicDetails = entity.publicDetails ?? {};
-  const questionnaireRows = [
-    {
-      label: "Startup Stage",
-      value: formatLabel(publicDetails.innovation?.startupStage),
-      icon: Sparkles,
-      compact: true,
-    },
-    {
-      label: "Funding Status",
-      value: formatFundingStatus(publicDetails.innovation?.fundingStatus),
-      icon: ShieldCheck,
-      compact: true,
-    },
-    {
-      label: "Patent Status",
-      value: formatPatentStatus(publicDetails.innovation?.patentStatus),
-      icon: FileText,
-      compact: true,
-    },
-    {
-      label: "Problem Clarity",
-      value: publicDetails.innovation?.problemClarity,
-      icon: Target,
-    },
-    {
-      label: "Unique Solution",
-      value: publicDetails.innovation?.uniqueSolution,
-      icon: Lightbulb,
-    },
-    {
-      label: "Market Differentiation",
-      value: publicDetails.innovation?.marketDifferentiation,
-      icon: Globe,
-    },
+
+  const snapshotRows: { label: string; value: string; icon: LucideIcon }[] = [
+    { label: "Startup Stage", value: formatLabel(publicDetails.innovation?.startupStage), icon: Sparkles },
+    { label: "Funding Status", value: formatFundingStatus(publicDetails.innovation?.fundingStatus), icon: ShieldCheck },
+    { label: "Patent Status", value: formatPatentStatus(publicDetails.innovation?.patentStatus), icon: FileText },
   ];
+
+  const narrativeRows = (
+    [
+      { label: "Problem Clarity", value: publicDetails.innovation?.problemClarity, icon: Target },
+      { label: "Unique Solution", value: publicDetails.innovation?.uniqueSolution, icon: Lightbulb },
+      { label: "Market Differentiation", value: publicDetails.innovation?.marketDifferentiation, icon: Globe },
+    ] as { label: string; value: string | undefined; icon: LucideIcon }[]
+  ).filter((row): row is { label: string; value: string; icon: LucideIcon } => Boolean(row.value));
+
   const proofItems = [
     { label: "Website live", active: entity.trustProfile.hasWebsite },
     { label: "Product demo", active: entity.trustProfile.hasProductDemo },
@@ -333,286 +315,293 @@ function StartupDetailView({
   };
 
   return (
-    <div className="space-y-6">
-      <section className="relative overflow-hidden rounded-[28px] border border-white/10 bg-[#080b16] px-5 py-6 shadow-[0_28px_110px_rgba(2,6,23,0.34)] sm:px-7 lg:px-9">
-        <div className="pointer-events-none absolute inset-0 bg-[radial-gradient(circle_at_top_left,rgba(45,212,191,0.13),transparent_36%),radial-gradient(circle_at_bottom_right,rgba(99,102,241,0.12),transparent_34%)]" />
-        <div className="relative flex flex-col gap-8 xl:flex-row xl:items-start xl:justify-between">
-          <div className="min-w-0 flex-1">
-            <div className="flex items-start gap-4">
-              <div className="flex h-16 w-16 shrink-0 items-center justify-center rounded-[18px] border border-white/10 bg-[#121827] text-xl font-semibold text-white shadow-[inset_0_1px_0_rgba(255,255,255,0.08)]">
-                {entity.name.slice(0, 1).toUpperCase()}
-              </div>
-
-              <div className="min-w-0 flex-1">
-                <div className="flex flex-wrap items-center gap-2">
-                  <span className="rounded-full bg-white px-3 py-1 text-xs font-semibold uppercase tracking-[0.18em] text-slate-950">
-                    Startup
-                  </span>
-                  <span className="rounded-full border border-teal-400/25 bg-teal-400/10 px-3 py-1 text-xs font-semibold text-teal-100">
-                    {entity.stage}
-                  </span>
-                  {entity.trustProfile.legalStructure ? (
-                    <span className="rounded-full border border-white/10 bg-white/[0.04] px-3 py-1 text-xs font-semibold text-slate-200">
-                      {entity.trustProfile.legalStructure}
-                    </span>
-                  ) : null}
-                </div>
-
-                <h1 className="mt-4 max-w-4xl break-words text-3xl font-semibold leading-tight text-white sm:text-5xl">
-                  {entity.name}
-                </h1>
-                <p className="mt-2 max-w-3xl text-base font-medium leading-7 text-slate-300">
-                  {entity.category} • {entity.stage}
-                </p>
-
-                <div className="mt-4 flex flex-wrap items-center gap-x-4 gap-y-2 text-sm text-slate-400">
-                  {primaryLocation ? (
-                    <span className="inline-flex items-center gap-1.5">
-                      <MapPin className="h-4 w-4 text-teal-300" />
-                      {primaryLocation}
-                    </span>
-                  ) : null}
-                  {summaryMeta
-                    .filter((meta) => meta !== primaryLocation)
-                    .map((meta) => (
-                      <span key={meta}>{meta}</span>
-                    ))}
-                </div>
-              </div>
-            </div>
-
-            <p className="mt-5 max-w-3xl text-sm leading-6 text-slate-300 sm:text-[15px]">
-              {entity.tagline}
-            </p>
-
-            <div className="mt-6 grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
-              <MetricCard compact label="Launch Score" value={String(entity.innovationScoreAtLaunch)} />
-              <MetricCard compact label="Team Size" value={String(entity.teamSize)} />
-              <MetricCard compact label="Products" value={String(entity.activeProducts)} />
-              <MetricCard compact label="Funding Needed" value={fundingLabel} />
-            </div>
-
-            <div className="mt-6 flex flex-wrap gap-2">
-              {snapshotChips.map((chip) => (
-                <span
-                  key={chip}
-                  className="rounded-full border border-white/10 bg-white/[0.03] px-3 py-1.5 text-xs font-medium text-slate-200"
-                >
-                  {chip}
-                </span>
-              ))}
-            </div>
-          </div>
-
-          <div className="w-full max-w-[340px] shrink-0 space-y-5 rounded-[24px] border border-white/10 bg-slate-950/35 p-4">
-            <div className="rounded-[20px] border border-white/10 bg-white/[0.04] p-4">
-              <div className="flex items-center gap-2 text-xs uppercase tracking-[0.25em] text-slate-500">
-                <FileText className="h-4 w-4" />
-                Pitch deck
-              </div>
-              <div className="mt-3 text-sm leading-6 text-slate-300">
-                {entity.pitchDeckUrl
-                  ? "The deck opens through a fresh authenticated link."
-                  : "No pitch deck is attached to this startup yet."}
-              </div>
-              {entity.pitchDeckUrl ? (
-                <a
-                  href={entity.pitchDeckUrl}
-                  target="_blank"
-                  rel="noreferrer"
-                  className="mt-4 inline-flex w-full items-center justify-center gap-2 rounded-full bg-white px-4 py-2.5 text-sm font-semibold text-slate-950 transition hover:bg-slate-100 active:scale-[0.98]"
-                >
-                  Open Pitch Deck
-                  <ExternalLink className="h-4 w-4" />
-                </a>
-              ) : (
-                <div className="mt-4 rounded-2xl border border-dashed border-white/10 px-4 py-3 text-sm text-slate-500">
-                  Pitch deck unavailable
-                </div>
-              )}
-            </div>
-
-            <div className="flex flex-wrap gap-2">
-              {canShowInvestorButton && (
-                <button
-                  onClick={handleExpressInterest}
-                  className="inline-flex items-center gap-2 rounded-full border border-cyan-400/30 bg-cyan-400/10 px-3.5 py-2 text-sm font-semibold text-cyan-300 transition hover:border-cyan-400/50 hover:bg-cyan-400/20"
-                >
-                  <Handshake className="h-4 w-4" />
-                  Express Interest
-                </button>
-              )}
-              {messageFounderId ? (
-                <button
-                  onClick={() => onMessage(messageFounderId)}
-                  className="inline-flex items-center gap-2 rounded-full border border-white/10 px-3.5 py-2 text-sm font-medium text-white transition hover:border-white/20 hover:bg-white/5"
-                >
-                  <MessageCircle className="h-4 w-4" />
-                  Message Founder
-                </button>
-              ) : null}
-            </div>
-          </div>
-        </div>
-      </section>
-
-      <section className="grid gap-6 xl:grid-cols-[minmax(0,1fr),300px]">
-        <div className="space-y-6 rounded-[32px] border border-white/10 bg-[#090d1b] p-5 shadow-[0_24px_80px_rgba(15,23,42,0.24)] sm:p-6">
-          <StartupPanel title="Startup questionnaire" icon={ShieldCheck}>
-            <div className="grid gap-3 md:grid-cols-3">
-              {questionnaireRows
-                .filter((row) => row.compact)
-                .map((row) => (
-                  <StartupInfoBlock
-                    key={row.label}
-                    compact
-                    label={row.label}
-                    value={row.value ?? "Not answered"}
-                    icon={row.icon}
-                  />
-                ))}
-            </div>
-            <div className="mt-3 grid gap-3">
-              {questionnaireRows
-                .filter((row) => !row.compact)
-                .map((row) => (
-                  <StartupInfoBlock
-                    key={row.label}
-                    label={row.label}
-                    value={row.value ?? "Not answered"}
-                    icon={row.icon}
-                  />
-                ))}
-            </div>
-          </StartupPanel>
-
-          <div>
-            <div className="text-[11px] uppercase tracking-[0.28em] text-slate-500">Startup signals</div>
-            <div className="mt-3 grid gap-2 sm:grid-cols-2 xl:grid-cols-4">
-              <MetricCard compact label="Launch Score" value={String(entity.innovationScoreAtLaunch)} />
-              <MetricCard compact label="Team Size" value={String(entity.teamSize)} />
-              <MetricCard compact label="Products" value={String(entity.activeProducts)} />
-              <MetricCard
-                compact
-                label="Funding Needed"
-                value={typeof entity.fundingNeeded === "number" ? money.format(entity.fundingNeeded) : "Undisclosed"}
-              />
-            </div>
-          </div>
-
-          <div className="border-t border-white/10 pt-5">
-            <div className="flex items-center gap-2 text-[11px] uppercase tracking-[0.28em] text-slate-500">
-              <Users className="h-4 w-4" />
-              Founder Team
-            </div>
-            <div className="mt-3 space-y-2.5">
-              {entity.founders.length === 0 ? (
-                <div className="rounded-2xl border border-dashed border-white/10 px-4 py-4 text-sm text-slate-500">
-                  No founder profiles linked to this startup yet.
-                </div>
-              ) : (
-                entity.founders.map((founder) => (
-                  <div key={founder._id || founder.displayName} className="rounded-2xl border border-white/10 px-4 py-3">
-                    <div className="flex flex-col gap-2.5 sm:flex-row sm:items-start sm:justify-between">
-                      <div>
-                        <div className="text-base font-semibold text-white">{founder.displayName || "Unknown Founder"}</div>
-                        <div className="mt-1 flex flex-wrap gap-2 text-sm text-slate-400">
-                          {founder.headline ? <span>{founder.headline}</span> : null}
-                          {founder.location ? <span>{founder.location}</span> : null}
-                          {founder.domain ? <span>{founder.domain}</span> : null}
-                        </div>
-                        {founder.bio ? <p className="mt-2 text-sm leading-6 text-slate-300">{founder.bio}</p> : null}
-                      </div>
-                      <div className="flex items-center gap-2">
-                        {founder._id && founder._id !== currentUser?._id ? (
-                          <button
-                            onClick={() => onMessage(founder._id)}
-                            className="inline-flex items-center gap-1.5 rounded-full border border-white/10 px-3 py-1 text-xs font-medium text-slate-300 transition hover:border-white/20 hover:bg-white/5"
-                          >
-                            <MessageCircle className="h-3.5 w-3.5" />
-                            Message
-                          </button>
-                        ) : null}
-                        <div className="rounded-full border border-cyan-400/20 bg-cyan-400/10 px-3 py-1 text-xs font-semibold text-cyan-100">
-                          Score {founder.innovationScore}
-                        </div>
-                      </div>
-                    </div>
-                  </div>
-                ))
-              )}
-            </div>
-          </div>
-
-          {entity.project ? (
-            <div className="border-t border-white/10 pt-5">
-              <div className="flex items-center gap-2 text-[11px] uppercase tracking-[0.28em] text-slate-500">
-                <FolderKanban className="h-4 w-4" />
-                Related Project
-              </div>
-              <div className="mt-3 flex flex-col gap-2.5 sm:flex-row sm:items-start sm:justify-between">
-                <div>
-                  <h2 className="text-xl font-semibold text-white">{entity.project.title}</h2>
-                  <p className="mt-1 text-sm text-cyan-200">
-                    {entity.project.category} - {entity.project.stage}
-                  </p>
-                </div>
-                <div className="rounded-full border border-white/10 px-3 py-1 text-xs text-slate-300">
-                  Updated {formatDate(entity.project.updatedAt)}
-                </div>
-              </div>
-              <div className="mt-4 grid gap-2 sm:grid-cols-2 xl:grid-cols-4">
-                {projectStats(entity.project).map((stat) => (
-                  <MetricCard compact key={stat.label} label={stat.label} value={stat.value} />
-                ))}
-              </div>
-              {entity.project.lastUpdate ? (
-                <div className="mt-4 rounded-2xl border border-white/10 px-4 py-3">
-                  <div className="text-[11px] uppercase tracking-[0.25em] text-slate-500">Latest update</div>
-                  <p className="mt-2 text-sm leading-6 text-slate-300">{entity.project.lastUpdate.note}</p>
-                  <div className="mt-2 text-xs text-slate-500">{formatDate(entity.project.lastUpdate.submittedAt)}</div>
-                </div>
-              ) : null}
-            </div>
+    <div className="space-y-10 pb-10">
+      <header className="relative isolate border-b border-white/10 px-4 pb-10 pt-8 sm:px-6 sm:pt-10 lg:px-8">
+        <div className="pointer-events-none absolute inset-x-0 bottom-0 top-0 -z-10 bg-[radial-gradient(circle_at_18%_20%,rgba(45,212,191,0.14),transparent_48%),radial-gradient(circle_at_82%_28%,rgba(59,130,246,0.12),transparent_52%)] [mask-image:linear-gradient(to_bottom,black_0%,black_62%,transparent_100%)]" />
+        <div className="flex flex-wrap items-center gap-3 text-[11px] font-semibold uppercase tracking-[0.24em] text-slate-500 sm:tracking-[0.32em]">
+          <span className="inline-flex h-8 w-8 items-center justify-center rounded-md bg-white/10 text-xs font-bold text-white ring-1 ring-white/10">
+            {entity.name.slice(0, 1).toUpperCase()}
+          </span>
+          <span className="text-teal-300">Startup</span>
+          <span className="hidden h-px flex-1 bg-white/10 sm:block" />
+          <span className="text-slate-400">{entity.stage}</span>
+          {entity.trustProfile.legalStructure ? (
+            <>
+              <span className="hidden h-px w-6 bg-white/10 sm:block" />
+              <span className="text-slate-400">{entity.trustProfile.legalStructure}</span>
+            </>
           ) : null}
         </div>
 
-        <aside className="space-y-6 rounded-[32px] border border-white/10 bg-[#090d1b] p-5 shadow-[0_24px_80px_rgba(15,23,42,0.24)] sm:p-6">
-          <div>
-            <div className="text-[11px] uppercase tracking-[0.28em] text-slate-500">Traction</div>
-            <div className="mt-3 space-y-2">
-              <SignalPill compact label="Patent Filed" active={entity.traction.patentFiled} />
-              <SignalPill compact label="Patent Status" value={formatLabel(publicDetails.innovation?.patentStatus)} />
-              <SignalPill compact label="MVP Built" active={entity.traction.mvpBuilt} />
-              <SignalPill compact label="Revenue Generating" active={entity.traction.revenueGenerating} />
-              <SignalPill
-                compact
-                label="Users"
-                value={typeof entity.traction.usersCount === "number" ? String(entity.traction.usersCount) : "Not shared"}
-              />
+        <div className="mt-7 flex flex-col gap-7 lg:flex-row lg:items-end lg:justify-between">
+          <div className="min-w-0 flex-1">
+            <h1 className="max-w-5xl break-words text-4xl font-semibold leading-[1.02] tracking-tight text-white sm:text-6xl">
+              {entity.name}
+            </h1>
+            <p className="mt-4 max-w-3xl text-lg leading-relaxed text-slate-300 [text-wrap:pretty]">
+              {entity.tagline}
+            </p>
+            <div className="mt-5 flex flex-wrap items-center gap-x-5 gap-y-2 text-sm text-slate-400">
+              {primaryLocation ? (
+                <span className="inline-flex items-center gap-1.5">
+                  <MapPin className="h-4 w-4 text-teal-300" />
+                  {primaryLocation}
+                </span>
+              ) : null}
+              <span>{entity.category}</span>
+              {launchTarget ? <span>Targeting {launchTarget}</span> : null}
+              <span>
+                Score <span className="text-white">{entity.innovationScoreAtLaunch}</span>
+              </span>
+              <span>{entity.teamSize} on team</span>
             </div>
           </div>
 
-          <div className="border-t border-white/10 pt-5">
-            <div className="text-[11px] uppercase tracking-[0.28em] text-slate-500">Trust proof</div>
-            <div className="mt-3 space-y-2">
-              <SidebarRow compact label="Proof Items" value={String(entity.trustProfile.proofCount)} />
-              <SidebarRow compact label="Funding Status" value={entity.trustProfile.fundingStatus ?? "Not disclosed"} />
+          <div className="flex w-full flex-wrap items-center gap-2 sm:w-auto lg:justify-end">
+            {entity.pitchDeckUrl ? (
+              <a
+                href={entity.pitchDeckUrl}
+                target="_blank"
+                rel="noreferrer"
+                className="inline-flex min-h-11 w-full items-center justify-center gap-2 rounded-full bg-white px-5 py-2.5 text-sm font-semibold text-slate-950 transition hover:bg-slate-100 active:scale-[0.98] sm:w-auto"
+              >
+                <FileText className="h-4 w-4" />
+                Pitch Deck
+                <ExternalLink className="h-3.5 w-3.5" />
+              </a>
+            ) : null}
+            {canShowInvestorButton ? (
+              <button
+                onClick={handleExpressInterest}
+                className="inline-flex min-h-11 w-full items-center justify-center gap-2 rounded-full border border-cyan-400/40 bg-cyan-400/10 px-5 py-2.5 text-sm font-semibold text-cyan-200 transition hover:border-cyan-400/60 hover:bg-cyan-400/15 active:scale-[0.98] sm:w-auto"
+              >
+                <Handshake className="h-4 w-4" />
+                Express Interest
+              </button>
+            ) : null}
+            {messageFounderId ? (
+              <button
+                onClick={() => onMessage(messageFounderId)}
+                className="inline-flex min-h-11 w-full items-center justify-center gap-2 rounded-full border border-white/15 px-5 py-2.5 text-sm font-medium text-white transition hover:border-white/30 hover:bg-white/5 active:scale-[0.98] sm:w-auto"
+              >
+                <MessageCircle className="h-4 w-4" />
+                Message Founder
+              </button>
+            ) : null}
+          </div>
+        </div>
+
+        {tags.length > 0 ? (
+          <div className="mt-7 flex flex-wrap gap-x-4 gap-y-1.5 text-sm text-slate-500">
+            {tags.map((tag) => (
+              <span key={tag} className="max-w-full [overflow-wrap:anywhere]">
+                <span className="text-slate-600">#</span>
+                {tag.toLowerCase().replace(/\s+/g, "")}
+              </span>
+            ))}
+          </div>
+        ) : null}
+      </header>
+
+      <div className="grid grid-cols-2 gap-y-6 border-b border-white/10 px-4 pb-8 sm:grid-cols-4 sm:gap-y-0 sm:divide-x sm:divide-white/10 sm:px-6 lg:px-8">
+        {stats.map((stat, index) => (
+          <div
+            key={stat.label}
+            className={`min-w-0 ${index > 0 ? "sm:pl-8" : ""} ${index < stats.length - 1 ? "sm:pr-8" : ""}`}
+          >
+            <div className="text-[11px] uppercase tracking-[0.28em] text-slate-500">{stat.label}</div>
+            <div className="mt-2 break-words text-2xl font-semibold text-white tabular-nums sm:text-3xl">{stat.value}</div>
+          </div>
+        ))}
+      </div>
+
+      <div className="grid gap-12 px-4 sm:px-6 lg:px-8 xl:grid-cols-[minmax(0,1fr)_320px] xl:gap-12">
+        <div className="min-w-0 space-y-12">
+          {narrativeRows.length > 0 ? (
+            <DetailSection title="About this startup">
+              <div className="space-y-7">
+                {narrativeRows.map((row) => {
+                  const Icon = row.icon;
+                  return (
+                    <div key={row.label}>
+                      <div className="flex items-center gap-2 text-[11px] uppercase tracking-[0.25em] text-slate-500">
+                        <Icon className="h-3.5 w-3.5 text-teal-300" />
+                        {row.label}
+                      </div>
+                      <p className="mt-2 max-w-[72ch] whitespace-pre-wrap text-base leading-7 text-slate-200 [overflow-wrap:anywhere]">
+                        {row.value}
+                      </p>
+                    </div>
+                  );
+                })}
+              </div>
+            </DetailSection>
+          ) : null}
+
+          <DetailSection title="Innovation snapshot" icon={ShieldCheck}>
+            <dl className="grid gap-x-10 gap-y-5 sm:grid-cols-3">
+              {snapshotRows.map((row) => {
+                const Icon = row.icon;
+                return (
+                  <div key={row.label}>
+                    <dt className="flex items-center gap-1.5 text-[11px] uppercase tracking-[0.22em] text-slate-500">
+                      <Icon className="h-3.5 w-3.5 text-teal-300" />
+                      {row.label}
+                    </dt>
+                    <dd className="mt-2 text-base font-semibold text-white [overflow-wrap:anywhere]">{row.value || "-"}</dd>
+                  </div>
+                );
+              })}
+            </dl>
+          </DetailSection>
+
+          <DetailSection title="Founder team" icon={Users}>
+            {entity.founders.length === 0 ? (
+              <p className="text-sm text-slate-500">No founder profiles linked to this startup yet.</p>
+            ) : (
+              <ul className="divide-y divide-white/5">
+                {entity.founders.map((founder) => (
+                  <li
+                    key={founder._id || founder.displayName}
+                    className="flex items-start gap-4 py-4 first:pt-0 last:pb-0"
+                  >
+                    <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-white/5 text-sm font-semibold text-white ring-1 ring-white/10">
+                      {(founder.displayName || "?").slice(0, 1).toUpperCase()}
+                    </div>
+                    <div className="min-w-0 flex-1">
+                      <div className="flex flex-wrap items-baseline gap-x-3 gap-y-1">
+                        <span className="min-w-0 text-base font-semibold text-white [overflow-wrap:anywhere]">
+                          {founder.displayName || "Unknown Founder"}
+                        </span>
+                        <span className="text-xs font-semibold uppercase tracking-[0.18em] text-cyan-300">
+                          Score {founder.innovationScore}
+                        </span>
+                      </div>
+                      <div className="mt-1 flex flex-wrap gap-x-3 gap-y-0.5 text-sm text-slate-400">
+                        {founder.headline ? <span className="[overflow-wrap:anywhere]">{founder.headline}</span> : null}
+                        {founder.location ? <span className="[overflow-wrap:anywhere]">{founder.location}</span> : null}
+                        {founder.domain ? <span className="[overflow-wrap:anywhere]">{founder.domain}</span> : null}
+                      </div>
+                      {founder.bio ? (
+                        <p className="mt-2 text-sm leading-6 text-slate-300 [overflow-wrap:anywhere]">{founder.bio}</p>
+                      ) : null}
+                    </div>
+                    {founder._id && founder._id !== currentUser?._id ? (
+                      <button
+                        onClick={() => onMessage(founder._id)}
+                        className="mt-1 inline-flex shrink-0 items-center gap-1.5 text-xs font-medium text-slate-400 transition hover:text-cyan-200"
+                      >
+                        <MessageCircle className="h-3.5 w-3.5" />
+                        Message
+                      </button>
+                    ) : null}
+                  </li>
+                ))}
+              </ul>
+            )}
+          </DetailSection>
+
+          {entity.project ? (
+            <DetailSection
+              title="Related project"
+              icon={FolderKanban}
+              action={
+                <span className="text-xs text-slate-500">
+                  Updated {formatDate(entity.project.updatedAt)}
+                </span>
+              }
+            >
+              <h3 className="text-xl font-semibold text-white [overflow-wrap:anywhere]">{entity.project.title}</h3>
+              <p className="mt-1 text-sm text-cyan-200">
+                {entity.project.category} - {entity.project.stage}
+              </p>
+              <dl className="mt-5 grid grid-cols-2 gap-x-8 gap-y-4 sm:grid-cols-4">
+                {projectStats(entity.project).map((stat) => (
+                  <div key={stat.label}>
+                    <dt className="text-[11px] uppercase tracking-[0.25em] text-slate-500">
+                      {stat.label}
+                    </dt>
+                    <dd className="mt-1 break-words text-lg font-semibold text-white tabular-nums">{stat.value}</dd>
+                  </div>
+                ))}
+              </dl>
+              {entity.project.lastUpdate ? (
+                <div className="mt-6 border-l-2 border-teal-400/40 pl-4">
+                  <div className="text-[11px] uppercase tracking-[0.25em] text-slate-500">
+                    Latest update
+                  </div>
+                  <p className="mt-2 text-sm leading-6 text-slate-300 [overflow-wrap:anywhere]">
+                    {entity.project.lastUpdate.note}
+                  </p>
+                  <div className="mt-2 text-xs text-slate-500">
+                    {formatDate(entity.project.lastUpdate.submittedAt)}
+                  </div>
+                </div>
+              ) : null}
+            </DetailSection>
+          ) : null}
+        </div>
+
+        <aside className="space-y-10 xl:border-l xl:border-white/10 xl:pl-8">
+          <DetailSection title="Traction" compact>
+            <dl>
+              <DefRow
+                label="Patent Filed"
+                value={entity.traction.patentFiled ? "Yes" : "No"}
+                tone={entity.traction.patentFiled ? "positive" : "muted"}
+              />
+              <DefRow
+                label="Patent Status"
+                value={formatLabel(publicDetails.innovation?.patentStatus)}
+              />
+              <DefRow
+                label="MVP Built"
+                value={entity.traction.mvpBuilt ? "Yes" : "No"}
+                tone={entity.traction.mvpBuilt ? "positive" : "muted"}
+              />
+              <DefRow
+                label="Revenue Generating"
+                value={entity.traction.revenueGenerating ? "Yes" : "No"}
+                tone={entity.traction.revenueGenerating ? "positive" : "muted"}
+              />
+              <DefRow
+                label="Users"
+                value={
+                  typeof entity.traction.usersCount === "number"
+                    ? String(entity.traction.usersCount)
+                    : "Not shared"
+                }
+              />
+            </dl>
+          </DetailSection>
+
+          <DetailSection title="Trust proof" compact>
+            <dl>
+              <DefRow label="Proof items" value={String(entity.trustProfile.proofCount)} />
+              <DefRow
+                label="Funding status"
+                value={entity.trustProfile.fundingStatus ?? "Not disclosed"}
+              />
               {proofItems.map((item) => (
-                <SignalPill key={item.label} compact label={item.label} active={item.active} />
+                <DefRow
+                  key={item.label}
+                  label={item.label}
+                  value={item.active ? "Yes" : "No"}
+                  tone={item.active ? "positive" : "muted"}
+                />
               ))}
-            </div>
+            </dl>
             {publicLinks.length > 0 ? (
-              <div className="mt-4 flex flex-wrap gap-2">
+              <div className="mt-4 flex flex-wrap gap-x-4 gap-y-2">
                 {publicLinks.map((link) => {
                   const Icon = link.icon;
                   return (
                     <a
-                      key={link.href}
+                      key={`${link.label}-${link.href}`}
                       href={link.href}
                       target="_blank"
                       rel="noreferrer"
-                      className="inline-flex items-center gap-2 rounded-full border border-white/10 px-3 py-1.5 text-xs font-semibold text-slate-200 transition hover:border-white/20 hover:bg-white/5"
+                      className="inline-flex items-center gap-1.5 text-xs font-semibold text-cyan-200 transition hover:text-cyan-100"
                     >
                       <Icon className="h-3.5 w-3.5" />
                       {link.label}
@@ -621,73 +610,87 @@ function StartupDetailView({
                 })}
               </div>
             ) : null}
-          </div>
+          </DetailSection>
 
           {entity.sharePool ? (
-            <div className="border-t border-white/10 pt-5">
-              <div className="text-[11px] uppercase tracking-[0.28em] text-slate-500">Equity window</div>
-              <div className="mt-3 space-y-2 text-sm text-slate-300">
-                <SidebarRow compact label="Total Shares" value={String(entity.sharePool.totalShares)} />
-                <SidebarRow compact label="Available Shares" value={String(entity.sharePool.availableShares)} />
-                <SidebarRow compact label="Reserved For Sole" value={String(entity.sharePool.reservedForSole)} />
-                <SidebarRow
-                  compact
+            <DetailSection title="Equity window" compact>
+              <dl>
+                <DefRow label="Total Shares" value={String(entity.sharePool.totalShares)} />
+                <DefRow
+                  label="Available Shares"
+                  value={String(entity.sharePool.availableShares)}
+                />
+                <DefRow
+                  label="Reserved For Sole"
+                  value={String(entity.sharePool.reservedForSole)}
+                />
+                <DefRow
                   label="Penny Investors"
                   value={`${entity.sharePool.currentPennyCount}/${entity.sharePool.maxPennyInvestors}`}
                 />
-                <SidebarRow compact label="Sole Investor" value={entity.sharePool.hasSoleInvestor ? "Assigned" : "Open"} />
-                <SidebarRow compact label="Launched" value={formatDate(entity.launchedAt)} />
-              </div>
-            </div>
+                <DefRow
+                  label="Sole Investor"
+                  value={entity.sharePool.hasSoleInvestor ? "Assigned" : "Open"}
+                  tone={entity.sharePool.hasSoleInvestor ? "muted" : "positive"}
+                />
+                <DefRow label="Launched" value={formatDate(entity.launchedAt)} />
+              </dl>
+            </DetailSection>
           ) : null}
         </aside>
-      </section>
+      </div>
     </div>
   );
 }
 
-function StartupPanel({
+function DetailSection({
   title,
   icon: Icon,
+  action,
+  compact = false,
   children,
 }: {
   title: string;
-  icon: LucideIcon;
+  icon?: LucideIcon;
+  action?: ReactNode;
+  compact?: boolean;
   children: ReactNode;
 }) {
   return (
-    <div className="rounded-[24px] border border-white/10 bg-white/[0.025] p-4 sm:p-5">
-      <div className="flex items-center gap-2 text-[11px] uppercase tracking-[0.28em] text-slate-500">
-        <Icon className="h-4 w-4" />
-        {title}
+    <section>
+      <div className="flex flex-wrap items-center justify-between gap-4 border-b border-white/10 pb-2.5">
+        <div className="flex min-w-0 items-center gap-2 text-[11px] font-semibold uppercase tracking-[0.24em] text-slate-400 sm:tracking-[0.3em]">
+          {Icon ? <Icon className="h-3.5 w-3.5 text-teal-300" /> : null}
+          <span className="min-w-0 [overflow-wrap:anywhere]">{title}</span>
+        </div>
+        {action}
       </div>
-      <div className="mt-4">{children}</div>
-    </div>
+      <div className={compact ? "mt-3" : "mt-6"}>{children}</div>
+    </section>
   );
 }
 
-function StartupInfoBlock({
+function DefRow({
   label,
   value,
-  icon: Icon,
-  compact = false,
+  tone,
 }: {
   label: string;
   value: string;
-  icon: LucideIcon;
-  compact?: boolean;
+  tone?: "positive" | "muted";
 }) {
-  const isUnanswered = value === "Not answered";
-
+  const valueClass =
+    tone === "positive"
+      ? "text-emerald-300"
+      : tone === "muted"
+        ? "text-slate-500"
+        : "text-white";
   return (
-    <div className="rounded-[20px] border border-white/10 bg-slate-950/30 p-4">
-      <div className="flex items-center gap-2 text-xs font-semibold uppercase tracking-[0.2em] text-slate-500">
-        <Icon className="h-4 w-4 text-teal-300" />
-        {label}
-      </div>
-      <p className={`${compact ? "text-base font-semibold" : "text-sm leading-6"} mt-3 ${isUnanswered ? "text-slate-500" : "text-slate-300"}`}>
+    <div className="flex items-start justify-between gap-3 border-b border-white/5 py-2.5 last:border-b-0">
+      <span className="min-w-0 text-sm text-slate-400 [overflow-wrap:anywhere]">{label}</span>
+      <span className={`max-w-[58%] text-right text-sm font-medium tabular-nums [overflow-wrap:anywhere] ${valueClass}`}>
         {value}
-      </p>
+      </span>
     </div>
   );
 }

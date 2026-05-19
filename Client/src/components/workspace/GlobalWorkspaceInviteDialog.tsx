@@ -128,12 +128,12 @@ export function GlobalWorkspaceInviteDialog() {
     <>
       <Button
         variant="secondary"
-        className="h-11 gap-2 rounded-2xl border-slate-700 bg-slate-950 px-4 text-white hover:border-slate-600 hover:bg-slate-900"
+        className="h-10 w-10 gap-2 rounded-2xl border-slate-700 bg-slate-950 px-0 text-white hover:border-slate-600 hover:bg-slate-900 sm:h-11 sm:w-auto sm:px-4"
         onClick={() => setOpen(true)}
+        aria-label="Invite teammate"
       >
         <UserPlus className="h-4 w-4" />
         <span className="hidden sm:inline">Invite teammate</span>
-        <span className="sm:hidden">Invite</span>
       </Button>
 
       <Dialog open={open} onOpenChange={setOpen}>

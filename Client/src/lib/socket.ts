@@ -8,6 +8,7 @@ let chatSocket: Socket | null = null;
 let notifSocket: Socket | null = null;
 let mentorSocket: Socket | null = null;
 let dmSocket: Socket | null = null;
+let bidSocket: Socket | null = null;
 
 const getToken = () => useAuthStore.getState().accessToken;
 
@@ -72,15 +73,28 @@ export const getDmSocket = () => {
   return dmSocket;
 };
 
+export const getBidSocket = () => {
+  if (!bidSocket) {
+    bidSocket = io(`${SOCKET_URL}/bids`, {
+      withCredentials: true,
+      autoConnect: false,
+    });
+  }
+  applyAuth(bidSocket);
+  return bidSocket;
+};
+
 export const disconnectAll = () => {
   scoreSocket?.disconnect();
   chatSocket?.disconnect();
   notifSocket?.disconnect();
   mentorSocket?.disconnect();
   dmSocket?.disconnect();
+  bidSocket?.disconnect();
   scoreSocket = null;
   chatSocket = null;
   notifSocket = null;
   mentorSocket = null;
   dmSocket = null;
+  bidSocket = null;
 };

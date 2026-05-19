@@ -9,9 +9,11 @@ import { Card } from '../../components/ui/Card';
 import { Input } from '../../components/ui/Input';
 import { Spinner } from '../../components/ui/Spinner';
 import { Slider } from '../../app/components/ui/slider';
+import { dealApi } from '../../api/deal.api';
 import { investorApi } from '../../api/investor.api';
 import { MAX_INNOVATION_SCORE } from '../../constants/score';
 import { StartupDetailDrawer } from './StartupDetailDrawer';
+import { MarketplaceStartupStats } from '../funding/MarketplaceStartupStats';
 
 const SAVED_STARTUPS_STORAGE_KEY = 'investor-saved-startups';
 const categories = ['Agriculture', 'Health', 'Education', 'Energy', 'Software', 'Other'];
@@ -20,7 +22,11 @@ const scoreRangeMin = 0;
 const scoreRangeMax = MAX_INNOVATION_SCORE;
 
 const getInvestorWorkflowErrorMessage = (error: unknown) => {
-  if (isAxiosError<{ error?: { message?: string } }>(error)) {
+  if (isAxiosError<{ error?: { code?: string; message?: string } }>(error)) {
+    if (error.response?.data?.error?.code === 'STARTUP_FOUNDER_UNAVAILABLE') {
+      return 'This startup is no longer ready for investment because its founder account is missing. Please choose another startup.';
+    }
+
     return error.response?.data?.error?.message ?? 'Unable to complete the investor action right now.';
   }
 
@@ -39,6 +45,7 @@ export default function StartupMarketplace() {
   const [acceptingSole, setAcceptingSole] = useState(true);
   const [selectedStartupId, setSelectedStartupId] = useState<string | null>(null);
   const [viewedStartupIds, setViewedStartupIds] = useState<Set<string>>(new Set());
+  const [submittedStartupIds, setSubmittedStartupIds] = useState<Set<string>>(new Set());
   const [savedStartupIds, setSavedStartupIds] = useState<Set<string>>(new Set());
   const [showSavedOnly, setShowSavedOnly] = useState(false);
   const [feedback, setFeedback] = useState<{ type: 'success' | 'error'; message: string } | null>(null);
@@ -59,6 +66,12 @@ export default function StartupMarketplace() {
     refetchInterval: 60_000,
   });
 
+  const investorDealsQuery = useQuery({
+    queryKey: ['investor-deals'],
+    queryFn: () => dealApi.getInvestorDeals(),
+    refetchInterval: 30_000,
+  });
+
   const expressInterestMutation = useMutation({
     mutationFn: (params: {
       startupId: string;
@@ -76,7 +89,11 @@ export default function StartupMarketplace() {
       if (typeof window !== 'undefined') {
         window.localStorage.removeItem(`investor-interest-draft:${variables.startupId}`);
       }
-      setFeedback({ type: 'success', message: 'Interest sent. The student has been notified.' });
+      setFeedback({
+        type: 'success',
+        message: 'Already bidded.',
+      });
+      setSubmittedStartupIds((current) => new Set(current).add(variables.startupId));
       setSelectedStartupId(null);
       await queryClient.invalidateQueries({ queryKey: ['investor-startups'] });
       await queryClient.invalidateQueries({ queryKey: ['investor-deals'] });
@@ -137,6 +154,19 @@ export default function StartupMarketplace() {
     [savedStartupIds, search, showSavedOnly, startupsQuery.data?.items],
   );
   const scoreRangeValue = useMemo(() => [scoreRange.min, scoreRange.max], [scoreRange.max, scoreRange.min]);
+  const alreadyBiddedStartupIds = useMemo(() => {
+    const ids = new Set(submittedStartupIds);
+
+    for (const group of investorDealsQuery.data ?? []) {
+      for (const deal of group.deals) {
+        if (deal.status !== 'cancelled') {
+          ids.add(deal.startupId);
+        }
+      }
+    }
+
+    return ids;
+  }, [investorDealsQuery.data, submittedStartupIds]);
 
   const savedCount = savedStartupIds.size;
 
@@ -193,13 +223,19 @@ export default function StartupMarketplace() {
       </div>
 
       <div className="flex flex-wrap items-center gap-2 rounded-xl border border-slate-800 bg-slate-900 px-4 py-3 text-sm text-slate-400">
-        <span className="font-medium text-cyan-300">Express Interest</span>
+        <span className="font-medium text-cyan-300">Review Pitch</span>
         <span className="text-slate-600">&rarr;</span>
-        <span>Start Negotiating</span>
+        <span>Send Offer</span>
         <span className="text-slate-600">&rarr;</span>
-        <span>Due Diligence</span>
+        <span>Founder Response</span>
         <span className="text-slate-600">&rarr;</span>
-        <span>Close Deal</span>
+        <span>Deal Review</span>
+        <a
+          href="/dashboard/investor/pipeline"
+          className="ml-auto shrink-0 rounded-lg border border-slate-700 bg-slate-800 px-3 py-1.5 text-xs font-medium text-cyan-300 hover:bg-slate-700 transition-all"
+        >
+          Track interests &rarr;
+        </a>
       </div>
 
       {feedback ? (
@@ -210,7 +246,19 @@ export default function StartupMarketplace() {
               : 'border border-red-500/30 bg-red-500/10 text-red-200'
           }`}
         >
-          {feedback.message}
+          {feedback.type === 'success' ? (
+            <div className="flex items-center justify-between gap-3">
+              <div className="font-medium text-cyan-100">{feedback.message}</div>
+              <a
+                href="/dashboard/investor/pipeline"
+                className="shrink-0 rounded-lg bg-cyan-500/20 px-3 py-1.5 text-xs font-medium text-cyan-300 hover:bg-cyan-500/30 transition-all"
+              >
+                Track
+              </a>
+            </div>
+          ) : (
+            feedback.message
+          )}
         </div>
       ) : null}
 
@@ -316,9 +364,13 @@ export default function StartupMarketplace() {
             const liveScore = startup.founder?.innovationScore ?? startup.innovationScoreAtLaunch;
             const isSaved = savedStartupIds.has(startup._id);
             const isFullyClosed = !startup.acceptsPennyInvestors && !startup.acceptsSoleInvestor;
+            const isAlreadyBidded = alreadyBiddedStartupIds.has(startup._id);
 
             return (
-              <Card key={startup._id} className="p-5">
+              <Card
+                key={startup._id}
+                className={`p-5 ${isAlreadyBidded ? 'border-cyan-500/30 bg-cyan-500/5' : ''}`}
+              >
                 <div className="flex items-start justify-between gap-4">
                   <div>
                     <div className="text-xl font-semibold text-white">{startup.name}</div>
@@ -328,13 +380,17 @@ export default function StartupMarketplace() {
                         Approved {new Date(startup.adminApprovedAt).toLocaleDateString('en-IN')}
                       </div>
                     ) : null}
-                    <div className="mt-2 text-sm leading-6 text-slate-400">{startup.tagline}</div>
-                    <p className="mt-3 line-clamp-2 text-sm leading-6 text-slate-400">
-                      {startup.founder?.displayName ?? 'Founding team'} is currently at {liveScore}/{MAX_INNOVATION_SCORE}.
-                      <span className="ml-2 text-slate-500">
-                        Launch snapshot: {startup.innovationScoreAtLaunch}/{MAX_INNOVATION_SCORE}.
-                      </span>
-                    </p>
+                    {!isAlreadyBidded ? (
+                      <>
+                        <div className="mt-2 text-sm leading-6 text-slate-400">{startup.tagline}</div>
+                        <p className="mt-3 line-clamp-2 text-sm leading-6 text-slate-400">
+                          {startup.founder?.displayName ?? 'Founding team'} is currently at {liveScore}/{MAX_INNOVATION_SCORE}.
+                          <span className="ml-2 text-slate-500">
+                            Launch snapshot: {startup.innovationScoreAtLaunch}/{MAX_INNOVATION_SCORE}.
+                          </span>
+                        </p>
+                      </>
+                    ) : null}
                   </div>
                   <div className="flex flex-col items-end gap-2">
                     <Badge>{startup.stage}</Badge>
@@ -344,28 +400,35 @@ export default function StartupMarketplace() {
                     {isSaved ? (
                       <Badge className="border-amber-500/30 bg-amber-500/10 text-amber-300">Saved</Badge>
                     ) : null}
+                    {isAlreadyBidded ? (
+                      <Badge className="border-cyan-500/30 bg-cyan-500/10 text-cyan-300">Already Bidded</Badge>
+                    ) : null}
                   </div>
                 </div>
 
-                <div className="mt-4 flex flex-wrap gap-2">
-                  {startup.traction.patentFiled ? <Badge className="border-emerald-500/30 bg-emerald-500/10 text-emerald-300">Patent filed</Badge> : null}
-                  {startup.traction.mvpBuilt ? <Badge className="border-cyan-500/30 bg-cyan-500/10 text-cyan-300">MVP ready</Badge> : null}
-                  {startup.traction.revenueGenerating ? <Badge className="border-amber-500/30 bg-amber-500/10 text-amber-300">Revenue generating</Badge> : null}
-                  <Badge className="border-slate-700 bg-slate-900 text-slate-300">Team {startup.teamSize}</Badge>
-                  {startup.acceptsPennyInvestors ? (
-                    <Badge className="border-cyan-500/30 bg-cyan-500/10 text-cyan-300">Accepting Penny Investors</Badge>
-                  ) : (
-                    <Badge className="border-slate-700 bg-slate-900 text-slate-400">Penny slots filled</Badge>
-                  )}
-                  {startup.acceptsSoleInvestor ? (
-                    <Badge className="border-amber-500/30 bg-amber-500/10 text-amber-300">Accepting Sole Investor</Badge>
-                  ) : (
-                    <Badge className="border-slate-700 bg-slate-900 text-slate-400">Sole investor locked</Badge>
-                  )}
-                  {isFullyClosed ? (
-                    <Badge className="border-emerald-500/30 bg-emerald-500/10 text-emerald-300">Fully subscribed</Badge>
-                  ) : null}
-                </div>
+                {!isAlreadyBidded ? (
+                  <div className="mt-4 flex flex-wrap gap-2">
+                    {startup.traction.patentFiled ? <Badge className="border-emerald-500/30 bg-emerald-500/10 text-emerald-300">Patent filed</Badge> : null}
+                    {startup.traction.mvpBuilt ? <Badge className="border-cyan-500/30 bg-cyan-500/10 text-cyan-300">MVP ready</Badge> : null}
+                    {startup.traction.revenueGenerating ? <Badge className="border-amber-500/30 bg-amber-500/10 text-amber-300">Revenue generating</Badge> : null}
+                    <Badge className="border-slate-700 bg-slate-900 text-slate-300">Team {startup.teamSize}</Badge>
+                    {startup.acceptsPennyInvestors ? (
+                      <Badge className="border-cyan-500/30 bg-cyan-500/10 text-cyan-300">Accepting Penny Investors</Badge>
+                    ) : (
+                      <Badge className="border-slate-700 bg-slate-900 text-slate-400">Penny slots filled</Badge>
+                    )}
+                    {startup.acceptsSoleInvestor ? (
+                      <Badge className="border-amber-500/30 bg-amber-500/10 text-amber-300">Accepting Sole Investor</Badge>
+                    ) : (
+                      <Badge className="border-slate-700 bg-slate-900 text-slate-400">Sole investor locked</Badge>
+                    )}
+                    {isFullyClosed ? (
+                      <Badge className="border-emerald-500/30 bg-emerald-500/10 text-emerald-300">Fully subscribed</Badge>
+                    ) : null}
+                  </div>
+                ) : null}
+
+                <MarketplaceStartupStats startupId={startup._id} />
 
                 <div className="mt-5 flex flex-wrap gap-3">
                   <Button variant="secondary" onClick={() => openStartup(startup._id)}>
@@ -384,7 +447,19 @@ export default function StartupMarketplace() {
                       </>
                     )}
                   </Button>
-                  {isFullyClosed ? (
+                  {isAlreadyBidded ? (
+                    <>
+                      <Button variant="secondary" disabled>
+                        Already Bidded
+                      </Button>
+                      <a
+                        href="/dashboard/investor/pipeline"
+                        className="inline-flex items-center justify-center rounded-xl border border-cyan-500/30 bg-cyan-500/10 px-4 py-3 text-sm font-semibold text-cyan-200 transition-all hover:bg-cyan-500/20"
+                      >
+                        Track
+                      </a>
+                    </>
+                  ) : isFullyClosed ? (
                     <Button variant="secondary" disabled>
                       Not Accepting Investors
                     </Button>
@@ -402,7 +477,11 @@ export default function StartupMarketplace() {
         startupId={selectedStartupId}
         open={Boolean(selectedStartupId)}
         canExpressInterest={Boolean(selectedStartupId && viewedStartupIds.has(selectedStartupId))}
+        alreadyBidded={Boolean(selectedStartupId && alreadyBiddedStartupIds.has(selectedStartupId))}
         isExpressingInterest={expressInterestMutation.isPending}
+        onTrackInterest={() => {
+          navigate('/dashboard/investor/pipeline');
+        }}
         onOpenChange={(open) => {
           if (!open) {
             setSelectedStartupId(null);

@@ -7,6 +7,7 @@ import { uploadFile } from '../../services/fileStorageService';
 import { serializeDirectMessage, serializeDirectMessages } from './dm.serializer';
 import { ensureDmAccess, ensureDmThreadAccess } from './dm.permissions';
 import { createRequest } from '../request/request.service';
+import { Settings } from '../settings/settings.model';
 import { Startup } from '../startup/startup.model';
 import { Workspace } from '../workspace/workspace.model';
 const allowedMimeTypes = new Set(['image/jpeg', 'image/png', 'image/gif', 'image/webp', 'application/pdf']);
@@ -206,8 +207,17 @@ export const listConversations = async (req: Request, res: Response) => {
   const users = await User.find({ _id: { $in: partnerIds } })
     .select('_id displayName avatar role')
     .lean();
+  const partnerSettings = await Settings.find({ userId: { $in: partnerIds } })
+    .select('userId privacy.showOnlineStatus')
+    .lean<Array<{ userId: Types.ObjectId; privacy?: { showOnlineStatus?: boolean } }>>();
 
   const userMap = new Map(users.map((u) => [u._id.toString(), u]));
+  const onlineVisibilityMap = new Map(
+    partnerSettings.map((setting) => [
+      String(setting.userId),
+      setting.privacy?.showOnlineStatus ?? true,
+    ]),
+  );
 
   const conversations = filteredRecent.map((r) => ({
     partnerId: r._id,
@@ -221,7 +231,7 @@ export const listConversations = async (req: Request, res: Response) => {
       readAt: r.lastMessage.readAt ?? null,
     },
     unreadCount: r.unreadCount,
-    isOnline: onlineUsers.has(r._id.toString()),
+    isOnline: onlineUsers.has(r._id.toString()) && (onlineVisibilityMap.get(r._id.toString()) ?? true),
   }));
 
   res.json({ success: true, data: conversations });
@@ -246,11 +256,15 @@ export const getPartnerProfile = async (req: Request, res: Response) => {
     throw new ApiError(404, 'USER_NOT_FOUND', 'User not found');
   }
 
+  const settings = await Settings.findOne({ userId })
+    .select('privacy.showOnlineStatus')
+    .lean<{ privacy?: { showOnlineStatus?: boolean } } | null>();
+
   res.json({
     success: true,
     data: {
       ...user,
-      isOnline: onlineUsers.has(user._id.toString()),
+      isOnline: onlineUsers.has(user._id.toString()) && (settings?.privacy?.showOnlineStatus ?? true),
     },
   });
 };

@@ -262,7 +262,7 @@ function EmptyState({
       <div className="text-sm font-medium text-zinc-100">{ownProfileTitle}</div>
       <p className="mt-2 text-sm leading-6 text-zinc-500">{message}</p>
       <Link
-        to="/dashboard/profile"
+        to="/portfolio"
         className="mt-4 inline-flex items-center gap-2 text-sm font-medium text-cyan-200 transition hover:text-cyan-100"
       >
         Edit Profile
@@ -1178,7 +1178,7 @@ function IdentityHero({
           <div className="flex flex-wrap items-center gap-3">
             {isOwnProfile ? (
               <Link
-                to="/dashboard/profile"
+                to="/portfolio"
                 className="inline-flex items-center gap-2 rounded-full border border-cyan-400/30 bg-cyan-400/10 px-4 py-2 text-sm font-medium text-cyan-100 transition hover:border-cyan-300/50 hover:bg-cyan-400/15"
               >
                 <PencilLine className="h-4 w-4" />

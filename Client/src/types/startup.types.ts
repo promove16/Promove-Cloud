@@ -259,6 +259,9 @@ export interface Startup {
   launchedToMentors: boolean;
   launchedToRecruiters?: boolean;
   launchedAt?: string;
+  marketplaceTermsAcceptedAt?: string;
+  marketplaceTermsAcceptedBy?: string | null;
+  marketplaceTermsVersion?: string;
   innovationScoreAtLaunch: number;
   totalShares: number;
   availableShares: number;

@@ -32,10 +32,13 @@ export function getStoredTheme(): AppTheme {
  */
 export function useThemeInit(): void {
   const { settings } = useSettings();
-  const theme = settings?.appearance?.theme ?? getStoredTheme();
+  const appearance = settings?.appearance;
+  const theme = appearance?.theme ?? getStoredTheme();
 
   useEffect(() => {
     applyTheme(theme as AppTheme);
+    document.documentElement.dataset.compactMode = appearance?.compactMode ? 'true' : 'false';
+    document.documentElement.dataset.reduceMotion = appearance?.showAnimations === false ? 'true' : 'false';
 
     if (theme === 'system') {
       const mq = window.matchMedia('(prefers-color-scheme: dark)');
@@ -43,5 +46,5 @@ export function useThemeInit(): void {
       mq.addEventListener('change', handler);
       return () => mq.removeEventListener('change', handler);
     }
-  }, [theme]);
+  }, [appearance?.compactMode, appearance?.showAnimations, theme]);
 }

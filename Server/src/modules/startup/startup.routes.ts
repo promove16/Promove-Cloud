@@ -23,6 +23,10 @@ import {
   getPitchRequestsController,
 } from './startup.controller';
 import { listStartupLifecycleEventsController } from '../startupLifecycle/startupLifecycle.controller';
+import {
+  getFundingSnapshotController,
+  recomputeFundingController,
+} from './funding.controller';
 
 const pitchDeckFileNamePattern = /\.(pdf|ppt|pptx)$/i;
 const documentPdfFileNamePattern = /\.pdf$/i;
@@ -80,6 +84,17 @@ router.post('/:id/members/:memberId/promote', authorize(UserRole.STUDENT), async
 router.post('/:id/members/:memberId/demote', authorize(UserRole.STUDENT), asyncHandler(demoteFromCoFounderController));
 router.delete('/:id', authorize(UserRole.STUDENT), asyncHandler(deleteStartupController));
 router.delete('/:id/documents/:documentId', authorize(UserRole.STUDENT), asyncHandler(removeStartupDocumentController));
+
+router.get(
+  '/:id/funding',
+  authorize(UserRole.STUDENT, UserRole.INVESTOR, UserRole.ADMIN),
+  asyncHandler(getFundingSnapshotController),
+);
+router.post(
+  '/:id/funding/recompute',
+  authorize(UserRole.STUDENT, UserRole.ADMIN),
+  asyncHandler(recomputeFundingController),
+);
 
 router.post('/:id/pitch-request', authorize(UserRole.STUDENT), asyncHandler(sendPitchRequestController));
 router.patch('/:id/pitch-request/:requestId', authorize(UserRole.STUDENT), asyncHandler(respondToPitchRequestController));

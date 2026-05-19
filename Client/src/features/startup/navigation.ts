@@ -40,7 +40,7 @@ export const STARTUP_LAUNCH_SECTION_LINKS: StartupLaunchSectionLink[] = [
   {
     label: "Equity & Deals",
     shortLabel: "Equity & Deals",
-    description: "Manage equity distribution, shares, and investment offers from investors",
+    description: "Manage equity, investment bids, and deal pipeline for this startup",
     segment: "cap-table",
     icon: BarChart3,
   },

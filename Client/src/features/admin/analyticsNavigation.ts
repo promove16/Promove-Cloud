@@ -1,4 +1,4 @@
-import { Activity, BarChart3, FileText, Users, type LucideIcon } from 'lucide-react';
+import { Activity, BarChart3, FileText, Globe, Users, type LucideIcon } from 'lucide-react';
 
 export interface AdminAnalyticsSectionLink {
   label: string;
@@ -38,5 +38,12 @@ export const ADMIN_ANALYTICS_SECTION_LINKS: AdminAnalyticsSectionLink[] = [
     description: 'Switch between admin audit logs and application logs without mixing both feeds on one screen.',
     path: `${ADMIN_ANALYTICS_BASE_PATH}/logs`,
     icon: FileText,
+  },
+  {
+    label: 'Platform Analytics',
+    shortLabel: 'Platform',
+    description: 'Bidding, startup, investor, and fraud metrics across the entire platform.',
+    path: `${ADMIN_ANALYTICS_BASE_PATH}/platform`,
+    icon: Globe,
   },
 ];

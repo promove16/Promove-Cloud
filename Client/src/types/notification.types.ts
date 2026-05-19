@@ -17,6 +17,12 @@ export interface NotificationItem {
   link?: string;
   metadata?: {
     workspaceId?: string;
+    startupId?: string;
+    startupName?: string;
+    reviewStatus?: string;
+    adminId?: string;
+    adminName?: string;
+    adminNotes?: string;
     requestId?: string;
     requestType?: string;
     actionType?: string;

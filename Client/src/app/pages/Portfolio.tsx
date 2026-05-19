@@ -4,6 +4,11 @@ import { Link, useNavigate, useParams } from "react-router-dom";
 import { useAuthStore } from "../../store/authStore";
 import { DashboardLayout } from "../components/DashboardLayout";
 import {
+  EditButton,
+  PortfolioSectionEditorModal,
+  type PortfolioEditorKey,
+} from "../../features/profile/PortfolioSectionEditors";
+import {
   type PublicStudentProfile,
   PortfolioBlogPost,
   UserProfile,
@@ -844,12 +849,6 @@ function Navbar({
                 </li>
               ))}
             </ul>
-
-            {isOwnerView ? (
-              <Link to="/dashboard/profile" style={styles.hireMeBtn}>
-                Edit Profile
-              </Link>
-            ) : null}
           </div>
 
         <button onClick={() => setMenuOpen(!menuOpen)} style={styles.hamburger}>
@@ -873,9 +872,11 @@ function Navbar({
 function HeroSection({
   profile,
   isOwnerView,
+  onEdit,
 }: {
   profile: PortfolioProfile;
   isOwnerView: boolean;
+  onEdit?: (key: PortfolioEditorKey) => void;
 }) {
   const pc = profile.portfolioContent;
   const roleCopy = getRoleCopy(profile);
@@ -891,7 +892,12 @@ function HeroSection({
   const accentHeroTitleParts = heroTitleParts.slice(1);
 
   return (
-    <section style={styles.hero}>
+    <section style={{ ...styles.hero, position: "relative" }}>
+      {isOwnerView && onEdit ? (
+        <div style={{ position: "absolute", top: 16, right: 24, zIndex: 2 }}>
+          <EditButton onClick={() => onEdit("intro")} label="Edit intro" />
+        </div>
+      ) : null}
       <div style={styles.heroContent}>
         <p style={styles.heroSub}>{pc?.heroEyebrow || roleCopy.heroEyebrow}</p>
         <h1 style={styles.heroHeading}>
@@ -916,10 +922,14 @@ function HeroSection({
             >
               {pc?.primaryButtonLabel || "Visit Website ↗"}
             </a>
-            ) : isOwnerView ? (
-              <Link to="/dashboard/profile" style={styles.downloadBtn}>
+            ) : isOwnerView && onEdit ? (
+              <button
+                type="button"
+                onClick={() => onEdit("intro")}
+                style={{ ...styles.downloadBtn, cursor: "pointer" }}
+              >
                 {pc?.primaryButtonLabel || "Edit Profile"}
-              </Link>
+              </button>
             ) : null}
           {socials.length > 0 && (
             <div style={styles.socialIcons}>
@@ -1097,11 +1107,167 @@ function StatsBar({ profile }: { profile: PortfolioProfile }) {
   );
 }
 
-function AboutSection({ profile }: { profile: PortfolioProfile }) {
+const INSTITUTION_FIELD_ICON: Record<string, string> = {
+  foundedYear: "📅",
+  organizationType: "🏛️",
+  academicYear: "🗓️",
+  location: "📍",
+  iicStarRating: "⭐",
+  totalStudentsEnrolled: "🎓",
+  alumniCount: "👥",
+  employeeCount: "👔",
+  contactEmail: "✉️",
+  contactPhone: "📞",
+};
+
+function SectionDecorator() {
+  return (
+    <div
+      aria-hidden
+      style={{
+        margin: "0 auto 28px",
+        width: 64,
+        height: 3,
+        borderRadius: 2,
+        background: THEME.accentGradient,
+        boxShadow: "0 0 18px rgba(14, 165, 233, 0.45)",
+      }}
+    />
+  );
+}
+
+function EmptyStateCard({
+  icon,
+  title,
+  description,
+  ctaLabel,
+  onCta,
+  variant = "panel",
+}: {
+  icon: string;
+  title: string;
+  description: string;
+  ctaLabel?: string;
+  onCta?: () => void;
+  variant?: "panel" | "grid";
+}) {
+  const isGrid = variant === "grid";
+  return (
+    <div
+      style={{
+        position: "relative",
+        marginTop: isGrid ? 12 : 8,
+        padding: "clamp(28px, 4vw, 44px)",
+        border: `1px dashed ${THEME.accentRing}`,
+        borderRadius: 18,
+        background:
+          "linear-gradient(160deg, rgba(14, 165, 233, 0.10) 0%, rgba(15, 23, 42, 0.55) 55%, rgba(2, 6, 23, 0.92) 100%)",
+        display: "flex",
+        flexDirection: isGrid ? "row" : "column",
+        alignItems: "center",
+        textAlign: isGrid ? "left" : "center",
+        gap: 20,
+        overflow: "hidden",
+      }}
+    >
+      <div
+        aria-hidden
+        style={{
+          position: "absolute",
+          top: -60,
+          right: -60,
+          width: 220,
+          height: 220,
+          borderRadius: "50%",
+          background:
+            "radial-gradient(circle, rgba(59, 130, 246, 0.18) 0%, transparent 70%)",
+          pointerEvents: "none",
+        }}
+      />
+      <div
+        style={{
+          width: 64,
+          height: 64,
+          minWidth: 64,
+          borderRadius: 18,
+          background:
+            "linear-gradient(135deg, rgba(14, 165, 233, 0.25), rgba(37, 99, 235, 0.18))",
+          border: `1px solid ${THEME.accentRing}`,
+          display: "flex",
+          alignItems: "center",
+          justifyContent: "center",
+          fontSize: 30,
+          boxShadow: "0 12px 28px rgba(8, 47, 73, 0.35)",
+          zIndex: 1,
+        }}
+      >
+        {icon}
+      </div>
+      <div style={{ flex: 1, zIndex: 1 }}>
+        <h4
+          style={{
+            color: THEME.text,
+            fontFamily: APP_FONT_STACK,
+            fontSize: 18,
+            fontWeight: 700,
+            marginBottom: 8,
+            lineHeight: 1.3,
+          }}
+        >
+          {title}
+        </h4>
+        <p
+          style={{
+            color: THEME.muted,
+            fontSize: 14,
+            lineHeight: 1.7,
+            maxWidth: 520,
+            margin: isGrid ? 0 : "0 auto",
+          }}
+        >
+          {description}
+        </p>
+      </div>
+      {ctaLabel && onCta ? (
+        <button
+          type="button"
+          onClick={onCta}
+          style={{
+            zIndex: 1,
+            padding: "12px 22px",
+            background: THEME.accentGradient,
+            color: "#f8fafc",
+            fontWeight: 700,
+            fontSize: 13,
+            letterSpacing: 0.4,
+            fontFamily: APP_FONT_STACK,
+            border: "none",
+            borderRadius: 10,
+            cursor: "pointer",
+            boxShadow: "0 14px 30px rgba(14, 165, 233, 0.32)",
+            whiteSpace: "nowrap",
+          }}
+        >
+          {ctaLabel} →
+        </button>
+      ) : null}
+    </div>
+  );
+}
+
+function AboutSection({
+  profile,
+  isOwnerView,
+  onEdit,
+}: {
+  profile: PortfolioProfile;
+  isOwnerView?: boolean;
+  onEdit?: (key: PortfolioEditorKey) => void;
+}) {
   const pc = profile.portfolioContent;
   const roleCopy = getRoleCopy(profile);
   const role = normalizePortfolioRole(profile.role);
-  if (!profile.bio) return null;
+  if (!profile.bio && !isOwnerView) return null;
 
   const details: { label: string; value: string }[] = [];
   if (profile.domain) details.push({ label: "Domain", value: profile.domain });
@@ -1177,17 +1343,33 @@ function AboutSection({ profile }: { profile: PortfolioProfile }) {
 
   return (
     <section id="about" style={styles.section}>
-      <p style={styles.sectionEyebrow}>{roleCopy.aboutEyebrow}</p>
-      <h2 style={styles.sectionTitle}>
-        {pc?.aboutTitle || (
-          <>
-            {roleCopy.aboutTitle.split(" ")[0]}{" "}
-            <span style={styles.accentText}>
-              {roleCopy.aboutTitle.split(" ").slice(1).join(" ")}
-            </span>
-          </>
-        )}
-      </h2>
+      <div
+        style={{
+          display: "flex",
+          alignItems: "center",
+          justifyContent: "space-between",
+          gap: 12,
+          flexWrap: "wrap",
+        }}
+      >
+        <div>
+          <p style={styles.sectionEyebrow}>{roleCopy.aboutEyebrow}</p>
+          <h2 style={styles.sectionTitle}>
+            {pc?.aboutTitle || (
+              <>
+                {roleCopy.aboutTitle.split(" ")[0]}{" "}
+                <span style={styles.accentText}>
+                  {roleCopy.aboutTitle.split(" ").slice(1).join(" ")}
+                </span>
+              </>
+            )}
+          </h2>
+        </div>
+        {isOwnerView && onEdit ? (
+          <EditButton onClick={() => onEdit("about")} label="Edit about" />
+        ) : null}
+      </div>
+      <SectionDecorator />
       <div
         style={{
           display: "grid",
@@ -1195,20 +1377,44 @@ function AboutSection({ profile }: { profile: PortfolioProfile }) {
             ? "repeat(auto-fit, minmax(280px, 1fr))"
             : "1fr",
           gap: 48,
-          marginTop: 40,
+          marginTop: 16,
           alignItems: "start",
         }}
       >
-        <div>
+        <div
+          style={{
+            position: "relative",
+            padding: "28px 32px",
+            border: `1px solid ${THEME.border}`,
+            borderRadius: 16,
+            background:
+              "linear-gradient(160deg, rgba(15, 23, 42, 0.7), rgba(2, 6, 23, 0.95))",
+            boxShadow: "0 20px 50px rgba(2, 6, 23, 0.35)",
+            overflow: "hidden",
+          }}
+        >
+          <span
+            aria-hidden
+            style={{
+              position: "absolute",
+              top: 0,
+              left: 0,
+              width: 4,
+              height: "100%",
+              background: THEME.accentGradient,
+            }}
+          />
           <p
             style={{
-              color: THEME.text,
+              color: profile.bio ? THEME.text : THEME.subtle,
               fontSize: 16,
               lineHeight: 1.9,
               letterSpacing: 0.2,
+              fontStyle: profile.bio ? "normal" : "italic",
             }}
           >
-            {profile.bio}
+            {profile.bio ||
+              "Share an overview of your institution — your mission, ecosystem strengths, and what makes your campus a launchpad for innovation."}
           </p>
           {socials.length > 0 && (
             <div style={{ display: "flex", gap: 10, marginTop: 28 }}>
@@ -1355,23 +1561,53 @@ function RecentWorksSection({ works }: { works: RecentWork[] }) {
 
 function QualityServicesSection({
   services,
+  isOwnerView,
+  onEdit,
 }: {
   services: PortfolioService[];
+  isOwnerView?: boolean;
+  onEdit?: (key: PortfolioEditorKey) => void;
 }) {
   const [activeIndex, setActiveIndex] = useState(0);
-  if (services.length === 0) return null;
-  const resolvedActiveIndex = Math.min(activeIndex, services.length - 1);
+  if (services.length === 0 && !isOwnerView) return null;
+  const resolvedActiveIndex =
+    services.length === 0 ? 0 : Math.min(activeIndex, services.length - 1);
 
   return (
     <section id="services" style={styles.section}>
-      <p style={styles.sectionEyebrow}>My Quality Services</p>
-      <h2 style={styles.sectionTitle}>
-        My <span style={styles.accentText}>Quality Services</span>
-      </h2>
+      <div
+        style={{
+          display: "flex",
+          alignItems: "center",
+          justifyContent: "space-between",
+          gap: 12,
+          flexWrap: "wrap",
+        }}
+      >
+        <div>
+          <p style={styles.sectionEyebrow}>My Quality Services</p>
+          <h2 style={styles.sectionTitle}>
+            My <span style={styles.accentText}>Quality Services</span>
+          </h2>
+        </div>
+        {isOwnerView && onEdit ? (
+          <EditButton onClick={() => onEdit("services")} label="Edit services" />
+        ) : null}
+      </div>
+      <SectionDecorator />
       <p style={styles.sectionDesc}>
         We put your ideas and thus your stories in the form of a unique web
         project that inspires you and your customers.
       </p>
+      {services.length === 0 ? (
+        <EmptyStateCard
+          icon="✨"
+          title="Showcase the services your institution offers"
+          description="Add programs, partnerships, or capabilities you provide — incubation, mentoring, research labs, accelerators, or industry collaborations."
+          ctaLabel={isOwnerView && onEdit ? "Add a service" : undefined}
+          onCta={isOwnerView && onEdit ? () => onEdit("services") : undefined}
+        />
+      ) : null}
       <div style={styles.servicesList}>
         {services.map((service, index) => (
           <button
@@ -1415,19 +1651,48 @@ function QualityServicesSection({
 
 function TestimonialsSection({
   testimonials,
+  isOwnerView,
+  onEdit,
 }: {
   testimonials: PortfolioTestimonial[];
+  isOwnerView?: boolean;
+  onEdit?: (key: PortfolioEditorKey) => void;
 }) {
-  if (testimonials.length === 0) return null;
+  if (testimonials.length === 0 && !isOwnerView) return null;
 
   return (
     <section id="testimonials" style={styles.section}>
-      <h2 style={styles.sectionTitle}>
-        Client <span style={styles.accentText}>Testimonials</span>
-      </h2>
+      <div
+        style={{
+          display: "flex",
+          alignItems: "center",
+          justifyContent: "space-between",
+          gap: 12,
+          flexWrap: "wrap",
+        }}
+      >
+        <h2 style={styles.sectionTitle}>
+          Client <span style={styles.accentText}>Testimonials</span>
+        </h2>
+        {isOwnerView && onEdit ? (
+          <EditButton
+            onClick={() => onEdit("testimonials")}
+            label="Edit testimonials"
+          />
+        ) : null}
+      </div>
       <p style={styles.sectionDesc}>
         Feedback from collaborators, founders, and teams I have shipped with.
       </p>
+      {testimonials.length === 0 ? (
+        <EmptyStateCard
+          icon="''"
+          title="Add collaborator feedback"
+          description="Show concise feedback from clients, founders, teammates, mentors, or collaborators who can speak to your work."
+          ctaLabel={isOwnerView && onEdit ? "Add a testimonial" : undefined}
+          onCta={isOwnerView && onEdit ? () => onEdit("testimonials") : undefined}
+        />
+      ) : null}
       <div
         style={{
           display: "grid",
@@ -1459,7 +1724,7 @@ function TestimonialsSection({
             >
               "
             </div>
-            <p style={styles.testimonialText}>{testimonial.text}</p>
+              <p style={styles.testimonialText}>{testimonial.text}</p>
             <div
               style={{
                 display: "flex",
@@ -1468,9 +1733,6 @@ function TestimonialsSection({
                 marginTop: 20,
               }}
             >
-              <div style={styles.testimonialAvatar}>
-                {(testimonial.name || "U").slice(0, 1).toUpperCase()}
-              </div>
               <div>
                 <p style={styles.testimonialName}>{testimonial.name}</p>
                 <p style={styles.testimonialRole}>{testimonial.role}</p>
@@ -1485,19 +1747,45 @@ function TestimonialsSection({
 
 function BlogSection({
   posts,
+  isOwnerView,
+  onEdit,
 }: {
   posts: PortfolioBlogPost[];
+  isOwnerView?: boolean;
+  onEdit?: (key: PortfolioEditorKey) => void;
 }) {
-  if (posts.length === 0) return null;
+  if (posts.length === 0 && !isOwnerView) return null;
 
   return (
     <section id="blog" style={styles.section}>
-      <h2 style={styles.sectionTitle}>
-        Recent <span style={styles.accentText}>Writing</span>
-      </h2>
+      <div
+        style={{
+          display: "flex",
+          alignItems: "center",
+          justifyContent: "space-between",
+          gap: 12,
+          flexWrap: "wrap",
+        }}
+      >
+        <h2 style={styles.sectionTitle}>
+          Recent <span style={styles.accentText}>Writing</span>
+        </h2>
+        {isOwnerView && onEdit ? (
+          <EditButton onClick={() => onEdit("blog")} label="Edit recent writing" />
+        ) : null}
+      </div>
       <p style={styles.sectionDesc}>
         Short posts on product thinking, AI execution, and building with clarity.
       </p>
+      {posts.length === 0 ? (
+        <EmptyStateCard
+          icon="W"
+          title="Add recent writing"
+          description="Link articles, launch notes, technical posts, or short reflections that support your portfolio story."
+          ctaLabel={isOwnerView && onEdit ? "Add writing" : undefined}
+          onCta={isOwnerView && onEdit ? () => onEdit("blog") : undefined}
+        />
+      ) : null}
       <div
         style={{
           display: "grid",
@@ -1587,9 +1875,13 @@ function BlogSection({
 function ProjectsSection({
   projects,
   title,
+  isOwnerView,
+  onEdit,
 }: {
   projects: PortfolioProject[];
   title: string;
+  isOwnerView?: boolean;
+  onEdit?: (key: PortfolioEditorKey) => void;
 }) {
   const [activeTab, setActiveTab] = useState("All");
   const techTabs = useMemo(() => {
@@ -1603,13 +1895,36 @@ function ProjectsSection({
       ? projects
       : projects.filter((p) => p.techStack.includes(activeTab));
 
-  if (projects.length === 0) return null;
+  if (projects.length === 0 && !isOwnerView) return null;
 
   return (
     <section id="projects" style={styles.section}>
-      <h2 style={styles.sectionTitle}>
-        My <span style={styles.accentText}>{title}</span>
-      </h2>
+      <div
+        style={{
+          display: "flex",
+          alignItems: "center",
+          justifyContent: "space-between",
+          gap: 12,
+          flexWrap: "wrap",
+        }}
+      >
+        <h2 style={styles.sectionTitle}>
+          My <span style={styles.accentText}>{title}</span>
+        </h2>
+        {isOwnerView && onEdit ? (
+          <EditButton onClick={() => onEdit("projects")} label="Edit projects" />
+        ) : null}
+      </div>
+      <SectionDecorator />
+      {projects.length === 0 ? (
+        <EmptyStateCard
+          icon="🚀"
+          title="Highlight your flagship programs & initiatives"
+          description="Add innovation programs, research projects, accelerator cohorts, or initiatives that define your institution's contribution to the ecosystem."
+          ctaLabel={isOwnerView && onEdit ? "Add an initiative" : undefined}
+          onCta={isOwnerView && onEdit ? () => onEdit("projects") : undefined}
+        />
+      ) : null}
       {techTabs.length > 1 && (
         <div style={styles.workTabs}>
           {techTabs.map((t) => (
@@ -1730,14 +2045,19 @@ function ResumeSection({
   sectionTitle,
   experienceTitle,
   educationTitle,
+  isOwnerView,
+  onEdit,
 }: {
   experience: ProfileExperience[];
   education: ProfileEducation[];
   sectionTitle: string;
   experienceTitle: string;
   educationTitle: string;
+  isOwnerView?: boolean;
+  onEdit?: (key: PortfolioEditorKey) => void;
 }) {
-  if (experience.length === 0 && education.length === 0) return null;
+  if (experience.length === 0 && education.length === 0 && !isOwnerView)
+    return null;
 
   const TimelineDot = () => (
     <div
@@ -1763,10 +2083,25 @@ function ResumeSection({
       </h2>
       <div style={styles.resumeGrid}>
         <div>
-          <h3 style={styles.resumeHeading}>
-            <span style={styles.resumeIcon}>🏆</span>{" "}
-            <span style={styles.accentText}>{experienceTitle}</span>
-          </h3>
+          <div
+            style={{
+              display: "flex",
+              alignItems: "center",
+              justifyContent: "space-between",
+              gap: 12,
+            }}
+          >
+            <h3 style={styles.resumeHeading}>
+              <span style={styles.resumeIcon}>🏆</span>{" "}
+              <span style={styles.accentText}>{experienceTitle}</span>
+            </h3>
+            {isOwnerView && onEdit ? (
+              <EditButton
+                onClick={() => onEdit("experience")}
+                label="Edit experience"
+              />
+            ) : null}
+          </div>
           {experience.length > 0 ? (
             experience.map((e, idx) => (
               <div key={e._id} style={styles.timelineCard}>
@@ -1811,10 +2146,25 @@ function ResumeSection({
           )}
         </div>
         <div>
-          <h3 style={styles.resumeHeading}>
-            <span style={styles.resumeIcon}>🎓</span>{" "}
-            <span style={styles.accentText}>{educationTitle}</span>
-          </h3>
+          <div
+            style={{
+              display: "flex",
+              alignItems: "center",
+              justifyContent: "space-between",
+              gap: 12,
+            }}
+          >
+            <h3 style={styles.resumeHeading}>
+              <span style={styles.resumeIcon}>🎓</span>{" "}
+              <span style={styles.accentText}>{educationTitle}</span>
+            </h3>
+            {isOwnerView && onEdit ? (
+              <EditButton
+                onClick={() => onEdit("education")}
+                label="Edit education"
+              />
+            ) : null}
+          </div>
           {education.length > 0 ? (
             education.map((e, idx) => (
               <div key={e._id} style={styles.timelineCard}>
@@ -1865,11 +2215,15 @@ function ResumeSection({
 function SkillsSection({
   skills,
   title,
+  isOwnerView,
+  onEdit,
 }: {
   skills: ProfileSkill[];
   title: string;
+  isOwnerView?: boolean;
+  onEdit?: (key: PortfolioEditorKey) => void;
 }) {
-  if (skills.length === 0) return null;
+  if (skills.length === 0 && !isOwnerView) return null;
 
   const grouped = useMemo(() => {
     const map: Record<string, ProfileSkill[]> = {};
@@ -1883,12 +2237,35 @@ function SkillsSection({
 
   return (
     <section id="skills" style={styles.section}>
-      <h2 style={styles.sectionTitle}>
-        My <span style={styles.accentText}>{title}</span>
-      </h2>
+      <div
+        style={{
+          display: "flex",
+          alignItems: "center",
+          justifyContent: "space-between",
+          gap: 12,
+          flexWrap: "wrap",
+        }}
+      >
+        <h2 style={styles.sectionTitle}>
+          My <span style={styles.accentText}>{title}</span>
+        </h2>
+        {isOwnerView && onEdit ? (
+          <EditButton onClick={() => onEdit("skills")} label="Edit skills" />
+        ) : null}
+      </div>
+      <SectionDecorator />
       <p style={styles.sectionDesc}>
         Skills I have developed and refined across my career.
       </p>
+      {skills.length === 0 ? (
+        <EmptyStateCard
+          icon="🎯"
+          title="Define your institution's focus areas"
+          description="List the disciplines, research themes, or domains where your institution drives impact — AI, sustainability, biotech, social innovation, and more."
+          ctaLabel={isOwnerView && onEdit ? "Add a focus area" : undefined}
+          onCta={isOwnerView && onEdit ? () => onEdit("skills") : undefined}
+        />
+      ) : null}
       {grouped.map(([category, catSkills]) => (
         <div key={category} style={{ marginBottom: 40 }}>
           <p
@@ -1969,20 +2346,295 @@ function SkillsSection({
   );
 }
 
+function InstitutionProfileSection({
+  profile,
+  isOwnerView,
+  onEdit,
+}: {
+  profile: PortfolioProfile;
+  isOwnerView?: boolean;
+  onEdit?: (key: PortfolioEditorKey) => void;
+}) {
+  const ip = profile.institutionProfile;
+  if (!ip && !isOwnerView) return null;
+
+  const rows: { label: string; value: string; iconKey: string }[] = [];
+  if (ip?.foundedYear)
+    rows.push({ label: "Established", value: String(ip.foundedYear), iconKey: "foundedYear" });
+  if (ip?.organizationType)
+    rows.push({ label: "Organization type", value: ip.organizationType, iconKey: "organizationType" });
+  if (ip?.academicYear)
+    rows.push({ label: "Academic year", value: ip.academicYear, iconKey: "academicYear" });
+  if (ip?.location) rows.push({ label: "Location", value: ip.location, iconKey: "location" });
+  if (ip?.iicStarRating)
+    rows.push({ label: "IIC star rating", value: String(ip.iicStarRating), iconKey: "iicStarRating" });
+  if (ip?.totalStudentsEnrolled)
+    rows.push({
+      label: "Students enrolled",
+      value: String(ip.totalStudentsEnrolled),
+      iconKey: "totalStudentsEnrolled",
+    });
+  if (ip?.alumniCount)
+    rows.push({ label: "Alumni", value: String(ip.alumniCount), iconKey: "alumniCount" });
+  if (ip?.employeeCount)
+    rows.push({ label: "Employees", value: String(ip.employeeCount), iconKey: "employeeCount" });
+  if (ip?.contactEmail)
+    rows.push({ label: "Contact email", value: ip.contactEmail, iconKey: "contactEmail" });
+  if (ip?.contactPhone)
+    rows.push({ label: "Contact phone", value: ip.contactPhone, iconKey: "contactPhone" });
+
+  const specialties = ip?.specialties?.filter(Boolean) ?? [];
+  const locations = ip?.locations?.filter(Boolean) ?? [];
+
+  return (
+    <section
+      id="resume"
+      style={{ ...styles.section, background: "transparent" }}
+    >
+      <div
+        style={{
+          display: "flex",
+          alignItems: "center",
+          justifyContent: "space-between",
+          gap: 12,
+          flexWrap: "wrap",
+          marginBottom: 16,
+        }}
+      >
+        <h2 style={{ ...styles.sectionTitle, marginBottom: 0 }}>
+          <span style={styles.accentText}>Institution Profile</span>
+        </h2>
+        {isOwnerView && onEdit ? (
+          <EditButton
+            onClick={() => onEdit("institution")}
+            label="Edit institution"
+          />
+        ) : null}
+      </div>
+      <SectionDecorator />
+      {rows.length === 0 && specialties.length === 0 && locations.length === 0 ? (
+        <EmptyStateCard
+          icon="🏛️"
+          title="Tell visitors about your institution"
+          description="Add your establishment date, organization type, IIC star rating, student strength, campuses, and contact details to give a complete profile."
+          ctaLabel={isOwnerView && onEdit ? "Add institution details" : undefined}
+          onCta={isOwnerView && onEdit ? () => onEdit("institution") : undefined}
+        />
+      ) : (
+        <div
+          style={{
+            display: "grid",
+            gridTemplateColumns: "repeat(auto-fit, minmax(240px, 1fr))",
+            gap: 18,
+          }}
+        >
+          {rows.map((row) => (
+            <div
+              key={row.label}
+              style={{
+                position: "relative",
+                padding: "20px 20px 20px 20px",
+                border: `1px solid ${THEME.border}`,
+                borderRadius: 14,
+                background:
+                  "linear-gradient(160deg, rgba(15, 23, 42, 0.85) 0%, rgba(2, 6, 23, 0.95) 100%)",
+                boxShadow: "0 10px 30px rgba(2, 6, 23, 0.28)",
+                overflow: "hidden",
+                transition: "transform 0.2s ease, border-color 0.2s ease",
+              }}
+            >
+              <span
+                aria-hidden
+                style={{
+                  position: "absolute",
+                  top: 0,
+                  left: 0,
+                  width: "100%",
+                  height: 2,
+                  background: THEME.accentGradient,
+                  opacity: 0.85,
+                }}
+              />
+              <div
+                style={{
+                  display: "flex",
+                  alignItems: "center",
+                  gap: 12,
+                  marginBottom: 12,
+                }}
+              >
+                <span
+                  style={{
+                    width: 36,
+                    height: 36,
+                    borderRadius: 10,
+                    background:
+                      "linear-gradient(135deg, rgba(14, 165, 233, 0.22), rgba(37, 99, 235, 0.16))",
+                    border: `1px solid ${THEME.accentRing}`,
+                    display: "inline-flex",
+                    alignItems: "center",
+                    justifyContent: "center",
+                    fontSize: 18,
+                  }}
+                >
+                  {INSTITUTION_FIELD_ICON[row.iconKey] || "•"}
+                </span>
+                <p
+                  style={{
+                    color: THEME.subtle,
+                    fontSize: 11,
+                    textTransform: "uppercase",
+                    letterSpacing: 1.6,
+                    fontWeight: 700,
+                    margin: 0,
+                  }}
+                >
+                  {row.label}
+                </p>
+              </div>
+              <p
+                style={{
+                  color: THEME.text,
+                  fontSize: 17,
+                  fontWeight: 700,
+                  fontFamily: APP_FONT_STACK,
+                  lineHeight: 1.35,
+                  wordBreak: "break-word",
+                }}
+              >
+                {row.value}
+              </p>
+            </div>
+          ))}
+        </div>
+      )}
+      {specialties.length > 0 || locations.length > 0 ? (
+        <div style={{ marginTop: 28, display: "grid", gap: 18 }}>
+          {specialties.length > 0 ? (
+            <div>
+              <p
+                style={{
+                  color: THEME.accent,
+                  fontSize: 12,
+                  fontWeight: 700,
+                  textTransform: "uppercase",
+                  letterSpacing: 2,
+                  marginBottom: 10,
+                }}
+              >
+                Specialties
+              </p>
+              <div style={{ display: "flex", flexWrap: "wrap", gap: 8 }}>
+                {specialties.map((s) => (
+                  <span
+                    key={s}
+                    style={{
+                      padding: "8px 14px",
+                      borderRadius: 999,
+                      border: `1px solid ${THEME.accentRing}`,
+                      background:
+                        "linear-gradient(135deg, rgba(14, 165, 233, 0.14), rgba(37, 99, 235, 0.08))",
+                      color: THEME.text,
+                      fontSize: 12,
+                      fontWeight: 600,
+                      letterSpacing: 0.3,
+                    }}
+                  >
+                    {s}
+                  </span>
+                ))}
+              </div>
+            </div>
+          ) : null}
+          {locations.length > 0 ? (
+            <div>
+              <p
+                style={{
+                  color: THEME.accent,
+                  fontSize: 12,
+                  fontWeight: 700,
+                  textTransform: "uppercase",
+                  letterSpacing: 2,
+                  marginBottom: 10,
+                }}
+              >
+                Campuses
+              </p>
+              <div style={{ display: "flex", flexWrap: "wrap", gap: 8 }}>
+                {locations.map((l) => (
+                  <span
+                    key={l}
+                    style={{
+                      padding: "8px 14px",
+                      borderRadius: 999,
+                      border: `1px solid ${THEME.accentRing}`,
+                      background:
+                        "linear-gradient(135deg, rgba(14, 165, 233, 0.14), rgba(37, 99, 235, 0.08))",
+                      color: THEME.text,
+                      fontSize: 12,
+                      fontWeight: 600,
+                      letterSpacing: 0.3,
+                      display: "inline-flex",
+                      alignItems: "center",
+                      gap: 6,
+                    }}
+                  >
+                    📍 {l}
+                  </span>
+                ))}
+              </div>
+            </div>
+          ) : null}
+        </div>
+      ) : null}
+    </section>
+  );
+}
+
 function CertificationsSection({
   certifications,
   title,
+  isOwnerView,
+  onEdit,
 }: {
   certifications: ProfileCertification[];
   title: string;
+  isOwnerView?: boolean;
+  onEdit?: (key: PortfolioEditorKey) => void;
 }) {
-  if (certifications.length === 0) return null;
+  if (certifications.length === 0 && !isOwnerView) return null;
 
   return (
     <section style={styles.section}>
-      <h2 style={styles.sectionTitle}>
-        <span style={styles.accentText}>{title}</span>
-      </h2>
+      <div
+        style={{
+          display: "flex",
+          alignItems: "center",
+          justifyContent: "space-between",
+          gap: 12,
+          flexWrap: "wrap",
+        }}
+      >
+        <h2 style={styles.sectionTitle}>
+          <span style={styles.accentText}>{title}</span>
+        </h2>
+        {isOwnerView && onEdit ? (
+          <EditButton
+            onClick={() => onEdit("certifications")}
+            label="Edit certifications"
+          />
+        ) : null}
+      </div>
+      <SectionDecorator />
+      {certifications.length === 0 ? (
+        <EmptyStateCard
+          icon="🏅"
+          title="Showcase accreditations & recognitions"
+          description="Highlight NAAC grades, NBA approvals, NIRF rankings, ISO certifications, or any recognitions that validate your institution's credibility."
+          ctaLabel={isOwnerView && onEdit ? "Add an accreditation" : undefined}
+          onCta={isOwnerView && onEdit ? () => onEdit("certifications") : undefined}
+        />
+      ) : null}
       <div
         style={{
           display: "grid",
@@ -2546,6 +3198,9 @@ export function Portfolio() {
     entityId?: string;
   }>();
   const authUser = useAuthStore((state) => state.user);
+  const [activeEditor, setActiveEditor] = useState<PortfolioEditorKey | null>(
+    null,
+  );
   const normalizedEntityType =
     entityType && PORTFOLIO_ROLE_SET.has(entityType as PortfolioRole)
       ? (entityType as PortfolioRole)
@@ -2708,46 +3363,82 @@ export function Portfolio() {
               isOwnerView={isOwnerView}
               sections={sections}
             />
-            <HeroSection profile={profile} isOwnerView={isOwnerView} />
+            <HeroSection
+              profile={profile}
+              isOwnerView={isOwnerView}
+              onEdit={isOwnerView ? setActiveEditor : undefined}
+            />
             <StatsBar profile={profile} />
           </div>
-          {sections.about ? <AboutSection profile={profile} /> : null}
-          {sections.services ? (
-            <QualityServicesSection services={profile.portfolioServices ?? []} />
+          {sections.about || isOwnerView ? (
+            <AboutSection
+              profile={profile}
+              isOwnerView={isOwnerView}
+              onEdit={isOwnerView ? setActiveEditor : undefined}
+            />
           ) : null}
-          {sections.projects ? (
+          {sections.services || isOwnerView ? (
+            <QualityServicesSection
+              services={profile.portfolioServices ?? []}
+              isOwnerView={isOwnerView}
+              onEdit={isOwnerView ? setActiveEditor : undefined}
+            />
+          ) : null}
+          {sections.projects || isOwnerView ? (
             <ProjectsSection
               projects={profile.portfolioProjects ?? []}
               title={pc?.projectsTitle || roleCopy.projectsTitle}
+              isOwnerView={isOwnerView}
+              onEdit={isOwnerView ? setActiveEditor : undefined}
             />
           ) : null}
-          {sections.resume ? (
+          {portfolioRole === "school" || portfolioRole === "college" ? (
+            <InstitutionProfileSection
+              profile={profile}
+              isOwnerView={isOwnerView}
+              onEdit={isOwnerView ? setActiveEditor : undefined}
+            />
+          ) : sections.resume || isOwnerView ? (
             <ResumeSection
               experience={profile.experience ?? []}
               education={profile.education ?? []}
               sectionTitle={roleCopy.resumeTitle}
               experienceTitle={pc?.experienceTitle || roleCopy.experienceTitle}
               educationTitle={pc?.educationTitle || roleCopy.educationTitle}
+              isOwnerView={isOwnerView}
+              onEdit={isOwnerView ? setActiveEditor : undefined}
             />
           ) : null}
-          {sections.skills ? (
+          {sections.skills || isOwnerView ? (
             <SkillsSection
               skills={profile.skills ?? []}
               title={pc?.skillsTitle || roleCopy.skillsTitle}
+              isOwnerView={isOwnerView}
+              onEdit={isOwnerView ? setActiveEditor : undefined}
             />
           ) : null}
-          {sections.certifications ? (
+          {portfolioRole !== "investor" && (sections.certifications || isOwnerView) ? (
             <CertificationsSection
               certifications={profile.certifications ?? []}
               title={pc?.certificationsTitle || roleCopy.certificationsTitle}
+              isOwnerView={isOwnerView}
+              onEdit={isOwnerView ? setActiveEditor : undefined}
             />
           ) : null}
-          {sections.testimonials ? (
-            <TestimonialsSection testimonials={profile.portfolioTestimonials ?? []} />
+          {portfolioRole === "student" && (sections.testimonials || isOwnerView) ? (
+            <TestimonialsSection
+              testimonials={profile.portfolioTestimonials ?? []}
+              isOwnerView={isOwnerView}
+              onEdit={isOwnerView ? setActiveEditor : undefined}
+            />
           ) : null}
           {sections.achievements ? <AchievementsSection profile={profile} /> : null}
-          {sections.blog ? (
-            <BlogSection posts={profile.portfolioBlogPosts ?? []} />
+          {portfolioRole === "student" && (sections.blog || isOwnerView) ? (
+            <BlogSection
+              posts={profile.portfolioBlogPosts ?? []}
+              isOwnerView={isOwnerView}
+              onEdit={isOwnerView ? setActiveEditor : undefined}
+            />
           ) : null}
           {sections.contact ? (
             <ContactSection
@@ -2758,6 +3449,13 @@ export function Portfolio() {
             />
           ) : null}
           <Footer profile={profile} sections={sections} />
+          {isOwnerView ? (
+            <PortfolioSectionEditorModal
+              editorKey={activeEditor}
+              profile={ownProfileQuery.data ?? null}
+              onClose={() => setActiveEditor(null)}
+            />
+          ) : null}
         </div>
       );
     })()
@@ -3231,19 +3929,6 @@ const styles: Record<string, CSSProperties> = {
     borderLeft: `3px solid ${THEME.accent}`,
     padding: "32px 0 32px 32px",
     position: "relative" as const,
-  },
-  testimonialAvatar: {
-    width: 40,
-    height: 40,
-    background: THEME.accentGradient,
-    color: "#fff",
-    display: "flex",
-    alignItems: "center",
-    justifyContent: "center",
-    fontFamily: APP_FONT_STACK,
-    fontSize: 16,
-    fontWeight: 700,
-    flexShrink: 0,
   },
   testimonialText: {
     color: THEME.text,

@@ -2,6 +2,7 @@ import http from 'http';
 import { initializeBullMqRedisTransport, shouldIgnoreBullMqUnhandledRejection } from './config/bullmq';
 import { connectDB, disconnectDB } from './config/db';
 import { logError, logger } from './config/logger';
+import { scheduleBidExpiryJob } from './jobs/biddingWorker';
 import { scheduleWeeklyProgressSummaryJob } from './jobs/retentionEmailWorker';
 import { scheduleMongoExcelBackupJob } from './jobs/mongoExcelBackupWorker';
 import { healthHandler, readinessHandler } from './middleware/health';
@@ -36,6 +37,7 @@ const startHealthServer = (): http.Server => {
 const scheduleRecurringJobs = async () => {
   await scheduleWeeklyProgressSummaryJob();
   await scheduleMongoExcelBackupJob();
+  await scheduleBidExpiryJob();
 };
 
 const startScheduler = async () => {

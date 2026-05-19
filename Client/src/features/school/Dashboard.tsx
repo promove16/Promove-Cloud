@@ -205,7 +205,9 @@ export default function Dashboard() {
       ]}
       ratingValue={iicRating}
       ratingUpdatedAt={institutionProfile?.iicLastUpdated}
-      ratingSummary="The score blends the published IIC rating with current project velocity, patent activity, mentorship coverage, and external collaboration signals."
+      ratingTitle="School Innovation Readiness Estimator"
+      ratingCurrentLabel="Current school readiness score"
+      ratingSummary="The score blends ATL/SQAAF-aligned activity, student project velocity, patent activity, mentorship coverage, and external collaboration signals."
       ratingBreakdown={[
         {
           label: 'Innovation activities completed',

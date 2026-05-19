@@ -24,6 +24,26 @@ a {
   text-decoration: none;
 }
 
+html[data-compact-mode='true'] .dashboard-theme-sidebar {
+  padding-top: 1rem !important;
+  padding-bottom: 1rem !important;
+}
+
+html[data-compact-mode='true'] .dashboard-theme-sidebar a,
+html[data-compact-mode='true'] .dashboard-theme-sidebar button {
+  padding-top: 0.5rem !important;
+  padding-bottom: 0.5rem !important;
+}
+
+html[data-reduce-motion='true'] *,
+html[data-reduce-motion='true'] *::before,
+html[data-reduce-motion='true'] *::after {
+  animation-duration: 0.01ms !important;
+  animation-iteration-count: 1 !important;
+  scroll-behavior: auto !important;
+  transition-duration: 0.01ms !important;
+}
+
 /* ─── Light mode theme overrides ──────────────────────────────────────────── */
 html.light body {
   background-color: #f8fafc;

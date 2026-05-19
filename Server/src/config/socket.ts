@@ -10,6 +10,7 @@ import { initChatSocket } from '../sockets/chatSocket';
 import { initNotificationSocket } from '../sockets/notificationSocket';
 import { initMentorSocket } from '../sockets/mentorSocket';
 import { initDmSocket } from '../sockets/dmSocket';
+import { initBidSocket } from '../sockets/bidSocket';
 import { socketConnections } from '../middleware/metrics';
 
 let warnedAboutMissingSocketServer = false;
@@ -42,7 +43,7 @@ const createNoopSocketServer = () =>
 
 export let io: SocketServer = createNoopSocketServer();
 
-const NAMESPACES_TO_INSTRUMENT = ['/', '/score', '/chat', '/notifications', '/mentor', '/dm'];
+const NAMESPACES_TO_INSTRUMENT = ['/', '/score', '/chat', '/notifications', '/mentor', '/dm', '/bids'];
 
 const attachConnectionMetrics = (server: SocketServer) => {
   for (const ns of NAMESPACES_TO_INSTRUMENT) {
@@ -121,6 +122,7 @@ export const initSocket = async (httpServer: HttpServer): Promise<SocketServer> 
   initNotificationSocket(io);
   initMentorSocket(io);
   initDmSocket(io);
+  initBidSocket(io);
 
   return io;
 };

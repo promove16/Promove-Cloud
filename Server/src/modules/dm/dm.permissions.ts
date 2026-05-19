@@ -7,6 +7,7 @@ import { DirectMessage, QueryType } from './dm.model';
 import { MentorSession } from '../mentor/mentorSession.model';
 import { RelevanceBridge } from '../recruiter/relevanceBridge.model';
 import { RequestRecord } from '../request/request.model';
+import { Settings } from '../settings/settings.model';
 import { Startup } from '../startup/startup.model';
 import { User } from '../user/user.model';
 import { Workspace } from '../workspace/workspace.model';
@@ -164,6 +165,27 @@ const hasConversationRequest = async (userIdA: string, userIdB: string) => {
 const hasAllowedRolePair = (senderRole: UserRole, recipientRole: UserRole) =>
   (ALLOWED_CONNECTIONS[senderRole] ?? []).includes(recipientRole);
 
+const recipientAllowsFirstContact = async (sender: MessagingUser, recipient: MessagingUser) => {
+  if (sender.role === UserRole.ADMIN || recipient.role === UserRole.ADMIN) {
+    return true;
+  }
+
+  const settings = await Settings.findOne({ userId: recipient._id })
+    .select('privacy.allowDMs')
+    .lean<{ privacy?: { allowDMs?: 'all' | 'connections' | 'none' } } | null>();
+  const allowDMs = settings?.privacy?.allowDMs ?? 'all';
+
+  if (allowDMs === 'none') {
+    return false;
+  }
+
+  if (allowDMs === 'connections') {
+    return hasAcceptedConversationRequest(String(sender._id), String(recipient._id));
+  }
+
+  return true;
+};
+
 const matchesSpecificQueryRule = (queryType: QueryType, senderRole: UserRole, recipientRole: UserRole) => {
   if (queryType === 'general') {
     return true;
@@ -245,6 +267,10 @@ const canInitiateSpecificFirstContact = async (
 const canInitiateFirstContact = async (sender: MessagingUser, recipient: MessagingUser, queryType: QueryType) => {
   if (sender.role === UserRole.ADMIN || recipient.role === UserRole.ADMIN) {
     return true;
+  }
+
+  if (!(await recipientAllowsFirstContact(sender, recipient))) {
+    return false;
   }
 
   if (queryType !== 'general') {
@@ -347,7 +373,11 @@ export const canSearchUserForDm = async (senderId: string, candidateId: string) 
     }
 
     if (await canOpenGeneralFirstContactChannel(context.sender, context.recipient)) {
-      return true;
+      return recipientAllowsFirstContact(context.sender, context.recipient);
+    }
+
+    if (!(await recipientAllowsFirstContact(context.sender, context.recipient))) {
+      return false;
     }
 
     return (await Promise.all(

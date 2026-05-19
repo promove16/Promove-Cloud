@@ -36,6 +36,14 @@ import adminRoutes from './modules/admin/admin.routes';
 import dmRoutes from './modules/dm/dm.routes';
 import reportRoutes from './modules/report/report.routes';
 import settingsRoutes from './modules/settings/settings.routes';
+import smartChatRoutes from './modules/smartChat/smartChat.routes';
+import biddingRoutes from './modules/bidding/bidding.routes';
+import interestRoutes from './modules/interest/interest.routes';
+import agreementRoutes from './modules/agreement/agreement.routes';
+import activityFeedRoutes from './modules/activityLog/activity.routes';
+import reputationRoutes from './modules/reputation/reputation.routes';
+import verificationRoutes from './modules/verification/verification.routes';
+import analyticsRoutes from './modules/analytics/analytics.routes';
 import { ApiError } from './utils/ApiError';
 
 export const createApp = () => {
@@ -97,6 +105,14 @@ export const createApp = () => {
   app.use('/api/dm', dmRoutes);
   app.use('/api/report', reportRoutes);
   app.use('/api/settings', settingsRoutes);
+  app.use('/api/smart-chat', smartChatRoutes);
+  app.use('/api/bids', biddingRoutes);
+  app.use('/api/interests', interestRoutes);
+  app.use('/api/agreements', agreementRoutes);
+  app.use('/api/activity-feed', activityFeedRoutes);
+  app.use('/api/reputation', reputationRoutes);
+  app.use('/api/verification', verificationRoutes);
+  app.use('/api/analytics', analyticsRoutes);
   app.get('/api/health', (_req, res) => {
     res.status(200).json({ success: true, data: { status: 'ok' } });
   });

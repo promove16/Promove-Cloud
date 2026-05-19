@@ -235,6 +235,9 @@ const startupSchema = new Schema<IStartup>(
     launchedToMentors: { type: Boolean, default: false },
     launchedToRecruiters: { type: Boolean, default: false },
     launchedAt: { type: Date, default: undefined },
+    marketplaceTermsAcceptedAt: { type: Date, default: undefined },
+    marketplaceTermsAcceptedBy: { type: Schema.Types.ObjectId, ref: 'User', default: null },
+    marketplaceTermsVersion: { type: String, default: undefined },
     launchFormLocked: { type: Boolean, default: false },
     launchFormLockedAt: { type: Date, default: undefined },
     launchFormUnlockedByAdmin: { type: Boolean, default: false },
@@ -270,6 +273,18 @@ const startupSchema = new Schema<IStartup>(
     adminEditUnlockApprovedAt: { type: Date, default: undefined },
     adminEditUnlockApprovedBy: { type: Schema.Types.ObjectId, ref: 'User', default: null },
     adminEditUnlockReason: { type: String, default: undefined },
+    fundingGoal: { type: Number, default: undefined, min: 0 },
+    currentFunding: { type: Number, default: 0, min: 0 },
+    availableEquity: { type: Number, default: 100, min: 0, max: 100 },
+    investorCount: { type: Number, default: 0, min: 0 },
+    interestedInvestorCount: { type: Number, default: 0, min: 0 },
+    trendingScore: { type: Number, default: 0 },
+    fundingStatus: {
+      type: String,
+      enum: ['open', 'partial', 'fully_funded', 'closed'],
+      default: 'open',
+    },
+    lastFundingUpdate: { type: Date, default: undefined },
     pitchRequests: {
       type: [
         new Schema(
@@ -299,5 +314,7 @@ startupSchema.index({ launchedToInvestors: 1, innovationScoreAtLaunch: -1 });
 startupSchema.index({ launchedToMentors: 1 });
 startupSchema.index({ launchedToRecruiters: 1 });
 startupSchema.index({ reviewStatus: 1, updatedAt: -1 });
+startupSchema.index({ fundingStatus: 1, trendingScore: -1 });
+startupSchema.index({ launchedToInvestors: 1, trendingScore: -1 });
 
 export const Startup = model<IStartup>('Startup', startupSchema);

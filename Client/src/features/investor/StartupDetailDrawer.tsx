@@ -8,13 +8,19 @@ import { Spinner } from '../../components/ui/Spinner';
 import { investorApi } from '../../api/investor.api';
 import { MAX_INNOVATION_SCORE } from '../../constants/score';
 import { InvestorStartupDetailResponse } from '../../types/investor.types';
+import { useStartupInterest } from '../../hooks/useStartupInterest';
+import { ExpressInterestCard } from '../interest/ExpressInterestCard';
+import { FundingProgressBar } from '../funding/FundingProgressBar';
+import { LiveActivityFeed } from '../activity/LiveActivityFeed';
 
 type Props = {
   startupId: string | null;
   open: boolean;
   canExpressInterest: boolean;
+  alreadyBidded?: boolean;
   isExpressingInterest?: boolean;
   onOpenChange: (open: boolean) => void;
+  onTrackInterest?: () => void;
   onExpressInterest: (
     startupId: string,
     payload: {
@@ -41,6 +47,45 @@ const breakdownLabels: Record<string, string> = {
 const MIN_INVESTMENT_AMOUNT_INR = 20_000;
 const MAX_PENNY_INVESTMENT_AMOUNT_INR = 500_000;
 const MAX_AMOUNT_INPUT_DIGITS = 9;
+
+const formatINR = (value: number) =>
+  new Intl.NumberFormat('en-IN', {
+    style: 'currency',
+    currency: 'INR',
+    maximumFractionDigits: 0,
+  }).format(value);
+
+const investorTypeGuidance = {
+  penny: {
+    title: 'Penny Investor',
+    subtitle: 'Smaller ticket, capped equity, portfolio-style participation.',
+    range: `${formatINR(MIN_INVESTMENT_AMOUNT_INR)} to ${formatINR(MAX_PENNY_INVESTMENT_AMOUNT_INR)}`,
+    role: 'Observer or shareholder',
+    note: 'Best when you want exposure without taking operating control.',
+  },
+  sole: {
+    title: 'Sole Investor',
+    subtitle: 'Lead ticket with negotiated authority and founder review.',
+    range: `${formatINR(MIN_INVESTMENT_AMOUNT_INR)}+`,
+    role: 'Shareholder or director',
+    note: 'Best when you want to lead the round and negotiate deeper rights.',
+  },
+} satisfies Record<
+  'penny' | 'sole',
+  {
+    title: string;
+    subtitle: string;
+    range: string;
+    role: string;
+    note: string;
+  }
+>;
+
+const interestNextSteps = [
+  'Founder receives your offer',
+  'They can accept, decline, or counter',
+  'Accepted interest moves into deal review',
+];
 
 type ExpressInterestDraft = {
   investorType: 'penny' | 'sole';
@@ -167,8 +212,10 @@ export function StartupDetailDrawer({
   startupId,
   open,
   canExpressInterest,
+  alreadyBidded = false,
   isExpressingInterest,
   onOpenChange,
+  onTrackInterest,
   onExpressInterest,
 }: Props) {
   const [investorType, setInvestorType] = useState<'penny' | 'sole'>(createDefaultDraft().investorType);
@@ -188,6 +235,8 @@ export function StartupDetailDrawer({
   });
 
   const detail = startupQuery.data as InvestorStartupDetailResponse | undefined;
+  const { summary: interestSummary } = useStartupInterest(startupId);
+  const hasExpressedInterest = interestSummary.isInterested;
   const canChoosePenny = Boolean(detail?.startup.acceptsPennyInvestors);
   const canChooseSole = Boolean(detail?.startup.acceptsSoleInvestor);
   const selectedTypeAvailable = investorType === 'penny' ? canChoosePenny : canChooseSole;
@@ -207,6 +256,7 @@ export function StartupDetailDrawer({
   const draftIsDirty = !isSameDraft(currentDraft, loadedDraft);
   const canSubmitInterest =
     canExpressInterest &&
+    !alreadyBidded &&
     Boolean(detail?.canExpressInterest) &&
     (canChoosePenny || canChooseSole) &&
     selectedTypeAvailable &&
@@ -416,9 +466,16 @@ export function StartupDetailDrawer({
               Review the complete founder score breakdown before expressing interest.
             </div>
           </div>
-          <Button variant="ghost" onClick={handleClose}>
-            Close
-          </Button>
+          <div className="flex items-center gap-3">
+            {interestSummary.interestedCount > 0 ? (
+              <Badge className="border-cyan-500/40 bg-cyan-500/10 text-cyan-300">
+                {interestSummary.interestedCount} interested
+              </Badge>
+            ) : null}
+            <Button variant="ghost" onClick={handleClose}>
+              Close
+            </Button>
+          </div>
         </div>
 
         {startupQuery.isLoading ? (
@@ -538,10 +595,63 @@ export function StartupDetailDrawer({
               </div>
             </Card>
 
+            {startupId ? <FundingProgressBar startupId={startupId} /> : null}
+
+            {!hasExpressedInterest && startupId ? (
+              <ExpressInterestCard
+                startupId={startupId}
+                startupName={detail.startup.name}
+                variant="banner"
+              />
+            ) : null}
+
+            {hasExpressedInterest && startupId ? (
+              <LiveActivityFeed startupId={startupId} maxItems={20} />
+            ) : null}
+
+            {alreadyBidded ? (
+              <Card className="border-cyan-500/30 bg-cyan-500/5 p-5">
+                <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
+                  <Badge className="w-fit border-cyan-500/30 bg-cyan-500/10 text-cyan-300">
+                    Already Bidded
+                  </Badge>
+                  <div className="flex flex-wrap gap-2">
+                    <Button variant="secondary" onClick={onTrackInterest}>
+                      Track
+                    </Button>
+                    <Button variant="ghost" onClick={handleClose}>
+                      Close
+                    </Button>
+                  </div>
+                </div>
+              </Card>
+            ) : hasExpressedInterest ? (
             <Card className="space-y-4 border-t border-slate-800 p-5">
-              <div className="text-sm font-semibold uppercase tracking-[0.2em] text-slate-400">
-                Step 0: Choose Your Investor Type
+              <div className="flex flex-col gap-3 lg:flex-row lg:items-start lg:justify-between">
+                <div>
+                  <div className="text-sm font-semibold uppercase tracking-[0.2em] text-slate-400">
+                    Investment Offer
+                  </div>
+                  <div className="mt-2 max-w-2xl text-sm leading-6 text-slate-400">
+                    Choose the investor type, enter the money and equity you are proposing, then send it to the founder for review.
+                  </div>
+                </div>
+                <div className="rounded-2xl border border-cyan-500/20 bg-cyan-500/10 px-4 py-3 text-sm text-cyan-100 lg:max-w-xs">
+                  This is not a closed deal yet. It starts the founder negotiation and admin review path.
+                </div>
               </div>
+
+              <div className="grid gap-2 text-xs text-slate-400 sm:grid-cols-3">
+                {interestNextSteps.map((step, index) => (
+                  <div key={step} className="flex items-center gap-2 rounded-2xl border border-slate-800 bg-slate-900 px-3 py-2">
+                    <span className="flex h-6 w-6 shrink-0 items-center justify-center rounded-full bg-slate-800 text-[11px] font-bold text-cyan-300">
+                      {index + 1}
+                    </span>
+                    <span>{step}</span>
+                  </div>
+                ))}
+              </div>
+
               <div className="grid gap-3 md:grid-cols-2">
                 <button
                   type="button"
@@ -549,13 +659,18 @@ export function StartupDetailDrawer({
                     setInvestorType('penny');
                     setChosenRole('observer');
                   }}
+                  aria-pressed={investorType === 'penny'}
                   disabled={!canChoosePenny}
                   className={`rounded-2xl border p-4 text-left ${
                     investorType === 'penny' ? 'border-cyan-400 bg-cyan-500/10' : 'border-slate-800 bg-slate-900'
                   } ${!canChoosePenny ? 'cursor-not-allowed opacity-50' : ''}`}
                 >
-                  <div className="font-semibold text-white">Penny Investor</div>
-                  <div className="mt-2 text-sm text-slate-400">Small stake, shareholder rights, INR 20k-INR 5L range</div>
+                  <div className="font-semibold text-white">{investorTypeGuidance.penny.title}</div>
+                  <div className="mt-2 text-sm text-slate-400">{investorTypeGuidance.penny.subtitle}</div>
+                  <div className="mt-4 grid gap-2 text-xs text-slate-400 sm:grid-cols-2">
+                    <span>Ticket: {investorTypeGuidance.penny.range}</span>
+                    <span>Role: {investorTypeGuidance.penny.role}</span>
+                  </div>
                   {!canChoosePenny ? (
                     <div className="mt-2 text-xs text-amber-300">All penny investor slots are filled.</div>
                   ) : null}
@@ -566,17 +681,27 @@ export function StartupDetailDrawer({
                     setInvestorType('sole');
                     setChosenRole('shareholder');
                   }}
+                  aria-pressed={investorType === 'sole'}
                   disabled={!canChooseSole}
                   className={`rounded-2xl border p-4 text-left ${
                     investorType === 'sole' ? 'border-amber-400 bg-amber-500/10' : 'border-slate-800 bg-slate-900'
                   } ${!canChooseSole ? 'cursor-not-allowed opacity-50' : ''}`}
                 >
-                  <div className="font-semibold text-white">Sole Investor</div>
-                  <div className="mt-2 text-sm text-slate-400">Lead investor, director option, negotiated authority</div>
+                  <div className="font-semibold text-white">{investorTypeGuidance.sole.title}</div>
+                  <div className="mt-2 text-sm text-slate-400">{investorTypeGuidance.sole.subtitle}</div>
+                  <div className="mt-4 grid gap-2 text-xs text-slate-400 sm:grid-cols-2">
+                    <span>Ticket: {investorTypeGuidance.sole.range}</span>
+                    <span>Role: {investorTypeGuidance.sole.role}</span>
+                  </div>
                   {!canChooseSole ? (
                     <div className="mt-2 text-xs text-amber-300">A sole investor is already assigned to this startup.</div>
                   ) : null}
                 </button>
+              </div>
+
+              <div className="rounded-2xl border border-slate-800 bg-slate-900 px-4 py-3 text-sm text-slate-300">
+                <span className="font-semibold text-white">{investorTypeGuidance[investorType].title}: </span>
+                {investorTypeGuidance[investorType].note}
               </div>
 
               <div className="grid gap-4 md:grid-cols-3">
@@ -608,6 +733,13 @@ export function StartupDetailDrawer({
                       <span>!</span> {amountError}
                     </div>
                   )}
+                  {!amountError ? (
+                    <div className="mt-1 text-xs text-slate-500">
+                      {investorType === 'penny'
+                        ? `Allowed range: ${investorTypeGuidance.penny.range}.`
+                        : 'Enter the lead investment amount you want the founder to review.'}
+                    </div>
+                  ) : null}
                 </div>
                 <div>
                   <div className="mb-2 flex items-center justify-between text-xs uppercase tracking-[0.2em] text-slate-500">
@@ -637,6 +769,15 @@ export function StartupDetailDrawer({
                       <span>!</span> {equityError}
                     </div>
                   )}
+                  {!equityError ? (
+                    <div className="mt-1 text-xs text-slate-500">
+                      {investorType === 'penny'
+                        ? 'Penny investor equity is capped at 5%.'
+                        : chosenRole === 'director'
+                          ? 'Director role requires at least 51% equity.'
+                          : 'Set the equity you expect for this offer.'}
+                    </div>
+                  ) : null}
                 </div>
                 <div>
                   <div className="mb-2 text-xs uppercase tracking-[0.2em] text-slate-500">Role</div>
@@ -657,6 +798,9 @@ export function StartupDetailDrawer({
                       </>
                     )}
                   </select>
+                  <div className="mt-1 text-xs text-slate-500">
+                    Founder and admin review will confirm final authority after acceptance.
+                  </div>
                 </div>
               </div>
 
@@ -670,8 +814,11 @@ export function StartupDetailDrawer({
                 <div className="space-y-1 text-sm text-slate-400">
                   <div>
                     {detail.canExpressInterest
-                      ? 'Express Interest is enabled after the full profile review.'
+                      ? 'Ready to send after you review the profile, pitch deck, and offer terms.'
                       : 'This startup is not accepting any new investor interest right now.'}
+                  </div>
+                  <div>
+                    Sending locks in this offer as your submitted interest. You can follow founder responses from the investor dashboard.
                   </div>
                   {draftIsDirty ? <div className="text-cyan-300">Draft saved locally for this startup.</div> : null}
                 </div>
@@ -692,11 +839,12 @@ export function StartupDetailDrawer({
                     onClick={handleExpressInterest}
                     disabled={!canSubmitInterest || isExpressingInterest}
                   >
-                    {isExpressingInterest ? 'Sending...' : 'Express Interest'}
+                    {isExpressingInterest ? 'Sending...' : 'Submit Investment Offer'}
                   </Button>
                 </div>
               </div>
             </Card>
+            ) : null}
           </div>
         ) : null}
       </div>

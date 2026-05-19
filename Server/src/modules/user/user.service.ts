@@ -40,6 +40,9 @@ import {
 import { InstitutionStudentRosterEntry } from '../institution/studentRoster.model';
 import { ALLOWED_CONNECTIONS } from '../../middleware/connectionGuard';
 import { Workspace } from '../workspace/workspace.model';
+import { Deal } from '../deal/deal.model';
+import { RequestRecord } from '../request/request.model';
+import { Settings } from '../settings/settings.model';
 
 export const socialEnrichSchema = z.object({
   githubUrl: z.string().trim().url().optional(),
@@ -1929,19 +1932,23 @@ export const updateCurrentUser = async (
 };
 
 const buildStudentPortfolioProfile = async (student: IUser): Promise<PublicStudentProfile> => {
-  const institution = student.institutionId
-    ? await User.findById(student.institutionId).select('_id displayName').lean()
-    : null;
-  const education = await resolveEducationEntriesForUser({
-    role: student.role,
-    institutionId: student.institutionId,
-    email: student.email,
-    education: student.education,
-  });
+  const [institution, education, settings] = await Promise.all([
+    student.institutionId
+      ? User.findById(student.institutionId).select('_id displayName').lean()
+      : Promise.resolve(null),
+    resolveEducationEntriesForUser({
+      role: student.role,
+      institutionId: student.institutionId,
+      email: student.email,
+      education: student.education,
+    }),
+    Settings.findOne({ userId: student._id }).select('privacy.showEmail').lean(),
+  ]);
 
   return {
     _id: String(student._id),
     displayName: student.displayName,
+    ...(settings?.privacy?.showEmail ? { email: student.email } : {}),
     ...(student.avatar ? { avatar: student.avatar } : {}),
     ...(student.avatarWallpaper ? { avatarWallpaper: student.avatarWallpaper } : {}),
     ...(student.bio ? { bio: student.bio } : {}),
@@ -2000,6 +2007,99 @@ const buildStudentPortfolioProfile = async (student: IUser): Promise<PublicStude
   };
 };
 
+const hasAcceptedProfileConnection = async (requesterId: string, studentId: string) => {
+  const [requesterObjectId, studentObjectId] = [new Types.ObjectId(requesterId), new Types.ObjectId(studentId)];
+
+  return Boolean(
+    await RequestRecord.exists({
+      type: 'generic',
+      actionType: 'connect',
+      status: 'accepted',
+      $or: [
+        { fromUserId: requesterObjectId, toUserId: studentObjectId },
+        { fromUserId: studentObjectId, toUserId: requesterObjectId },
+      ],
+    }),
+  );
+};
+
+const hasProfileVisibilityRelationship = async (
+  requesterId: string,
+  requesterRole: UserRole,
+  student: IUser,
+) => {
+  const studentId = String(student._id);
+  const studentObjectId = new Types.ObjectId(studentId);
+
+  if (requesterRole === UserRole.SCHOOL || requesterRole === UserRole.COLLEGE) {
+    return Boolean(student.institutionId && String(student.institutionId) === requesterId);
+  }
+
+  if (requesterRole === UserRole.MENTOR) {
+    return Boolean(
+      await Workspace.exists({
+        isActive: true,
+        chatParticipants: {
+          $elemMatch: {
+            userId: new Types.ObjectId(requesterId),
+            role: 'mentor',
+          },
+        },
+        $or: [{ ownerId: studentObjectId }, { teamMemberIds: studentObjectId }],
+      }),
+    );
+  }
+
+  if (requesterRole === UserRole.RECRUITER) {
+    const bridge = await RelevanceBridge.exists({
+      recruiterId: new Types.ObjectId(requesterId),
+      studentId: studentObjectId,
+      isActive: true,
+    });
+    return Boolean(bridge || student.discoverableToRecruiters);
+  }
+
+  if (requesterRole === UserRole.INVESTOR) {
+    return Boolean(
+      await Deal.exists({
+        investorId: new Types.ObjectId(requesterId),
+        studentId: studentObjectId,
+        status: { $ne: 'cancelled' },
+      }),
+    );
+  }
+
+  return hasAcceptedProfileConnection(requesterId, studentId);
+};
+
+const ensureStudentProfileVisibility = async (
+  requesterId: string,
+  requesterRole: UserRole,
+  student: IUser,
+) => {
+  if (requesterId === String(student._id) || requesterRole === UserRole.ADMIN) {
+    return;
+  }
+
+  const settings = await Settings.findOne({ userId: student._id })
+    .select('privacy.profileVisibility')
+    .lean<{ privacy?: { profileVisibility?: 'public' | 'connections' | 'private' } } | null>();
+  const profileVisibility = settings?.privacy?.profileVisibility ?? (student.isProfilePublic ? 'public' : 'private');
+
+  if (profileVisibility === 'public') {
+    return;
+  }
+
+  if (
+    profileVisibility === 'connections' &&
+    (await hasProfileVisibilityRelationship(requesterId, requesterRole, student))
+  ) {
+    return;
+  }
+
+  throw new ApiError(404, 'USER_NOT_FOUND', 'User not found');
+};
+
 export const getPublicStudentProfileBySlug = async (profileSlug: string): Promise<PublicStudentProfile> => {
   const student = await User.findOne({
     profileSlug,
@@ -2037,6 +2137,8 @@ export const getStudentPortfolioForViewer = async (
   }
 
   const studentObjectId = new Types.ObjectId(studentId);
+
+  await ensureStudentProfileVisibility(requesterId, requesterRole, student);
 
   switch (requesterRole) {
     case UserRole.ADMIN:

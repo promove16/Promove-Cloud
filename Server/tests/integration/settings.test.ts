@@ -138,6 +138,63 @@ describe('settings integration', () => {
     expect(storedUser?.isProfilePublic).toBe(false);
   });
 
+  it('syncs account profile visibility from privacy settings', async () => {
+    const { user, email } = await createApprovedUser({
+      role: UserRole.STUDENT,
+      email: `student-privacy-${randomUUID()}@example.com`,
+    });
+    const accessToken = await loginAs(email);
+
+    const response = await request(app)
+      .put('/api/settings')
+      .set('Authorization', `Bearer ${accessToken}`)
+      .send({
+        privacy: {
+          profileVisibility: 'private',
+        },
+      });
+
+    expect(response.status).toBe(200);
+    expect(response.body.data.privacy.profileVisibility).toBe('private');
+
+    const storedUser = await User.findById(user._id).lean();
+    expect(storedUser?.isProfilePublic).toBe(false);
+  });
+
+  it('blocks first-contact DMs when the recipient disables incoming messages', async () => {
+    const { email: studentEmail } = await createApprovedUser({
+      role: UserRole.STUDENT,
+      email: `dm-sender-${randomUUID()}@example.com`,
+    });
+    const { user: mentor, email: mentorEmail } = await createApprovedUser({
+      role: UserRole.MENTOR,
+      email: `dm-recipient-${randomUUID()}@example.com`,
+    });
+    const [studentToken, mentorToken] = await Promise.all([loginAs(studentEmail), loginAs(mentorEmail)]);
+
+    const savePrivacy = await request(app)
+      .put('/api/settings')
+      .set('Authorization', `Bearer ${mentorToken}`)
+      .send({
+        privacy: {
+          allowDMs: 'none',
+        },
+      });
+
+    expect(savePrivacy.status).toBe(200);
+
+    const dmResponse = await request(app)
+      .post(`/api/dm/${mentor._id.toString()}`)
+      .set('Authorization', `Bearer ${studentToken}`)
+      .send({
+        message: 'I would like to discuss my project.',
+        queryType: 'general',
+      });
+
+    expect(dmResponse.status).toBe(403);
+    expect(dmResponse.body.error.code).toBe('DM_PERMISSION_DENIED');
+  });
+
   it('rejects invalid investor ranges', async () => {
     const { email } = await createApprovedUser({
       role: UserRole.INVESTOR,

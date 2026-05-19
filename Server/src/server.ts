@@ -9,6 +9,7 @@ import { startActivityWorker } from './jobs/activityWorker';
 import { startNotificationWorker } from './jobs/notificationWorker';
 import { scheduleMongoExcelBackupJob, startMongoExcelBackupWorker } from './jobs/mongoExcelBackupWorker';
 import { scheduleWeeklyProgressSummaryJob, startRetentionEmailWorker } from './jobs/retentionEmailWorker';
+import { scheduleBidExpiryJob, startBidExpiryWorker } from './jobs/biddingWorker';
 import { startScoreWorker } from './jobs/scoreRecalcWorker';
 import { seedProblemsIfEmpty } from './modules/problemBank/problem.service';
 import { initSocket } from './config/socket';
@@ -48,8 +49,10 @@ const startServer = async () => {
       startNotificationWorker();
       startMongoExcelBackupWorker();
       startRetentionEmailWorker();
+      startBidExpiryWorker();
       await scheduleWeeklyProgressSummaryJob();
       await scheduleMongoExcelBackupJob();
+      await scheduleBidExpiryJob();
     } else {
       logger.info('API replica started without inline workers (RUN_WORKERS_INLINE=false).');
     }

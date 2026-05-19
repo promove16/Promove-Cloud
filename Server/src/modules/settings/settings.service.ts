@@ -103,13 +103,21 @@ const sanitizeSettingsUpdate = (role: UserRole, payload: unknown): SettingsUpdat
 const syncUserSettingsSideEffects = async (
   userId: string,
   role: UserRole,
+  privacy?: Partial<IUserSettings['privacy']>,
   roleSettings?: Partial<RoleSettings>,
 ) => {
-  if (!roleSettings) {
-    return;
+  const userUpdate: Record<string, unknown> = {};
+
+  if (privacy?.profileVisibility !== undefined) {
+    userUpdate.isProfilePublic = privacy.profileVisibility === 'public';
   }
 
-  const userUpdate: Record<string, unknown> = {};
+  if (!roleSettings) {
+    if (Object.keys(userUpdate).length > 0) {
+      await User.findByIdAndUpdate(userId, { $set: userUpdate });
+    }
+    return;
+  }
 
   if (role === UserRole.STUDENT && roleSettings.jobSeeking !== undefined) {
     userUpdate.discoverableToRecruiters = roleSettings.jobSeeking;
@@ -178,7 +186,7 @@ export async function updateSettings(
   payload: unknown,
 ): Promise<ISettingsDocument> {
   const updates = sanitizeSettingsUpdate(role, payload);
-  await syncUserSettingsSideEffects(userId, role, updates.roleSettings);
+  await syncUserSettingsSideEffects(userId, role, updates.privacy, updates.roleSettings);
   const dotUpdate = buildDotNotationUpdate(updates);
 
   if (Object.keys(dotUpdate).length === 0) {

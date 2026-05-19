@@ -73,6 +73,8 @@ type InstitutionOverviewDashboardProps = {
   ratingValue: number;
   ratingMax?: number;
   ratingUpdatedAt?: string;
+  ratingTitle?: string;
+  ratingCurrentLabel?: string;
   ratingSummary: string;
   ratingBreakdown: RatingBreakdownItem[];
   ratingNote: string;
@@ -250,6 +252,8 @@ export function InstitutionOverviewDashboard({
   ratingValue,
   ratingMax = 5,
   ratingUpdatedAt,
+  ratingTitle = 'IIC Star Rating Estimator',
+  ratingCurrentLabel = 'Current institutional rating',
   ratingSummary,
   ratingBreakdown,
   ratingNote,
@@ -381,7 +385,7 @@ export function InstitutionOverviewDashboard({
                 <div className="text-[11px] uppercase tracking-[0.24em] text-slate-500">
                   Rating estimator
                 </div>
-                <h2 className="mt-1 text-xl font-semibold text-white">IIC Star Rating Estimator</h2>
+                <h2 className="mt-1 text-xl font-semibold text-white">{ratingTitle}</h2>
               </div>
             </div>
             <div className="flex items-center gap-1">
@@ -398,7 +402,7 @@ export function InstitutionOverviewDashboard({
             <div className="flex items-end justify-between gap-4">
               <div>
                 <div className="text-[11px] uppercase tracking-[0.24em] text-slate-500">
-                  Current institutional rating
+                  {ratingCurrentLabel}
                 </div>
                 <div className="mt-2 text-[30px] font-semibold tracking-[-0.05em] text-white">
                   {normalizedRating.toFixed(1)}

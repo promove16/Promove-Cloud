@@ -493,6 +493,46 @@ const STATUS_STYLES: Record<string, string> = {
   cancelled: "bg-slate-600/40 text-slate-400",
 };
 
+const SUCCESSFUL_PATENT_REQUEST_STATUSES = new Set(["granted", "completed"]);
+const CLOSED_PATENT_REQUEST_STATUSES = new Set([
+  "granted",
+  "completed",
+  "rejected",
+  "abandoned",
+  "cancelled",
+]);
+
+const isSuccessfulPatentRequestStatus = (status?: string) =>
+  Boolean(status && SUCCESSFUL_PATENT_REQUEST_STATUSES.has(status));
+
+const isClosedPatentRequestStatus = (status?: string) =>
+  Boolean(status && CLOSED_PATENT_REQUEST_STATUSES.has(status));
+
+const isApprovedPatentSubmissionStatus = (status?: string) =>
+  status === "approved";
+
+const getPatentReviewTitle = (status?: string, hasAdminNotes = false) => {
+  if (hasAdminNotes) return "Reviewer notes available";
+  if (status === "approved") return "Patent approved";
+  if (status === "granted") return "Patent granted";
+  if (status === "completed") return "Patent completed";
+  if (status === "rejected") return "Review rejected";
+  if (status === "abandoned" || status === "cancelled") return "Review closed";
+  return status ? "Review in progress" : "Awaiting request";
+};
+
+const getPatentReviewMessage = (status?: string, adminNotes?: string) => {
+  if (adminNotes) return adminNotes;
+  if (status === "approved") return "Admin approved this patent submission.";
+  if (status === "granted") return "The patent support request has been granted.";
+  if (status === "completed") return "The patent support request has been completed.";
+  if (status === "rejected") return "Admin rejected this patent request.";
+  if (status === "abandoned" || status === "cancelled") {
+    return "This patent request is no longer active.";
+  }
+  return "Admin and IPR review details will appear here after the filing team updates the request.";
+};
+
 const DOCUMENT_CATEGORY_LABELS: Record<string, string> = {
   form1_application: "Form 1 application",
   form2_specification: "Form 2 specification",
@@ -896,6 +936,8 @@ function StartupPatentRequestOverview({
   const adminNotes = latestRequest?.adminNotes ?? latestSubmission?.adminNotes;
   const scoreAwarded =
     latestRequest?.scoreAwarded ?? latestSubmission?.scoreAwarded ?? false;
+  const reviewTitle = getPatentReviewTitle(status, Boolean(adminNotes));
+  const reviewMessage = getPatentReviewMessage(status, adminNotes);
   const requestType = latestRequest
     ? "Assisted filing request"
     : latestSubmission
@@ -959,16 +1001,9 @@ function StartupPatentRequestOverview({
         <div className="text-xs uppercase tracking-[0.24em] text-cyan-300">
           Review
         </div>
-        <h2 className="mt-3 text-lg font-semibold text-white">
-          {adminNotes
-            ? "Reviewer notes available"
-            : status
-              ? "Review in progress"
-              : "Awaiting request"}
-        </h2>
+        <h2 className="mt-3 text-lg font-semibold text-white">{reviewTitle}</h2>
         <p className="mt-3 text-sm leading-6 text-slate-400">
-          {adminNotes ??
-            "Admin and IPR review details will appear here after the filing team updates the request."}
+          {reviewMessage}
         </p>
         <div className="mt-4 grid gap-2 text-sm text-slate-400">
           <div className="flex items-center justify-between gap-3">
@@ -3003,10 +3038,7 @@ export function PatentSupport() {
   const hasActivePatentRequest = useMemo(
     () =>
       visiblePatentRequests.some(
-        (request) =>
-          request.status !== "granted" &&
-          request.status !== "rejected" &&
-          request.status !== "abandoned",
+        (request) => !isClosedPatentRequestStatus(request.status),
       ),
     [visiblePatentRequests],
   );
@@ -3014,12 +3046,27 @@ export function PatentSupport() {
     () =>
       visiblePatents.some(
         (patent) =>
-          patent.status !== "approved" && patent.status !== "rejected",
+          !isApprovedPatentSubmissionStatus(patent.status) &&
+          patent.status !== "rejected",
       ),
     [visiblePatents],
   );
+  const hasSuccessfulPatentFlow = useMemo(
+    () =>
+      visiblePatents.some((patent) =>
+        isApprovedPatentSubmissionStatus(patent.status),
+      ) ||
+      visiblePatentRequests.some((request) =>
+        isSuccessfulPatentRequestStatus(request.status),
+      ),
+    [visiblePatentRequests, visiblePatents],
+  );
+  const hasVisiblePatentFlow =
+    visiblePatents.length > 0 || visiblePatentRequests.length > 0;
   const hasSubmittedPatentFlow =
-    hasActivePatentRequest || hasActivePatentSubmission;
+    hasActivePatentRequest ||
+    hasActivePatentSubmission ||
+    hasSuccessfulPatentFlow;
 
   useEffect(() => {
     if (isStartupScoped) {
@@ -3411,6 +3458,7 @@ export function PatentSupport() {
         {/* Overview - show existing patents/requests */}
         {isStartupScoped &&
         hasPatentEligibleWorkspaces &&
+        hasVisiblePatentFlow &&
         !hasActivePatentRequest ? (
           <StartupPatentRequestOverview
             requests={visiblePatentRequests}

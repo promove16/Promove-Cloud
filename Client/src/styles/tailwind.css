@@ -7,6 +7,26 @@
     color-scheme: dark;
     scrollbar-color: rgba(71, 85, 105, 0.9) transparent;
     scrollbar-width: thin;
+
+    /* Landing-page design tokens (HSL channels, space-separated) */
+    --background: 222 47% 5%;
+    --foreground: 210 40% 98%;
+    --muted: 217 32% 14%;
+    --muted-foreground: 215 20% 65%;
+    --card: 222 47% 8%;
+    --card-foreground: 210 40% 98%;
+    --border: 217 32% 18%;
+    --primary: 230 100% 65%;
+    --primary-foreground: 222 47% 5%;
+    --accent: 280 90% 65%;
+    --accent-foreground: 222 47% 5%;
+    --destructive: 0 75% 60%;
+    --destructive-foreground: 210 40% 98%;
+    --chart-1: 230 100% 65%;
+    --chart-2: 280 90% 65%;
+    --chart-3: 160 70% 50%;
+    --chart-4: 35 95% 60%;
+    --chart-5: 340 85% 65%;
     --dashboard-bg: #020617;
     --dashboard-sidebar-bg: rgba(2, 6, 23, 0.95);
     --dashboard-header-bg: rgba(2, 6, 23, 0.85);
@@ -29,6 +49,13 @@
   html.light {
     color-scheme: light;
     scrollbar-color: rgba(148, 163, 184, 0.9) transparent;
+    --background: 210 40% 98%;
+    --foreground: 222 47% 11%;
+    --muted: 210 30% 92%;
+    --muted-foreground: 215 16% 40%;
+    --card: 0 0% 100%;
+    --card-foreground: 222 47% 11%;
+    --border: 215 27% 87%;
     --dashboard-bg: #f8fafc;
     --dashboard-sidebar-bg: rgba(255, 255, 255, 0.95);
     --dashboard-header-bg: rgba(255, 255, 255, 0.86);

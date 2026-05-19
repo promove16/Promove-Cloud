@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react';
 import { useMutation, useQueryClient } from '@tanstack/react-query';
-import { X, TrendingUp, Users, User, ChevronDown, AlertCircle } from 'lucide-react';
+import { X, TrendingUp, Users, User, ChevronDown, AlertCircle, CheckCircle2, ArrowRight } from 'lucide-react';
 import { isAxiosError } from 'axios';
 import { Button } from '../../components/ui/Button';
 import { Input } from '../../components/ui/Input';
@@ -44,6 +44,7 @@ export function PlaceBidModal({ startupId, startupName, board, defaultType = 'pe
   const [role, setRole] = useState<InvestorRole>(() => getDefaultRole(initialInvestorType));
   const [coverLetter, setCoverLetter] = useState('');
   const [error, setError] = useState<string | null>(null);
+  const [bidPlaced, setBidPlaced] = useState(false);
 
   // Reset terms when switching investor type so the form cannot keep an invalid role/equity pair.
   useEffect(() => {
@@ -55,7 +56,7 @@ export function PlaceBidModal({ startupId, startupName, board, defaultType = 'pe
     mutationFn: (payload: PlaceBidPayload) => dealApi.placeBid(startupId, payload),
     onSuccess: async () => {
       await queryClient.invalidateQueries({ queryKey: ['startup-bid-board', startupId] });
-      onSuccess();
+      setBidPlaced(true);
     },
     onError: (err) => {
       setError(getErrorMessage(err));
@@ -116,6 +117,43 @@ export function PlaceBidModal({ startupId, startupName, board, defaultType = 'pe
             status: currentUserSoleBid.founderDecisionStatus,
           }
         : undefined);
+
+  if (bidPlaced) {
+    return (
+      <div className="fixed inset-0 z-[60] overflow-y-auto bg-black/70 p-4 backdrop-blur-sm sm:p-6">
+        <div className="mx-auto flex min-h-full items-center justify-center">
+          <div className="w-full max-w-md rounded-2xl border border-emerald-500/20 bg-slate-950 p-8 shadow-2xl shadow-black/40 text-center">
+            <CheckCircle2 className="w-16 h-16 text-emerald-400 mx-auto mb-4" />
+            <h2 className="text-2xl font-bold text-white mb-2">Bid Placed!</h2>
+            <p className="text-slate-400 mb-2">
+              Your {investorType === 'penny' ? 'penny' : 'sole'} investor bid for{' '}
+              <span className="text-white font-semibold">{startupName}</span> has been submitted.
+            </p>
+            <p className="text-sm text-slate-500 mb-6">
+              {investorType === 'penny'
+                ? 'The founder will review all penny pool bids. Track your status in the investor pipeline.'
+                : 'The founder will review your sole investor proposal. You\'ll be notified when they respond.'}
+            </p>
+            <div className="flex flex-col gap-3">
+              <a
+                href="/dashboard/investor/pipeline"
+                className="inline-flex items-center justify-center gap-2 rounded-xl bg-emerald-500/10 border border-emerald-500/30 px-6 py-3 text-emerald-400 font-medium hover:bg-emerald-500/20 transition-all"
+                onClick={(e) => { e.stopPropagation(); onClose(); }}
+              >
+                View Pipeline <ArrowRight className="w-4 h-4" />
+              </a>
+              <button
+                onClick={onClose}
+                className="text-sm text-slate-400 hover:text-white transition-colors"
+              >
+                Continue browsing
+              </button>
+            </div>
+          </div>
+        </div>
+      </div>
+    );
+  }
 
   if (existingBid) {
     return (

@@ -118,11 +118,11 @@ export interface ComplianceOverview {
 
 const defaultFrameworksByType: Record<InstitutionComplianceType, string[]> = {
   school: [
-    "IIC (Institution's Innovation Council)",
-    'NEP 2020 Compliance',
+    'ATL / School Innovation Program',
+    'SQAAF / School Quality Assurance',
+    'NEP 2020 School Compliance',
     'Attendance Governance',
     'Student Safety & Conduct',
-    'NISP (Innovation Startup Policy)',
   ],
   college: [
     "IIC (Institution's Innovation Council)",

@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { isAxiosError } from 'axios';
 import { useNavigate } from 'react-router-dom';
+import { Check, X, DollarSign, TrendingUp, Activity, ShieldCheck } from 'lucide-react';
 import { Badge } from '../../components/ui/Badge';
 import { Button } from '../../components/ui/Button';
 import { Card } from '../../components/ui/Card';
@@ -179,13 +180,43 @@ export function DealDetail({ dealId, open, onOpenChange }: Props) {
     return null;
   }
 
+  const advanceDisabled = !deal
+    ? true
+    : advanceMutation.isPending ||
+      (deal.currentStage === 1 && deal.founderDecision.status !== 'accepted') ||
+      (awaitingAdminApproval && deal.stockTransfer.status !== 'rejected') ||
+      (deal.currentStage === 3 && deal.stockTransfer.status !== 'rejected' && !deal.adminApprovedAt);
+
+  const advanceLabel = !deal
+    ? ''
+    : advanceMutation.isPending
+      ? 'Updating...'
+      : deal.currentStage === 0
+        ? 'Advance to Due Diligence'
+        : deal.currentStage === 1
+          ? deal.founderDecision.status === 'accepted'
+            ? 'View Payment Placeholder'
+            : 'Awaiting Founder Acceptance'
+          : deal.currentStage === 2
+            ? awaitingAdminApproval
+              ? 'Awaiting Admin Verification'
+              : 'Submit for Admin Approval'
+            : deal.currentStage === 3
+              ? deal.stockTransfer.status === 'rejected'
+                ? 'Resubmit for Admin Approval'
+                : 'Move to Portfolio'
+              : 'Already in Portfolio';
+
   return (
-    <div className="fixed inset-0 z-50 flex justify-end bg-slate-950 backdrop-blur-sm">
-      <div className="h-full w-full max-w-3xl overflow-y-auto border-l border-slate-800 bg-slate-950 px-6 py-6 text-white">
-        <div className="mb-6 flex items-start justify-between gap-4 border-b border-slate-800 pb-4">
+    <div className="fixed inset-0 z-50 flex justify-end bg-slate-950/85 backdrop-blur-sm" onClick={() => onOpenChange(false)}>
+      <div
+        className="flex h-full w-full max-w-6xl flex-col border-l border-slate-800 bg-slate-950 text-white shadow-2xl"
+        onClick={(event) => event.stopPropagation()}
+      >
+        <div className="sticky top-0 z-10 flex items-start justify-between gap-4 border-b border-slate-800 bg-slate-950/95 px-6 py-4 backdrop-blur">
           <div>
             <div className="text-2xl font-bold text-white">Deal Detail</div>
-            <div className="mt-2 text-sm text-slate-400">
+            <div className="mt-1 text-sm text-slate-400">
               Stage progression is sequential and stage 3 requires admin verification.
             </div>
           </div>
@@ -195,43 +226,160 @@ export function DealDetail({ dealId, open, onOpenChange }: Props) {
         </div>
 
         {dealQuery.isLoading ? (
-          <div className="flex min-h-[50vh] items-center justify-center">
+          <div className="flex flex-1 items-center justify-center">
             <Spinner />
           </div>
         ) : deal ? (
-          <div className="space-y-6">
-            <Card className="p-5">
-              <div className="flex flex-wrap items-start justify-between gap-4">
-                <div>
-                  <div className="text-3xl font-bold text-white">{deal.startupName}</div>
-                  <div className="mt-2 text-slate-400">{deal.startupCategory}</div>
+          <div className="grid flex-1 gap-6 overflow-y-auto px-6 py-6 lg:grid-cols-[340px,1fr]">
+            {/* LEFT RAIL: summary, vertical timeline, primary action */}
+            <aside className="space-y-4 lg:sticky lg:top-24 lg:self-start">
+              <Card className="p-5">
+                <div className="text-[10px] font-semibold uppercase tracking-[0.22em] text-slate-500">
+                  Startup
                 </div>
-                <div className="flex flex-wrap gap-2">
+                <div className="mt-1 text-2xl font-bold leading-tight text-white">
+                  {deal.startupName}
+                </div>
+                <div className="mt-1 text-sm text-slate-400">{deal.startupCategory}</div>
+
+                <div className="mt-4 flex flex-wrap gap-2">
                   <Badge>Stage {deal.currentStage}</Badge>
-                  <Badge className={deal.investorType === 'sole' ? 'border-amber-500/30 bg-amber-500/10 text-amber-300' : 'border-cyan-500/30 bg-cyan-500/10 text-cyan-300'}>
+                  <Badge
+                    className={
+                      deal.investorType === 'sole'
+                        ? 'border-amber-500/30 bg-amber-500/10 text-amber-300'
+                        : 'border-cyan-500/30 bg-cyan-500/10 text-cyan-300'
+                    }
+                  >
                     {formatInvestorTypeLabel(deal.investorType)}
                   </Badge>
                   {deal.adminApprovalRequired ? (
                     <Badge className="border-amber-500/30 bg-amber-500/10 text-amber-300">
-                      Awaiting Admin Approval
+                      <ShieldCheck className="mr-1 inline h-3 w-3" />
+                      Awaiting Admin
                     </Badge>
                   ) : null}
-                  <Badge className="border-cyan-500/30 bg-cyan-500/10 text-cyan-300">
-                    {deal.nextActionLabel}
-                  </Badge>
                 </div>
-              </div>
-            </Card>
 
-            {notice ? (
-              <div className="rounded-2xl border border-cyan-500/30 bg-cyan-500/10 px-4 py-3 text-sm text-cyan-200">
-                {notice}
-              </div>
-            ) : null}
+                <div className="mt-5 grid grid-cols-2 gap-3">
+                  <div className="rounded-lg border border-slate-800 bg-slate-900/60 p-3">
+                    <div className="flex items-center gap-1.5 text-[10px] uppercase tracking-[0.18em] text-slate-500">
+                      <DollarSign className="h-3 w-3" />
+                      Amount
+                    </div>
+                    <div className="mt-1 text-base font-semibold text-white">
+                      {formatInr(deal.amountINR)}
+                    </div>
+                  </div>
+                  <div className="rounded-lg border border-slate-800 bg-slate-900/60 p-3">
+                    <div className="flex items-center gap-1.5 text-[10px] uppercase tracking-[0.18em] text-slate-500">
+                      <TrendingUp className="h-3 w-3" />
+                      Equity
+                    </div>
+                    <div className="mt-1 text-base font-semibold text-white">
+                      {deal.equityPercent}%
+                    </div>
+                  </div>
+                </div>
 
-            {deal.currentStage === 0 && (
-              <NegotiationPanel deal={deal} isInvestor={true} />
-            )}
+                <div className="mt-4 flex items-center gap-2 rounded-lg border border-cyan-500/20 bg-cyan-500/5 px-3 py-2 text-xs text-cyan-200">
+                  <Activity className="h-3.5 w-3.5 shrink-0" />
+                  <span>Next: {deal.nextActionLabel}</span>
+                </div>
+              </Card>
+
+              <Card className="p-5">
+                <div className="mb-4 text-[10px] font-semibold uppercase tracking-[0.22em] text-slate-500">
+                  Deal Progress
+                </div>
+                <ol className="relative space-y-4">
+                  {[0, 1, 2, 3, 4].map((stage, index, arr) => {
+                    const state =
+                      stage < deal.currentStage
+                        ? 'done'
+                        : stage === deal.currentStage
+                          ? 'active'
+                          : 'pending';
+                    const isLast = index === arr.length - 1;
+                    return (
+                      <li key={stage} className="relative flex items-start gap-3">
+                        {!isLast && (
+                          <span
+                            className={`absolute left-[11px] top-6 h-[calc(100%-4px)] w-px ${
+                              state === 'done' ? 'bg-emerald-500/40' : 'bg-slate-800'
+                            }`}
+                          />
+                        )}
+                        <div
+                          className={`relative z-[1] flex h-6 w-6 shrink-0 items-center justify-center rounded-full border text-[11px] font-semibold ${
+                            state === 'done'
+                              ? 'border-emerald-500/40 bg-emerald-500/20 text-emerald-300'
+                              : state === 'active'
+                                ? 'border-cyan-400/60 bg-cyan-500/20 text-cyan-200 shadow-[0_0_0_3px_rgba(34,211,238,0.12)]'
+                                : 'border-slate-700 bg-slate-900 text-slate-500'
+                          }`}
+                        >
+                          {state === 'done' ? <Check className="h-3 w-3" /> : stage}
+                        </div>
+                        <div className="pt-0.5">
+                          <div
+                            className={`text-sm font-medium ${
+                              state === 'active'
+                                ? 'text-cyan-200'
+                                : state === 'done'
+                                  ? 'text-emerald-300'
+                                  : 'text-slate-500'
+                            }`}
+                          >
+                            {stageLabels[stage]}
+                          </div>
+                          {state === 'active' && (
+                            <div className="mt-0.5 text-[11px] text-slate-500">In progress</div>
+                          )}
+                        </div>
+                      </li>
+                    );
+                  })}
+                </ol>
+              </Card>
+
+              {deal.currentStage === 4 ? (
+                <div className="flex items-center gap-2 rounded-xl border border-emerald-500/30 bg-emerald-500/10 px-4 py-3 text-sm text-emerald-200">
+                  <Check className="h-4 w-4" />
+                  This deal is in your portfolio.
+                </div>
+              ) : deal.currentStage === 0 && !canAdvanceFromNegotiation ? (
+                <div className="rounded-xl border border-slate-800 bg-slate-900/80 px-4 py-3 text-xs leading-5 text-slate-400">
+                  Agree on terms in the Negotiation Room to advance.
+                </div>
+              ) : (
+                <Button
+                  onClick={handleAdvance}
+                  disabled={advanceDisabled}
+                  className="w-full"
+                >
+                  {advanceLabel}
+                </Button>
+              )}
+              {error ? (
+                <div className="flex items-start gap-2 rounded-lg border border-red-500/30 bg-red-500/10 px-3 py-2 text-xs text-red-300">
+                  <X className="mt-0.5 h-3.5 w-3.5 shrink-0" />
+                  <span>{error}</span>
+                </div>
+              ) : null}
+            </aside>
+
+            {/* RIGHT: workspace */}
+            <div className="min-w-0 space-y-6">
+              {notice ? (
+                <div className="rounded-2xl border border-cyan-500/30 bg-cyan-500/10 px-4 py-3 text-sm text-cyan-200">
+                  {notice}
+                </div>
+              ) : null}
+
+              {deal.currentStage === 0 && (
+                <NegotiationPanel deal={deal} isInvestor={true} />
+              )}
 
             {deal.currentStage === 1 ? (
               <Card className="space-y-4 p-5">
@@ -383,76 +531,7 @@ export function DealDetail({ dealId, open, onOpenChange }: Props) {
               </Card>
             ) : null}
 
-            <Card className="p-4">
-              <div className="mb-3 text-xs font-semibold uppercase tracking-[0.2em] text-slate-400">
-                Deal Progress
-              </div>
-              <div className="flex items-center gap-1">
-                {[0, 1, 2, 3, 4].map((stage) => (
-                  <div key={stage} className="flex flex-1 items-center gap-1">
-                    <div className="flex flex-1 flex-col items-center gap-1">
-                      <div
-                        className={`h-2 w-full rounded-full ${
-                          stage < deal.currentStage
-                            ? 'bg-emerald-400'
-                            : stage === deal.currentStage
-                              ? 'bg-cyan-400'
-                              : 'bg-slate-800'
-                        }`}
-                      />
-                      <span
-                        className={`text-[10px] ${
-                          stage === deal.currentStage
-                            ? 'font-semibold text-cyan-300'
-                            : stage < deal.currentStage
-                              ? 'text-emerald-400'
-                              : 'text-slate-600'
-                        }`}
-                      >
-                        {stageLabels[stage]}
-                      </span>
-                    </div>
-                  </div>
-                ))}
-              </div>
-            </Card>
-
-            {deal.currentStage === 0 && !canAdvanceFromNegotiation ? (
-              <div className="rounded-xl border border-slate-800 bg-slate-900 px-4 py-3 text-sm text-slate-400">
-                Complete the negotiation above and agree on terms before advancing to Due Diligence.
-              </div>
-            ) : deal.currentStage === 4 ? null : (
-              <div className="flex items-center justify-between gap-4">
-                {error ? <div className="text-sm text-red-300">{error}</div> : <div />}
-                <Button
-                  onClick={handleAdvance}
-                  disabled={
-                    advanceMutation.isPending ||
-                    (deal.currentStage === 1 && deal.founderDecision.status !== 'accepted') ||
-                    (awaitingAdminApproval && deal.stockTransfer.status !== 'rejected') ||
-                    (deal.currentStage === 3 && deal.stockTransfer.status !== 'rejected' && !deal.adminApprovedAt)
-                  }
-                >
-                  {advanceMutation.isPending
-                    ? 'Updating...'
-                    : deal.currentStage === 0
-                      ? 'Advance to Due Diligence'
-                      : deal.currentStage === 1
-                        ? deal.founderDecision.status === 'accepted'
-                          ? 'View Payment Placeholder'
-                          : 'Awaiting Founder Acceptance'
-                        : deal.currentStage === 2
-                          ? awaitingAdminApproval
-                            ? 'Awaiting Admin Verification'
-                            : 'Submit for Admin Approval'
-                          : deal.currentStage === 3
-                            ? deal.stockTransfer.status === 'rejected'
-                              ? 'Resubmit for Admin Approval'
-                              : 'Move to Portfolio'
-                            : 'Already in Portfolio'}
-                </Button>
-              </div>
-            )}
+            </div>
           </div>
         ) : null}
       </div>

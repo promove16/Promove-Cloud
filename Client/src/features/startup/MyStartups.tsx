@@ -96,9 +96,9 @@ function StartupCard({
   const badge = reviewBadge[startup.reviewStatus] ?? reviewBadge.draft;
   const BadgeIcon = badge.Icon;
   const isLive = startup.launchedToInvestors || startup.launchedToMentors;
-  const isVerifiedAndLive = startup.reviewStatus === 'approved' && isLive;
+  const isMarketplaceLaunched = isLive || Boolean(startup.launchedToRecruiters);
   const accessMeta = getStartupAccessMeta(startup, currentUserId);
-  const canDelete = accessMeta.canDelete && !isVerifiedAndLive;
+  const canDelete = accessMeta.canDelete && !isMarketplaceLaunched;
   const nameMatches = confirmName.trim().toLowerCase() === (startup.name || '').trim().toLowerCase();
 
   const deleteMutation = useMutation({

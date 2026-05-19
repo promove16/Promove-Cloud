@@ -90,7 +90,7 @@ const serializeState = (value: unknown) => JSON.stringify(value);
 
 type NotifRow = { email: boolean; inApp: boolean };
 type NotifMatrix = { messages: NotifRow; deals: NotifRow; sessions: NotifRow; patents: NotifRow; platform: NotifRow };
-type PrivacyState = { profileVisibility: 'public' | 'connections' | 'private'; dmPermissions: 'everyone' | 'connections' | 'nobody'; showEmail: boolean; showPhone: boolean; showOnlineStatus: boolean };
+type PrivacyState = { profileVisibility: 'public' | 'connections' | 'private'; dmPermissions: 'everyone' | 'connections' | 'nobody'; showEmail: boolean; showOnlineStatus: boolean };
 type AppearanceState = { theme: 'dark' | 'light' | 'system'; compactMode: boolean; showAnimations: boolean };
 type SessionTypes = { video: boolean; text: boolean; inPerson: boolean };
 type RoleState = {
@@ -120,7 +120,7 @@ const defaultNotif: NotifMatrix = {
   messages: { email: true, inApp: true }, deals: { email: true, inApp: true },
   sessions: { email: true, inApp: true }, patents: { email: false, inApp: true }, platform: { email: true, inApp: false },
 };
-const defaultPrivacy: PrivacyState = { profileVisibility: 'public', dmPermissions: 'everyone', showEmail: false, showPhone: false, showOnlineStatus: true };
+const defaultPrivacy: PrivacyState = { profileVisibility: 'public', dmPermissions: 'everyone', showEmail: false, showOnlineStatus: true };
 const defaultAppearance: AppearanceState = { theme: 'dark', compactMode: false, showAnimations: true };
 const defaultRole: RoleState = {
   jobSeeking: false, openToMentorship: false, innovationVisibility: 'public',
@@ -383,7 +383,6 @@ export function SettingsPage() {
               ? 'nobody'
               : 'connections',
         showEmail: settings.privacy.showEmail,
-        showPhone: settings.privacy.showPhone,
         showOnlineStatus: settings.privacy.showOnlineStatus,
       });
     }
@@ -433,7 +432,6 @@ export function SettingsPage() {
                     ? 'nobody'
                     : 'connections',
               showEmail: settings.privacy.showEmail,
-              showPhone: settings.privacy.showPhone,
               showOnlineStatus: settings.privacy.showOnlineStatus,
             }
           : defaultPrivacy,
@@ -527,7 +525,7 @@ export function SettingsPage() {
         privacy: {
           profileVisibility: privacy.profileVisibility,
           showEmail: privacy.showEmail,
-          showPhone: privacy.showPhone,
+          showPhone: settings?.privacy?.showPhone ?? false,
           allowDMs:
             privacy.dmPermissions === 'everyone'
               ? 'all'
@@ -865,7 +863,6 @@ export function SettingsPage() {
               <p className={sectionHdr}>Contact Info Visibility</p>
               <div className="space-y-5">
                 <ToggleRow label="Show Email Address" desc="Display your email on your public profile" checked={privacy.showEmail} onChange={(v) => setPrivacy((p) => ({ ...p, showEmail: v }))} />
-                <ToggleRow label="Show Phone Number" desc="Display your phone number on your public profile" checked={privacy.showPhone} onChange={(v) => setPrivacy((p) => ({ ...p, showPhone: v }))} />
                 <ToggleRow label="Show Online Status" desc="Let others see when you are active on the platform" checked={privacy.showOnlineStatus} onChange={(v) => setPrivacy((p) => ({ ...p, showOnlineStatus: v }))} />
               </div>
             </div>

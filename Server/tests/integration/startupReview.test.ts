@@ -3,6 +3,8 @@ import request from 'supertest';
 import app from '../../src/app';
 import { env } from '../../src/config/env';
 import { AdminAuditLog } from '../../src/modules/admin/adminAuditLog.model';
+import { DirectMessage } from '../../src/modules/dm/dm.model';
+import { Notification } from '../../src/modules/notification/notification.model';
 import { Startup } from '../../src/modules/startup/startup.model';
 import { User } from '../../src/modules/user/user.model';
 import { UserRole } from '../../src/types/roles.types';
@@ -104,6 +106,99 @@ describe('startup review readiness integration', () => {
           reviewStatus: 'review_requested',
         }),
       ]),
+    );
+  });
+
+  it('returns signed pitch deck URLs in the admin startup review list', async () => {
+    const founder = await User.create({
+      email: `student-${Math.random().toString(36).slice(2, 10)}@example.com`,
+      passwordHash: 'hashed-password',
+      role: UserRole.STUDENT,
+      displayName: 'Signed Deck Founder',
+      accessGrantedBy: 'self_registered',
+      accessExpiresAt: new Date(Date.now() + 365 * 24 * 60 * 60 * 1000),
+      isActive: true,
+      innovationScore: 52,
+      profileComplete: true,
+      registrationStage: 'profile_setup',
+      verificationStatus: 'verified',
+      adminApprovalStatus: 'not_required',
+    });
+
+    const admin = await User.create({
+      email: `admin-${Math.random().toString(36).slice(2, 10)}@example.com`,
+      passwordHash: 'hashed-password',
+      role: UserRole.ADMIN,
+      displayName: 'Signed Deck Admin',
+      accessGrantedBy: 'admin',
+      accessExpiresAt: new Date(Date.now() + 365 * 24 * 60 * 60 * 1000),
+      isActive: true,
+      innovationScore: 0,
+      profileComplete: true,
+      registrationStage: 'complete',
+      verificationStatus: 'not_required',
+      adminApprovalStatus: 'approved',
+      adminApprovedAt: new Date(),
+    });
+
+    await Startup.create({
+      founderIds: [founder._id],
+      name: 'Signed Deck Review Startup',
+      tagline: 'A startup with a private pitch deck',
+      category: 'Software',
+      stage: 'Pre-Launch',
+      teamSize: 1,
+      activeProducts: 1,
+      traction: {
+        patentFiled: false,
+        mvpBuilt: true,
+        revenueGenerating: false,
+      },
+      pitchDeckUrl: 'https://res.cloudinary.com/demo/raw/upload/v123/promove/startups/private-deck.pdf',
+      pitchDeckName: 'private-deck.pdf',
+      pitchDeckStorageProvider: 'cloudinary',
+      pitchDeckStorageKey: 'promove/startups/private-deck',
+      registrationProfile: {
+        problemStatement: 'This startup addresses a validated logistics issue for student founders in distributed teams.',
+        solutionDifferentiation: 'It unifies startup readiness, compliance documents, and approval routing in one system.',
+        coreInnovation: 'The innovation is an approval-aware startup operating workflow.',
+        priorArtStatus: 'Comparable startup tooling was reviewed and gaps remain in governed launch approvals.',
+        workingMechanism: 'The workflow validates submissions, missing items, and review status before launch.',
+        keyComponents: 'Startup profile, admin review, and supporting documents.',
+        developmentStage: 'idea',
+        documentationReadiness: 'Core documents are assembled and ready.',
+        inventorOwnership: 'team',
+        developmentContext: 'Developed within an institution startup launch process.',
+        targetMarkets: 'Student founders, incubators, and early-stage investors.',
+        commercializationStrategy: 'build_startup',
+        publicDisclosureStatus: 'There has been no harmful disclosure.',
+        legalAgreements: 'Founder ownership is documented.',
+        ipProtectionType: 'patent',
+      },
+      reviewStatus: 'review_requested',
+      reviewRequestedAt: new Date(),
+      documents: [],
+      isActive: true,
+    });
+
+    const response = await request(app)
+      .get('/api/admin/startups?status=review_requested')
+      .set(authHeader(admin));
+
+    expect(response.status).toBe(200);
+    const startup = response.body.data.find(
+      (item: { name: string }) => item.name === 'Signed Deck Review Startup',
+    );
+    expect(startup).toEqual(
+      expect.objectContaining({
+        pitchDeckName: 'private-deck.pdf',
+      }),
+    );
+    expect(startup.pitchDeckUrl).toContain('/raw/upload/');
+    expect(startup.pitchDeckUrl).toContain('promove/startups/private-deck');
+    expect(startup.pitchDeckUrl).toContain('signature=');
+    expect(startup.pitchDeckUrl).not.toBe(
+      'https://res.cloudinary.com/demo/raw/upload/v123/promove/startups/private-deck.pdf',
     );
   });
 
@@ -343,6 +438,32 @@ describe('startup review readiness integration', () => {
     expect(changesAudit?.metadata).toEqual(
       expect.objectContaining({
         reviewStatus: 'changes_requested',
+      }),
+    );
+
+    const founderMessage = await DirectMessage.findOne({
+      senderId: admin._id,
+      recipientId: founder._id,
+      queryType: 'general',
+    }).lean();
+    expect(founderMessage).toBeTruthy();
+    expect(founderMessage?.message).toContain('Edit request for Audit Ready Startup');
+    expect(founderMessage?.message).toContain('Please update the legal agreements and disclosure notes.');
+    expect(founderMessage?.message).toContain(`/startup-launch/${startup._id}/overview`);
+
+    const founderNotification = await Notification.findOne({
+      userId: founder._id,
+      type: 'startup_launch',
+      title: 'Startup edit request',
+    }).lean();
+    expect(founderNotification).toBeTruthy();
+    expect(founderNotification?.body).toContain('Please update the legal agreements and disclosure notes.');
+    expect(founderNotification?.link).toBe(`/startup-launch/${startup._id}/overview`);
+    expect(founderNotification?.metadata).toEqual(
+      expect.objectContaining({
+        startupId: startup._id.toString(),
+        reviewStatus: 'changes_requested',
+        adminNotes: 'Please update the legal agreements and disclosure notes.',
       }),
     );
   });

@@ -2,7 +2,7 @@ import { Types } from 'mongoose';
 import { z } from 'zod';
 import { notificationQueue } from '../../config/bullmq';
 import { applyScoreAsync } from '../../services/scoreEngine';
-import { deleteStoredAsset, generatePresignedUrl, uploadFile } from '../../services/fileStorageService';
+import { deleteStoredAsset, extractS3KeyFromUrl, generatePresignedUrl, uploadFile } from '../../services/fileStorageService';
 import { generateSignedCloudinaryUrl } from '../../services/cloudinaryService';
 import { User } from '../user/user.model';
 import { Startup } from './startup.model';
@@ -15,6 +15,10 @@ import { ensureDirectWorkspaceChatAccess } from '../workspace/workspace.service'
 import { Deal } from '../deal/deal.model';
 import { AdminAuditLog } from '../admin/adminAuditLog.model';
 import { recordStartupLifecycleEvent } from '../startupLifecycle/startupLifecycle.service';
+import { DirectMessage } from '../dm/dm.model';
+import { serializeDirectMessage } from '../dm/dm.serializer';
+import { NotificationService } from '../notification/notification.service';
+import { io } from '../../config/socket';
 import type {
   StartupDocumentCategory,
   StartupEditAccess,
@@ -25,6 +29,12 @@ import type {
 
 const pitchDeckFileNamePattern = /\.(pdf|ppt|pptx)$/i;
 const MIN_UPLOAD_FILE_BYTES = 1;
+const NOTIFICATION_BODY_MAX_LENGTH = 500;
+
+const truncateNotificationBody = (value: string) =>
+  value.length > NOTIFICATION_BODY_MAX_LENGTH
+    ? `${value.slice(0, NOTIFICATION_BODY_MAX_LENGTH - 3)}...`
+    : value;
 
 const STARTUP_DOCUMENT_CATEGORIES = [
   'business_plan',
@@ -137,6 +147,8 @@ const DEFAULT_INNOVATION_PROFILE = {
     retentionRate: 0,
   },
 } as const satisfies Omit<StartupInnovationProfile, 'rubricVersion'>;
+
+const MARKETPLACE_LAUNCH_TERMS_VERSION = 'marketplace-launch-v1';
 
 const REGISTERED_ENTITY_TYPES = new Set(['llp', 'private_limited', 'opc']);
 
@@ -304,6 +316,7 @@ export const startupSchema = z.object({
   stage: z.enum(['Pre-Idea', 'Ideation', 'MVP', 'Pre-Launch', 'Launched']).default('Pre-Idea'),
   phase: z.enum(['creation', 'building', 'launched']).default('creation'),
   fundingNeeded: z.number().optional(),
+  fundingGoal: z.number().min(0).optional(),
   activeProducts: z.number().int().min(0).default(1),
   teamSize: z.number().int().min(1).default(1),
   traction: z
@@ -326,6 +339,11 @@ export const startupSchema = z.object({
 
 export const launchSchema = z.object({
   launchTo: z.enum(['investors', 'mentors', 'both', 'recruiters']),
+  termsAccepted: z.literal(true, {
+    errorMap: () => ({
+      message: 'You must accept the marketplace launch terms before launching this startup.',
+    }),
+  }),
 });
 
 export const reviewStartupSubmissionSchema = z
@@ -1344,10 +1362,11 @@ const calculateStartupInnovationScoreBreakdown = (
 const calculateStartupInnovationScore = (startup: Record<string, any>) =>
   calculateStartupInnovationScoreBreakdown(startup).total;
 
-const sanitizeStartupForClient = async (startup: Record<string, any>) => {
-  const editAccess = buildStartupEditAccess(startup);
-  const innovationScorePreview = calculateStartupInnovationScoreBreakdown(startup);
-
+const getSignedStartupPitchDeckUrl = async (startup: {
+  pitchDeckUrl?: string;
+  pitchDeckStorageProvider?: 'cloudinary' | 's3';
+  pitchDeckStorageKey?: string;
+}) => {
   let pitchDeckUrl = startup.pitchDeckUrl;
   if (pitchDeckUrl) {
     try {
@@ -1356,13 +1375,27 @@ const sanitizeStartupForClient = async (startup: Record<string, any>) => {
         if (storageKey) {
           pitchDeckUrl = generateSignedCloudinaryUrl(storageKey, 'raw');
         }
-      } else if (startup.pitchDeckStorageProvider === 's3' && startup.pitchDeckStorageKey) {
-        pitchDeckUrl = await generatePresignedUrl(startup.pitchDeckStorageKey);
+      } else {
+        const storageKey =
+          startup.pitchDeckStorageProvider === 's3'
+            ? startup.pitchDeckStorageKey || extractS3KeyFromUrl(pitchDeckUrl)
+            : extractS3KeyFromUrl(pitchDeckUrl);
+        if (storageKey) {
+          pitchDeckUrl = await generatePresignedUrl(storageKey);
+        }
       }
     } catch (error) {
       console.error('Error generating signed URL for pitch deck:', error);
     }
   }
+
+  return pitchDeckUrl;
+};
+
+const sanitizeStartupForClient = async (startup: Record<string, any>) => {
+  const editAccess = buildStartupEditAccess(startup);
+  const innovationScorePreview = calculateStartupInnovationScoreBreakdown(startup);
+  const pitchDeckUrl = await getSignedStartupPitchDeckUrl(startup);
 
   return {
     ...startup,
@@ -1653,6 +1686,9 @@ export const launchStartup = async (
     startup.launchedToMentors || payload.launchTo === 'mentors' || payload.launchTo === 'both';
   startup.launchedToRecruiters = startup.launchedToRecruiters || payload.launchTo === 'recruiters';
   startup.launchedAt = new Date();
+  startup.marketplaceTermsAcceptedAt = new Date();
+  startup.marketplaceTermsAcceptedBy = new Types.ObjectId(userId);
+  startup.marketplaceTermsVersion = MARKETPLACE_LAUNCH_TERMS_VERSION;
   startup.innovationScoreAtLaunch = score;
   startup.launchFormLocked = true;
   startup.launchFormLockedAt = new Date();
@@ -2121,12 +2157,12 @@ export const deleteStartup = async (startupId: string, userId: string) => {
     throw new ApiError(403, 'FORBIDDEN', 'Only the primary founder can delete this startup.');
   }
 
-  // Cannot delete a verified startup that is live on the marketplace
-  if (startup.reviewStatus === 'approved' && (startup.launchedToInvestors || startup.launchedToMentors || startup.launchedToRecruiters)) {
+  // Marketplace launches become public commercial records and require admin-managed deletion.
+  if (startup.launchedToInvestors || startup.launchedToMentors || startup.launchedToRecruiters) {
     throw new ApiError(
       400,
-      'STARTUP_VERIFIED_AND_LAUNCHED',
-      'Cannot delete a verified startup that is live on the marketplace.',
+      'STARTUP_LAUNCHED_DELETION_REQUIRES_ADMIN',
+      'This startup is live on the marketplace. Request admin deletion instead of deleting it directly.',
     );
   }
 
@@ -2241,6 +2277,8 @@ export const listStartupsForAdmin = async (status?: 'draft' | 'review_requested'
       updatedAt: Date;
       pitchDeckUrl?: string;
       pitchDeckName?: string;
+      pitchDeckStorageProvider?: 'cloudinary' | 's3';
+      pitchDeckStorageKey?: string;
       registrationProfile: {
         problemStatement: string;
         solutionDifferentiation: string;
@@ -2298,10 +2336,11 @@ export const listStartupsForAdmin = async (status?: 'draft' | 'review_requested'
 
   const founderMap = new Map(founders.map((founder) => [String(founder._id), founder]));
 
-  return startups.map((startup) => {
+  const adminStartupRows = await Promise.all(startups.map(async (startup) => {
     const founderIds = Array.isArray(startup.founderIds) ? startup.founderIds : [];
     const documents = Array.isArray(startup.documents) ? startup.documents : [];
     const readiness = buildStartupReadiness(startup);
+    const pitchDeckUrl = await getSignedStartupPitchDeckUrl(startup);
 
     return {
       _id: String(startup._id),
@@ -2333,7 +2372,7 @@ export const listStartupsForAdmin = async (status?: 'draft' | 'review_requested'
           ? { unlockedBy: String(startup.adminEditUnlockApprovedBy) }
           : {}),
       },
-      ...(startup.pitchDeckUrl ? { pitchDeckUrl: startup.pitchDeckUrl } : {}),
+      ...(pitchDeckUrl ? { pitchDeckUrl } : {}),
       ...(startup.pitchDeckName ? { pitchDeckName: startup.pitchDeckName } : {}),
       traction: startup.traction,
       registrationProfile: startup.registrationProfile,
@@ -2361,7 +2400,71 @@ export const listStartupsForAdmin = async (status?: 'draft' | 'review_requested'
       createdAt: toIsoString(startup.createdAt) ?? new Date(0).toISOString(),
       updatedAt: toIsoString(startup.updatedAt) ?? new Date(0).toISOString(),
     };
-  });
+  }));
+
+  return adminStartupRows;
+};
+
+const notifyFoundersAboutStartupChangeRequest = async (params: {
+  adminId: string;
+  startup: InstanceType<typeof Startup>;
+  adminNotes: string;
+}) => {
+  const { adminId, startup, adminNotes } = params;
+  const founderIds = (startup.founderIds ?? [])
+    .map((founderId) => String(founderId))
+    .filter((founderId) => Types.ObjectId.isValid(founderId));
+
+  if (founderIds.length === 0) {
+    return;
+  }
+
+  const admin = await User.findById(adminId).select('displayName email').lean();
+  const adminName = admin?.displayName?.trim() || admin?.email || 'ProMove admin';
+  const startupName = startup.name?.trim() || 'your startup';
+  const startupId = String(startup._id);
+  const detailLink = `/startup-launch/${startupId}/overview`;
+  const message = [
+    `Edit request for ${startupName}`,
+    '',
+    `${adminName} requested changes before launch approval.`,
+    '',
+    `Admin note: ${adminNotes}`,
+    '',
+    `Open details: ${detailLink}`,
+  ].join('\n');
+  const notificationBody = truncateNotificationBody(`Admin note: ${adminNotes}`);
+
+  await Promise.all(
+    founderIds.map(async (founderId) => {
+      const directMessage = await DirectMessage.create({
+        senderId: new Types.ObjectId(adminId),
+        recipientId: new Types.ObjectId(founderId),
+        message,
+        messageType: 'text',
+        queryType: 'general',
+      });
+      const serializedMessage = await serializeDirectMessage(directMessage.toObject());
+      io.of('/dm').to(`user:${founderId}`).emit('dm:message', serializedMessage);
+
+      await NotificationService.create({
+        userId: founderId,
+        type: 'startup_launch',
+        title: 'Startup edit request',
+        body: notificationBody,
+        link: detailLink,
+        metadata: {
+          startupId,
+          startupName,
+          reviewStatus: 'changes_requested',
+          adminId,
+          adminName,
+          adminNotes,
+          deepLink: detailLink,
+        },
+      });
+    }),
+  );
 };
 
 export const reviewStartupSubmission = async (
@@ -2412,6 +2515,15 @@ export const reviewStartupSubmission = async (
       ...(startup.adminNotes ? { adminNotes: startup.adminNotes } : {}),
     },
   });
+
+  if (payload.decision === 'changes_requested' && startup.adminNotes) {
+    await notifyFoundersAboutStartupChangeRequest({
+      adminId,
+      startup,
+      adminNotes: startup.adminNotes,
+    });
+  }
+
   return serializeStartup(startup);
 };
 

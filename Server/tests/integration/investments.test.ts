@@ -1364,6 +1364,27 @@ describe('investment workflow integration', () => {
     );
   });
 
+  it('returns a presigned pitch deck URL in investor startup detail when s3 storage metadata exists', async () => {
+    const founder = await createUser(UserRole.STUDENT, { displayName: 'S3 Pitch Founder' });
+    const investor = await createUser(UserRole.INVESTOR, { displayName: 'S3 Pitch Investor' });
+    const startup = await createStartup(founder._id.toString(), {
+      pitchDeckUrl: 'https://promove-test-bucket.s3.ap-south-1.amazonaws.com/promove/startups/pitch.pdf',
+      pitchDeckStorageProvider: 's3',
+      pitchDeckStorageKey: 'promove/startups/pitch.pdf',
+    });
+
+    const response = await request(app)
+      .get(`/api/investor/startups/${startup._id}`)
+      .set(authHeader(investor));
+
+    expect(response.status).toBe(200);
+    expect(response.body.data.startup.pitchDeckUrl).toContain('X-Amz-Signature=');
+    expect(response.body.data.startup.pitchDeckUrl).toContain('promove/startups/pitch.pdf');
+    expect(response.body.data.startup.pitchDeckUrl).not.toBe(
+      'https://promove-test-bucket.s3.ap-south-1.amazonaws.com/promove/startups/pitch.pdf',
+    );
+  });
+
   it('moves a deal from negotiation to due diligence after terms are agreed', async () => {
     const founder = await createUser(UserRole.STUDENT, { displayName: 'Stage Zero Founder' });
     const investor = await createUser(UserRole.INVESTOR, { displayName: 'Stage Zero Investor' });

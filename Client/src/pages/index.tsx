@@ -95,6 +95,9 @@ const AdminAnalyticsOverview = lazy(() => import("../features/admin/AnalyticsOve
 const AdminAnalyticsUsage = lazy(() => import("../features/admin/AnalyticsUsage"));
 const AdminAnalyticsUsers = lazy(() => import("../features/admin/AnalyticsUsers"));
 const AdminAnalyticsLogs = lazy(() => import("../features/admin/AnalyticsLogs"));
+const AdminPlatformAnalytics = lazy(() => import("../features/analytics/AdminPlatformAnalytics"));
+const AdminVerificationPanel = lazy(() => import("../features/admin/VerificationPanel"));
+const InvestorBidDashboard = lazy(() => import("../features/bidding/InvestorBidDashboard"));
 const AdminMentorshipPrograms = lazy(() => import("../features/admin/MentorshipPrograms"));
 const AdminMentorshipMentors = lazy(() => import("../features/admin/MentorshipMentors"));
 const AdminMentorshipProgramCreation = lazy(() => import("../features/admin/MentorshipProgramCreation"));
@@ -144,11 +147,6 @@ const InvestorOutreach = lazy(() =>
   })),
 );
 
-const UserProfilePage = lazy(() =>
-  import("../features/profile/UserProfilePage").then((module) => ({
-    default: module.UserProfilePage,
-  })),
-);
 const SettingsPage = lazy(() =>
   import("../features/settings/SettingsPage").then((module) => ({
     default: module.SettingsPage,
@@ -629,6 +627,7 @@ export const router = createBrowserRouter([
             { path: "investor-outreach", element: <LazyPage component={InvestorOutreach} /> },
             { path: "product-workspace", element: <LazyPage component={StartupWorkspace} /> },
             { path: "cap-table", element: <LazyPage component={StartupCapTable} /> },
+            { path: "bids", element: <Navigate to="../cap-table?view=pipeline" replace /> },
             { path: "investor-deals", element: <Navigate to="../cap-table" replace /> },
             { path: "patent-support", element: <LazyPage component={PatentSupport} /> },
           ],
@@ -713,6 +712,7 @@ export const router = createBrowserRouter([
               { path: "applications", element: <LazyPage component={StudentApplicationsPage} /> },
               { path: "applications/:applicationId", element: <LazyPage component={HiringSessionPage} /> },
               { path: "events", element: <LazyPage component={StudentEventsPage} /> },
+              { path: "bids", element: <Navigate to="/startup-launch" replace /> },
               { path: "marketplace", element: <LazyPage component={Marketplace} /> },
               { path: "marketplace/view/:entityType/:entityId", element: <LazyPage component={MarketplaceDetail} /> },
             ],
@@ -734,6 +734,7 @@ export const router = createBrowserRouter([
             element: <ProtectedRoleRoute role={UserRole.INVESTOR} />,
             children: [
               { index: true, element: <LazyPage component={InvestorDashboard} /> },
+              { path: "bids", element: <Navigate to="/dashboard/investor/pipeline" replace /> },
               { path: "startups", element: <LazyPage component={InvestorStartupMarketplace} /> },
               { path: "pipeline", element: <LazyPage component={InvestmentPipeline} /> },
               { path: "institutions", element: <LazyPage component={InvestorInstitutions} /> },
@@ -844,15 +845,16 @@ export const router = createBrowserRouter([
                   { path: "usage", element: <LazyPage component={AdminAnalyticsUsage} /> },
                   { path: "users", element: <LazyPage component={AdminAnalyticsUsers} /> },
                   { path: "logs", element: <LazyPage component={AdminAnalyticsLogs} /> },
+                  { path: "platform", element: <LazyPage component={AdminPlatformAnalytics} /> },
                   { path: "*", element: <Navigate to="overview" replace /> },
                 ],
               },
+              { path: "verification", element: <LazyPage component={AdminVerificationPanel} /> },
             ],
           },
           {
             path: "profile",
-            element: <ProtectedAnyRoute />,
-            children: [{ index: true, element: <LazyPage component={UserProfilePage} /> }],
+            element: <Navigate to="/portfolio" replace />,
           },
           {
             path: "settings",

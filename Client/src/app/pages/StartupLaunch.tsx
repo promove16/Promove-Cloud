@@ -45,6 +45,7 @@ import {
   STARTUP_FUNDING_STATUS_OPTIONS,
   STARTUP_LEGAL_STRUCTURE_OPTIONS,
   STARTUP_PATENT_STATUS_OPTIONS,
+  REGISTERED_ENTITY_TYPES,
   STARTUP_RUBRIC_DOCUMENT_MAX_BYTES,
   STARTUP_RUBRIC_DOCUMENT_SPECS,
   STARTUP_RUBRIC_MIN_UPLOAD_BYTES,
@@ -114,6 +115,7 @@ const DEFAULT_IDENTITY: IdentityForm = {
 
 const fieldCls =
   "w-full border border-slate-800 bg-slate-950 px-3 py-2 text-sm text-white outline-none transition focus:border-cyan-400/60";
+const fieldLabelCls = "text-xs uppercase tracking-[0.2em] text-slate-400";
 
 const REVIEW_BADGE: Record<
   Startup["reviewStatus"],
@@ -481,6 +483,59 @@ export function StartupLaunch() {
       ),
     [startup?.documents],
   );
+  const requiredDocumentCategories = useMemo(() => {
+    const companyProfile = innovationProfile.companyProfile;
+    const tractionProfile = innovationProfile.tractionProfile;
+    const categories = new Set<StartupDocumentCategory>();
+
+    if (
+      REGISTERED_ENTITY_TYPES.has(companyProfile.legalStructure) ||
+      companyProfile.cinNumber.trim()
+    ) {
+      categories.add("incorporation_certificate");
+    }
+    if (companyProfile.dpiitRecognitionNumber.trim()) {
+      categories.add("dpiit_certificate");
+    }
+    if (companyProfile.msmeUdyamNumber.trim()) {
+      categories.add("udyam_certificate");
+    }
+    if (
+      companyProfile.otherGovernmentCertificationName.trim() ||
+      companyProfile.otherGovernmentCertificationNumber.trim()
+    ) {
+      categories.add("government_certificate_other");
+    }
+    if (tractionProfile.patentStatus !== "none") {
+      categories.add("patent_proof");
+    }
+    if (tractionProfile.hasItrFiling) {
+      categories.add("itr_filing");
+    }
+    if (tractionProfile.hasRevenueProof) {
+      categories.add("revenue_proof");
+    }
+    if (tractionProfile.hasGovernmentGrant) {
+      categories.add("grant_certificate");
+    }
+    if (tractionProfile.hasAwardRecognition) {
+      categories.add("award_certificate");
+    }
+    if (
+      tractionProfile.fundingStatus === "angel_seed" ||
+      tractionProfile.fundingStatus === "vc"
+    ) {
+      categories.add("funding_proof");
+    }
+
+    return categories;
+  }, [innovationProfile]);
+  const requiresPitchOrDpr =
+    !startup?.pitchDeckUrl && !documentsByCategory.has("dpr");
+  const requiresProfileLink =
+    !innovationProfile.companyProfile.websiteUrl.trim() &&
+    !innovationProfile.companyProfile.productDemoUrl.trim() &&
+    !innovationProfile.companyProfile.portfolioUrl.trim();
 
   const scorePreview = useMemo(
     () =>
@@ -761,9 +816,7 @@ export function StartupLaunch() {
 
       <section className="grid gap-4 border border-slate-800 bg-slate-950 p-5 md:grid-cols-2">
         <label className="space-y-1.5">
-          <span className="text-xs uppercase tracking-[0.2em] text-slate-400">
-            Startup Name
-          </span>
+          <RequiredLabel label="Startup Name" />
           <input
             type="text"
             required
@@ -776,9 +829,7 @@ export function StartupLaunch() {
           />
         </label>
         <label className="space-y-1.5">
-          <span className="text-xs uppercase tracking-[0.2em] text-slate-400">
-            Sector / Category
-          </span>
+          <RequiredLabel label="Sector / Category" />
           <input
             type="text"
             required
@@ -791,9 +842,7 @@ export function StartupLaunch() {
           />
         </label>
         <label className="space-y-1.5 md:col-span-2">
-          <span className="text-xs uppercase tracking-[0.2em] text-slate-400">
-            Tagline
-          </span>
+          <RequiredLabel label="Tagline" />
           <input
             type="text"
             disabled={!canEditSetup}
@@ -805,9 +854,7 @@ export function StartupLaunch() {
           />
         </label>
         <label className="space-y-1.5">
-          <span className="text-xs uppercase tracking-[0.2em] text-slate-400">
-            Team Size
-          </span>
+          <span className={fieldLabelCls}>Team Size</span>
           <input
             type="number"
             min={1}
@@ -823,9 +870,7 @@ export function StartupLaunch() {
           />
         </label>
         <label className="space-y-1.5">
-          <span className="text-xs uppercase tracking-[0.2em] text-slate-400">
-            Active Products
-          </span>
+          <span className={fieldLabelCls}>Active Products</span>
           <input
             type="number"
             min={0}
@@ -841,9 +886,7 @@ export function StartupLaunch() {
           />
         </label>
         <label className="space-y-1.5">
-          <span className="text-xs uppercase tracking-[0.2em] text-slate-400">
-            Funding Needed (INR)
-          </span>
+          <span className={fieldLabelCls}>Funding Needed (INR)</span>
           <input
             type="number"
             min={0}
@@ -872,9 +915,7 @@ export function StartupLaunch() {
 
         <div className="grid gap-4 md:grid-cols-2">
           <label className="space-y-1.5">
-            <span className="text-xs uppercase tracking-[0.2em] text-slate-400">
-              Legal Structure
-            </span>
+            <RequiredLabel label="Legal Structure" />
             <select
               disabled={!canEditSetup}
               value={innovationProfile.companyProfile.legalStructure}
@@ -899,9 +940,13 @@ export function StartupLaunch() {
           </label>
 
           <label className="space-y-1.5">
-            <span className="text-xs uppercase tracking-[0.2em] text-slate-400">
-              CIN Number
-            </span>
+            {REGISTERED_ENTITY_TYPES.has(
+              innovationProfile.companyProfile.legalStructure,
+            ) ? (
+              <RequiredLabel label="CIN Number" />
+            ) : (
+              <span className={fieldLabelCls}>CIN Number</span>
+            )}
             <input
               type="text"
               disabled={!canEditSetup}
@@ -920,9 +965,7 @@ export function StartupLaunch() {
           </label>
 
           <label className="space-y-1.5">
-            <span className="text-xs uppercase tracking-[0.2em] text-slate-400">
-              DPIIT Recognition Number
-            </span>
+            <span className={fieldLabelCls}>DPIIT Recognition Number</span>
             <input
               type="text"
               disabled={!canEditSetup}
@@ -941,9 +984,7 @@ export function StartupLaunch() {
           </label>
 
           <label className="space-y-1.5">
-            <span className="text-xs uppercase tracking-[0.2em] text-slate-400">
-              MSME / Udyam Number
-            </span>
+            <span className={fieldLabelCls}>MSME / Udyam Number</span>
             <input
               type="text"
               disabled={!canEditSetup}
@@ -962,9 +1003,7 @@ export function StartupLaunch() {
           </label>
 
           <label className="space-y-1.5">
-            <span className="text-xs uppercase tracking-[0.2em] text-slate-400">
-              Other Government Certification
-            </span>
+            <span className={fieldLabelCls}>Other Government Certification</span>
             <input
               type="text"
               disabled={!canEditSetup}
@@ -986,9 +1025,11 @@ export function StartupLaunch() {
           </label>
 
           <label className="space-y-1.5">
-            <span className="text-xs uppercase tracking-[0.2em] text-slate-400">
-              Other Certification Number
-            </span>
+            {innovationProfile.companyProfile.otherGovernmentCertificationName.trim() ? (
+              <RequiredLabel label="Other Certification Number" />
+            ) : (
+              <span className={fieldLabelCls}>Other Certification Number</span>
+            )}
             <input
               type="text"
               disabled={!canEditSetup}
@@ -1012,9 +1053,11 @@ export function StartupLaunch() {
 
         <div className="grid gap-4 md:grid-cols-3">
           <label className="space-y-1.5">
-            <span className="text-xs uppercase tracking-[0.2em] text-slate-400">
-              Website
-            </span>
+            {requiresProfileLink ? (
+              <RequiredLabel label="Website" />
+            ) : (
+              <span className={fieldLabelCls}>Website</span>
+            )}
             <input
               type="url"
               disabled={!canEditSetup}
@@ -1033,9 +1076,11 @@ export function StartupLaunch() {
             />
           </label>
           <label className="space-y-1.5">
-            <span className="text-xs uppercase tracking-[0.2em] text-slate-400">
-              Product Demo
-            </span>
+            {requiresProfileLink ? (
+              <RequiredLabel label="Product Demo" />
+            ) : (
+              <span className={fieldLabelCls}>Product Demo</span>
+            )}
             <input
               type="url"
               disabled={!canEditSetup}
@@ -1054,9 +1099,11 @@ export function StartupLaunch() {
             />
           </label>
           <label className="space-y-1.5">
-            <span className="text-xs uppercase tracking-[0.2em] text-slate-400">
-              Portfolio Link
-            </span>
+            {requiresProfileLink ? (
+              <RequiredLabel label="Portfolio Link" />
+            ) : (
+              <span className={fieldLabelCls}>Portfolio Link</span>
+            )}
             <input
               type="url"
               disabled={!canEditSetup}
@@ -1082,6 +1129,7 @@ export function StartupLaunch() {
             fileUrl={startup?.pitchDeckUrl}
             disabled={!canUpload}
             isUploading={uploadingKey === "pitch" || uploadPitch.isPending}
+            required={requiresPitchOrDpr}
             onFileSelected={handlePitchSelected}
           />
           {STARTUP_RUBRIC_DOCUMENT_SPECS.slice(0, 6).map((spec) => (
@@ -1089,6 +1137,10 @@ export function StartupLaunch() {
               key={spec.category}
               label={spec.label}
               hint={spec.hint}
+              required={
+                requiredDocumentCategories.has(spec.category) ||
+                (spec.category === "dpr" && requiresPitchOrDpr)
+              }
               disabled={!canUpload}
               isUploading={
                 uploadingKey === spec.category ||
@@ -1119,9 +1171,7 @@ export function StartupLaunch() {
 
         <div className="grid gap-4 md:grid-cols-2">
           <label className="space-y-1.5">
-            <span className="text-xs uppercase tracking-[0.2em] text-slate-400">
-              Startup Stage
-            </span>
+            <RequiredLabel label="Startup Stage" />
             <select
               disabled={!canEditSetup}
               value={innovationProfile.tractionProfile.startupStage}
@@ -1146,9 +1196,7 @@ export function StartupLaunch() {
           </label>
 
           <label className="space-y-1.5">
-            <span className="text-xs uppercase tracking-[0.2em] text-slate-400">
-              Funding Status
-            </span>
+            <span className={fieldLabelCls}>Funding Status</span>
             <select
               disabled={!canEditSetup}
               value={innovationProfile.tractionProfile.fundingStatus}
@@ -1174,6 +1222,7 @@ export function StartupLaunch() {
 
           <LongTextField
             label="Problem Clarity"
+            required
             value={innovationProfile.tractionProfile.problemClarity}
             disabled={!canEditSetup}
             onChange={(value) =>
@@ -1188,6 +1237,7 @@ export function StartupLaunch() {
           />
           <LongTextField
             label="Unique Solution"
+            required
             value={innovationProfile.tractionProfile.uniqueSolution}
             disabled={!canEditSetup}
             onChange={(value) =>
@@ -1202,6 +1252,7 @@ export function StartupLaunch() {
           />
           <LongTextField
             label="Market Differentiation"
+            required
             value={innovationProfile.tractionProfile.marketDifferentiation}
             disabled={!canEditSetup}
             onChange={(value) =>
@@ -1215,9 +1266,7 @@ export function StartupLaunch() {
             }
           />
           <label className="space-y-1.5">
-            <span className="text-xs uppercase tracking-[0.2em] text-slate-400">
-              Patent Status
-            </span>
+            <span className={fieldLabelCls}>Patent Status</span>
             <select
               disabled={!canEditSetup}
               value={innovationProfile.tractionProfile.patentStatus}
@@ -1293,6 +1342,7 @@ export function StartupLaunch() {
               key={spec.category}
               label={spec.label}
               hint={spec.hint}
+              required={requiredDocumentCategories.has(spec.category)}
               disabled={!canUpload}
               isUploading={
                 uploadingKey === spec.category ||
@@ -1409,22 +1459,60 @@ export function StartupLaunch() {
   );
 }
 
+function RequiredLabel({ label }: { label: string }) {
+  return (
+    <span className={fieldLabelCls}>
+      {label}
+      <span className="ml-1 text-rose-300" aria-hidden="true">
+        *
+      </span>
+      <span className="sr-only"> required</span>
+    </span>
+  );
+}
+
+function UploadLabel({
+  label,
+  required,
+}: {
+  label: string;
+  required: boolean;
+}) {
+  return (
+    <div className="text-sm font-semibold text-white">
+      {label}
+      {required ? (
+        <>
+          <span className="ml-1 text-rose-300" aria-hidden="true">
+            *
+          </span>
+          <span className="sr-only"> required</span>
+        </>
+      ) : null}
+    </div>
+  );
+}
+
 function LongTextField({
   label,
+  required = false,
   value,
   disabled,
   onChange,
 }: {
   label: string;
+  required?: boolean;
   value: string;
   disabled: boolean;
   onChange: (value: string) => void;
 }) {
   return (
     <label className="space-y-1.5 md:col-span-2">
-      <span className="text-xs uppercase tracking-[0.2em] text-slate-400">
-        {label}
-      </span>
+      {required ? (
+        <RequiredLabel label={label} />
+      ) : (
+        <span className={fieldLabelCls}>{label}</span>
+      )}
       <textarea
         disabled={disabled}
         value={value}
@@ -1449,9 +1537,7 @@ function NumberField({
 }) {
   return (
     <label className="space-y-1.5">
-      <span className="text-xs uppercase tracking-[0.2em] text-slate-400">
-        {label}
-      </span>
+      <span className={fieldLabelCls}>{label}</span>
       <input
         type="number"
         min={0}
@@ -1493,12 +1579,14 @@ function PitchUploadSlot({
   fileUrl,
   disabled,
   isUploading,
+  required = false,
   onFileSelected,
 }: {
   fileName?: string;
   fileUrl?: string;
   disabled: boolean;
   isUploading: boolean;
+  required?: boolean;
   onFileSelected: (file: File | null) => void;
 }) {
   const inputRef = useRef<HTMLInputElement | null>(null);
@@ -1508,9 +1596,7 @@ function PitchUploadSlot({
     <div className="border border-slate-800 bg-slate-900 p-4">
       <div className="flex items-start justify-between gap-3">
         <div>
-          <div className="text-sm font-semibold text-white">
-            Pitch Deck Upload
-          </div>
+          <UploadLabel label="Pitch Deck Upload" required={required} />
           <div className="mt-1 text-xs text-slate-400">
             Accepts PDF, PPT, and PPTX.{" "}
             {formatFileSize(STARTUP_RUBRIC_PITCH_MAX_BYTES)}.
@@ -1564,6 +1650,7 @@ function DocumentUploadSlot({
   document,
   disabled,
   isUploading,
+  required = false,
   onFileSelected,
   onRemove,
   controls,
@@ -1573,6 +1660,7 @@ function DocumentUploadSlot({
   document?: Startup["documents"][number];
   disabled: boolean;
   isUploading: boolean;
+  required?: boolean;
   onFileSelected: (file: File | null) => void;
   onRemove?: () => void;
   controls?: React.ReactNode;
@@ -1584,7 +1672,7 @@ function DocumentUploadSlot({
     <div className="border border-slate-800 bg-slate-900 p-4">
       <div className="flex items-start justify-between gap-3">
         <div>
-          <div className="text-sm font-semibold text-white">{label}</div>
+          <UploadLabel label={label} required={required} />
           <div className="mt-1 text-xs text-slate-400">{hint}</div>
         </div>
         {document?.fileUrl ? (
@@ -1658,6 +1746,9 @@ function StartupDashboard({
   const canRequestReview =
     startup.reviewStatus === "draft" ||
     startup.reviewStatus === "changes_requested";
+  const [launchTarget, setLaunchTarget] = useState<
+    "investors" | "mentors" | "recruiters" | null
+  >(null);
 
   const reviewMutation = useMutation({
     mutationFn: () => startupApi.requestReview(startup._id),
@@ -1672,8 +1763,10 @@ function StartupDashboard({
 
   const launchMutation = useMutation({
     mutationFn: (launchTo: "investors" | "mentors" | "recruiters") =>
-      startupApi.launch(startup._id, launchTo),
+      startupApi.launch(startup._id, launchTo, true),
     onSuccess: async () => {
+      setLaunchTarget(null);
+      toast.success("Startup launched to marketplace.");
       await queryClient.invalidateQueries({ queryKey: ["startup", startup._id] });
     },
     onError: (err) => {
@@ -1845,7 +1938,7 @@ function StartupDashboard({
             <button
               type="button"
               disabled={launchMutation.isPending}
-              onClick={() => launchMutation.mutate("investors")}
+              onClick={() => setLaunchTarget("investors")}
               className="inline-flex items-center gap-2 border border-cyan-500/40 bg-cyan-500/10 px-4 py-2 text-sm font-semibold text-cyan-200 transition hover:border-cyan-400 hover:bg-cyan-500/20 disabled:cursor-not-allowed disabled:opacity-40"
             >
               <Rocket className="h-4 w-4" />
@@ -1882,6 +1975,93 @@ function StartupDashboard({
           )}
         </div>
       </section>
+
+      {launchTarget ? (
+        <div
+          className="fixed inset-0 z-50 flex items-center justify-center bg-black/70 px-4 backdrop-blur-sm"
+          onClick={() => {
+            if (!launchMutation.isPending) setLaunchTarget(null);
+          }}
+        >
+          <div
+            className="w-full max-w-xl border border-cyan-500/20 bg-slate-950 p-6 shadow-2xl"
+            onClick={(event) => event.stopPropagation()}
+          >
+            <div className="flex items-start gap-3">
+              <div className="flex h-10 w-10 shrink-0 items-center justify-center border border-cyan-500/30 bg-cyan-500/10 text-cyan-200">
+                <Rocket className="h-5 w-5" />
+              </div>
+              <div>
+                <h2 className="text-lg font-semibold text-white">
+                  Agree before marketplace launch
+                </h2>
+                <p className="mt-2 text-sm leading-6 text-slate-300">
+                  Launching publishes this startup for marketplace discovery.
+                  After launch, founders cannot directly delete it. Any removal
+                  must go through admin review and admin-managed deletion.
+                </p>
+              </div>
+            </div>
+
+            <div className="mt-5 space-y-3 border border-slate-800 bg-slate-900/70 p-4 text-sm text-slate-300">
+              <div className="flex gap-2">
+                <CheckCircle2 className="mt-0.5 h-4 w-4 shrink-0 text-emerald-300" />
+                <span>
+                  I confirm the startup profile, traction, ownership, and
+                  launch information are accurate.
+                </span>
+              </div>
+              <div className="flex gap-2">
+                <CheckCircle2 className="mt-0.5 h-4 w-4 shrink-0 text-emerald-300" />
+                <span>
+                  I understand investors may rely on this information for
+                  discovery, diligence, and commercial communication.
+                </span>
+              </div>
+              <div className="flex gap-2">
+                <CheckCircle2 className="mt-0.5 h-4 w-4 shrink-0 text-emerald-300" />
+                <span>
+                  I agree that deletion after marketplace launch requires an
+                  admin request and admin action.
+                </span>
+              </div>
+            </div>
+
+            {launchMutation.isError ? (
+              <p className="mt-3 text-sm text-rose-300">
+                {getApiErrorMessage(
+                  launchMutation.error,
+                  "Unable to launch right now.",
+                )}
+              </p>
+            ) : null}
+
+            <div className="mt-6 flex flex-col-reverse gap-3 sm:flex-row sm:justify-end">
+              <button
+                type="button"
+                disabled={launchMutation.isPending}
+                onClick={() => setLaunchTarget(null)}
+                className="border border-slate-700 px-4 py-2 text-sm font-semibold text-slate-300 transition hover:bg-slate-900 disabled:cursor-not-allowed disabled:opacity-60"
+              >
+                Cancel
+              </button>
+              <button
+                type="button"
+                disabled={launchMutation.isPending}
+                onClick={() => launchMutation.mutate(launchTarget)}
+                className="inline-flex items-center justify-center gap-2 border border-cyan-400 bg-cyan-500/15 px-4 py-2 text-sm font-semibold text-cyan-100 transition hover:bg-cyan-500/25 disabled:cursor-not-allowed disabled:opacity-60"
+              >
+                {launchMutation.isPending ? (
+                  <Loader2 className="h-4 w-4 animate-spin" />
+                ) : (
+                  <Rocket className="h-4 w-4" />
+                )}
+                Agree and Launch
+              </button>
+            </div>
+          </div>
+        </div>
+      ) : null}
 
       <section className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
         <KpiCard

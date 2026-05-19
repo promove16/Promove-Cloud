@@ -48,6 +48,59 @@ type ReportMetrics = {
   pennyInvestmentsRaised: number;
 };
 
+const defaultReportPoliciesByType: Record<ReportMetrics['institutionType'], string[]> = {
+  school: [
+    'ATL / School Innovation Program',
+    'SQAAF / School Quality Assurance',
+    'NEP 2020 School Compliance',
+    'Attendance Governance',
+    'Student Safety & Conduct',
+  ],
+  college: [
+    "IIC (Institution's Innovation Council)",
+    'NAAC (Accreditation)',
+    'NIRF (Innovation Ranking)',
+    'AICTE Regulations',
+    'NEP 2020 Compliance',
+    'NISP (Innovation Startup Policy)',
+  ],
+};
+
+const getReportProfile = (institutionType: ReportMetrics['institutionType']) =>
+  institutionType === 'college'
+    ? {
+        subtitle: 'Higher Education Compliance Report',
+        ratingLabel: 'IIC rating',
+        summaryLabel: 'higher-education compliance milestones',
+        innovationContext:
+          'IIC-linked activities, startup proof, mentoring coverage, placement signals, and approved policy evidence',
+      }
+    : {
+        subtitle: 'School Innovation & Compliance Report',
+        ratingLabel: 'Innovation readiness',
+        summaryLabel: 'school compliance milestones',
+        innovationContext:
+          'ATL/SQAAF-aligned activities, student innovation work, mentoring coverage, safety governance, and approved evidence',
+      };
+
+const mergeReportPolicies = (
+  institutionType: ReportMetrics['institutionType'],
+  policies: ReportMetrics['policies'] = [],
+): ReportMetrics['policies'] => {
+  const policyMap = new Map(policies.map((policy) => [policy.name.toLowerCase(), policy]));
+  const defaults = defaultReportPoliciesByType[institutionType].map((name) => {
+    const match = policyMap.get(name.toLowerCase());
+    return match ?? { name, status: 'Pending' as PolicyStatus };
+  });
+  const extras = policies.filter(
+    (policy) =>
+      !defaultReportPoliciesByType[institutionType].some(
+        (defaultName) => defaultName.toLowerCase() === policy.name.toLowerCase(),
+      ),
+  );
+  return [...defaults, ...extras];
+};
+
 const loadReportMetrics = async (
   institutionId: string,
   institutionType: 'school' | 'college',
@@ -127,6 +180,7 @@ const loadReportMetrics = async (
     institution.institutionProfile?.stats.industryCollaborations ??
     (await Event.countDocuments({ institutionId }));
 
+  const policies = mergeReportPolicies(institutionType, institution.institutionProfile?.policies ?? []);
   const iicRating = calculateEstimatedIicRating({
     totalStudents: students.length,
     activeProjects,
@@ -137,7 +191,7 @@ const loadReportMetrics = async (
     industryCollaborations,
     structuredActivityCount: iicTelemetry.structuredActivityCount,
     activeQuarterCount: iicTelemetry.activeQuarterCount,
-    policies: institution.institutionProfile?.policies ?? [],
+    policies,
   });
 
   return {
@@ -147,7 +201,7 @@ const loadReportMetrics = async (
     academicYear: institution.institutionProfile?.academicYear ?? 'Current AY',
     generatedAt: new Date(),
     iicStarRating: iicRating.starRating,
-    policies: institution.institutionProfile?.policies ?? [],
+    policies,
     totalStudents: students.length,
     totalInnovationActivities,
     patentsFiled,
@@ -304,7 +358,7 @@ const drawHeader = (doc: PDFKit.PDFDocument, metrics: ReportMetrics) => {
     .fillColor(pdfColors.body)
     .fontSize(12)
     .font('Helvetica')
-    .text('Institutional Compliance Report', page.marginX, doc.y + 4, { width: 280 });
+    .text(getReportProfile(metrics.institutionType).subtitle, page.marginX, doc.y + 4, { width: 280 });
 
   doc
     .fontSize(9)
@@ -327,11 +381,12 @@ const drawHeader = (doc: PDFKit.PDFDocument, metrics: ReportMetrics) => {
 const drawInfoBlock = (doc: PDFKit.PDFDocument, metrics: ReportMetrics) => {
   const y = doc.y;
   const rowHeight = 33;
+  const reportProfile = getReportProfile(metrics.institutionType);
   const columns = [
     { label: 'Institution', value: metrics.institutionName },
     { label: 'Location', value: metrics.location },
     { label: 'Academic year', value: metrics.academicYear },
-    { label: 'IIC rating', value: `${metrics.iicStarRating.toFixed(1)} / 5.0` },
+    { label: reportProfile.ratingLabel, value: `${metrics.iicStarRating.toFixed(1)} / 5.0` },
   ];
 
   doc
@@ -593,6 +648,7 @@ const addFooter = (doc: PDFKit.PDFDocument) => {
 
 export const buildSchoolDocument = (metrics: ReportMetrics, shouldAddFooter = true) => {
   const doc = createReportDocument();
+  const reportProfile = getReportProfile(metrics.institutionType);
 
   drawHeader(doc, metrics);
   drawInfoBlock(doc, metrics);
@@ -600,11 +656,11 @@ export const buildSchoolDocument = (metrics: ReportMetrics, shouldAddFooter = tr
   drawSectionTitle(doc, 'SECTION I: EXECUTIVE SUMMARY');
   drawParagraph(
     doc,
-    `Overall Compliance Status: ON TRACK (${metrics.policies.filter((policy) => policy.status !== 'Inactive').length}/${Math.max(metrics.policies.length, 1)} milestones active or on track).`,
+    `Overall Compliance Status: ON TRACK (${metrics.policies.filter((policy) => policy.status !== 'Inactive').length}/${Math.max(metrics.policies.length, 1)} ${reportProfile.summaryLabel} active or on track).`,
   );
   drawParagraph(
     doc,
-    `${metrics.institutionName} recorded ${metrics.totalInnovationActivities} innovation activities with ${metrics.patentsFiled} patent filings and ${metrics.startupsLaunched} startup launches in ${metrics.academicYear}.`,
+    `${metrics.institutionName} recorded ${metrics.totalInnovationActivities} innovation activities in ${metrics.academicYear}. This report evaluates ${reportProfile.innovationContext}.`,
   );
 
   drawSectionTitle(doc, 'SECTION II: KEY PERFORMANCE INDICATORS');

@@ -380,6 +380,7 @@ export interface OnboardingStatus {
 export interface PublicStudentProfile {
   _id: string;
   displayName: string;
+  email?: string;
   avatar?: string;
   avatarWallpaper?: string;
   bio?: string;

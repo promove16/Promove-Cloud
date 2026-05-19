@@ -8,7 +8,6 @@ import {
   Menu,
   Settings,
   Trophy,
-  User,
   X,
   type LucideIcon,
 } from 'lucide-react';
@@ -56,7 +55,6 @@ type DashboardAccountMenuItem =
     };
 
 const SHARED_ROUTE_LABELS = [
-  { path: '/dashboard/profile', label: 'Profile' },
   { path: '/dashboard/settings', label: 'Settings' },
 ] as const;
 
@@ -106,24 +104,16 @@ const findNavLinkItem = (items: DashboardNavItem[], label: string) =>
 
 const buildAccountMenuItems = (
   items: DashboardNavItem[],
-  role?: UserRole,
 ): DashboardAccountMenuItem[] => {
   const primaryItem =
     findNavLinkItem(items, 'Portfolio') ??
     findNavLinkItem(items, 'Profile') ??
-    (role === UserRole.ADMIN
-      ? ({
-          kind: 'link',
-          label: 'Profile',
-          icon: User,
-          path: '/dashboard/profile',
-        } as const)
-      : ({
-          kind: 'link',
-          label: 'Portfolio',
-          icon: Trophy,
-          path: '/portfolio',
-        } as const));
+    ({
+      kind: 'link',
+      label: 'Portfolio',
+      icon: Trophy,
+      path: '/portfolio',
+    } as const);
 
   const settingsItem =
     findNavLinkItem(items, 'Settings') ??
@@ -465,8 +455,8 @@ export function DashboardLayout({ children, role }: PropsWithChildren<DashboardL
   const resolvedRole = user?.role ?? role;
   const navItems = resolvedRole ? SIDEBAR_CONFIG[resolvedRole] : [];
   const accountMenuItems = useMemo(
-    () => buildAccountMenuItems(navItems, resolvedRole),
-    [navItems, resolvedRole],
+    () => buildAccountMenuItems(navItems),
+    [navItems],
   );
   const accountMenuLabels = useMemo(
     () =>
@@ -758,13 +748,13 @@ export function DashboardLayout({ children, role }: PropsWithChildren<DashboardL
           <button
             type="button"
             aria-label="Open account menu"
-            className="group flex items-center gap-3 rounded-2xl px-1 py-1 text-left transition hover:bg-white/5 data-[state=open]:bg-white/5"
+            className="group flex min-w-0 items-center gap-2 rounded-2xl px-1 py-1 text-left transition hover:bg-white/5 data-[state=open]:bg-white/5 sm:gap-3"
           >
-            <div className="relative flex h-12 w-12 shrink-0 items-center justify-center rounded-[0.3rem] bg-gradient-to-br from-blue-500 via-violet-500 to-purple-600 text-base font-black tracking-tight text-white">
+            <div className="relative flex h-10 w-10 shrink-0 items-center justify-center rounded-[0.3rem] bg-gradient-to-br from-blue-500 via-violet-500 to-purple-600 text-sm font-black tracking-tight text-white sm:h-12 sm:w-12 sm:text-base">
               {initials}
               <span className="absolute -bottom-0.5 -right-0.5 h-3.5 w-3.5 rounded-[2px] border-2 border-[#020817] bg-[#22c55e]" />
             </div>
-            <div className="min-w-0">
+            <div className="hidden min-w-0 md:block">
               <div className="text-[10px] uppercase tracking-[0.32em] text-slate-500">
                 Account
               </div>
@@ -777,7 +767,7 @@ export function DashboardLayout({ children, role }: PropsWithChildren<DashboardL
                 </span>
               </div>
             </div>
-            <ChevronDown className="h-4 w-4 shrink-0 text-slate-500 transition group-data-[state=open]:rotate-180 group-hover:text-blue-300" />
+            <ChevronDown className="hidden h-4 w-4 shrink-0 text-slate-500 transition group-data-[state=open]:rotate-180 group-hover:text-blue-300 sm:block" />
           </button>
         </DropdownMenuTrigger>
         <DropdownMenuContent
@@ -856,18 +846,18 @@ export function DashboardLayout({ children, role }: PropsWithChildren<DashboardL
         <div className="flex min-h-0 min-w-0 flex-1 flex-col">
           {!isPortfolioRoute ? (
             <header className="dashboard-theme-border dashboard-theme-header sticky top-0 z-30 border-b backdrop-blur-xl">
-              <div className="flex items-center justify-between px-4 py-4 lg:px-8">
-                <div className="flex items-center gap-3">
+              <div className="flex items-center justify-between gap-3 px-4 py-4 lg:px-8">
+                <div className="flex min-w-0 flex-1 items-center gap-3">
                   <Button variant="ghost" className="lg:hidden" onClick={() => setSidebarOpen(true)}>
                     <Menu className="h-5 w-5" />
                   </Button>
-                  <div>
+                  <div className="min-w-0">
                     <div className="dashboard-theme-faint text-xs uppercase tracking-[0.3em]">Workspace</div>
-                    <div className="dashboard-theme-text mt-1 text-xl font-semibold">{currentLabel}</div>
+                    <div className="dashboard-theme-text mt-1 truncate text-xl font-semibold">{currentLabel}</div>
                   </div>
                 </div>
 
-                <div className="flex items-center gap-3">
+                <div className="flex shrink-0 items-center gap-2 sm:gap-3">
                   <GlobalWorkspaceInviteDialog />
                   <NotificationBell notifications={notifications} unreadCount={unreadNotificationsCount} />
                   {renderAccountMenu()}

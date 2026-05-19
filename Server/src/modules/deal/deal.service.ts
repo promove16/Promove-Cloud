@@ -2,6 +2,7 @@ import { ClientSession, Types } from 'mongoose';
 import { z } from 'zod';
 import { notificationQueue } from '../../config/bullmq';
 import { redis } from '../../config/redis';
+import { extractS3KeyFromUrl, generatePresignedUrl } from '../../services/fileStorageService';
 import { generateSignedCloudinaryUrl } from '../../services/cloudinaryService';
 import { ApiError } from '../../utils/ApiError';
 import { readRedisJson } from '../../utils/redisJson';
@@ -14,6 +15,8 @@ import { Workspace } from '../workspace/workspace.model';
 import { ensureDirectWorkspaceChatAccess } from '../workspace/workspace.service';
 import { recordStartupLifecycleEvent } from '../startupLifecycle/startupLifecycle.service';
 import { Deal } from './deal.model';
+import { Bid } from '../bidding/bidding.model';
+import { BIDDING_EXPIRY_DAYS } from '../bidding/bidding.types';
 import {
   CapTableResponse,
   DealDetailView,
@@ -388,22 +391,23 @@ const extractCloudinaryPublicId = (url?: string) => {
   return match ? match[1].replace(/\.[^.]+$/, '') : null;
 };
 
-const getSignedPitchDeckUrl = (startup: LeanStartup) => {
+const getSignedPitchDeckUrl = async (startup: LeanStartup) => {
   if (!startup.pitchDeckUrl) {
     return undefined;
   }
 
-  if (startup.pitchDeckStorageProvider !== 'cloudinary') {
-    return startup.pitchDeckUrl;
-  }
-
-  const storageKey = startup.pitchDeckStorageKey || extractCloudinaryPublicId(startup.pitchDeckUrl);
-  if (!storageKey) {
-    return startup.pitchDeckUrl;
-  }
-
   try {
-    return generateSignedCloudinaryUrl(storageKey, 'raw');
+    if (startup.pitchDeckStorageProvider === 'cloudinary') {
+      const storageKey = startup.pitchDeckStorageKey || extractCloudinaryPublicId(startup.pitchDeckUrl);
+      return storageKey ? generateSignedCloudinaryUrl(storageKey, 'raw') : startup.pitchDeckUrl;
+    }
+
+    const s3Key =
+      startup.pitchDeckStorageProvider === 's3'
+        ? startup.pitchDeckStorageKey || extractS3KeyFromUrl(startup.pitchDeckUrl)
+        : extractS3KeyFromUrl(startup.pitchDeckUrl);
+
+    return s3Key ? await generatePresignedUrl(s3Key) : startup.pitchDeckUrl;
   } catch (error) {
     console.error('Error generating signed pitch deck URL for deal context:', error);
     return startup.pitchDeckUrl;
@@ -459,15 +463,15 @@ const buildSummary = (
   };
 };
 
-const buildDetail = (
+const buildDetail = async (
   deal: DealDocumentLike,
   startup: LeanStartup,
   student: LeanUser,
   investor: LeanUser,
   investorDisplayName: string,
   productWorkshop?: LeanProductWorkshop | null,
-): DealDetailView => {
-  const pitchDeckUrl = getSignedPitchDeckUrl(startup);
+): Promise<DealDetailView> => {
+  const pitchDeckUrl = await getSignedPitchDeckUrl(startup);
 
   return {
     ...buildSummary(deal, startup, student, investor, investorDisplayName, productWorkshop),
@@ -809,6 +813,65 @@ const pushFounderNotification = async (founderIds: Types.ObjectId[], title: stri
     ),
   );
 
+const isActiveStudentFounder = (
+  user?: LeanUser | null,
+): user is LeanUser & { isActive: boolean } =>
+  Boolean(user && user.role === UserRole.STUDENT && user.isActive);
+
+const getActiveStudentFounderIds = () =>
+  User.distinct('_id', { role: UserRole.STUDENT, isActive: true });
+
+const getEligibleStudentFounders = async (
+  founderIds: Types.ObjectId[],
+  session?: ClientSession,
+) => {
+  if (founderIds.length === 0) {
+    return [];
+  }
+
+  const query = User.find({
+    _id: { $in: founderIds },
+    role: UserRole.STUDENT,
+    isActive: true,
+  }).select('_id displayName avatar role innovationScore scoreBreakdown domain isActive');
+
+  if (session) {
+    query.session(session);
+  }
+
+  const founders = await query.lean<(LeanUser & { isActive?: boolean })[]>();
+  const founderMap = new Map(founders.map((founder) => [String(founder._id), founder]));
+
+  return founderIds
+    .map((founderId) => founderMap.get(String(founderId)))
+    .filter(isActiveStudentFounder);
+};
+
+const resolvePrimaryEligibleFounder = async (
+  founderIds: Types.ObjectId[],
+  session?: ClientSession,
+) => {
+  if (founderIds.length === 0) {
+    throw new ApiError(400, 'STARTUP_NO_FOUNDERS', 'Startup does not have a founder linked');
+  }
+
+  const founders = await getEligibleStudentFounders(founderIds, session);
+  const founder = founders[0];
+
+  if (!founder) {
+    throw new ApiError(
+      409,
+      'STARTUP_FOUNDER_UNAVAILABLE',
+      'This startup cannot receive investment offers because its active founder account is missing.',
+    );
+  }
+
+  return {
+    founder,
+    founderIds: founders.map((item) => item._id),
+  };
+};
+
 export const createInvestorDealFromInterest = async (
   investorId: string,
   startupId: string,
@@ -837,18 +900,8 @@ export const createInvestorDealFromInterest = async (
       throw new ApiError(400, 'SELF_BID', 'Founders cannot bid on their own startup');
     }
 
-    const studentId = startup.founderIds[0];
-    if (!studentId) {
-      throw new ApiError(400, 'STARTUP_NO_FOUNDERS', 'Startup does not have a founder linked');
-    }
-
-    const founder = await User.findById(studentId)
-      .session(session)
-      .select('_id innovationScore role isActive')
-      .lean<(LeanUser & { isActive?: boolean }) | null>();
-    if (!founder || founder.role !== UserRole.STUDENT || !founder.isActive) {
-      throw new ApiError(404, 'STUDENT_NOT_FOUND', 'Student not found');
-    }
+    const { founder, founderIds } = await resolvePrimaryEligibleFounder(startup.founderIds, session);
+    const studentId = founder._id;
 
     const existing = await Deal.findOne({
       investorId,
@@ -857,9 +910,30 @@ export const createInvestorDealFromInterest = async (
     }).session(session);
 
     if (existing && existing.status !== 'cancelled') {
+      const existingBid = await Bid.findOne({ dealId: existing._id }).session(session);
+      if (!existingBid) {
+        const existingAuthority = resolveInvestorAuthority(
+          existing.investorType,
+          existing.proposedEquityPercent ?? existing.equityPercent ?? 0,
+          existing.investorRole,
+        );
+        await Bid.create([{
+          startupId,
+          investorId,
+          founderId: studentId,
+          status: 'pending',
+          bidType: existing.investorType,
+          proposedAmount: existing.proposedAmountINR,
+          proposedEquity: existing.proposedEquityPercent ?? existing.equityPercent ?? 0,
+          coverLetter: existing.coverLetter,
+          investorRole: existingAuthority.investorRole,
+          dealId: existing._id,
+          expiresAt: new Date(Date.now() + BIDDING_EXPIRY_DAYS * 24 * 60 * 60 * 1000),
+        }], { session });
+      }
       return {
         existingDealId: String(existing._id),
-        founderIds: startup.founderIds,
+        founderIds,
       };
     }
 
@@ -952,9 +1026,23 @@ export const createInvestorDealFromInterest = async (
 
     await deal.save({ session });
 
+    await Bid.create([{
+      startupId,
+      investorId,
+      founderId: studentId,
+      status: 'pending',
+      bidType: parsed.investorType,
+      proposedAmount: parsed.proposedAmountINR,
+      proposedEquity: parsed.proposedEquityPercent,
+      coverLetter: parsed.coverLetter,
+      investorRole: authority.investorRole,
+      dealId: deal._id,
+      expiresAt: new Date(Date.now() + BIDDING_EXPIRY_DAYS * 24 * 60 * 60 * 1000),
+    }], { session });
+
     return {
       dealId: String(deal._id),
-      founderIds: startup.founderIds,
+      founderIds,
     };
   });
 
@@ -967,7 +1055,7 @@ export const createInvestorDealFromInterest = async (
     }
 
     const context = await fetchDealContext(existingDeal);
-    return buildDetail(
+    return await buildDetail(
       existingDeal,
       context.startup,
       context.student,
@@ -1014,7 +1102,7 @@ export const createInvestorDealFromInterest = async (
       proposedEquityPercent: parsed.proposedEquityPercent,
     },
   });
-  return buildDetail(
+  return await buildDetail(
     createdDeal,
     context.startup,
     context.student,
@@ -1115,7 +1203,7 @@ export const getDealForParticipant = async (userId: string, role: UserRole, deal
   }
 
   const context = await fetchDealContext(deal);
-  return buildDetail(
+  return await buildDetail(
     deal,
     context.startup,
     context.student,
@@ -1226,7 +1314,7 @@ export const recordFounderDecision = async (
     );
   }
 
-  return buildDetail(
+  return await buildDetail(
     deal,
     context.startup,
     context.student,
@@ -1487,7 +1575,7 @@ export const advanceDealStage = async (
   });
 
   return {
-    deal: buildDetail(
+    deal: await buildDetail(
       deal,
       context.startup,
       context.student,
@@ -1570,6 +1658,18 @@ export const listInvestorStartups = async (
   const page = Math.max(filters.page ?? 1, 1);
   const limit = Math.min(Math.max(filters.limit ?? 20, 1), 50);
   const query: Record<string, unknown> = { launchedToInvestors: true, reviewStatus: 'approved' };
+  const activeStudentFounderIds = await getActiveStudentFounderIds();
+
+  if (activeStudentFounderIds.length === 0) {
+    return {
+      items: [],
+      page,
+      limit,
+      total: 0,
+    };
+  }
+
+  query.founderIds = { $in: activeStudentFounderIds };
 
   if (filters.category) {
     query.category = new RegExp(filters.category, 'i');
@@ -1612,13 +1712,15 @@ export const listInvestorStartups = async (
   const founders =
     founderIds.length > 0
       ? await User.find({ _id: { $in: founderIds } })
-          .select('_id displayName avatar innovationScore scoreBreakdown role domain')
+          .select('_id displayName avatar innovationScore scoreBreakdown role domain isActive')
           .lean<LeanUser[]>()
       : [];
   const founderMap = new Map(founders.map((founder) => [String(founder._id), founder]));
 
   const items = startups.map((startup) => {
-    const founder = founderMap.get(String(startup.founderIds[0]));
+    const founder = startup.founderIds
+      .map((founderId) => founderMap.get(String(founderId)))
+      .find(isActiveStudentFounder);
 
     return {
       _id: String(startup._id),
@@ -1665,11 +1767,13 @@ export const listInvestorStartups = async (
 
 export const getInvestorStartup = async (investorId: string, startupId: string) => {
   await ensureInvestor(investorId);
+  const activeStudentFounderIds = await getActiveStudentFounderIds();
 
   const startup = await Startup.findOne({
     _id: startupId,
     launchedToInvestors: true,
     reviewStatus: 'approved',
+    founderIds: { $in: activeStudentFounderIds },
   })
     .select('_id name tagline category stage pitchDeckUrl pitchDeckStorageProvider pitchDeckStorageKey founderIds launchedToInvestors launchedAt innovationScoreAtLaunch traction totalShares availableShares reservedForSole maxPennyInvestors currentPennyCount hasSoleInvestor soleInvestorId')
     .lean<LeanStartup>();
@@ -1681,15 +1785,19 @@ export const getInvestorStartup = async (investorId: string, startupId: string) 
   const founders =
     startup.founderIds.length > 0
       ? await User.find({ _id: { $in: startup.founderIds } })
-          .select('_id displayName avatar innovationScore scoreBreakdown role domain')
+          .select('_id displayName avatar innovationScore scoreBreakdown role domain isActive')
           .lean<LeanUser[]>()
       : [];
+  const founderMap = new Map(founders.map((founder) => [String(founder._id), founder]));
+  const eligibleFounders = startup.founderIds
+    .map((founderId) => founderMap.get(String(founderId)))
+    .filter(isActiveStudentFounder);
 
   const scoreEvents =
-    startup.founderIds.length > 0
-      ? await ScoreEvent.find({ userId: startup.founderIds[0] }).sort({ createdAt: -1 }).limit(25).lean()
+    eligibleFounders.length > 0
+      ? await ScoreEvent.find({ userId: eligibleFounders[0]._id }).sort({ createdAt: -1 }).limit(25).lean()
       : [];
-  const pitchDeckUrl = getSignedPitchDeckUrl(startup);
+  const pitchDeckUrl = await getSignedPitchDeckUrl(startup);
 
   return {
     startup: {
@@ -1709,7 +1817,7 @@ export const getInvestorStartup = async (investorId: string, startupId: string) 
         totalShares: startup.totalShares,
         availableShares: startup.availableShares,
       },
-      founders: founders.map((founder) => ({
+      founders: eligibleFounders.map((founder) => ({
         _id: String(founder._id),
         displayName: founder.displayName,
         ...(founder.avatar ? { avatar: founder.avatar } : {}),
@@ -2045,7 +2153,7 @@ export const updateInvestmentRole = async (dealId: string, investorRole: Investo
 
   await invalidateInvestmentCaches(String(deal.startupId), String(deal.investorId));
   const context = await fetchDealContext(deal.toObject() as DealDocumentLike);
-  return buildDetail(
+  return await buildDetail(
     deal.toObject() as DealDocumentLike,
     context.startup,
     context.student,
@@ -2497,10 +2605,12 @@ export const getStartupBidBoard = async (
   startupId: string,
   viewerId?: string,
 ): Promise<StartupBidBoardResponse> => {
+  const activeStudentFounderIds = await getActiveStudentFounderIds();
   const startup = await Startup.findOne({
     _id: startupId,
     launchedToInvestors: true,
     reviewStatus: 'approved',
+    founderIds: { $in: activeStudentFounderIds },
   })
     .select('_id name tagline fundingNeeded maxPennyInvestors currentPennyCount hasSoleInvestor founderIds')
     .lean<LeanStartupBidInfo | null>();
@@ -2625,22 +2735,33 @@ export const placeBidFromUser = async (
       throw new ApiError(400, 'SELF_BID', 'Founders cannot bid on their own startup');
     }
 
-    const studentId = startup.founderIds[0];
-    if (!studentId) {
-      throw new ApiError(400, 'STARTUP_NO_FOUNDERS', 'Startup does not have a founder linked');
-    }
-
-    const founder = await User.findById(studentId)
-      .session(session)
-      .select('_id innovationScore role isActive')
-      .lean<(LeanUser & { isActive?: boolean }) | null>();
-    if (!founder || founder.role !== UserRole.STUDENT || !founder.isActive) {
-      throw new ApiError(404, 'STUDENT_NOT_FOUND', 'Student not found');
-    }
+    const { founder, founderIds } = await resolvePrimaryEligibleFounder(startup.founderIds, session);
+    const studentId = founder._id;
 
     const existing = await Deal.findOne({ investorId: userId, startupId, studentId }).session(session);
     if (existing && existing.status !== 'cancelled') {
-      return { existingDealId: String(existing._id), founderIds: startup.founderIds };
+      const existingBid = await Bid.findOne({ dealId: existing._id }).session(session);
+      if (!existingBid) {
+        const existingAuthority = resolveInvestorAuthority(
+          existing.investorType,
+          existing.proposedEquityPercent ?? existing.equityPercent ?? 0,
+          existing.investorRole,
+        );
+        await Bid.create([{
+          startupId,
+          investorId: userId,
+          founderId: studentId,
+          status: 'pending',
+          bidType: existing.investorType,
+          proposedAmount: existing.proposedAmountINR,
+          proposedEquity: existing.proposedEquityPercent ?? existing.equityPercent ?? 0,
+          coverLetter: existing.coverLetter,
+          investorRole: existingAuthority.investorRole,
+          dealId: existing._id,
+          expiresAt: new Date(Date.now() + BIDDING_EXPIRY_DAYS * 24 * 60 * 60 * 1000),
+        }], { session });
+      }
+      return { existingDealId: String(existing._id), founderIds };
     }
 
     if (parsed.investorType === 'sole' && startup.hasSoleInvestor) {
@@ -2725,7 +2846,21 @@ export const placeBidFromUser = async (
 
     await deal.save({ session });
 
-    return { dealId: String(deal._id), founderIds: startup.founderIds };
+    await Bid.create([{
+      startupId,
+      investorId: userId,
+      founderId: studentId,
+      status: 'pending',
+      bidType: parsed.investorType,
+      proposedAmount: parsed.proposedAmountINR,
+      proposedEquity: parsed.proposedEquityPercent,
+      coverLetter: parsed.coverLetter,
+      investorRole: authority.investorRole,
+      dealId: deal._id,
+      expiresAt: new Date(Date.now() + BIDDING_EXPIRY_DAYS * 24 * 60 * 60 * 1000),
+    }], { session });
+
+    return { dealId: String(deal._id), founderIds };
   });
 
   await invalidateInvestmentCaches(startupId, userId);
@@ -2736,7 +2871,7 @@ export const placeBidFromUser = async (
       throw new ApiError(404, 'DEAL_NOT_FOUND', 'Deal not found');
     }
     const context = await fetchDealContext(existingDeal);
-    return buildDetail(existingDeal, context.startup, context.student, context.investor, context.investor.displayName, context.productWorkshop);
+    return await buildDetail(existingDeal, context.startup, context.student, context.investor, context.investor.displayName, context.productWorkshop);
   }
 
   await pushFounderNotification(
@@ -2770,7 +2905,7 @@ export const placeBidFromUser = async (
       proposedEquityPercent: parsed.proposedEquityPercent,
     },
   });
-  return buildDetail(createdDeal, context.startup, context.student, context.investor, context.investor.displayName, context.productWorkshop);
+  return await buildDetail(createdDeal, context.startup, context.student, context.investor, context.investor.displayName, context.productWorkshop);
 };
 
 export const cancelDealByParticipant = async (
@@ -2854,7 +2989,7 @@ export const cancelDealByParticipant = async (
       ),
     );
 
-    return buildDetail(
+    return await buildDetail(
       dealObject,
       context.startup,
       context.student,
@@ -2903,7 +3038,7 @@ export const cancelDealByParticipant = async (
 
   const dealObject = deal.toObject() as DealDocumentLike;
   const context = await fetchDealContext(dealObject);
-  return buildDetail(
+  return await buildDetail(
     dealObject,
     context.startup,
     context.student,
