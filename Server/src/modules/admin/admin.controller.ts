@@ -53,6 +53,7 @@ import {
   updateUserRole,
   verifyMilestone,
 } from './admin.service';
+import { reviewPaymentApproval, reviewPaymentApprovalSchema } from '../deal/deal.service';
 import {
   listAdminInstitutionPolicySubmissions,
   reviewInstitutionPolicySubmission,
@@ -258,6 +259,15 @@ export const approveDealStageController = async (req: Request, res: Response) =>
   if (!dealId || !isObjectId(dealId)) throw new ApiError(400, 'INVALID_ID', 'Invalid ID format');
   await approveDealStage(req.user._id, dealId);
   res.status(200).json(new ApiResponse({ approved: true }));
+};
+
+export const reviewPaymentApprovalController = async (req: Request, res: Response) => {
+  if (!req.user) throw new ApiError(401, 'UNAUTHORIZED', 'Invalid or expired token');
+  const dealId = getParam(req.params.id);
+  if (!dealId || !isObjectId(dealId)) throw new ApiError(400, 'INVALID_ID', 'Invalid ID format');
+  const payload = reviewPaymentApprovalSchema.parse(req.body);
+  const deal = await reviewPaymentApproval(req.user._id, dealId, payload);
+  res.status(200).json(new ApiResponse(deal));
 };
 
 export const reviewDealController = async (req: Request, res: Response) => {

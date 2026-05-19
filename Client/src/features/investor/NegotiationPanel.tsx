@@ -17,6 +17,7 @@ import { Button } from '../../components/ui/Button';
 import { Input } from '../../components/ui/Input';
 import { Card } from '../../components/ui/Card';
 import { getApiErrorMessage } from '../../utils/apiError';
+import { invalidateDealQueries } from '../../utils/invalidateDealQueries';
 import type { DealDetailView, DealNegotiation } from '../../types/deal.types';
 
 interface OptimisticMessage {
@@ -79,9 +80,7 @@ export function NegotiationPanel({ deal, isInvestor }: NegotiationPanelProps) {
       setFailedMessage(null);
       setOptimisticMessages((prev) => prev.filter((m) => m.message !== sentMsg));
       setFeedback(null);
-      await queryClient.invalidateQueries({ queryKey: ['deal', deal._id] });
-      await queryClient.invalidateQueries({ queryKey: ['investor-deal', deal._id] });
-      await queryClient.invalidateQueries({ queryKey: ['investor-deals'] });
+      await invalidateDealQueries(queryClient, { dealId: deal._id, startupId: deal.startupId });
     },
     onError: (error, sentMsg) => {
       setOptimisticMessages((prev) =>
@@ -103,9 +102,7 @@ export function NegotiationPanel({ deal, isInvestor }: NegotiationPanelProps) {
       setProposedAmount('');
       setProposedEquity('');
       setFeedback({ type: 'success', message: 'Terms updated.' });
-      await queryClient.invalidateQueries({ queryKey: ['deal', deal._id] });
-      await queryClient.invalidateQueries({ queryKey: ['investor-deal', deal._id] });
-      await queryClient.invalidateQueries({ queryKey: ['investor-deals'] });
+      await invalidateDealQueries(queryClient, { dealId: deal._id, startupId: deal.startupId });
     },
     onError: (error) => {
       setFeedback({
@@ -119,11 +116,7 @@ export function NegotiationPanel({ deal, isInvestor }: NegotiationPanelProps) {
     mutationFn: () => dealApi.agreeNegotiationTerms(deal._id),
     onSuccess: async () => {
       setFeedback(null);
-      await queryClient.invalidateQueries({ queryKey: ['deal', deal._id] });
-      await queryClient.invalidateQueries({ queryKey: ['investor-deal', deal._id] });
-      await queryClient.invalidateQueries({ queryKey: ['investor-deals'] });
-      await queryClient.invalidateQueries({ queryKey: ['startup-bid-board', deal.startupId] });
-      await queryClient.invalidateQueries({ queryKey: ['startup-bid-board', deal.startupId] });
+      await invalidateDealQueries(queryClient, { dealId: deal._id, startupId: deal.startupId });
     },
     onError: (error) => {
       setFeedback({
@@ -145,10 +138,7 @@ export function NegotiationPanel({ deal, isInvestor }: NegotiationPanelProps) {
         type: 'success',
         message: isAdminCancellationReview ? 'Cancellation request sent to admin.' : 'Deal cancelled.',
       });
-      await queryClient.invalidateQueries({ queryKey: ['deal', deal._id] });
-      await queryClient.invalidateQueries({ queryKey: ['investor-deal', deal._id] });
-      await queryClient.invalidateQueries({ queryKey: ['investor-deals'] });
-      await queryClient.invalidateQueries({ queryKey: ['startup-bid-board', deal.startupId] });
+      await invalidateDealQueries(queryClient, { dealId: deal._id, startupId: deal.startupId });
     },
     onError: (error) => {
       setFeedback({

@@ -245,6 +245,14 @@ export interface AdminDealItem {
     reviewedBy?: string;
     reviewedAt?: string;
   };
+  paymentApproval?: {
+    status: 'none' | 'requested' | 'approved' | 'rejected';
+    requestedAt?: string;
+    requestedBy?: string;
+    reviewedAt?: string;
+    reviewedBy?: string;
+    reviewNotes?: string;
+  };
   innovationScoreSnapshot: number;
   status: 'active' | 'closed' | 'cancelled';
   nextActionLabel: string;

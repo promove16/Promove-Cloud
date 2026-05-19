@@ -216,6 +216,14 @@ export interface AdminDealItem {
   stockTransfer: DealStockTransfer;
   royalty: DealRoyalty;
   cancellationRequest?: DealCancellationRequest;
+  paymentApproval?: {
+    status: 'none' | 'requested' | 'approved' | 'rejected';
+    requestedAt?: string;
+    requestedBy?: string;
+    reviewedAt?: string;
+    reviewedBy?: string;
+    reviewNotes?: string;
+  };
   innovationScoreSnapshot: number;
   status: 'active' | 'closed' | 'cancelled';
   nextActionLabel: string;
@@ -736,6 +744,16 @@ export const adminApi = {
   async approveDealStage(dealId: string) {
     const response = await api.patch<ApiSuccessResponse<{ approved: true }>>(
       `/api/admin/deals/${dealId}/approve-stage`,
+    );
+    return response.data.data;
+  },
+  async reviewPaymentApproval(
+    dealId: string,
+    payload: { decision: 'approved' | 'rejected'; reviewNotes?: string },
+  ) {
+    const response = await api.patch<ApiSuccessResponse<AdminDealReviewItem>>(
+      `/api/admin/deals/${dealId}/payment-approval`,
+      payload,
     );
     return response.data.data;
   },

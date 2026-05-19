@@ -96,7 +96,6 @@ const AdminAnalyticsUsage = lazy(() => import("../features/admin/AnalyticsUsage"
 const AdminAnalyticsUsers = lazy(() => import("../features/admin/AnalyticsUsers"));
 const AdminAnalyticsLogs = lazy(() => import("../features/admin/AnalyticsLogs"));
 const AdminPlatformAnalytics = lazy(() => import("../features/analytics/AdminPlatformAnalytics"));
-const AdminVerificationPanel = lazy(() => import("../features/admin/VerificationPanel"));
 const InvestorBidDashboard = lazy(() => import("../features/bidding/InvestorBidDashboard"));
 const AdminMentorshipPrograms = lazy(() => import("../features/admin/MentorshipPrograms"));
 const AdminMentorshipMentors = lazy(() => import("../features/admin/MentorshipMentors"));
@@ -849,7 +848,7 @@ export const router = createBrowserRouter([
                   { path: "*", element: <Navigate to="overview" replace /> },
                 ],
               },
-              { path: "verification", element: <LazyPage component={AdminVerificationPanel} /> },
+              { path: "verification", element: <Navigate to="/dashboard/admin" replace /> },
             ],
           },
           {

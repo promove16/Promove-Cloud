@@ -525,6 +525,31 @@ const getAdminCancellationRequest = (deal: {
   };
 };
 
+const getAdminPaymentApproval = (deal: {
+  paymentApproval?: {
+    status?: 'none' | 'requested' | 'approved' | 'rejected';
+    requestedAt?: Date | null;
+    requestedBy?: Types.ObjectId;
+    reviewedAt?: Date | null;
+    reviewedBy?: Types.ObjectId;
+    reviewNotes?: string;
+  };
+}) => {
+  const approval = deal.paymentApproval;
+  if (!approval?.status || approval.status === 'none') {
+    return undefined;
+  }
+
+  return {
+    status: approval.status,
+    ...(approval.requestedAt ? { requestedAt: toIso(approval.requestedAt) } : {}),
+    ...(approval.requestedBy ? { requestedBy: String(approval.requestedBy) } : {}),
+    ...(approval.reviewedAt ? { reviewedAt: toIso(approval.reviewedAt) } : {}),
+    ...(approval.reviewedBy ? { reviewedBy: String(approval.reviewedBy) } : {}),
+    ...(approval.reviewNotes ? { reviewNotes: approval.reviewNotes } : {}),
+  };
+};
+
 const buildAdminDealItem = (
   deal: {
     _id: Types.ObjectId;
@@ -576,6 +601,14 @@ const buildAdminDealItem = (
       reviewedAt?: Date | null;
       reviewNotes?: string;
     };
+    paymentApproval?: {
+      status?: 'none' | 'requested' | 'approved' | 'rejected';
+      requestedAt?: Date | null;
+      requestedBy?: Types.ObjectId;
+      reviewedAt?: Date | null;
+      reviewedBy?: Types.ObjectId;
+      reviewNotes?: string;
+    };
     innovationScoreSnapshot: number;
     status: 'active' | 'closed' | 'cancelled';
   },
@@ -605,11 +638,14 @@ const buildAdminDealItem = (
   stockTransfer: getAdminStockTransfer(deal),
   royalty: getAdminRoyalty(deal),
   ...(getAdminCancellationRequest(deal) ? { cancellationRequest: getAdminCancellationRequest(deal) } : {}),
+  ...(getAdminPaymentApproval(deal) ? { paymentApproval: getAdminPaymentApproval(deal) } : {}),
   innovationScoreSnapshot: deal.innovationScoreSnapshot,
   status: deal.status,
   nextActionLabel:
     deal.cancellationRequest?.status === 'pending'
       ? 'Review cancellation request'
+      : deal.paymentApproval?.status === 'requested'
+      ? 'Review payment approval request'
       : deal.stage < 3
       ? 'Waiting for stock transfer request'
       : deal.stockTransfer?.status === 'rejected'
@@ -671,6 +707,14 @@ const buildAdminDealReviewItem = (
       requestedAt?: Date | null;
       reviewedBy?: Types.ObjectId;
       reviewedAt?: Date | null;
+      reviewNotes?: string;
+    };
+    paymentApproval?: {
+      status?: 'none' | 'requested' | 'approved' | 'rejected';
+      requestedAt?: Date | null;
+      requestedBy?: Types.ObjectId;
+      reviewedAt?: Date | null;
+      reviewedBy?: Types.ObjectId;
       reviewNotes?: string;
     };
     innovationScoreSnapshot: number;

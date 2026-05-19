@@ -16,6 +16,7 @@ import { Button } from '../../../components/ui/Button';
 import { Input } from '../../../components/ui/Input';
 import { Card } from '../../../components/ui/Card';
 import { getApiErrorMessage } from '../../../utils/apiError';
+import { invalidateDealQueries } from '../../../utils/invalidateDealQueries';
 import type { DealSummaryView, DealNegotiation } from '../../../types/deal.types';
 
 interface StudentNegotiationCardProps {
@@ -52,7 +53,7 @@ export function StudentNegotiationCard({ deal, investorIndex }: StudentNegotiati
     onSuccess: () => {
       setMessage('');
       setError('');
-      queryClient.invalidateQueries({ queryKey: ['student', 'active-deals'] });
+      void invalidateDealQueries(queryClient, { dealId: deal._id, startupId: deal.startupId });
     },
     onError: (mutationError) => {
       setError(getApiErrorMessage(mutationError, 'Unable to send your negotiation message right now.'));
@@ -67,7 +68,7 @@ export function StudentNegotiationCard({ deal, investorIndex }: StudentNegotiati
       setProposedAmount('');
       setProposedEquity('');
       setError('');
-      queryClient.invalidateQueries({ queryKey: ['student', 'active-deals'] });
+      void invalidateDealQueries(queryClient, { dealId: deal._id, startupId: deal.startupId });
     },
     onError: (mutationError) => {
       setError(getApiErrorMessage(mutationError, 'Unable to submit the counter-offer right now.'));
@@ -78,7 +79,7 @@ export function StudentNegotiationCard({ deal, investorIndex }: StudentNegotiati
     mutationFn: () => dealApi.agreeNegotiationTerms(deal._id),
     onSuccess: () => {
       setError('');
-      queryClient.invalidateQueries({ queryKey: ['student', 'active-deals'] });
+      void invalidateDealQueries(queryClient, { dealId: deal._id, startupId: deal.startupId });
     },
     onError: (mutationError) => {
       setError(getApiErrorMessage(mutationError, 'Unable to accept the current terms right now.'));

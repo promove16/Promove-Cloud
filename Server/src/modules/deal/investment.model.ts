@@ -281,6 +281,37 @@ const investmentSchema = new Schema<IInvestment>(
       termsAgreedAt: { type: Date, default: undefined },
       notes: { type: String, default: undefined },
     },
+    paymentApproval: {
+      status: {
+        type: String,
+        enum: ['none', 'requested', 'approved', 'rejected'],
+        default: 'none',
+      },
+      requestedAt: {
+        type: Date,
+        default: undefined,
+      },
+      requestedBy: {
+        type: Schema.Types.ObjectId,
+        ref: 'User',
+        default: undefined,
+      },
+      reviewedAt: {
+        type: Date,
+        default: undefined,
+      },
+      reviewedBy: {
+        type: Schema.Types.ObjectId,
+        ref: 'User',
+        default: undefined,
+      },
+      reviewNotes: {
+        type: String,
+        trim: true,
+        maxlength: 1000,
+        default: undefined,
+      },
+    },
     fundTransferInitiatedAt: {
       type: Date,
       default: undefined,

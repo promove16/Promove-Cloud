@@ -631,8 +631,8 @@ export function InstitutionComplianceVerificationTab({
           {policyDrafts.map((policy, policyIndex) => (
             <div key={policy.id} className="min-w-0 overflow-hidden border border-slate-700 bg-slate-900">
               <div className="border-b border-slate-700 bg-slate-800 px-4 py-4 sm:px-6">
-                <div className="grid gap-3 2xl:grid-cols-[minmax(0,1fr),180px,180px]">
-                  <div className="min-w-0 space-y-2">
+                <div className="grid gap-3 md:grid-cols-2">
+                  <div className="min-w-0 space-y-2 md:col-span-2">
                     <div className="flex items-center gap-2 text-[10px] font-semibold uppercase tracking-[0.2em] text-slate-500">
                       <span className="h-1.5 w-1.5 rounded-full bg-cyan-300" />
                       Framework {String(policyIndex + 1).padStart(2, '0')}
@@ -731,7 +731,7 @@ export function InstitutionComplianceVerificationTab({
                             {String(evidenceIndex + 1).padStart(2, '0')}
                           </div>
                         </div>
-                        <div className="grid min-w-0 gap-3 2xl:grid-cols-[minmax(0,1fr),180px,minmax(0,1.45fr)]">
+                        <div className="grid min-w-0 gap-3 md:grid-cols-2">
                           <input
                             value={evidence.title}
                             disabled={evidence.isSubmitted}
@@ -744,7 +744,7 @@ export function InstitutionComplianceVerificationTab({
                               )
                             }
                             placeholder="Evidence title (optional)"
-                            className={fieldClassName}
+                            className={`${fieldClassName} md:col-span-2`}
                           />
                           <select
                             value={evidence.type}
@@ -833,7 +833,7 @@ export function InstitutionComplianceVerificationTab({
                             </>
                           )}
                           {evidence.fileSizeBytes ? (
-                            <div className="text-xs text-slate-500 2xl:col-start-3">
+                            <div className="text-xs text-slate-500 md:col-span-2">
                               {formatFileSize(evidence.fileSizeBytes)}
                             </div>
                           ) : null}
@@ -849,7 +849,7 @@ export function InstitutionComplianceVerificationTab({
                               )
                             }
                             placeholder="Reviewer note or checkpoint covered"
-                            className={`${fieldClassName} 2xl:col-span-3`}
+                            className={`${fieldClassName} md:col-span-2`}
                           />
                         </div>
                       </div>

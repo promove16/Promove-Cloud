@@ -11,6 +11,7 @@ import {
   approveRegistrationRequestController,
   approveAwardController,
   approveDealStageController,
+  reviewPaymentApprovalController,
   approvePatentController,
   getAnalyticsController,
   getAnalyticsLogsController,
@@ -140,6 +141,7 @@ router.patch('/awards/:id/reject', asyncHandler(rejectAwardController));
 router.get('/deals', asyncHandler(getDealsController));
 router.get('/deals/:id', asyncHandler(getDealController));
 router.patch('/deals/:id/approve-stage', asyncHandler(approveDealStageController));
+router.patch('/deals/:id/payment-approval', asyncHandler(reviewPaymentApprovalController));
 router.patch('/deals/:id/cancellation', asyncHandler(reviewDealCancellationController));
 router.patch('/deals/:id/review', asyncHandler(reviewDealController));
 router.patch('/deals/:id/investor-role', asyncHandler(updateDealInvestorRoleController));

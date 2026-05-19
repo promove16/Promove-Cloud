@@ -89,6 +89,7 @@ export default function DealReview() {
   const queryClient = useQueryClient();
   const [reviewNotes, setReviewNotes] = useState('');
   const [cancellationReviewNotes, setCancellationReviewNotes] = useState('');
+  const [paymentReviewNotes, setPaymentReviewNotes] = useState('');
 
   const dealQuery = useQuery({
     queryKey: ['admin-deal-review', dealId],
@@ -142,6 +143,20 @@ export default function DealReview() {
     },
   });
 
+  const paymentApprovalMutation = useMutation({
+    mutationFn: (decision: 'approved' | 'rejected') =>
+      adminApi.reviewPaymentApproval(dealId!, {
+        decision,
+        reviewNotes: paymentReviewNotes.trim() || undefined,
+      }),
+    onSuccess: async () => {
+      setPaymentReviewNotes('');
+      await queryClient.invalidateQueries({ queryKey: ['admin-deal-review', dealId] });
+      await queryClient.invalidateQueries({ queryKey: ['admin-deals'] });
+      await queryClient.invalidateQueries({ queryKey: ['admin-analytics'] });
+    },
+  });
+
   const metrics = useMemo(() => {
     if (!deal) return null;
     const amount = deal.amountINR ?? deal.stockDetails.transferValueInr ?? 0;
@@ -176,6 +191,8 @@ export default function DealReview() {
       reviewNotes.trim().length >= 10
     : false;
   const canRejectCancellation = canReviewCancellation && cancellationReviewNotes.trim().length >= 10;
+  const canReviewPaymentApproval = deal?.paymentApproval?.status === 'requested';
+  const canRejectPaymentApproval = canReviewPaymentApproval && paymentReviewNotes.trim().length >= 10;
 
   if (dealQuery.isLoading) {
     return (
@@ -290,6 +307,58 @@ export default function DealReview() {
               className="w-full border border-slate-800 bg-slate-950 px-4 py-3 text-sm text-white outline-none"
               placeholder="Required when rejecting a transfer"
             />
+            {deal.paymentApproval && deal.paymentApproval.status !== 'none' ? (
+              <div className="border border-amber-500/30 bg-amber-950/10 px-4 py-4">
+                <div className="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
+                  <div>
+                    <div className="text-[11px] uppercase tracking-[0.25em] text-amber-300">Payment approval</div>
+                    <div className="mt-2 text-lg font-semibold capitalize text-white">
+                      {deal.paymentApproval.status}
+                    </div>
+                    <div className="mt-2 text-sm leading-6 text-slate-300">
+                      Investor is asking for ProMove admin approval in place of the payment gateway.
+                    </div>
+                    <div className="mt-2 text-xs uppercase tracking-[0.18em] text-slate-500">
+                      Requested {dt(deal.paymentApproval.requestedAt)}
+                    </div>
+                    {deal.paymentApproval.reviewNotes ? (
+                      <div className="mt-3 text-sm text-slate-400">
+                        Admin note: {deal.paymentApproval.reviewNotes}
+                      </div>
+                    ) : null}
+                  </div>
+                  {canReviewPaymentApproval ? (
+                    <div className="flex w-full flex-col gap-3 lg:max-w-xs">
+                      <textarea
+                        value={paymentReviewNotes}
+                        onChange={(event) => setPaymentReviewNotes(event.target.value)}
+                        rows={3}
+                        className="w-full border border-slate-800 bg-slate-950 px-4 py-3 text-sm text-white outline-none"
+                        placeholder="Required when declining payment approval"
+                      />
+                      <Button
+                        onClick={() => paymentApprovalMutation.mutate('approved')}
+                        disabled={paymentApprovalMutation.isPending}
+                        className="w-full justify-center"
+                      >
+                        <CheckCircle2 className="mr-2 h-4 w-4" />
+                        Approve Payment
+                      </Button>
+                      <Button
+                        variant="secondary"
+                        onClick={() => paymentApprovalMutation.mutate('rejected')}
+                        disabled={!canRejectPaymentApproval || paymentApprovalMutation.isPending}
+                        className="w-full justify-center"
+                      >
+                        <XCircle className="mr-2 h-4 w-4" />
+                        Decline Payment
+                      </Button>
+                    </div>
+                  ) : null}
+                </div>
+              </div>
+            ) : null}
+
             {deal.cancellationRequest ? (
               <div className="border border-rose-500/30 bg-rose-950/10 px-4 py-4">
                 <div className="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">

@@ -21,6 +21,7 @@ import {
   proposeNegotiationTermsController,
   agreeNegotiationTermsController,
   cancelDealController,
+  requestPaymentApprovalController,
 } from './deal.controller';
 import { expressSoleInterestController } from '../investor/investor.controller';
 
@@ -34,6 +35,7 @@ dealsRouter.get('/', asyncHandler(getMyDealsController));
 dealsRouter.get('/:id', asyncHandler(getMyDealController));
 dealsRouter.patch('/:id/founder-decision', authorize(UserRole.STUDENT), asyncHandler(respondToDealController));
 dealsRouter.post('/:id/fund-transfer', authorize(UserRole.INVESTOR), asyncHandler(fundTransferController));
+dealsRouter.post('/:id/request-payment-approval', authorize(UserRole.INVESTOR), asyncHandler(requestPaymentApprovalController));
 dealsRouter.patch('/:id/stage', authorize(UserRole.INVESTOR), asyncHandler(updateDealStageController));
 dealsRouter.patch('/:id/investor-role', authorize(UserRole.ADMIN), asyncHandler(updateInvestorRoleController));
 dealsRouter.patch('/:id/link-workshop', authorize(UserRole.STUDENT), asyncHandler(linkWorkshopController));

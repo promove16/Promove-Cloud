@@ -109,7 +109,6 @@ export const SIDEBAR_CONFIG: Record<UserRole, DashboardNavItem[]> = {
     { kind: 'link', label: 'Access Control', icon: ShieldCheck, path: '/dashboard/admin/users' },
     { kind: 'link', label: 'Patents', icon: FileText, path: '/dashboard/admin/patents' },
     { kind: 'link', label: 'Startups', icon: Rocket, path: '/dashboard/admin/startups' },
-    { kind: 'link', label: 'Verification', icon: ShieldCheck, path: '/dashboard/admin/verification' },
     { kind: 'link', label: 'Deals', icon: BriefcaseBusiness, path: '/dashboard/admin/deals' },
     { kind: 'link', label: 'Mentorship', icon: GraduationCap, path: '/dashboard/admin/mentorship' },
     { kind: 'link', label: 'Analytics', icon: BarChart3, path: '/dashboard/admin/analytics' },
@@ -148,7 +147,6 @@ export const DASHBOARD_ROUTE_LABELS: Partial<Record<UserRole, DashboardRouteLabe
     { path: '/dashboard/college/compliance', label: 'Compliance' },
   ],
   [UserRole.ADMIN]: [
-    { path: '/dashboard/admin/verification', label: 'Verification' },
     { path: '/dashboard/admin/analytics/platform', label: 'Platform Analytics' },
   ],
   [UserRole.MENTOR]: [{ path: '/product-workspace', label: 'Product Workspace' }],

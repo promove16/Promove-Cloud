@@ -15,6 +15,7 @@ import {
   PlaceBidSchema,
   recordFounderDecision,
   recordFundTransfer,
+  requestPaymentApproval,
   updateInvestorRoleSchema,
   updateInvestmentRole,
   linkWorkshopToDeal,
@@ -61,6 +62,15 @@ export const fundTransferController = async (req: Request, res: Response) => {
   }
 
   const deal = await recordFundTransfer(req.user._id, assertObjectId(String(req.params.id), 'Deal id'), req.body);
+  res.status(200).json(new ApiResponse(deal));
+};
+
+export const requestPaymentApprovalController = async (req: Request, res: Response) => {
+  if (!req.user) {
+    throw new ApiError(401, 'UNAUTHORIZED', 'Invalid or expired token');
+  }
+
+  const deal = await requestPaymentApproval(req.user._id, assertObjectId(String(req.params.id), 'Deal id'));
   res.status(200).json(new ApiResponse(deal));
 };
 

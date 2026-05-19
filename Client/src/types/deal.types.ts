@@ -9,6 +9,7 @@ export type RoyaltyStatus = 'pending' | 'invoiced' | 'received';
 export type FounderDecisionStatus = 'pending' | 'accepted' | 'rejected';
 export type NegotiationStatus = 'initial' | 'terms_proposed' | 'counter_offer' | 'terms_agreed' | 'stalled' | 'cancelled';
 export type DealCancellationRequestStatus = 'pending' | 'approved' | 'rejected';
+export type PaymentApprovalStatus = 'none' | 'requested' | 'approved' | 'rejected';
 
 export interface DealNegotiation {
   status: NegotiationStatus;
@@ -79,6 +80,15 @@ export interface DealCancellationRequest {
   reviewNotes?: string;
 }
 
+export interface DealPaymentApproval {
+  status: PaymentApprovalStatus;
+  requestedAt?: string;
+  requestedBy?: string;
+  reviewedAt?: string;
+  reviewedBy?: string;
+  reviewNotes?: string;
+}
+
 export interface DealProductWorkshopSummary {
   workspaceId: string;
   title: string;
@@ -117,6 +127,7 @@ export interface DealSummaryView {
   royalty: DealRoyalty;
   founderDecision: DealFounderDecision;
   cancellationRequest?: DealCancellationRequest;
+  paymentApproval?: DealPaymentApproval;
   productWorkshop?: DealProductWorkshopSummary;
   negotiation?: DealNegotiation;
   innovationScoreSnapshot: number;

@@ -44,6 +44,12 @@ export const dealApi = {
     });
     return response.data.data;
   },
+  async requestPaymentApproval(dealId: string) {
+    const response = await api.post<ApiSuccessResponse<DealDetailView>>(
+      `/api/deals/${dealId}/request-payment-approval`,
+    );
+    return response.data.data;
+  },
   async respondToFounderDecision(dealId: string, payload: DealFounderDecisionPayload) {
     const response = await api.patch<ApiSuccessResponse<DealDetailView>>(
       `/api/deals/${dealId}/founder-decision`,

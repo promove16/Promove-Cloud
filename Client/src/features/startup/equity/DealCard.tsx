@@ -15,6 +15,7 @@ import {
 import { workspaceApi } from '../../../api/workspace.api';
 import { dealApi } from '../../../api/deal.api';
 import type { DealSummaryView } from '../../../types/deal.types';
+import { invalidateDealQueries } from '../../../utils/invalidateDealQueries';
 import { DEAL_STAGE_META } from './dealStageMeta';
 
 const formatINR = (value?: number) => {
@@ -210,8 +211,7 @@ export function DealCard({
   const acceptTermsMutation = useMutation({
     mutationFn: () => dealApi.agreeNegotiationTerms(deal._id),
     onSuccess: async () => {
-      await queryClient.invalidateQueries({ queryKey: ['student-deals'] });
-      await queryClient.invalidateQueries({ queryKey: ['deals'] });
+      await invalidateDealQueries(queryClient, { dealId: deal._id, startupId: deal.startupId });
     },
   });
 
@@ -223,8 +223,7 @@ export function DealCard({
       setCounterAmount('');
       setCounterEquity('');
       setCounterError(null);
-      await queryClient.invalidateQueries({ queryKey: ['student-deals'] });
-      await queryClient.invalidateQueries({ queryKey: ['deals'] });
+      await invalidateDealQueries(queryClient, { dealId: deal._id, startupId: deal.startupId });
     },
     onError: () => {
       setCounterError('Unable to submit counter offer. Please try again.');

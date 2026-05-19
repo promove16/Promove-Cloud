@@ -256,6 +256,22 @@ const getCancellationRequestView = (deal: DealDocumentLike) => {
   };
 };
 
+const getPaymentApprovalView = (deal: DealDocumentLike) => {
+  const approval = deal.paymentApproval;
+  if (!approval?.status || approval.status === 'none') {
+    return undefined;
+  }
+
+  return {
+    status: approval.status,
+    ...(approval.requestedAt ? { requestedAt: approval.requestedAt.toISOString() } : {}),
+    ...(approval.requestedBy ? { requestedBy: String(approval.requestedBy) } : {}),
+    ...(approval.reviewedAt ? { reviewedAt: approval.reviewedAt.toISOString() } : {}),
+    ...(approval.reviewedBy ? { reviewedBy: String(approval.reviewedBy) } : {}),
+    ...(approval.reviewNotes ? { reviewNotes: approval.reviewNotes } : {}),
+  };
+};
+
 const getNegotiationView = (deal: DealDocumentLike) => {
   const negotiation = deal.negotiation;
   if (!negotiation) {
@@ -454,6 +470,7 @@ const buildSummary = (
     royalty: getRoyaltyView(deal),
     founderDecision: getFounderDecisionView(deal),
     ...(getCancellationRequestView(deal) ? { cancellationRequest: getCancellationRequestView(deal) } : {}),
+    ...(getPaymentApprovalView(deal) ? { paymentApproval: getPaymentApprovalView(deal) } : {}),
     ...(getNegotiationView(deal) ? { negotiation: getNegotiationView(deal) } : {}),
     innovationScoreSnapshot: deal.innovationScoreSnapshot,
     nextActionLabel: nextActionLabel(deal),
@@ -649,6 +666,19 @@ export const invalidateInvestmentCaches = async (startupId: string, investorId?:
 const buildOfficialDealQuery = (excludeId?: string) => ({
   status: { $ne: 'cancelled' as const },
   adminApprovedAt: { $exists: true, $ne: null },
+  ...(excludeId ? { _id: { $ne: excludeId } } : {}),
+});
+
+// Deals whose terms are committed by both parties. Includes admin-approved
+// deals AND deals where both sides have agreed in negotiation but the deal
+// is still awaiting admin review. Used by the cap table so agreed equity
+// shows up immediately instead of waiting for admin sign-off.
+const buildCommittedDealQuery = (excludeId?: string) => ({
+  status: { $ne: 'cancelled' as const },
+  $or: [
+    { adminApprovedAt: { $exists: true, $ne: null } },
+    { 'negotiation.status': 'terms_agreed' as const },
+  ],
   ...(excludeId ? { _id: { $ne: excludeId } } : {}),
 });
 
@@ -1333,6 +1363,172 @@ export const recordFundTransfer = async (
     newStage: 2,
     stageData: { amountINR: FundTransferSchema.parse(payload).amountINR },
   });
+
+export const reviewPaymentApprovalSchema = z.object({
+  decision: z.enum(['approved', 'rejected']),
+  reviewNotes: z.string().trim().max(1000).optional(),
+});
+
+export const reviewPaymentApproval = async (
+  adminId: string,
+  dealId: string,
+  payload: z.infer<typeof reviewPaymentApprovalSchema>,
+) => {
+  const parsed = reviewPaymentApprovalSchema.parse(payload);
+  const reviewedAt = new Date();
+
+  const result = await runMongoTransaction(async (session) => {
+    const deal = await Deal.findById(dealId).session(session);
+    if (!deal || deal.status !== 'active') {
+      throw new ApiError(404, 'DEAL_NOT_FOUND', 'Deal not found');
+    }
+    if (deal.stage !== 1) {
+      throw new ApiError(400, 'INVALID_STAGE', 'Payment approval can only be reviewed at the payment stage');
+    }
+    if ((deal.paymentApproval?.status ?? 'none') !== 'requested') {
+      throw new ApiError(400, 'PAYMENT_APPROVAL_NOT_PENDING', 'There is no pending payment approval to review');
+    }
+
+    deal.paymentApproval = {
+      status: parsed.decision,
+      requestedAt: deal.paymentApproval?.requestedAt,
+      requestedBy: deal.paymentApproval?.requestedBy,
+      reviewedAt,
+      reviewedBy: new Types.ObjectId(adminId),
+      ...(parsed.reviewNotes ? { reviewNotes: parsed.reviewNotes } : {}),
+    };
+
+    if (parsed.decision === 'approved') {
+      deal.stage = 2;
+      deal.fundTransferInitiatedAt = reviewedAt;
+      deal.mediationStatus = 'intake';
+      const metadata = buildDealFinancialMetadata(deal.toObject() as DealDocumentLike);
+      deal.mediatorLabel = metadata.mediatorLabel;
+      deal.stockDetails = metadata.stockDetails;
+      deal.stockTransfer = metadata.stockTransfer;
+      deal.royalty = metadata.royalty;
+    }
+
+    await deal.save({ session });
+
+    return {
+      dealId: String(deal._id),
+      startupId: String(deal.startupId),
+      investorId: String(deal.investorId),
+      studentId: String(deal.studentId),
+      decision: parsed.decision,
+      reviewNotes: parsed.reviewNotes,
+    };
+  });
+
+  await invalidateInvestmentCaches(result.startupId, result.investorId);
+
+  const fresh = await Deal.findById(result.dealId).lean<DealDocumentLike | null>();
+  if (!fresh) {
+    throw new ApiError(404, 'DEAL_NOT_FOUND', 'Deal not found');
+  }
+  const context = await fetchDealContext(fresh);
+
+  const title =
+    result.decision === 'approved' ? 'Payment approved by admin' : 'Payment request declined';
+  const body =
+    result.decision === 'approved'
+      ? `ProMove admin approved payment for ${context.startup.name}. The deal has moved to the next stage.`
+      : result.reviewNotes || 'ProMove admin declined the payment approval request.';
+
+  await Promise.all([
+    notificationQueue.add('deal-stage', {
+      userId: result.investorId,
+      type: 'deal_interest',
+      title,
+      body,
+      link: '/dashboard/investor/deals',
+    }),
+    notificationQueue.add('deal-stage', {
+      userId: result.studentId,
+      type: 'deal_interest',
+      title,
+      body,
+      link: '/startup-launch',
+    }),
+  ]);
+
+  return buildDetail(
+    fresh,
+    context.startup,
+    context.student,
+    context.investor,
+    context.investor.displayName,
+    context.productWorkshop,
+  );
+};
+
+export const requestPaymentApproval = async (
+  investorId: string,
+  dealId: string,
+): Promise<DealDetailView> => {
+  await ensureInvestor(investorId);
+
+  const transactionResult = await runMongoTransaction(async (session) => {
+    const deal = await Deal.findOne({ _id: dealId, investorId }).session(session);
+    if (!deal || deal.status !== 'active') {
+      throw new ApiError(404, 'DEAL_NOT_FOUND', 'Deal not found');
+    }
+    if (deal.stage !== 1) {
+      throw new ApiError(400, 'INVALID_STAGE', 'Payment approval can only be requested at the payment stage');
+    }
+    if ((deal.founderDecision?.status ?? 'pending') !== 'accepted') {
+      throw new ApiError(400, 'FOUNDER_ACCEPTANCE_REQUIRED', 'Founder must accept before requesting payment approval');
+    }
+
+    const currentStatus = deal.paymentApproval?.status ?? 'none';
+    if (currentStatus === 'requested') {
+      throw new ApiError(400, 'PAYMENT_APPROVAL_ALREADY_REQUESTED', 'Payment approval has already been requested');
+    }
+    if (currentStatus === 'approved') {
+      throw new ApiError(400, 'PAYMENT_APPROVAL_ALREADY_APPROVED', 'Payment has already been approved');
+    }
+
+    deal.paymentApproval = {
+      status: 'requested',
+      requestedAt: new Date(),
+      requestedBy: new Types.ObjectId(investorId),
+    };
+
+    await deal.save({ session });
+
+    return {
+      dealId: String(deal._id),
+      startupId: String(deal.startupId),
+      studentId: String(deal.studentId),
+    };
+  });
+
+  await invalidateInvestmentCaches(transactionResult.startupId, investorId);
+
+  const deal = await Deal.findById(transactionResult.dealId).lean<DealDocumentLike | null>();
+  if (!deal) {
+    throw new ApiError(404, 'DEAL_NOT_FOUND', 'Deal not found');
+  }
+  const context = await fetchDealContext(deal);
+
+  await notificationQueue.add('deal-stage', {
+    userId: transactionResult.studentId,
+    type: 'deal_interest',
+    title: 'Payment approval requested',
+    body: `${context.investor.displayName} requested ProMove admin approval for payment on ${context.startup.name}.`,
+    link: '/startup-launch',
+  });
+
+  return await buildDetail(
+    deal,
+    context.startup,
+    context.student,
+    context.investor,
+    context.investor.displayName,
+    context.productWorkshop,
+  );
+};
 
 export const advanceDealStage = async (
   investorId: string,
@@ -2042,7 +2238,7 @@ const getCapTableBase = async (startupId: string): Promise<CapTableResponse> => 
     throw new ApiError(404, 'STARTUP_NOT_FOUND', 'Startup not found');
   }
 
-  const deals = await Deal.find({ startupId, ...buildOfficialDealQuery() })
+  const deals = await Deal.find({ startupId, ...buildCommittedDealQuery() })
     .sort({ createdAt: 1 })
     .lean<DealDocumentLike[]>();
   const investorIds = [...new Set(deals.map((deal) => String(deal.investorId)))];
@@ -2527,6 +2723,7 @@ export const agreeNegotiationTerms = async (
 
   deal.negotiation.lastUpdatedAt = new Date();
   await deal.save();
+  await invalidateInvestmentCaches(String(deal.startupId), String(deal.investorId));
   return deal.negotiation;
 };
 
