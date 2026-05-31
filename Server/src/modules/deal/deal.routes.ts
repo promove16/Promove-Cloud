@@ -22,6 +22,7 @@ import {
   agreeNegotiationTermsController,
   cancelDealController,
   requestPaymentApprovalController,
+  downloadDealContractController,
 } from './deal.controller';
 import { expressSoleInterestController } from '../investor/investor.controller';
 
@@ -33,6 +34,11 @@ startupsInvestmentRouter.use(authenticate);
 
 dealsRouter.get('/', asyncHandler(getMyDealsController));
 dealsRouter.get('/:id', asyncHandler(getMyDealController));
+dealsRouter.get(
+  '/:id/contract',
+  authorize(UserRole.STUDENT, UserRole.INVESTOR, UserRole.MENTOR, UserRole.ADMIN),
+  asyncHandler(downloadDealContractController),
+);
 dealsRouter.patch('/:id/founder-decision', authorize(UserRole.STUDENT), asyncHandler(respondToDealController));
 dealsRouter.post('/:id/fund-transfer', authorize(UserRole.INVESTOR), asyncHandler(fundTransferController));
 dealsRouter.post('/:id/request-payment-approval', authorize(UserRole.INVESTOR), asyncHandler(requestPaymentApprovalController));

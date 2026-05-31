@@ -25,8 +25,10 @@ import {
   X,
   Paperclip,
   UserPlus,
+  HandCoins,
   Inbox,
 } from "lucide-react";
+import { toast } from "sonner";
 import { dmApi, DMConversation, DMMessage, QueryType } from "../../api/dm.api";
 import { startupApi } from "../../api/startup.api";
 import { useDM } from "../../hooks/useDM";
@@ -36,6 +38,7 @@ import { QueryTypeModal } from "../../components/messaging/QueryTypeModal";
 import { ReportUserModal } from "../../components/messaging/ReportUserModal";
 import { InvestorProposalReplyActions } from "../../components/messaging/InvestorProposalModal";
 import { InvitationCard } from "../../components/messaging/InvitationCard";
+import { ChatInvestmentNegotiation } from "../../components/messaging/ChatInvestmentNegotiation";
 import { getConversationPreviewText } from "../../components/messaging/conversationPreview";
 import {
   getVisibleAssociationQueryTypes,
@@ -1156,6 +1159,8 @@ function MessageBubble({
   disableAttachmentOpen = false,
   onQuickReply,
   showInvestorPitchReplyActions = false,
+  currentUserRole,
+  onInvest,
 }: {
   msg: DMMessage;
   isMine: boolean;
@@ -1167,6 +1172,8 @@ function MessageBubble({
   disableAttachmentOpen?: boolean;
   onQuickReply?: (message: string) => void;
   showInvestorPitchReplyActions?: boolean;
+  currentUserRole?: string;
+  onInvest?: (startupId: string) => void;
 }) {
   const isImage = msg.attachmentType === "image";
   const isPdf = msg.attachmentType === "pdf";
@@ -1299,6 +1306,28 @@ function MessageBubble({
               ) : null}
             </div>
           </div>
+        ) : msg.messageType === "funding_request" ? (
+          <div className="order-1 w-full max-w-[28rem] space-y-2">
+            {msg.message ? (
+              <div
+                className={`rounded-2xl px-4 py-2.5 ${
+                  isMine
+                    ? "rounded-tr-sm bg-gradient-to-br from-cyan-600 to-cyan-700 text-white"
+                    : "rounded-tl-sm bg-slate-800 text-slate-100"
+                }`}
+              >
+                <p className="text-sm leading-relaxed whitespace-pre-wrap break-words">
+                  {msg.message}
+                </p>
+              </div>
+            ) : null}
+            {msg.startupId ? (
+              <ChatInvestmentNegotiation
+                startupId={msg.startupId}
+                counterpartyId={isMine ? msg.recipientId : msg.senderId}
+              />
+            ) : null}
+          </div>
         ) : msg.message &&
           (msg.messageType === "invitation" &&
           msg.invitationType &&
@@ -1317,8 +1346,21 @@ function MessageBubble({
               />
             </div>
           ) : investorPitch ? (
-            <div className="order-1 w-full">
+            <div className="order-1 w-full space-y-2">
               <InvestorPitchCard details={investorPitch} isMine={isMine} />
+              {!isMine &&
+              currentUserRole === UserRole.INVESTOR &&
+              msg.startupId &&
+              onInvest ? (
+                <button
+                  type="button"
+                  onClick={() => onInvest(msg.startupId!)}
+                  className="inline-flex items-center gap-2 rounded-xl border border-emerald-500/40 bg-emerald-500/10 px-3 py-2 text-sm font-semibold text-emerald-300 transition hover:bg-emerald-500/20"
+                >
+                  <TrendingUp className="h-4 w-4" />
+                  Invest in {investorPitch.startupName ?? "this startup"}
+                </button>
+              ) : null}
             </div>
           ) : startupHandshake ? (
             <div className="order-1 w-full">
@@ -1609,6 +1651,7 @@ function ScheduleInterviewModal({
 function ChatPanel({
   partnerName,
   partnerRole,
+  partnerId,
   isFirstContact,
   onSendWithQuery,
   initialQueryType,
@@ -1622,6 +1665,7 @@ function ChatPanel({
 }: {
   partnerName: string;
   partnerRole?: string;
+  partnerId?: string;
   isFirstContact?: boolean;
   onSendWithQuery?: (message: string, queryType: QueryType) => void;
   initialQueryType?: QueryType | null;
@@ -1634,6 +1678,7 @@ function ChatPanel({
   dm: DMHookState;
 }) {
   const currentUser = useAuthStore((s) => s.user);
+  const navigate = useNavigate();
   const { messages, sendMessage, sendTyping, typingFromPartner, isLoading } =
     dm;
   const [draft, setDraft] = useState("");
@@ -1647,6 +1692,41 @@ function ChatPanel({
   const fileInputRef = useRef<HTMLInputElement>(null);
   const textareaRef = useRef<HTMLTextAreaElement>(null);
   const canScheduleInterview = currentUser?.role === UserRole.RECRUITER;
+  const queryClient = useQueryClient();
+
+  // A founder may request funding from an investor once their pitch has been accepted.
+  const pitchedStartupId = [...messages]
+    .reverse()
+    .find((m) => m.queryType === "investor" && m.startupId)?.startupId;
+  const investorAcceptedPitch = messages.some(
+    (m) => m.senderId === partnerId && m.message.trim() === investorPitchAcceptReply,
+  );
+  const alreadyRequestedFunding = messages.some(
+    (m) => m.messageType === "funding_request",
+  );
+  const canRequestFunding =
+    currentUser?.role === UserRole.STUDENT &&
+    partnerRole === UserRole.INVESTOR &&
+    Boolean(partnerId) &&
+    Boolean(pitchedStartupId) &&
+    investorAcceptedPitch &&
+    !alreadyRequestedFunding;
+
+  const requestFundingMutation = useMutation({
+    mutationFn: () =>
+      dmApi.send(partnerId!, {
+        message:
+          "I'd like to move forward on funding. Let's set the investment terms right here.",
+        messageType: "funding_request",
+        pitchContext: { startupId: pitchedStartupId! },
+      }),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["dm", "thread", partnerId] });
+      queryClient.invalidateQueries({ queryKey: ["dm", "conversations"] });
+      toast.success("Funding request sent. Negotiate the terms in this chat.");
+    },
+    onError: () => toast.error("Could not send the funding request right now."),
+  });
 
   useEffect(() => {
     const thread = threadRef.current;
@@ -1880,6 +1960,12 @@ function ChatPanel({
                       queryType: "general",
                     })
                   }
+                  currentUserRole={currentUser?.role}
+                  onInvest={(startupId) =>
+                    navigate("/dashboard/investor/startups", {
+                      state: { highlightStartupId: startupId },
+                    })
+                  }
                 />
               );
             })}
@@ -1974,6 +2060,18 @@ function ChatPanel({
                 title="Schedule interview"
               >
                 <Calendar className="h-5 w-5" />
+              </button>
+            ) : null}
+            {canRequestFunding ? (
+              <button
+                type="button"
+                onClick={() => requestFundingMutation.mutate()}
+                disabled={requestFundingMutation.isPending}
+                className="flex h-10 flex-shrink-0 items-center gap-1.5 rounded-full border border-emerald-500/40 bg-emerald-500/10 px-3 text-sm font-semibold text-emerald-300 transition hover:bg-emerald-500/20 disabled:opacity-50"
+                title="Request funding from this investor"
+              >
+                <HandCoins className="h-4 w-4" />
+                Request Funding
               </button>
             ) : null}
             <button
@@ -3127,6 +3225,7 @@ export function MessagesPage() {
             <ChatPanel
               partnerName={partnerName}
               partnerRole={partnerRole}
+              partnerId={partnerId ?? undefined}
               isFirstContact={isFirstContact}
               initialQueryType={isFirstContact ? contextualQueryType : null}
               conversationRequest={partnerConversationRequest}

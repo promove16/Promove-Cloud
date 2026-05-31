@@ -88,6 +88,7 @@ export const serializeDirectMessage = async (message: DirectMessageRecord) => {
     message: typeof message.message === 'string' ? message.message : '',
     messageType: message.messageType ?? 'text',
     queryType: message.queryType ?? 'general',
+    ...(message.startupId ? { startupId: stringifyObjectId(message.startupId) } : {}),
     ...(message.scheduledAt ? { scheduledAt: serializeDate(message.scheduledAt) } : {}),
     ...(message.meetLink ? { meetLink: message.meetLink } : {}),
     ...(attachmentUrl

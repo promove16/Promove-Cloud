@@ -23,6 +23,24 @@ export const dealApi = {
     const response = await api.get<ApiSuccessResponse<DealDetailView>>(`/api/deals/${dealId}`);
     return response.data.data;
   },
+  async downloadDealContract(dealId: string) {
+    const response = await api.get<Blob>(`/api/deals/${dealId}/contract`, {
+      responseType: 'blob',
+    });
+
+    const disposition = response.headers['content-disposition'] as string | undefined;
+    const matched = disposition?.match(/filename="?([^"]+)"?/i);
+    const fileName = matched?.[1] ?? `deal-contract-${dealId}.pdf`;
+
+    const blobUrl = window.URL.createObjectURL(response.data);
+    const anchor = document.createElement('a');
+    anchor.href = blobUrl;
+    anchor.download = fileName;
+    document.body.appendChild(anchor);
+    anchor.click();
+    anchor.remove();
+    window.URL.revokeObjectURL(blobUrl);
+  },
   async getInvestorDeals() {
     const response = await api.get<ApiSuccessResponse<DealGroupView[]>>('/api/investor/deals');
     return response.data.data;

@@ -2,7 +2,7 @@ import { useEffect, useState } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { isAxiosError } from 'axios';
 import { useNavigate } from 'react-router-dom';
-import { Check, X, DollarSign, TrendingUp, Activity, ShieldCheck } from 'lucide-react';
+import { Check, X, DollarSign, TrendingUp, Activity, ShieldCheck, FileDown } from 'lucide-react';
 import { Badge } from '../../components/ui/Badge';
 import { Button } from '../../components/ui/Button';
 import { Card } from '../../components/ui/Card';
@@ -95,6 +95,14 @@ export function DealDetail({ dealId, open, onOpenChange }: Props) {
       await queryClient.invalidateQueries({ queryKey: ['investor-dashboard'] });
       await queryClient.invalidateQueries({ queryKey: ['investor-portfolio'] });
     },
+    onError: (mutationError) => {
+      setError(getDealWorkflowErrorMessage(mutationError));
+    },
+  });
+
+  const downloadContractMutation = useMutation({
+    mutationFn: () =>
+      dealId ? dealApi.downloadDealContract(dealId) : Promise.reject(new Error('Missing deal')),
     onError: (mutationError) => {
       setError(getDealWorkflowErrorMessage(mutationError));
     },
@@ -342,6 +350,18 @@ export function DealDetail({ dealId, open, onOpenChange }: Props) {
                   })}
                 </ol>
               </Card>
+
+              {deal.adminApprovedAt ? (
+                <Button
+                  variant="secondary"
+                  onClick={() => downloadContractMutation.mutate()}
+                  disabled={downloadContractMutation.isPending}
+                  className="w-full"
+                >
+                  <FileDown className="mr-2 h-4 w-4" />
+                  {downloadContractMutation.isPending ? 'Preparing...' : 'Download Official Contract'}
+                </Button>
+              ) : null}
 
               {deal.currentStage === 4 ? (
                 <div className="flex items-center gap-2 rounded-xl border border-emerald-500/30 bg-emerald-500/10 px-4 py-3 text-sm text-emerald-200">

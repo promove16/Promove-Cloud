@@ -1,0 +1,17 @@
+{
+  "permissions": {
+    "allow": [
+      "mcp__plugin_chrome-devtools-mcp_chrome-devtools__list_pages",
+      "PowerShell(Stop-Process -Id 9448 -Force)",
+      "PowerShell(Get-NetTCPConnection -LocalPort 5000 -State Listen -ErrorAction SilentlyContinue)",
+      "PowerShell(\"killed\")",
+      "PowerShell(Start-Process -FilePath \"npm.cmd\" -ArgumentList \"run\",\"dev\" -WorkingDirectory \"c:\\\\Charan Works\\\\Other Projects\\\\ProMove\\\\Server\" -WindowStyle Hidden)",
+      "PowerShell(\"started\")",
+      "PowerShell($ok=$false; for\\($i=0;$i -lt 30;$i++\\){ Start-Sleep -Seconds 2; $c=Get-NetTCPConnection -LocalPort 5000 -State Listen -ErrorAction SilentlyContinue; if\\($c\\){ $ok=$true; break } }; if\\($ok\\){ \"LISTENING on 5000 \\(pid $\\($c.OwningProcess\\)\\)\" } else { \"NOT listening yet\" })",
+      "mcp__plugin_chrome-devtools-mcp_chrome-devtools__navigate_page",
+      "mcp__plugin_chrome-devtools-mcp_chrome-devtools__evaluate_script",
+      "Bash(npx tsc *)",
+      "Bash(echo \"SERVER_EXIT=$?\")"
+    ]
+  }
+}

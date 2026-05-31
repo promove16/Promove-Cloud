@@ -44,6 +44,7 @@ export default function Deals() {
     () =>
       deals.filter(
         (deal) =>
+          deal.paymentApproval?.status === 'requested' ||
           deal.cancellationRequest?.status === 'pending' ||
           (deal.stage === 3 &&
             deal.adminApprovalRequired &&

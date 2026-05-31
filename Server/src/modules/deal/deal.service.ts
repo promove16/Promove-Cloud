@@ -4,6 +4,7 @@ import { notificationQueue } from '../../config/bullmq';
 import { redis } from '../../config/redis';
 import { extractS3KeyFromUrl, generatePresignedUrl } from '../../services/fileStorageService';
 import { generateSignedCloudinaryUrl } from '../../services/cloudinaryService';
+import type { DealContractData } from '../../services/dealContract';
 import { ApiError } from '../../utils/ApiError';
 import { readRedisJson } from '../../utils/redisJson';
 import { runMongoTransaction } from '../../utils/runMongoTransaction';
@@ -465,6 +466,14 @@ const buildSummary = (
     canRequestUpdates: deal.canRequestUpdates,
     adminApprovalRequired: deal.adminApprovalRequired,
     ...(deal.adminApprovedAt ? { adminApprovedAt: deal.adminApprovedAt.toISOString() } : {}),
+    ...(deal.officialContract?.contractNumber && deal.officialContract.generatedAt
+      ? {
+          officialContract: {
+            contractNumber: deal.officialContract.contractNumber,
+            generatedAt: deal.officialContract.generatedAt.toISOString(),
+          },
+        }
+      : {}),
     stockDetails: getStockDetailsView(deal),
     stockTransfer: getStockTransferView(deal),
     royalty: getRoyaltyView(deal),
@@ -1241,6 +1250,55 @@ export const getDealForParticipant = async (userId: string, role: UserRole, deal
     context.investor.displayName,
     context.productWorkshop,
   );
+};
+
+export const getDealContractData = async (
+  userId: string,
+  role: UserRole,
+  dealId: string,
+): Promise<DealContractData> => {
+  const accessFilter = await resolveDealAccessFilter(userId, role);
+  const deal = await Deal.findOne({
+    _id: dealId,
+    ...accessFilter,
+  }).lean<DealDocumentLike | null>();
+
+  if (!deal) {
+    throw new ApiError(403, 'FORBIDDEN', 'You cannot access this deal');
+  }
+
+  if (!deal.adminApprovedAt || !deal.officialContract?.contractNumber) {
+    throw new ApiError(
+      409,
+      'CONTRACT_NOT_READY',
+      'The official contract becomes available after ProMove admin verifies the deal.',
+    );
+  }
+
+  const context = await fetchDealContext(deal);
+  const royaltyPercentage = getRoyaltyPercentage(deal);
+
+  return {
+    contractNumber: deal.officialContract.contractNumber,
+    generatedAt: deal.officialContract.generatedAt ?? deal.adminApprovedAt,
+    adminApprovedAt: deal.adminApprovedAt,
+    mediatorLabel: deal.mediatorLabel || 'ProMove',
+    mediationStatus: deal.mediationStatus,
+    startupName: context.startup.name,
+    startupCategory: context.startup.category,
+    founderName: context.student.displayName ?? 'Founder',
+    investorName: context.investor.displayName ?? 'Investor',
+    investorType: deal.investorType,
+    investorRole: deal.investorRole,
+    amountINR: deal.amountINR,
+    equityPercent: deal.equityPercent,
+    sharesAllocated: deal.sharesAllocated,
+    shareClassLabel: deal.stockDetails?.shareClassLabel ?? 'Common Equity',
+    sharePriceInr: deal.stockDetails?.sharePriceInr ?? 0,
+    transferValueInr: deal.stockDetails?.transferValueInr ?? deal.amountINR,
+    royaltyPercentage,
+    royaltyAmountINR: deal.royalty?.promoveAmountINR ?? 0,
+  };
 };
 
 export const recordFounderDecision = async (

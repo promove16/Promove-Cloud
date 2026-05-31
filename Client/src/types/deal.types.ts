@@ -122,6 +122,10 @@ export interface DealSummaryView {
   canRequestUpdates: boolean;
   adminApprovalRequired: boolean;
   adminApprovedAt?: string;
+  officialContract?: {
+    contractNumber: string;
+    generatedAt: string;
+  };
   stockDetails: DealStockDetails;
   stockTransfer: DealStockTransfer;
   royalty: DealRoyalty;

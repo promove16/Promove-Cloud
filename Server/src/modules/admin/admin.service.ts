@@ -149,6 +149,15 @@ const toIso = (value: Date | string) => new Date(value).toISOString();
 const round = (value: number) => Number(value.toFixed(2));
 const calculateRoyaltyAmount = (amountINR: number, royaltyPercentage: number) =>
   round((amountINR * royaltyPercentage) / 100);
+
+const generateDealContractNumber = () => {
+  const date = new Date();
+  const yy = String(date.getUTCFullYear()).slice(-2);
+  const mm = String(date.getUTCMonth() + 1).padStart(2, '0');
+  const dd = String(date.getUTCDate()).padStart(2, '0');
+  const random = randomBytes(4).toString('hex').toUpperCase();
+  return `PMV-CON-${yy}${mm}${dd}-${random}`;
+};
 type AdminInstitutionVerification = NonNullable<
   AdminRegistrationRequestItem['institutionVerification']
 >;
@@ -1275,6 +1284,15 @@ export const approvePatent = async (adminId: string, patentId: string, trigger: 
     throw new ApiError(400, 'PATENT_NOT_REVIEWABLE', 'Patent cannot be approved in its current state');
   }
 
+  const studentExists = await User.exists({ _id: patent.studentId });
+  if (!studentExists) {
+    throw new ApiError(
+      400,
+      'PATENT_STUDENT_NOT_FOUND',
+      'Patent cannot be approved because the submitting student no longer exists',
+    );
+  }
+
   const reviewedAt = new Date();
   const reviewedBy = new Types.ObjectId(adminId);
   const updateResult = await Patent.updateOne(
@@ -1866,6 +1884,10 @@ export const approveDealStage = async (adminId: string, dealId: string) => {
     deal.adminApprovalRequired = false;
     deal.mediatorLabel = deal.mediatorLabel || 'ProMove';
     deal.mediationStatus = 'approved';
+    deal.officialContract = {
+      contractNumber: deal.officialContract?.contractNumber ?? generateDealContractNumber(),
+      generatedAt: deal.officialContract?.generatedAt ?? approvedAt,
+    };
     deal.stockDetails = {
       shareClassLabel: deal.stockDetails?.shareClassLabel ?? DEFAULT_SHARE_CLASS_LABEL,
       sharePriceInr:
@@ -1925,7 +1947,7 @@ export const approveDealStage = async (adminId: string, dealId: string) => {
       String(student._id),
       'system',
       'Equity transfer verified by ProMove admin',
-      'Your deal equity has been verified by ProMove admin.',
+      'Your deal equity has been verified. Your official contract is ready to download from the deal.',
     );
   }
   if (investor) {
@@ -1933,7 +1955,7 @@ export const approveDealStage = async (adminId: string, dealId: string) => {
       String(investor._id),
       'system',
       'Equity transfer verified by ProMove admin',
-      'You may now close the deal.',
+      'You may now close the deal. Your official contract is ready to download from the deal.',
     );
   }
 };

@@ -329,6 +329,17 @@ const investmentSchema = new Schema<IInvestment>(
       ref: 'User',
       default: undefined,
     },
+    officialContract: {
+      contractNumber: {
+        type: String,
+        default: undefined,
+        trim: true,
+      },
+      generatedAt: {
+        type: Date,
+        default: undefined,
+      },
+    },
     closedAt: {
       type: Date,
       default: undefined,

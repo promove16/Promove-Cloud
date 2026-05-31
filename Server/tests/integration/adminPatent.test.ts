@@ -1,5 +1,6 @@
 import bcrypt from 'bcrypt';
 import { randomUUID } from 'crypto';
+import { Types } from 'mongoose';
 import request from 'supertest';
 import app from '../../src/app';
 import { ScoreEvent } from '../../src/modules/innovationScore/score.model';
@@ -95,6 +96,57 @@ describe('admin patent review integration', () => {
     expect(String(updatedPatent?.adminReviewedBy)).toBe(adminUser._id.toString());
     expect(updatedPatent?.adminReviewedAt).toBeTruthy();
     expect(updatedPatent?.filingDocuments).toBeUndefined();
+  });
+
+  it('rejects approving an orphaned patent without changing its review state', async () => {
+    const { email: adminEmail } = await createApprovedUser({
+      role: UserRole.ADMIN,
+      displayName: 'Admin Reviewer',
+    });
+
+    const insertResult = await Patent.collection.insertOne({
+      studentId: new Types.ObjectId(),
+      projectTitle: 'Orphaned Patent Submission',
+      questionnaire: {
+        problemStatement: 'A patent record whose student account has been removed.',
+        solutionDifferentiation: 'The review action should fail before state mutation.',
+        coreInnovation: 'Guard orphaned patent approval.',
+        priorArtStatus: 'Prior art has been checked.',
+        workingMechanism: 'Admin approval verifies score eligibility.',
+        keyComponents: 'Patent approval, score event, student owner.',
+        developmentStage: 'prototype',
+        documentationReadiness: 'Patent documents are ready.',
+        inventorOwnership: 'individual',
+        developmentContext: 'Student product workspace.',
+        targetMarkets: 'Student innovation programs.',
+        commercializationStrategy: 'build_startup',
+        publicDisclosureStatus: 'No public disclosure.',
+        legalAgreements: 'No conflicting agreements.',
+        ipProtectionType: 'patent',
+      },
+      supportingDocuments: [],
+      status: 'submitted',
+      submittedAt: new Date(),
+      scoreAwarded: false,
+      showcasedInMarketplace: false,
+      createdAt: new Date(),
+      updatedAt: new Date(),
+    });
+
+    const accessToken = await loginAs(adminEmail);
+
+    const response = await request(app)
+      .patch(`/api/admin/patents/${insertResult.insertedId.toString()}/approve`)
+      .set('Authorization', `Bearer ${accessToken}`);
+
+    expect(response.status).toBe(400);
+    expect(response.body.error.code).toBe('PATENT_STUDENT_NOT_FOUND');
+
+    const updatedPatent = await Patent.findById(insertResult.insertedId).lean();
+    expect(updatedPatent?.status).toBe('submitted');
+    expect(updatedPatent?.scoreAwarded).toBe(false);
+    expect(updatedPatent?.adminReviewedAt).toBeUndefined();
+    expect(updatedPatent?.adminReviewedBy).toBeUndefined();
   });
 
   it('awards patent submission score only after first admin verification and approval score per patent', async () => {

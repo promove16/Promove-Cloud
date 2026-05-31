@@ -11,6 +11,7 @@ import {
   X,
   XCircle,
   RefreshCw,
+  FileDown,
 } from 'lucide-react';
 import { workspaceApi } from '../../../api/workspace.api';
 import { dealApi } from '../../../api/deal.api';
@@ -213,6 +214,10 @@ export function DealCard({
     onSuccess: async () => {
       await invalidateDealQueries(queryClient, { dealId: deal._id, startupId: deal.startupId });
     },
+  });
+
+  const downloadContractMutation = useMutation({
+    mutationFn: () => dealApi.downloadDealContract(deal._id),
   });
 
   const counterMutation = useMutation({
@@ -496,6 +501,27 @@ export function DealCard({
           <dd className="mt-1 font-semibold text-white">{formatDate(deal.updatedAt)}</dd>
         </div>
       </dl>
+
+      {deal.adminApprovedAt ? (
+        <button
+          type="button"
+          onClick={() => downloadContractMutation.mutate()}
+          disabled={downloadContractMutation.isPending}
+          className="mt-4 inline-flex w-full items-center justify-center gap-2 rounded-lg border border-emerald-500/30 bg-emerald-500/10 px-3 py-2 text-xs font-semibold text-emerald-300 transition hover:bg-emerald-500/20 disabled:cursor-not-allowed disabled:opacity-50"
+        >
+          {downloadContractMutation.isPending ? (
+            <Loader2 className="h-3.5 w-3.5 animate-spin" />
+          ) : (
+            <FileDown className="h-3.5 w-3.5" />
+          )}
+          {downloadContractMutation.isPending ? 'Preparing…' : 'Download Official Contract'}
+        </button>
+      ) : null}
+      {downloadContractMutation.isError ? (
+        <p className="mt-2 text-[11px] text-rose-400">
+          Could not download the contract. Please try again.
+        </p>
+      ) : null}
 
       <div className="mt-4 rounded-xl border border-slate-800 bg-slate-950 p-3">
         <div className="flex items-center justify-between gap-2">

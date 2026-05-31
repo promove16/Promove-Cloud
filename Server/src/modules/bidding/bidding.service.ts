@@ -51,7 +51,7 @@ export const respondToBidSchema = z.object({
 });
 
 const BID_STATUS_TRANSITIONS: Record<BidStatus, BidStatus[]> = {
-  pending: ['viewed', 'expired'],
+  pending: ['viewed', 'accepted', 'rejected', 'expired'],
   viewed: ['negotiating', 'accepted', 'rejected', 'expired'],
   negotiating: ['countered', 'accepted', 'rejected', 'expired'],
   countered: ['negotiating', 'accepted', 'rejected', 'expired'],

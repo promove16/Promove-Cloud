@@ -4,6 +4,7 @@ import { ApiResponse } from '../../utils/ApiResponse';
 import {
   advanceDealStage,
   founderDecisionSchema,
+  getDealContractData,
   getDealForParticipant,
   getInvestorAuthorityPortfolio,
   getStartupBidBoard,
@@ -27,6 +28,7 @@ import {
   cancelDealByParticipant,
   cancelDealSchema,
 } from './deal.service';
+import { buildDealContractDocument, finalizeDealContract } from '../../services/dealContract';
 
 const objectIdSchema = /^[0-9a-fA-F]{24}$/;
 
@@ -54,6 +56,25 @@ export const getMyDealController = async (req: Request, res: Response) => {
 
   const deal = await getDealForParticipant(req.user._id, req.user.role, String(req.params.id));
   res.status(200).json(new ApiResponse(deal));
+};
+
+export const downloadDealContractController = async (req: Request, res: Response) => {
+  if (!req.user) {
+    throw new ApiError(401, 'UNAUTHORIZED', 'Invalid or expired token');
+  }
+
+  const data = await getDealContractData(
+    req.user._id,
+    req.user.role,
+    assertObjectId(String(req.params.id), 'Deal id'),
+  );
+
+  const buffer = await finalizeDealContract(buildDealContractDocument(data));
+
+  res.setHeader('Content-Type', 'application/pdf');
+  res.setHeader('Content-Length', String(buffer.length));
+  res.setHeader('Content-Disposition', `attachment; filename="${data.contractNumber}.pdf"`);
+  res.status(200).send(buffer);
 };
 
 export const fundTransferController = async (req: Request, res: Response) => {

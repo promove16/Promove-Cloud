@@ -92,7 +92,10 @@ export default function Dashboard() {
   const mentorshipStats = mentorshipProgramsQuery.data?.stats;
   const activeDeals = dealsQuery.data?.filter((deal) => deal.status === 'active') ?? [];
   const pendingDealReviews = activeDeals.filter(
-    (deal) => deal.cancellationRequest?.status === 'pending' || (deal.adminApprovalRequired && !deal.adminApprovedAt),
+    (deal) =>
+      deal.paymentApproval?.status === 'requested' ||
+      deal.cancellationRequest?.status === 'pending' ||
+      (deal.adminApprovalRequired && !deal.adminApprovedAt),
   ).length;
   const dashboardIsRefreshing =
     analyticsQuery.isLoading ||

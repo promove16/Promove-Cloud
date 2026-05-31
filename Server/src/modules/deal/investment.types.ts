@@ -128,6 +128,10 @@ export interface IInvestment extends InvestmentAuthority {
   adminApprovalRequired: boolean;
   adminApprovedAt?: Date;
   adminApprovedBy?: Types.ObjectId;
+  officialContract?: {
+    contractNumber: string;
+    generatedAt: Date;
+  };
   closedAt?: Date;
   linkedWorkspaceId?: Types.ObjectId;
   innovationScoreSnapshot: number;
@@ -181,6 +185,10 @@ export interface DealSummaryView extends InvestmentAuthority {
   sharesAllocated: number;
   adminApprovalRequired: boolean;
   adminApprovedAt?: string;
+  officialContract?: {
+    contractNumber: string;
+    generatedAt: string;
+  };
   stockDetails: {
     shareClassLabel: string;
     sharePriceInr: number;

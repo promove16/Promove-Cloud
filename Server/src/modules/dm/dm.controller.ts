@@ -338,7 +338,7 @@ export const sendMessage = async (req: Request, res: Response) => {
   const { message, messageType, scheduledAt, meetLink, attachmentUrl, attachmentType, attachmentName, attachmentStorageProvider, attachmentStorageKey, queryType, pitchContext } =
     req.body as {
     message?: string;
-    messageType?: 'text' | 'interview_request';
+    messageType?: 'text' | 'interview_request' | 'funding_request';
     scheduledAt?: string;
     meetLink?: string;
     attachmentUrl?: string;
@@ -361,9 +361,14 @@ export const sendMessage = async (req: Request, res: Response) => {
   };
 
   const normalizedMessage = typeof message === 'string' ? message.trim() : '';
-  const type = messageType === 'interview_request' ? 'interview_request' : 'text';
+  const type =
+    messageType === 'interview_request'
+      ? 'interview_request'
+      : messageType === 'funding_request'
+        ? 'funding_request'
+        : 'text';
 
-  if (!normalizedMessage && type !== 'interview_request' && !attachmentUrl) {
+  if (!normalizedMessage && type === 'text' && !attachmentUrl) {
     throw new ApiError(400, 'EMPTY_MESSAGE', 'Message cannot be empty');
   }
 
@@ -382,12 +387,29 @@ export const sendMessage = async (req: Request, res: Response) => {
     attachmentStorageKey,
   );
 
+  // Resolve the pitched startup up front so investor pitches and founder funding
+  // requests can be persisted with a direct reference, letting the recipient act on
+  // the startup straight from the chat. The resolver verifies founder ownership.
+  const investorPitchContext =
+    queryType === 'investor' || type === 'funding_request'
+      ? await resolveInvestorPitchContext(req.user!._id, pitchContext)
+      : {};
+
+  if (type === 'funding_request' && !investorPitchContext.startupId) {
+    throw new ApiError(
+      400,
+      'INVALID_FUNDING_REQUEST',
+      'A funding request must reference one of your startups',
+    );
+  }
+
   const msg = await DirectMessage.create({
     senderId: myId,
     recipientId,
     message: normalizedMessage,
     messageType: type,
     queryType: queryType || 'general',
+    ...(investorPitchContext.startupId ? { startupId: investorPitchContext.startupId } : {}),
     ...(scheduledAt ? { scheduledAt: new Date(scheduledAt) } : {}),
     ...(meetLink ? { meetLink } : {}),
     ...(attachmentUrl ? { attachmentUrl } : {}),
@@ -398,10 +420,6 @@ export const sendMessage = async (req: Request, res: Response) => {
 
   if (queryType && queryType !== 'general') {
     const recipient = await User.findById(recipientId).select('displayName role').lean();
-    const investorPitchContext =
-      queryType === 'investor'
-        ? await resolveInvestorPitchContext(req.user!._id, pitchContext)
-        : {};
     const acceptRedirect = investorPitchContext.workspaceId
       ? `/product-workspace/${investorPitchContext.workspaceId}`
       : `/dashboard/messages/${String(recipientId)}`;

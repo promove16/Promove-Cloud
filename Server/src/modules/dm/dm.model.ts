@@ -21,8 +21,10 @@ export interface IDirectMessage extends Document {
   /** ISO string for interview scheduling messages */
   scheduledAt?: Date;
   meetLink?: string;
-  messageType: 'text' | 'interview_request';
+  messageType: 'text' | 'interview_request' | 'funding_request';
   queryType?: QueryType;
+  /** Set on investor pitch / funding-request messages so the recipient can act on the startup directly. */
+  startupId?: Types.ObjectId;
   readAt?: Date;
   sentAt: Date;
 }
@@ -39,12 +41,13 @@ const directMessageSchema = new Schema<IDirectMessage>(
     attachmentStorageKey: { type: String, default: undefined, trim: true },
     scheduledAt: { type: Date, default: undefined },
     meetLink: { type: String, default: undefined },
-    messageType: { type: String, enum: ['text', 'interview_request'], default: 'text' },
+    messageType: { type: String, enum: ['text', 'interview_request', 'funding_request'], default: 'text' },
     queryType: {
       type: String,
       enum: ['project_mentor', 'project_join', 'investor', 'recruiter', 'hiring_event', 'mentorship_program', 'general'],
       default: 'general',
     },
+    startupId: { type: Schema.Types.ObjectId, ref: 'Startup', default: undefined },
     readAt: { type: Date, default: undefined },
     sentAt: { type: Date, default: () => new Date() },
   },

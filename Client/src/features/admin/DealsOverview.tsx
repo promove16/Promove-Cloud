@@ -97,7 +97,7 @@ export default function DealsOverview() {
               <div className="text-xs uppercase tracking-[0.3em] text-cyan-300">Transfer Queue</div>
               <h2 className="mt-2 text-2xl font-semibold text-white">Priority approvals</h2>
               <p className="mt-2 text-sm text-slate-400">
-                Keep the overview focused on deals that are blocked on stock-transfer review.
+                Keep the overview focused on deals blocked on payment, transfer, or cancellation review.
               </p>
             </div>
             <Button variant="secondary" onClick={() => navigate('/dashboard/admin/deals/register')}>
@@ -128,6 +128,11 @@ export default function DealsOverview() {
                             cancellation requested
                           </Badge>
                         ) : null}
+                        {deal.paymentApproval?.status === 'requested' ? (
+                          <Badge className="border-amber-500/30 bg-amber-500/10 text-amber-300">
+                            payment approval requested
+                          </Badge>
+                        ) : null}
                       </div>
 
                       <div>
@@ -147,10 +152,24 @@ export default function DealsOverview() {
                         Open Review
                       </Button>
                       <Button
-                        onClick={() => approveDeal(deal._id)}
-                        disabled={approveBusy || deal.cancellationRequest?.status === 'pending'}
+                        onClick={() => {
+                          if (
+                            deal.paymentApproval?.status === 'requested' ||
+                            deal.cancellationRequest?.status === 'pending'
+                          ) {
+                            navigate(`/dashboard/admin/deals/${deal._id}`);
+                            return;
+                          }
+
+                          approveDeal(deal._id);
+                        }}
+                        disabled={approveBusy}
                       >
-                        {deal.cancellationRequest?.status === 'pending' ? 'Open Cancellation Review' : 'Approve Transfer'}
+                        {deal.paymentApproval?.status === 'requested'
+                          ? 'Open Payment Review'
+                          : deal.cancellationRequest?.status === 'pending'
+                            ? 'Open Cancellation Review'
+                            : 'Approve Transfer'}
                         <ArrowRight className="ml-2 h-4 w-4" />
                       </Button>
                     </div>

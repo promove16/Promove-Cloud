@@ -9,6 +9,7 @@ import { Button } from '../../components/ui/Button';
 import { toast } from 'sonner';
 import { Eye, X, Check, TrendingUp, MessageCircle, ArrowLeft, DollarSign, Users } from 'lucide-react';
 import { useAuthStore } from '../../store/authStore';
+import { getApiErrorMessage } from '../../utils/apiError';
 import { NegotiationTimeline } from './NegotiationTimeline';
 import { BidComparisonTable } from './BidComparisonTable';
 import { LiveActivityFeed } from '../activity/LiveActivityFeed';
@@ -258,7 +259,7 @@ function FounderBidDashboard() {
       toast.success('Bid response recorded');
       setSelectedBid(null);
     },
-    onError: () => toast.error('Failed to respond to bid'),
+    onError: (error) => toast.error(getApiErrorMessage(error, 'Failed to respond to bid')),
   });
 
   const viewMutation = useMutation({

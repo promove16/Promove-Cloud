@@ -15,8 +15,10 @@ export interface DMMessage {
   senderId: string;
   recipientId: string;
   message: string;
-  messageType: 'text' | 'interview_request' | 'invitation';
+  messageType: 'text' | 'interview_request' | 'invitation' | 'funding_request';
   queryType?: QueryType;
+  /** Present on investor pitch / funding-request messages — the startup in question. */
+  startupId?: string;
   invitationType?: 'workspace_invite' | 'startup_invite';
   invitationData?: {
     entityId: string;
@@ -79,7 +81,7 @@ export const dmApi = {
   },
   async send(userId: string, payload: {
     message?: string;
-    messageType?: 'text' | 'interview_request';
+    messageType?: 'text' | 'interview_request' | 'funding_request';
     scheduledAt?: string;
     meetLink?: string;
     queryType?: QueryType;
