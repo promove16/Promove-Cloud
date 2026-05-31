@@ -48,6 +48,9 @@ const VIEW_IDS: ViewId[] = ['overview', 'cap-table', 'pipeline'];
 
 const DEFAULT_VIEW: ViewId = 'overview';
 
+// Bid statuses that are still being negotiated through the FounderBidDashboard.
+const ACTIVE_BID_STATUSES = new Set(['pending', 'viewed', 'negotiating', 'countered']);
+
 const VIEW_TABS: ReadonlyArray<OptionTabItem<ViewId>> = [
   { id: 'overview', label: 'Overview', icon: PieIcon },
   { id: 'cap-table', label: 'Cap Table', icon: Layers },
@@ -748,9 +751,18 @@ export default function StartupEquityAndDeals() {
     refetchInterval: 30_000,
   });
 
+  // Only deals tied to a still-active (pre-acceptance) bid are surfaced through the
+  // FounderBidDashboard, so we hide their Stage 0 negotiation card to avoid a duplicate.
+  // Once the bid is accepted the bid drawer becomes terminal, so the deal's negotiation
+  // card must reappear — that card is where the founder agrees to the deal terms
+  // (negotiation-agree) to move the deal from `terms_proposed` to `terms_agreed`.
   const bidLinkedDealIds = useMemo(() => {
     const items = bidsQuery.data?.items ?? [];
-    return new Set(items.map((b) => b.dealId).filter(Boolean) as string[]);
+    return new Set(
+      items
+        .filter((b) => b.dealId && ACTIVE_BID_STATUSES.has(b.status))
+        .map((b) => b.dealId) as string[],
+    );
   }, [bidsQuery.data]);
 
   const hasBids = (bidsQuery.data?.items?.length ?? 0) > 0;

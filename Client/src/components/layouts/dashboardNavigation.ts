@@ -89,6 +89,7 @@ export const SIDEBAR_CONFIG: Record<UserRole, DashboardNavItem[]> = {
     { kind: 'link', label: 'Dashboard', icon: Home, path: '/dashboard/investor' },
     // { kind: 'link', label: 'Portfolio', icon: Trophy, path: '/portfolio' },
     { kind: 'link', label: 'Marketplace', icon: Globe, path: '/dashboard/investor/startups' },
+    { kind: 'link', label: 'My Bids', icon: FileText, path: '/dashboard/investor/bids' },
     { kind: 'link', label: 'Pipeline', icon: Handshake, path: '/dashboard/investor/pipeline' },
     { kind: 'link', label: 'Product Workshop', icon: FolderKanban, path: '/dashboard/investor/product-workshop' },
     { kind: 'link', label: 'Portfolio', icon: BriefcaseBusiness, path: '/portfolio' },

@@ -97,6 +97,7 @@ const AdminAnalyticsUsers = lazy(() => import("../features/admin/AnalyticsUsers"
 const AdminAnalyticsLogs = lazy(() => import("../features/admin/AnalyticsLogs"));
 const AdminPlatformAnalytics = lazy(() => import("../features/analytics/AdminPlatformAnalytics"));
 const InvestorBidDashboard = lazy(() => import("../features/bidding/InvestorBidDashboard"));
+const AgreementPage = lazy(() => import("../features/agreement/AgreementPage"));
 const AdminMentorshipPrograms = lazy(() => import("../features/admin/MentorshipPrograms"));
 const AdminMentorshipMentors = lazy(() => import("../features/admin/MentorshipMentors"));
 const AdminMentorshipProgramCreation = lazy(() => import("../features/admin/MentorshipProgramCreation"));
@@ -656,6 +657,14 @@ export const router = createBrowserRouter([
         ),
       },
       {
+        path: "/agreements/:agreementId",
+        element: (
+          <ProtectedAnyRoute>
+            <LazyPage component={AgreementPage} />
+          </ProtectedAnyRoute>
+        ),
+      },
+      {
         path: "/marketplace",
         element: (
           <ProtectedRolesRoute roles={NON_ADMIN_DASHBOARD_ROLES}>
@@ -733,7 +742,7 @@ export const router = createBrowserRouter([
             element: <ProtectedRoleRoute role={UserRole.INVESTOR} />,
             children: [
               { index: true, element: <LazyPage component={InvestorDashboard} /> },
-              { path: "bids", element: <Navigate to="/dashboard/investor/pipeline" replace /> },
+              { path: "bids", element: <LazyPage component={InvestorBidDashboard} /> },
               { path: "startups", element: <LazyPage component={InvestorStartupMarketplace} /> },
               { path: "pipeline", element: <LazyPage component={InvestmentPipeline} /> },
               { path: "institutions", element: <LazyPage component={InvestorInstitutions} /> },
