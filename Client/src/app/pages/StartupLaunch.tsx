@@ -182,6 +182,9 @@ const STARTUP_TRUST_PROOF_CATEGORIES: StartupDocumentCategory[] = [
   "funding_proof",
 ];
 
+const COMPANY_DOCUMENT_SPECS = STARTUP_RUBRIC_DOCUMENT_SPECS.slice(0, 6);
+const TRACTION_DOCUMENT_SPECS = STARTUP_RUBRIC_DOCUMENT_SPECS.slice(6);
+
 const STARTUP_LEGAL_STRUCTURE_LABELS: Record<string, string> = {
   sole_proprietorship: "Sole Proprietorship",
   partnership: "Partnership",
@@ -416,6 +419,10 @@ export function StartupLaunch() {
   const [innovationProfile, setInnovationProfile] =
     useState<StartupInnovationProfile>(DEFAULT_STARTUP_INNOVATION_PROFILE);
   const [uploadingKey, setUploadingKey] = useState<string | null>(null);
+  const [pendingPitchFile, setPendingPitchFile] = useState<File | null>(null);
+  const [pendingDocumentFiles, setPendingDocumentFiles] = useState<
+    Partial<Record<StartupDocumentCategory, File>>
+  >({});
 
   useEffect(() => {
     if (!startup) return;
@@ -547,15 +554,72 @@ export function StartupLaunch() {
     [innovationProfile, startup?.pitchDeckUrl, uploadedDocumentCategories],
   );
 
+  const pendingDocuments = Object.entries(pendingDocumentFiles).filter(
+    (entry): entry is [StartupDocumentCategory, File] =>
+      entry[1] instanceof File,
+  );
+  const pendingUploadCount =
+    (pendingPitchFile ? 1 : 0) + pendingDocuments.length;
+
   const save = useMutation({
     mutationFn: async () => {
       if (startupId) {
-        return startupApi.update(startupId, basePayload);
+        const saved = await startupApi.update(startupId, basePayload);
+        return {
+          saved,
+          stagedUploadCount: 0,
+          failedUploadCount: 0,
+        };
       }
-      return startupApi.create(basePayload);
+
+      let saved = await startupApi.create(basePayload);
+      let failedUploadCount = 0;
+
+      if (pendingPitchFile) {
+        try {
+          saved = await startupApi.uploadPitch(saved._id, pendingPitchFile);
+        } catch (error) {
+          failedUploadCount += 1;
+          console.error("Unable to upload staged startup pitch deck", error);
+        }
+      }
+
+      for (const [category, file] of pendingDocuments) {
+        try {
+          saved = await startupApi.uploadDocument(saved._id, file, category);
+        } catch (error) {
+          failedUploadCount += 1;
+          console.error("Unable to upload staged startup document", {
+            category,
+            error,
+          });
+        }
+      }
+
+      return {
+        saved,
+        stagedUploadCount: pendingUploadCount,
+        failedUploadCount,
+      };
     },
-    onSuccess: async (saved) => {
-      toast.success(startupId ? "Startup updated." : "Startup created.");
+    onSuccess: async ({ saved, stagedUploadCount, failedUploadCount }) => {
+      if (startupId) {
+        toast.success("Startup updated.");
+      } else if (stagedUploadCount > 0 && failedUploadCount === 0) {
+        toast.success("Startup created and proof files uploaded.");
+      } else if (failedUploadCount > 0) {
+        toast.warning(
+          `Startup created, but ${failedUploadCount} file${
+            failedUploadCount === 1 ? "" : "s"
+          } could not be uploaded. You can retry from the saved startup page.`,
+        );
+      } else {
+        toast.success("Startup created.");
+      }
+      if (!startupId && stagedUploadCount > 0) {
+        setPendingPitchFile(null);
+        setPendingDocumentFiles({});
+      }
       await Promise.all([
         queryClient.invalidateQueries({ queryKey: ["startup"] }),
         queryClient.invalidateQueries({ queryKey: ["startup", saved._id] }),
@@ -649,7 +713,7 @@ export function StartupLaunch() {
     identity.category.trim().length > 0 &&
     !save.isPending;
 
-  const canUpload = Boolean(startupId);
+  const canSelectUpload = Boolean(startupId) || !save.isPending;
 
   const handlePitchSelected = (file: File | null) => {
     if (!file) return;
@@ -658,7 +722,10 @@ export function StartupLaunch() {
       return;
     }
     if (!startupId) {
-      toast.error("Save the startup once before uploading pitch files.");
+      setPendingPitchFile(file);
+      toast.success(
+        "Pitch deck selected. It will upload when you create the startup.",
+      );
       return;
     }
     if (file.size > STARTUP_RUBRIC_PITCH_MAX_BYTES) {
@@ -680,7 +747,13 @@ export function StartupLaunch() {
       return;
     }
     if (!startupId) {
-      toast.error("Save the startup once before uploading proof files.");
+      setPendingDocumentFiles((current) => ({
+        ...current,
+        [category]: file,
+      }));
+      toast.success(
+        "Proof selected. It will upload when you create the startup.",
+      );
       return;
     }
     if (file.size > STARTUP_RUBRIC_DOCUMENT_MAX_BYTES) {
@@ -1127,12 +1200,16 @@ export function StartupLaunch() {
           <PitchUploadSlot
             fileName={startup?.pitchDeckName}
             fileUrl={startup?.pitchDeckUrl}
-            disabled={!canUpload}
+            pendingFileName={pendingPitchFile?.name}
+            disabled={!canSelectUpload}
             isUploading={uploadingKey === "pitch" || uploadPitch.isPending}
             required={requiresPitchOrDpr}
             onFileSelected={handlePitchSelected}
+            onRemovePending={
+              pendingPitchFile ? () => setPendingPitchFile(null) : undefined
+            }
           />
-          {STARTUP_RUBRIC_DOCUMENT_SPECS.slice(0, 6).map((spec) => (
+          {COMPANY_DOCUMENT_SPECS.map((spec, index) => (
             <DocumentUploadSlot
               key={spec.category}
               label={spec.label}
@@ -1141,14 +1218,25 @@ export function StartupLaunch() {
                 requiredDocumentCategories.has(spec.category) ||
                 (spec.category === "dpr" && requiresPitchOrDpr)
               }
-              disabled={!canUpload}
+              disabled={!canSelectUpload}
               isUploading={
                 uploadingKey === spec.category ||
                 uploadingKey === `delete-${spec.category}`
               }
               document={documentsByCategory.get(spec.category)}
+              pendingFileName={pendingDocumentFiles[spec.category]?.name}
               onFileSelected={(file) =>
                 handleDocumentSelected(spec.category, file)
+              }
+              onRemovePending={
+                pendingDocumentFiles[spec.category]
+                  ? () =>
+                      setPendingDocumentFiles((current) => {
+                        const next = { ...current };
+                        delete next[spec.category];
+                        return next;
+                      })
+                  : undefined
               }
               onRemove={
                 documentsByCategory.get(spec.category)
@@ -1157,6 +1245,11 @@ export function StartupLaunch() {
                         category: spec.category,
                         documentId: documentsByCategory.get(spec.category)!._id,
                       })
+                  : undefined
+              }
+              className={
+                index === COMPANY_DOCUMENT_SPECS.length - 1
+                  ? "lg:col-span-2"
                   : undefined
               }
             />
@@ -1337,20 +1430,31 @@ export function StartupLaunch() {
         </div>
 
         <div className="grid gap-4 lg:grid-cols-2">
-          {STARTUP_RUBRIC_DOCUMENT_SPECS.slice(6).map((spec) => (
+          {TRACTION_DOCUMENT_SPECS.map((spec) => (
             <DocumentUploadSlot
               key={spec.category}
               label={spec.label}
               hint={spec.hint}
               required={requiredDocumentCategories.has(spec.category)}
-              disabled={!canUpload}
+              disabled={!canSelectUpload}
               isUploading={
                 uploadingKey === spec.category ||
                 uploadingKey === `delete-${spec.category}`
               }
               document={documentsByCategory.get(spec.category)}
+              pendingFileName={pendingDocumentFiles[spec.category]?.name}
               onFileSelected={(file) =>
                 handleDocumentSelected(spec.category, file)
+              }
+              onRemovePending={
+                pendingDocumentFiles[spec.category]
+                  ? () =>
+                      setPendingDocumentFiles((current) => {
+                        const next = { ...current };
+                        delete next[spec.category];
+                        return next;
+                      })
+                  : undefined
               }
               onRemove={
                 documentsByCategory.get(spec.category)
@@ -1577,23 +1681,29 @@ function ClaimToggle({
 function PitchUploadSlot({
   fileName,
   fileUrl,
+  pendingFileName,
   disabled,
   isUploading,
   required = false,
   onFileSelected,
+  onRemovePending,
 }: {
   fileName?: string;
   fileUrl?: string;
+  pendingFileName?: string;
   disabled: boolean;
   isUploading: boolean;
   required?: boolean;
   onFileSelected: (file: File | null) => void;
+  onRemovePending?: () => void;
 }) {
   const inputRef = useRef<HTMLInputElement | null>(null);
   const isDisabled = disabled || isUploading;
+  const displayName =
+    fileName ?? pendingFileName ?? "No pitch deck uploaded yet";
 
   return (
-    <div className="border border-slate-800 bg-slate-900 p-4">
+    <div className="h-full border border-slate-800 bg-slate-900 p-4">
       <div className="flex items-start justify-between gap-3">
         <div>
           <UploadLabel label="Pitch Deck Upload" required={required} />
@@ -1615,8 +1725,23 @@ function PitchUploadSlot({
       </div>
       <div className="mt-3 flex items-center justify-between gap-3">
         <div className="min-w-0 text-sm text-slate-300">
-          {fileName ?? "No pitch deck uploaded yet"}
+          {displayName}
+          {!fileName && pendingFileName ? (
+            <div className="mt-1 text-xs text-cyan-300">
+              Ready to upload after create
+            </div>
+          ) : null}
         </div>
+        {pendingFileName && !fileName && onRemovePending ? (
+          <button
+            type="button"
+            disabled={isDisabled}
+            onClick={onRemovePending}
+            className="border border-slate-700 bg-slate-950 px-3 py-2 text-xs font-semibold text-slate-200 disabled:cursor-not-allowed disabled:opacity-60"
+          >
+            Remove
+          </button>
+        ) : null}
         <button
           type="button"
           disabled={isDisabled}
@@ -1626,7 +1751,7 @@ function PitchUploadSlot({
           {isUploading ? (
             <Loader2 className="h-3.5 w-3.5 animate-spin" />
           ) : null}
-          {fileName ? "Replace" : "Upload"}
+          {fileName ? "Replace" : pendingFileName ? "Change" : "Upload"}
         </button>
         <input
           ref={inputRef}
@@ -1648,28 +1773,40 @@ function DocumentUploadSlot({
   label,
   hint,
   document,
+  pendingFileName,
   disabled,
   isUploading,
   required = false,
   onFileSelected,
   onRemove,
+  onRemovePending,
   controls,
+  className,
 }: {
   label: string;
   hint: string;
   document?: Startup["documents"][number];
+  pendingFileName?: string;
   disabled: boolean;
   isUploading: boolean;
   required?: boolean;
   onFileSelected: (file: File | null) => void;
   onRemove?: () => void;
+  onRemovePending?: () => void;
   controls?: React.ReactNode;
+  className?: string;
 }) {
   const inputRef = useRef<HTMLInputElement | null>(null);
   const isDisabled = disabled || isUploading;
+  const displayName =
+    document?.fileName ?? pendingFileName ?? "No proof uploaded yet";
 
   return (
-    <div className="border border-slate-800 bg-slate-900 p-4">
+    <div
+      className={`h-full border border-slate-800 bg-slate-900 p-4 ${
+        className ?? ""
+      }`}
+    >
       <div className="flex items-start justify-between gap-3">
         <div>
           <UploadLabel label={label} required={required} />
@@ -1689,7 +1826,12 @@ function DocumentUploadSlot({
       {controls ? <div className="mt-3">{controls}</div> : null}
       <div className="mt-3 flex items-center justify-between gap-3">
         <div className="min-w-0 text-sm text-slate-300">
-          {document?.fileName ?? "No proof uploaded yet"}
+          {displayName}
+          {!document && pendingFileName ? (
+            <div className="mt-1 text-xs text-cyan-300">
+              Ready to upload after create
+            </div>
+          ) : null}
         </div>
         <div className="flex items-center gap-2">
           {document && onRemove ? (
@@ -1697,6 +1839,16 @@ function DocumentUploadSlot({
               type="button"
               disabled={isDisabled}
               onClick={onRemove}
+              className="border border-slate-700 bg-slate-950 px-3 py-2 text-xs font-semibold text-slate-200 disabled:cursor-not-allowed disabled:opacity-60"
+            >
+              Remove
+            </button>
+          ) : null}
+          {!document && pendingFileName && onRemovePending ? (
+            <button
+              type="button"
+              disabled={isDisabled}
+              onClick={onRemovePending}
               className="border border-slate-700 bg-slate-950 px-3 py-2 text-xs font-semibold text-slate-200 disabled:cursor-not-allowed disabled:opacity-60"
             >
               Remove
@@ -1711,7 +1863,7 @@ function DocumentUploadSlot({
             {isUploading ? (
               <Loader2 className="h-3.5 w-3.5 animate-spin" />
             ) : null}
-            {document ? "Replace" : "Upload"}
+            {document ? "Replace" : pendingFileName ? "Change" : "Upload"}
           </button>
           <input
             ref={inputRef}

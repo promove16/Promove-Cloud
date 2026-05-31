@@ -819,7 +819,7 @@ export function DashboardLayout({ children, role }: PropsWithChildren<DashboardL
   };
 
   return (
-    <div className="dashboard-theme-bg h-screen overflow-hidden">
+    <div className="dashboard-theme-bg fixed inset-0 overflow-hidden">
       <div className="flex h-full">
         <aside
           className={`dashboard-theme-border dashboard-theme-sidebar fixed inset-y-0 left-0 z-40 flex min-h-0 w-80 transform flex-col overflow-hidden border-r px-6 py-6 backdrop-blur-xl transition lg:static lg:translate-x-0 ${
