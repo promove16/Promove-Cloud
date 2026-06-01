@@ -6,8 +6,12 @@ import {
   RegistrationRequestStatus,
 } from '../types/auth.types';
 import {
+  BulkCredentialImportResult,
   InstitutionPolicySubmissionListResponse,
   InstitutionPolicySubmissionRecord,
+  StudentRosterEntry,
+  StudentRosterImportResult,
+  TemporaryStudentCredentials,
 } from '../types/school.types';
 import {
   CapTableResponse,
@@ -973,6 +977,74 @@ export const adminApi = {
   async getPatentUnreadCount(requestId: string) {
     const response = await api.get<ApiSuccessResponse<{ count: number }>>(
       `/api/admin/patent-requests/${requestId}/messages/unread`,
+    );
+    return response.data.data;
+  },
+
+  // ── Admin-side student roster management ──────────────────────────────────
+  async adminGetStudentRoster(institutionId: string) {
+    const response = await api.get<ApiSuccessResponse<StudentRosterEntry[]>>(
+      `/api/admin/institutions/${institutionId}/student-roster`,
+    );
+    return response.data.data;
+  },
+  async adminAddManualStudent(
+    institutionId: string,
+    payload: {
+      displayName: string;
+      email: string;
+      gradeOrProgram?: string;
+      rollNumber?: string;
+      notes?: string;
+    },
+  ) {
+    const response = await api.post<ApiSuccessResponse<StudentRosterEntry>>(
+      `/api/admin/institutions/${institutionId}/student-roster/manual`,
+      payload,
+    );
+    return response.data.data;
+  },
+  async adminImportStudentRoster(institutionId: string, file: File) {
+    const formData = new FormData();
+    formData.append('file', file);
+    const response = await api.post<ApiSuccessResponse<StudentRosterImportResult>>(
+      `/api/admin/institutions/${institutionId}/student-roster/import`,
+      formData,
+      { headers: { 'Content-Type': 'multipart/form-data' } },
+    );
+    return response.data.data;
+  },
+  async adminImportStudentRosterWithCredentials(institutionId: string, file: File) {
+    const formData = new FormData();
+    formData.append('file', file);
+    const response = await api.post<ApiSuccessResponse<BulkCredentialImportResult>>(
+      `/api/admin/institutions/${institutionId}/student-roster/import-credentials`,
+      formData,
+      { headers: { 'Content-Type': 'multipart/form-data' } },
+    );
+    return response.data.data;
+  },
+  async adminCancelStudentInvite(institutionId: string, rosterEntryId: string) {
+    const response = await api.delete<ApiSuccessResponse<{ _id: string; cancelled: true; cancelledAt: string }>>(
+      `/api/admin/institutions/${institutionId}/student-roster/${rosterEntryId}`,
+    );
+    return response.data.data;
+  },
+  async adminCreateTemporaryCredentials(
+    institutionId: string,
+    payload: {
+      displayName: string;
+      email: string;
+      domain?: string;
+      bio?: string;
+      gradeOrProgram?: string;
+      rollNumber?: string;
+      notes?: string;
+    },
+  ) {
+    const response = await api.post<ApiSuccessResponse<TemporaryStudentCredentials>>(
+      `/api/admin/institutions/${institutionId}/student-temp-credentials`,
+      payload,
     );
     return response.data.data;
   },
