@@ -1087,7 +1087,6 @@ function StartupPatentRequestOverview({
 // ─── Self-Upload Patent Form ─────────────────────────────────────────────────
 
 interface SelfUploadPatentFormProps {
-  startupId?: string;
   activeWorkspace?: { _id: string; title: string } | null;
   initialAnswers: PatentQuestionnaire;
   isStartupScoped: boolean;
@@ -1100,9 +1099,6 @@ interface SelfUploadPatentFormProps {
     title: string;
     claimedProblemId?: string;
   }>;
-  submitted: boolean;
-  setSubmitted: (submitted: boolean) => void;
-  setPatentOption: (option: "self-upload" | "admin-assist" | null) => void;
   patentStage: "filed" | "published" | "granted";
   setPatentStage: (stage: "filed" | "published" | "granted") => void;
   applicationNumber: string;
@@ -1115,25 +1111,23 @@ interface SelfUploadPatentFormProps {
   setGrantDate: (date: string) => void;
 }
 
-type AdminAssistPatentFormProps = Omit<
-  SelfUploadPatentFormProps,
-  | "submitted"
-  | "setSubmitted"
-  | "patentStage"
-  | "setPatentStage"
-  | "applicationNumber"
-  | "setApplicationNumber"
-  | "filingDate"
-  | "setFilingDate"
-  | "grantNumber"
-  | "setGrantNumber"
-  | "grantDate"
-  | "setGrantDate"
->;
+interface AdminAssistPatentFormProps {
+  activeWorkspace?: { _id: string; title: string } | null;
+  initialAnswers: PatentQuestionnaire;
+  isStartupScoped: boolean;
+  workspaceId: string;
+  setWorkspaceId: (id: string) => void;
+  projectTitle: string;
+  setProjectTitle: (title: string) => void;
+  patentEligibleWorkspaces: Array<{
+    _id: string;
+    title: string;
+    claimedProblemId?: string;
+  }>;
+}
 
 function SelfUploadPatentForm(props: SelfUploadPatentFormProps) {
   const {
-    startupId,
     activeWorkspace,
     initialAnswers,
     isStartupScoped,
@@ -1142,9 +1136,6 @@ function SelfUploadPatentForm(props: SelfUploadPatentFormProps) {
     projectTitle,
     setProjectTitle,
     patentEligibleWorkspaces,
-    submitted,
-    setSubmitted,
-    setPatentOption,
     patentStage,
     setPatentStage,
     applicationNumber,
@@ -1496,6 +1487,7 @@ function SelfUploadPatentForm(props: SelfUploadPatentFormProps) {
                 type="file"
                 accept=".pdf"
                 className="hidden"
+                tabIndex={-1}
                 onChange={handleFileChange}
                 disabled={isDisabled}
               />
@@ -1507,15 +1499,13 @@ function SelfUploadPatentForm(props: SelfUploadPatentFormProps) {
         )}
       </div>
 
-      {uploadError && <p className="text-sm text-red-400">{uploadError}</p>}
-
       <button
         type="button"
         onClick={() => submitMutation.mutate()}
         disabled={
           !patentFile || !projectTitle.trim() || isDisabled
         }
-        className="bg-cyan-500 px-6 py-3 text-sm font-semibold text-slate-950 transition hover:bg-cyan-400 disabled:cursor-not-allowed disabled:opacity-50 flex items-center justify-center gap-2"
+        className="rounded-lg bg-cyan-500 px-6 py-3 text-sm font-semibold text-slate-950 transition hover:bg-cyan-400 disabled:cursor-not-allowed disabled:opacity-50 flex items-center justify-center gap-2"
       >
         {submitMutation.isPending ? (
           <>
@@ -1762,22 +1752,29 @@ function PatentRequestDocumentsPanel({
                 Add patent workflow documents for admin review.
               </p>
             </div>
-            <label className="inline-flex cursor-pointer items-center gap-2 rounded-lg bg-cyan-500 px-4 py-2 text-sm font-semibold text-slate-950 transition hover:bg-cyan-400">
-              {uploadMutation.isPending ? (
-                <Loader2 className="h-4 w-4 animate-spin" />
-              ) : (
-                <Upload className="h-4 w-4" />
-              )}
-              Upload file
-              <input
-                ref={fileInputRef}
-                type="file"
-                accept=".pdf,image/*"
-                className="hidden"
-                onChange={handleFileChange}
-                disabled={uploadMutation.isPending}
-              />
-            </label>
+            <div className={uploadMutation.isPending ? "cursor-not-allowed" : ""}>
+              <label className={`inline-flex items-center gap-2 rounded-lg bg-cyan-500 px-4 py-2 text-sm font-semibold text-slate-950 transition ${
+                uploadMutation.isPending
+                  ? "pointer-events-none opacity-50"
+                  : "cursor-pointer hover:bg-cyan-400"
+              }`}>
+                {uploadMutation.isPending ? (
+                  <Loader2 className="h-4 w-4 animate-spin" />
+                ) : (
+                  <Upload className="h-4 w-4" />
+                )}
+                Upload file
+                <input
+                  ref={fileInputRef}
+                  type="file"
+                  accept=".pdf,image/*"
+                  className="hidden"
+                  tabIndex={-1}
+                  onChange={handleFileChange}
+                  disabled={uploadMutation.isPending}
+                />
+              </label>
+            </div>
           </div>
           <div className="grid gap-4 md:grid-cols-[220px,1fr]">
             <select
@@ -2091,7 +2088,6 @@ const TRACKING_STAGES = [
 ];
 
 function AdminAssistPatentForm({
-  startupId,
   activeWorkspace,
   initialAnswers,
   isStartupScoped,
@@ -2100,7 +2096,6 @@ function AdminAssistPatentForm({
   projectTitle,
   setProjectTitle,
   patentEligibleWorkspaces,
-  setPatentOption,
 }: AdminAssistPatentFormProps) {
   const queryClient = useQueryClient();
   const [requestDescription, setRequestDescription] = useState("");
@@ -2130,7 +2125,7 @@ function AdminAssistPatentForm({
     setIntakeAnswers((current) =>
       hasAnyPatentAnswer(current)
         ? mergePatentAnswers(current, initialAnswers)
-        : initialAnswers,
+        : mergePatentAnswers(undefined, initialAnswers),
     );
   }, [initialAnswers]);
 
@@ -2138,6 +2133,7 @@ function AdminAssistPatentForm({
     queryKey: ["patent-requests", "mine"],
     queryFn: () => patentRequestApi.mine(),
     enabled: Boolean(selectedWorkspaceId),
+    refetchOnWindowFocus: false,
   });
 
   useEffect(() => {
@@ -2201,7 +2197,7 @@ function AdminAssistPatentForm({
 
   const handleFileSelect = async (
     slotKey: string,
-    category: PatentRequestDocCategory,
+    _category: PatentRequestDocCategory,
     file: File,
   ) => {
     const targetWorkspaceId = selectedWorkspaceIdRef.current;
@@ -2259,6 +2255,9 @@ function AdminAssistPatentForm({
         PATENT_SUPPORT_FILE_SLOTS.find((slot) => slot.key === slotKey)?.label,
       );
       const newUpload = uploads[uploads.length - 1];
+      if (!newUpload?._id) {
+        throw new Error("Upload succeeded but no file ID was returned.");
+      }
       if (selectedWorkspaceIdRef.current !== targetWorkspaceId) {
         await workspaceApi
           .removeUpload(targetWorkspaceId, newUpload._id)
@@ -2321,7 +2320,7 @@ function AdminAssistPatentForm({
 
   const allIntakeValid = QUESTION_SECTIONS.every((section) =>
     section.questions.every((question) => {
-      const value = intakeAnswers[question.key].trim();
+      const value = (intakeAnswers[question.key] || "").trim();
       if (question.type === "select") return value.length > 0;
       return value.length >= question.minLength;
     }),
@@ -2537,8 +2536,83 @@ const canEditDocuments = !!activeRequest &&
             </div>
           </section>
 
-          <div className="grid gap-5 xl:grid-cols-[minmax(0,1fr),minmax(360px,0.8fr)] xl:items-start">
-            <section className="order-2 self-start border-t border-slate-800 pt-5 xl:order-2 xl:border-l xl:border-t-0 xl:pl-5 xl:pt-0">
+          <div className="flex flex-col xl:flex-row gap-5 xl:items-start">
+            {/* Left Column: Questionnaire (60% width on desktop) */}
+            <section className="w-full xl:w-3/5">
+              <div className="mb-3 flex flex-col gap-1 sm:flex-row sm:items-end sm:justify-between">
+                <div className="text-xs uppercase tracking-[0.28em] text-cyan-300">
+                  Patent Intake Questionnaire
+                </div>
+                <div className="text-xs text-slate-500">
+                  Complete each field to submit your request
+                </div>
+              </div>
+              <div className="space-y-4">
+                {QUESTION_SECTIONS.map((section) => (
+                  <div key={section.title}>
+                    <div className="mb-2 text-sm font-semibold text-slate-300">
+                      {section.title}
+                    </div>
+                    <div className="space-y-3">
+                      {section.questions.map((question) => (
+                        <div key={question.key}>
+                          <label className="mb-1 block text-sm text-slate-400">
+                            {question.label}
+                          </label>
+                          {question.type === "select" ? (
+                            <select
+                              value={intakeAnswers[question.key] || ""}
+                              onChange={(e) =>
+                                setIntakeAnswers((prev) => ({
+                                  ...prev,
+                                  [question.key]: e.target.value,
+                                }))
+                              }
+                              className={fieldCls}
+                            >
+                              <option value="">Select...</option>
+                              {question.options.map((option) => (
+                                <option key={option.value} value={option.value}>
+                                  {option.label}
+                                </option>
+                              ))}
+                            </select>
+                          ) : (
+                            <div>
+                              <textarea
+                                value={intakeAnswers[question.key] || ""}
+                                onChange={(e) =>
+                                  setIntakeAnswers((prev) => ({
+                                    ...prev,
+                                    [question.key]: e.target.value,
+                                  }))
+                                }
+                                className={textAreaCls}
+                                placeholder={question.label}
+                              />
+                              <div
+                                className={`mt-1 text-xs ${
+                                  (intakeAnswers[question.key] || "").trim().length >=
+                                  question.minLength
+                                    ? "text-slate-600"
+                                    : "text-amber-500/70"
+                                }`}
+                              >
+                                {(intakeAnswers[question.key] || "").trim().length}/
+                                {question.minLength}
+                              </div>
+                            </div>
+                          )}
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </section>
+
+            {/* Right Column: Supporting Files (40% width on desktop) */}
+            <section className="w-full xl:w-2/5 self-start border-t border-slate-800 pt-5 xl:border-l xl:border-t-0 xl:pl-5 xl:pt-0">
               <div className="flex flex-col gap-2 md:flex-row md:items-end md:justify-between">
                 <div className="text-xs uppercase tracking-[0.28em] text-cyan-300">
                   Supporting Files
@@ -2638,6 +2712,7 @@ const canEditDocuments = !!activeRequest &&
                                 type="file"
                                 accept=".pdf,image/*"
                                 className="sr-only"
+                                tabIndex={-1}
                                 disabled={isDisabled}
                                 onChange={(e) => {
                                   const file = e.target.files?.[0];
@@ -2653,79 +2728,6 @@ const canEditDocuments = !!activeRequest &&
                     );
                   },
                 )}
-              </div>
-            </section>
-
-            <section className="order-1">
-              <div className="mb-3 flex flex-col gap-1 sm:flex-row sm:items-end sm:justify-between">
-                <div className="text-xs uppercase tracking-[0.28em] text-cyan-300">
-                  Patent Intake Questionnaire
-                </div>
-                <div className="text-xs text-slate-500">
-                  Complete each field to submit your request
-                </div>
-              </div>
-              <div className="space-y-4">
-                {QUESTION_SECTIONS.map((section) => (
-                  <div key={section.title}>
-                    <div className="mb-2 text-sm font-semibold text-slate-300">
-                      {section.title}
-                    </div>
-                    <div className="space-y-3">
-                      {section.questions.map((question) => (
-                        <div key={question.key}>
-                          <label className="mb-1 block text-sm text-slate-400">
-                            {question.label}
-                          </label>
-                          {question.type === "select" ? (
-                            <select
-                              value={intakeAnswers[question.key]}
-                              onChange={(e) =>
-                                setIntakeAnswers((prev) => ({
-                                  ...prev,
-                                  [question.key]: e.target.value,
-                                }))
-                              }
-                              className={fieldCls}
-                            >
-                              <option value="">Select...</option>
-                              {question.options.map((option) => (
-                                <option key={option.value} value={option.value}>
-                                  {option.label}
-                                </option>
-                              ))}
-                            </select>
-                          ) : (
-                            <div>
-                              <textarea
-                                value={intakeAnswers[question.key]}
-                                onChange={(e) =>
-                                  setIntakeAnswers((prev) => ({
-                                    ...prev,
-                                    [question.key]: e.target.value,
-                                  }))
-                                }
-                                className={textAreaCls}
-                                placeholder={question.label}
-                              />
-                              <div
-                                className={`mt-1 text-xs ${
-                                  intakeAnswers[question.key].trim().length >=
-                                  question.minLength
-                                    ? "text-slate-600"
-                                    : "text-amber-500/70"
-                                }`}
-                              >
-                                {intakeAnswers[question.key].trim().length}/
-                                {question.minLength}
-                              </div>
-                            </div>
-                          )}
-                        </div>
-                      ))}
-                    </div>
-                  </div>
-                ))}
               </div>
             </section>
           </div>
@@ -3077,7 +3079,7 @@ export function PatentSupport() {
   const patentRequestsQuery = useQuery({
     queryKey: ["patent-requests", "mine"],
     queryFn: () => patentRequestApi.mine(),
-    enabled: isStartupScoped,
+    refetchOnWindowFocus: false,
   });
   const startupQuery = useQuery({
     queryKey: ["startup", startupId],
@@ -3428,7 +3430,6 @@ export function PatentSupport() {
     [categorySlots],
   );
   const uploadedSupportCount = documentUploads.length;
-  const requiredDocsUploaded = uploadedSupportCount > 0;
 
   const allQuestionsValid = QUESTION_SECTIONS.every((section) =>
     section.questions.every((question) => {
@@ -3506,7 +3507,6 @@ export function PatentSupport() {
         {/* Patent Option Selection */}
         {hasPatentEligibleWorkspaces &&
         !patentOption &&
-        !submitted &&
         !hasSubmittedPatentFlow ? (
           <div className="space-y-4">
             <div className="text-xs uppercase tracking-[0.28em] text-cyan-300">
@@ -3586,19 +3586,15 @@ export function PatentSupport() {
 
         {/* Self-Upload Path - when user has existing patent */}
         {patentOption === "self-upload" && hasPatentEligibleWorkspaces ? (
-            <SelfUploadPatentForm
-              startupId={startupId}
-              activeWorkspace={activeWorkspace}
-              initialAnswers={startupPatentAnswers}
-              isStartupScoped={isStartupScoped}
-              workspaceId={workspaceId}
+          <SelfUploadPatentForm
+            activeWorkspace={activeWorkspace}
+            initialAnswers={startupPatentAnswers}
+            isStartupScoped={isStartupScoped}
+            workspaceId={workspaceId}
             setWorkspaceId={setWorkspaceId}
             projectTitle={projectTitle}
             setProjectTitle={setProjectTitle}
             patentEligibleWorkspaces={patentEligibleWorkspaces}
-            submitted={submitted}
-            setSubmitted={setSubmitted}
-            setPatentOption={setPatentOption}
             patentStage={patentStage}
             setPatentStage={setPatentStage}
             applicationNumber={applicationNumber}
@@ -3614,17 +3610,15 @@ export function PatentSupport() {
 
         {/* Admin-Assist Path - when user needs patent support */}
         {patentOption === "admin-assist" && hasPatentEligibleWorkspaces ? (
-            <AdminAssistPatentForm
-              startupId={startupId}
-              activeWorkspace={activeWorkspace}
-              initialAnswers={startupPatentAnswers}
-              isStartupScoped={isStartupScoped}
-              workspaceId={workspaceId}
+          <AdminAssistPatentForm
+            activeWorkspace={activeWorkspace}
+            initialAnswers={startupPatentAnswers}
+            isStartupScoped={isStartupScoped}
+            workspaceId={workspaceId}
             setWorkspaceId={setWorkspaceId}
             projectTitle={projectTitle}
             setProjectTitle={setProjectTitle}
             patentEligibleWorkspaces={patentEligibleWorkspaces}
-            setPatentOption={setPatentOption}
           />
         ) : null}
 
@@ -3804,6 +3798,7 @@ export function PatentSupport() {
                                   type="file"
                                   accept=".pdf,image/*"
                                   className="sr-only"
+                                  tabIndex={-1}
                                   disabled={isDisabled}
                                   onChange={(e) => {
                                     const file = e.target.files?.[0];
