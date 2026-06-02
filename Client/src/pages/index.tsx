@@ -105,7 +105,6 @@ const AdminMentorshipRequests = lazy(() => import("../features/admin/MentorshipR
 const AdminProblemBank = lazy(() => import("../features/admin/ProblemBank"));
 const AdminProblemLibrary = lazy(() => import("../features/admin/ProblemLibrary"));
 const AdminProblemReviewQueue = lazy(() => import("../features/admin/ProblemReviewQueue"));
-const AdminStudentOnboarding = lazy(() => import("../features/admin/AdminStudentOnboarding"));
 
 const RecruiterDashboard = lazy(() => import("../features/recruiter/RecruiterDashboardExperience"));
 const RecruiterOnboardingTracker = lazy(() => import("../features/recruiter/OnboardingTracker"));
@@ -826,7 +825,7 @@ export const router = createBrowserRouter([
                 path: "patent-requests",
                 element: <Navigate to="/dashboard/admin/patents/assisted-filing" replace />,
               },
-              { path: "student-onboarding", element: <LazyPage component={AdminStudentOnboarding} /> },
+              { path: "student-onboarding", element: <Navigate to="/dashboard/admin/onboarding/accounts" replace /> },
               { path: "startups", element: <LazyPage component={AdminStartups} /> },
               {
                 path: "deals",

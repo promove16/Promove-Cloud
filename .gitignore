@@ -34,3 +34,4 @@ infra/
 .codex-logs
 generate-local-env.js
 dump.rdb
+.claude/

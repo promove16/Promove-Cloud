@@ -787,9 +787,10 @@ export default function UserRequests({ roleFilter }: { roleFilter?: UserRole } =
   }
 
   const showComplianceLane = !roleFilter || isInstitutionRole;
+  const shouldSplitReviewLanes = showComplianceLane && !roleFilter;
 
   return (
-    <div className={`grid gap-10 xl:items-start ${showComplianceLane ? '2xl:grid-cols-2' : ''}`}>
+    <div className={`grid gap-10 xl:items-start ${shouldSplitReviewLanes ? '2xl:grid-cols-2' : ''}`}>
       <ReviewLane
         count={registrationItems.length}
         isLoading={registrationRequestsQuery.isLoading}

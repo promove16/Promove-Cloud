@@ -108,7 +108,6 @@ export const SIDEBAR_CONFIG: Record<UserRole, DashboardNavItem[]> = {
     { kind: 'link', label: 'Dashboard', icon: Home, path: '/dashboard/admin' },
     { kind: 'link', label: 'Problems', icon: Sparkles, path: '/dashboard/admin/problems' },
     { kind: 'link', label: 'Onboarding', icon: UserPlus, path: '/dashboard/admin/onboarding' },
-    { kind: 'link', label: 'Student Onboarding', icon: Users, path: '/dashboard/admin/student-onboarding' },
     { kind: 'link', label: 'Patents', icon: FileText, path: '/dashboard/admin/patents' },
     { kind: 'link', label: 'Startups', icon: Rocket, path: '/dashboard/admin/startups' },
     { kind: 'link', label: 'Deals', icon: BriefcaseBusiness, path: '/dashboard/admin/deals' },

@@ -92,7 +92,7 @@ const ROLE_ORDER: OnboardRole[] = [
 ];
 
 const inputCls =
-  'w-full rounded-lg border border-slate-800 bg-slate-950 px-4 py-3 text-sm text-white placeholder-slate-500 focus:border-cyan-500 focus:outline-none';
+  'w-full min-w-0 rounded-lg border border-slate-800 bg-slate-950 px-4 py-3 text-sm text-white placeholder-slate-500 focus:border-cyan-500 focus:outline-none';
 
 const emailDomain = (email?: string) => email?.trim().toLowerCase().split('@')[1] ?? '';
 
@@ -321,10 +321,10 @@ function InstitutionOnboardingForm({ role }: { role: UserRole.SCHOOL | UserRole.
   };
 
   return (
-    <div className="grid gap-6 lg:grid-cols-[1.1fr_0.9fr]">
-      <form onSubmit={handleSubmit} className="space-y-4 rounded-2xl border border-slate-800 bg-slate-900/60 p-6">
-        <div className="grid gap-4 sm:grid-cols-2">
-          <div>
+    <div className="grid gap-6">
+      <form onSubmit={handleSubmit} className="space-y-4 rounded-2xl border border-slate-800 bg-slate-900/60 p-5 sm:p-6">
+        <div className="grid gap-4 md:grid-cols-[minmax(0,1fr)_minmax(0,1fr)]">
+          <div className="min-w-0">
             <label className={formLabelClassName}>Admin contact name</label>
             <input
               value={form.displayName}
@@ -334,7 +334,7 @@ function InstitutionOnboardingForm({ role }: { role: UserRole.SCHOOL | UserRole.
               required
             />
           </div>
-          <div>
+          <div className="min-w-0">
             <label className={formLabelClassName}>Login email</label>
             <input
               type="email"
@@ -355,8 +355,8 @@ function InstitutionOnboardingForm({ role }: { role: UserRole.SCHOOL | UserRole.
             className={inputCls}
           />
         </div>
-        <div className="grid gap-4 sm:grid-cols-2">
-          <div>
+        <div className="grid gap-4 md:grid-cols-[minmax(0,1fr)_minmax(0,1fr)]">
+          <div className="min-w-0">
             <label className={formLabelClassName}>Location</label>
             <input
               value={form.location}
@@ -366,7 +366,7 @@ function InstitutionOnboardingForm({ role }: { role: UserRole.SCHOOL | UserRole.
               required
             />
           </div>
-          <div>
+          <div className="min-w-0">
             <label className={formLabelClassName}>Students enrolled</label>
             <input
               type="number"
@@ -378,8 +378,8 @@ function InstitutionOnboardingForm({ role }: { role: UserRole.SCHOOL | UserRole.
             />
           </div>
         </div>
-        <div className="grid gap-4 sm:grid-cols-2">
-          <div>
+        <div className="grid gap-4 md:grid-cols-[minmax(0,1fr)_minmax(0,1fr)]">
+          <div className="min-w-0">
             <label className={formLabelClassName}>Academic year</label>
             <input
               value={form.academicYear}
@@ -388,7 +388,7 @@ function InstitutionOnboardingForm({ role }: { role: UserRole.SCHOOL | UserRole.
               className={inputCls}
             />
           </div>
-          <div>
+          <div className="min-w-0">
             <label className={formLabelClassName}>Organization type</label>
             <input
               value={form.organizationType}
@@ -634,6 +634,7 @@ function StudentOnboardingSection() {
 export default function OnboardingAccounts() {
   const [role, setRole] = useState<OnboardRole>(UserRole.STUDENT);
   const meta = ROLE_META[role];
+  const isInstitutionRole = meta.kind === 'institution';
 
   return (
     <div className="space-y-8">
@@ -679,9 +680,15 @@ export default function OnboardingAccounts() {
         })}
       </div>
 
-      <div className="grid gap-8 xl:grid-cols-2">
-        <div>
-          <div className="mb-4 flex items-center gap-2 text-sm text-slate-300">
+      <div
+        className={`grid gap-8 ${
+          isInstitutionRole
+            ? '2xl:grid-cols-[minmax(0,1fr)_minmax(26rem,30rem)]'
+            : 'xl:grid-cols-2'
+        }`}
+      >
+        <div className="min-w-0">
+          <div className="mb-4 flex flex-wrap items-center gap-x-2 gap-y-1 text-sm text-slate-300">
             <Rocket className="h-4 w-4 text-cyan-300" />
             <span className="font-semibold text-white">{meta.label}</span>
             <span className="text-slate-500">· {meta.blurb}</span>
@@ -696,7 +703,13 @@ export default function OnboardingAccounts() {
           )}
         </div>
 
-        <div className="space-y-4 xl:border-l xl:border-slate-800/80 xl:pl-8">
+        <div
+          className={`space-y-4 ${
+            isInstitutionRole
+              ? '2xl:border-l 2xl:border-slate-800/80 2xl:pl-8'
+              : 'xl:border-l xl:border-slate-800/80 xl:pl-8'
+          }`}
+        >
           <div className="rounded-2xl border border-dashed border-slate-800 bg-slate-950/60 px-5 py-4 text-sm text-slate-400">
             <div className="text-xs font-semibold uppercase tracking-[0.22em] text-cyan-300">
               Direct requests
