@@ -17,6 +17,7 @@ import {
   RotateCcw,
   ShieldCheck,
   Sparkles,
+  Trash2,
   TrendingUp,
   Users,
   Wallet,
@@ -271,9 +272,12 @@ export default function Startups() {
   const queryClient = useQueryClient();
   const focusedStartupId = searchParams.get('startupId')?.trim() ?? '';
   const [status, setStatus] = useState<StartupReviewStatus | 'all'>('all');
-  const [feedback, setFeedback] = useState<string | null>(null);
+  const [feedback, setFeedback] = useState<{ message: string; tone: 'info' | 'error' } | null>(
+    null,
+  );
   const [notesByStartup, setNotesByStartup] = useState<Record<string, string>>({});
   const [selectedId, setSelectedId] = useState<string>('');
+  const [confirmDeleteId, setConfirmDeleteId] = useState<string>('');
 
   const startupsQuery = useQuery({
     queryKey: ['admin-startup-reviews', status],
@@ -287,11 +291,24 @@ export default function Startups() {
       payload: { decision: 'approved' | 'changes_requested'; adminNotes?: string };
     }) => adminApi.reviewStartup(params.startupId, params.payload),
     onSuccess: async () => {
-      setFeedback('Startup review updated.');
+      setFeedback({ message: 'Startup review updated.', tone: 'info' });
       await queryClient.invalidateQueries({ queryKey: ['admin-startup-reviews'] });
     },
     onError: (error) => {
-      setFeedback(getErrorMessage(error));
+      setFeedback({ message: getErrorMessage(error), tone: 'error' });
+    },
+  });
+
+  const deleteMutation = useMutation({
+    mutationFn: (startupId: string) => adminApi.deleteStartup(startupId),
+    onSuccess: async () => {
+      setFeedback({ message: 'Startup deleted.', tone: 'info' });
+      setConfirmDeleteId('');
+      setSelectedId('');
+      await queryClient.invalidateQueries({ queryKey: ['admin-startup-reviews'] });
+    },
+    onError: (error) => {
+      setFeedback({ message: getErrorMessage(error), tone: 'error' });
     },
   });
 
@@ -353,7 +370,10 @@ export default function Startups() {
     const adminNotes = notesByStartup[startup._id]?.trim();
 
     if (decision === 'changes_requested' && !adminNotes) {
-      setFeedback('Admin notes are required when requesting changes.');
+      setFeedback({
+        message: 'Admin notes are required when requesting changes.',
+        tone: 'error',
+      });
       return;
     }
 
@@ -397,8 +417,14 @@ export default function Startups() {
       </AdminPageHeader>
 
       {feedback ? (
-        <div className="rounded-2xl border border-cyan-500/20 bg-cyan-500/10 px-4 py-3 text-sm text-cyan-100">
-          {feedback}
+        <div
+          className={`rounded-2xl border px-4 py-3 text-sm ${
+            feedback.tone === 'error'
+              ? 'border-rose-500/30 bg-rose-500/10 text-rose-100'
+              : 'border-cyan-500/20 bg-cyan-500/10 text-cyan-100'
+          }`}
+        >
+          {feedback.message}
         </div>
       ) : null}
 
@@ -1088,6 +1114,56 @@ export default function Startups() {
                   </p>
                 </div>
               )}
+
+              {/* Danger zone — permanently remove the startup from the platform */}
+              <div className="mt-1 rounded-2xl border border-rose-500/25 bg-rose-500/5 p-4">
+                <div className="flex items-center gap-2 text-sm font-semibold text-rose-200">
+                  <Trash2 className="h-4 w-4" />
+                  Delete startup
+                </div>
+                <p className="mt-1 text-xs text-rose-100/70">
+                  Removes this startup from the marketplace and review queue. Blocked while active
+                  investor deals exist — cancel those first.
+                </p>
+                {confirmDeleteId === selected._id ? (
+                  <div className="mt-3 flex flex-wrap items-center gap-3">
+                    <span className="text-xs text-rose-100">
+                      Permanently delete <span className="font-semibold">{selected.name}</span>?
+                    </span>
+                    <Button
+                      variant="secondary"
+                      size="sm"
+                      onClick={() => deleteMutation.mutate(selected._id)}
+                      disabled={deleteMutation.isPending}
+                      className="border-rose-500/40 bg-rose-500/15 text-rose-100 hover:bg-rose-500/25"
+                    >
+                      <Trash2 className="mr-1.5 h-3.5 w-3.5" />
+                      {deleteMutation.isPending ? 'Deleting…' : 'Confirm delete'}
+                    </Button>
+                    <Button
+                      variant="secondary"
+                      size="sm"
+                      onClick={() => setConfirmDeleteId('')}
+                      disabled={deleteMutation.isPending}
+                    >
+                      Cancel
+                    </Button>
+                  </div>
+                ) : (
+                  <Button
+                    variant="secondary"
+                    size="sm"
+                    onClick={() => {
+                      setFeedback(null);
+                      setConfirmDeleteId(selected._id);
+                    }}
+                    className="mt-3 border-rose-500/40 bg-rose-500/10 text-rose-200 hover:bg-rose-500/20"
+                  >
+                    <Trash2 className="mr-1.5 h-3.5 w-3.5" />
+                    Delete startup
+                  </Button>
+                )}
+              </div>
             </Card>
           ) : null}
         </div>

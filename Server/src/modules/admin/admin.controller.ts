@@ -252,6 +252,13 @@ export const reviewStartupController = async (req: Request, res: Response) => {
   res.status(200).json(new ApiResponse(startup));
 };
 
+export const deleteStartupController = async (req: Request, res: Response) => {
+  if (!req.user) throw new ApiError(401, 'UNAUTHORIZED', 'Invalid or expired token');
+  const startupId = getParam(req.params.id);
+  if (!startupId || !isObjectId(startupId)) throw new ApiError(400, 'INVALID_ID', 'Invalid ID format');
+  res.status(200).json(new ApiResponse(await startupService.adminDeleteStartup(req.user._id, startupId)));
+};
+
 export const unlockLaunchFormController = async (req: Request, res: Response) => {
   if (!req.user) throw new ApiError(401, 'UNAUTHORIZED', 'Invalid or expired token');
   const startupId = getParam(req.params.id);

@@ -5,6 +5,7 @@ export type AdminAction =
   | 'STARTUP_CHANGES_REQUESTED'
   | 'STARTUP_AUTO_VERIFIED_BY_PATENT'
   | 'STARTUP_EDIT_UNLOCKED'
+  | 'STARTUP_DELETED'
   | 'DEAL_REJECTED'
   | 'PATENT_APPROVED'
   | 'PATENT_REJECTED'
@@ -56,6 +57,7 @@ const adminAuditLogSchema = new Schema<IAdminAuditLog>(
         'STARTUP_CHANGES_REQUESTED',
         'STARTUP_AUTO_VERIFIED_BY_PATENT',
         'STARTUP_EDIT_UNLOCKED',
+        'STARTUP_DELETED',
         'DEAL_REJECTED',
         'PATENT_APPROVED',
         'PATENT_REJECTED',

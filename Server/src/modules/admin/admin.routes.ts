@@ -46,6 +46,7 @@ import {
   reviewComplianceSubmissionController,
   reviewRegistrationRequestController,
   reviewStartupController,
+  deleteStartupController,
   unlockLaunchFormController,
   reviewMentorshipProgramController,
   resetSoleInvestorController,
@@ -188,6 +189,7 @@ router.patch('/deals/:id/review', asyncHandler(reviewDealController));
 router.patch('/deals/:id/investor-role', asyncHandler(updateDealInvestorRoleController));
 router.get('/startups', asyncHandler(getStartupReviewsController));
 router.patch('/startups/:id/review', asyncHandler(reviewStartupController));
+router.delete('/startups/:id', asyncHandler(deleteStartupController));
 router.patch('/startups/:id/unlock-launch-form', asyncHandler(unlockLaunchFormController));
 router.get('/startups/:id/cap-table', asyncHandler(getStartupCapTableController));
 router.get('/startups/:id/record', asyncHandler(getStartupRecordController));

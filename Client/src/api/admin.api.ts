@@ -858,6 +858,12 @@ export const adminApi = {
     );
     return response.data.data;
   },
+  async deleteStartup(startupId: string) {
+    const response = await api.delete<ApiSuccessResponse<{ deleted: true }>>(
+      `/api/admin/startups/${startupId}`,
+    );
+    return response.data.data;
+  },
   async getDeal(dealId: string) {
     const response = await api.get<ApiSuccessResponse<AdminDealReviewItem>>(`/api/admin/deals/${dealId}`);
     return response.data.data;

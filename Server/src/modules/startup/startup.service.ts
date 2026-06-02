@@ -2205,6 +2205,71 @@ export const deleteStartup = async (startupId: string, userId: string) => {
   await startup.save();
 };
 
+export const adminDeleteStartup = async (adminId: string, startupId: string) => {
+  const startup = await Startup.findById(startupId);
+
+  if (!startup || !startup.isActive) {
+    throw new ApiError(404, 'STARTUP_NOT_FOUND', 'Startup not found');
+  }
+
+  // Block deletion while investor deals are still live — capital and equity are in play.
+  const hasActiveDeals = await Deal.exists({
+    startupId: startup._id,
+    status: { $ne: 'cancelled' },
+  });
+
+  if (hasActiveDeals) {
+    throw new ApiError(
+      400,
+      'STARTUP_HAS_INVESTORS',
+      'Cannot delete a startup with active investor deals. Cancel all deals first.',
+    );
+  }
+
+  // Clean up pitch deck
+  await deleteStoredAsset({
+    storageProvider: startup.pitchDeckStorageProvider,
+    storageKey: startup.pitchDeckStorageKey,
+    cloudinaryPublicId: startup.pitchDeckCloudinaryPublicId,
+    legacyCloudinaryResourceType: 'raw',
+  });
+
+  // Clean up uploaded documents
+  await Promise.all(
+    startup.documents.map((document) =>
+      deleteStoredAsset({
+        storageProvider: document.storageProvider,
+        storageKey: document.storageKey,
+        cloudinaryPublicId: document.cloudinaryPublicId,
+        legacyCloudinaryResourceType: document.fileType === 'pdf' ? 'raw' : 'image',
+      }),
+    ),
+  );
+
+  const startupName = startup.name;
+  const founderIds = startup.founderIds.map((id) => String(id));
+  const wasLaunched =
+    startup.launchedToInvestors || startup.launchedToMentors || startup.launchedToRecruiters;
+
+  // Soft delete — keeps historical records intact and matches founder-side deletion.
+  startup.isActive = false;
+  await startup.save();
+
+  await AdminAuditLog.create({
+    adminId: new Types.ObjectId(adminId),
+    action: 'STARTUP_DELETED',
+    targetId: startup._id,
+    targetModel: 'Startup',
+    metadata: {
+      name: startupName,
+      founderIds,
+      wasLaunched,
+    },
+  });
+
+  return { deleted: true as const };
+};
+
 export const promoteToCoFounder = async (startupId: string, userId: string, memberId: string) => {
   const startup = await getStartupForFounder(startupId, userId);
   prepareStartupForEditableMutation(startup);
