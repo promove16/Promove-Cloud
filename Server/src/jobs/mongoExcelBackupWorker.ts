@@ -14,6 +14,7 @@ import { env } from '../config/env';
 import { logError, logger } from '../config/logger';
 import { runMongoDisasterBackup } from '../services/mongoDisasterBackupService';
 import { runMongoExcelBackup } from '../services/mongoExcelBackupService';
+import { runMongoNativeBackup } from '../services/mongoNativeBackupService';
 
 type MongoExcelBackupJobData = {
   type: 'mongo_excel_backup';
@@ -35,11 +36,34 @@ export const startMongoExcelBackupWorker = () =>
         return;
       }
 
+      // Run each backup independently so one failing engine (e.g. a missing
+      // mongodump binary) does not prevent the others from completing.
+      const steps: { name: string; run: () => Promise<unknown> }[] = [];
+      if (env.MONGO_NATIVE_BACKUP_ENABLED) {
+        steps.push({ name: 'native', run: runMongoNativeBackup });
+      }
       if (env.MONGO_DISASTER_BACKUP_ENABLED) {
-        await runMongoDisasterBackup();
+        steps.push({ name: 'disaster', run: runMongoDisasterBackup });
+      }
+      steps.push({ name: 'excel', run: runMongoExcelBackup });
+
+      const failures: { name: string; error: unknown }[] = [];
+      for (const step of steps) {
+        try {
+          await step.run();
+        } catch (error) {
+          failures.push({ name: step.name, error });
+          logError(`Mongo ${step.name} backup failed`, error);
+        }
       }
 
-      await runMongoExcelBackup();
+      // Surface failure to BullMQ only if every backup engine failed, so a
+      // partial success is not retried into duplicate uploads.
+      if (failures.length === steps.length) {
+        throw new Error(
+          `All Mongo backups failed: ${failures.map((failure) => failure.name).join(', ')}`,
+        );
+      }
     },
     {
       concurrency: 1,
@@ -111,6 +135,7 @@ export const scheduleMongoExcelBackupJob = async () => {
       cron: env.MONGO_EXCEL_BACKUP_CRON,
       timezone: env.MONGO_EXCEL_BACKUP_TIMEZONE,
       retentionDays: env.MONGO_EXCEL_BACKUP_RETENTION_DAYS,
+      nativeBackupEnabled: env.MONGO_NATIVE_BACKUP_ENABLED,
       disasterBackupEnabled: env.MONGO_DISASTER_BACKUP_ENABLED,
     });
 

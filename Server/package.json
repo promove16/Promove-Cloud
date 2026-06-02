@@ -24,6 +24,8 @@
     "backup:mongo:excel:dev": "node -e \"process.env.TS_NODE_PREFER_TS_EXTS='true'; require('ts-node/register/transpile-only'); require('./src/maintenance/backupMongoToS3.ts');\"",
     "backup:mongo": "node dist/src/maintenance/backupMongoToS3.js",
     "backup:mongo:dev": "node -e \"process.env.TS_NODE_PREFER_TS_EXTS='true'; require('ts-node/register/transpile-only'); require('./src/maintenance/backupMongoToS3.ts');\"",
+    "restore:mongo": "node dist/src/maintenance/restoreMongoFromS3.js",
+    "restore:mongo:dev": "node -e \"process.env.TS_NODE_PREFER_TS_EXTS='true'; require('ts-node/register/transpile-only'); require('./src/maintenance/restoreMongoFromS3.ts');\"",
     "user:reset-password": "node dist/src/maintenance/resetUserPassword.js",
     "user:reset-password:dev": "node -e \"process.env.TS_NODE_PREFER_TS_EXTS='true'; require('ts-node/register/transpile-only'); require('./src/maintenance/resetUserPassword.ts');\"",
     "problem-bank:replace": "ts-node --transpile-only ./src/modules/problemBank/replaceProblemBank.ts --force",

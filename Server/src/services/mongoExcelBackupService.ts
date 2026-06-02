@@ -13,7 +13,7 @@ import { randomUUID } from 'crypto';
 import mongoose from 'mongoose';
 import type { Collection, Document, WithId } from 'mongodb';
 import { env } from '../config/env';
-import { logger } from '../config/logger';
+import { logError, logger } from '../config/logger';
 
 const XLSX_CONTENT_TYPE = 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet';
 const EXCEL_CELL_LIMIT = 32767;
@@ -352,10 +352,13 @@ export const runMongoExcelBackup = async (): Promise<MongoExcelBackupResult> => 
       collections: result.collections.length,
     });
 
-    await deleteExpiredMongoExcelBackups({
-      s3,
-      currentBackupKey: key,
-    });
+    // Best-effort: a cleanup failure (e.g. missing s3:ListBucket/DeleteObject)
+    // must not fail an already-successful backup.
+    try {
+      await deleteExpiredMongoExcelBackups({ s3, currentBackupKey: key });
+    } catch (error) {
+      logError('Failed to prune expired Mongo Excel backups (backup itself succeeded)', error);
+    }
 
     return result;
   } finally {

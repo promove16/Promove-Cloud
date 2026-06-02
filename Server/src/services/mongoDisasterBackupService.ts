@@ -11,7 +11,7 @@ import path from 'path';
 import { randomUUID } from 'crypto';
 import { spawn } from 'child_process';
 import { env } from '../config/env';
-import { logger } from '../config/logger';
+import { logError, logger } from '../config/logger';
 
 const ARCHIVE_CONTENT_TYPE = 'application/gzip';
 
@@ -141,10 +141,13 @@ export const runMongoDisasterBackup = async (): Promise<MongoDisasterBackupResul
       fileSizeBytes: result.fileSizeBytes,
     });
 
-    await deleteExpiredMongoDisasterBackups({
-      s3,
-      currentBackupKey: key,
-    });
+    // Best-effort: a cleanup failure (e.g. missing s3:ListBucket/DeleteObject)
+    // must not fail an already-successful backup.
+    try {
+      await deleteExpiredMongoDisasterBackups({ s3, currentBackupKey: key });
+    } catch (error) {
+      logError('Failed to prune expired Mongo disaster backups (backup itself succeeded)', error);
+    }
 
     return result;
   } finally {

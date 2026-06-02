@@ -107,6 +107,9 @@ const envSchema = z.object({
   MONGO_DISASTER_BACKUP_ENABLED: booleanFromEnv.default(false),
   MONGO_DISASTER_BACKUP_S3_PREFIX: z.string().min(1).default("backups/mongo-archive"),
   MONGODUMP_BIN: z.string().min(1).default("mongodump"),
+  // Pure-Node restorable backup (no mongodump binary required).
+  MONGO_NATIVE_BACKUP_ENABLED: booleanFromEnv.default(false),
+  MONGO_NATIVE_BACKUP_S3_PREFIX: z.string().min(1).default("backups/mongo-native"),
   GROQ_API_KEY: z.string().min(1).optional(),
   GROQ_MODEL: z.string().min(1).default("llama-3.1-8b-instant"),
   GROQ_BASE_URL: z

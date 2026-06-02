@@ -3,9 +3,13 @@ import { env } from '../config/env';
 import { logError, logger } from '../config/logger';
 import { runMongoDisasterBackup } from '../services/mongoDisasterBackupService';
 import { runMongoExcelBackup } from '../services/mongoExcelBackupService';
+import { runMongoNativeBackup } from '../services/mongoNativeBackupService';
 
 const run = async () => {
   await connectDB();
+  const nativeResult = env.MONGO_NATIVE_BACKUP_ENABLED
+    ? await runMongoNativeBackup()
+    : null;
   const disasterResult = env.MONGO_DISASTER_BACKUP_ENABLED
     ? await runMongoDisasterBackup()
     : null;
@@ -15,12 +19,21 @@ const run = async () => {
     s3Uri: excelResult.s3Uri,
     fileSizeBytes: excelResult.fileSizeBytes,
     collections: excelResult.collections.length,
+    nativeBackupS3Uri: nativeResult?.s3Uri,
     disasterBackupS3Uri: disasterResult?.s3Uri,
   });
 
   console.log(
     JSON.stringify(
       {
+        nativeBackup: nativeResult
+          ? {
+              s3Uri: nativeResult.s3Uri,
+              fileSizeBytes: nativeResult.fileSizeBytes,
+              generatedAt: nativeResult.generatedAt,
+              collections: nativeResult.collections.length,
+            }
+          : null,
         disasterBackup: disasterResult
           ? {
               s3Uri: disasterResult.s3Uri,

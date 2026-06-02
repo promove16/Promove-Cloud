@@ -471,6 +471,25 @@ SCHEDULER_HEALTH_PORT=${PORT_SCHEDULER_HEALTH}
 SCHEDULER_RESCHEDULE_INTERVAL_MS=3600000
 ENVEOF
 
+# Daily MongoDB backups to S3. Only enabled when an S3 bucket is configured.
+# Native = pure-Node restorable EJSON archive (no mongodump binary needed).
+# Excel  = inspection workbook; its flag also drives the daily scheduler.
+if [[ -n "$AWS_S3_BUCKET_NAME" ]]; then
+  cat >> "$SERVER_DIR/.env" <<ENVEOF
+
+# ---------------------------------------------------------------------------
+# MongoDB -> S3 backups
+# ---------------------------------------------------------------------------
+MONGO_EXCEL_BACKUP_ENABLED=true
+MONGO_NATIVE_BACKUP_ENABLED=true
+MONGO_EXCEL_BACKUP_CRON=0 2 * * *
+MONGO_EXCEL_BACKUP_RETENTION_DAYS=30
+ENVEOF
+  log "MongoDB daily S3 backups enabled (native + excel)"
+else
+  warn "S3 not configured — MongoDB backups disabled. Set AWS_S3_BUCKET_NAME to enable."
+fi
+
 chown "$APP_USER:$APP_USER" "$SERVER_DIR/.env"
 chmod 600 "$SERVER_DIR/.env"
 log "Server/.env created (permissions: 600)"

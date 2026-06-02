@@ -13,3 +13,4 @@ docs/docs/
 .tmp-*.json
 .postman/
 postman/
+.claude/
