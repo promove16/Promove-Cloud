@@ -451,6 +451,7 @@ export function DashboardLayout({ children, role }: PropsWithChildren<DashboardL
   const [sidebarOpen, setSidebarOpen] = useState(false);
   const queryClient = useQueryClient();
   const autoMarkedNotificationIds = useRef<Set<string>>(new Set());
+  const mainScrollRef = useRef<HTMLElement | null>(null);
 
   const resolvedRole = user?.role ?? role;
   const navItems = resolvedRole ? SIDEBAR_CONFIG[resolvedRole] : [];
@@ -550,6 +551,10 @@ export function DashboardLayout({ children, role }: PropsWithChildren<DashboardL
         });
     });
   }, [location.pathname, notifications, queryClient]);
+
+  useEffect(() => {
+    mainScrollRef.current?.scrollTo({ top: 0, left: 0 });
+  }, [location.pathname]);
 
   const isPathActive = (path: string, exact = false) => matchesPath(location.pathname, path, exact);
 
@@ -867,6 +872,7 @@ export function DashboardLayout({ children, role }: PropsWithChildren<DashboardL
           ) : null}
 
           <main
+            ref={mainScrollRef}
             className={`flex min-h-0 flex-1 flex-col overflow-y-auto ${
               shouldUseFullBleedMain ? 'min-w-0 p-0' : 'min-w-0 px-4 py-6 lg:px-8'
             }`}

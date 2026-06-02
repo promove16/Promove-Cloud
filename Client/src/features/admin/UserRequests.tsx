@@ -1,6 +1,6 @@
 import { useState, type ReactNode } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
-import { Check, ExternalLink, FileCheck2, ShieldCheck, UserCheck, X } from 'lucide-react';
+import { Check, ExternalLink, FileCheck2, X } from 'lucide-react';
 import { adminApi, type AdminRegistrationRequestItem } from '../../api/admin.api';
 import { toast } from '../../app/components/ui/sonner';
 import { Spinner } from '../../components/ui/Spinner';
@@ -232,65 +232,24 @@ function DecisionPanel({
 }
 
 function ReviewLane({
-  eyebrow,
-  title,
-  description,
   count,
   isLoading,
-  emptyTitle,
-  emptyDescription,
-  icon: Icon,
-  accentColor,
   children,
 }: {
-  eyebrow: string;
-  title: string;
-  description: string;
   count: number;
   isLoading: boolean;
-  emptyTitle: string;
-  emptyDescription: string;
-  icon: React.ElementType;
-  accentColor: 'violet' | 'cyan';
   children: ReactNode;
 }) {
-  const cls = accentColor === 'violet'
-    ? { eyebrow: 'bg-violet-500/10 text-violet-300 ring-1 ring-violet-500/20', dot: 'bg-violet-400', count: 'bg-violet-500/10 text-violet-300 ring-1 ring-violet-400/20', iconBg: 'bg-violet-500/10 text-violet-400' }
-    : { eyebrow: 'bg-cyan-500/10 text-cyan-300 ring-1 ring-cyan-500/20',       dot: 'bg-cyan-400',   count: 'bg-cyan-500/10 text-cyan-300 ring-1 ring-cyan-400/20',     iconBg: 'bg-cyan-500/10 text-cyan-400'   };
+  if (!isLoading && count === 0) {
+    return null;
+  }
 
   return (
-    <section className="flex flex-col gap-6">
-      <div className="space-y-4">
-        <div className="flex flex-wrap items-start justify-between gap-4">
-          <div className="space-y-3">
-            <span className={`inline-flex items-center gap-2 rounded-full px-3 py-1 text-[11px] font-semibold uppercase tracking-[0.22em] ${cls.eyebrow}`}>
-              <span className={`h-1.5 w-1.5 rounded-full ${cls.dot}`} />
-              {eyebrow}
-            </span>
-            <h2 className="text-xl font-bold tracking-tight text-white sm:text-2xl">{title}</h2>
-            <p className="max-w-md text-sm leading-6 text-slate-400">{description}</p>
-          </div>
-          <span className={`inline-flex items-center rounded-full px-3 py-1.5 text-sm font-bold tabular-nums ${cls.count}`}>
-            {count} to review
-          </span>
-        </div>
-        <div className="h-px bg-slate-800" />
-      </div>
-
+    <section className="flex flex-col">
       <div className="flex-1">
         {isLoading ? (
           <div className="flex min-h-36 items-center justify-center rounded-2xl border border-slate-800 bg-slate-900">
             <Spinner />
-          </div>
-        ) : count === 0 ? (
-          <div className="flex min-h-32 items-center gap-5 rounded-2xl border border-slate-800 bg-slate-900 px-6 py-5">
-            <div className={`flex h-12 w-12 shrink-0 items-center justify-center rounded-2xl ${cls.iconBg}`}>
-              <Icon className="h-5 w-5" />
-            </div>
-            <div className="space-y-1">
-              <p className="text-sm font-semibold text-slate-100">{emptyTitle}</p>
-              <p className="text-sm leading-6 text-slate-500">{emptyDescription}</p>
-            </div>
           </div>
         ) : (
           <div className="grid max-h-[calc(100vh-20rem)] grid-cols-[repeat(auto-fit,minmax(min(100%,22rem),1fr))] gap-5 overflow-y-auto pr-1 [scrollbar-color:rgba(100,116,139,0.3)_transparent] [scrollbar-width:thin]">
@@ -747,7 +706,7 @@ function RegistrationRequestCard({
 
 // ─── page ─────────────────────────────────────────────────────────────────────
 
-export default function UserRequests() {
+export default function UserRequests({ roleFilter }: { roleFilter?: UserRole } = {}) {
   const queryClient = useQueryClient();
   const [registrationRejectReasons, setRegistrationRejectReasons] = useState<Record<string, string>>({});
   const [complianceRejectNotes, setComplianceRejectNotes] = useState<Record<string, string>>({});
@@ -804,20 +763,38 @@ export default function UserRequests() {
   const allComplianceSubmissions = [...pendingSubmissions, ...editRequestedSubmissions];
   const isComplianceLoading = complianceSubmissionsQuery.isLoading || editRequestedSubmissionsQuery.isLoading;
 
+  const isStudentRole = roleFilter === UserRole.STUDENT;
+  const isInstitutionRole = roleFilter === UserRole.SCHOOL || roleFilter === UserRole.COLLEGE;
+
+  // Only surface the approval cards that match the selected role.
+  const registrationItems = roleFilter
+    ? pendingRequests.filter((req) => req.role === roleFilter)
+    : pendingRequests;
+  const complianceItems = !roleFilter
+    ? allComplianceSubmissions
+    : isInstitutionRole
+      ? allComplianceSubmissions.filter((sub) => sub.institutionType === roleFilter)
+      : [];
+
+  // Students have no public sign-up requests — they are managed inside the institution.
+  if (isStudentRole) {
+    return (
+      <div className="rounded-2xl border border-dashed border-slate-800 bg-slate-900 px-6 py-12 text-center text-sm text-slate-400">
+        Student approvals happen inside the school or college workspace, not as public sign-up
+        requests. Use the roster tools on the left to invite or create student accounts.
+      </div>
+    );
+  }
+
+  const showComplianceLane = !roleFilter || isInstitutionRole;
+
   return (
-    <div className="grid gap-10 xl:grid-cols-2 xl:items-start">
+    <div className={`grid gap-10 xl:items-start ${showComplianceLane ? '2xl:grid-cols-2' : ''}`}>
       <ReviewLane
-        eyebrow="Registration Requests"
-        title="Approve public sign-up requests"
-        description="Review institution and operator accounts before access is enabled. Student roster approvals stay inside the school or college workspace."
-        count={pendingRequests.length}
+        count={registrationItems.length}
         isLoading={registrationRequestsQuery.isLoading}
-        emptyTitle="No registration requests are waiting"
-        emptyDescription="New school, college, and operator sign-ups will appear here when they request access."
-        icon={UserCheck}
-        accentColor="violet"
       >
-        {pendingRequests.map((req) => (
+        {registrationItems.map((req) => (
           <RegistrationRequestCard
             key={req._id}
             request={req}
@@ -834,33 +811,28 @@ export default function UserRequests() {
         ))}
       </ReviewLane>
 
-      <ReviewLane
-        eyebrow="Compliance Verification"
-        title="Review institution policy submissions"
-        description="Approve evidence-backed policy packets or review edit requests before they update the verified compliance dashboard state."
-        count={allComplianceSubmissions.length}
-        isLoading={isComplianceLoading}
-        emptyTitle="No compliance packets are waiting"
-        emptyDescription="Submitted school, college packets, and edit requests will appear here."
-        icon={ShieldCheck}
-        accentColor="cyan"
-      >
-        {allComplianceSubmissions.map((sub) => (
-          <ComplianceSubmissionCard
-            key={sub._id}
-            submission={sub}
-            rejectNote={complianceRejectNotes[sub._id] ?? ''}
-            onRejectNoteChange={(v) => setComplianceRejectNotes((c) => ({ ...c, [sub._id]: v }))}
-            isPending={reviewComplianceMutation.isPending}
-            onApprove={(id) => reviewComplianceMutation.mutate({ submissionId: id, decision: 'approved' })}
-            onReject={(id) => reviewComplianceMutation.mutate({
-              submissionId: id,
-              decision: 'rejected',
-              adminNotes: complianceRejectNotes[id]?.trim(),
-            })}
-          />
-        ))}
-      </ReviewLane>
+      {showComplianceLane ? (
+        <ReviewLane
+          count={complianceItems.length}
+          isLoading={isComplianceLoading}
+        >
+          {complianceItems.map((sub) => (
+            <ComplianceSubmissionCard
+              key={sub._id}
+              submission={sub}
+              rejectNote={complianceRejectNotes[sub._id] ?? ''}
+              onRejectNoteChange={(v) => setComplianceRejectNotes((c) => ({ ...c, [sub._id]: v }))}
+              isPending={reviewComplianceMutation.isPending}
+              onApprove={(id) => reviewComplianceMutation.mutate({ submissionId: id, decision: 'approved' })}
+              onReject={(id) => reviewComplianceMutation.mutate({
+                submissionId: id,
+                decision: 'rejected',
+                adminNotes: complianceRejectNotes[id]?.trim(),
+              })}
+            />
+          ))}
+        </ReviewLane>
+      ) : null}
     </div>
   );
 }

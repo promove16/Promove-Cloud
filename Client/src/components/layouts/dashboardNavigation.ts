@@ -10,8 +10,8 @@ import {
   Home,
   MessageCircle,
   Rocket,
-  ShieldCheck,
   Sparkles,
+  UserPlus,
   Users,
   type LucideIcon,
 } from 'lucide-react';
@@ -107,7 +107,7 @@ export const SIDEBAR_CONFIG: Record<UserRole, DashboardNavItem[]> = {
   [UserRole.ADMIN]: [
     { kind: 'link', label: 'Dashboard', icon: Home, path: '/dashboard/admin' },
     { kind: 'link', label: 'Problems', icon: Sparkles, path: '/dashboard/admin/problems' },
-    { kind: 'link', label: 'Access Control', icon: ShieldCheck, path: '/dashboard/admin/users' },
+    { kind: 'link', label: 'Onboarding', icon: UserPlus, path: '/dashboard/admin/onboarding' },
     { kind: 'link', label: 'Patents', icon: FileText, path: '/dashboard/admin/patents' },
     { kind: 'link', label: 'Startups', icon: Rocket, path: '/dashboard/admin/startups' },
     { kind: 'link', label: 'Deals', icon: BriefcaseBusiness, path: '/dashboard/admin/deals' },

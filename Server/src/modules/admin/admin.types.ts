@@ -202,6 +202,64 @@ export interface AdminAwardItem {
   };
 }
 
+export interface AdminStartupRecordInvestor {
+  dealId: string;
+  investorId: string;
+  investorName: string;
+  investorType: 'penny' | 'sole';
+  amountINR?: number;
+  equityPercent?: number;
+  sharesAllocated?: number;
+  stage: number;
+  status: 'active' | 'closed' | 'cancelled';
+  investorRole?: 'shareholder' | 'director' | 'observer';
+  royaltyOwedINR?: number;
+  createdAt: string;
+}
+
+export interface AdminStartupRecordAuditEntry {
+  _id: string;
+  action: string;
+  adminId: string;
+  adminName: string;
+  targetModel: string;
+  metadata?: Record<string, unknown>;
+  createdAt: string;
+}
+
+export interface AdminStartupRecord {
+  startupId: string;
+  funds: {
+    totalRaisedINR: number;
+    totalRoyaltyOwedINR: number;
+    activeDealCount: number;
+    closedDealCount: number;
+    cancelledDealCount: number;
+    pennyInvestorCount: number;
+    soleInvestorCount: number;
+    capTable: {
+      totalShares: number;
+      availableShares: number;
+      founderRetainedEquity: number;
+      totalInvestorEquity: number;
+    };
+  };
+  marketReach: {
+    launchedToInvestors: boolean;
+    launchedToMentors: boolean;
+    launchedAt?: string;
+    innovationScoreAtLaunch: number;
+    traction: {
+      patentFiled: boolean;
+      mvpBuilt: boolean;
+      revenueGenerating: boolean;
+      usersCount?: number;
+    };
+  };
+  investors: AdminStartupRecordInvestor[];
+  auditTrail: AdminStartupRecordAuditEntry[];
+}
+
 export interface AdminDealItem {
   _id: string;
   investorId: string;
@@ -440,3 +498,18 @@ export type AdminCreateMentorshipProgramPayload = AdminCreateInstitutionMentorsh
 export type AdminMentorshipProgramReviewPayload = InstitutionMentorshipProgramReviewInput;
 export type AdminMentorListItem = MentorshipAdminMentorItem;
 export type AdminCreatedMentorProfile = CreatedMentorProfileResult;
+
+export interface AdminOnboardedAccount {
+  user: {
+    _id: string;
+    displayName: string;
+    email: string;
+    role: UserRole;
+    domain?: string;
+    headline?: string;
+    bio?: string;
+    institutionName?: string;
+    createdAt: string;
+  };
+  temporaryPassword: string;
+}

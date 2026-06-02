@@ -12,7 +12,7 @@ const temporaryLinks = [
   {
     label: 'Manage Users',
     description: 'Review access, approvals, and operator activity from the current admin workspace.',
-    path: '/dashboard/admin/users/directory',
+    path: '/dashboard/admin/onboarding/directory',
     icon: Users,
   },
 ];

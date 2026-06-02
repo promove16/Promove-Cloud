@@ -8,6 +8,13 @@ import { ApiError } from '../../utils/ApiError';
 import {
   createAdminMentorshipProgramController,
   createMentorProfileController,
+  onboardAccountController,
+  listOnboardingInstitutionRosterController,
+  createOnboardingInstitutionRosterEntryController,
+  cancelOnboardingInstitutionRosterInviteController,
+  createOnboardingInstitutionStudentCredentialsController,
+  importOnboardingInstitutionRosterController,
+  importOnboardingInstitutionRosterWithCredentialsController,
   approveRegistrationRequestController,
   approveAwardController,
   approveDealStageController,
@@ -23,6 +30,7 @@ import {
   getMentorshipProgramsController,
   getRegistrationRequestsController,
   getStartupCapTableController,
+  getStartupRecordController,
   getStartupReviewsController,
   getAwardsController,
   getDealController,
@@ -74,6 +82,10 @@ import {
 } from '../patent/patentConversation.controller';
 
 const router = Router();
+const rosterUpload = multer({
+  storage: multer.memoryStorage(),
+  limits: { fileSize: 5 * 1024 * 1024 },
+});
 const pdfFileNamePattern = /\.pdf$/i;
 const patentHandoverUpload = multer({
   storage: multer.memoryStorage(),
@@ -109,6 +121,35 @@ router.delete('/users/:id', asyncHandler(deleteUserController));
 router.patch('/users/:id/registration-request', asyncHandler(reviewRegistrationRequestController));
 router.get('/mentors', asyncHandler(getMentorsController));
 router.post('/mentors', asyncHandler(createMentorProfileController));
+
+// ── Multipurpose onboarding ──────────────────────────────────────────────────
+router.post('/onboarding/accounts', asyncHandler(onboardAccountController));
+router.get(
+  '/onboarding/institutions/:institutionId/roster',
+  asyncHandler(listOnboardingInstitutionRosterController),
+);
+router.post(
+  '/onboarding/institutions/:institutionId/roster/manual',
+  asyncHandler(createOnboardingInstitutionRosterEntryController),
+);
+router.delete(
+  '/onboarding/institutions/:institutionId/roster/:rosterEntryId',
+  asyncHandler(cancelOnboardingInstitutionRosterInviteController),
+);
+router.post(
+  '/onboarding/institutions/:institutionId/student-credentials',
+  asyncHandler(createOnboardingInstitutionStudentCredentialsController),
+);
+router.post(
+  '/onboarding/institutions/:institutionId/roster/import',
+  rosterUpload.single('file'),
+  asyncHandler(importOnboardingInstitutionRosterController),
+);
+router.post(
+  '/onboarding/institutions/:institutionId/roster/import-credentials',
+  rosterUpload.single('file'),
+  asyncHandler(importOnboardingInstitutionRosterWithCredentialsController),
+);
 router.get('/mentorship-programs', asyncHandler(getMentorshipProgramsController));
 router.post('/mentorship-programs', asyncHandler(createAdminMentorshipProgramController));
 router.patch('/mentorship-programs/:id', asyncHandler(reviewMentorshipProgramController));
@@ -149,6 +190,7 @@ router.get('/startups', asyncHandler(getStartupReviewsController));
 router.patch('/startups/:id/review', asyncHandler(reviewStartupController));
 router.patch('/startups/:id/unlock-launch-form', asyncHandler(unlockLaunchFormController));
 router.get('/startups/:id/cap-table', asyncHandler(getStartupCapTableController));
+router.get('/startups/:id/record', asyncHandler(getStartupRecordController));
 router.post('/startups/:id/reset-sole-investor', asyncHandler(resetSoleInvestorController));
 router.get('/investments/by-type', asyncHandler(getInvestmentTypeAnalyticsController));
 router.patch('/milestones/:id/verify', asyncHandler(verifyMilestoneController));

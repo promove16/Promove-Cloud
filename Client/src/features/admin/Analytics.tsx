@@ -5,6 +5,7 @@ import { adminApi, type AdminAnalyticsData } from '../../api/admin.api';
 import { getOptionTabClassName, getOptionTabsListClassName } from '../../components/ui/OptionTabs';
 import { Spinner } from '../../components/ui/Spinner';
 import { ADMIN_ANALYTICS_SECTION_LINKS } from './analyticsNavigation';
+import { AdminPageHeader } from './AdminPageHeader';
 
 export interface AdminAnalyticsOutletContext {
   analytics: AdminAnalyticsData;
@@ -32,35 +33,31 @@ export default function Analytics() {
 
   const handleRoleSelect = useCallback(
     (role: string) => {
-      navigate(`/dashboard/admin/users/directory?role=${encodeURIComponent(role)}`);
+      navigate(`/dashboard/admin/onboarding/directory?role=${encodeURIComponent(role)}`);
     },
     [navigate],
   );
 
+  const analytics = analyticsQuery.data;
+
   return (
     <div className="space-y-8">
-      <section className="border-b border-slate-800/80 pb-3">
-        <div className="px-1 pb-6">
-          <div className="grid gap-5 2xl:grid-cols-[minmax(0,1fr),auto] 2xl:items-end">
-            <div className="min-w-0 max-w-3xl">
-              <div className="text-[11px] uppercase tracking-[0.35em] text-cyan-300">Admin Analytics</div>
-              <h1 className="mt-3 text-2xl font-semibold tracking-tight text-white sm:text-3xl">{activeSection.label}</h1>
-              <p className="mt-3 max-w-2xl text-sm leading-6 text-slate-400">{activeSection.description}</p>
-            </div>
-
-            {analyticsQuery.data ? (
-              <div className="text-sm text-slate-400">
-                <span className="font-medium text-slate-100">{analyticsQuery.data.totalUsers}</span> users
-                <span className="mx-2 text-slate-700">/</span>
-                <span className="font-medium text-slate-100">{analyticsQuery.data.activeThisWeek}</span> active this week
-                <span className="mx-2 text-slate-700">/</span>
-                <span className="font-medium text-slate-100">{analyticsQuery.data.dealConversionRate}%</span> deal completion
-              </div>
-            ) : null}
-          </div>
-        </div>
-
-        <div className="overflow-x-auto px-1">
+      <AdminPageHeader
+        eyebrow="Admin Analytics"
+        title={activeSection.label}
+        description={activeSection.description}
+        stats={
+          analytics
+            ? [
+                { label: 'Total Users', value: analytics.totalUsers, accent: 'cyan' },
+                { label: 'Active This Week', value: analytics.activeThisWeek, accent: 'emerald' },
+                { label: 'Deal Completion', value: `${analytics.dealConversionRate}%`, accent: 'violet' },
+                { label: 'Total Deals', value: analytics.totalDeals, accent: 'amber' },
+              ]
+            : undefined
+        }
+      >
+        <div className="overflow-x-auto">
           <div className={getOptionTabsListClassName()}>
             {ADMIN_ANALYTICS_SECTION_LINKS.map((section) => {
               const isActive = location.pathname === section.path || location.pathname.startsWith(`${section.path}/`);
@@ -81,7 +78,7 @@ export default function Analytics() {
             })}
           </div>
         </div>
-      </section>
+      </AdminPageHeader>
 
       {analyticsQuery.isLoading ? (
         <div className="flex items-center justify-center py-20">

@@ -79,8 +79,8 @@ const MentorSessions = lazy(() => import("../features/mentor/Sessions"));
 const MentorMarketplace = lazy(() => import("../features/mentor/MentorMarketplace"));
 
 const AdminDashboard = lazy(() => import("../features/admin/Dashboard"));
-const AdminUserManagement = lazy(() => import("../features/admin/UserManagement"));
-const AdminUserRequests = lazy(() => import("../features/admin/UserRequests"));
+const AdminOnboarding = lazy(() => import("../features/admin/Onboarding"));
+const AdminOnboardingAccounts = lazy(() => import("../features/admin/OnboardingAccounts"));
 const AdminUserDirectory = lazy(() => import("../features/admin/UserDirectory"));
 const AdminPatentsWorkspace = lazy(() => import("../features/admin/PatentsWorkspace"));
 const AdminPatents = lazy(() => import("../features/admin/Patents"));
@@ -797,14 +797,20 @@ export const router = createBrowserRouter([
                 ],
               },
               {
-                path: "users",
-                element: <LazyPage component={AdminUserManagement} />,
+                path: "onboarding",
+                element: <LazyPage component={AdminOnboarding} />,
                 children: [
-                  { index: true, element: <Navigate to="requests" replace /> },
-                  { path: "requests", element: <LazyPage component={AdminUserRequests} /> },
+                  { index: true, element: <Navigate to="accounts" replace /> },
+                  { path: "accounts", element: <LazyPage component={AdminOnboardingAccounts} /> },
+                  // Requests are merged into the Onboard view — redirect legacy links.
+                  { path: "requests", element: <Navigate to="/dashboard/admin/onboarding/accounts" replace /> },
                   { path: "directory", element: <LazyPage component={AdminUserDirectory} /> },
                 ],
               },
+              // Access Control merged into Onboarding — keep old links working.
+              { path: "users", element: <Navigate to="/dashboard/admin/onboarding/accounts" replace /> },
+              { path: "users/requests", element: <Navigate to="/dashboard/admin/onboarding/accounts" replace /> },
+              { path: "users/directory", element: <Navigate to="/dashboard/admin/onboarding/directory" replace /> },
               {
                 path: "patents",
                 element: <LazyPage component={AdminPatentsWorkspace} />,

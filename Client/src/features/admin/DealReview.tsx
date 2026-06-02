@@ -53,10 +53,10 @@ const trigger = (value: string) =>
 
 function Stat({ label, value, detail }: { label: string; value: string; detail?: string }) {
   return (
-    <div className="border border-slate-800 bg-slate-950 px-4 py-4">
-      <div className="text-[11px] uppercase tracking-[0.26em] text-slate-500">{label}</div>
-      <div className="mt-3 text-2xl font-semibold text-white">{value}</div>
-      {detail ? <div className="mt-2 text-sm text-slate-400">{detail}</div> : null}
+    <div className="min-w-0 border border-slate-800 bg-slate-950 px-4 py-4">
+      <div className="break-words text-[11px] uppercase tracking-[0.26em] text-slate-500">{label}</div>
+      <div className="mt-3 min-w-0 break-words text-2xl font-semibold text-white">{value}</div>
+      {detail ? <div className="mt-2 min-w-0 break-all text-sm text-slate-400">{detail}</div> : null}
     </div>
   );
 }
@@ -212,12 +212,27 @@ export default function DealReview() {
 
   return (
     <div className="space-y-6">
-      <Card className="overflow-hidden rounded-none border border-slate-800 bg-slate-950">
-        <div className="border-b border-slate-800 px-6 py-6 lg:px-8">
+      <Card className="relative overflow-hidden rounded-3xl border border-slate-800/80 bg-slate-950">
+        <div className="pointer-events-none absolute inset-0 bg-[radial-gradient(circle_at_0%_0%,rgba(34,211,238,0.12),transparent_42%),radial-gradient(circle_at_100%_0%,rgba(167,139,250,0.1),transparent_38%)]" />
+        <div
+          className="pointer-events-none absolute inset-0 opacity-[0.06]"
+          style={{
+            backgroundImage:
+              'linear-gradient(to right, rgba(148,163,184,0.6) 1px, transparent 1px), linear-gradient(to bottom, rgba(148,163,184,0.6) 1px, transparent 1px)',
+            backgroundSize: '44px 44px',
+          }}
+        />
+        <div className="relative border-b border-slate-800/80 px-6 py-6 lg:px-8">
           <div className="flex flex-col gap-6 xl:flex-row xl:items-start xl:justify-between">
             <div className="max-w-4xl">
-              <div className="text-[11px] uppercase tracking-[0.35em] text-cyan-300">Deal Review</div>
-              <h1 className="mt-3 text-4xl font-semibold text-white">{deal.startup.name}</h1>
+              <div className="flex items-center gap-2.5">
+                <span className="relative flex h-2 w-2">
+                  <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-emerald-400/70" />
+                  <span className="relative inline-flex h-2 w-2 rounded-full bg-emerald-400" />
+                </span>
+                <span className="text-[11px] font-medium uppercase tracking-[0.34em] text-cyan-300">Deal Review</span>
+              </div>
+              <h1 className="font-heading mt-3 text-4xl font-semibold tracking-tight text-white">{deal.startup.name}</h1>
               <p className="mt-3 text-base leading-7 text-slate-300">{deal.startup.tagline}</p>
               <div className="mt-4 flex flex-wrap gap-2">
                 <Badge>Stage {deal.stage}</Badge>
@@ -257,7 +272,7 @@ export default function DealReview() {
           </div>
         </div>
 
-        <div className="grid gap-px bg-slate-800 md:grid-cols-2 xl:grid-cols-4">
+        <div className="relative grid gap-px bg-slate-800 md:grid-cols-2 xl:grid-cols-4">
           <Stat label="Investor ticket" value={money(deal.amountINR)} detail={`${pct(deal.equityPercent)} equity`} />
           <Stat label="Funding target" value={deal.startup.fundingNeeded ? money(deal.startup.fundingNeeded) : 'Not provided'} detail={`${deal.startup.activeProducts} active products`} />
           <Stat label="Founder score" value={number.format(deal.student.innovationScore)} detail={deal.student.displayName} />

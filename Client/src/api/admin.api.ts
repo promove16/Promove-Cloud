@@ -37,7 +37,19 @@ import {
 } from '../types/patentRequest.types';
 import { Problem } from '../types/problem.types';
 import { UserRole } from '../types/roles.types';
-import { StartupDocument, StartupReadiness, StartupRegistrationProfile, StartupReviewStatus } from '../types/startup.types';
+import {
+  BulkCredentialImportResult,
+  StudentRosterEntry,
+  StudentRosterImportResult,
+  TemporaryStudentCredentials,
+} from '../types/school.types';
+import {
+  StartupDocument,
+  StartupInitializationProfile,
+  StartupReadiness,
+  StartupRegistrationProfile,
+  StartupReviewStatus,
+} from '../types/startup.types';
 import { MentorStudentProfile } from './mentor.api';
 
 export interface AdminUserListItem {
@@ -364,6 +376,7 @@ export interface AdminStartupReviewItem {
   pitchDeckUrl?: string;
   pitchDeckName?: string;
   registrationProfile: StartupRegistrationProfile;
+  initializationProfile: StartupInitializationProfile;
   readiness: StartupReadiness;
   documents: StartupDocument[];
   traction: {
@@ -381,6 +394,64 @@ export interface AdminStartupReviewItem {
   }>;
   createdAt: string;
   updatedAt: string;
+}
+
+export interface AdminStartupRecordInvestor {
+  dealId: string;
+  investorId: string;
+  investorName: string;
+  investorType: 'penny' | 'sole';
+  amountINR?: number;
+  equityPercent?: number;
+  sharesAllocated?: number;
+  stage: number;
+  status: 'active' | 'closed' | 'cancelled';
+  investorRole?: 'shareholder' | 'director' | 'observer';
+  royaltyOwedINR?: number;
+  createdAt: string;
+}
+
+export interface AdminStartupRecordAuditEntry {
+  _id: string;
+  action: string;
+  adminId: string;
+  adminName: string;
+  targetModel: string;
+  metadata?: Record<string, unknown>;
+  createdAt: string;
+}
+
+export interface AdminStartupRecord {
+  startupId: string;
+  funds: {
+    totalRaisedINR: number;
+    totalRoyaltyOwedINR: number;
+    activeDealCount: number;
+    closedDealCount: number;
+    cancelledDealCount: number;
+    pennyInvestorCount: number;
+    soleInvestorCount: number;
+    capTable: {
+      totalShares: number;
+      availableShares: number;
+      founderRetainedEquity: number;
+      totalInvestorEquity: number;
+    };
+  };
+  marketReach: {
+    launchedToInvestors: boolean;
+    launchedToMentors: boolean;
+    launchedAt?: string;
+    innovationScoreAtLaunch: number;
+    traction: {
+      patentFiled: boolean;
+      mvpBuilt: boolean;
+      revenueGenerating: boolean;
+      usersCount?: number;
+    };
+  };
+  investors: AdminStartupRecordInvestor[];
+  auditTrail: AdminStartupRecordAuditEntry[];
 }
 
 export interface AdminDealReviewPayload {
@@ -583,6 +654,52 @@ export interface AdminAnalyticsLogEntry {
   timestamp?: string;
 }
 
+export interface AdminOnboardInstitutionProfileInput {
+  institutionName?: string;
+  location?: string;
+  totalStudentsEnrolled?: number;
+  academicYear?: string;
+  organizationType?: string;
+  contactEmail?: string;
+  contactPhone?: string;
+}
+
+export interface AdminOnboardAccountInput {
+  role: UserRole;
+  displayName: string;
+  email: string;
+  domain?: string;
+  bio?: string;
+  headline?: string;
+  institutionProfile?: AdminOnboardInstitutionProfileInput;
+}
+
+export interface AdminOnboardedAccount {
+  user: {
+    _id: string;
+    displayName: string;
+    email: string;
+    role: UserRole;
+    domain?: string;
+    headline?: string;
+    bio?: string;
+    institutionName?: string;
+    createdAt: string;
+  };
+  temporaryPassword: string;
+}
+
+export interface AdminInstitutionRosterResponse {
+  summary: {
+    total: number;
+    invited: number;
+    registeredPending: number;
+    verified: number;
+    rejected: number;
+  };
+  entries: StudentRosterEntry[];
+}
+
 export const adminApi = {
   async getUsers(params?: { role?: UserRole; isActive?: boolean; page?: number; limit?: number }) {
     const response = await api.get<ApiSuccessResponse<AdminUsersResponse>>('/api/admin/users', { params });
@@ -737,6 +854,12 @@ export const adminApi = {
     );
     return response.data.data;
   },
+  async getStartupRecord(startupId: string) {
+    const response = await api.get<ApiSuccessResponse<AdminStartupRecord>>(
+      `/api/admin/startups/${startupId}/record`,
+    );
+    return response.data.data;
+  },
   async getDeal(dealId: string) {
     const response = await api.get<ApiSuccessResponse<AdminDealReviewItem>>(`/api/admin/deals/${dealId}`);
     return response.data.data;
@@ -847,6 +970,82 @@ export const adminApi = {
   },
   async createMentorProfile(payload: CreateMentorProfileInput) {
     const response = await api.post<ApiSuccessResponse<CreatedMentorProfileResult>>('/api/admin/mentors', payload);
+    return response.data.data;
+  },
+
+  // ── Multipurpose onboarding ────────────────────────────────────────────────
+  async onboardAccount(payload: AdminOnboardAccountInput) {
+    const response = await api.post<ApiSuccessResponse<AdminOnboardedAccount>>(
+      '/api/admin/onboarding/accounts',
+      payload,
+    );
+    return response.data.data;
+  },
+  async getInstitutionRoster(institutionId: string, search?: string) {
+    const response = await api.get<ApiSuccessResponse<AdminInstitutionRosterResponse>>(
+      `/api/admin/onboarding/institutions/${institutionId}/roster`,
+      { params: search ? { search } : undefined },
+    );
+    return response.data.data;
+  },
+  async createInstitutionRosterEntry(
+    institutionId: string,
+    payload: {
+      displayName: string;
+      email: string;
+      gradeOrProgram?: string;
+      rollNumber?: string;
+      notes?: string;
+    },
+  ) {
+    const response = await api.post<ApiSuccessResponse<StudentRosterEntry>>(
+      `/api/admin/onboarding/institutions/${institutionId}/roster/manual`,
+      payload,
+    );
+    return response.data.data;
+  },
+  async cancelInstitutionRosterInvite(institutionId: string, rosterEntryId: string) {
+    const response = await api.delete<
+      ApiSuccessResponse<{ _id: string; cancelled: true; cancelledAt: string }>
+    >(`/api/admin/onboarding/institutions/${institutionId}/roster/${rosterEntryId}`);
+    return response.data.data;
+  },
+  async createInstitutionStudentCredentials(
+    institutionId: string,
+    payload: {
+      displayName: string;
+      email: string;
+      domain?: string;
+      bio?: string;
+      gradeOrProgram?: string;
+      rollNumber?: string;
+      notes?: string;
+    },
+  ) {
+    const response = await api.post<ApiSuccessResponse<TemporaryStudentCredentials>>(
+      `/api/admin/onboarding/institutions/${institutionId}/student-credentials`,
+      payload,
+    );
+    return response.data.data;
+  },
+  async importInstitutionRoster(institutionId: string, file: File) {
+    const formData = new FormData();
+    formData.append('file', file);
+    const response = await api.post<ApiSuccessResponse<StudentRosterImportResult>>(
+      `/api/admin/onboarding/institutions/${institutionId}/roster/import`,
+      formData,
+      { headers: { 'Content-Type': 'multipart/form-data' } },
+    );
+    return response.data.data;
+  },
+  async importInstitutionRosterWithCredentials(institutionId: string, file: File) {
+    const formData = new FormData();
+    formData.append('file', file);
+    const response = await api.post<ApiSuccessResponse<BulkCredentialImportResult>>(
+      `/api/admin/onboarding/institutions/${institutionId}/roster/import-credentials`,
+      formData,
+      { headers: { 'Content-Type': 'multipart/form-data' } },
+    );
     return response.data.data;
   },
 

@@ -17,15 +17,29 @@ import {
   listRegistrationRequestsQuerySchema,
   listUsersQuerySchema,
   milestoneVerifySchema,
+  onboardAccountSchema,
+  adminInstitutionRosterQuerySchema,
   patentRejectSchema,
   registrationRequestReviewSchema,
 } from './admin.validation';
 import {
+  createManagedStudentCredentialsSchema,
+} from '../institution/institutionAccess.service';
+import { manualStudentRosterEntrySchema } from '../institution/studentRoster.service';
+import {
   approveAward,
   getAdminCapTable,
+  getStartupAdminRecord,
   getDealAwaitingApproval,
   createAdminMentorshipProgram,
   createMentorProfile,
+  createOnboardedAccount,
+  adminListInstitutionRoster,
+  adminCreateInstitutionRosterEntry,
+  adminCancelInstitutionRosterInvite,
+  adminImportInstitutionRoster,
+  adminImportInstitutionRosterWithCredentials,
+  adminCreateInstitutionStudentCredentials,
   getMentorDirectory,
   getMentorshipPrograms,
   approveDealStage,
@@ -304,6 +318,12 @@ export const getStartupCapTableController = async (req: Request, res: Response) 
   res.status(200).json(new ApiResponse(await getAdminCapTable(startupId)));
 };
 
+export const getStartupRecordController = async (req: Request, res: Response) => {
+  const startupId = getParam(req.params.id);
+  if (!startupId || !isObjectId(startupId)) throw new ApiError(400, 'INVALID_ID', 'Invalid ID format');
+  res.status(200).json(new ApiResponse(await getStartupAdminRecord(startupId)));
+};
+
 export const resetSoleInvestorController = async (req: Request, res: Response) => {
   if (!req.user) throw new ApiError(401, 'UNAUTHORIZED', 'Invalid or expired token');
   const startupId = getParam(req.params.id);
@@ -357,6 +377,117 @@ export const createMentorProfileController = async (req: Request, res: Response)
   if (!req.user) throw new ApiError(401, 'UNAUTHORIZED', 'Invalid or expired token');
   const payload = createMentorProfileSchema.parse(req.body);
   res.status(201).json(new ApiResponse(await createMentorProfile(req.user._id, payload)));
+};
+
+// ── Multipurpose onboarding ──────────────────────────────────────────────────
+
+export const onboardAccountController = async (req: Request, res: Response) => {
+  if (!req.user) throw new ApiError(401, 'UNAUTHORIZED', 'Invalid or expired token');
+  const payload = onboardAccountSchema.parse(req.body);
+  res.status(201).json(new ApiResponse(await createOnboardedAccount(req.user._id, payload)));
+};
+
+const getInstitutionId = (req: Request) => {
+  const institutionId = getParam(req.params.institutionId);
+  if (!institutionId || !isObjectId(institutionId)) {
+    throw new ApiError(400, 'INVALID_ID', 'Invalid institution id');
+  }
+  return institutionId;
+};
+
+export const listOnboardingInstitutionRosterController = async (req: Request, res: Response) => {
+  if (!req.user) throw new ApiError(401, 'UNAUTHORIZED', 'Invalid or expired token');
+  const institutionId = getInstitutionId(req);
+  const query = adminInstitutionRosterQuerySchema.parse(req.query);
+  res
+    .status(200)
+    .json(new ApiResponse(await adminListInstitutionRoster(institutionId, query.search)));
+};
+
+export const createOnboardingInstitutionRosterEntryController = async (
+  req: Request,
+  res: Response,
+) => {
+  if (!req.user) throw new ApiError(401, 'UNAUTHORIZED', 'Invalid or expired token');
+  const institutionId = getInstitutionId(req);
+  const payload = manualStudentRosterEntrySchema.parse(req.body);
+  res
+    .status(201)
+    .json(
+      new ApiResponse(
+        await adminCreateInstitutionRosterEntry(req.user._id, institutionId, payload),
+      ),
+    );
+};
+
+export const cancelOnboardingInstitutionRosterInviteController = async (
+  req: Request,
+  res: Response,
+) => {
+  if (!req.user) throw new ApiError(401, 'UNAUTHORIZED', 'Invalid or expired token');
+  const institutionId = getInstitutionId(req);
+  const rosterEntryId = getParam(req.params.rosterEntryId);
+  if (!rosterEntryId || !isObjectId(rosterEntryId)) {
+    throw new ApiError(400, 'INVALID_ID', 'Invalid roster entry id');
+  }
+  res
+    .status(200)
+    .json(
+      new ApiResponse(
+        await adminCancelInstitutionRosterInvite(req.user._id, institutionId, rosterEntryId),
+      ),
+    );
+};
+
+export const createOnboardingInstitutionStudentCredentialsController = async (
+  req: Request,
+  res: Response,
+) => {
+  if (!req.user) throw new ApiError(401, 'UNAUTHORIZED', 'Invalid or expired token');
+  const institutionId = getInstitutionId(req);
+  const payload = createManagedStudentCredentialsSchema.parse(req.body);
+  res
+    .status(201)
+    .json(
+      new ApiResponse(
+        await adminCreateInstitutionStudentCredentials(req.user._id, institutionId, payload),
+      ),
+    );
+};
+
+export const importOnboardingInstitutionRosterController = async (req: Request, res: Response) => {
+  if (!req.user) throw new ApiError(401, 'UNAUTHORIZED', 'Invalid or expired token');
+  const institutionId = getInstitutionId(req);
+  if (!req.file?.buffer) {
+    throw new ApiError(400, 'FILE_REQUIRED', 'An Excel or CSV file is required.');
+  }
+  res.status(200).json(
+    new ApiResponse(
+      await adminImportInstitutionRoster(req.user._id, institutionId, {
+        originalname: req.file.originalname,
+        buffer: req.file.buffer,
+      }),
+    ),
+  );
+};
+
+export const importOnboardingInstitutionRosterWithCredentialsController = async (
+  req: Request,
+  res: Response,
+) => {
+  if (!req.user) throw new ApiError(401, 'UNAUTHORIZED', 'Invalid or expired token');
+  const institutionId = getInstitutionId(req);
+  if (!req.file?.buffer) {
+    throw new ApiError(400, 'FILE_REQUIRED', 'An Excel or CSV file is required.');
+  }
+  res.status(200).json(
+    new ApiResponse(
+      await adminImportInstitutionRosterWithCredentials(req.user._id, institutionId, {
+        originalname: req.file.originalname,
+        buffer: req.file.buffer,
+      }),
+    ),
+  );
 };
 
 export const createAdminMentorshipProgramController = async (req: Request, res: Response) => {

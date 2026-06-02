@@ -2296,6 +2296,25 @@ export const listStartupsForAdmin = async (status?: 'draft' | 'review_requested'
         legalAgreements: string;
         ipProtectionType: string;
       };
+      initializationProfile: {
+        vision: string;
+        mission: string;
+        foundingStory: string;
+        teamComposition: string;
+        productStage: string;
+        productOverview: string;
+        customerProfile: string;
+        marketOpportunity: string;
+        businessModel: string;
+        pricingStrategy: string;
+        competitiveLandscape: string;
+        defensibleMoat: string;
+        currentTraction: string;
+        upcomingMilestones: string;
+        fundingAsk: string;
+        legalEntityType: string;
+        risksAndMitigation: string;
+      };
       documents: Array<{
         _id: Types.ObjectId;
         category: StartupDocumentCategory;
@@ -2376,6 +2395,7 @@ export const listStartupsForAdmin = async (status?: 'draft' | 'review_requested'
       ...(startup.pitchDeckName ? { pitchDeckName: startup.pitchDeckName } : {}),
       traction: startup.traction,
       registrationProfile: startup.registrationProfile,
+      initializationProfile: startup.initializationProfile,
       readiness,
       documents: documents.map((document) => ({
         _id: String(document._id),

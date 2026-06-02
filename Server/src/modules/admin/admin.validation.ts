@@ -49,6 +49,62 @@ export const createMentorProfileSchema = z.object({
   headline: z.string().trim().max(120).optional(),
 });
 
+const directOnboardRoleSchema = z.enum([
+  UserRole.MENTOR,
+  UserRole.INVESTOR,
+  UserRole.RECRUITER,
+  UserRole.SCHOOL,
+  UserRole.COLLEGE,
+]);
+
+const onboardInstitutionProfileSchema = z.object({
+  institutionName: z.string().trim().min(2).max(160).optional(),
+  location: z.string().trim().min(2).max(160).optional(),
+  totalStudentsEnrolled: z.coerce.number().int().min(0).max(10_000_000).optional(),
+  academicYear: z.string().trim().min(4).max(20).optional(),
+  organizationType: z.string().trim().max(120).optional(),
+  contactEmail: z.string().trim().email().optional(),
+  contactPhone: z.string().trim().max(40).optional(),
+});
+
+const INSTITUTION_ONBOARD_ROLES: UserRole[] = [UserRole.SCHOOL, UserRole.COLLEGE];
+const STAFF_ONBOARD_ROLES: UserRole[] = [UserRole.MENTOR, UserRole.INVESTOR, UserRole.RECRUITER];
+
+export const onboardAccountSchema = z
+  .object({
+    role: directOnboardRoleSchema,
+    displayName: z.string().trim().min(2).max(120),
+    email: z.string().trim().email(),
+    domain: z.string().trim().max(120).optional(),
+    bio: z.string().trim().max(500).optional(),
+    headline: z.string().trim().max(120).optional(),
+    institutionProfile: onboardInstitutionProfileSchema.optional(),
+  })
+  .superRefine((value, ctx) => {
+    if (STAFF_ONBOARD_ROLES.includes(value.role) && !value.domain) {
+      ctx.addIssue({
+        code: z.ZodIssueCode.custom,
+        path: ['domain'],
+        message: 'Domain or focus area is required for this role',
+      });
+    }
+
+    if (INSTITUTION_ONBOARD_ROLES.includes(value.role)) {
+      const profile = value.institutionProfile;
+      if (!profile?.location) {
+        ctx.addIssue({
+          code: z.ZodIssueCode.custom,
+          path: ['institutionProfile', 'location'],
+          message: 'Location is required for school and college accounts',
+        });
+      }
+    }
+  });
+
+export const adminInstitutionRosterQuerySchema = z.object({
+  search: z.string().trim().max(120).optional(),
+});
+
 export const listMentorshipProgramsQuerySchema = z.object({
   status: z.enum(['Pending', 'Assigned', 'Rejected']).optional(),
 });

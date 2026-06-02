@@ -21,6 +21,16 @@ import {
   RegistrationStage,
 } from '../user/user.types';
 import { assertInstitutionVerificationReadyForApproval } from '../institution/institutionVerification.service';
+import {
+  cancelStudentRosterInvite,
+  createStudentRosterEntry as createInstitutionStudentRosterEntry,
+  importStudentRosterEntries,
+  listStudentRoster,
+} from '../institution/studentRoster.service';
+import {
+  bulkCreateManagedStudentCredentials,
+  createManagedStudentCredentials,
+} from '../institution/institutionAccess.service';
 import { UserRole } from '../../types/roles.types';
 import { Workspace } from '../workspace/workspace.model';
 import { ScoreEvent } from '../innovationScore/score.model';
@@ -50,12 +60,14 @@ import {
   AdminDealReviewPayload,
   AdminDealReviewItem,
   AdminCreatedMentorProfile,
+  AdminOnboardedAccount,
   AdminDealCancellationReviewPayload,
   AdminMentorListItem,
   AdminMentorshipProgramReviewPayload,
   AdminMentorshipProgramsResponse,
   AdminPatentItem,
   AdminRegistrationRequestItem,
+  AdminStartupRecord,
   AdminUserActivityDetail,
   AdminUserListItem,
   AdminUserActivitySearchResponse,
@@ -87,6 +99,7 @@ type AuditAction =
   | 'DEAL_REJECTED'
   | 'DEAL_REVIEW_UPDATED'
   | 'MENTOR_PROFILE_CREATED'
+  | 'ACCOUNT_ONBOARDED'
   | 'PROJECT_MENTOR_ASSIGNED'
   | 'PROJECT_MENTOR_UNASSIGNED'
   | 'MENTORSHIP_PROGRAM_CREATED'
@@ -1962,6 +1975,138 @@ export const approveDealStage = async (adminId: string, dealId: string) => {
 
 export const getAdminCapTable = async (startupId: string) => getStartupCapTable(startupId, '', UserRole.ADMIN);
 
+export const getStartupAdminRecord = async (startupId: string): Promise<AdminStartupRecord> => {
+  const startup = await Startup.findById(startupId)
+    .select('_id launchedToInvestors launchedToMentors launchedAt innovationScoreAtLaunch traction')
+    .lean<{
+      _id: Types.ObjectId;
+      launchedToInvestors?: boolean;
+      launchedToMentors?: boolean;
+      launchedAt?: Date;
+      innovationScoreAtLaunch?: number;
+      traction?: {
+        patentFiled?: boolean;
+        mvpBuilt?: boolean;
+        revenueGenerating?: boolean;
+        usersCount?: number;
+      };
+    } | null>();
+
+  if (!startup) {
+    throw new ApiError(404, 'STARTUP_NOT_FOUND', 'Startup not found');
+  }
+
+  const [deals, capTable, auditLogs] = await Promise.all([
+    Deal.find({ startupId })
+      .select(
+        '_id investorId investorType amountINR equityPercent sharesAllocated stage status investorRole royalty createdAt',
+      )
+      .sort({ createdAt: -1 })
+      .lean<Array<{
+        _id: Types.ObjectId;
+        investorId: Types.ObjectId;
+        investorType: 'penny' | 'sole';
+        amountINR?: number;
+        equityPercent?: number;
+        sharesAllocated?: number;
+        stage: number;
+        status: 'active' | 'closed' | 'cancelled';
+        investorRole?: 'shareholder' | 'director' | 'observer';
+        royalty?: { promoveAmountINR?: number };
+        createdAt: Date;
+      }>>(),
+    getAdminCapTable(startupId),
+    AdminAuditLog.find({ targetId: startupId })
+      .sort({ createdAt: -1 })
+      .limit(50)
+      .lean<Array<{
+        _id: Types.ObjectId;
+        adminId: Types.ObjectId;
+        action: string;
+        targetModel: string;
+        metadata?: Record<string, unknown>;
+        createdAt: Date;
+      }>>(),
+  ]);
+
+  const userIds = [
+    ...new Set([
+      ...deals.map((deal) => String(deal.investorId)),
+      ...auditLogs.map((log) => String(log.adminId)),
+    ]),
+  ];
+  const users = userIds.length
+    ? await User.find({ _id: { $in: userIds } })
+        .select('_id displayName')
+        .lean<Array<{ _id: Types.ObjectId; displayName: string }>>()
+    : [];
+  const nameMap = new Map(users.map((user) => [String(user._id), user.displayName]));
+
+  const activeDeals = deals.filter((deal) => deal.status !== 'cancelled');
+
+  return {
+    startupId,
+    funds: {
+      totalRaisedINR: round(activeDeals.reduce((sum, deal) => sum + (deal.amountINR ?? 0), 0)),
+      totalRoyaltyOwedINR: round(
+        activeDeals.reduce((sum, deal) => sum + (deal.royalty?.promoveAmountINR ?? 0), 0),
+      ),
+      activeDealCount: deals.filter((deal) => deal.status === 'active').length,
+      closedDealCount: deals.filter((deal) => deal.status === 'closed').length,
+      cancelledDealCount: deals.filter((deal) => deal.status === 'cancelled').length,
+      pennyInvestorCount: activeDeals.filter((deal) => deal.investorType === 'penny').length,
+      soleInvestorCount: activeDeals.filter((deal) => deal.investorType === 'sole').length,
+      capTable: {
+        totalShares: capTable.totalShares,
+        availableShares: capTable.availableShares,
+        founderRetainedEquity: capTable.founderRetained.equityPercent,
+        totalInvestorEquity: capTable.totalInvestorEquity,
+      },
+    },
+    marketReach: {
+      launchedToInvestors: startup.launchedToInvestors ?? false,
+      launchedToMentors: startup.launchedToMentors ?? false,
+      ...(startup.launchedAt ? { launchedAt: toIso(startup.launchedAt) } : {}),
+      innovationScoreAtLaunch: startup.innovationScoreAtLaunch ?? 0,
+      traction: {
+        patentFiled: startup.traction?.patentFiled ?? false,
+        mvpBuilt: startup.traction?.mvpBuilt ?? false,
+        revenueGenerating: startup.traction?.revenueGenerating ?? false,
+        ...(typeof startup.traction?.usersCount === 'number'
+          ? { usersCount: startup.traction.usersCount }
+          : {}),
+      },
+    },
+    investors: deals.map((deal) => ({
+      dealId: String(deal._id),
+      investorId: String(deal.investorId),
+      investorName: nameMap.get(String(deal.investorId)) ?? 'Investor',
+      investorType: deal.investorType,
+      ...(typeof deal.amountINR === 'number' ? { amountINR: deal.amountINR } : {}),
+      ...(typeof deal.equityPercent === 'number' ? { equityPercent: deal.equityPercent } : {}),
+      ...(typeof deal.sharesAllocated === 'number'
+        ? { sharesAllocated: deal.sharesAllocated }
+        : {}),
+      stage: deal.stage,
+      status: deal.status,
+      ...(deal.investorRole ? { investorRole: deal.investorRole } : {}),
+      ...(typeof deal.royalty?.promoveAmountINR === 'number'
+        ? { royaltyOwedINR: deal.royalty.promoveAmountINR }
+        : {}),
+      createdAt: toIso(deal.createdAt),
+    })),
+    auditTrail: auditLogs.map((log) => ({
+      _id: String(log._id),
+      action: log.action,
+      adminId: String(log.adminId),
+      adminName: nameMap.get(String(log.adminId)) ?? 'Admin',
+      targetModel: log.targetModel,
+      ...(log.metadata ? { metadata: log.metadata } : {}),
+      createdAt: toIso(log.createdAt),
+    })),
+  };
+};
+
 export const updateDealInvestorRole = async (adminId: string, dealId: string, investorRole: 'shareholder' | 'director' | 'observer') => {
   const deal = await updateInvestmentRole(dealId, investorRole);
   await createAudit(adminId, 'DEAL_STAGE_APPROVED', dealId, 'Deal', { investorRole });
@@ -2167,6 +2312,235 @@ export const createMentorProfile = async (
     },
     temporaryPassword,
   };
+};
+
+type OnboardAccountInput = {
+  role: UserRole.MENTOR | UserRole.INVESTOR | UserRole.RECRUITER | UserRole.SCHOOL | UserRole.COLLEGE;
+  displayName: string;
+  email: string;
+  domain?: string;
+  bio?: string;
+  headline?: string;
+  institutionProfile?: {
+    institutionName?: string;
+    location?: string;
+    totalStudentsEnrolled?: number;
+    academicYear?: string;
+    organizationType?: string;
+    contactEmail?: string;
+    contactPhone?: string;
+  };
+};
+
+const ONBOARD_INSTITUTION_ROLES: UserRole[] = [UserRole.SCHOOL, UserRole.COLLEGE];
+
+const buildCurrentAcademicYear = () => {
+  const now = new Date();
+  // Indian academic years roll over mid-year; June onward counts as the new year.
+  const startYear = now.getMonth() >= 5 ? now.getFullYear() : now.getFullYear() - 1;
+  return `${startYear}-${startYear + 1}`;
+};
+
+/**
+ * Directly onboards a non-student account (mentor, investor, recruiter, school or
+ * college) with a generated temporary password. The account is admin-approved and
+ * active immediately; the user is forced to reset the password on first login.
+ */
+export const createOnboardedAccount = async (
+  adminId: string,
+  payload: OnboardAccountInput,
+): Promise<AdminOnboardedAccount> => {
+  const admin = await findUser(adminId);
+  if (admin.role !== UserRole.ADMIN) {
+    throw new ApiError(403, 'FORBIDDEN', 'Only admins can onboard accounts');
+  }
+
+  const normalizedEmail = payload.email.toLowerCase();
+  const existing = await User.findOne({ email: normalizedEmail }).lean();
+  if (existing) {
+    throw new ApiError(409, 'DUPLICATE_KEY', 'Email already registered');
+  }
+
+  const displayName = sanitizePlainText(payload.displayName);
+  const profileSlug = await generateProfileSlug(displayName);
+  const temporaryPassword = generateTemporaryPassword();
+  const passwordHash = await bcrypt.hash(temporaryPassword, env.BCRYPT_ROUNDS);
+  const now = new Date();
+  const isInstitution = ONBOARD_INSTITUTION_ROLES.includes(payload.role);
+
+  const baseFields = {
+    email: normalizedEmail,
+    passwordHash,
+    role: payload.role,
+    displayName,
+    profileSlug,
+    accessGrantedBy: 'admin',
+    accessExpiresAt: new Date(Date.now() + MS_IN_YEAR),
+    isActive: true,
+    institutionToken: null,
+    institutionId: null,
+    adminApprovalStatus: 'approved' as const,
+    adminApprovedAt: now,
+    adminApprovedBy: new Types.ObjectId(adminId),
+    mustChangePasswordOnNextLogin: true,
+  };
+
+  let user;
+
+  if (isInstitution) {
+    const profile = payload.institutionProfile ?? {};
+    user = await User.create({
+      ...baseFields,
+      profileComplete: false,
+      registrationStage: 'complete',
+      verificationStatus: 'not_required',
+      institutionVerificationStatus: 'verified',
+      institutionVerifiedAt: now,
+      institutionProfile: {
+        institutionName: profile.institutionName
+          ? sanitizePlainText(profile.institutionName)
+          : displayName,
+        location: profile.location ? sanitizePlainText(profile.location) : 'India',
+        totalStudentsEnrolled: profile.totalStudentsEnrolled ?? 0,
+        academicYear: profile.academicYear ?? buildCurrentAcademicYear(),
+        iicStarRating: 0,
+        ...(profile.organizationType
+          ? { organizationType: sanitizePlainText(profile.organizationType) }
+          : {}),
+        specialties: [],
+        locations: [],
+        ...(profile.contactEmail ? { contactEmail: profile.contactEmail } : {}),
+        ...(profile.contactPhone ? { contactPhone: sanitizePlainText(profile.contactPhone) } : {}),
+        policies: [],
+        stats: {
+          totalInnovationActivities: 0,
+          patentsFiled: 0,
+          totalMentoringHours: 0,
+          startupsLaunched: 0,
+          industryCollaborations: 0,
+        },
+      },
+    });
+  } else {
+    user = await User.create({
+      ...baseFields,
+      ...(payload.domain ? { domain: sanitizePlainText(payload.domain) } : {}),
+      ...(payload.bio ? { bio: sanitizePlainText(payload.bio) } : {}),
+      ...(payload.headline ? { headline: sanitizePlainText(payload.headline) } : {}),
+      profileComplete: Boolean(payload.domain || payload.bio),
+      registrationStage: 'basic',
+      verificationStatus: 'not_required',
+      institutionVerificationStatus: 'none',
+    });
+  }
+
+  await createAudit(adminId, 'ACCOUNT_ONBOARDED', String(user._id), 'User', {
+    role: payload.role,
+  });
+
+  return {
+    user: {
+      _id: String(user._id),
+      displayName: user.displayName,
+      email: user.email,
+      role: user.role,
+      ...(user.domain ? { domain: user.domain } : {}),
+      ...(user.headline ? { headline: user.headline } : {}),
+      ...(user.bio ? { bio: user.bio } : {}),
+      ...(user.institutionProfile?.institutionName
+        ? { institutionName: user.institutionProfile.institutionName }
+        : {}),
+      createdAt: toIso(user.createdAt),
+    },
+    temporaryPassword,
+  };
+};
+
+// ── Admin-operated student onboarding (per selected institution) ──────────────
+
+const resolveOnboardingInstitutionRole = async (
+  institutionId: string,
+): Promise<UserRole.SCHOOL | UserRole.COLLEGE> => {
+  if (!Types.ObjectId.isValid(institutionId)) {
+    throw new ApiError(400, 'INVALID_ID', 'Invalid institution id');
+  }
+
+  const institution = await User.findById(institutionId).select('_id role').lean();
+  if (
+    !institution ||
+    (institution.role !== UserRole.SCHOOL && institution.role !== UserRole.COLLEGE)
+  ) {
+    throw new ApiError(404, 'INSTITUTION_NOT_FOUND', 'Institution account not found');
+  }
+
+  return institution.role;
+};
+
+export const adminListInstitutionRoster = async (
+  institutionId: string,
+  search?: string,
+) => {
+  const institutionRole = await resolveOnboardingInstitutionRole(institutionId);
+  return listStudentRoster(institutionId, institutionRole, search);
+};
+
+export const adminCreateInstitutionRosterEntry = async (
+  adminId: string,
+  institutionId: string,
+  payload: {
+    displayName: string;
+    email: string;
+    gradeOrProgram?: string;
+    rollNumber?: string;
+    notes?: string;
+  },
+) => {
+  const institutionRole = await resolveOnboardingInstitutionRole(institutionId);
+  return createInstitutionStudentRosterEntry(institutionId, institutionRole, adminId, payload);
+};
+
+export const adminCancelInstitutionRosterInvite = async (
+  adminId: string,
+  institutionId: string,
+  rosterEntryId: string,
+) => {
+  const institutionRole = await resolveOnboardingInstitutionRole(institutionId);
+  return cancelStudentRosterInvite(institutionId, institutionRole, rosterEntryId);
+};
+
+export const adminImportInstitutionRoster = async (
+  adminId: string,
+  institutionId: string,
+  file: { originalname: string; buffer: Buffer },
+) => {
+  const institutionRole = await resolveOnboardingInstitutionRole(institutionId);
+  return importStudentRosterEntries(institutionId, institutionRole, adminId, file);
+};
+
+export const adminImportInstitutionRosterWithCredentials = async (
+  adminId: string,
+  institutionId: string,
+  file: { originalname: string; buffer: Buffer },
+) => {
+  const institutionRole = await resolveOnboardingInstitutionRole(institutionId);
+  return bulkCreateManagedStudentCredentials(institutionId, institutionRole, adminId, file);
+};
+
+export const adminCreateInstitutionStudentCredentials = async (
+  adminId: string,
+  institutionId: string,
+  payload: {
+    displayName: string;
+    email: string;
+    domain?: string;
+    bio?: string;
+    gradeOrProgram?: string;
+    rollNumber?: string;
+    notes?: string;
+  },
+) => {
+  const institutionRole = await resolveOnboardingInstitutionRole(institutionId);
+  return createManagedStudentCredentials(institutionId, institutionRole, adminId, payload);
 };
 
 export const reviewMentorshipProgram = async (
