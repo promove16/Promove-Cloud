@@ -1,4 +1,4 @@
-import { FormEvent, useMemo, useState } from 'react';
+import { FormEvent, ReactNode, useMemo, useState } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { adminApi } from '../../api/admin.api';
 import { Button } from '../../components/ui/Button';
@@ -13,6 +13,29 @@ import {
 } from './mentorshipAdminShared';
 import { InstitutionSearchField } from './InstitutionSearchField';
 import { MentorSearchField } from './MentorSearchField';
+
+const fieldClassName =
+  'w-full rounded-lg border border-slate-800 bg-slate-950/60 px-3 py-2 text-sm text-white outline-none transition focus:border-cyan-500/50 focus:bg-slate-950';
+
+function FormSection({
+  label,
+  hint,
+  children,
+}: {
+  label: string;
+  hint?: string;
+  children: ReactNode;
+}) {
+  return (
+    <section className="rounded-xl border border-slate-800/70 bg-slate-950/30 p-3.5">
+      <div className="mb-3 flex items-baseline justify-between gap-3 border-b border-slate-800/60 pb-2">
+        <h3 className="text-[11px] font-semibold uppercase tracking-[0.18em] text-cyan-300/90">{label}</h3>
+        {hint ? <span className="truncate text-[11px] text-slate-500">{hint}</span> : null}
+      </div>
+      {children}
+    </section>
+  );
+}
 
 export default function MentorshipProgramCreation() {
   const queryClient = useQueryClient();
@@ -104,24 +127,31 @@ export default function MentorshipProgramCreation() {
   };
 
   return (
-    <Card className="p-5">
-      <div className="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
-        <div className="max-w-4xl">
-          <div className="text-xs uppercase tracking-[0.3em] text-cyan-300">Admin Created Programs</div>
-          <h2 className="mt-2 text-2xl font-bold text-white">Create for any school or college</h2>
-          <p className="mt-2 text-sm text-slate-400">
-            Build a mentorship programme on behalf of an institution and assign an available mentor in the same step.
+    <Card className="p-4 sm:p-5">
+      <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+        <div className="min-w-0">
+          <div className="text-[10px] font-semibold uppercase tracking-[0.28em] text-cyan-300/90">
+            Admin Created Programs
+          </div>
+          <h2 className="mt-1 text-lg font-bold text-white sm:text-xl">Create for any school or college</h2>
+          <p className="mt-0.5 text-xs text-slate-400">
+            Build a programme for an institution and assign an available mentor in one step.
           </p>
         </div>
 
-        <Button type="submit" form="admin-mentorship-program-form" disabled={!canCreateProgram} className="shrink-0">
-          {createProgramMutation.isPending ? 'Creating...' : 'Create Mentorship Programme'}
+        <Button
+          type="submit"
+          form="admin-mentorship-program-form"
+          disabled={!canCreateProgram}
+          className="shrink-0 self-start sm:self-auto"
+        >
+          {createProgramMutation.isPending ? 'Creating...' : 'Create Programme'}
         </Button>
       </div>
 
       {feedback ? (
         <div
-          className={`mt-6 rounded-2xl border px-4 py-3 text-sm ${
+          className={`mt-3 rounded-lg border px-3 py-2 text-sm ${
             feedback.tone === 'success'
               ? 'border-emerald-500/30 bg-emerald-500/10 text-emerald-200'
               : 'border-rose-500/30 bg-rose-500/10 text-rose-200'
@@ -132,203 +162,198 @@ export default function MentorshipProgramCreation() {
       ) : null}
 
       <form id="admin-mentorship-program-form" className="mt-4 space-y-3" onSubmit={handleCreateProgram}>
-        <div className="grid gap-3 md:grid-cols-2">
-          <div>
-            <label className={formLabelClassName}>Institution Type</label>
-            <select
-              value={programForm.institutionType}
-              onChange={(event) =>
-                setProgramForm((current) => ({
-                  ...current,
-                  institutionType: event.target.value as ProgramFormState['institutionType'],
-                  institutionId: '',
-                }))
+        <FormSection label="Setup">
+          <div className="grid gap-3 md:grid-cols-2">
+            <div>
+              <label className={formLabelClassName}>Institution Type</label>
+              <select
+                value={programForm.institutionType}
+                onChange={(event) =>
+                  setProgramForm((current) => ({
+                    ...current,
+                    institutionType: event.target.value as ProgramFormState['institutionType'],
+                    institutionId: '',
+                  }))
+                }
+                className={fieldClassName}
+              >
+                <option value="school">School</option>
+                <option value="college">College</option>
+              </select>
+            </div>
+            <div>
+              <label className={formLabelClassName}>Programme Title</label>
+              <input
+                value={programForm.title}
+                onChange={(event) => updateProgramForm({ title: event.target.value })}
+                placeholder="Enter the programme title"
+                className={fieldClassName}
+                required
+              />
+            </div>
+            <InstitutionSearchField
+              institutions={institutionOptions}
+              value={programForm.institutionId}
+              onChange={(institutionId) => updateProgramForm({ institutionId })}
+              helperText={
+                schoolsQuery.isLoading || collegesQuery.isLoading
+                  ? 'Loading institutions...'
+                  : 'Search by name, location, or email.'
               }
-              className="w-full rounded-lg border border-slate-800 bg-slate-950 px-4 py-3 text-white"
-            >
-              <option value="school">School</option>
-              <option value="college">College</option>
-            </select>
-          </div>
-          <InstitutionSearchField
-            institutions={institutionOptions}
-            value={programForm.institutionId}
-            onChange={(institutionId) => updateProgramForm({ institutionId })}
-            helperText={
-              schoolsQuery.isLoading || collegesQuery.isLoading
-                ? 'Loading institutions...'
-                : 'Type to search institutions by name, location, or email.'
-            }
-          />
-        </div>
-
-        <div className="grid gap-3 md:grid-cols-2">
-          <div>
-            <label className={formLabelClassName}>Programme Title</label>
-            <input
-              value={programForm.title}
-              onChange={(event) => updateProgramForm({ title: event.target.value })}
-              placeholder="Enter the programme title"
-              className="w-full rounded-lg border border-slate-800 bg-slate-950 px-4 py-3 text-white"
-              required
+            />
+            <MentorSearchField
+              mentors={mentors}
+              value={programForm.mentorId}
+              onChange={(mentorId) => updateProgramForm({ mentorId })}
+              preferredExpertise={programForm.preferredExpertise}
+              helperText="Suggestions favor matching expertise and lower load."
             />
           </div>
-          <MentorSearchField
-            mentors={mentors}
-            value={programForm.mentorId}
-            onChange={(mentorId) => updateProgramForm({ mentorId })}
-            preferredExpertise={programForm.preferredExpertise}
-            helperText="Type to search mentors instantly. Suggestions favor matching expertise and lower current load."
-          />
-        </div>
+        </FormSection>
 
-        <div>
-          <label className={formLabelClassName}>Objective</label>
-          <textarea
-            value={programForm.objective}
-            onChange={(event) => updateProgramForm({ objective: event.target.value })}
-            placeholder="Describe the objective and expected outcomes"
-            className="min-h-24 w-full rounded-lg border border-slate-800 bg-slate-950 px-4 py-3 text-white"
-            required
-          />
-        </div>
-
-        <div className="grid gap-3 md:grid-cols-2">
-          <div>
-            <label className={formLabelClassName}>Preferred Date & Time</label>
-            <input
-              type="datetime-local"
-              value={programForm.preferredDate}
-              onChange={(event) => updateProgramForm({ preferredDate: event.target.value })}
-              {...createPickerOnlyDateTimeInputHandlers(() => updateProgramForm({ preferredDate: '' }))}
-              className="w-full rounded-lg border border-slate-800 bg-slate-950 px-4 py-3 text-white"
-              required
-            />
-          </div>
-          <div>
-            <label className={formLabelClassName}>Scheduled Date & Time</label>
-            <input
-              type="datetime-local"
-              value={programForm.scheduledAt}
-              onChange={(event) => updateProgramForm({ scheduledAt: event.target.value })}
-              {...createPickerOnlyDateTimeInputHandlers(() => updateProgramForm({ scheduledAt: '' }))}
-              className="w-full rounded-lg border border-slate-800 bg-slate-950 px-4 py-3 text-white"
-              required
-            />
-          </div>
-        </div>
-
-        <div className="grid gap-3 md:grid-cols-2">
-          <div>
-            <label className={formLabelClassName}>Duration (Minutes)</label>
-            <input
-              type="number"
-              min={30}
-              max={480}
-              value={programForm.durationMinutes}
-              onChange={(event) => updateProgramForm({ durationMinutes: event.target.value })}
-              className="w-full rounded-lg border border-slate-800 bg-slate-950 px-4 py-3 text-white"
-              required
-            />
-          </div>
-          <div>
-            <label className={formLabelClassName}>Expected Participants</label>
-            <input
-              type="number"
-              min={1}
-              max={10000}
-              value={programForm.expectedParticipants}
-              onChange={(event) => updateProgramForm({ expectedParticipants: event.target.value })}
-              className="w-full rounded-lg border border-slate-800 bg-slate-950 px-4 py-3 text-white"
-              required
-            />
-          </div>
-        </div>
-
-        <div className="grid gap-3 md:grid-cols-2">
-          <div>
-            <label className={formLabelClassName}>Delivery Mode</label>
-            <select
-              value={programForm.deliveryMode}
-              onChange={(event) => {
-                const deliveryMode = event.target.value as ProgramFormState['deliveryMode'];
-                updateProgramForm({
-                  deliveryMode,
-                  platform: deliveryMode === 'Online' ? 'Google Meet' : 'Offline',
-                  meetingLink: deliveryMode === 'Online' ? programForm.meetingLink : '',
-                  venue: deliveryMode === 'Offline' ? programForm.venue : '',
-                });
-              }}
-              className="w-full rounded-lg border border-slate-800 bg-slate-950 px-4 py-3 text-white"
-            >
-              <option value="Online">Online</option>
-              <option value="Offline">Offline</option>
-            </select>
-          </div>
-          <div>
-            <label className={formLabelClassName}>Platform</label>
-            <select
-              value={programForm.platform}
-              onChange={(event) =>
-                updateProgramForm({ platform: event.target.value as ProgramFormState['platform'] })
-              }
-              className="w-full rounded-lg border border-slate-800 bg-slate-950 px-4 py-3 text-white"
-            >
-              {programForm.deliveryMode === 'Online' ? (
-                <>
-                  <option value="Google Meet">Google Meet</option>
-                  <option value="Microsoft Teams">Microsoft Teams</option>
-                  <option value="Zoom">Zoom</option>
-                </>
-              ) : (
+        <FormSection label="Schedule & logistics">
+          <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-4">
+            <div>
+              <label className={formLabelClassName}>Preferred Date & Time</label>
+              <input
+                type="datetime-local"
+                value={programForm.preferredDate}
+                onChange={(event) => updateProgramForm({ preferredDate: event.target.value })}
+                {...createPickerOnlyDateTimeInputHandlers(() => updateProgramForm({ preferredDate: '' }))}
+                className={fieldClassName}
+                required
+              />
+            </div>
+            <div>
+              <label className={formLabelClassName}>Scheduled Date & Time</label>
+              <input
+                type="datetime-local"
+                value={programForm.scheduledAt}
+                onChange={(event) => updateProgramForm({ scheduledAt: event.target.value })}
+                {...createPickerOnlyDateTimeInputHandlers(() => updateProgramForm({ scheduledAt: '' }))}
+                className={fieldClassName}
+                required
+              />
+            </div>
+            <div>
+              <label className={formLabelClassName}>Duration (Minutes)</label>
+              <input
+                type="number"
+                min={30}
+                max={480}
+                value={programForm.durationMinutes}
+                onChange={(event) => updateProgramForm({ durationMinutes: event.target.value })}
+                className={fieldClassName}
+                required
+              />
+            </div>
+            <div>
+              <label className={formLabelClassName}>Expected Participants</label>
+              <input
+                type="number"
+                min={1}
+                max={10000}
+                value={programForm.expectedParticipants}
+                onChange={(event) => updateProgramForm({ expectedParticipants: event.target.value })}
+                className={fieldClassName}
+                required
+              />
+            </div>
+            <div>
+              <label className={formLabelClassName}>Delivery Mode</label>
+              <select
+                value={programForm.deliveryMode}
+                onChange={(event) => {
+                  const deliveryMode = event.target.value as ProgramFormState['deliveryMode'];
+                  updateProgramForm({
+                    deliveryMode,
+                    platform: deliveryMode === 'Online' ? 'Google Meet' : 'Offline',
+                    meetingLink: deliveryMode === 'Online' ? programForm.meetingLink : '',
+                    venue: deliveryMode === 'Offline' ? programForm.venue : '',
+                  });
+                }}
+                className={fieldClassName}
+              >
+                <option value="Online">Online</option>
                 <option value="Offline">Offline</option>
-              )}
-            </select>
+              </select>
+            </div>
+            <div>
+              <label className={formLabelClassName}>Platform</label>
+              <select
+                value={programForm.platform}
+                onChange={(event) =>
+                  updateProgramForm({ platform: event.target.value as ProgramFormState['platform'] })
+                }
+                className={fieldClassName}
+              >
+                {programForm.deliveryMode === 'Online' ? (
+                  <>
+                    <option value="Google Meet">Google Meet</option>
+                    <option value="Microsoft Teams">Microsoft Teams</option>
+                    <option value="Zoom">Zoom</option>
+                  </>
+                ) : (
+                  <option value="Offline">Offline</option>
+                )}
+              </select>
+            </div>
+            {programForm.deliveryMode === 'Online' ? (
+              <div className="md:col-span-2">
+                <label className={formLabelClassName}>Meeting Link</label>
+                <input
+                  value={programForm.meetingLink}
+                  onChange={(event) => updateProgramForm({ meetingLink: event.target.value })}
+                  placeholder="Paste the Google Meet, Zoom, or Teams link"
+                  className={fieldClassName}
+                />
+              </div>
+            ) : (
+              <div className="md:col-span-2">
+                <label className={formLabelClassName}>Venue</label>
+                <input
+                  value={programForm.venue}
+                  onChange={(event) => updateProgramForm({ venue: event.target.value })}
+                  placeholder="Enter the campus venue or room"
+                  className={fieldClassName}
+                />
+              </div>
+            )}
           </div>
-        </div>
+        </FormSection>
 
-        {programForm.deliveryMode === 'Online' ? (
-          <div>
-            <label className={formLabelClassName}>Meeting Link</label>
-            <input
-              value={programForm.meetingLink}
-              onChange={(event) => updateProgramForm({ meetingLink: event.target.value })}
-              placeholder="Paste the Google Meet, Zoom, or Teams link"
-              className="w-full rounded-lg border border-slate-800 bg-slate-950 px-4 py-3 text-white"
-            />
+        <FormSection label="Programme brief">
+          <div className="grid gap-3 md:grid-cols-2">
+            <div>
+              <label className={formLabelClassName}>Objective</label>
+              <textarea
+                value={programForm.objective}
+                onChange={(event) => updateProgramForm({ objective: event.target.value })}
+                placeholder="Describe the objective and expected outcomes"
+                className={`${fieldClassName} min-h-20 resize-y`}
+                required
+              />
+            </div>
+            <div>
+              <label className={formLabelClassName}>Admin Notes</label>
+              <textarea
+                value={programForm.adminNotes}
+                onChange={(event) => updateProgramForm({ adminNotes: event.target.value })}
+                placeholder="Add internal notes or logistics context"
+                className={`${fieldClassName} min-h-20 resize-y`}
+              />
+            </div>
+            <div className="md:col-span-2">
+              <label className={formLabelClassName}>Preferred Expertise</label>
+              <input
+                value={programForm.preferredExpertise}
+                onChange={(event) => updateProgramForm({ preferredExpertise: event.target.value })}
+                placeholder="Example: Product strategy, investor readiness"
+                className={fieldClassName}
+              />
+            </div>
           </div>
-        ) : (
-          <div>
-            <label className={formLabelClassName}>Venue</label>
-            <input
-              value={programForm.venue}
-              onChange={(event) => updateProgramForm({ venue: event.target.value })}
-              placeholder="Enter the campus venue or room"
-              className="w-full rounded-lg border border-slate-800 bg-slate-950 px-4 py-3 text-white"
-            />
-          </div>
-        )}
-
-        <div className="grid gap-3 md:grid-cols-2">
-          <div>
-            <label className={formLabelClassName}>Preferred Expertise</label>
-            <input
-              value={programForm.preferredExpertise}
-              onChange={(event) => updateProgramForm({ preferredExpertise: event.target.value })}
-              placeholder="Example: Product strategy, investor readiness"
-              className="w-full rounded-lg border border-slate-800 bg-slate-950 px-4 py-3 text-white"
-            />
-          </div>
-          <div>
-            <label className={formLabelClassName}>Admin Notes</label>
-            <textarea
-              value={programForm.adminNotes}
-              onChange={(event) => updateProgramForm({ adminNotes: event.target.value })}
-              placeholder="Add internal notes or logistics context"
-              className="min-h-20 w-full rounded-lg border border-slate-800 bg-slate-950 px-4 py-3 text-white"
-            />
-          </div>
-        </div>
+        </FormSection>
       </form>
     </Card>
   );

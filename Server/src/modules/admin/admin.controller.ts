@@ -46,6 +46,7 @@ import {
   approvePatent,
   getAnalytics,
   getAnalyticsLogs,
+  getLogFilePath,
   getAnalyticsUserDetail,
   getAnalyticsUsers,
   getInvestmentTypeBreakdown,
@@ -348,7 +349,19 @@ export const getAnalyticsController = async (_req: Request, res: Response) => {
 
 export const getAnalyticsLogsController = async (req: Request, res: Response) => {
   const query = analyticsLogsQuerySchema.parse(req.query);
-  res.status(200).json(new ApiResponse(await getAnalyticsLogs(query.limit)));
+  res.status(200).json(new ApiResponse(await getAnalyticsLogs(query.limit, query.page)));
+};
+
+export const downloadAnalyticsLogsController = async (_req: Request, res: Response) => {
+  const filePath = getLogFilePath();
+
+  if (!filePath) {
+    res.status(404).json({ success: false, error: { code: 'NOT_FOUND', message: 'No log file available' } });
+    return;
+  }
+
+  const date = new Date().toISOString().split('T')[0];
+  res.download(filePath, `app-logs-${date}.log`);
 };
 
 export const getAnalyticsUsersController = async (req: Request, res: Response) => {

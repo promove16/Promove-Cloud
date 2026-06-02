@@ -25,7 +25,7 @@ const StatCard = ({ icon: Icon, label, value, sub }: { icon: any; label: string;
 
 function AdminPlatformAnalytics() {
   const { data, isLoading } = useQuery({
-    queryKey: ['admin-analytics'],
+    queryKey: ['admin-platform-analytics'],
     queryFn: async () => {
       const res = await analyticsApi.getAdminAnalytics();
       return res.data.data;
@@ -122,12 +122,12 @@ function AdminPlatformAnalytics() {
             <h3 className="font-semibold text-white">Deal Stages</h3>
           </div>
           <div className="space-y-2">
-            {stats.dealsByStage.map((d) => (
+            {Array.isArray(stats.dealsByStage) ? stats.dealsByStage.map((d) => (
               <div key={d.stage} className="flex justify-between text-sm">
                 <span className="text-slate-400">Stage {d.stage}</span>
                 <span className="text-white font-medium">{d.count}</span>
               </div>
-            ))}
+            )) : null}
           </div>
         </Card>
       </div>

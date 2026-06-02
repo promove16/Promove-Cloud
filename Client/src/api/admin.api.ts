@@ -652,6 +652,14 @@ export interface AdminAnalyticsLogEntry {
   timestamp?: string;
 }
 
+export interface AdminAnalyticsLogsResponse {
+  logs: AdminAnalyticsLogEntry[];
+  total: number;
+  page: number;
+  limit: number;
+  totalPages: number;
+}
+
 export interface AdminOnboardInstitutionProfileInput {
   institutionName?: string;
   location?: string;
@@ -929,11 +937,28 @@ export const adminApi = {
     const response = await api.get<ApiSuccessResponse<AdminAnalyticsData>>('/api/admin/analytics');
     return response.data.data;
   },
-  async getAnalyticsLogs(params?: { limit?: number }) {
-    const response = await api.get<ApiSuccessResponse<AdminAnalyticsLogEntry[]>>('/api/admin/analytics/logs', {
+  async getAnalyticsLogs(params?: { limit?: number; page?: number }) {
+    const response = await api.get<ApiSuccessResponse<AdminAnalyticsLogsResponse>>('/api/admin/analytics/logs', {
       params,
     });
     return response.data.data;
+  },
+
+  async downloadLogs() {
+    const response = await api.get<Blob>('/api/admin/analytics/logs/download', {
+      responseType: 'blob',
+    });
+    const disposition = response.headers['content-disposition'] as string | undefined;
+    const matched = disposition?.match(/filename="?([^"]+)"?/i);
+    const fileName = matched?.[1] ?? `app-logs-${new Date().toISOString().split('T')[0]}.log`;
+    const blobUrl = window.URL.createObjectURL(response.data);
+    const anchor = document.createElement('a');
+    anchor.href = blobUrl;
+    anchor.download = fileName;
+    document.body.appendChild(anchor);
+    anchor.click();
+    anchor.remove();
+    window.URL.revokeObjectURL(blobUrl);
   },
   async getAnalyticsUsers(params?: { q?: string; limit?: number }) {
     const response = await api.get<ApiSuccessResponse<AdminUserActivitySearchResponse>>('/api/admin/analytics/users', {

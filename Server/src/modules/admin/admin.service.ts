@@ -72,6 +72,7 @@ import {
   AdminUserListItem,
   AdminUserActivitySearchResponse,
   AdminUsersResponse,
+  AdminAnalyticsLogsResponse,
 } from './admin.types';
 import {
   createAdminInstitutionMentorshipProgram,
@@ -120,9 +121,7 @@ const NON_STUDENT_REGISTRATION_ROLES = new Set<UserRole>([
 const MAX_ADMIN_CREDENTIALS = 3;
 const MS_IN_YEAR = 365 * 24 * 60 * 60 * 1000;
 const ANALYTICS_CACHE_TTL_SECONDS = 60;
-const ANALYTICS_LOG_CACHE_TTL_SECONDS = 15;
-const APP_LOG_TAIL_LINE_LIMIT = 20;
-const APP_LOG_READ_CHUNK_BYTES = 64 * 1024;
+const APP_LOG_TAIL_LINE_LIMIT = 50;
 const appLogPath = path.resolve(__dirname, '../../../../logs/app.log');
 const ansiEscapeSequence = /\u001b\[[0-9;]*m/g;
 const DEFAULT_PROMOVE_ROYALTY_PERCENTAGE = 2.5;
@@ -207,47 +206,6 @@ const generateTemporaryPassword = () => randomBytes(6).toString('base64url');
 
 const stripAnsi = (value: string) => value.replace(ansiEscapeSequence, '');
 
-const countLines = (value: string) => value.split(/\r?\n/).filter((line) => line.trim().length > 0).length;
-
-const readRecentLogLines = async (limit: number): Promise<string[]> => {
-  let fileHandle: Awaited<ReturnType<typeof open>> | null = null;
-
-  try {
-    fileHandle = await open(appLogPath, 'r');
-    const stat = await fileHandle.stat();
-
-    if (stat.size === 0) {
-      return [];
-    }
-
-    let offset = stat.size;
-    let content = '';
-
-    while (offset > 0 && countLines(content) <= limit) {
-      const chunkSize = Math.min(APP_LOG_READ_CHUNK_BYTES, offset);
-      offset -= chunkSize;
-
-      const buffer = Buffer.alloc(chunkSize);
-      const { bytesRead } = await fileHandle.read(buffer, 0, chunkSize, offset);
-      content = buffer.toString('utf8', 0, bytesRead) + content;
-    }
-
-    return content
-      .split(/\r?\n/)
-      .map((line) => line.trim())
-      .filter((line) => line.length > 0)
-      .slice(-limit);
-  } catch (error) {
-    const code = (error as NodeJS.ErrnoException).code;
-    if (code === 'ENOENT') {
-      return [];
-    }
-    throw error;
-  } finally {
-    await fileHandle?.close();
-  }
-};
-
 const parseApplicationLogLine = (
   line: string,
   index: number,
@@ -265,13 +223,6 @@ const parseApplicationLogLine = (
     source: /^(GET|POST|PUT|PATCH|DELETE|OPTIONS|HEAD)\s/i.test(message) ? 'http' : 'application',
     ...(timestamp ? { timestamp } : {}),
   };
-};
-
-const listRecentApplicationLogs = async (limit = APP_LOG_TAIL_LINE_LIMIT): Promise<AdminAnalyticsLogEntry[]> => {
-  const recentLines = await readRecentLogLines(limit);
-  return recentLines
-    .map((line, index) => parseApplicationLogLine(line, index))
-    .reverse();
 };
 
 const userListItem = (user: {
@@ -2204,18 +2155,61 @@ export const getAnalytics = async (): Promise<AdminAnalyticsData> => {
   return result;
 };
 
-export const getAnalyticsLogs = async (limit = APP_LOG_TAIL_LINE_LIMIT): Promise<AdminAnalyticsLogEntry[]> => {
-  const normalizedLimit = Math.min(Math.max(limit, 1), 50);
-  const cacheKey = `admin:analytics:logs:${normalizedLimit}`;
-  const cached = await redis.get<string>(cacheKey);
-  const cachedData = readRedisJson<AdminAnalyticsLogEntry[]>(cached);
-  if (cachedData) {
-    return cachedData;
-  }
+const readLogLines = async (maxLines = 10000): Promise<string[]> => {
+  let fileHandle: Awaited<ReturnType<typeof open>> | null = null;
 
-  const logs = await listRecentApplicationLogs(normalizedLimit);
-  await redis.set(cacheKey, JSON.stringify(logs), { ex: ANALYTICS_LOG_CACHE_TTL_SECONDS });
-  return logs;
+  try {
+    fileHandle = await open(appLogPath, 'r');
+    const stat = await fileHandle.stat();
+
+    if (stat.size === 0) {
+      return [];
+    }
+
+    const maxBytes = Math.min(stat.size, 10 * 1024 * 1024);
+    const buffer = Buffer.alloc(maxBytes);
+    const { bytesRead } = await fileHandle.read(buffer, 0, maxBytes, stat.size - maxBytes);
+    const content = buffer.toString('utf8', 0, bytesRead);
+
+    return content
+      .split(/\r?\n/)
+      .map((line) => line.trim())
+      .filter((line) => line.length > 0)
+      .slice(-maxLines);
+  } catch (error) {
+    const code = (error as NodeJS.ErrnoException).code;
+    if (code === 'ENOENT') {
+      return [];
+    }
+    throw error;
+  } finally {
+    await fileHandle?.close();
+  }
+};
+
+export const getAnalyticsLogs = async (
+  limit = APP_LOG_TAIL_LINE_LIMIT,
+  page = 1,
+): Promise<AdminAnalyticsLogsResponse> => {
+  const normalizedLimit = Math.min(Math.max(limit, 1), 10000);
+  const normalizedPage = Math.max(page, 1);
+
+  const allLines = await readLogLines();
+  const total = allLines.length;
+  const totalPages = total > 0 ? Math.ceil(total / normalizedLimit) : 0;
+
+  const reversed = [...allLines].reverse();
+  const startIndex = (normalizedPage - 1) * normalizedLimit;
+  const pageLines = reversed.slice(startIndex, startIndex + normalizedLimit);
+
+  const logs = pageLines.map((line, index) => parseApplicationLogLine(line, index));
+
+  return { logs, total, page: normalizedPage, limit: normalizedLimit, totalPages };
+};
+
+export const getLogFilePath = (): string | null => {
+  const { existsSync } = require('fs');
+  return existsSync(appLogPath) ? appLogPath : null;
 };
 
 export const getAnalyticsUsers = async (

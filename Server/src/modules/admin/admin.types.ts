@@ -475,6 +475,14 @@ export interface AdminAnalyticsLogEntry {
   timestamp?: string;
 }
 
+export interface AdminAnalyticsLogsResponse {
+  logs: AdminAnalyticsLogEntry[];
+  total: number;
+  page: number;
+  limit: number;
+  totalPages: number;
+}
+
 export interface AdminUserActivitySearchResponse {
   items: UserActivitySummary[];
 }

@@ -314,7 +314,6 @@ const AnalyticsOverviewPanel = memo(function AnalyticsOverviewPanel({
                   <div className="text-2xl font-semibold text-slate-600">0{index + 1}</div>
                   <div>
                     <div className="text-sm font-medium text-white">{user.displayName}</div>
-                    <div className="mt-1 text-xs uppercase tracking-[0.22em] text-slate-500">{user.role}</div>
                   </div>
                   <div className="text-right">
                     <div className="text-lg font-semibold text-white">{numberFormatter.format(user.innovationScore)}</div>

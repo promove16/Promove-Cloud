@@ -22,6 +22,7 @@ import {
   approvePatentController,
   getAnalyticsController,
   getAnalyticsLogsController,
+  downloadAnalyticsLogsController,
   getAnalyticsUserDetailController,
   getAnalyticsUsersController,
   getComplianceSubmissionsController,
@@ -198,6 +199,7 @@ router.get('/investments/by-type', asyncHandler(getInvestmentTypeAnalyticsContro
 router.patch('/milestones/:id/verify', asyncHandler(verifyMilestoneController));
 router.get('/analytics', asyncHandler(getAnalyticsController));
 router.get('/analytics/logs', asyncHandler(getAnalyticsLogsController));
+router.get('/analytics/logs/download', asyncHandler(downloadAnalyticsLogsController));
 router.get('/analytics/users', asyncHandler(getAnalyticsUsersController));
 router.get('/analytics/users/:userId', asyncHandler(getAnalyticsUserDetailController));
 

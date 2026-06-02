@@ -110,7 +110,8 @@ export const listMentorshipProgramsQuerySchema = z.object({
 });
 
 export const analyticsLogsQuerySchema = z.object({
-  limit: z.coerce.number().int().positive().max(50).default(20),
+  limit: z.coerce.number().int().positive().max(10000).default(50),
+  page: z.coerce.number().int().positive().default(1),
 });
 
 export const analyticsUsersQuerySchema = z.object({
