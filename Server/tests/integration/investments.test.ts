@@ -135,6 +135,45 @@ const approveDealThroughAdmin = async ({
 };
 
 describe('investment workflow integration', () => {
+  it('filters investor marketplace startups by visible live founder score instead of launch snapshot', async () => {
+    const investor = await createUser(UserRole.INVESTOR, { displayName: 'Score Range Investor' });
+    const highLiveFounder = await createUser(UserRole.STUDENT, {
+      displayName: 'High Live Founder',
+      innovationScore: 730,
+    });
+    const lowLiveFounder = await createUser(UserRole.STUDENT, {
+      displayName: 'Low Live Founder',
+      innovationScore: 400,
+    });
+
+    await createStartup(highLiveFounder._id.toString(), {
+      name: 'High Live Startup',
+      innovationScoreAtLaunch: 400,
+    });
+    await createStartup(lowLiveFounder._id.toString(), {
+      name: 'Low Live Startup',
+      innovationScoreAtLaunch: 730,
+    });
+
+    const response = await request(app)
+      .get('/api/investor/startups?minScore=0&maxScore=456')
+      .set(authHeader(investor));
+
+    expect(response.status).toBe(200);
+    const startupNames = response.body.data.items.map((item: { name: string }) => item.name);
+    expect(startupNames).toContain('Low Live Startup');
+    expect(startupNames).not.toContain('High Live Startup');
+    expect(response.body.data.items).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({
+          name: 'Low Live Startup',
+          founder: expect.objectContaining({ innovationScore: 400 }),
+          innovationScoreAtLaunch: 730,
+        }),
+      ]),
+    );
+  });
+
   it('lists admin deals from the admin router', async () => {
     const founder = await createUser(UserRole.STUDENT, { displayName: 'Admin Deals Founder' });
     const investor = await createUser(UserRole.INVESTOR, { displayName: 'Admin Deals Investor' });

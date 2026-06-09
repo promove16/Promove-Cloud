@@ -1,6 +1,6 @@
-import { useState, useMemo } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { useQuery } from '@tanstack/react-query';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, useSearchParams } from 'react-router-dom';
 import { 
   Handshake, 
   Clock, 
@@ -53,6 +53,7 @@ const formatInr = (amount: number) =>
 
 export default function InvestmentPipeline() {
   const navigate = useNavigate();
+  const [searchParams, setSearchParams] = useSearchParams();
   const [selectedDealId, setSelectedDealId] = useState<string | null>(null);
   const [showDealDetail, setShowDealDetail] = useState(false);
   const [filterStage, setFilterStage] = useState<string>('all');
@@ -95,6 +96,19 @@ export default function InvestmentPipeline() {
     });
     return grouped;
   }, [allDeals]);
+
+  useEffect(() => {
+    const dealId = searchParams.get('dealId');
+    if (!dealId) {
+      return;
+    }
+
+    setSelectedDealId(dealId);
+    setShowDealDetail(true);
+    const nextParams = new URLSearchParams(searchParams);
+    nextParams.delete('dealId');
+    setSearchParams(nextParams, { replace: true });
+  }, [searchParams, setSearchParams]);
 
   const getNegotiationStatus = (deal: any) => {
     const neg = deal.negotiation;

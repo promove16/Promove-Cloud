@@ -18,6 +18,7 @@ import { recordStartupLifecycleEvent } from '../startupLifecycle/startupLifecycl
 import { DirectMessage } from '../dm/dm.model';
 import { serializeDirectMessage } from '../dm/dm.serializer';
 import { NotificationService } from '../notification/notification.service';
+import { RequestRecord } from '../request/request.model';
 import { io } from '../../config/socket';
 import type {
   StartupDocumentCategory,
@@ -35,6 +36,15 @@ const truncateNotificationBody = (value: string) =>
   value.length > NOTIFICATION_BODY_MAX_LENGTH
     ? `${value.slice(0, NOTIFICATION_BODY_MAX_LENGTH - 3)}...`
     : value;
+
+const deleteRequestsLinkedToStartup = async (startupId: string) => {
+  await RequestRecord.deleteMany({
+    $or: [
+      { targetEntityType: 'startup', targetEntityId: startupId },
+      { 'metadata.startupId': startupId },
+    ],
+  });
+};
 
 const STARTUP_DOCUMENT_CATEGORIES = [
   'business_plan',
@@ -2203,6 +2213,7 @@ export const deleteStartup = async (startupId: string, userId: string) => {
   // Soft delete
   startup.isActive = false;
   await startup.save();
+  await deleteRequestsLinkedToStartup(startupId);
 };
 
 export const adminDeleteStartup = async (adminId: string, startupId: string) => {
@@ -2254,6 +2265,7 @@ export const adminDeleteStartup = async (adminId: string, startupId: string) => 
   // Soft delete — keeps historical records intact and matches founder-side deletion.
   startup.isActive = false;
   await startup.save();
+  await deleteRequestsLinkedToStartup(startupId);
 
   await AdminAuditLog.create({
     adminId: new Types.ObjectId(adminId),

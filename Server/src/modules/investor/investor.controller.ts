@@ -37,6 +37,7 @@ export const listInvestorStartupsController = async (req: Request, res: Response
   const data = await getStartups(req.user!._id, {
     minScore: parseOptionalNumber(req.query.minScore),
     maxScore: parseOptionalNumber(req.query.maxScore),
+    search: typeof req.query.search === 'string' ? req.query.search : undefined,
     category: typeof req.query.category === 'string' ? req.query.category : undefined,
     stage: typeof req.query.stage === 'string' ? req.query.stage : undefined,
     page: parseOptionalNumber(req.query.page),

@@ -66,7 +66,7 @@ const axiosInstance = axios.create({
 
 let refreshPromise: Promise<AuthPayload | null> | null = null;
 let refreshBlocked = false;
-const SUPPORT_EMAIL = "charan.f.sde@gmail.com";
+const SUPPORT_EMAIL = import.meta.env.VITE_SUPPORT_EMAIL ?? "charan.f.sde@gmail.com";
 const SERVICE_TOAST_DEBOUNCE_MS = 30_000;
 const serviceToastLastShownAt = new Map<string, number>();
 
@@ -188,15 +188,18 @@ axiosInstance.interceptors.request.use((config) => {
 axiosInstance.interceptors.response.use(
   (response) => response,
   async (error: AxiosError) => {
-    showServiceUnavailableToast(error as AxiosError<ApiErrorResponse>);
-
     const originalRequest = error.config as RetriableRequestConfig | undefined;
+    const isOriginalAuthRequest = isAuthRequest(originalRequest?.url);
+
+    if (!isOriginalAuthRequest) {
+      showServiceUnavailableToast(error as AxiosError<ApiErrorResponse>);
+    }
 
     if (!originalRequest || error.response?.status !== 401) {
       return Promise.reject(error);
     }
 
-    if (isAuthRequest(originalRequest.url)) {
+    if (isOriginalAuthRequest) {
       return Promise.reject(error);
     }
 

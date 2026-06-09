@@ -19,6 +19,47 @@ const loginSchema = z.object({
 
 type LoginFormValues = z.infer<typeof loginSchema>;
 
+const getLoginErrorMessage = (submissionError: unknown) => {
+  if (!isAxiosError(submissionError)) {
+    return 'Unable to sign in right now.';
+  }
+
+  if (!submissionError.response) {
+    return 'API service is not reachable right now. Please try again shortly.';
+  }
+
+  const apiError = submissionError.response.data?.error;
+
+  switch (apiError?.code) {
+    case 'INVALID_CREDENTIALS':
+      return 'Invalid email or password.';
+    case 'ROLE_MISMATCH':
+      return apiError.message || 'This account is registered under a different role.';
+    case 'ACCESS_DISABLED':
+      return apiError.message || 'Your account is currently inactive. Please contact support.';
+    case 'ADMIN_APPROVAL_PENDING':
+      return 'Your registration request is still waiting for admin approval.';
+    case 'ADMIN_APPROVAL_REJECTED':
+      return (
+        apiError.message ||
+        'Your registration request was rejected. Please contact the ProMove admin team.'
+      );
+    case 'INSTITUTION_APPROVAL_PENDING':
+      return 'Your school or college has not approved your student account yet. This step is handled by the institution, not the platform admin.';
+    case 'INSTITUTION_VERIFICATION_REJECTED':
+      return (
+        apiError.message ||
+        'Your institution could not verify your account. Please contact your school or college for support.'
+      );
+    case 'AUTH_SESSION_STORE_UNAVAILABLE':
+    case 'DEPENDENCY_UNAVAILABLE':
+    case 'OVERLOADED':
+      return apiError.message || 'Sign in is temporarily unavailable. Please try again shortly.';
+    default:
+      return apiError?.message ?? 'Unable to sign in right now.';
+  }
+};
+
 const getLoginNotice = (message: string | null, intent: string | null) => {
   if (message === 'session_expired') {
     return {
@@ -82,42 +123,7 @@ export function LoginPage() {
         { replace: true },
       );
     } catch (submissionError) {
-      if (isAxiosError(submissionError)) {
-        const apiError = submissionError.response?.data?.error;
-
-        if (apiError?.code === 'ADMIN_APPROVAL_PENDING') {
-          showError('Your registration request is still waiting for admin approval.');
-          return;
-        }
-
-        if (apiError?.code === 'ADMIN_APPROVAL_REJECTED') {
-          showError(
-            apiError.message ||
-              'Your registration request was rejected. Please contact the ProMove admin team.',
-          );
-          return;
-        }
-
-        if (apiError?.code === 'INSTITUTION_APPROVAL_PENDING') {
-          showError(
-            'Your school or college has not approved your student account yet. This step is handled by the institution, not the platform admin.',
-          );
-          return;
-        }
-
-        if (apiError?.code === 'INSTITUTION_VERIFICATION_REJECTED') {
-          showError(
-            apiError.message ||
-              'Your institution could not verify your account. Please contact your school or college for support.',
-          );
-          return;
-        }
-
-        showError(apiError?.message ?? 'Unable to sign in right now.');
-        return;
-      }
-
-      showError('Unable to sign in right now.');
+      showError(getLoginErrorMessage(submissionError));
     }
   };
 

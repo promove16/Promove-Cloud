@@ -372,14 +372,16 @@ const pushNotification = async (
   type: Parameters<typeof NotificationService.create>[0]['type'],
   title: string,
   body: string,
-  link = '/dashboard/admin',
+  link?: string,
+  metadata?: Record<string, unknown>,
 ) => {
   const notification = await NotificationService.create({
     userId,
     type,
     title,
     body,
-    link,
+    ...(link ? { link } : {}),
+    ...(metadata ? { metadata } : {}),
   });
 
   if (io) {
@@ -1894,6 +1896,7 @@ export const approveDealStage = async (adminId: string, dealId: string) => {
 
     return {
       startupId: String(deal.startupId),
+      dealId: String(deal._id),
       investorId: String(deal.investorId),
       studentId: String(deal.studentId),
     };
@@ -1912,6 +1915,11 @@ export const approveDealStage = async (adminId: string, dealId: string) => {
       'system',
       'Equity transfer verified by ProMove admin',
       'Your deal equity has been verified. Your official contract is ready to download from the deal.',
+      `/startup-launch/${approvalResult.startupId}/cap-table?view=pipeline&dealId=${approvalResult.dealId}`,
+      {
+        dealId: approvalResult.dealId,
+        startupId: approvalResult.startupId,
+      },
     );
   }
   if (investor) {
@@ -1920,6 +1928,11 @@ export const approveDealStage = async (adminId: string, dealId: string) => {
       'system',
       'Equity transfer verified by ProMove admin',
       'You may now close the deal. Your official contract is ready to download from the deal.',
+      `/dashboard/investor/pipeline?dealId=${approvalResult.dealId}`,
+      {
+        dealId: approvalResult.dealId,
+        startupId: approvalResult.startupId,
+      },
     );
   }
 };

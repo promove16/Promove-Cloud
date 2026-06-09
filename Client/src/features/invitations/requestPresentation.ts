@@ -139,8 +139,42 @@ export function formatRequestStatus(status: WorkflowRequest['status']) {
   return humanize(status);
 }
 
+const isTerminalPositiveStatus = (request: WorkflowRequest) =>
+  request.status === 'accepted' || request.status === 'completed';
+
+const getMetadataString = (request: WorkflowRequest, key: string) => {
+  const value = request.metadata?.[key];
+  return typeof value === 'string' && value.trim() ? value.trim() : null;
+};
+
+const isMessagePath = (path: string) => path.startsWith('/dashboard/messages');
+
+const isRequestInboxPath = (path: string) =>
+  path === '/dashboard/invitations' ||
+  path.startsWith('/dashboard/invitations?') ||
+  path === '/dashboard/messages?view=requests' ||
+  path.startsWith('/dashboard/messages?view=requests&');
+
+function getConversationRequestPartnerId(request: WorkflowRequest, viewerUserId?: string) {
+  if (request.type !== 'generic' || request.actionType !== 'connect' || request.targetEntityType !== 'conversation') {
+    return null;
+  }
+
+  if (viewerUserId) {
+    if (request.fromUserId === viewerUserId) {
+      return request.toUserId ?? request.targetEntityId ?? null;
+    }
+
+    if (request.toUserId === viewerUserId || request.targetEntityId === viewerUserId) {
+      return request.fromUserId;
+    }
+  }
+
+  return request.toUserId ?? request.fromUserId ?? null;
+}
+
 const getAcceptedPitchWorkspacePath = (request: WorkflowRequest) => {
-  if (request.status !== 'accepted' && request.status !== 'completed') {
+  if (!isTerminalPositiveStatus(request)) {
     return null;
   }
 
@@ -153,6 +187,40 @@ const getAcceptedPitchWorkspacePath = (request: WorkflowRequest) => {
     ? `/product-workspace/${workspaceId.trim()}`
     : null;
 };
+
+const getWorkspacePath = (request: WorkflowRequest, viewerUserId?: string) => {
+  const workspaceId =
+    request.targetEntityType === 'workspace' && request.targetEntityId.trim()
+      ? request.targetEntityId.trim()
+      : getMetadataString(request, 'workspaceId');
+
+  if (!workspaceId) {
+    return null;
+  }
+
+  const senderCanAlreadyOpen = viewerUserId ? request.fromUserId === viewerUserId : false;
+  return isTerminalPositiveStatus(request) || senderCanAlreadyOpen ? `/product-workspace/${workspaceId}` : null;
+};
+
+const getStartupPath = (request: WorkflowRequest) => {
+  const startupId =
+    request.targetEntityType === 'startup' && request.targetEntityId.trim()
+      ? request.targetEntityId.trim()
+      : getMetadataString(request, 'startupId');
+
+  return startupId ? `/marketplace/view/startup/${startupId}` : null;
+};
+
+const getJobPath = (request: WorkflowRequest) => {
+  const jobId =
+    request.targetEntityType === 'recruiter_job' && request.targetEntityId.trim()
+      ? request.targetEntityId.trim()
+      : getMetadataString(request, 'jobId');
+
+  return jobId ? `/marketplace/jobs/${jobId}` : null;
+};
+
+const labelForPath = (path: string) => (isMessagePath(path) ? 'Continue Chat' : 'Open Linked Content');
 
 export function getRequestEntityName(request: WorkflowRequest) {
   for (const key of ENTITY_METADATA_KEYS) {
@@ -172,17 +240,48 @@ export function getRequestActorLabel(request: WorkflowRequest, direction: 'incom
     : request.toUser?.displayName ?? request.recipientEmail ?? 'Pending account';
 }
 
-export function getRequestPrimaryLink(request: WorkflowRequest) {
+export function getRequestPrimaryAction(request: WorkflowRequest, viewerUserId?: string) {
+  const conversationPartnerId = getConversationRequestPartnerId(request, viewerUserId);
+  if (conversationPartnerId) {
+    return {
+      label: 'Continue Chat',
+      path: `/dashboard/messages/${conversationPartnerId}`,
+    };
+  }
+
   const acceptedPitchWorkspacePath = getAcceptedPitchWorkspacePath(request);
   if (acceptedPitchWorkspacePath) {
-    return acceptedPitchWorkspacePath;
+    return { label: 'Open Workspace', path: acceptedPitchWorkspacePath };
   }
 
-  if ((request.status === 'accepted' || request.status === 'completed') && request.acceptRedirect) {
-    return request.acceptRedirect;
+  const workspacePath = getWorkspacePath(request, viewerUserId);
+  if (workspacePath) {
+    return { label: 'Open Workspace', path: workspacePath };
   }
 
-  return request.deepLink ?? request.acceptRedirect ?? request.declineRedirect ?? null;
+  const startupPath = getStartupPath(request);
+  if (startupPath) {
+    return { label: 'Open Startup', path: startupPath };
+  }
+
+  const jobPath = getJobPath(request);
+  if (jobPath) {
+    return { label: 'Open Job', path: jobPath };
+  }
+
+  if (isTerminalPositiveStatus(request) && request.acceptRedirect && !isRequestInboxPath(request.acceptRedirect)) {
+    return { label: labelForPath(request.acceptRedirect), path: request.acceptRedirect };
+  }
+
+  const fallbackPath = [request.deepLink, request.acceptRedirect, request.declineRedirect].find(
+    (path): path is string => Boolean(path && !isRequestInboxPath(path)),
+  );
+
+  return fallbackPath ? { label: labelForPath(fallbackPath), path: fallbackPath } : null;
+}
+
+export function getRequestPrimaryLink(request: WorkflowRequest, viewerUserId?: string) {
+  return getRequestPrimaryAction(request, viewerUserId)?.path ?? null;
 }
 
 export function getRequestLinkTargets(request: WorkflowRequest) {
@@ -191,15 +290,15 @@ export function getRequestLinkTargets(request: WorkflowRequest) {
   const targets = isAccepted
     ? [
         acceptedPitchWorkspacePath
-          ? { label: 'Open linked content', path: acceptedPitchWorkspacePath }
+          ? { label: 'Open Workspace', path: acceptedPitchWorkspacePath }
           : request.acceptRedirect
-            ? { label: 'Open linked content', path: request.acceptRedirect }
+            ? { label: labelForPath(request.acceptRedirect), path: request.acceptRedirect }
             : null,
         request.deepLink ? { label: 'Original request', path: request.deepLink } : null,
         request.declineRedirect ? { label: 'After decline', path: request.declineRedirect } : null,
       ]
     : [
-        request.deepLink ? { label: 'Open linked content', path: request.deepLink } : null,
+        request.deepLink ? { label: labelForPath(request.deepLink), path: request.deepLink } : null,
         request.acceptRedirect ? { label: 'After acceptance', path: request.acceptRedirect } : null,
         request.declineRedirect ? { label: 'After decline', path: request.declineRedirect } : null,
       ];

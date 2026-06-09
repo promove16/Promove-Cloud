@@ -16,6 +16,8 @@ export interface NotificationItem {
   body: string;
   link?: string;
   metadata?: {
+    dealId?: string;
+    agreementId?: string;
     workspaceId?: string;
     startupId?: string;
     startupName?: string;

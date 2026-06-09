@@ -113,12 +113,34 @@ export function StudentPortfolioViewContent({ userId: userIdOverride }: { userId
               {/* Hero */}
               <section className="overflow-hidden rounded-2xl border border-slate-800 bg-slate-900 shadow-[0_24px_60px_rgba(3,7,18,0.4)]">
                 <div className="grid gap-4 p-4 sm:grid-cols-[220px_minmax(0,1fr)] sm:items-center sm:gap-6 sm:p-6">
-                  <div className="mx-auto flex h-40 w-40 items-center justify-center overflow-hidden rounded-full border-4 border-slate-700 bg-black text-4xl font-semibold text-white sm:h-44 sm:w-44">
-                    {profile.avatar ? (
-                      <img src={profile.avatar} alt={profile.displayName} className="h-full w-full object-cover" />
-                    ) : (
-                      profile.displayName.split(" ").map((p) => p[0]).join("").slice(0, 2).toUpperCase()
-                    )}
+                  <div className="relative group/avatar mx-auto sm:mx-0 shrink-0">
+                    {/* Ambient Glow */}
+                    <div className="absolute -inset-1.5 rounded-[2rem] bg-gradient-to-tr from-blue-600 via-indigo-600 to-cyan-500 opacity-30 blur-md transition duration-500 group-hover/avatar:opacity-60" />
+                    
+                    {/* Gradient Squircle Frame */}
+                    <div className="relative h-40 w-40 rounded-3xl bg-gradient-to-tr from-blue-600 via-indigo-600 to-cyan-500 p-[3px] shadow-[0_24px_50px_rgba(0,0,0,0.4)] sm:h-44 sm:w-44">
+                      {/* Inner Slate Gap */}
+                      <div className="h-full w-full rounded-[21px] bg-[#0c1220] p-1">
+                        {/* Content Box */}
+                        <div className="h-full w-full overflow-hidden rounded-[17px] bg-slate-950 flex items-center justify-center">
+                          {profile.avatar ? (
+                            <img src={profile.avatar} alt={profile.displayName} className="h-full w-full object-cover transition duration-500 group-hover/avatar:scale-105" />
+                          ) : (
+                            <div className="flex h-full w-full items-center justify-center bg-gradient-to-tr from-blue-900/40 via-indigo-900/40 to-cyan-900/40">
+                              <span className="bg-gradient-to-tr from-white to-slate-400 bg-clip-text text-5xl font-black tracking-tight text-transparent">
+                                {profile.displayName.split(" ").map((p) => p[0]).join("").slice(0, 2).toUpperCase()}
+                              </span>
+                            </div>
+                          )}
+                        </div>
+                      </div>
+                    </div>
+                    
+                    {/* Pulse ring for active status */}
+                    <span className="absolute -bottom-1 -right-1 flex h-6 w-6">
+                      <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75"></span>
+                      <span className="relative inline-flex rounded-full h-6 w-6 border-2 border-[#0c1220] bg-emerald-500"></span>
+                    </span>
                   </div>
 
                   <div className="rounded-2xl border border-slate-800 bg-[#0c1220] p-5 text-slate-300">

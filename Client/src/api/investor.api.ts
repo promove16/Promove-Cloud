@@ -17,6 +17,7 @@ export const investorApi = {
   async getStartups(params?: {
     minScore?: number;
     maxScore?: number;
+    search?: string;
     category?: string;
     stage?: string;
     page?: number;

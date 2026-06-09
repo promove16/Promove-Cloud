@@ -205,6 +205,39 @@ const getNotificationTargets = (notification: NotificationItem) =>
     .filter((target): target is string => typeof target === 'string' && target.trim().length > 0)
     .map(normalizeNotificationPath);
 
+const getNotificationNavigationTarget = (
+  notification: NotificationItem,
+  role?: UserRole,
+) => {
+  const dealId = notification.metadata?.dealId;
+  if (dealId && role === UserRole.INVESTOR) {
+    return `/dashboard/investor/pipeline?dealId=${dealId}`;
+  }
+
+  if (dealId && notification.metadata?.startupId && role === UserRole.STUDENT) {
+    return `/startup-launch/${notification.metadata.startupId}/cap-table?view=pipeline&dealId=${dealId}`;
+  }
+
+  if (notification.metadata?.agreementId) {
+    return `/agreements/${notification.metadata.agreementId}`;
+  }
+
+  if (notification.link && notification.link !== '/dashboard/admin') {
+    return notification.link;
+  }
+
+  if (notification.title.toLowerCase().includes('equity transfer verified')) {
+    if (role === UserRole.INVESTOR) {
+      return '/dashboard/investor/pipeline';
+    }
+    if (role === UserRole.STUDENT) {
+      return '/startup-launch';
+    }
+  }
+
+  return notification.metadata?.deepLink ?? notification.metadata?.acceptRedirect ?? undefined;
+};
+
 const hasNotificationTarget = (targets: string[], pathPrefixes: string[]) =>
   targets.some((target) =>
     pathPrefixes.some((pathPrefix) => {
@@ -271,9 +304,11 @@ const getUnreadSidebarNotificationState = (notifications: NotificationItem[]) =>
 function NotificationBell({
   notifications,
   unreadCount,
+  role,
 }: {
   notifications: NotificationItem[];
   unreadCount: number;
+  role?: UserRole;
 }) {
   const navigate = useNavigate();
   const queryClient = useQueryClient();
@@ -371,15 +406,16 @@ function NotificationBell({
           notifications.slice(0, 6).map((notification) => (
             <DropdownMenuItem
               key={notification._id}
-              className={`dashboard-theme-menu-item cursor-pointer rounded-xl px-3 py-3 ${notification.isRead ? 'opacity-70' : ''}`}
+              className={`dashboard-theme-menu-item rounded-xl px-3 py-3 ${getNotificationNavigationTarget(notification, role) || notification.type === 'team_invite' ? 'cursor-pointer' : 'cursor-default'} ${notification.isRead ? 'opacity-70' : ''}`}
               onSelect={(event) => {
                 const isTeamInvite = notification.type === 'team_invite';
                 if (isTeamInvite) {
                   event.preventDefault();
                 }
                 markReadMutation.mutate(notification._id);
-                if (!isTeamInvite && notification.link) {
-                  navigate(notification.link);
+                const target = getNotificationNavigationTarget(notification, role);
+                if (!isTeamInvite && target) {
+                  navigate(target);
                 }
               }}
             >
@@ -529,7 +565,12 @@ export function DashboardLayout({ children, role }: PropsWithChildren<DashboardL
         return false;
       }
 
-      return doesCurrentPathMatchTargets(location.pathname, getNotificationTargets(notification));
+      return doesCurrentPathMatchTargets(location.pathname, [
+        ...getNotificationTargets(notification),
+        ...(getNotificationNavigationTarget(notification, resolvedRole)
+          ? [normalizeNotificationPath(getNotificationNavigationTarget(notification, resolvedRole)!)]
+          : []),
+      ]);
     });
 
     if (matchingUnreadNotifications.length === 0) {
@@ -747,77 +788,165 @@ export function DashboardLayout({ children, role }: PropsWithChildren<DashboardL
       return null;
     }
 
+    const roleBadgeStyles: Record<string, string> = {
+      [UserRole.INVESTOR]: 'border-teal-300/20 bg-teal-300/10 text-teal-200',
+      [UserRole.RECRUITER]: 'border-amber-300/20 bg-amber-300/10 text-amber-200',
+      [UserRole.STUDENT]: 'border-sky-300/20 bg-sky-300/10 text-sky-200',
+      [UserRole.MENTOR]: 'border-violet-300/20 bg-violet-300/10 text-violet-200',
+      [UserRole.SCHOOL]: 'border-pink-300/20 bg-pink-300/10 text-pink-200',
+      [UserRole.COLLEGE]: 'border-indigo-300/20 bg-indigo-300/10 text-indigo-200',
+      [UserRole.ADMIN]: 'border-rose-300/20 bg-rose-300/10 text-rose-200',
+    };
+
+    const currentBadgeStyle = roleBadgeStyles[user.role] ?? 'border-slate-500/20 bg-slate-500/10 text-slate-200';
+
     return (
       <DropdownMenu>
         <DropdownMenuTrigger asChild>
           <button
             type="button"
             aria-label="Open account menu"
-            className="group flex min-w-0 items-center gap-2 rounded-2xl px-1 py-1 text-left transition hover:bg-white/5 data-[state=open]:bg-white/5 sm:gap-3"
+            className="group relative flex min-w-0 items-center gap-3 overflow-hidden rounded-[1.35rem] border border-white/[0.08] bg-[#0b1020]/85 px-2.5 py-2 text-left shadow-[inset_0_1px_0_rgba(255,255,255,0.06),0_18px_38px_rgba(0,0,0,0.22)] backdrop-blur-xl transition-all duration-300 hover:-translate-y-0.5 hover:border-cyan-200/20 hover:bg-[#10172a]/95 data-[state=open]:-translate-y-0.5 data-[state=open]:border-cyan-200/25 data-[state=open]:bg-[#10172a]/95 sm:min-w-[13.5rem]"
           >
-            <div className="relative flex h-10 w-10 shrink-0 items-center justify-center rounded-[0.3rem] bg-gradient-to-br from-blue-500 via-violet-500 to-purple-600 text-sm font-black tracking-tight text-white sm:h-12 sm:w-12 sm:text-base">
-              {initials}
-              <span className="absolute -bottom-0.5 -right-0.5 h-3.5 w-3.5 rounded-[2px] border-2 border-[#020817] bg-[#22c55e]" />
+            <span className="pointer-events-none absolute inset-x-3 top-0 h-px bg-gradient-to-r from-transparent via-cyan-100/30 to-transparent" />
+            <span className="pointer-events-none absolute inset-y-2 left-[3.75rem] w-px bg-white/[0.06]" />
+            <div className="relative flex h-10 w-10 shrink-0 items-center justify-center rounded-[1rem] text-sm font-black tracking-tight text-white shadow-[0_12px_26px_rgba(56,189,248,0.16)] sm:h-11 sm:w-11">
+              <div className="absolute inset-0 overflow-hidden rounded-[1rem] bg-[linear-gradient(135deg,#5b21b6_0%,#312e81_54%,#0f766e_100%)]" />
+              <div className="absolute inset-[1px] flex items-center justify-center overflow-hidden rounded-[0.92rem] bg-slate-950/20">
+                {user.avatar ? (
+                  <img src={user.avatar} alt={user.displayName} className="h-full w-full object-cover" />
+                ) : (
+                  initials
+                )}
+              </div>
+              <span className="absolute -bottom-0.5 -right-0.5 flex h-4 w-4 items-center justify-center rounded-full border border-[#0b1020] bg-[#0b1020]">
+                <span className="h-2.5 w-2.5 rounded-full bg-teal-300 shadow-[0_0_12px_rgba(94,234,212,0.75)]" />
+              </span>
             </div>
-            <div className="hidden min-w-0 md:block">
-              <div className="text-[10px] uppercase tracking-[0.32em] text-slate-500">
-                Account
-              </div>
-              <div className="truncate text-base font-semibold text-slate-50">
-                {user.displayName}
-              </div>
-              <div className="mt-1 flex items-center">
-                <span className="inline-flex items-center rounded-full border border-[#2e4e77] bg-[#13284a] px-3 py-1 text-[10px] font-semibold uppercase tracking-[0.22em] text-[#93c5fd]">
-                  {user.role}
+            <div className="hidden min-w-0 flex-1 md:block">
+              <div className="mb-1 flex items-center gap-2">
+                <span className="text-[9px] font-semibold uppercase tracking-[0.28em] text-slate-500">
+                  Account
+                </span>
+                <span className={`inline-flex max-w-[5.75rem] items-center rounded-md border px-1.5 py-[2px] text-[9px] font-bold uppercase leading-none tracking-[0.16em] ${currentBadgeStyle}`}>
+                  <span className="truncate">{user.role}</span>
                 </span>
               </div>
+              <div className="truncate text-sm font-semibold leading-tight text-slate-100 transition-colors duration-200 group-hover:text-white">
+                {user.displayName}
+              </div>
             </div>
-            <ChevronDown className="hidden h-4 w-4 shrink-0 text-slate-500 transition group-data-[state=open]:rotate-180 group-hover:text-blue-300 sm:block" />
+            <ChevronDown className="hidden h-4 w-4 shrink-0 text-slate-500 transition-all duration-200 group-hover:text-cyan-100 group-data-[state=open]:rotate-180 group-data-[state=open]:text-cyan-100 sm:block" />
           </button>
         </DropdownMenuTrigger>
         <DropdownMenuContent
           align={align}
           side={side}
           sideOffset={12}
-          className="w-[18.5rem] rounded-2xl border border-white/10 bg-[#020817] p-2 text-slate-50 shadow-[0_28px_52px_rgba(2,6,23,0.58)]"
+          className="w-[20rem] rounded-2xl border border-white/10 bg-[#070c19]/95 backdrop-blur-xl p-3 text-slate-50 shadow-[0_28px_52px_rgba(2,6,23,0.7)]"
         >
-          {accountMenuItems.map((item) =>
-            item.kind === 'link' ? (
-              <DropdownMenuItem
-                key={item.label}
-                onSelect={() => {
+          {/* Profile Quick Overview */}
+          <div className="flex flex-col gap-3 p-3 rounded-xl bg-white/[0.02] border border-white/5 mb-3">
+            <div className="flex items-center gap-3">
+              <div className="relative h-12 w-12 shrink-0 rounded-xl overflow-hidden bg-gradient-to-tr from-violet-600 via-indigo-600 to-cyan-500 flex items-center justify-center font-black text-white text-base shadow-[0_0_15px_rgba(139,92,246,0.3)]">
+                {user.avatar ? (
+                  <img src={user.avatar} alt={user.displayName} className="h-full w-full object-cover" />
+                ) : (
+                  initials
+                )}
+              </div>
+              <div className="min-w-0 flex-1">
+                <div className="truncate text-sm font-bold text-white leading-snug">
+                  {user.displayName}
+                </div>
+                <div className="truncate text-xs text-slate-400 font-medium leading-none mt-0.5">
+                  {user.email}
+                </div>
+              </div>
+            </div>
+            
+            {/* Innovation Score & Role Info */}
+            <div className="flex items-center justify-between gap-2 pt-2 border-t border-white/5">
+              {user.role === UserRole.STUDENT ? (
+                <>
+                  <div className="flex items-center gap-1.5">
+                    <span className="text-[10px] text-slate-400 font-semibold uppercase tracking-wider">Score:</span>
+                    <span className="text-xs font-black text-cyan-400 bg-cyan-500/10 border border-cyan-500/20 px-1.5 py-0.5 rounded">
+                      {user.innovationScore ?? 0}
+                    </span>
+                  </div>
+                  <span className={`inline-flex items-center rounded-full border px-2 py-0.5 text-[9px] font-bold uppercase tracking-wider ${currentBadgeStyle}`}>
+                    {user.role}
+                  </span>
+                </>
+              ) : (
+                <div className="flex w-full justify-end">
+                  <span className={`inline-flex items-center rounded-full border px-2.5 py-0.5 text-[9px] font-bold uppercase tracking-wider ${currentBadgeStyle}`}>
+                    {user.role}
+                  </span>
+                </div>
+              )}
+            </div>
+          </div>
+
+          <DropdownMenuSeparator className="bg-white/5 my-1" />
+
+          {/* Menu Items */}
+          <div className="space-y-1">
+            {accountMenuItems.map((item) => {
+              const isLogout = item.kind === 'action' && item.action === 'logout';
+              
+              // Custom colors & descriptions
+              let iconColor = 'text-cyan-400';
+              let hoverBg = 'hover:bg-cyan-500/5 hover:border-cyan-500/15';
+              let description = 'Manage settings';
+              
+              if (item.label === 'Portfolio' || item.label === 'Profile') {
+                iconColor = 'text-amber-400';
+                hoverBg = 'hover:bg-amber-500/5 hover:border-amber-500/15';
+                description = 'Showcase achievements';
+              } else if (item.label === 'Settings') {
+                iconColor = 'text-blue-400';
+                hoverBg = 'hover:bg-blue-500/5 hover:border-blue-500/15';
+                description = 'Configure preferences';
+              } else if (isLogout) {
+                iconColor = 'text-rose-400';
+                hoverBg = 'hover:bg-rose-500/5 hover:border-rose-500/15';
+                description = 'Sign out of session';
+              }
+
+              const handleSelect = () => {
+                if (item.kind === 'link') {
                   trackNavigationClick(item.path, item.label);
                   navigate(item.path);
                   setSidebarOpen(false);
-                }}
-                className={`group flex min-h-12 items-center gap-3 rounded-xl px-3 py-3 text-sm text-slate-50 focus:bg-white/5 focus:text-slate-50 ${
-                  isPathActive(item.path, shouldMatchExactly(item.path))
-                    ? 'bg-white/5 text-blue-100 ring-1 ring-blue-400/20'
-                    : ''
-                }`}
-              >
-                <item.icon className="h-4 w-4 text-slate-200" />
-                <div className="flex min-w-0 flex-1 items-center justify-between gap-3">
-                  <span className="truncate font-medium">{item.label}</span>
-                  <ChevronRight className="h-4 w-4 text-slate-500 transition group-hover:text-slate-300" />
-                </div>
-              </DropdownMenuItem>
-            ) : (
-              <DropdownMenuItem
-                key={item.label}
-                onSelect={() => {
+                } else {
                   void handleLogout();
-                }}
-                className="group flex min-h-12 items-center gap-3 rounded-xl px-3 py-3 text-sm text-slate-50 focus:bg-rose-500/10 focus:text-slate-50"
-              >
-                <item.icon className="h-4 w-4 text-slate-200" />
-                <div className="flex min-w-0 flex-1 items-center justify-between gap-3">
-                  <span className="truncate font-medium">{item.label}</span>
-                  <ChevronRight className="h-4 w-4 text-slate-500 transition group-hover:text-slate-300" />
-                </div>
-              </DropdownMenuItem>
-            ),
-          )}
+                }
+              };
+
+              return (
+                <DropdownMenuItem
+                  key={item.label}
+                  onSelect={handleSelect}
+                  className={`group flex items-start gap-3 rounded-xl border border-transparent p-2.5 transition-all duration-200 cursor-pointer focus:bg-white/5 focus:text-slate-50 ${hoverBg}`}
+                >
+                  <div className={`p-2 rounded-lg bg-white/5 group-hover:scale-105 transition-transform duration-200 ${iconColor}`}>
+                    <item.icon className="h-4 w-4" />
+                  </div>
+                  <div className="flex-1 min-w-0">
+                    <div className="text-sm font-semibold text-slate-100 group-hover:text-white transition-colors">
+                      {item.label}
+                    </div>
+                    <div className="text-[11px] text-slate-500 mt-0.5 leading-none">
+                      {description}
+                    </div>
+                  </div>
+                  <ChevronRight className="h-4 w-4 text-slate-600 self-center opacity-0 group-hover:opacity-100 group-hover:translate-x-0.5 transition-all duration-200" />
+                </DropdownMenuItem>
+              );
+            })}
+          </div>
         </DropdownMenuContent>
       </DropdownMenu>
     );
@@ -864,7 +993,7 @@ export function DashboardLayout({ children, role }: PropsWithChildren<DashboardL
 
                 <div className="flex shrink-0 items-center gap-2 sm:gap-3">
                   <GlobalWorkspaceInviteDialog />
-                  <NotificationBell notifications={notifications} unreadCount={unreadNotificationsCount} />
+                  <NotificationBell notifications={notifications} unreadCount={unreadNotificationsCount} role={resolvedRole} />
                   {renderAccountMenu()}
                 </div>
               </div>

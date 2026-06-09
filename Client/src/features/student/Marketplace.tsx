@@ -344,6 +344,33 @@ const getInsightCounts = (profile: MarketplaceProfile) => ({
     profile.insightCounts?.portfolioProjects ?? profile.portfolioHighlights?.length ?? 0,
 });
 
+const roleGradients: Record<string, string> = {
+  student: 'from-blue-600 via-indigo-600 to-cyan-500',
+  mentor: 'from-purple-600 via-violet-600 to-pink-500',
+  recruiter: 'from-amber-500 via-orange-600 to-yellow-500',
+  investor: 'from-emerald-600 via-teal-600 to-green-500',
+  school: 'from-pink-600 via-rose-600 to-red-500',
+  college: 'from-indigo-600 via-blue-600 to-violet-500',
+};
+
+const sizeConfigs = {
+  compact: {
+    outer: 'h-12 w-12 rounded-xl p-[1.5px]',
+    inner: 'rounded-[10px]',
+    content: 'rounded-[8px] text-sm font-bold',
+  },
+  small: {
+    outer: 'h-14 w-14 rounded-2xl p-[2px]',
+    inner: 'rounded-[13px]',
+    content: 'rounded-[11px] text-base font-bold',
+  },
+  large: {
+    outer: 'h-16 w-16 rounded-3xl p-[2.5px]',
+    inner: 'rounded-[21px]',
+    content: 'rounded-[18px] text-lg font-bold',
+  },
+};
+
 function ProfileAvatar({
   profile,
   size = 'large',
@@ -351,26 +378,28 @@ function ProfileAvatar({
   profile: MarketplaceProfile;
   size?: 'compact' | 'small' | 'large';
 }) {
-  const containerClassName =
-    size === 'compact'
-      ? 'h-12 w-12 rounded-xl text-base'
-      : size === 'small'
-        ? 'h-14 w-14 rounded-2xl text-lg'
-        : 'h-16 w-16 rounded-3xl text-xl';
+  const cfg = sizeConfigs[size];
+  const gradient = roleGradients[profile.role] ?? 'from-slate-600 to-slate-500';
 
   return (
-    <div
-      className={`flex items-center justify-center bg-gradient-to-br from-cyan-500 to-emerald-500 font-bold text-white ${containerClassName}`}
-    >
-      {profile.avatar ? (
-        <img
-          src={profile.avatar}
-          alt={profile.displayName}
-          className={`object-cover ${containerClassName}`}
-        />
-      ) : (
-        profile.displayName.slice(0, 1).toUpperCase()
-      )}
+    <div className={`relative shrink-0 ${cfg.outer} bg-gradient-to-tr ${gradient}`}>
+      <div className={`h-full w-full bg-[#0c1220] p-0.5 ${cfg.inner}`}>
+        <div className={`h-full w-full overflow-hidden bg-slate-950 flex items-center justify-center text-white ${cfg.content}`}>
+          {profile.avatar ? (
+            <img
+              src={profile.avatar}
+              alt={profile.displayName}
+              className="h-full w-full object-cover"
+            />
+          ) : (
+            <div className={`flex h-full w-full items-center justify-center bg-gradient-to-tr ${gradient}/10`}>
+              <span className="bg-gradient-to-tr from-white to-slate-400 bg-clip-text text-transparent">
+                {profile.displayName.slice(0, 1).toUpperCase()}
+              </span>
+            </div>
+          )}
+        </div>
+      </div>
     </div>
   );
 }

@@ -36,6 +36,7 @@ export const getStartups = async (
   filters: {
     minScore?: number;
     maxScore?: number;
+    search?: string;
     category?: string;
     stage?: string;
     page?: number;
