@@ -1,17 +1,21 @@
-import { useEffect, useMemo, useState } from 'react';
+import { type ElementType, useEffect, useMemo, useState } from 'react';
 import { Link, useNavigate, useParams } from 'react-router-dom';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import {
   ArrowLeft,
   ArrowRight,
+  Award,
   BriefcaseBusiness,
   Building2,
+  CheckCircle2,
+  ChevronRight,
   Clock3,
   ExternalLink,
   MapPin,
   MessageCircle,
   Sparkles,
   Users,
+  Wallet,
 } from 'lucide-react';
 import { DashboardLayout } from '../../app/components/DashboardLayout';
 import { recruiterApi } from '../../api/recruiter.api';
@@ -20,6 +24,8 @@ import { Spinner } from '../../components/ui/Spinner';
 import { Button } from '../../components/ui/Button';
 import { RecruiterJobView } from '../../types/recruiter.types';
 
+// ─── Helpers ────────────────────────────────────────────────────────────────
+
 const dateFormatter = new Intl.DateTimeFormat('en-IN', {
   day: 'numeric',
   month: 'short',
@@ -27,56 +33,28 @@ const dateFormatter = new Intl.DateTimeFormat('en-IN', {
 });
 
 const formatDate = (value?: string) => {
-  if (!value) {
-    return null;
-  }
-
+  if (!value) return null;
   const date = new Date(value);
-
-  if (Number.isNaN(date.getTime())) {
-    return null;
-  }
-
+  if (Number.isNaN(date.getTime())) return null;
   return dateFormatter.format(date);
 };
 
 const formatRelativeDate = (value?: string) => {
-  if (!value) {
-    return null;
-  }
-
+  if (!value) return null;
   const date = new Date(value);
-
-  if (Number.isNaN(date.getTime())) {
-    return null;
-  }
-
+  if (Number.isNaN(date.getTime())) return null;
   const diff = Date.now() - date.getTime();
   const day = 1000 * 60 * 60 * 24;
   const days = Math.max(1, Math.floor(diff / day));
-
-  if (days <= 1) {
-    return 'Posted today';
-  }
-
-  if (days < 7) {
-    return `Posted ${days} days ago`;
-  }
-
+  if (days <= 1) return 'Posted today';
+  if (days < 7) return `Posted ${days} days ago`;
   const weeks = Math.floor(days / 7);
-
-  if (weeks < 5) {
-    return `Posted ${weeks} week${weeks === 1 ? '' : 's'} ago`;
-  }
-
+  if (weeks < 5) return `Posted ${weeks} week${weeks === 1 ? '' : 's'} ago`;
   return `Posted ${formatDate(value)}`;
 };
 
 const buildDetailList = (items: string[], fallbackText?: string) => {
-  if (items.length > 0) {
-    return items;
-  }
-
+  if (items.length > 0) return items;
   return (fallbackText ?? '')
     .split(/[\n.]/)
     .map((item) => item.trim())
@@ -84,47 +62,97 @@ const buildDetailList = (items: string[], fallbackText?: string) => {
     .slice(0, 5);
 };
 
-function DetailSection({
-  title,
-  subtitle,
-  items,
-}: {
-  title: string;
-  subtitle?: string;
-  items: string[];
-}) {
-  if (items.length === 0) {
-    return null;
-  }
+const COMPANY_GRADIENTS = [
+  'from-blue-600 to-blue-700',
+  'from-violet-600 to-violet-700',
+  'from-emerald-600 to-emerald-700',
+  'from-rose-600 to-rose-700',
+  'from-amber-500 to-amber-600',
+  'from-cyan-600 to-cyan-700',
+  'from-indigo-600 to-indigo-700',
+  'from-pink-600 to-pink-700',
+  'from-teal-600 to-teal-700',
+  'from-orange-500 to-orange-600',
+];
 
-  return (
-    <section className="border-t border-slate-800 py-8">
-      <div className="grid gap-6 lg:grid-cols-[220px,minmax(0,1fr)] xl:grid-cols-[240px,minmax(0,1fr)]">
-        <div>
-          <div className="text-xs uppercase tracking-[0.28em] text-slate-500">{title}</div>
-          {subtitle ? <p className="mt-2 text-sm leading-6 text-slate-400">{subtitle}</p> : null}
-        </div>
-        <div className="space-y-3.5">
-          {items.map((item) => (
-            <div key={item} className="flex gap-3 text-sm leading-6 text-slate-200">
-              <span className="mt-2 h-1.5 w-1.5 rounded-full bg-cyan-300" />
-              <span>{item}</span>
-            </div>
-          ))}
-        </div>
-      </div>
-    </section>
-  );
-}
+const getCompanyGradient = (name: string) =>
+  COMPANY_GRADIENTS[name.charCodeAt(0) % COMPANY_GRADIENTS.length];
 
-function InfoTile({ label, value }: { label: string; value: string }) {
+// ─── Sub-components ──────────────────────────────────────────────────────────
+
+function SectionHeader({ title, icon: Icon }: { title: string; icon?: ElementType }) {
   return (
-    <div className="min-w-0 py-1">
-      <div className="text-[11px] uppercase tracking-[0.24em] text-slate-500">{label}</div>
-      <div className="mt-2 text-sm font-medium text-white">{value}</div>
+    <div className="mb-5 flex items-center gap-3">
+      <div className="h-5 w-1 shrink-0 rounded-full bg-cyan-400" />
+      <h2 className="flex items-center gap-2 text-lg font-semibold text-white">
+        {Icon ? <Icon className="h-4.5 w-4.5 text-cyan-300 shrink-0" /> : null}
+        {title}
+      </h2>
     </div>
   );
 }
+
+function BulletList({ items }: { items: string[] }) {
+  return (
+    <ul className="space-y-3">
+      {items.map((item) => (
+        <li key={item} className="flex items-start gap-3 text-sm leading-6 text-slate-200">
+          <span className="mt-2.5 h-1.5 w-1.5 shrink-0 rounded-full bg-cyan-400" />
+          <span>{item}</span>
+        </li>
+      ))}
+    </ul>
+  );
+}
+
+function CheckList({ items }: { items: string[] }) {
+  return (
+    <ul className="space-y-3">
+      {items.map((item) => (
+        <li key={item} className="flex items-start gap-3 text-sm leading-6 text-slate-200">
+          <CheckCircle2 className="mt-0.5 h-4 w-4 shrink-0 text-emerald-400" />
+          <span>{item}</span>
+        </li>
+      ))}
+    </ul>
+  );
+}
+
+function NumberedList({ items }: { items: string[] }) {
+  return (
+    <ol className="space-y-4">
+      {items.map((item, idx) => (
+        <li key={item} className="flex items-start gap-4">
+          <span className="flex h-7 w-7 shrink-0 items-center justify-center rounded-full bg-cyan-500/15 text-sm font-bold text-cyan-300">
+            {idx + 1}
+          </span>
+          <span className="pt-0.5 text-sm leading-6 text-slate-200">{item}</span>
+        </li>
+      ))}
+    </ol>
+  );
+}
+
+function StatItem({ icon: Icon, label, value }: { icon: ElementType; label: string; value: string }) {
+  return (
+    <div className="flex items-center gap-2 text-sm text-slate-300">
+      <Icon className="h-4 w-4 shrink-0 text-slate-500" />
+      <span className="text-slate-500">{label}:</span>
+      <span className="font-medium text-white">{value}</span>
+    </div>
+  );
+}
+
+function OverviewRow({ label, value }: { label: string; value: string }) {
+  return (
+    <div className="flex items-start justify-between gap-3 border-b border-slate-800/60 pb-3 last:border-0 last:pb-0">
+      <span className="text-sm text-slate-500">{label}</span>
+      <span className="text-right text-sm font-medium text-white">{value}</span>
+    </div>
+  );
+}
+
+// ─── Main component ───────────────────────────────────────────────────────────
 
 export function MarketplaceJobDetail() {
   const navigate = useNavigate();
@@ -154,13 +182,17 @@ export function MarketplaceJobDetail() {
   const job = jobQuery.data;
   const recruiter = recruiterQuery.data;
   const isApplyLocked = hasApplied || !job?.isActive;
+
   const relatedJobs = useMemo(
-    () => (relatedJobsQuery.data ?? []).filter((relatedJob) => relatedJob._id !== job?._id).slice(0, 4),
+    () => (relatedJobsQuery.data ?? []).filter((j) => j._id !== job?._id).slice(0, 4),
     [job?._id, relatedJobsQuery.data],
   );
 
   const responsibilityList = buildDetailList(job?.keyResponsibilities ?? [], job?.description);
-  const requirementList = buildDetailList(job?.requirements ?? [], recruiter?.skills?.map((skill) => skill.name).join('. '));
+  const requirementList = buildDetailList(
+    job?.requirements ?? [],
+    recruiter?.skills?.map((s) => s.name).join('. '),
+  );
   const benefitList = buildDetailList(job?.benefits ?? [], job?.companyOverview);
   const applicationSteps = buildDetailList(
     job?.applicationSteps ?? [],
@@ -172,12 +204,8 @@ export function MarketplaceJobDetail() {
   }, [job?.hasApplied]);
 
   const markJobAsApplied = () => {
-    if (!job) {
-      return;
-    }
-
+    if (!job) return;
     const applicationUpdatedAt = new Date().toISOString();
-
     const applyPatch = <T extends RecruiterJobView>(current: T): T => ({
       ...current,
       hasApplied: true,
@@ -187,284 +215,370 @@ export function MarketplaceJobDetail() {
     });
 
     setHasApplied(true);
-
     queryClient.setQueriesData<RecruiterJobView[]>(
       { queryKey: ['marketplace', 'student-recruiter-jobs'] },
-      (current) =>
-        current?.map((currentJob) =>
-          currentJob._id === job._id ? applyPatch(currentJob) : currentJob,
-        ) ?? current,
+      (current) => current?.map((j) => (j._id === job._id ? applyPatch(j) : j)) ?? current,
     );
-
     queryClient.setQueryData<RecruiterJobView>(
       ['marketplace', 'job-detail', job._id],
       (current) => (current ? applyPatch(current) : current),
     );
-
     queryClient.setQueriesData<RecruiterJobView[]>(
       { queryKey: ['marketplace', 'job-detail', 'related'] },
       (current) =>
-        Array.isArray(current)
-          ? current.map((currentJob) =>
-              currentJob._id === job._id ? applyPatch(currentJob) : currentJob,
-            )
-          : current,
+        Array.isArray(current) ? current.map((j) => (j._id === job._id ? applyPatch(j) : j)) : current,
     );
-
     void queryClient.invalidateQueries({ queryKey: ['student', 'applications'] });
   };
 
   const applyToJob = useMutation({
     mutationFn: async () => recruiterApi.applyToJob(jobId!),
-    onMutate: () => {
-      setApplyError(null);
-    },
+    onMutate: () => { setApplyError(null); },
     onSuccess: (response) => {
-      if (response.applied || response.alreadyApplied) {
-        markJobAsApplied();
-      }
+      if (response.applied || response.alreadyApplied) markJobAsApplied();
     },
-    onError: () => {
-      setApplyError('Unable to apply to this job right now.');
-    },
+    onError: () => { setApplyError('Unable to apply to this job right now.'); },
   });
 
   const handleMessage = () => {
-    if (!job) {
-      return;
-    }
-
+    if (!job) return;
     const storageKey = `dm_first_contact_${job.recruiterId}`;
-    if (!localStorage.getItem(storageKey)) {
-      localStorage.setItem(storageKey, 'true');
-    }
+    if (!localStorage.getItem(storageKey)) localStorage.setItem(storageKey, 'true');
     navigate(`/dashboard/messages/${job.recruiterId}`);
   };
 
   const handleApply = () => {
-    if (!job || hasApplied || applyToJob.isPending || !job.isActive) {
-      return;
-    }
-
+    if (!job || hasApplied || applyToJob.isPending || !job.isActive) return;
     applyToJob.mutate();
   };
 
+  const applyLabel = applyToJob.isPending
+    ? 'Applying…'
+    : hasApplied
+      ? job?.applicationSource === 'recruiter_invite'
+        ? 'Invited'
+        : 'Applied ✓'
+      : job?.isActive
+        ? 'Apply Now'
+        : 'Applications Closed';
+
   return (
     <DashboardLayout role="student">
-      <div className="-mx-4 -my-6 min-h-[calc(100vh-5rem)] bg-[#0a0f1d] px-4 py-6 text-white sm:px-5 lg:-mx-8 lg:px-8 lg:py-8">
-        <div className="mx-auto flex w-full max-w-[96rem] min-h-full flex-col gap-6">
+      <div className="-mx-4 -my-6 min-h-[calc(100vh-5rem)] bg-[#080d1a] px-4 py-6 text-white sm:px-5 lg:-mx-8 lg:px-8 lg:py-8">
+        <div className="mx-auto flex w-full max-w-[96rem] flex-col gap-5">
+
+          {/* ── Nav row ── */}
           <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
             <Link
               to="/marketplace"
-              className="inline-flex items-center gap-2 rounded-full border border-slate-800 bg-slate-950 px-4 py-2 text-sm font-medium text-slate-200 transition hover:border-slate-700 hover:text-white"
+              className="inline-flex items-center gap-2 rounded-full border border-slate-800 bg-slate-950 px-4 py-2 text-sm font-medium text-slate-300 transition hover:border-slate-600 hover:text-white"
             >
               <ArrowLeft className="h-4 w-4" />
               Back to marketplace
             </Link>
-            <div className="flex flex-wrap items-center gap-3">
-              {job ? (
-                <Button
-                  className="rounded-full px-5"
-                  onClick={handleApply}
-                  disabled={isApplyLocked || applyToJob.isPending}
-                >
-                  <ArrowRight className="mr-2 h-4 w-4" />
-                  {applyToJob.isPending
-                    ? 'Applying...'
-                    : hasApplied
-                      ? job.applicationSource === 'recruiter_invite'
-                        ? 'Invited'
-                        : 'Applied'
-                      : job.isActive
-                        ? 'Apply now'
-                        : 'Applications closed'}
-                </Button>
-              ) : null}
-              <Link
-                to="/dashboard/student/applications"
-                className="inline-flex items-center gap-2 rounded-full border border-slate-700 bg-slate-950 px-4 py-2 text-sm font-medium text-slate-200 transition hover:border-cyan-400/50 hover:text-white"
-              >
-                <BriefcaseBusiness className="h-4 w-4" />
-                My applications
-              </Link>
-            </div>
+            <Link
+              to="/dashboard/student/applications"
+              className="inline-flex items-center gap-2 rounded-full border border-slate-700 bg-slate-950 px-4 py-2 text-sm font-medium text-slate-300 transition hover:border-cyan-400/40 hover:text-white"
+            >
+              <BriefcaseBusiness className="h-4 w-4" />
+              My applications
+            </Link>
           </div>
 
-          <div className="marketplace-scroll min-h-0 flex-1 overflow-y-auto rounded-[30px] border border-slate-800 bg-[linear-gradient(180deg,#101624_0%,#0c1220_100%)] shadow-[0_24px_80px_rgba(0,0,0,0.28)]">
-            <div className="w-full px-5 py-6 sm:px-7 sm:py-7 lg:px-8 lg:py-8 xl:px-10">
-            {jobQuery.isLoading ? (
-              <div className="flex min-h-[40vh] items-center justify-center">
-                <Spinner />
-              </div>
-            ) : null}
+          {/* ── Loading / Error ── */}
+          {jobQuery.isLoading && (
+            <div className="flex min-h-[40vh] items-center justify-center rounded-2xl border border-slate-800 bg-slate-950">
+              <Spinner />
+            </div>
+          )}
+          {jobQuery.isError && (
+            <div className="rounded-2xl border border-rose-500/20 bg-rose-500/10 px-6 py-5 text-sm text-rose-200">
+              Unable to load this job right now.
+            </div>
+          )}
 
-            {jobQuery.isError ? (
-              <div className="border border-rose-500/30 bg-rose-500/10 px-6 py-5 text-sm text-rose-200">
-                Unable to load this job right now.
-              </div>
-            ) : null}
+          {job && (
+            <div className="space-y-5">
 
-            {job ? (
-              <div className="grid gap-8 xl:grid-cols-[minmax(0,1fr),340px] xl:gap-10">
-                <div className="min-w-0">
-                  <section className="border-b border-slate-800 pb-8">
-                    <div className="flex flex-wrap items-center gap-2 text-xs uppercase tracking-[0.28em] text-cyan-300">
-                      <span>{job.type}</span>
-                      <span className="text-slate-600">|</span>
-                      <span>{job.domain}</span>
-                      {job.workMode ? (
-                        <>
-                          <span className="text-slate-600">|</span>
-                          <span>{job.workMode}</span>
-                        </>
-                      ) : null}
-                      {formatRelativeDate(job.createdAt) ? (
-                        <>
-                          <span className="text-slate-600">|</span>
-                          <span>{formatRelativeDate(job.createdAt)}</span>
-                        </>
-                      ) : null}
+              {/* ── Applied success banner ── */}
+              {hasApplied && (
+                <div className="flex items-center justify-between gap-4 rounded-2xl border border-emerald-500/20 bg-emerald-500/8 px-5 py-4">
+                  <div className="flex items-center gap-3 text-sm text-emerald-200">
+                    <CheckCircle2 className="h-5 w-5 shrink-0 text-emerald-400" />
+                    <span>
+                      <span className="font-semibold">Application submitted.</span> Track updates in My Applications.
+                    </span>
+                  </div>
+                  <Link
+                    to="/dashboard/student/applications"
+                    className="inline-flex shrink-0 items-center gap-1.5 text-sm font-medium text-emerald-300 transition hover:text-emerald-200"
+                  >
+                    View status <ChevronRight className="h-4 w-4" />
+                  </Link>
+                </div>
+              )}
+
+              {/* ═══════════════════════════════════════════════════════════
+                  HERO CARD  —  Naukri / LinkedIn style job header
+              ════════════════════════════════════════════════════════════ */}
+              <section className="relative overflow-hidden rounded-2xl border border-slate-800 bg-gradient-to-br from-slate-900 via-slate-900 to-slate-800/70 p-6 sm:p-7">
+                <div className="pointer-events-none absolute inset-0 bg-gradient-to-r from-cyan-500/4 via-transparent to-blue-500/4" />
+
+                <div className="relative flex flex-col gap-5 xl:flex-row xl:items-start xl:gap-6">
+                  {/* Left: avatar + job info */}
+                  <div className="flex min-w-0 flex-1 flex-col gap-4 sm:flex-row sm:items-start sm:gap-5">
+                    {/* Company avatar */}
+                    <div
+                      className={`flex h-16 w-16 shrink-0 items-center justify-center rounded-2xl bg-gradient-to-br text-lg font-bold text-white shadow-lg ${getCompanyGradient(job.company)}`}
+                    >
+                      {job.company.slice(0, 2).toUpperCase()}
                     </div>
 
-                    <h1 className="mt-4 text-3xl font-semibold tracking-tight text-white sm:text-4xl">{job.title}</h1>
+                    <div className="min-w-0 flex-1">
+                      {/* Badges */}
+                      <div className="mb-2 flex flex-wrap items-center gap-2">
+                        {job.isActive ? (
+                          <span className="inline-flex items-center gap-1.5 rounded-full border border-emerald-500/30 bg-emerald-500/10 px-2.5 py-0.5 text-[11px] font-semibold uppercase tracking-wider text-emerald-400">
+                            <span className="h-1.5 w-1.5 rounded-full bg-emerald-400" />
+                            Actively Hiring
+                          </span>
+                        ) : (
+                          <span className="rounded-full border border-slate-700 bg-slate-900 px-2.5 py-0.5 text-[11px] uppercase tracking-wider text-slate-500">
+                            Closed
+                          </span>
+                        )}
+                        <span className="rounded-full border border-slate-700 bg-slate-900 px-2.5 py-0.5 text-[11px] uppercase tracking-wider text-slate-400">
+                          {job.domain}
+                        </span>
+                        {job.workMode && (
+                          <span className="rounded-full border border-slate-700 bg-slate-900 px-2.5 py-0.5 text-[11px] uppercase tracking-wider text-slate-400">
+                            {job.workMode}
+                          </span>
+                        )}
+                      </div>
 
-                    <div className="mt-4 flex flex-wrap items-center gap-x-2 gap-y-2 text-sm text-slate-300">
-                      <span className="font-semibold text-white">{job.company}</span>
-                      <span className="text-slate-600">|</span>
-                      <span>{recruiter?.displayName ?? 'Recruiter'}</span>
-                      <span className="text-slate-600">|</span>
-                      <span className="inline-flex items-center gap-1.5">
-                        <MapPin className="h-4 w-4 text-cyan-300" />
-                        {job.location}
-                      </span>
+                      {/* Title */}
+                      <h1 className="text-2xl font-bold tracking-tight text-white sm:text-3xl">{job.title}</h1>
+
+                      {/* Company + recruiter + location */}
+                      <div className="mt-2 flex flex-wrap items-center gap-x-2 gap-y-1 text-sm text-slate-400">
+                        <span className="font-semibold text-slate-200">{job.company}</span>
+                        <span className="text-slate-700">·</span>
+                        <span>{recruiter?.displayName ?? 'Recruiter'}</span>
+                        <span className="text-slate-700">·</span>
+                        <span className="inline-flex items-center gap-1">
+                          <MapPin className="h-3.5 w-3.5 text-cyan-400" />
+                          {job.location}
+                        </span>
+                      </div>
+
+                      {/* Key stats row — Naukri highlights */}
+                      <div className="mt-4 flex flex-wrap items-center gap-4 border-t border-slate-800/60 pt-4">
+                        {job.salaryExpectation && (
+                          <StatItem icon={Wallet} label="Salary" value={job.salaryExpectation} />
+                        )}
+                        {job.experienceLevel && (
+                          <StatItem icon={Award} label="Exp" value={job.experienceLevel} />
+                        )}
+                        <StatItem icon={BriefcaseBusiness} label="Type" value={job.type} />
+                        <StatItem
+                          icon={Users}
+                          label="Openings"
+                          value={typeof job.openings === 'number' ? String(job.openings) : 'Open'}
+                        />
+                        <StatItem icon={Sparkles} label="Min Score" value={`${job.minimumInnovationScore}+`} />
+                      </div>
+
+                      {/* Meta row: posted, applicants, deadline */}
+                      <div className="mt-3 flex flex-wrap items-center gap-2 text-xs text-slate-500">
+                        {formatRelativeDate(job.createdAt) && (
+                          <span className="inline-flex items-center gap-1">
+                            <Clock3 className="h-3.5 w-3.5" />
+                            {formatRelativeDate(job.createdAt)}
+                          </span>
+                        )}
+                        <span>·</span>
+                        <span>{job.applicantCount} applicants</span>
+                        {job.shortlistedCount > 0 && (
+                          <>
+                            <span>·</span>
+                            <span className="text-cyan-400">{job.shortlistedCount} shortlisted</span>
+                          </>
+                        )}
+                        {job.expiresAt && (
+                          <>
+                            <span>·</span>
+                            <span className="text-amber-400">Apply by {formatDate(job.expiresAt)}</span>
+                          </>
+                        )}
+                      </div>
                     </div>
+                  </div>
 
-                    <div className="mt-6 grid gap-4 border-t border-slate-800 pt-5 md:grid-cols-2 md:divide-x md:divide-slate-800 xl:grid-cols-4">
-                      <InfoTile label="Salary" value={job.salaryExpectation ?? 'To be discussed'} />
-                      <InfoTile label="Experience" value={job.experienceLevel ?? 'Open to aligned profiles'} />
-                      <InfoTile label="Openings" value={typeof job.openings === 'number' ? String(job.openings) : 'Not specified'} />
-                      <InfoTile label="Min Score" value={`${job.minimumInnovationScore}+`} />
-                    </div>
-                  </section>
+                  {/* Right: CTA buttons — desktop only */}
+                  <div className="hidden shrink-0 flex-col gap-2.5 xl:flex xl:min-w-[180px]">
+                    <Button
+                      className="h-11 w-full rounded-full"
+                      onClick={handleApply}
+                      disabled={isApplyLocked || applyToJob.isPending}
+                    >
+                      <ArrowRight className="mr-2 h-4 w-4" />
+                      {applyLabel}
+                    </Button>
+                    <Button
+                      variant="secondary"
+                      className="h-11 w-full rounded-full border-slate-700 bg-transparent text-slate-200 hover:border-slate-500 hover:bg-slate-900"
+                      onClick={handleMessage}
+                    >
+                      <MessageCircle className="mr-2 h-4 w-4" />
+                      Message
+                    </Button>
+                    {applyError && <p className="text-center text-xs text-rose-300">{applyError}</p>}
+                  </div>
+                </div>
 
-                  <section className="border-t border-slate-800 py-8">
-                    <div className="grid gap-6 lg:grid-cols-[220px,minmax(0,1fr)] xl:grid-cols-[240px,minmax(0,1fr)]">
-                      <div>
-                        <div className="text-xs uppercase tracking-[0.28em] text-slate-500">About Company</div>
-                        <p className="mt-2 text-sm leading-6 text-slate-400">Recruiter-provided company context and public profile summary.</p>
-                      </div>
-                      <div className="space-y-4">
-                        <p className="text-sm leading-7 text-slate-200">
-                          {job.companyOverview ??
-                            recruiter?.bio ??
-                            `${job.company} is hiring through the marketplace. Recruiter-authored company details will appear here as they complete their job setup.`}
-                        </p>
-                        <div className="flex flex-wrap gap-2 text-xs text-slate-300">
-                          <span className="rounded-full border border-slate-700 px-3 py-1.5">{job.domain}</span>
-                          <span className="rounded-full border border-slate-700 px-3 py-1.5">{job.type}</span>
-                          {job.workMode ? <span className="rounded-full border border-slate-700 px-3 py-1.5">{job.workMode}</span> : null}
-                          <span className="rounded-full border border-slate-700 px-3 py-1.5">{job.location}</span>
-                        </div>
-                      </div>
-                    </div>
-                  </section>
+                {/* CTA buttons — mobile */}
+                <div className="relative mt-5 flex gap-3 border-t border-slate-800/60 pt-5 xl:hidden">
+                  <Button
+                    className="h-11 flex-1 rounded-full"
+                    onClick={handleApply}
+                    disabled={isApplyLocked || applyToJob.isPending}
+                  >
+                    <ArrowRight className="mr-2 h-4 w-4" />
+                    {applyLabel}
+                  </Button>
+                  <Button
+                    variant="secondary"
+                    className="h-11 flex-1 rounded-full border-slate-700 bg-transparent text-slate-200 hover:border-slate-500 hover:bg-slate-900"
+                    onClick={handleMessage}
+                  >
+                    <MessageCircle className="mr-2 h-4 w-4" />
+                    Message
+                  </Button>
+                </div>
+              </section>
 
-                  <section className="border-t border-slate-800 py-8">
-                    <div className="grid gap-6 lg:grid-cols-[220px,minmax(0,1fr)] xl:grid-cols-[240px,minmax(0,1fr)]">
-                      <div>
-                        <div className="text-xs uppercase tracking-[0.28em] text-slate-500">Role Overview</div>
-                        <p className="mt-2 text-sm leading-6 text-slate-400">High-level summary before the full JD.</p>
-                      </div>
-                      <div className="space-y-4 text-sm leading-7 text-slate-200">
-                        <p>{job.roleSummary ?? job.description}</p>
-                      </div>
-                    </div>
-                  </section>
+              {/* ═══════════════════════════════════════════════════════════
+                  TWO-COLUMN LAYOUT
+              ════════════════════════════════════════════════════════════ */}
+              <div className="grid gap-5 xl:grid-cols-[minmax(0,1fr),360px]">
 
-                  <DetailSection
-                    title="Key Responsibilities"
-                    subtitle="What the recruiter expects this role to own."
-                    items={responsibilityList}
-                  />
+                {/* ─── Left: Main JD content ─── */}
+                <div className="overflow-hidden rounded-2xl border border-slate-800 bg-slate-950">
 
-                  <DetailSection
-                    title="Requirements"
-                    subtitle="Skills, background, or portfolio depth expected for shortlisting."
-                    items={requirementList}
-                  />
-
-                  <DetailSection
-                    title="Benefits"
-                    subtitle="Benefits, exposure, or role incentives shared by the recruiter."
-                    items={benefitList}
-                  />
-
-                  <DetailSection
-                    title="Application Process"
-                    subtitle="Naukri-style workflow: review the JD, apply, recruiter screens, then shortlisted candidates are contacted."
-                    items={applicationSteps}
-                  />
-
-                  {relatedJobs.length > 0 ? (
-                    <section className="border-t border-slate-800 py-8">
-                      <div className="flex items-center justify-between gap-4">
-                        <div>
-                          <div className="text-xs uppercase tracking-[0.28em] text-slate-500">More Jobs</div>
-                          <h2 className="mt-2 text-2xl font-semibold text-white">More openings from this recruiter</h2>
-                        </div>
-                      </div>
-                      <div className="mt-5 space-y-4">
-                        {relatedJobs.map((relatedJob) => (
-                          <button
-                            key={relatedJob._id}
-                            type="button"
-                            onClick={() => navigate(`/marketplace/jobs/${relatedJob._id}`)}
-                            className="flex w-full items-start justify-between gap-4 border border-slate-800 px-5 py-4 text-left transition hover:border-slate-700 hover:bg-slate-950"
+                  {/* Skills chips — Naukri "Key Skills Required" */}
+                  {(recruiter?.skills?.length ?? 0) > 0 && (
+                    <section className="border-b border-slate-800 px-6 py-6">
+                      <SectionHeader title="Key Skills Required" />
+                      <div className="flex flex-wrap gap-2">
+                        {(recruiter?.skills ?? []).map((skill) => (
+                          <span
+                            key={skill.name}
+                            className="rounded-full border border-cyan-500/20 bg-cyan-500/8 px-3 py-1 text-sm font-medium text-cyan-200"
                           >
-                            <div>
-                              <div className="text-lg font-semibold text-white">{relatedJob.title}</div>
-                              <div className="mt-1 flex flex-wrap gap-2 text-sm text-slate-400">
-                                <span>{relatedJob.company}</span>
-                                <span>{relatedJob.location}</span>
-                                <span>{relatedJob.type}</span>
-                              </div>
-                            </div>
-                            <ArrowRight className="mt-1 h-5 w-5 text-slate-500" />
-                          </button>
+                            {skill.name}
+                          </span>
                         ))}
                       </div>
                     </section>
-                  ) : null}
+                  )}
+
+                  {/* About the Role */}
+                  <section className="border-b border-slate-800 px-6 py-6">
+                    <SectionHeader title="About the Role" />
+                    <p className="text-sm leading-7 text-slate-300">
+                      {job.roleSummary ?? job.description}
+                    </p>
+                    <div className="mt-4 flex flex-wrap gap-2">
+                      <span className="rounded-full border border-slate-800 bg-slate-900 px-3 py-1 text-xs text-slate-400">{job.type}</span>
+                      <span className="rounded-full border border-slate-800 bg-slate-900 px-3 py-1 text-xs text-slate-400">{job.domain}</span>
+                      {job.workMode && (
+                        <span className="rounded-full border border-slate-800 bg-slate-900 px-3 py-1 text-xs text-slate-400">{job.workMode}</span>
+                      )}
+                      <span className="rounded-full border border-slate-800 bg-slate-900 px-3 py-1 text-xs text-slate-400">{job.location}</span>
+                    </div>
+                  </section>
+
+                  {/* Key Responsibilities */}
+                  {responsibilityList.length > 0 && (
+                    <section className="border-b border-slate-800 px-6 py-6">
+                      <SectionHeader title="Key Responsibilities" />
+                      <BulletList items={responsibilityList} />
+                    </section>
+                  )}
+
+                  {/* Requirements */}
+                  {requirementList.length > 0 && (
+                    <section className="border-b border-slate-800 px-6 py-6">
+                      <SectionHeader title="Requirements" />
+                      <BulletList items={requirementList} />
+                    </section>
+                  )}
+
+                  {/* Perks & Benefits */}
+                  {benefitList.length > 0 && (
+                    <section className="border-b border-slate-800 px-6 py-6">
+                      <SectionHeader title="Perks & Benefits" />
+                      <CheckList items={benefitList} />
+                    </section>
+                  )}
+
+                  {/* Application Process — numbered steps like Indeed */}
+                  {applicationSteps.length > 0 && (
+                    <section className="border-b border-slate-800 px-6 py-6">
+                      <SectionHeader title="Application Process" />
+                      <NumberedList items={applicationSteps} />
+                    </section>
+                  )}
+
+                  {/* About the Company */}
+                  <section className="px-6 py-6">
+                    <SectionHeader title="About the Company" />
+                    <p className="text-sm leading-7 text-slate-300">
+                      {job.companyOverview ??
+                        recruiter?.bio ??
+                        `${job.company} is hiring through the ProMove marketplace. Company details will appear here as the recruiter completes their profile.`}
+                    </p>
+                    {recruiter?.links?.websiteUrl && (
+                      <a
+                        href={recruiter.links.websiteUrl}
+                        target="_blank"
+                        rel="noreferrer"
+                        className="mt-4 inline-flex items-center gap-2 text-sm font-medium text-cyan-300 transition hover:text-cyan-200"
+                      >
+                        <Building2 className="h-4 w-4" />
+                        Visit company website
+                        <ExternalLink className="h-3.5 w-3.5" />
+                      </a>
+                    )}
+                  </section>
                 </div>
 
-                <aside className="space-y-4 xl:sticky xl:top-6 xl:self-start">
-                  <section className="rounded-[24px] border border-slate-800 bg-slate-950 p-5 sm:p-6">
-                    <div className="flex items-center gap-3">
-                      <div className="flex h-14 w-14 items-center justify-center rounded-xl bg-gradient-to-br from-cyan-500 to-emerald-500 text-lg font-semibold text-white">
-                        {(recruiter?.displayName ?? job.company).slice(0, 1).toUpperCase()}
+                {/* ─── Right: Sticky sidebar ─── */}
+                <aside className="space-y-4 xl:sticky xl:top-4 xl:self-start">
+
+                  {/* Apply card */}
+                  <div className="rounded-2xl border border-slate-800 bg-slate-950 p-5">
+                    <div className="mb-4 flex items-center gap-3">
+                      <div
+                        className={`flex h-12 w-12 shrink-0 items-center justify-center rounded-xl bg-gradient-to-br text-base font-bold text-white ${getCompanyGradient(job.company)}`}
+                      >
+                        {job.company.slice(0, 2).toUpperCase()}
                       </div>
                       <div>
-                        <div className="text-sm font-semibold text-white">{recruiter?.displayName ?? job.company}</div>
-                        <div className="mt-1 text-xs uppercase tracking-[0.24em] text-slate-500">Hiring Contact</div>
+                        <div className="font-semibold text-white">{recruiter?.displayName ?? job.company}</div>
+                        <div className="mt-0.5 text-xs text-slate-500">Hiring Contact</div>
                       </div>
                     </div>
 
-                    <div className="mt-5 space-y-3">
+                    <div className="space-y-2.5">
                       <Button
                         className="h-11 w-full rounded-full"
                         onClick={handleApply}
                         disabled={isApplyLocked || applyToJob.isPending}
                       >
                         <ArrowRight className="mr-2 h-4 w-4" />
-                        {applyToJob.isPending
-                          ? 'Applying...'
-                          : hasApplied
-                            ? job.applicationSource === 'recruiter_invite'
-                              ? 'Invited'
-                              : 'Applied'
-                            : job.isActive
-                              ? 'Apply now'
-                              : 'Applications closed'}
+                        {applyLabel}
                       </Button>
                       <Button
                         variant="secondary"
@@ -472,84 +586,105 @@ export function MarketplaceJobDetail() {
                         onClick={handleMessage}
                       >
                         <MessageCircle className="mr-2 h-4 w-4" />
-                        Message recruiter
+                        Message Recruiter
                       </Button>
-                      {applyError ? (
-                        <div className="text-sm text-rose-300">{applyError}</div>
-                      ) : hasApplied ? (
-                        <div className="text-sm text-emerald-200">
-                          Application recorded. Track updates in My Applications.
-                        </div>
-                      ) : null}
                     </div>
-                  </section>
 
-                  <section className="rounded-[24px] border border-slate-800 bg-slate-950 p-5 sm:p-6">
-                    <div className="text-xs uppercase tracking-[0.28em] text-slate-500">Application Snapshot</div>
-                    <div className="mt-4 space-y-4">
-                      <div className="flex items-start gap-3 text-sm text-slate-300">
-                        <Clock3 className="mt-0.5 h-4 w-4 text-cyan-300" />
-                        <div>
-                          <div className="font-medium text-white">{formatRelativeDate(job.createdAt) ?? 'Recently posted'}</div>
-                          <div className="mt-1 text-slate-400">{formatDate(job.createdAt)}</div>
-                        </div>
-                      </div>
-                      <div className="flex items-start gap-3 text-sm text-slate-300">
-                        <Users className="mt-0.5 h-4 w-4 text-cyan-300" />
-                        <div>
-                          <div className="font-medium text-white">{job.applicantCount} applicants</div>
-                          <div className="mt-1 text-slate-400">{job.shortlistedCount} shortlisted so far</div>
-                        </div>
-                      </div>
-                      <div className="flex items-start gap-3 text-sm text-slate-300">
-                        <Sparkles className="mt-0.5 h-4 w-4 text-cyan-300" />
-                        <div>
-                          <div className="font-medium text-white">Minimum innovation score {job.minimumInnovationScore}+</div>
-                          <div className="mt-1 text-slate-400">Used as the baseline fit signal for this role.</div>
-                        </div>
-                      </div>
-                      {job.expiresAt ? (
-                        <div className="flex items-start gap-3 text-sm text-slate-300">
-                          <BriefcaseBusiness className="mt-0.5 h-4 w-4 text-cyan-300" />
-                          <div>
-                            <div className="font-medium text-white">Apply before {formatDate(job.expiresAt)}</div>
-                            <div className="mt-1 text-slate-400">Recruiter closes this role after the listed date.</div>
-                          </div>
-                        </div>
-                      ) : null}
+                    {applyError && <p className="mt-3 text-sm text-rose-300">{applyError}</p>}
+                    {hasApplied && !applyError && (
+                      <p className="mt-3 text-sm text-emerald-300">
+                        Application recorded. Track updates in My Applications.
+                      </p>
+                    )}
+                  </div>
+
+                  {/* Job Overview — Naukri-style table */}
+                  <div className="rounded-2xl border border-slate-800 bg-slate-950 p-5">
+                    <SectionHeader title="Job Overview" />
+                    <div className="space-y-3">
+                      <OverviewRow label="Posted" value={formatDate(job.createdAt) ?? 'Recently'} />
+                      <OverviewRow
+                        label="Salary"
+                        value={job.salaryExpectation ?? 'To be discussed'}
+                      />
+                      <OverviewRow
+                        label="Experience"
+                        value={job.experienceLevel ?? 'Open to all'}
+                      />
+                      <OverviewRow label="Job Type" value={job.type} />
+                      {job.workMode && <OverviewRow label="Work Mode" value={job.workMode} />}
+                      <OverviewRow
+                        label="Openings"
+                        value={typeof job.openings === 'number' ? String(job.openings) : 'Not specified'}
+                      />
+                      <OverviewRow label="Applicants" value={String(job.applicantCount)} />
+                      <OverviewRow label="Shortlisted" value={String(job.shortlistedCount)} />
+                      <OverviewRow label="Min Score" value={`${job.minimumInnovationScore}+`} />
+                      {job.expiresAt && (
+                        <OverviewRow label="Apply Before" value={formatDate(job.expiresAt) ?? ''} />
+                      )}
                     </div>
-                  </section>
+                  </div>
 
-                  <section className="rounded-[24px] border border-slate-800 bg-slate-950 p-5 sm:p-6">
-                    <div className="text-xs uppercase tracking-[0.28em] text-slate-500">Recruiter Profile</div>
-                    <div className="mt-4 space-y-3 text-sm text-slate-300">
-                      <div className="font-medium text-white">{recruiter?.displayName ?? 'Recruiter'}</div>
-                      {recruiter?.headline ? <div>{recruiter.headline}</div> : null}
-                      {recruiter?.location ? (
-                        <div className="inline-flex items-center gap-1.5">
-                          <MapPin className="h-4 w-4 text-cyan-300" />
+                  {/* About Recruiter */}
+                  <div className="rounded-2xl border border-slate-800 bg-slate-950 p-5">
+                    <SectionHeader title="About Recruiter" />
+                    <div className="space-y-2.5 text-sm text-slate-300">
+                      <div className="font-semibold text-white">{recruiter?.displayName ?? 'Recruiter'}</div>
+                      {recruiter?.headline && <div className="text-slate-400">{recruiter.headline}</div>}
+                      {recruiter?.location && (
+                        <div className="flex items-center gap-1.5 text-slate-400">
+                          <MapPin className="h-3.5 w-3.5 text-slate-600" />
                           {recruiter.location}
                         </div>
-                      ) : null}
-                      {recruiter?.links?.websiteUrl ? (
+                      )}
+                      {recruiter?.links?.websiteUrl && (
                         <a
                           href={recruiter.links.websiteUrl}
                           target="_blank"
                           rel="noreferrer"
-                          className="inline-flex items-center gap-2 text-cyan-300 transition hover:text-cyan-200"
+                          className="inline-flex items-center gap-1.5 text-cyan-300 transition hover:text-cyan-200"
                         >
-                          <Building2 className="h-4 w-4" />
+                          <Building2 className="h-3.5 w-3.5" />
                           Company site
-                          <ExternalLink className="h-4 w-4" />
+                          <ExternalLink className="h-3.5 w-3.5" />
                         </a>
-                      ) : null}
+                      )}
                     </div>
-                  </section>
+                  </div>
+
+                  {/* Related jobs from same recruiter */}
+                  {relatedJobs.length > 0 && (
+                    <div className="rounded-2xl border border-slate-800 bg-slate-950 p-5">
+                      <SectionHeader title="More from this Recruiter" />
+                      <div className="space-y-2">
+                        {relatedJobs.map((rj) => (
+                          <button
+                            key={rj._id}
+                            type="button"
+                            onClick={() => navigate(`/marketplace/jobs/${rj._id}`)}
+                            className="flex w-full items-start justify-between gap-3 rounded-xl border border-slate-800 bg-slate-900/50 px-4 py-3 text-left transition hover:border-slate-600 hover:bg-slate-900"
+                          >
+                            <div className="min-w-0">
+                              <div className="truncate text-sm font-medium text-white">{rj.title}</div>
+                              <div className="mt-0.5 flex flex-wrap gap-x-2 text-xs text-slate-500">
+                                <span>{rj.company}</span>
+                                <span>·</span>
+                                <span>{rj.location}</span>
+                                <span>·</span>
+                                <span>{rj.type}</span>
+                              </div>
+                            </div>
+                            <ChevronRight className="mt-0.5 h-4 w-4 shrink-0 text-slate-600" />
+                          </button>
+                        ))}
+                      </div>
+                    </div>
+                  )}
                 </aside>
               </div>
-            ) : null}
             </div>
-          </div>
+          )}
         </div>
       </div>
     </DashboardLayout>

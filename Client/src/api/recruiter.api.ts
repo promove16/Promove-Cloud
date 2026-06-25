@@ -321,7 +321,7 @@ export const recruiterApi = {
   async createHiringEvent(payload: {
     title: string;
     collegeId: string;
-    type: 'Industry Connect Session' | 'Placement Hackathon' | 'Innovation Drive' | 'Other';
+    type: 'Industry Connect Session' | 'Placement Hackathon' | 'Innovation Drive' | 'Other' | 'Walk-in Drive';
     date: string;
     description: string;
     linkedJobId?: string;
@@ -345,7 +345,7 @@ export const recruiterApi = {
     collegeId: string,
     payload: {
       title: string;
-      type: 'Industry Connect Session' | 'Placement Hackathon' | 'Innovation Drive' | 'Other';
+      type: 'Industry Connect Session' | 'Placement Hackathon' | 'Innovation Drive' | 'Other' | 'Walk-in Drive';
       date: string;
       description: string;
       linkedJobId?: string;

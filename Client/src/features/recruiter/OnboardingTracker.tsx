@@ -56,7 +56,7 @@ export default function OnboardingTracker({ embedded = false }: OnboardingTracke
     <div className={`${RECRUITER_PAGE_CONTENT_CLASS} space-y-6`}>
       {!embedded ? (
         <RecruiterSectionHeader
-          eyebrow="Drive Workspace"
+          eyebrow="Campus Hiring"
           title="Track students after shortlist and hire actions"
           description="This tracker now reflects recruiter placement rows and active hiring progress so shortlisted candidates do not disappear from view."
           navItems={recruiterDriveSectionItems}

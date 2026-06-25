@@ -109,7 +109,7 @@ const AdminProblemReviewQueue = lazy(() => import("../features/admin/ProblemRevi
 const RecruiterDashboard = lazy(() => import("../features/recruiter/RecruiterDashboardExperience"));
 const RecruiterOnboardingTracker = lazy(() => import("../features/recruiter/OnboardingTracker"));
 const RecruiterApplications = lazy(() => import("../features/recruiter/ApplicationsPipeline"));
-const RecruiterHiringEvents = lazy(() => import("../features/recruiter/HiringEvents"));
+const RecruiterActiveDrives = lazy(() => import("../features/recruiter/ActiveDrives"));
 const HiringSessionPage = lazy(() => import("../features/recruiter/HiringSessionPage"));
 const RecruiterCollegeStudentsPage = lazy(() => import("../features/recruiter/CollegeStudentsPage"));
 
@@ -771,7 +771,9 @@ export const router = createBrowserRouter([
               { path: "applications/:applicationId", element: <LazyPage component={HiringSessionPage} /> },
               { path: "colleges", element: <RecruiterMarketplaceRouteRedirect lane="colleges" /> },
               { path: "colleges/:collegeId/students", element: <LazyPage component={RecruiterCollegeStudentsPage} /> },
-              { path: "hiring-events", element: <LazyPage component={RecruiterHiringEvents} /> },
+              { path: "campus", element: <LazyPage component={RecruiterActiveDrives} /> },
+              { path: "drives", element: <Navigate to="/dashboard/recruiter/campus?mode=drives" replace /> },
+              { path: "hiring-events", element: <Navigate to="/dashboard/recruiter/campus?mode=events" replace /> },
               { path: "onboarding", element: <LazyPage component={RecruiterOnboardingTracker} /> },
               {
                 path: "messages",

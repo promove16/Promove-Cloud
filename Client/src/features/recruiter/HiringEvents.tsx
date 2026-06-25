@@ -11,7 +11,7 @@ import { Input } from '../../components/ui/Input';
 import {
   RECRUITER_PAGE_CONTENT_CLASS,
   RecruiterSectionHeader,
-  recruiterDriveSectionItems,
+  recruiterCampusSectionItems,
 } from './RecruiterSectionNav';
 
 const eventTypes = [
@@ -209,10 +209,10 @@ export default function HiringEvents({ embedded = false }: HiringEventsProps) {
     <div className={`${RECRUITER_PAGE_CONTENT_CLASS} space-y-6`}>
       {!embedded ? (
         <RecruiterSectionHeader
-          eyebrow="Drive Workspace"
-          title="Run recruiter hiring events"
-          description="Create college-linked hiring events, review participants, and push selected students into your hiring pipeline."
-          navItems={recruiterDriveSectionItems}
+          eyebrow="Campus Hiring"
+          title="Run college hiring events"
+          description="Create college-linked hiring events with scoring and rankings, then push selected students into your campus onboarding pipeline."
+          navItems={recruiterCampusSectionItems}
         />
       ) : null}
 
@@ -307,27 +307,43 @@ export default function HiringEvents({ embedded = false }: HiringEventsProps) {
               value={form.date}
               onChange={(event) => setForm((current) => ({ ...current, date: event.target.value }))}
             />
-            <select
-              value={form.linkedJobId}
-              onChange={(event) => setForm((current) => ({ ...current, linkedJobId: event.target.value }))}
-              className="w-full rounded-lg border border-slate-800 bg-slate-950 px-4 py-3 text-white"
-            >
-              <option value="">Link to a job later</option>
-              {activeJobs.map((job) => (
-                <option key={job._id} value={job._id}>
-                  {job.title} | {job.company}
-                </option>
-              ))}
-            </select>
-            <Input
-              type="number"
-              min={0}
-              value={form.minimumInnovationScore}
-              onChange={(event) =>
-                setForm((current) => ({ ...current, minimumInnovationScore: event.target.value }))
-              }
-              placeholder="Minimum innovation score"
-            />
+            <div className="grid gap-1">
+              <div className="flex items-center gap-2">
+                <span className="text-xs text-slate-400">Linked Job</span>
+                <span className="rounded-full border border-cyan-500/30 bg-cyan-500/10 px-2 py-0.5 text-[10px] font-medium uppercase tracking-wide text-cyan-300">
+                  Recommended
+                </span>
+              </div>
+              <select
+                value={form.linkedJobId}
+                onChange={(event) => setForm((current) => ({ ...current, linkedJobId: event.target.value }))}
+                className="w-full rounded-lg border border-slate-800 bg-slate-950 px-4 py-3 text-white"
+              >
+                <option value="">Link to a job later</option>
+                {activeJobs.map((job) => (
+                  <option key={job._id} value={job._id}>
+                    {job.title} | {job.company}
+                  </option>
+                ))}
+              </select>
+            </div>
+            <div className="grid gap-1">
+              <div className="flex items-center gap-2">
+                <span className="text-xs text-slate-400">Minimum Innovation Score</span>
+                <span className="rounded-full border border-cyan-500/30 bg-cyan-500/10 px-2 py-0.5 text-[10px] font-medium uppercase tracking-wide text-cyan-300">
+                  Recommended
+                </span>
+              </div>
+              <Input
+                type="number"
+                min={0}
+                value={form.minimumInnovationScore}
+                onChange={(event) =>
+                  setForm((current) => ({ ...current, minimumInnovationScore: event.target.value }))
+                }
+                placeholder="Minimum innovation score"
+              />
+            </div>
             <textarea
               value={form.description}
               onChange={(event) => setForm((current) => ({ ...current, description: event.target.value }))}

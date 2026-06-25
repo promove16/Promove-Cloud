@@ -1,6 +1,5 @@
 import {
   BriefcaseBusiness,
-  CalendarDays,
   ClipboardList,
   Files,
   type LucideIcon,
@@ -23,7 +22,7 @@ export const RECRUITER_PAGE_CONTENT_CLASS = 'w-full';
 
 export const recruiterMarketplaceSectionItems: RecruiterSectionNavItem[] = [
   {
-    label: 'Marketplace',
+    label: 'Talent Pool',
     path: '/dashboard/recruiter/marketplace',
     end: true,
     icon: BriefcaseBusiness,
@@ -36,12 +35,17 @@ export const recruiterMarketplaceSectionItems: RecruiterSectionNavItem[] = [
   },
 ];
 
-export const recruiterDriveSectionItems: RecruiterSectionNavItem[] = [
+export const recruiterCampusSectionItems: RecruiterSectionNavItem[] = [
   {
-    label: 'Hiring Events',
-    path: '/dashboard/recruiter/hiring-events',
+    label: 'Campus Drives',
+    path: '/dashboard/recruiter/campus',
     end: true,
-    icon: CalendarDays,
+    icon: BriefcaseBusiness,
+    matchPrefixes: [
+      '/dashboard/recruiter/campus',
+      '/dashboard/recruiter/drives',
+      '/dashboard/recruiter/hiring-events',
+    ],
   },
   {
     label: 'Onboarding Tracker',
@@ -50,6 +54,8 @@ export const recruiterDriveSectionItems: RecruiterSectionNavItem[] = [
     icon: ClipboardList,
   },
 ];
+
+export const recruiterDriveSectionItems = recruiterCampusSectionItems;
 
 export function RecruiterSectionNav({ items }: { items: RecruiterSectionNavItem[] }) {
   const location = useLocation();
