@@ -5,6 +5,7 @@ import app from '../../src/app';
 import { env } from '../../src/config/env';
 import { Event } from '../../src/modules/event/event.model';
 import { RequestRecord } from '../../src/modules/request/request.model';
+import { Startup } from '../../src/modules/startup/startup.model';
 import { User } from '../../src/modules/user/user.model';
 import { UserRole } from '../../src/types/roles.types';
 
@@ -221,6 +222,77 @@ describe('workflow requests', () => {
         eventId: String(events[0]._id),
       }),
     );
+  });
+
+  it('expires stale pending requests before returning the messages list', async () => {
+    const sender = await createUser(UserRole.STUDENT, 'Expired Sender');
+    const recipient = await createUser(UserRole.INVESTOR, 'Expired Recipient');
+    const expiredRequest = await RequestRecord.create({
+      type: 'generic',
+      actionType: 'connect',
+      fromUserId: sender._id,
+      toUserId: recipient._id,
+      targetEntityType: 'conversation',
+      targetEntityId: recipient._id.toString(),
+      targetEntityTitle: recipient.displayName,
+      status: 'pending',
+      message: 'This request should expire before listing.',
+      expiresAt: new Date(Date.now() - 60 * 1000),
+      auditTrail: [{ status: 'created', actorUserId: sender._id, at: new Date() }],
+    });
+
+    const incomingResponse = await request(app)
+      .get('/api/workflow-requests/incoming')
+      .set(authHeader(recipient));
+
+    expect(incomingResponse.status).toBe(200);
+    expect(incomingResponse.body.data).toEqual([
+      expect.objectContaining({
+        _id: expiredRequest._id.toString(),
+        status: 'expired',
+      }),
+    ]);
+
+    const storedRequest = await RequestRecord.findById(expiredRequest._id).lean();
+    expect(storedRequest?.status).toBe('expired');
+  });
+
+  it('removes startup-linked requests when the startup is no longer active', async () => {
+    const founder = await createUser(UserRole.STUDENT, 'Founder Sender');
+    const investor = await createUser(UserRole.INVESTOR, 'Investor Recipient');
+    const startup = await Startup.create({
+      founderIds: [founder._id],
+      name: 'Archived Startup',
+      tagline: 'No longer available',
+      category: 'AI',
+      isActive: false,
+    });
+    const staleRequest = await RequestRecord.create({
+      type: 'generic',
+      actionType: 'invest',
+      fromUserId: founder._id,
+      toUserId: investor._id,
+      targetEntityType: 'user_profile',
+      targetEntityId: `${investor._id.toString()}:investor`,
+      targetEntityTitle: investor.displayName,
+      requestedPermission: 'dm_investor',
+      status: 'pending',
+      message: 'Please invest in my startup.',
+      metadata: {
+        startupId: startup._id.toString(),
+        startupName: startup.name,
+      },
+      expiresAt: new Date(Date.now() + 24 * 60 * 60 * 1000),
+      auditTrail: [{ status: 'created', actorUserId: founder._id, at: new Date() }],
+    });
+
+    const incomingResponse = await request(app)
+      .get('/api/workflow-requests/incoming')
+      .set(authHeader(investor));
+
+    expect(incomingResponse.status).toBe(200);
+    expect(incomingResponse.body.data).toEqual([]);
+    expect(await RequestRecord.findById(staleRequest._id).lean()).toBeNull();
   });
 
   it('blocks colleges from sending another hiring request to the same recruiter for 30 days', async () => {

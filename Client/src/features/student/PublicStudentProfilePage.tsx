@@ -180,6 +180,15 @@ const ROLE_DEFINITIONS: Record<ViewRole, RoleDefinition> = {
   },
 };
 
+const roleGradients: Record<ViewRole, string> = {
+  student: 'from-blue-600 via-indigo-600 to-cyan-500',
+  mentor: 'from-purple-600 via-violet-600 to-pink-500',
+  recruiter: 'from-amber-500 via-orange-600 to-yellow-500',
+  investor: 'from-emerald-600 via-teal-600 to-green-500',
+  school: 'from-pink-600 via-rose-600 to-red-500',
+  college: 'from-indigo-600 via-blue-600 to-violet-500',
+};
+
 // ─────────────────────────────────────────────
 // Helpers
 // ─────────────────────────────────────────────
@@ -1123,24 +1132,38 @@ function IdentityHero({
         {/* Left: identity */}
         <div className="flex items-start gap-6">
           {/* Avatar */}
-          <div className="relative shrink-0">
-            <div className="h-[72px] w-[72px] overflow-hidden rounded-full bg-zinc-900 ring-1 ring-zinc-800">
-              {avatar ? (
-                <img
-                  src={avatar}
-                  alt={displayName}
-                  className="h-full w-full object-cover"
-                />
-              ) : (
-                <div className="flex h-full w-full items-center justify-center text-lg font-medium text-zinc-500">
-                  {getInitials(displayName)}
+          <div className="relative group/avatar shrink-0">
+            {/* Ambient Glow */}
+            <div className={`absolute -inset-1 rounded-[1.25rem] bg-gradient-to-tr ${roleGradients[role] ?? 'from-slate-600 to-slate-500'} opacity-30 blur-sm transition duration-500 group-hover/avatar:opacity-60`} />
+            
+            {/* Gradient Squircle Frame */}
+            <div className={`relative h-[72px] w-[72px] rounded-2xl bg-gradient-to-tr ${roleGradients[role] ?? 'from-slate-600 to-slate-500'} p-[2px] shadow-[0_12px_24px_rgba(0,0,0,0.4)]`}>
+              {/* Inner Slate Gap */}
+              <div className="h-full w-full rounded-[13px] bg-[#0c1220] p-0.5">
+                {/* Content Box */}
+                <div className="h-full w-full overflow-hidden rounded-[10px] bg-slate-950 flex items-center justify-center">
+                  {avatar ? (
+                    <img
+                      src={avatar}
+                      alt={displayName}
+                      className="h-full w-full object-cover transition duration-500 group-hover/avatar:scale-105"
+                    />
+                  ) : (
+                    <div className={`flex h-full w-full items-center justify-center bg-gradient-to-tr ${roleGradients[role] ?? 'from-slate-600 to-slate-500'}/10`}>
+                      <span className="bg-gradient-to-tr from-white to-slate-400 bg-clip-text text-xl font-black tracking-tight text-transparent">
+                        {getInitials(displayName)}
+                      </span>
+                    </div>
+                  )}
                 </div>
-              )}
+              </div>
             </div>
-            <div
-              className={`absolute -bottom-0.5 -right-0.5 h-3 w-3 rounded-full border-2 border-[#09090b] ${roleConfig.accentDot}`}
-              title={`Viewing as: ${roleConfig.tag}`}
-            />
+            
+            {/* Status indicator pulse ring mapping to active switcher role */}
+            <span className="absolute -bottom-0.5 -right-0.5 flex h-3.5 w-3.5" title={`Viewing as: ${roleConfig.tag}`}>
+              <span className={`animate-ping absolute inline-flex h-full w-full rounded-full ${roleConfig.accentDot} opacity-75`}></span>
+              <span className={`relative inline-flex rounded-full h-3.5 w-3.5 border-2 border-[#09090b] ${roleConfig.accentDot}`}></span>
+            </span>
           </div>
 
           {/* Name and meta */}

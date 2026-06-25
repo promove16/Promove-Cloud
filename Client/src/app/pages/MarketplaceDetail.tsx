@@ -3,7 +3,6 @@ import { Link, Navigate, useNavigate, useParams } from "react-router-dom";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { isAxiosError } from "axios";
 import {
-  ArrowLeft,
   ArrowRight,
   ArrowUpRight,
   BriefcaseBusiness,
@@ -57,7 +56,6 @@ import { investorApi } from "../../api/investor.api";
 import { useAuthStore } from "../../store/authStore";
 import { UserRole } from "../../types/roles.types";
 import {
-  getMarketplaceBasePath,
   getMarketplaceDetailPath,
   getStudentPortfolioViewPath,
   getUserPortfolioViewPath,
@@ -199,16 +197,6 @@ export function MarketplaceDetail() {
     <div className={marketplaceDetailShellClassName}>
       <div className={marketplaceDetailContentClassName}>
         <div className="space-y-8 sm:space-y-10">
-          <div className="flex flex-wrap items-center justify-between gap-3 pt-1 sm:pt-2">
-            <Link
-              to={`${getMarketplaceBasePath(dashboardRole)}?role=${entityType}`}
-              className="inline-flex items-center gap-2 rounded-full border border-white/10 bg-slate-950/55 px-4 py-2 text-sm font-medium text-slate-200 transition hover:border-white/20 hover:bg-white/10"
-            >
-              <ArrowLeft className="h-4 w-4" />
-              Back to marketplace
-            </Link>
-          </div>
-
           {detailQuery.isLoading ? (
             <div className="rounded-[32px] border border-white/10 bg-[#090d1b] px-6 py-10 text-sm text-slate-400">
               Loading detail view...

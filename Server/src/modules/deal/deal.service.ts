@@ -1899,6 +1899,7 @@ export const listInvestorStartups = async (
   filters: {
     minScore?: number;
     maxScore?: number;
+    search?: string;
     category?: string;
     stage?: string;
     page?: number;
@@ -1911,8 +1912,21 @@ export const listInvestorStartups = async (
 
   const page = Math.max(filters.page ?? 1, 1);
   const limit = Math.min(Math.max(filters.limit ?? 20, 1), 50);
-  const query: Record<string, unknown> = { launchedToInvestors: true, reviewStatus: 'approved' };
-  const activeStudentFounderIds = await getActiveStudentFounderIds();
+  const andClauses: Array<Record<string, unknown>> = [
+    { launchedToInvestors: true },
+    { reviewStatus: 'approved' },
+  ];
+  const founderFilter: Record<string, unknown> = { role: UserRole.STUDENT, isActive: true };
+  const hasScoreFilter = typeof filters.minScore === 'number' || typeof filters.maxScore === 'number';
+
+  if (hasScoreFilter) {
+    founderFilter.innovationScore = {
+      ...(typeof filters.minScore === 'number' ? { $gte: filters.minScore } : {}),
+      ...(typeof filters.maxScore === 'number' ? { $lte: filters.maxScore } : {}),
+    };
+  }
+
+  const activeStudentFounderIds = await User.distinct('_id', founderFilter);
 
   if (activeStudentFounderIds.length === 0) {
     return {
@@ -1923,21 +1937,37 @@ export const listInvestorStartups = async (
     };
   }
 
-  query.founderIds = { $in: activeStudentFounderIds };
+  andClauses.push({ founderIds: { $in: activeStudentFounderIds } });
 
   if (filters.category) {
-    query.category = new RegExp(filters.category, 'i');
+    andClauses.push({ category: new RegExp(filters.category, 'i') });
   }
 
   if (filters.stage) {
-    query.stage = filters.stage;
+    andClauses.push({ stage: filters.stage });
   }
 
-  if (typeof filters.minScore === 'number' || typeof filters.maxScore === 'number') {
-    query.innovationScoreAtLaunch = {
-      ...(typeof filters.minScore === 'number' ? { $gte: filters.minScore } : {}),
-      ...(typeof filters.maxScore === 'number' ? { $lte: filters.maxScore } : {}),
-    };
+  const search = filters.search?.trim();
+  let matchingFounderIds: Types.ObjectId[] = [];
+  if (search) {
+    const searchRegex = new RegExp(search.replace(/[.*+?^${}()|[\]\\]/g, '\\$&'), 'i');
+    matchingFounderIds = await User.distinct('_id', {
+      _id: { $in: activeStudentFounderIds },
+      $or: [
+        { displayName: searchRegex },
+        { email: searchRegex },
+        { domain: searchRegex },
+      ],
+    });
+
+    andClauses.push({
+      $or: [
+        { name: searchRegex },
+        { tagline: searchRegex },
+        { category: searchRegex },
+        { founderIds: { $in: matchingFounderIds } },
+      ],
+    });
   }
 
   const acceptingClauses: Array<Record<string, unknown>> = [];
@@ -1948,10 +1978,12 @@ export const listInvestorStartups = async (
     acceptingClauses.push({ hasSoleInvestor: false });
   }
   if (acceptingClauses.length === 1) {
-    Object.assign(query, acceptingClauses[0]);
+    andClauses.push(acceptingClauses[0]);
   } else if (acceptingClauses.length > 1) {
-    query.$or = acceptingClauses;
+    andClauses.push({ $or: acceptingClauses });
   }
+
+  const query = andClauses.length === 1 ? andClauses[0] : { $and: andClauses };
 
   const [total, startups] = await Promise.all([
     Startup.countDocuments(query),
@@ -1970,11 +2002,21 @@ export const listInvestorStartups = async (
           .lean<LeanUser[]>()
       : [];
   const founderMap = new Map(founders.map((founder) => [String(founder._id), founder]));
+  const scoreMatchedFounderIdSet = new Set(activeStudentFounderIds.map(String));
+  const searchMatchedFounderIdSet = new Set(matchingFounderIds.map(String));
 
   const items = startups.map((startup) => {
-    const founder = startup.founderIds
+    const founderCandidates = startup.founderIds
       .map((founderId) => founderMap.get(String(founderId)))
-      .find(isActiveStudentFounder);
+      .filter(isActiveStudentFounder);
+    const founder =
+      (searchMatchedFounderIdSet.size > 0
+        ? founderCandidates.find((candidate) => searchMatchedFounderIdSet.has(String(candidate._id)))
+        : null) ??
+      (hasScoreFilter
+        ? founderCandidates.find((candidate) => scoreMatchedFounderIdSet.has(String(candidate._id)))
+        : null) ??
+      founderCandidates[0];
 
     return {
       _id: String(startup._id),

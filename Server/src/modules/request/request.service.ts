@@ -2,7 +2,9 @@ import { FilterQuery, Types } from 'mongoose';
 import { notificationQueue } from '../../config/bullmq';
 import { ApiError } from '../../utils/ApiError';
 import { UserRole } from '../../types/roles.types';
+import { Startup } from '../startup/startup.model';
 import { User } from '../user/user.model';
+import { Workspace } from '../workspace/workspace.model';
 import {
   IRequest,
   RequestActionType,
@@ -141,6 +143,140 @@ const requestVisibilityFilter = (userId: string, email: string): FilterQuery<IRe
     { recipientEmail: email, toUserId: null },
   ],
 });
+
+const getMetadataObjectId = (metadata: Record<string, unknown> | undefined, key: string) => {
+  const value = metadata?.[key];
+  return typeof value === 'string' && Types.ObjectId.isValid(value) ? value : null;
+};
+
+const addValidObjectId = (set: Set<string>, value?: string | Types.ObjectId | null) => {
+  if (!value) {
+    return;
+  }
+
+  const id = String(value);
+  if (Types.ObjectId.isValid(id)) {
+    set.add(id);
+  }
+};
+
+const expirePendingRequests = async (filter: FilterQuery<IRequest>) => {
+  const now = new Date();
+  await RequestRecord.updateMany(
+    {
+      ...filter,
+      status: 'pending',
+      expiresAt: { $lte: now },
+    },
+    {
+      $set: {
+        status: 'expired',
+        respondedAt: now,
+      },
+      $push: {
+        auditTrail: {
+          status: 'expired',
+          message: 'Request expired automatically before listing.',
+          at: now,
+        },
+      },
+    },
+  );
+};
+
+const removeUnavailableRequests = async <T extends IRequest>(requests: T[]) => {
+  if (requests.length === 0) {
+    return requests;
+  }
+
+  const userIds = new Set<string>();
+  const startupIds = new Set<string>();
+  const workspaceIds = new Set<string>();
+
+  for (const request of requests) {
+    addValidObjectId(userIds, request.fromUserId);
+    addValidObjectId(userIds, request.toUserId);
+
+    if (request.targetEntityType === 'startup') {
+      addValidObjectId(startupIds, request.targetEntityId);
+    }
+    if (request.targetEntityType === 'workspace') {
+      addValidObjectId(workspaceIds, request.targetEntityId);
+    }
+
+    addValidObjectId(startupIds, getMetadataObjectId(request.metadata, 'startupId'));
+    addValidObjectId(workspaceIds, getMetadataObjectId(request.metadata, 'workspaceId'));
+  }
+
+  const [users, startups, workspaces] = await Promise.all([
+    userIds.size
+      ? User.find({ _id: { $in: Array.from(userIds) }, isActive: true }).select('_id').lean()
+      : Promise.resolve([]),
+    startupIds.size
+      ? Startup.find({ _id: { $in: Array.from(startupIds) }, isActive: true }).select('_id').lean()
+      : Promise.resolve([]),
+    workspaceIds.size
+      ? Workspace.find({ _id: { $in: Array.from(workspaceIds) }, isActive: true }).select('_id').lean()
+      : Promise.resolve([]),
+  ]);
+
+  const existingUserIds = new Set(users.map((user) => String(user._id)));
+  const existingStartupIds = new Set(startups.map((startup) => String(startup._id)));
+  const existingWorkspaceIds = new Set(workspaces.map((workspace) => String(workspace._id)));
+
+  const unavailableRequestIds = requests
+    .filter((request) => {
+      if (!existingUserIds.has(String(request.fromUserId))) {
+        return true;
+      }
+      if (request.toUserId && !existingUserIds.has(String(request.toUserId))) {
+        return true;
+      }
+
+      const targetStartupId =
+        request.targetEntityType === 'startup' && Types.ObjectId.isValid(request.targetEntityId)
+          ? request.targetEntityId
+          : null;
+      if (request.targetEntityType === 'startup' && !targetStartupId) {
+        return true;
+      }
+      if (targetStartupId && !existingStartupIds.has(targetStartupId)) {
+        return true;
+      }
+
+      const metadataStartupId = getMetadataObjectId(request.metadata, 'startupId');
+      if (metadataStartupId && !existingStartupIds.has(metadataStartupId)) {
+        return true;
+      }
+
+      const targetWorkspaceId =
+        request.targetEntityType === 'workspace' && Types.ObjectId.isValid(request.targetEntityId)
+          ? request.targetEntityId
+          : null;
+      if (request.targetEntityType === 'workspace' && !targetWorkspaceId) {
+        return true;
+      }
+      if (targetWorkspaceId && !existingWorkspaceIds.has(targetWorkspaceId)) {
+        return true;
+      }
+
+      const metadataWorkspaceId = getMetadataObjectId(request.metadata, 'workspaceId');
+      if (metadataWorkspaceId && !existingWorkspaceIds.has(metadataWorkspaceId)) {
+        return true;
+      }
+
+      return false;
+    })
+    .map((request) => request._id);
+
+  if (unavailableRequestIds.length === 0) {
+    return requests;
+  }
+
+  await RequestRecord.deleteMany({ _id: { $in: unavailableRequestIds } });
+  const unavailableIdSet = new Set(unavailableRequestIds.map((id) => String(id)));
+  return requests.filter((request) => !unavailableIdSet.has(String(request._id)));
+};
 
 export const claimEmailRequestsForUser = async (
   userId: string,
@@ -587,17 +723,21 @@ export const listIncomingRequests = async (
   institutionId?: string | null,
 ) => {
   await claimEmailRequestsForUser(userId, email, institutionId);
-  const requests = await RequestRecord.find(requestRecipientFilter(userId, normalizeEmail(email) ?? ''))
+  const filter = requestRecipientFilter(userId, normalizeEmail(email) ?? '');
+  await expirePendingRequests(filter);
+  const requests = await RequestRecord.find(filter)
     .sort({ status: 1, createdAt: -1 })
     .lean<IRequest[]>();
-  return serializeRequests(requests);
+  return serializeRequests(await removeUnavailableRequests(requests));
 };
 
 export const listOutgoingRequests = async (userId: string, institutionId?: string | null) => {
-  const requests = await RequestRecord.find({ fromUserId: objectId(userId) })
+  const filter = { fromUserId: objectId(userId) };
+  await expirePendingRequests(filter);
+  const requests = await RequestRecord.find(filter)
     .sort({ status: 1, createdAt: -1 })
     .lean<IRequest[]>();
-  return serializeRequests(requests);
+  return serializeRequests(await removeUnavailableRequests(requests));
 };
 
 export const getRequestForUser = async (
@@ -616,7 +756,12 @@ export const getRequestForUser = async (
     throw new ApiError(404, 'REQUEST_NOT_FOUND', 'Request not found.');
   }
 
-  return mapRequest(request);
+  const [availableRequest] = await removeUnavailableRequests([request]);
+  if (!availableRequest) {
+    throw new ApiError(404, 'REQUEST_NOT_FOUND', 'Request is no longer available.');
+  }
+
+  return mapRequest(availableRequest);
 };
 
 const getActionableRecipientRequest = async (
@@ -633,6 +778,11 @@ const getActionableRecipientRequest = async (
 
   if (!request) {
     throw new ApiError(404, 'REQUEST_NOT_FOUND', 'Request not found.');
+  }
+
+  const [availableRequest] = await removeUnavailableRequests([request]);
+  if (!availableRequest) {
+    throw new ApiError(404, 'REQUEST_NOT_FOUND', 'Request is no longer available.');
   }
 
   if (String(request.fromUserId) === userId && request.metadata?.allowSelfAcceptance !== true) {

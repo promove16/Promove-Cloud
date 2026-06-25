@@ -21,6 +21,11 @@ const stages = ['Pre-Idea', 'Ideation', 'MVP', 'Pre-Launch', 'Launched'];
 const scoreRangeMin = 0;
 const scoreRangeMax = MAX_INNOVATION_SCORE;
 
+const getStartupLiveScore = (startup: {
+  founder?: { innovationScore?: number };
+  innovationScoreAtLaunch: number;
+}) => startup.founder?.innovationScore ?? startup.innovationScoreAtLaunch;
+
 const getInvestorWorkflowErrorMessage = (error: unknown) => {
   if (isAxiosError<{ error?: { code?: string; message?: string } }>(error)) {
     if (error.response?.data?.error?.code === 'STARTUP_FOUNDER_UNAVAILABLE') {
@@ -49,11 +54,13 @@ export default function StartupMarketplace() {
   const [savedStartupIds, setSavedStartupIds] = useState<Set<string>>(new Set());
   const [showSavedOnly, setShowSavedOnly] = useState(false);
   const [feedback, setFeedback] = useState<{ type: 'success' | 'error'; message: string } | null>(null);
+  const normalizedSearch = search.trim().toLowerCase();
 
   const startupsQuery = useQuery({
-    queryKey: ['investor-startups', { category, stage, scoreRange, acceptingPenny, acceptingSole }],
+    queryKey: ['investor-startups', { category, stage, scoreRange, acceptingPenny, acceptingSole, search: normalizedSearch }],
     queryFn: () =>
       investorApi.getStartups({
+        search: normalizedSearch || undefined,
         category: category === 'all' ? undefined : category,
         stage: stage === 'all' ? undefined : stage,
         minScore: scoreRange.min,
@@ -144,14 +151,13 @@ export default function StartupMarketplace() {
   const startups = useMemo(
     () =>
       (startupsQuery.data?.items ?? []).filter((startup) => {
-        const matchesSearch = `${startup.name} ${startup.category} ${startup.founder?.displayName ?? ''}`
-          .toLowerCase()
-          .includes(search.toLowerCase());
+        const liveScore = getStartupLiveScore(startup);
+        const matchesScoreRange = liveScore >= scoreRange.min && liveScore <= scoreRange.max;
         const matchesSavedFilter = !showSavedOnly || savedStartupIds.has(startup._id);
 
-        return matchesSearch && matchesSavedFilter;
+        return matchesScoreRange && matchesSavedFilter;
       }),
-    [savedStartupIds, search, showSavedOnly, startupsQuery.data?.items],
+    [savedStartupIds, scoreRange.max, scoreRange.min, showSavedOnly, startupsQuery.data?.items],
   );
   const scoreRangeValue = useMemo(() => [scoreRange.min, scoreRange.max], [scoreRange.max, scoreRange.min]);
   const alreadyBiddedStartupIds = useMemo(() => {
@@ -361,7 +367,7 @@ export default function StartupMarketplace() {
       ) : (
         <div className="grid gap-4 xl:grid-cols-2">
           {startups.map((startup) => {
-            const liveScore = startup.founder?.innovationScore ?? startup.innovationScoreAtLaunch;
+            const liveScore = getStartupLiveScore(startup);
             const isSaved = savedStartupIds.has(startup._id);
             const isFullyClosed = !startup.acceptsPennyInvestors && !startup.acceptsSoleInvestor;
             const isAlreadyBidded = alreadyBiddedStartupIds.has(startup._id);

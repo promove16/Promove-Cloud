@@ -16,6 +16,7 @@ import {
   formatRequestStatus,
   getRequestActorLabel,
   getRequestEntityName,
+  getRequestPrimaryAction,
   getRequestPrimaryLink,
 } from './requestPresentation';
 
@@ -77,36 +78,10 @@ function getErrorMessage(error: unknown, fallback: string) {
   );
 }
 
-function getConversationRequestPartnerId(request: WorkflowRequest, viewerUserId?: string) {
-  if (request.type !== 'generic' || request.actionType !== 'connect' || request.targetEntityType !== 'conversation') {
-    return null;
-  }
-
-  if (viewerUserId) {
-    if (request.fromUserId === viewerUserId) {
-      return request.toUserId ?? request.targetEntityId ?? null;
-    }
-
-    if (request.toUserId === viewerUserId || request.targetEntityId === viewerUserId) {
-      return request.fromUserId;
-    }
-  }
-
-  return request.toUserId ?? request.fromUserId ?? null;
-}
-
-function getRequestNavigationTarget(request: WorkflowRequest, viewerUserId?: string) {
-  const conversationPartnerId = getConversationRequestPartnerId(request, viewerUserId);
-  if (conversationPartnerId) {
-    return `/dashboard/messages/${conversationPartnerId}`;
-  }
-
-  return request.acceptRedirect ?? request.deepLink ?? request.declineRedirect ?? null;
-}
-
 function RequestRow({
   request,
   direction,
+  viewerUserId,
   isUpdating,
   isSelected,
   onAccept,
@@ -117,6 +92,7 @@ function RequestRow({
 }: {
   request: WorkflowRequest;
   direction: 'incoming' | 'outgoing';
+  viewerUserId?: string;
   isUpdating: boolean;
   isSelected?: boolean;
   onAccept: (request: WorkflowRequest) => void;
@@ -127,7 +103,7 @@ function RequestRow({
 }) {
   const entityName = getRequestEntityName(request);
   const actorLabel = getRequestActorLabel(request, direction);
-  const primaryLink = getRequestPrimaryLink(request);
+  const primaryAction = getRequestPrimaryAction(request, viewerUserId);
   const statusClassName = REQUEST_STATUS_COLOR_CLASSES[request.status];
   const isActionable = direction === 'incoming' ? request.status === 'pending' : request.status === 'pending';
 
@@ -202,10 +178,10 @@ function RequestRow({
             Withdraw
           </Button>
         ) : null}
-        {primaryLink ? (
+        {primaryAction ? (
           <Button variant="ghost" className="h-9 rounded-xl px-3" onClick={() => onOpen(request)}>
             <ArrowRight className="mr-2 h-3.5 w-3.5" />
-            Open
+            {primaryAction.label}
           </Button>
         ) : null}
       </div>
@@ -216,6 +192,7 @@ function RequestRow({
 function RequestDetailCard({
   request,
   direction,
+  viewerUserId,
   isUpdating,
   onAccept,
   onDecline,
@@ -224,6 +201,7 @@ function RequestDetailCard({
 }: {
   request: WorkflowRequest;
   direction: 'incoming' | 'outgoing';
+  viewerUserId?: string;
   isUpdating: boolean;
   onAccept: (request: WorkflowRequest) => void;
   onDecline: (request: WorkflowRequest) => void;
@@ -233,7 +211,7 @@ function RequestDetailCard({
   const entityName = getRequestEntityName(request);
   const actorLabel = getRequestActorLabel(request, direction);
   const statusClassName = REQUEST_STATUS_COLOR_CLASSES[request.status];
-  const primaryLink = getRequestPrimaryLink(request);
+  const primaryAction = getRequestPrimaryAction(request, viewerUserId);
 
   return (
     <section className="overflow-hidden rounded-2xl border border-[#334155] bg-[#182131] shadow-[0_24px_80px_rgba(2,6,23,0.32)]">
@@ -310,10 +288,10 @@ function RequestDetailCard({
               Withdraw
             </Button>
           ) : null}
-          {primaryLink ? (
+          {primaryAction ? (
             <Button variant="ghost" className="h-10 rounded-xl px-4" onClick={() => onOpen(request)}>
               <ArrowRight className="mr-2 h-4 w-4" />
-              Open linked content
+              {primaryAction.label}
             </Button>
           ) : null}
         </div>
@@ -389,7 +367,7 @@ export function InvitationPage({ selectedRequestId, onSelectRequest }: Invitatio
       await refreshRequests();
       const nextTarget =
         variables.action === 'accept'
-          ? getRequestNavigationTarget(request, user?._id) ?? getRequestNavigationTarget(variables.request, user?._id)
+          ? getRequestPrimaryLink(request, user?._id) ?? getRequestPrimaryLink(variables.request, user?._id)
           : null;
 
       if (nextTarget) {
@@ -507,12 +485,13 @@ export function InvitationPage({ selectedRequestId, onSelectRequest }: Invitatio
         <RequestDetailCard
           request={selectedEntry.request}
           direction={selectedEntry.direction}
+          viewerUserId={user?._id}
           isUpdating={requestActionMutation.isPending}
           onAccept={(item) => requestActionMutation.mutate({ action: 'accept', request: item })}
           onDecline={(item) => requestActionMutation.mutate({ action: 'decline', request: item })}
           onWithdraw={(item) => requestActionMutation.mutate({ action: 'withdraw', request: item })}
           onOpen={(item) => {
-            const target = getRequestPrimaryLink(item);
+            const target = getRequestPrimaryLink(item, user?._id);
             if (target) {
               navigate(target);
             }
@@ -548,13 +527,14 @@ export function InvitationPage({ selectedRequestId, onSelectRequest }: Invitatio
               key={request._id}
               request={request}
               direction="incoming"
+              viewerUserId={user?._id}
               isUpdating={requestActionMutation.isPending}
               isSelected={selectedEntry?.request._id === request._id}
               onAccept={(item) => requestActionMutation.mutate({ action: 'accept', request: item })}
               onDecline={(item) => requestActionMutation.mutate({ action: 'decline', request: item })}
               onWithdraw={(item) => requestActionMutation.mutate({ action: 'withdraw', request: item })}
               onOpen={(item) => {
-                const target = getRequestPrimaryLink(item);
+                const target = getRequestPrimaryLink(item, user?._id);
                 if (target) {
                   navigate(target);
                 }
@@ -588,13 +568,14 @@ export function InvitationPage({ selectedRequestId, onSelectRequest }: Invitatio
               key={request._id}
               request={request}
               direction="outgoing"
+              viewerUserId={user?._id}
               isUpdating={requestActionMutation.isPending}
               isSelected={selectedEntry?.request._id === request._id}
               onAccept={(item) => requestActionMutation.mutate({ action: 'accept', request: item })}
               onDecline={(item) => requestActionMutation.mutate({ action: 'decline', request: item })}
               onWithdraw={(item) => requestActionMutation.mutate({ action: 'withdraw', request: item })}
               onOpen={(item) => {
-                const target = getRequestPrimaryLink(item);
+                const target = getRequestPrimaryLink(item, user?._id);
                 if (target) {
                   navigate(target);
                 }
