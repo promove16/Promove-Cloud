@@ -16,10 +16,12 @@ import {
   Zap,
 } from 'lucide-react';
 import { mentorScoreApi, MentorVerificationTask, LeaderboardEntry } from '../../api/mentorScore.api';
+import { adminApi } from '../../api/admin.api';
+import { toast } from 'sonner';
 
 // ─── Types / Helpers ──────────────────────────────────────────────────────────
 
-type AdminTab = 'leaderboard' | 'verifications';
+type AdminTab = 'leaderboard' | 'verifications' | 'history';
 
 const fmt = (d: string) =>
   new Date(d).toLocaleDateString('en-IN', { day: 'numeric', month: 'short', year: 'numeric' });
@@ -352,101 +354,257 @@ function VerificationsTab() {
   );
 }
 
-// ─── Score History ────────────────────────────────────────────────────────────
+// ─── Score History Tab ────────────────────────────────────────────────────────
 
-interface ScoreHistoryModalProps {
-  mentorId: string;
-  onClose: () => void;
-}
+function ScoreHistoryTab({
+  selectedMentorId,
+  setSelectedMentorId,
+}: {
+  selectedMentorId: string;
+  setSelectedMentorId: (id: string) => void;
+}) {
+  const queryClient = useQueryClient();
 
-function ScoreHistoryModal({ mentorId, onClose }: ScoreHistoryModalProps) {
-  const query = useQuery({
-    queryKey: ['admin', 'mentor-history', mentorId],
-    queryFn: () => mentorScoreApi.getMentorScoreHistory(mentorId),
-    enabled: !!mentorId,
+  // Fetch mentors list for dropdown selector
+  const mentorsQuery = useQuery({
+    queryKey: ['admin', 'mentors'],
+    queryFn: adminApi.getMentors,
   });
 
+  // Fetch selected mentor's score history
+  const historyQuery = useQuery({
+    queryKey: ['admin', 'mentor-history', selectedMentorId],
+    queryFn: () => mentorScoreApi.getMentorScoreHistory(selectedMentorId),
+    enabled: !!selectedMentorId,
+  });
+
+  // Score adjustment inputs
+  const [delta, setDelta] = useState('');
+  const [reason, setReason] = useState('');
+  const [phase, setPhase] = useState<'1' | '2' | '3'>('1');
+
+  const adjustMutation = useMutation({
+    mutationFn: () =>
+      mentorScoreApi.adminAdjustScore({
+        mentorId: selectedMentorId,
+        delta: Number(delta),
+        reason,
+        phase: Number(phase) as 1 | 2 | 3,
+      }),
+    onSuccess: () => {
+      toast.success('Score adjusted successfully');
+      setDelta('');
+      setReason('');
+      void queryClient.invalidateQueries({ queryKey: ['admin', 'mentor-history', selectedMentorId] });
+      void queryClient.invalidateQueries({ queryKey: ['admin', 'mentor-leaderboard'] });
+    },
+    onError: (err: any) => {
+      toast.error(err?.response?.data?.message || 'Failed to adjust score');
+    },
+  });
+
+  const mentors = mentorsQuery.data ?? [];
+  const selectedMentor = mentors.find((m) => m._id === selectedMentorId);
+
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-950/85 backdrop-blur-sm animate-fade-in">
-      <div className="relative w-full max-w-2xl max-h-[85vh] flex flex-col rounded-2xl border border-slate-800 bg-slate-950 shadow-2xl p-6 overflow-hidden animate-scale-up">
-        {/* Header */}
-        <div className="flex items-center justify-between border-b border-slate-800/80 pb-4 mb-4">
-          <div>
-            <h3 className="text-lg font-bold text-white flex items-center gap-2">
-              <Award className="h-5 w-5 text-violet-400" />
-              Score History & Audit Trail
-            </h3>
-            <p className="text-xs text-slate-500 mt-1">
-              Mentor ID: {mentorId}
-            </p>
-          </div>
-          <button
-            onClick={onClose}
-            className="rounded-lg p-1.5 text-slate-400 hover:bg-slate-800 hover:text-white transition"
-          >
-            <X className="h-5 w-5" />
-          </button>
+    <div className="space-y-6">
+      {/* Mentor Selector Card */}
+      <div className="rounded-2xl border border-slate-800 bg-slate-900 p-6 flex flex-col md:flex-row md:items-center justify-between gap-4">
+        <div className="space-y-1">
+          <h3 className="text-lg font-bold text-white flex items-center gap-2">
+            <Award className="h-5 w-5 text-violet-400" />
+            Score Audit & Adjustments
+          </h3>
+          <p className="text-xs text-slate-400">
+            Select a mentor to review complete scoring logs and perform manual point adjustments.
+          </p>
         </div>
-
-        {/* Content */}
-        <div className="flex-1 overflow-y-auto space-y-4 pr-1">
-          {query.isLoading && <div className="text-sm text-slate-400 py-10 text-center">Loading history...</div>}
-
-          {query.data && (
-            <>
-              {/* Summary */}
-              <div className="rounded-xl border border-slate-800 bg-slate-900/40 p-4">
-                <div className="text-xs uppercase tracking-wider text-slate-400 mb-3 font-semibold">Score Summary</div>
-                <div className="grid grid-cols-2 sm:grid-cols-4 gap-4 text-sm">
-                  <div className="bg-slate-950/50 p-3 rounded-lg border border-slate-800/50">
-                    <div className="text-xs text-slate-400">Total Score</div>
-                    <div className="text-lg font-bold text-white mt-0.5">{query.data.scoreDoc?.totalScore ?? 0}</div>
-                  </div>
-                  <div className="bg-slate-950/50 p-3 rounded-lg border border-slate-800/50">
-                    <div className="text-xs text-slate-400">Phase 1</div>
-                    <div className="text-lg font-bold text-cyan-400 mt-0.5">{query.data.scoreDoc?.phase1Score ?? 0}</div>
-                  </div>
-                  <div className="bg-slate-950/50 p-3 rounded-lg border border-slate-800/50">
-                    <div className="text-xs text-slate-400">Phase 2</div>
-                    <div className="text-lg font-bold text-violet-400 mt-0.5">{query.data.scoreDoc?.phase2Score ?? 0}</div>
-                  </div>
-                  <div className="bg-slate-950/50 p-3 rounded-lg border border-slate-800/50">
-                    <div className="text-xs text-slate-400">Phase 3</div>
-                    <div className="text-lg font-bold text-emerald-400 mt-0.5">{query.data.scoreDoc?.phase3Score ?? 0}</div>
-                  </div>
-                </div>
-              </div>
-
-              {/* History Events */}
-              <div className="rounded-xl border border-slate-800 bg-slate-900/40 overflow-hidden flex flex-col border-t-0">
-                <div className="border border-slate-800 bg-slate-900/40 px-4 py-3 text-xs font-semibold text-slate-400 uppercase tracking-wider rounded-t-xl">
-                  Score Events ({query.data.total})
-                </div>
-                <div className="divide-y divide-slate-800/60 max-h-[40vh] overflow-y-auto border-x border-b border-slate-800 rounded-b-xl">
-                  {query.data.events.length === 0 ? (
-                    <div className="text-sm text-slate-500 py-8 text-center bg-slate-950/30">No scoring events found for this mentor.</div>
-                  ) : (
-                    query.data.events.map((ev) => (
-                      <div key={ev._id} className="flex items-center justify-between gap-3 px-4 py-3 hover:bg-slate-900/20 transition bg-slate-950/10">
-                        <div>
-                          <div className="text-xs font-semibold text-white">{ev.trigger}</div>
-                          <div className="text-[10px] text-slate-500 mt-0.5">{fmt(ev.createdAt)}</div>
-                        </div>
-                        <div className="text-right">
-                          <div className={`text-sm font-bold ${ev.delta < 0 ? 'text-rose-400' : 'text-emerald-400'}`}>
-                            {ev.delta > 0 ? '+' : ''}{ev.delta}
-                          </div>
-                          <div className="text-[10px] text-slate-500 mt-0.5">{ev.scoreAfter} total</div>
-                        </div>
-                      </div>
-                    ))
-                  )}
-                </div>
-              </div>
-            </>
+        
+        <div className="w-full md:w-80">
+          {mentorsQuery.isLoading ? (
+            <div className="text-sm text-slate-500">Loading mentors...</div>
+          ) : (
+            <select
+              value={selectedMentorId}
+              onChange={(e) => setSelectedMentorId(e.target.value)}
+              className="w-full rounded-lg border border-slate-700 bg-slate-800 px-3 py-2 text-sm text-white focus:border-violet-500 focus:outline-none"
+            >
+              <option value="">-- Select a Mentor --</option>
+              {mentors.map((m) => (
+                <option key={m._id} value={m._id}>
+                  {m.displayName} ({m.email})
+                </option>
+              ))}
+            </select>
           )}
         </div>
       </div>
+
+      {!selectedMentorId ? (
+        <div className="rounded-2xl border border-dashed border-slate-800 bg-slate-950/20 py-20 text-center text-sm text-slate-400">
+          Please select a mentor from the dropdown above to view their audit log.
+        </div>
+      ) : (
+        <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+          {/* Main Column: Summary & History Events */}
+          <div className="lg:col-span-2 space-y-6">
+            {/* Score Summary Card */}
+            <div className="rounded-2xl border border-slate-800 bg-slate-900 p-6 space-y-4">
+              <h4 className="text-sm font-semibold text-slate-400 uppercase tracking-wider">
+                Score Summary: {selectedMentor?.displayName}
+              </h4>
+              
+              {historyQuery.isLoading ? (
+                <div className="text-sm text-slate-500 py-4">Loading scores...</div>
+              ) : (
+                <div className="grid grid-cols-2 sm:grid-cols-4 gap-4">
+                  <div className="bg-slate-950 p-4 rounded-xl border border-slate-800/80">
+                    <div className="text-xs text-slate-500 font-medium">Total Score</div>
+                    <div className="text-2xl font-bold text-white mt-1">
+                      {historyQuery.data?.scoreDoc?.totalScore ?? 0}
+                    </div>
+                  </div>
+                  <div className="bg-slate-950 p-4 rounded-xl border border-slate-800/80">
+                    <div className="text-xs text-cyan-500 font-medium font-semibold">Phase 1</div>
+                    <div className="text-2xl font-bold text-cyan-400 mt-1">
+                      {historyQuery.data?.scoreDoc?.phase1Score ?? 0}
+                    </div>
+                  </div>
+                  <div className="bg-slate-950 p-4 rounded-xl border border-slate-800/80">
+                    <div className="text-xs text-violet-500 font-medium font-semibold">Phase 2</div>
+                    <div className="text-2xl font-bold text-violet-400 mt-1">
+                      {historyQuery.data?.scoreDoc?.phase2Score ?? 0}
+                    </div>
+                  </div>
+                  <div className="bg-slate-950 p-4 rounded-xl border border-slate-800/80">
+                    <div className="text-xs text-emerald-500 font-medium font-semibold">Phase 3</div>
+                    <div className="text-2xl font-bold text-emerald-400 mt-1">
+                      {historyQuery.data?.scoreDoc?.phase3Score ?? 0}
+                    </div>
+                  </div>
+                </div>
+              )}
+            </div>
+
+            {/* Audit Log / Score Events Card */}
+            <div className="rounded-2xl border border-slate-800 bg-slate-900 overflow-hidden">
+              <div className="border-b border-slate-800 bg-slate-900 px-6 py-4 flex items-center justify-between">
+                <span className="text-sm font-semibold text-white uppercase tracking-wider">
+                  Audit Trail
+                </span>
+                <span className="rounded-full bg-violet-500/10 border border-violet-500/20 px-3 py-0.5 text-xs text-violet-300">
+                  {historyQuery.data?.total ?? 0} events
+                </span>
+              </div>
+
+              <div className="divide-y divide-slate-800 bg-slate-950/20 max-h-[500px] overflow-y-auto">
+                {historyQuery.isLoading ? (
+                  <div className="text-sm text-slate-500 py-12 text-center">Loading event logs...</div>
+                ) : !historyQuery.data?.events || historyQuery.data.events.length === 0 ? (
+                  <div className="text-sm text-slate-500 py-16 text-center">
+                    No scoring events logged for this mentor.
+                  </div>
+                ) : (
+                  historyQuery.data.events.map((ev) => (
+                    <div key={ev._id} className="flex items-center justify-between gap-4 px-6 py-4 hover:bg-slate-900/30 transition">
+                      <div className="space-y-1">
+                        <div className="text-sm font-semibold text-white">{ev.trigger}</div>
+                        <div className="flex items-center gap-2 text-xs text-slate-500">
+                          <span>{fmt(ev.createdAt)}</span>
+                          <span>•</span>
+                          <span className="text-slate-400 font-semibold">Phase {ev.phase}</span>
+                        </div>
+                      </div>
+                      <div className="text-right space-y-1">
+                        <div className={`text-sm font-bold ${ev.delta < 0 ? 'text-rose-400' : 'text-emerald-400'}`}>
+                          {ev.delta > 0 ? '+' : ''}{ev.delta}
+                        </div>
+                        <div className="text-xs text-slate-500 font-medium">
+                          {ev.scoreAfter} total
+                        </div>
+                      </div>
+                    </div>
+                  ))
+                )}
+              </div>
+            </div>
+          </div>
+
+          {/* Right Column: Score Adjustment Panel */}
+          <div className="rounded-2xl border border-slate-800 bg-slate-900 p-6 h-fit space-y-4">
+            <div className="space-y-1">
+              <h4 className="text-base font-bold text-white flex items-center gap-2">
+                <Zap className="h-4 w-4 text-amber-400" />
+                Adjust Score
+              </h4>
+              <p className="text-xs text-slate-400">
+                Manually add or deduct points from this mentor's score for administrative overrides.
+              </p>
+            </div>
+
+            <div className="space-y-4 pt-2">
+              <div>
+                <label className="block text-xs font-semibold text-slate-400 mb-1.5">Target Phase</label>
+                <select
+                  value={phase}
+                  onChange={(e) => setPhase(e.target.value as '1' | '2' | '3')}
+                  className="w-full rounded-lg border border-slate-700 bg-slate-800 px-3 py-2 text-sm text-white focus:border-violet-500 focus:outline-none"
+                >
+                  <option value="1">Phase 1 (Core Prep & Foundation)</option>
+                  <option value="2">Phase 2 (Connect & Startup Velocity)</option>
+                  <option value="3">Phase 3 (Ecosystem Contribution)</option>
+                </select>
+              </div>
+
+              <div>
+                <label className="block text-xs font-semibold text-slate-400 mb-1.5">Point Delta</label>
+                <div className="flex gap-2">
+                  <input
+                    type="number"
+                    value={delta}
+                    onChange={(e) => setDelta(e.target.value)}
+                    placeholder="e.g. 50 or -25"
+                    className="w-full rounded-lg border border-slate-700 bg-slate-800 px-3 py-2 text-sm text-white placeholder-slate-500 focus:border-violet-500 focus:outline-none"
+                  />
+                </div>
+                {/* Quick select buttons */}
+                <div className="flex flex-wrap gap-1.5 mt-2">
+                  {['+10', '+50', '+100', '-10', '-50'].map((val) => (
+                    <button
+                      key={val}
+                      type="button"
+                      onClick={() => setDelta(val.replace('+', ''))}
+                      className="px-2 py-1 rounded bg-slate-800 hover:bg-slate-700 text-xs font-semibold text-slate-300 border border-slate-700"
+                    >
+                      {val}
+                    </button>
+                  ))}
+                </div>
+              </div>
+
+              <div>
+                <label className="block text-xs font-semibold text-slate-400 mb-1.5">Reason for Adjustment</label>
+                <textarea
+                  value={reason}
+                  onChange={(e) => setReason(e.target.value)}
+                  placeholder="Manual override for outstanding community contribution..."
+                  rows={3}
+                  className="w-full rounded-lg border border-slate-700 bg-slate-800 px-3 py-2 text-sm text-white placeholder-slate-500 focus:border-violet-500 focus:outline-none resize-none"
+                />
+              </div>
+
+              <button
+                type="button"
+                onClick={() => adjustMutation.mutate()}
+                disabled={!delta || !reason || adjustMutation.isPending}
+                className="w-full inline-flex items-center justify-center gap-2 rounded-lg bg-violet-600 px-4 py-2.5 text-sm font-semibold text-white hover:bg-violet-500 disabled:opacity-50 disabled:cursor-not-allowed transition"
+              >
+                {adjustMutation.isPending ? 'Applying...' : 'Apply Adjustment'}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }
@@ -456,11 +614,11 @@ function ScoreHistoryModal({ mentorId, onClose }: ScoreHistoryModalProps) {
 export default function AdminMentorScores() {
   const [activeTab, setActiveTab] = useState<AdminTab>('leaderboard');
   const [selectedMentorId, setSelectedMentorId] = useState('');
-  const [historyOpen, setHistoryOpen] = useState(false);
 
   const TABS: { id: AdminTab; label: string; icon: React.ElementType }[] = [
     { id: 'leaderboard',   label: 'Leaderboard',        icon: TrendingUp },
     { id: 'verifications', label: 'Verification Queue',  icon: Clock3 },
+    { id: 'history',       label: 'Score History',      icon: Award },
   ];
 
   return (
@@ -505,20 +663,15 @@ export default function AdminMentorScores() {
         <LeaderboardTab
           onViewHistory={(id) => {
             setSelectedMentorId(id);
-            setHistoryOpen(true);
+            setActiveTab('history');
           }}
         />
       )}
       {activeTab === 'verifications' && <VerificationsTab />}
-
-      {/* Score History Modal overlay */}
-      {historyOpen && selectedMentorId && (
-        <ScoreHistoryModal
-          mentorId={selectedMentorId}
-          onClose={() => {
-            setHistoryOpen(false);
-            setSelectedMentorId('');
-          }}
+      {activeTab === 'history'       && (
+        <ScoreHistoryTab
+          selectedMentorId={selectedMentorId}
+          setSelectedMentorId={setSelectedMentorId}
         />
       )}
     </div>
