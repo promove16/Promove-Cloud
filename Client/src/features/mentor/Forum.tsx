@@ -8,11 +8,13 @@ import {
   Plus,
   Send,
   ThumbsUp,
+  Users,
   X,
 } from 'lucide-react';
 import { Link } from 'react-router-dom';
 import { forumApi, ForumPost, ForumAnswer } from '../../api/forum.api';
 import { useAuthStore } from '../../store/authStore';
+import { ResearchNote } from '../../components/ui/ResearchSpotlight';
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
 
@@ -244,6 +246,10 @@ function PostDetail({ postId, onBack }: { postId: string; onBack: () => void }) 
             <p className="text-xs text-slate-500">
               Mentor answers earn +5 pts per helpful vote and +15 pts when marked as a verified solution.
             </p>
+            <ResearchNote
+              icon={Users}
+              text="Communities of Practice: Answering questions drives Etienne Wenger's social learning model, where regular interaction and collaborative troubleshooting refine community expertise and build a shared repertoire of solutions."
+            />
             <Textarea
               rows={5}
               value={answerBody}

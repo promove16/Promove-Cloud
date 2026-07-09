@@ -16,6 +16,7 @@ import { Link } from 'react-router-dom';
 import { mentorResourceApi, MentorResourceItem } from '../../api/mentorResource.api';
 import { useAuthStore } from '../../store/authStore';
 import { UserRole } from '../../types/roles.types';
+import { ResearchNote } from '../../components/ui/ResearchSpotlight';
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
 
@@ -238,6 +239,12 @@ function UploadForm() {
             <Upload className="h-4 w-4" />
             {mutation.isPending ? 'Uploading…' : 'Upload Resource'}
           </button>
+          <div className="border-t border-slate-800 pt-3">
+            <ResearchNote
+              icon={Globe}
+              text="OER Integration: Contributing templates and guides aligns with the Open Educational Resources model (recognized by UNESCO), which aims to build shared, inclusive educational assets and remove access barriers for the mentor network."
+            />
+          </div>
         </form>
       )}
     </div>

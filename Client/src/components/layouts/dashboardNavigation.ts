@@ -85,7 +85,6 @@ export const SIDEBAR_CONFIG: Record<UserRole, DashboardNavItem[]> = {
     { kind: 'link', label: 'Opportunities', icon: Globe, path: getMarketplaceBasePath(UserRole.MENTOR) },
     { kind: 'link', label: 'Student Feed', icon: Users, path: '/dashboard/mentor/students' },
     { kind: 'link', label: 'Sessions', icon: GraduationCap, path: '/dashboard/mentor/sessions' },
-    { kind: 'link', label: 'Mentor Score', icon: Trophy, path: '/dashboard/mentor/score' },
     { kind: 'link', label: 'Evidence Center', icon: Upload, path: '/dashboard/mentor/evidence-center' },
     { kind: 'link', label: 'Resources', icon: BookMarked, path: '/dashboard/mentor/resources' },
     { kind: 'link', label: 'Forum', icon: MessageSquare, path: '/dashboard/mentor/forum' },

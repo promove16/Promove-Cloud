@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useState } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
-import { CalendarDays, Search } from 'lucide-react';
+import { CalendarDays, Search, Pin } from 'lucide-react';
 import { useNavigate, useParams } from 'react-router-dom';
 import { mentorApi, MentorFeedStudent } from '../../api/mentor.api';
 import { getMentorSocket } from '../../lib/socket';
@@ -176,12 +176,18 @@ export default function StudentFeed() {
   }, []);
 
   const students = useMemo(
-    () =>
-      (studentsQuery.data ?? []).filter((student) =>
+    () => {
+      const filtered = (studentsQuery.data ?? []).filter((student) =>
         `${student.displayName} ${student.startupName} ${student.category} ${student.recentActivitySummary}`
           .toLowerCase()
-          .includes(search.toLowerCase()),
-      ),
+          .includes(search.toLowerCase())
+      );
+      return [...filtered].sort((a, b) => {
+        if (a.isWatched && !b.isWatched) return -1;
+        if (!a.isWatched && b.isWatched) return 1;
+        return 0;
+      });
+    },
     [studentsQuery.data, search],
   );
 
@@ -201,7 +207,7 @@ export default function StudentFeed() {
         <div>
           <div className="text-xs uppercase tracking-[0.3em] text-cyan-300">Student Feed</div>
           <h1 className="mt-2 text-3xl font-bold text-white">Students routed to you</h1>
-          <p className="mt-2 text-slate-400">This feed is limited to students attached to your admin-assigned project workspaces. Watching a student keeps their live score activity flowing into your dashboard.</p>
+          <p className="mt-2 text-slate-400">This feed is limited to students attached to your admin-assigned project workspaces. Pinning a student keeps their live score activity flowing into your dashboard.</p>
         </div>
         <div className="relative w-full max-w-md">
           <Search className="pointer-events-none absolute left-4 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-500" />
@@ -222,7 +228,14 @@ export default function StudentFeed() {
 
       <div className="grid gap-4 xl:grid-cols-2">
         {students.map((student) => (
-          <Card key={student._id} className="p-5">
+          <Card 
+            key={student._id} 
+            className={`p-5 transition-all duration-300 relative ${
+              student.isWatched 
+                ? 'border-cyan-500/50 bg-slate-900/60 shadow-lg shadow-cyan-950/20 ring-1 ring-cyan-500/20 scale-[1.01]' 
+                : 'hover:border-slate-700'
+            }`}
+          >
             <div className="flex items-start justify-between gap-4">
               <div className="flex items-start gap-4">
                 <div className="flex h-14 w-14 items-center justify-center rounded-2xl bg-gradient-to-br from-cyan-500 to-emerald-500 text-xl font-bold text-white">
@@ -233,12 +246,28 @@ export default function StudentFeed() {
                   )}
                 </div>
                 <div>
-                  <div className="text-xl font-semibold text-white">{student.displayName}</div>
+                  <div className="flex items-center gap-2">
+                    <div className="text-xl font-semibold text-white">{student.displayName}</div>
+                    <button
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        toggleWatchMutation.mutate({ studentId: student.studentId, watched: student.isWatched });
+                      }}
+                      className={`p-1.5 rounded-lg transition-all duration-300 ${
+                        student.isWatched 
+                          ? 'text-cyan-400 hover:text-cyan-300 hover:bg-cyan-500/10' 
+                          : 'text-slate-500 hover:text-slate-300 hover:bg-slate-800'
+                      }`}
+                      title={student.isWatched ? 'Unpin student' : 'Pin student'}
+                    >
+                      <Pin className={`h-4 w-4 transition-transform duration-300 hover:scale-110 active:scale-95 ${student.isWatched ? 'fill-cyan-400 stroke-cyan-400 rotate-45' : ''}`} />
+                    </button>
+                  </div>
                   <div className="mt-1 text-sm text-cyan-300">{student.startupName}</div>
                   <div className="mt-3 flex flex-wrap gap-2">
                     <Badge>{student.category}</Badge>
                     <Badge>{student.innovationScore}/{MAX_INNOVATION_SCORE}</Badge>
-                    <Badge>{student.isWatched ? 'Watching' : 'Assigned'}</Badge>
+                    <Badge>{student.isWatched ? 'Pinned' : 'Assigned'}</Badge>
                   </div>
                   <p className="mt-3 text-sm leading-6 text-slate-400">{student.recentActivitySummary}</p>
                 </div>
@@ -250,12 +279,6 @@ export default function StudentFeed() {
                 <Button variant="secondary" onClick={() => openSchedule(student.studentId)}>
                   <CalendarDays className="mr-2 h-4 w-4" />
                   Schedule Session
-                </Button>
-                <Button
-                  onClick={() => toggleWatchMutation.mutate({ studentId: student.studentId, watched: student.isWatched })}
-                  variant={student.isWatched ? 'secondary' : 'primary'}
-                >
-                  {student.isWatched ? 'Unwatch' : 'Watch'}
                 </Button>
               </div>
             </div>

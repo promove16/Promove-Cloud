@@ -228,6 +228,13 @@ export const getMentorScore = async (mentorId: string): Promise<IMentorScore | n
   (doc as IMentorScore & { incubationRate: number }).incubationRate =
     parseFloat((Math.min(1, prototypeEvents / denominator)).toFixed(3));
 
+  let rank = await redis.zrevrank(MENTOR_LB_KEY, mentorId);
+  if (rank === null) {
+    await redis.zadd(MENTOR_LB_KEY, { score: doc.totalScore, member: mentorId });
+    rank = await redis.zrevrank(MENTOR_LB_KEY, mentorId);
+  }
+  (doc as any).rank = rank !== null ? rank + 1 : (doc.rank || 0);
+
   await redis.set(cacheKey(mentorId), JSON.stringify(doc), { ex: SCORE_CACHE_TTL });
   return doc;
 };

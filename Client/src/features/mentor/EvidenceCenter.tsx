@@ -21,6 +21,7 @@ import {
 import { Link } from 'react-router-dom';
 import { mentorScoreApi, MentorVerificationTask } from '../../api/mentorScore.api';
 import { mentorResourceApi } from '../../api/mentorResource.api';
+import { ResearchNote } from '../../components/ui/ResearchSpotlight';
 
 // ─── Types / Constants ────────────────────────────────────────────────────────
 
@@ -605,6 +606,12 @@ export default function EvidenceCenter() {
             <span className="font-semibold text-emerald-400">Phase 3 — Global Mentorship (uncapped)</span>
             <p>Resource milestones (+20 per 10 unique downloads) + Forum answers + Session tokens + LOIs + Outcome bonuses</p>
           </div>
+        </div>
+        <div className="mt-4 border-t border-slate-800 pt-3">
+          <ResearchNote
+            icon={BookOpen}
+            text="Educational Framework: This scoring model follows an e-portfolio assessment framework (informed by EDUCAUSE standards) where mentors showcase competencies dynamically through continuous growth logs, authentic evaluation artifacts, and reflection instead of exams."
+          />
         </div>
       </section>
 

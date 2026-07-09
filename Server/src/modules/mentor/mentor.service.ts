@@ -283,7 +283,7 @@ export const getMentorStudents = async (mentorId: string): Promise<MentorFeedStu
       ...(leadStudent?.avatar ? { avatar: leadStudent.avatar } : {}),
       startupName: startup?.name ?? workspace.title,
       category: startup?.category ?? workspace.category,
-      innovationScore: startup?.innovationScoreAtLaunch ?? leadStudent?.innovationScore ?? 0,
+      innovationScore: leadStudent?.innovationScore ?? 0,
       recentActivitySummary: summary,
       isWatched: watched.has(leadStudentId),
       activeSince: leadStudent?.createdAt ? toIso(leadStudent.createdAt) : toIso(workspace.updatedAt),
