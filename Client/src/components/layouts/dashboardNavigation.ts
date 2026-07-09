@@ -39,14 +39,16 @@ export interface DashboardNavGroupItem {
   children: Array<Pick<DashboardNavLinkItem, 'label' | 'path'>>;
 }
 
-export interface DashboardNavActionItem {
-  kind: 'action';
+export interface DashboardNavHeaderItem {
+  kind: 'header';
   label: string;
-  icon: LucideIcon;
-  action: 'logout';
 }
 
-export type DashboardNavItem = DashboardNavLinkItem | DashboardNavGroupItem | DashboardNavActionItem;
+export type DashboardNavItem =
+  | DashboardNavLinkItem
+  | DashboardNavGroupItem
+  | DashboardNavActionItem
+  | DashboardNavHeaderItem;
 
 export interface DashboardRouteLabelItem {
   path: string;
@@ -116,8 +118,7 @@ export const SIDEBAR_CONFIG: Record<UserRole, DashboardNavItem[]> = {
     { kind: 'link', label: 'Patents', icon: FileText, path: '/dashboard/admin/patents' },
     { kind: 'link', label: 'Startups', icon: Rocket, path: '/dashboard/admin/startups' },
     { kind: 'link', label: 'Deals', icon: BriefcaseBusiness, path: '/dashboard/admin/deals' },
-    { kind: 'link', label: 'Mentorship', icon: GraduationCap, path: '/dashboard/admin/mentorship' },
-    { kind: 'link', label: 'Mentor Scores', icon: Award, path: '/dashboard/admin/mentor-scores' },
+    { kind: 'link', label: 'Mentors', icon: GraduationCap, path: '/dashboard/admin/mentors' },
     { kind: 'link', label: 'Analytics', icon: BarChart3, path: '/dashboard/admin/analytics' },
   ],
 };
@@ -155,7 +156,8 @@ export const DASHBOARD_ROUTE_LABELS: Partial<Record<UserRole, DashboardRouteLabe
   ],
   [UserRole.ADMIN]: [
     { path: '/dashboard/admin/analytics/platform', label: 'Platform Analytics' },
-    { path: '/dashboard/admin/mentor-scores', label: 'Mentor Scores' },
+    { path: '/dashboard/admin/mentors/scores', label: 'Mentor Scores' },
+    { path: '/dashboard/admin/mentors/mentorship', label: 'Mentorship' },
   ],
   [UserRole.MENTOR]: [
     { path: '/product-workspace', label: 'Product Workspace' },

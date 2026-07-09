@@ -4,6 +4,8 @@ import { ApiError } from '../../utils/ApiError';
 import { ApiResponse } from '../../utils/ApiResponse';
 import { MentorVerificationTask } from './mentorVerificationTask.model';
 import { AdminAuditLog } from '../admin/adminAuditLog.model';
+import { User } from '../user/user.model';
+import { UserRole } from '../../types/roles.types';
 import {
   awardMentorPoints,
   getMentorLeaderboard,
@@ -161,15 +163,37 @@ export const getMentorLeaderboardHandler = async (req: Request, res: Response) =
 // ─── Score History (admin view) ────────────────────────────────────────────────
 
 export const getMentorScoreHistory = async (req: Request, res: Response) => {
-  const mentorId = String(req.params.mentorId);
-  if (!mentorId) throw new ApiError(400, 'MENTOR_ID_REQUIRED', 'mentorId is required');
+  const mentorIdInput = String(req.params.mentorId).trim();
+  if (!mentorIdInput) throw new ApiError(400, 'MENTOR_ID_REQUIRED', 'mentorId is required');
 
-  const events = await MentorScoreEvent.find({ mentorId })
+  let resolvedMentorId: Types.ObjectId | null = null;
+  if (Types.ObjectId.isValid(mentorIdInput)) {
+    resolvedMentorId = new Types.ObjectId(mentorIdInput);
+  } else {
+    // Attempt lookup by email or case-insensitive displayName
+    const user = await User.findOne({
+      role: UserRole.MENTOR,
+      $or: [
+        { email: mentorIdInput },
+        { displayName: { $regex: new RegExp(`^${mentorIdInput}$`, 'i') } },
+      ],
+    }).select('_id').lean();
+
+    if (user) {
+      resolvedMentorId = user._id;
+    }
+  }
+
+  if (!resolvedMentorId) {
+    return res.json(new ApiResponse({ scoreDoc: null, events: [], total: 0 }));
+  }
+
+  const events = await MentorScoreEvent.find({ mentorId: resolvedMentorId })
     .sort({ createdAt: -1 })
     .limit(200)
     .lean();
 
-  const scoreDoc = await MentorScore.findOne({ mentorId }).lean();
+  const scoreDoc = await MentorScore.findOne({ mentorId: resolvedMentorId }).lean();
 
   res.json(new ApiResponse({ scoreDoc, events, total: events.length }));
 };

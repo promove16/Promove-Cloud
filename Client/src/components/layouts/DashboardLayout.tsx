@@ -711,6 +711,17 @@ export function DashboardLayout({ children, role }: PropsWithChildren<DashboardL
   );
 
   const renderItem = (item: DashboardNavItem) => {
+    if (item.kind === 'header') {
+      return (
+        <div
+          key={item.label}
+          className="px-4 pt-4 pb-1.5 text-[10px] font-bold uppercase tracking-[0.25em] text-slate-500/80 cursor-default select-none pointer-events-none"
+        >
+          {item.label}
+        </div>
+      );
+    }
+
     if (item.kind === 'action') {
       return (
         <button

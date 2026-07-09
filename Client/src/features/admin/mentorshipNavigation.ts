@@ -1,6 +1,6 @@
 import { type AdminSectionLink } from './AdminSectionTabs';
 
-export const ADMIN_MENTORSHIP_BASE_PATH = '/dashboard/admin/mentorship';
+export const ADMIN_MENTORSHIP_BASE_PATH = '/dashboard/admin/mentors/mentorship';
 
 export const ADMIN_MENTORSHIP_SECTION_LINKS: ReadonlyArray<AdminSectionLink> = [
   {

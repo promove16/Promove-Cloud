@@ -1,5 +1,6 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
+import { AdminMentorsSwitcher } from './AdminMentorsSwitcher';
 import {
   Award,
   CheckCircle2,
@@ -10,6 +11,7 @@ import {
   Search,
   Star,
   TrendingUp,
+  X,
   XCircle,
   Zap,
 } from 'lucide-react';
@@ -17,7 +19,7 @@ import { mentorScoreApi, MentorVerificationTask, LeaderboardEntry } from '../../
 
 // ─── Types / Helpers ──────────────────────────────────────────────────────────
 
-type AdminTab = 'leaderboard' | 'verifications' | 'history';
+type AdminTab = 'leaderboard' | 'verifications';
 
 const fmt = (d: string) =>
   new Date(d).toLocaleDateString('en-IN', { day: 'numeric', month: 'short', year: 'numeric' });
@@ -45,7 +47,7 @@ function Input(props: React.InputHTMLAttributes<HTMLInputElement>) {
 
 // ─── Leaderboard ──────────────────────────────────────────────────────────────
 
-function LeaderboardTab() {
+function LeaderboardTab({ onViewHistory }: { onViewHistory: (id: string) => void }) {
   const [page, setPage] = useState(1);
   const [phase, setPhase] = useState<'1' | '2' | '3' | ''>('');
 
@@ -98,6 +100,7 @@ function LeaderboardTab() {
                 <th className="px-4 py-3 text-right text-xs font-semibold uppercase tracking-wide text-slate-500">Ph3</th>
                 <th className="px-4 py-3 text-right text-xs font-semibold uppercase tracking-wide text-slate-500">Rating</th>
                 <th className="px-4 py-3 text-right text-xs font-semibold uppercase tracking-wide text-slate-500">Activity</th>
+                <th className="px-4 py-3 text-right text-xs font-semibold uppercase tracking-wide text-slate-500">Actions</th>
               </tr>
             </thead>
             <tbody className="divide-y divide-slate-800/60">
@@ -140,6 +143,15 @@ function LeaderboardTab() {
                       ) : (
                         <span className="text-slate-600">—</span>
                       )}
+                    </td>
+                    <td className="px-4 py-3 text-right">
+                      <button
+                        onClick={() => onViewHistory(entry.mentorId?._id)}
+                        className="inline-flex items-center gap-1 rounded bg-violet-600/80 px-2.5 py-1 text-xs font-semibold text-white transition hover:bg-violet-650 hover:shadow shadow-violet-500/20"
+                        title="View Score History Audit"
+                      >
+                        History
+                      </button>
                     </td>
                   </tr>
                 );
@@ -342,80 +354,99 @@ function VerificationsTab() {
 
 // ─── Score History ────────────────────────────────────────────────────────────
 
-function ScoreHistoryTab() {
-  const [mentorId, setMentorId] = useState('');
-  const [submittedId, setSubmittedId] = useState('');
+interface ScoreHistoryModalProps {
+  mentorId: string;
+  onClose: () => void;
+}
 
+function ScoreHistoryModal({ mentorId, onClose }: ScoreHistoryModalProps) {
   const query = useQuery({
-    queryKey: ['admin', 'mentor-history', submittedId],
-    queryFn: () => mentorScoreApi.getMentorScoreHistory(submittedId),
-    enabled: !!submittedId,
+    queryKey: ['admin', 'mentor-history', mentorId],
+    queryFn: () => mentorScoreApi.getMentorScoreHistory(mentorId),
+    enabled: !!mentorId,
   });
 
   return (
-    <div className="space-y-4">
-      <div className="flex gap-2">
-        <Input
-          value={mentorId}
-          onChange={(e) => setMentorId(e.target.value)}
-          placeholder="Paste mentor user ID…"
-          className="flex-1"
-        />
-        <button
-          onClick={() => setSubmittedId(mentorId.trim())}
-          disabled={!mentorId.trim()}
-          className="inline-flex items-center gap-2 rounded-lg bg-violet-600 px-4 py-2 text-sm font-semibold text-white hover:bg-violet-500 disabled:opacity-50"
-        >
-          <Search className="h-4 w-4" />
-          Load
-        </button>
-      </div>
-
-      {query.isLoading && <div className="text-sm text-slate-400">Loading…</div>}
-
-      {query.data && (
-        <>
-          <div className="rounded-2xl border border-slate-800 bg-slate-900 p-4">
-            <div className="text-xs uppercase tracking-wide text-slate-500 mb-2">Score Summary</div>
-            <div className="grid grid-cols-2 gap-2 text-sm">
-              <div className="text-slate-400">Total Score</div>
-              <div className="text-right font-bold text-white">{query.data.scoreDoc?.totalScore ?? 0}</div>
-              <div className="text-slate-400">Phase 1</div>
-              <div className="text-right text-cyan-400">{query.data.scoreDoc?.phase1Score ?? 0}</div>
-              <div className="text-slate-400">Phase 2</div>
-              <div className="text-right text-violet-400">{query.data.scoreDoc?.phase2Score ?? 0}</div>
-              <div className="text-slate-400">Phase 3</div>
-              <div className="text-right text-emerald-400">{query.data.scoreDoc?.phase3Score ?? 0}</div>
-              <div className="text-slate-400">Rating</div>
-              <div className="text-right text-amber-300">
-                {query.data.scoreDoc?.mentorshipRating?.toFixed(1) ?? '—'} ★
-              </div>
-            </div>
+    <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-950/85 backdrop-blur-sm animate-fade-in">
+      <div className="relative w-full max-w-2xl max-h-[85vh] flex flex-col rounded-2xl border border-slate-800 bg-slate-950 shadow-2xl p-6 overflow-hidden animate-scale-up">
+        {/* Header */}
+        <div className="flex items-center justify-between border-b border-slate-800/80 pb-4 mb-4">
+          <div>
+            <h3 className="text-lg font-bold text-white flex items-center gap-2">
+              <Award className="h-5 w-5 text-violet-400" />
+              Score History & Audit Trail
+            </h3>
+            <p className="text-xs text-slate-500 mt-1">
+              Mentor ID: {mentorId}
+            </p>
           </div>
+          <button
+            onClick={onClose}
+            className="rounded-lg p-1.5 text-slate-400 hover:bg-slate-800 hover:text-white transition"
+          >
+            <X className="h-5 w-5" />
+          </button>
+        </div>
 
-          <div className="rounded-2xl border border-slate-800 bg-slate-900 overflow-hidden">
-            <div className="border-b border-slate-800 px-4 py-3 text-xs font-semibold text-slate-500 uppercase tracking-wide">
-              Score Events ({query.data.total})
-            </div>
-            <div className="divide-y divide-slate-800/60 max-h-[60vh] overflow-y-auto">
-              {query.data.events.map((ev) => (
-                <div key={ev._id} className="flex items-center justify-between gap-3 px-4 py-2.5">
-                  <div>
-                    <div className="text-xs text-white">{ev.trigger}</div>
-                    <div className="text-xs text-slate-500">{fmt(ev.createdAt)}</div>
+        {/* Content */}
+        <div className="flex-1 overflow-y-auto space-y-4 pr-1">
+          {query.isLoading && <div className="text-sm text-slate-400 py-10 text-center">Loading history...</div>}
+
+          {query.data && (
+            <>
+              {/* Summary */}
+              <div className="rounded-xl border border-slate-800 bg-slate-900/40 p-4">
+                <div className="text-xs uppercase tracking-wider text-slate-400 mb-3 font-semibold">Score Summary</div>
+                <div className="grid grid-cols-2 sm:grid-cols-4 gap-4 text-sm">
+                  <div className="bg-slate-950/50 p-3 rounded-lg border border-slate-800/50">
+                    <div className="text-xs text-slate-400">Total Score</div>
+                    <div className="text-lg font-bold text-white mt-0.5">{query.data.scoreDoc?.totalScore ?? 0}</div>
                   </div>
-                  <div className="text-right">
-                    <div className={`text-sm font-bold ${ev.delta < 0 ? 'text-rose-400' : 'text-emerald-400'}`}>
-                      {ev.delta > 0 ? '+' : ''}{ev.delta}
-                    </div>
-                    <div className="text-xs text-slate-500">{ev.scoreAfter} total</div>
+                  <div className="bg-slate-950/50 p-3 rounded-lg border border-slate-800/50">
+                    <div className="text-xs text-slate-400">Phase 1</div>
+                    <div className="text-lg font-bold text-cyan-400 mt-0.5">{query.data.scoreDoc?.phase1Score ?? 0}</div>
+                  </div>
+                  <div className="bg-slate-950/50 p-3 rounded-lg border border-slate-800/50">
+                    <div className="text-xs text-slate-400">Phase 2</div>
+                    <div className="text-lg font-bold text-violet-400 mt-0.5">{query.data.scoreDoc?.phase2Score ?? 0}</div>
+                  </div>
+                  <div className="bg-slate-950/50 p-3 rounded-lg border border-slate-800/50">
+                    <div className="text-xs text-slate-400">Phase 3</div>
+                    <div className="text-lg font-bold text-emerald-400 mt-0.5">{query.data.scoreDoc?.phase3Score ?? 0}</div>
                   </div>
                 </div>
-              ))}
-            </div>
-          </div>
-        </>
-      )}
+              </div>
+
+              {/* History Events */}
+              <div className="rounded-xl border border-slate-800 bg-slate-900/40 overflow-hidden flex flex-col border-t-0">
+                <div className="border border-slate-800 bg-slate-900/40 px-4 py-3 text-xs font-semibold text-slate-400 uppercase tracking-wider rounded-t-xl">
+                  Score Events ({query.data.total})
+                </div>
+                <div className="divide-y divide-slate-800/60 max-h-[40vh] overflow-y-auto border-x border-b border-slate-800 rounded-b-xl">
+                  {query.data.events.length === 0 ? (
+                    <div className="text-sm text-slate-500 py-8 text-center bg-slate-950/30">No scoring events found for this mentor.</div>
+                  ) : (
+                    query.data.events.map((ev) => (
+                      <div key={ev._id} className="flex items-center justify-between gap-3 px-4 py-3 hover:bg-slate-900/20 transition bg-slate-950/10">
+                        <div>
+                          <div className="text-xs font-semibold text-white">{ev.trigger}</div>
+                          <div className="text-[10px] text-slate-500 mt-0.5">{fmt(ev.createdAt)}</div>
+                        </div>
+                        <div className="text-right">
+                          <div className={`text-sm font-bold ${ev.delta < 0 ? 'text-rose-400' : 'text-emerald-400'}`}>
+                            {ev.delta > 0 ? '+' : ''}{ev.delta}
+                          </div>
+                          <div className="text-[10px] text-slate-500 mt-0.5">{ev.scoreAfter} total</div>
+                        </div>
+                      </div>
+                    ))
+                  )}
+                </div>
+              </div>
+            </>
+          )}
+        </div>
+      </div>
     </div>
   );
 }
@@ -424,24 +455,28 @@ function ScoreHistoryTab() {
 
 export default function AdminMentorScores() {
   const [activeTab, setActiveTab] = useState<AdminTab>('leaderboard');
+  const [selectedMentorId, setSelectedMentorId] = useState('');
+  const [historyOpen, setHistoryOpen] = useState(false);
 
   const TABS: { id: AdminTab; label: string; icon: React.ElementType }[] = [
     { id: 'leaderboard',   label: 'Leaderboard',        icon: TrendingUp },
     { id: 'verifications', label: 'Verification Queue',  icon: Clock3 },
-    { id: 'history',       label: 'Score History',       icon: Award },
   ];
 
   return (
-    <div className="space-y-5">
+    <div className="space-y-4">
       {/* Header */}
-      <div>
-        <div className="flex items-center gap-2">
-          <Zap className="h-5 w-5 text-violet-400" />
-          <h1 className="text-2xl font-bold text-white">Mentor Scores</h1>
+      <div className="flex flex-col md:flex-row md:items-start md:justify-between gap-4 border-b border-slate-800/80 pb-3">
+        <div>
+          <div className="flex items-center gap-2">
+            <Zap className="h-5 w-5 text-violet-400" />
+            <h1 className="text-2xl font-bold text-white">Mentor Scores</h1>
+          </div>
+          <p className="mt-1.5 text-sm text-slate-400">
+            Teacher leaderboard, evidence verification queue, and individual score audit trail.
+          </p>
         </div>
-        <p className="mt-1 text-sm text-slate-400">
-          Teacher leaderboard, evidence verification queue, and individual score audit trail.
-        </p>
+        <AdminMentorsSwitcher />
       </div>
 
       {/* Tabs */}
@@ -466,9 +501,26 @@ export default function AdminMentorScores() {
       </div>
 
       {/* Tab content */}
-      {activeTab === 'leaderboard'   && <LeaderboardTab />}
+      {activeTab === 'leaderboard'   && (
+        <LeaderboardTab
+          onViewHistory={(id) => {
+            setSelectedMentorId(id);
+            setHistoryOpen(true);
+          }}
+        />
+      )}
       {activeTab === 'verifications' && <VerificationsTab />}
-      {activeTab === 'history'       && <ScoreHistoryTab />}
+
+      {/* Score History Modal overlay */}
+      {historyOpen && selectedMentorId && (
+        <ScoreHistoryModal
+          mentorId={selectedMentorId}
+          onClose={() => {
+            setHistoryOpen(false);
+            setSelectedMentorId('');
+          }}
+        />
+      )}
     </div>
   );
 }

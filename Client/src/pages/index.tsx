@@ -102,6 +102,7 @@ const AdminAnalyticsLogs = lazy(() => import("../features/admin/AnalyticsLogs"))
 const AdminPlatformAnalytics = lazy(() => import("../features/analytics/AdminPlatformAnalytics"));
 const InvestorBidDashboard = lazy(() => import("../features/bidding/InvestorBidDashboard"));
 const AgreementPage = lazy(() => import("../features/agreement/AgreementPage"));
+const AdminMentorsLayout = lazy(() => import("../features/admin/AdminMentorsLayout"));
 const AdminMentorshipPrograms = lazy(() => import("../features/admin/MentorshipPrograms"));
 const AdminMentorshipMentors = lazy(() => import("../features/admin/MentorshipMentors"));
 const AdminMentorshipProgramCreation = lazy(() => import("../features/admin/MentorshipProgramCreation"));
@@ -849,15 +850,31 @@ export const router = createBrowserRouter([
               },
               { path: "deals/:dealId", element: <LazyPage component={AdminDealReview} /> },
               {
-                path: "mentorship",
-                element: <LazyPage component={AdminMentorshipPrograms} />,
+                path: "mentors",
+                element: <LazyPage component={AdminMentorsLayout} />,
                 children: [
-                  { index: true, element: <Navigate to="requests" replace /> },
-                  { path: "requests", element: <LazyPage component={AdminMentorshipRequests} /> },
-                  { path: "mentors", element: <LazyPage component={AdminMentorshipMentors} /> },
-                  { path: "programs", element: <LazyPage component={AdminMentorshipProgramCreation} /> },
+                  { index: true, element: <Navigate to="mentorship" replace /> },
+                  {
+                    path: "mentorship",
+                    element: <LazyPage component={AdminMentorshipPrograms} />,
+                    children: [
+                      { index: true, element: <Navigate to="requests" replace /> },
+                      { path: "requests", element: <LazyPage component={AdminMentorshipRequests} /> },
+                      { path: "mentors", element: <LazyPage component={AdminMentorshipMentors} /> },
+                      { path: "programs", element: <LazyPage component={AdminMentorshipProgramCreation} /> },
+                    ],
+                  },
+                  {
+                    path: "scores",
+                    element: <LazyPage component={AdminMentorScores} />,
+                  },
                 ],
               },
+              { path: "mentorship/requests", element: <Navigate to="/dashboard/admin/mentors/mentorship/requests" replace /> },
+              { path: "mentorship/mentors", element: <Navigate to="/dashboard/admin/mentors/mentorship/mentors" replace /> },
+              { path: "mentorship/programs", element: <Navigate to="/dashboard/admin/mentors/mentorship/programs" replace /> },
+              { path: "mentorship", element: <Navigate to="/dashboard/admin/mentors/mentorship" replace /> },
+              { path: "mentor-scores", element: <Navigate to="/dashboard/admin/mentors/scores" replace /> },
               {
                 path: "help-desk/*",
                 element: <Navigate to="/dashboard/admin" replace />,
@@ -875,7 +892,6 @@ export const router = createBrowserRouter([
                   { path: "*", element: <Navigate to="overview" replace /> },
                 ],
               },
-              { path: "mentor-scores", element: <LazyPage component={AdminMentorScores} /> },
               { path: "verification", element: <Navigate to="/dashboard/admin" replace /> },
             ],
           },

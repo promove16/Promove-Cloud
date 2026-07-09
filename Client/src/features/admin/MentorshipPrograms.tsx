@@ -6,6 +6,7 @@ import { Card } from '../../components/ui/Card';
 import { Spinner } from '../../components/ui/Spinner';
 import { AdminSectionTabs, getActiveAdminSection } from './AdminSectionTabs';
 import { ADMIN_MENTORSHIP_SECTION_LINKS } from './mentorshipNavigation';
+import { AdminMentorsSwitcher } from './AdminMentorsSwitcher';
 
 export default function MentorshipPrograms() {
   const location = useLocation();
@@ -30,17 +31,20 @@ export default function MentorshipPrograms() {
   );
 
   return (
-    <div className="space-y-8">
-      <section className="border-b border-slate-800/80 pb-3">
-        <div className="px-1 pb-6">
-          <div className="grid gap-5 2xl:grid-cols-[minmax(0,1fr),auto] 2xl:items-end">
-            <div className="min-w-0 max-w-4xl">
-              <div className="text-[11px] uppercase tracking-[0.35em] text-cyan-300">Admin Mentorship</div>
-              <h1 className="mt-3 text-2xl font-semibold tracking-tight text-white sm:text-3xl">{activeSection.label}</h1>
-              <p className="mt-3 max-w-3xl text-sm leading-6 text-slate-400">{activeSection.description}</p>
+    <div className="space-y-4">
+      <section className="border-b border-slate-800/80 pb-1">
+        <div className="px-1 pb-3">
+          <div className="flex flex-col gap-3">
+            <div className="flex flex-col md:flex-row md:items-start md:justify-between gap-4">
+              <div className="min-w-0 max-w-4xl">
+                <div className="text-[11px] uppercase tracking-[0.35em] text-cyan-300 font-bold">Admin Mentorship</div>
+                <h1 className="mt-1.5 text-2xl font-semibold tracking-tight text-white sm:text-3xl">{activeSection.label}</h1>
+                <p className="mt-1.5 max-w-3xl text-sm leading-relaxed text-slate-400">{activeSection.description}</p>
+              </div>
+              <AdminMentorsSwitcher />
             </div>
 
-            <div className="text-sm text-slate-400">
+            <div className="text-xs text-slate-400 self-start md:self-end">
               <span className="font-medium text-slate-100">{summary.mentors}</span> mentors
               <span className="mx-2 text-slate-700">/</span>
               <span className="font-medium text-slate-100">{summary.pendingPrograms}</span> pending requests
