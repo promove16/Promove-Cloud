@@ -1,19 +1,14 @@
 import { Toaster as Sonner, toast } from 'sonner';
-import { useSettings } from '../../../hooks/useSettings';
-import { getStoredTheme } from '../../../hooks/useTheme';
 
 export { toast };
 
 export function Toaster() {
-  const { settings } = useSettings();
-  const theme = settings?.appearance?.theme ?? getStoredTheme();
-
   return (
     <Sonner
       closeButton
       richColors
       expand
-      theme={theme === 'system' ? 'dark' : theme}
+      theme="dark"
       position="top-right"
       toastOptions={{
         classNames: {

@@ -55,11 +55,23 @@ const resolveKey = (req: Request): string => {
   return `ip:${req.ip ?? 'anonymous'}`;
 };
 
+const LOOPBACK_IPS = new Set(['127.0.0.1', '::1', '::ffff:127.0.0.1']);
+
+// Local dev/test agents (e.g. Antigravity hitting a locally-run server) hammer
+// endpoints far faster than a real user ever would. Only loopback traffic is
+// exempt, so this can never be used to bypass limits from outside the box.
+const isLocalhost = (req: Request): boolean => !!req.ip && LOOPBACK_IPS.has(req.ip);
+
 export const withRateLimit =
   (limiter: RateLimiter) =>
   async (req: Request, res: Response, next: NextFunction) => {
     if (!env.RATE_LIMIT_ENABLED) {
       rateLimitDecisions.inc({ limiter: limiter.prefix, decision: 'disabled' });
+      return next();
+    }
+
+    if (env.NODE_ENV !== 'production' && isLocalhost(req)) {
+      rateLimitDecisions.inc({ limiter: limiter.prefix, decision: 'localhost_bypass' });
       return next();
     }
 

@@ -96,6 +96,22 @@ const assignedInstitutionMentorshipProgramReviewSchema = z.object({
   adminNotes: z.string().trim().max(1000).optional().or(z.literal('')),
 });
 
+export const updateAdminInstitutionMentorshipProgramSchema = z.object({
+  title: z.string().trim().min(2).max(160).optional(),
+  objective: z.string().trim().min(10).max(1000).optional(),
+  preferredDate: z.string().datetime().optional(),
+  scheduledAt: z.string().datetime().optional(),
+  durationMinutes: z.number().int().min(30).max(480).optional(),
+  expectedParticipants: z.number().int().min(1).max(10000).optional(),
+  deliveryMode: z.enum(['Online', 'Offline']).optional(),
+  platform: z.enum(['Google Meet', 'Microsoft Teams', 'Zoom', 'Offline']).optional(),
+  meetingLink: z.string().trim().url().optional().or(z.literal('')),
+  venue: z.string().trim().max(240).optional().or(z.literal('')),
+  preferredExpertise: z.string().trim().max(160).optional().or(z.literal('')),
+  adminNotes: z.string().trim().max(1000).optional().or(z.literal('')),
+  mentorId: z.string().regex(/^[0-9a-fA-F]{24}$/, 'Invalid ID format').optional(),
+});
+
 export const submitMentorBidSchema = z.object({
   opportunityId: z.string().regex(/^[0-9a-fA-F]{24}$/, 'Invalid ID format'),
   kind: z.enum(['startup', 'problem_bank']),

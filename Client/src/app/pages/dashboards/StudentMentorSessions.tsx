@@ -1,5 +1,6 @@
 import type { ReactNode } from "react";
-import { useQuery } from "@tanstack/react-query";
+import { useState } from "react";
+import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import {
   Calendar,
   Clock,
@@ -12,12 +13,15 @@ import {
   School,
   BookOpen,
   UserCheck,
+  Star,
+  Unlock,
 } from "lucide-react";
 import {
   studentApi,
   StudentMentorSessionItem,
   StudentInstitutionMentorshipProgramItem,
 } from "../../../api/student.api";
+import { mentorScoreApi } from "../../../api/mentorScore.api";
 
 type IconComponent = typeof Calendar;
 
@@ -158,8 +162,66 @@ function SectionHeading({
   );
 }
 
+function StarRating({ sessionId, onDone }: { sessionId: string; onDone: () => void }) {
+  const [hovered, setHovered] = useState(0);
+  const [selected, setSelected] = useState(0);
+  const queryClient = useQueryClient();
+
+  const mutation = useMutation({
+    mutationFn: (rating: number) => mentorScoreApi.rateSession(sessionId, rating),
+    onSuccess: () => {
+      void queryClient.invalidateQueries({ queryKey: ["student", "mentor-sessions"] });
+      onDone();
+    },
+  });
+
+  return (
+    <div className="mt-3 rounded-lg border border-slate-800 bg-slate-900/40 p-3">
+      <p className="text-xs text-slate-400 mb-2">Rate your session with this mentor (optional):</p>
+      <div className="flex items-center gap-1">
+        {[1, 2, 3, 4, 5].map((n) => (
+          <button
+            key={n}
+            onMouseEnter={() => setHovered(n)}
+            onMouseLeave={() => setHovered(0)}
+            onClick={() => { setSelected(n); mutation.mutate(n); }}
+            disabled={mutation.isPending}
+            className="focus:outline-none disabled:opacity-50"
+          >
+            <Star
+              className={`h-6 w-6 transition ${
+                (hovered || selected) >= n ? "fill-amber-400 text-amber-400" : "text-slate-600"
+              }`}
+            />
+          </button>
+        ))}
+        {mutation.isPending && <span className="ml-2 text-xs text-slate-400">Saving…</span>}
+        {mutation.isSuccess && <span className="ml-2 text-xs text-emerald-400">Rated!</span>}
+      </div>
+    </div>
+  );
+}
+
 function SessionRow({ session }: { session: StudentMentorSessionItem }) {
   const status = sessionStatusConfig[session.status];
+  const [showRating, setShowRating] = useState(false);
+  const queryClient = useQueryClient();
+
+  const endMutation = useMutation({
+    mutationFn: () => mentorScoreApi.endSession(session._id),
+    onSuccess: () => {
+      setShowRating(true);
+      void queryClient.invalidateQueries({ queryKey: ["student", "mentor-sessions"] });
+    },
+  });
+
+  const isPastScheduled =
+    session.status === "Scheduled" &&
+    new Date(session.scheduledAt).getTime() < Date.now();
+
+  const canEnd =
+    (session.status === "Completed" || isPastScheduled) &&
+    !session.tokenReleased;
 
   return (
     <article className="rounded-lg border border-slate-800 bg-slate-950/70 p-4 shadow-sm shadow-black/10 transition hover:border-slate-700">
@@ -193,6 +255,34 @@ function SessionRow({ session }: { session: StudentMentorSessionItem }) {
           </a>
         </div>
       ) : null}
+
+      {/* End Session / token release */}
+      {session.tokenReleased ? (
+        <div className="mt-3 inline-flex items-center gap-1.5 rounded-full border border-emerald-500/20 bg-emerald-500/10 px-3 py-1 text-xs font-semibold text-emerald-300">
+          <CheckCircle2 className="h-3.5 w-3.5" />
+          Points released to mentor
+        </div>
+      ) : canEnd ? (
+        <div className="mt-3">
+          <button
+            onClick={() => endMutation.mutate()}
+            disabled={endMutation.isPending}
+            className="inline-flex items-center gap-1.5 rounded-lg border border-violet-500/30 bg-violet-500/10 px-3 py-1.5 text-xs font-semibold text-violet-300 transition hover:bg-violet-500/20 disabled:opacity-50"
+          >
+            <Unlock className="h-3.5 w-3.5" />
+            {endMutation.isPending ? "Releasing…" : "End Session & Release Points"}
+          </button>
+          <p className="mt-1 text-xs text-slate-500">
+            This releases session points to your mentor and marks the session complete.
+          </p>
+        </div>
+      ) : null}
+
+      {/* Rating flow after end */}
+      {showRating && (
+        <StarRating sessionId={session._id} onDone={() => setShowRating(false)} />
+      )}
+
       {session.mentorNotes ? (
         <div className="mt-4 rounded-lg border border-slate-800 bg-slate-900/30 p-3">
           <div className="mb-1 text-xs font-semibold uppercase tracking-wider text-slate-500">Mentor Notes</div>

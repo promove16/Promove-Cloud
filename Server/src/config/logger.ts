@@ -34,6 +34,8 @@ const logFormat = winston.format.printf(({ timestamp, level, message, stack, ...
   return `${baseMessage} ${JSON.stringify(filteredMeta)}`;
 });
 
+const shouldLogToConsole = process.env.LOG_TO_CONSOLE !== 'false' && process.env.NODE_ENV !== 'test';
+
 export const logger = winston.createLogger({
   level: process.env.NODE_ENV === 'production' ? 'info' : 'debug',
   format: winston.format.combine(
@@ -46,7 +48,7 @@ export const logger = winston.createLogger({
     new winston.transports.File({
       filename: logFilePath,
     }),
-    ...(process.env.NODE_ENV === 'development'
+    ...(shouldLogToConsole
       ? [
           new winston.transports.Console({
             format: winston.format.combine(

@@ -1304,6 +1304,8 @@ export const getCurrentUserMentorSessions = async (
       status: session.status,
       ...(session.mentorNotes ? { mentorNotes: session.mentorNotes } : {}),
       ...(session.studentFeedback ? { studentFeedback: session.studentFeedback } : {}),
+      tokenReleased: session.tokenReleased ?? false,
+      sessionPointsAwarded: session.sessionPointsAwarded ?? false,
       createdAt: session.createdAt,
     };
   });

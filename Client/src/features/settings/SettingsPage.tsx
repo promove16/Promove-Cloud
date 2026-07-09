@@ -2,13 +2,12 @@ import { type FormEvent, useEffect, useMemo, useRef, useState } from 'react';
 import { useSearchParams } from 'react-router-dom';
 import { useForm } from 'react-hook-form';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
-import { User, Bell, Shield, Palette, Settings2, Save, Loader2, Check, Lock, Globe, Monitor, Moon, Sun } from 'lucide-react';
+import { User, Bell, Shield, Palette, Settings2, Save, Loader2, Check, Lock, Globe } from 'lucide-react';
 import { authApi } from '../../api/auth.api';
 import { userApi } from '../../api/user.api';
 import type { UserSettings } from '../../types/settings.types';
 import { useSettings } from '../../hooks/useSettings';
 import { useAuthStore } from '../../store/authStore';
-import { applyTheme } from '../../hooks/useTheme';
 import { UserRole } from '../../types/roles.types';
 import { OptionTabs } from '../../components/ui/OptionTabs';
 import { toast } from '../../app/components/ui/sonner';
@@ -91,7 +90,7 @@ const serializeState = (value: unknown) => JSON.stringify(value);
 type NotifRow = { email: boolean; inApp: boolean };
 type NotifMatrix = { messages: NotifRow; deals: NotifRow; sessions: NotifRow; patents: NotifRow; platform: NotifRow };
 type PrivacyState = { profileVisibility: 'public' | 'connections' | 'private'; dmPermissions: 'everyone' | 'connections' | 'nobody'; showEmail: boolean; showOnlineStatus: boolean };
-type AppearanceState = { theme: 'dark' | 'light' | 'system'; compactMode: boolean; showAnimations: boolean };
+type AppearanceState = { compactMode: boolean; showAnimations: boolean };
 type SessionTypes = { video: boolean; text: boolean; inPerson: boolean };
 type RoleState = {
   jobSeeking: boolean; openToMentorship: boolean; innovationVisibility: 'public' | 'private';
@@ -121,7 +120,7 @@ const defaultNotif: NotifMatrix = {
   sessions: { email: true, inApp: true }, patents: { email: false, inApp: true }, platform: { email: true, inApp: false },
 };
 const defaultPrivacy: PrivacyState = { profileVisibility: 'public', dmPermissions: 'everyone', showEmail: false, showOnlineStatus: true };
-const defaultAppearance: AppearanceState = { theme: 'dark', compactMode: false, showAnimations: true };
+const defaultAppearance: AppearanceState = { compactMode: false, showAnimations: true };
 const defaultRole: RoleState = {
   jobSeeking: false, openToMentorship: false, innovationVisibility: 'public',
   dealFlowNotifications: true, minInvestment: 10000, maxInvestment: 500000, preferredSectors: '',
@@ -948,19 +947,6 @@ export function SettingsPage() {
         {/* ── Appearance ───────────────────────────────────────────────────── */}
         {activeTab === 'appearance' && (
           <div className="space-y-6">
-            <div className={card}>
-              <p className={sectionHdr}>Theme</p>
-              <div className="grid grid-cols-3 gap-4">
-                {([{ value: 'dark', label: 'Dark', Icon: Moon }, { value: 'light', label: 'Light', Icon: Sun }, { value: 'system', label: 'System', Icon: Monitor }] as const).map(({ value, label, Icon }) => (
-                  <button key={value} type="button" onClick={() => { setAppearance((a) => ({ ...a, theme: value })); applyTheme(value); }}
-                    className={`flex flex-col items-center gap-3 p-5 rounded-2xl border-2 transition-all ${appearance.theme === value ? 'border-cyan-500 bg-cyan-500/10' : 'border-slate-700 hover:border-slate-600 bg-slate-950'}`}>
-                    <Icon className={`w-6 h-6 ${appearance.theme === value ? 'text-cyan-400' : 'text-slate-400'}`} />
-                    <span className={`text-sm font-medium ${appearance.theme === value ? 'text-cyan-300' : 'text-slate-300'}`}>{label}</span>
-                  </button>
-                ))}
-              </div>
-            </div>
-
             <div className={card}>
               <p className={sectionHdr}>Display Options</p>
               <div className="space-y-5">

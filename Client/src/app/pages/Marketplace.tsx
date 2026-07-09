@@ -573,12 +573,9 @@ const buildStatList = (item: MarketplaceDirectoryItem) => {
 
   if (userItem.entityType === "mentor") {
     return [
+      { label: "Score", value: userItem.mentorScore ? String(userItem.mentorScore.total) : "—" },
       { label: "Experience", value: String(userItem.insightCounts.experience) },
       { label: "Education", value: String(userItem.insightCounts.education) },
-      {
-        label: "Projects",
-        value: String(userItem.insightCounts.portfolioProjects),
-      },
       {
         label: "Startup Links",
         value: String(userItem.relatedCounts.startups),
@@ -661,7 +658,7 @@ const buildMetaList = (item: MarketplaceDirectoryItem) => {
     case "mentor":
       return [
         userItem.domain ?? "",
-        `${userItem.relatedCounts.startups} startup links`,
+        userItem.mentorScore ? `${userItem.mentorScore.total} mentor pts` : "",
         `${userItem.insightCounts.experience} experience`,
       ].filter(Boolean);
     case "student":

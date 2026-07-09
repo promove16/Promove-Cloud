@@ -25,6 +25,7 @@ import {
 import {
   AdminMentorListItem,
   AdminCreateMentorshipProgramInput,
+  AdminUpdateMentorshipProgramInput,
   CreateMentorProfileInput,
   CreatedMentorProfileResult,
   InstitutionMentorshipProgram,
@@ -481,6 +482,7 @@ export interface AdminAnalyticsData {
     action: string;
     targetId: string;
     targetModel: string;
+    targetName?: string;
     metadata?: Record<string, unknown>;
     createdAt: string;
   }>;
@@ -992,6 +994,16 @@ export const adminApi = {
       payload,
     );
     return response.data.data;
+  },
+  async updateMentorshipProgram(programId: string, payload: AdminUpdateMentorshipProgramInput) {
+    const response = await api.patch<ApiSuccessResponse<InstitutionMentorshipProgram>>(
+      `/api/admin/mentorship-programs/${programId}/edit`,
+      payload,
+    );
+    return response.data.data;
+  },
+  async deleteMentorshipProgram(programId: string) {
+    await api.delete(`/api/admin/mentorship-programs/${programId}`);
   },
   async getMentors() {
     const response = await api.get<ApiSuccessResponse<AdminMentorListItem[]>>('/api/admin/mentors');

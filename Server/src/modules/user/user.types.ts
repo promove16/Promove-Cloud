@@ -577,6 +577,8 @@ export interface StudentMentorSessionView {
   status: 'Scheduled' | 'Completed' | 'Cancelled';
   mentorNotes?: string;
   studentFeedback?: string;
+  tokenReleased: boolean;
+  sessionPointsAwarded: boolean;
   createdAt: Date;
 }
 

@@ -24,6 +24,7 @@ import {
   startRetentionEmailWorker,
 } from './jobs/retentionEmailWorker';
 import { startScoreWorker } from './jobs/scoreRecalcWorker';
+import { startMentorDecayWorker } from './jobs/mentorDecayWorker';
 import { logError, logger } from './config/logger';
 import http from 'http';
 import { metricsHandler } from './middleware/metrics';
@@ -54,6 +55,7 @@ const startWorker = async () => {
   startNotificationWorker();
   startMongoExcelBackupWorker();
   startRetentionEmailWorker();
+  startMentorDecayWorker();
   startQueueDepthPoller();
 
   const metricsServer = startMetricsServer();

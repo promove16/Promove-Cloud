@@ -580,3 +580,4 @@ export const bidExpiryQueue = createSafeQueue('bid-expiry');
 export const institutionVerifyQueue = createSafeQueue<{ userId: string; token: string }>(
   'institution-verify',
 );
+export const mentorDecayQueue = createSafeQueue('mentor-score-decay');

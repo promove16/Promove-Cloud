@@ -579,7 +579,6 @@ function StudentOnboardingSection() {
               }}
               label="Institution"
               placeholder="Search school or college by name, location, or email"
-              helperText="Only schools and colleges are listed. Type to search."
             />
           )}
         </div>

@@ -11,6 +11,7 @@ import { scheduleMongoExcelBackupJob, startMongoExcelBackupWorker } from './jobs
 import { scheduleWeeklyProgressSummaryJob, startRetentionEmailWorker } from './jobs/retentionEmailWorker';
 import { scheduleBidExpiryJob, startBidExpiryWorker } from './jobs/biddingWorker';
 import { startScoreWorker } from './jobs/scoreRecalcWorker';
+import { startMentorDecayWorker, scheduleMentorDecayJob } from './jobs/mentorDecayWorker';
 import { seedProblemsIfEmpty } from './modules/problemBank/problem.service';
 import { initSocket } from './config/socket';
 import { connectDB } from './config/db';
@@ -50,9 +51,11 @@ const startServer = async () => {
       startMongoExcelBackupWorker();
       startRetentionEmailWorker();
       startBidExpiryWorker();
+      startMentorDecayWorker();
       await scheduleWeeklyProgressSummaryJob();
       await scheduleMongoExcelBackupJob();
       await scheduleBidExpiryJob();
+      await scheduleMentorDecayJob();
     } else {
       logger.info('API replica started without inline workers (RUN_WORKERS_INLINE=false).');
     }

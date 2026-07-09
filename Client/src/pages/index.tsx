@@ -77,6 +77,10 @@ const MentorDashboard = lazy(() => import("../features/mentor/Dashboard"));
 const MentorStudentFeed = lazy(() => import("../features/mentor/StudentFeed"));
 const MentorSessions = lazy(() => import("../features/mentor/Sessions"));
 const MentorMarketplace = lazy(() => import("../features/mentor/MentorMarketplace"));
+const MentorScorePage = lazy(() => import("../features/mentor/MentorScore"));
+const MentorEvidenceCenter = lazy(() => import("../features/mentor/EvidenceCenter"));
+const MentorForum = lazy(() => import("../features/mentor/Forum"));
+const MentorResources = lazy(() => import("../features/mentor/Resources"));
 
 const AdminDashboard = lazy(() => import("../features/admin/Dashboard"));
 const AdminOnboarding = lazy(() => import("../features/admin/Onboarding"));
@@ -102,6 +106,7 @@ const AdminMentorshipPrograms = lazy(() => import("../features/admin/MentorshipP
 const AdminMentorshipMentors = lazy(() => import("../features/admin/MentorshipMentors"));
 const AdminMentorshipProgramCreation = lazy(() => import("../features/admin/MentorshipProgramCreation"));
 const AdminMentorshipRequests = lazy(() => import("../features/admin/MentorshipRequests"));
+const AdminMentorScores = lazy(() => import("../features/admin/MentorScores"));
 const AdminProblemBank = lazy(() => import("../features/admin/ProblemBank"));
 const AdminProblemLibrary = lazy(() => import("../features/admin/ProblemLibrary"));
 const AdminProblemReviewQueue = lazy(() => import("../features/admin/ProblemReviewQueue"));
@@ -733,6 +738,10 @@ export const router = createBrowserRouter([
               { path: "students", element: <LazyPage component={MentorStudentFeed} /> },
               { path: "students/:id", element: <StudentPortfolioRedirect /> },
               { path: "sessions", element: <LazyPage component={MentorSessions} /> },
+              { path: "score", element: <LazyPage component={MentorScorePage} /> },
+              { path: "evidence-center", element: <LazyPage component={MentorEvidenceCenter} /> },
+              { path: "forum", element: <LazyPage component={MentorForum} /> },
+              { path: "resources", element: <LazyPage component={MentorResources} /> },
               { path: "marketplace", element: <LazyPage component={MentorMarketplace} /> },
               { path: "marketplace/view/:entityType/:entityId", element: <LazyPage component={MarketplaceDetail} /> },
             ],
@@ -866,6 +875,7 @@ export const router = createBrowserRouter([
                   { path: "*", element: <Navigate to="overview" replace /> },
                 ],
               },
+              { path: "mentor-scores", element: <LazyPage component={AdminMentorScores} /> },
               { path: "verification", element: <Navigate to="/dashboard/admin" replace /> },
             ],
           },

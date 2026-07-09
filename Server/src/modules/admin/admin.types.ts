@@ -442,15 +442,16 @@ export interface AdminAnalyticsData {
   patentsByStatus: Record<'submitted' | 'under_review' | 'approved' | 'rejected', number>;
   scoreDistribution: Record<'0-50' | '51-100' | '101-150' | '151-200', number>;
   topInnovators: AdminUserListItem[];
-  recentAdminActions: Array<{
-    _id: string;
-    adminId: string;
-    action: string;
-    targetId: string;
-    targetModel: string;
-    metadata?: Record<string, unknown>;
-    createdAt: string;
-  }>;
+    recentAdminActions: Array<{
+      _id: string;
+      adminId: string;
+      action: string;
+      targetId: string;
+      targetModel: string;
+      targetName?: string;
+      metadata?: Record<string, unknown>;
+      createdAt: string;
+    }>;
   patentsPending: number;
   awardsPending: number;
   investmentTypeBreakdown: {
@@ -504,6 +505,22 @@ export interface AdminDealCancellationReviewPayload {
 export type AdminMentorshipProgramsResponse = InstitutionMentorshipProgramListResponse;
 export type AdminCreateMentorshipProgramPayload = AdminCreateInstitutionMentorshipProgramInput;
 export type AdminMentorshipProgramReviewPayload = InstitutionMentorshipProgramReviewInput;
+
+export interface AdminUpdateMentorshipProgramPayload {
+  title?: string;
+  objective?: string;
+  preferredDate?: string;
+  scheduledAt?: string;
+  durationMinutes?: number;
+  expectedParticipants?: number;
+  deliveryMode?: 'Online' | 'Offline';
+  platform?: 'Google Meet' | 'Microsoft Teams' | 'Zoom' | 'Offline';
+  meetingLink?: string;
+  venue?: string;
+  preferredExpertise?: string;
+  adminNotes?: string;
+  mentorId?: string;
+}
 export type AdminMentorListItem = MentorshipAdminMentorItem;
 export type AdminCreatedMentorProfile = CreatedMentorProfileResult;
 

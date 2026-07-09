@@ -38,7 +38,6 @@ export interface IUserSettings {
 
   // Appearance
   appearance: {
-    theme: 'dark' | 'light' | 'system';
     compactMode: boolean;
     showAnimations: boolean;
   };

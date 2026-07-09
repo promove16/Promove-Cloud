@@ -76,11 +76,6 @@ const settingsSchema = new Schema<ISettingsDocument>(
     appearance: {
       type: new Schema(
         {
-          theme: {
-            type: String,
-            enum: ['dark', 'light', 'system'],
-            default: 'dark',
-          },
           compactMode: { type: Boolean, default: false },
           showAnimations: { type: Boolean, default: true },
         },

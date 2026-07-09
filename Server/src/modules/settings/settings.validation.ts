@@ -29,7 +29,6 @@ const privacySchema = z
 
 const appearanceSchema = z
   .object({
-    theme: z.enum(['dark', 'light', 'system']).optional(),
     compactMode: z.boolean().optional(),
     showAnimations: z.boolean().optional(),
   })

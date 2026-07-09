@@ -70,6 +70,30 @@ export interface AdminCreateMentorshipProgramInput extends CreateInstitutionMent
   adminNotes?: string;
 }
 
+export interface AdminUpdateMentorshipProgramInput {
+  title?: string;
+  objective?: string;
+  preferredDate?: string;
+  scheduledAt?: string;
+  durationMinutes?: number;
+  expectedParticipants?: number;
+  deliveryMode?: 'Online' | 'Offline';
+  platform?: 'Google Meet' | 'Microsoft Teams' | 'Zoom' | 'Offline';
+  meetingLink?: string;
+  venue?: string;
+  preferredExpertise?: string;
+  adminNotes?: string;
+  mentorId?: string;
+}
+
+export interface MentorScoreSummary {
+  total: number;
+  phase1: number;
+  phase2: number;
+  phase3: number;
+  rank: number;
+}
+
 export interface AdminMentorListItem {
   _id: string;
   displayName: string;
@@ -81,6 +105,7 @@ export interface AdminMentorListItem {
   assignedProjects: number;
   assignedPrograms: number;
   createdAt: string;
+  mentorScore?: MentorScoreSummary;
 }
 
 export interface CreateMentorProfileInput {

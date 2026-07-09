@@ -259,9 +259,18 @@ export interface MarketplaceJobSummary {
   expiresAt?: string;
 }
 
+export interface MentorScoreSummary {
+  total: number;
+  phase1: number;
+  phase2: number;
+  phase3: number;
+  rank: number;
+}
+
 export interface MarketplaceUserItem extends MarketplaceProfile {
   entityType: MarketplaceRole;
   relatedCounts: MarketplaceRelatedCounts;
+  mentorScore?: MentorScoreSummary;
 }
 
 export interface MarketplaceUserDetail extends MarketplaceUserItem {

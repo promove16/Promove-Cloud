@@ -5,6 +5,7 @@ import { logError, logger } from './config/logger';
 import { scheduleBidExpiryJob } from './jobs/biddingWorker';
 import { scheduleWeeklyProgressSummaryJob } from './jobs/retentionEmailWorker';
 import { scheduleMongoExcelBackupJob } from './jobs/mongoExcelBackupWorker';
+import { scheduleMentorDecayJob } from './jobs/mentorDecayWorker';
 import { healthHandler, readinessHandler } from './middleware/health';
 import { metricsHandler } from './middleware/metrics';
 
@@ -38,6 +39,7 @@ const scheduleRecurringJobs = async () => {
   await scheduleWeeklyProgressSummaryJob();
   await scheduleMongoExcelBackupJob();
   await scheduleBidExpiryJob();
+  await scheduleMentorDecayJob();
 };
 
 const startScheduler = async () => {

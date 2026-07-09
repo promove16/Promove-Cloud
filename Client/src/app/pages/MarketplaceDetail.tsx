@@ -939,6 +939,13 @@ export function ProfileDetailView({
                   <MetricCard label="Startups" value={String(institutionProfile?.stats?.startupsLaunched ?? 0)} />
                   <MetricCard label="Collaborations" value={String(institutionProfile?.stats?.industryCollaborations ?? 0)} />
                 </>
+              ) : entity.entityType === "mentor" ? (
+                <>
+                  <MetricCard label="Mentor Score" value={entity.mentorScore ? String(entity.mentorScore.total) : "—"} />
+                  <MetricCard label="Phase 1" value={entity.mentorScore ? `${entity.mentorScore.phase1}/140` : "—"} />
+                  <MetricCard label="Phase 2" value={entity.mentorScore ? `${entity.mentorScore.phase2}/245` : "—"} />
+                  <MetricCard label="Phase 3" value={entity.mentorScore ? String(entity.mentorScore.phase3) : "—"} />
+                </>
               ) : (
                 <>
                   <MetricCard label="Skills" value={String(entity.insightCounts.skills)} />
@@ -1265,6 +1272,12 @@ export function ProfileDetailView({
             <div className="text-xs uppercase tracking-[0.28em] text-slate-500">Quick facts</div>
             <div className="mt-4 space-y-3 text-sm text-slate-300">
               <SidebarRow label="Role" value={formatRole(entity.entityType)} />
+              {entity.entityType === "mentor" && entity.mentorScore ? (
+                <SidebarRow
+                  label="Mentor Score"
+                  value={`${entity.mentorScore.total} pts${entity.mentorScore.rank > 0 ? ` · #${entity.mentorScore.rank}` : ""}`}
+                />
+              ) : null}
               <SidebarRow label="Domain" value={entity.domain ?? "Not specified"} />
               <SidebarRow label="Location" value={institutionProfile?.location ?? entity.location ?? "Not specified"} />
               <SidebarRow label={isInstitution ? "Organization Type" : "Skills"} value={isInstitution ? institutionProfile?.organizationType ?? "Not specified" : String(entity.insightCounts.skills)} />

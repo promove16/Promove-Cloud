@@ -12,6 +12,7 @@ import { Startup } from '../startup/startup.model';
 import { User } from '../user/user.model';
 import { Workspace } from '../workspace/workspace.model';
 import { MentorSession } from './mentorSession.model';
+import { MentorScore } from '../mentorScore/mentorScore.model';
 import {
   AdminCreateInstitutionMentorshipProgramInput,
   AdminProjectMentorshipItem,
@@ -1129,6 +1130,105 @@ export const assignProjectMentor = async (
   );
 };
 
+export const updateAdminMentorshipProgram = async (
+  adminId: string,
+  programId: string,
+  payload: {
+    title?: string;
+    objective?: string;
+    preferredDate?: string;
+    scheduledAt?: string;
+    durationMinutes?: number;
+    expectedParticipants?: number;
+    deliveryMode?: 'Online' | 'Offline';
+    platform?: 'Google Meet' | 'Microsoft Teams' | 'Zoom' | 'Offline';
+    meetingLink?: string;
+    venue?: string;
+    preferredExpertise?: string;
+    adminNotes?: string;
+    mentorId?: string;
+  },
+): Promise<InstitutionMentorshipProgramItem> => {
+  const admin = await User.findById(adminId).select('_id role').lean();
+  if (!admin || admin.role !== UserRole.ADMIN) {
+    throw new ApiError(403, 'FORBIDDEN', 'Only admins can update mentorship programs');
+  }
+
+  const program = await InstitutionMentorshipProgram.findById(programId);
+  if (!program) {
+    throw new ApiError(404, 'MENTORSHIP_PROGRAM_NOT_FOUND', 'Mentorship program not found');
+  }
+
+  const changingMentor = payload.mentorId && payload.mentorId !== String(program.mentorId);
+  if (changingMentor) {
+    await assertAssignableMentor(payload.mentorId!);
+  }
+
+  const newScheduledAt = payload.scheduledAt ? new Date(payload.scheduledAt) : program.scheduledAt;
+  const newMentorId = payload.mentorId ?? (program.mentorId ? String(program.mentorId) : undefined);
+  const newDurationMinutes = payload.durationMinutes ?? program.durationMinutes;
+
+  if (newMentorId && newScheduledAt && (payload.mentorId || payload.scheduledAt)) {
+    await assertMentorAvailability({
+      mentorId: newMentorId,
+      scheduledAt: newScheduledAt,
+      durationMinutes: newDurationMinutes,
+      excludeInstitutionProgramId: programId,
+    });
+  }
+
+  if (payload.title !== undefined) program.title = sanitizePlainText(payload.title);
+  if (payload.objective !== undefined) program.objective = sanitizePlainText(payload.objective);
+  if (payload.preferredDate !== undefined) program.preferredDate = new Date(payload.preferredDate);
+  if (payload.scheduledAt !== undefined) program.scheduledAt = new Date(payload.scheduledAt);
+  if (payload.durationMinutes !== undefined) program.durationMinutes = payload.durationMinutes;
+  if (payload.expectedParticipants !== undefined) program.expectedParticipants = payload.expectedParticipants;
+  if (payload.deliveryMode !== undefined) program.deliveryMode = payload.deliveryMode;
+  if (payload.platform !== undefined) program.platform = payload.platform;
+  if (payload.meetingLink !== undefined) program.meetingLink = payload.meetingLink || undefined;
+  if (payload.venue !== undefined) program.venue = payload.venue ? sanitizePlainText(payload.venue) : undefined;
+  if (payload.preferredExpertise !== undefined) program.preferredExpertise = payload.preferredExpertise ? sanitizePlainText(payload.preferredExpertise) : undefined;
+  if (payload.adminNotes !== undefined) program.adminNotes = payload.adminNotes ? sanitizePlainText(payload.adminNotes) : undefined;
+  if (payload.mentorId) program.mentorId = new Types.ObjectId(payload.mentorId);
+
+  await program.save();
+  await invalidateInstitutionMentorshipCaches(String(program.institutionId));
+
+  const [institution, requester, assignedMentor] = await Promise.all([
+    User.findById(program.institutionId).select('_id displayName institutionProfile').lean(),
+    User.findById(program.requestedBy).select('_id displayName email').lean(),
+    program.mentorId
+      ? User.findById(program.mentorId).select('_id displayName email avatar domain bio').lean()
+      : Promise.resolve(undefined),
+  ]);
+
+  return mapProgram(
+    program.toObject(),
+    institution ?? { _id: program.institutionId, displayName: 'Institution' },
+    requester ?? { _id: program.requestedBy, displayName: 'Requester', email: '' },
+    assignedMentor ?? undefined,
+  );
+};
+
+export const deleteAdminMentorshipProgram = async (
+  adminId: string,
+  programId: string,
+): Promise<void> => {
+  const admin = await User.findById(adminId).select('_id role').lean();
+  if (!admin || admin.role !== UserRole.ADMIN) {
+    throw new ApiError(403, 'FORBIDDEN', 'Only admins can delete mentorship programs');
+  }
+
+  const program = await InstitutionMentorshipProgram.findById(programId);
+  if (!program) {
+    throw new ApiError(404, 'MENTORSHIP_PROGRAM_NOT_FOUND', 'Mentorship program not found');
+  }
+
+  const institutionId = String(program.institutionId);
+  await program.deleteOne();
+  await invalidateInstitutionMentorshipCaches(institutionId);
+};
+
 export const listAdminMentors = async (): Promise<MentorshipAdminMentorItem[]> => {
   const mentors = await User.find({
     role: UserRole.MENTOR,
@@ -1140,7 +1240,7 @@ export const listAdminMentors = async (): Promise<MentorshipAdminMentorItem[]> =
     .lean();
 
   const mentorIds = mentors.map((mentor) => mentor._id);
-  const [programAssignmentCounts, projectAssignmentCounts] = await Promise.all([
+  const [programAssignmentCounts, projectAssignmentCounts, mentorScores] = await Promise.all([
     mentorIds.length > 0
       ? await InstitutionMentorshipProgram.aggregate<{ _id: Types.ObjectId; count: number }>([
           {
@@ -1175,22 +1275,42 @@ export const listAdminMentors = async (): Promise<MentorshipAdminMentorItem[]> =
           },
         ])
       : [],
+    mentorIds.length > 0
+      ? MentorScore.find({ mentorId: { $in: mentorIds } })
+          .select('mentorId totalScore phase1Score phase2Score phase3Score rank')
+          .lean()
+      : [],
   ]);
   const programCountMap = new Map(programAssignmentCounts.map((entry) => [String(entry._id), entry.count]));
   const projectCountMap = new Map(projectAssignmentCounts.map((entry) => [String(entry._id), entry.count]));
+  const scoreMap = new Map(mentorScores.map((s) => [String(s.mentorId), s]));
 
-  return mentors.map((mentor) => ({
-    _id: String(mentor._id),
-    displayName: mentor.displayName,
-    email: mentor.email,
-    ...(mentor.avatar ? { avatar: mentor.avatar } : {}),
-    ...(mentor.domain ? { domain: mentor.domain } : {}),
-    ...(mentor.bio ? { bio: mentor.bio } : {}),
-    ...(mentor.headline ? { headline: mentor.headline } : {}),
-    assignedProjects: projectCountMap.get(String(mentor._id)) ?? 0,
-    assignedPrograms: programCountMap.get(String(mentor._id)) ?? 0,
-    createdAt: toIso(mentor.createdAt),
-  }));
+  return mentors.map((mentor) => {
+    const score = scoreMap.get(String(mentor._id));
+    return {
+      _id: String(mentor._id),
+      displayName: mentor.displayName,
+      email: mentor.email,
+      ...(mentor.avatar ? { avatar: mentor.avatar } : {}),
+      ...(mentor.domain ? { domain: mentor.domain } : {}),
+      ...(mentor.bio ? { bio: mentor.bio } : {}),
+      ...(mentor.headline ? { headline: mentor.headline } : {}),
+      assignedProjects: projectCountMap.get(String(mentor._id)) ?? 0,
+      assignedPrograms: programCountMap.get(String(mentor._id)) ?? 0,
+      createdAt: toIso(mentor.createdAt),
+      ...(score
+        ? {
+            mentorScore: {
+              total: score.totalScore,
+              phase1: score.phase1Score,
+              phase2: score.phase2Score,
+              phase3: score.phase3Score,
+              rank: score.rank,
+            },
+          }
+        : {}),
+    };
+  });
 };
 
 export const createAdminMentorProfile = async (

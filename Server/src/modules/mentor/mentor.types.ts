@@ -305,6 +305,14 @@ export type InstitutionMentorshipProgramReviewInput =
       adminNotes?: string;
     };
 
+export interface MentorScoreSummary {
+  total: number;
+  phase1: number;
+  phase2: number;
+  phase3: number;
+  rank: number;
+}
+
 export interface MentorshipAdminMentorItem {
   _id: string;
   displayName: string;
@@ -316,6 +324,7 @@ export interface MentorshipAdminMentorItem {
   assignedProjects: number;
   assignedPrograms: number;
   createdAt: string;
+  mentorScore?: MentorScoreSummary;
 }
 
 export interface CreateMentorProfileInput {

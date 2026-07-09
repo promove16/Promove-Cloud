@@ -50,6 +50,8 @@ import {
   deleteStartupController,
   unlockLaunchFormController,
   reviewMentorshipProgramController,
+  updateAdminMentorshipProgramController,
+  deleteAdminMentorshipProgramController,
   resetSoleInvestorController,
   updateDealInvestorRoleController,
   updateUserAccessController,
@@ -155,6 +157,8 @@ router.post(
 router.get('/mentorship-programs', asyncHandler(getMentorshipProgramsController));
 router.post('/mentorship-programs', asyncHandler(createAdminMentorshipProgramController));
 router.patch('/mentorship-programs/:id', asyncHandler(reviewMentorshipProgramController));
+router.patch('/mentorship-programs/:id/edit', asyncHandler(updateAdminMentorshipProgramController));
+router.delete('/mentorship-programs/:id', asyncHandler(deleteAdminMentorshipProgramController));
 router.get('/patents', asyncHandler(getPatentsController));
 router.patch('/patents/:id/approve', asyncHandler(approvePatentController));
 router.patch('/patents/:id/reject', asyncHandler(rejectPatentController));

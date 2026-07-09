@@ -14,6 +14,10 @@ export interface IMentorSession {
   status: MentorSessionStatus;
   mentorNotes?: string;
   studentFeedback?: string;
+  // Session token — student releases points to mentor by ending the session
+  tokenReleased: boolean;
+  tokenReleasedAt?: Date;
+  sessionPointsAwarded: boolean;
   createdAt: Date;
 }
 
@@ -70,6 +74,18 @@ const mentorSessionSchema = new Schema<IMentorSession>(
       default: undefined,
       trim: true,
       maxlength: 4000,
+    },
+    tokenReleased: {
+      type: Boolean,
+      default: false,
+    },
+    tokenReleasedAt: {
+      type: Date,
+      default: undefined,
+    },
+    sessionPointsAwarded: {
+      type: Boolean,
+      default: false,
     },
   },
   {

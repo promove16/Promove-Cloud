@@ -44,6 +44,10 @@ import activityFeedRoutes from './modules/activityLog/activity.routes';
 import reputationRoutes from './modules/reputation/reputation.routes';
 import verificationRoutes from './modules/verification/verification.routes';
 import analyticsRoutes from './modules/analytics/analytics.routes';
+import mentorScoreRoutes from './modules/mentorScore/mentorScore.routes';
+import mentorScoreAdminRoutes from './modules/mentorScore/mentorScore.admin.routes';
+import mentorResourceRoutes from './modules/mentorScore/mentorResource.routes';
+import forumRoutes from './modules/mentorScore/forum.routes';
 import { ApiError } from './utils/ApiError';
 
 export const createApp = () => {
@@ -113,6 +117,10 @@ export const createApp = () => {
   app.use('/api/reputation', reputationRoutes);
   app.use('/api/verification', verificationRoutes);
   app.use('/api/analytics', analyticsRoutes);
+  app.use('/api/mentor-score', mentorScoreRoutes);
+  app.use('/api/admin/mentor-score', mentorScoreAdminRoutes);
+  app.use('/api/mentor-resources', mentorResourceRoutes);
+  app.use('/api/forum', forumRoutes);
   app.get('/api/health', (_req, res) => {
     res.status(200).json({ success: true, data: { status: 'ok' } });
   });

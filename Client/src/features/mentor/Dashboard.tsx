@@ -1,8 +1,9 @@
 import { useEffect, useMemo, useState } from 'react';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
-import { ArrowRight, BriefcaseBusiness, CalendarDays, GraduationCap, Sparkles, Users, Gavel } from 'lucide-react';
-import { useNavigate } from 'react-router-dom';
+import { ArrowRight, BriefcaseBusiness, CalendarDays, GraduationCap, Sparkles, Users, Gavel, Trophy } from 'lucide-react';
+import { Link, useNavigate } from 'react-router-dom';
 import { mentorApi, MentorDashboardActivity } from '../../api/mentor.api';
+import { mentorScoreApi } from '../../api/mentorScore.api';
 import { getMentorSocket } from '../../lib/socket';
 import { Badge } from '../../components/ui/Badge';
 import { Button } from '../../components/ui/Button';
@@ -43,6 +44,11 @@ export default function MentorDashboard() {
     };
   }, [queryClient]);
 
+  const scoreQuery = useQuery({
+    queryKey: ['mentor-score', 'me'],
+    queryFn: mentorScoreApi.getMyScore,
+  });
+
   const stats = useMemo(
     () => [
       { label: 'Assigned Students', value: dashboardQuery.data?.activeStudentCount ?? 0, icon: Users },
@@ -63,7 +69,7 @@ export default function MentorDashboard() {
           <h1 className="mt-2 text-3xl font-bold text-white">Welcome back, Mentor</h1>
           <p className="mt-2 text-slate-400">Admin-routed projects and institution programs appear here, alongside student activity and sessions.</p>
         </div>
-        <div className="flex flex-wrap gap-3">
+        <div className="flex shrink-0 flex-wrap gap-3">
           <Button variant="secondary" onClick={() => navigate('/dashboard/mentor/marketplace')}>
             Browse Opportunities
             <ArrowRight className="ml-2 h-4 w-4" />
@@ -74,6 +80,42 @@ export default function MentorDashboard() {
           </Button>
         </div>
       </div>
+
+      {/* Mentor Score Banner */}
+      <Link
+        to="/dashboard/mentor/score"
+        className="block rounded-2xl border border-violet-700/40 bg-gradient-to-r from-violet-950 via-slate-950 to-indigo-950 p-4 transition hover:border-violet-600/60"
+      >
+        <div className="flex items-center justify-between gap-4">
+          <div className="flex items-center gap-3">
+            <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-violet-500/15">
+              <Trophy className="h-5 w-5 text-violet-300" />
+            </div>
+            <div>
+              <div className="text-xs uppercase tracking-[0.2em] text-violet-400">Mentor Score</div>
+              <div className="mt-0.5 text-2xl font-bold text-white">
+                {scoreQuery.data?.totalScore ?? 0}
+                <span className="ml-1.5 text-sm font-normal text-slate-400">pts</span>
+              </div>
+            </div>
+          </div>
+          <div className="flex items-center gap-4 text-right">
+            {[
+              { label: 'Phase 1', value: scoreQuery.data?.phase1Score ?? 0, cap: 140 },
+              { label: 'Phase 2', value: scoreQuery.data?.phase2Score ?? 0, cap: 245 },
+              { label: 'Phase 3', value: scoreQuery.data?.phase3Score ?? 0, cap: null },
+            ].map(({ label, value, cap }) => (
+              <div key={label} className="hidden sm:block">
+                <div className="text-xs text-slate-500">{label}</div>
+                <div className="text-sm font-semibold text-violet-300">
+                  {value}{cap !== null ? <span className="text-xs text-slate-500">/{cap}</span> : null}
+                </div>
+              </div>
+            ))}
+            <ArrowRight className="h-4 w-4 flex-shrink-0 text-slate-500" />
+          </div>
+        </div>
+      </Link>
 
       <div className="grid gap-4 md:grid-cols-3 xl:grid-cols-6">
         {stats.map((stat) => (

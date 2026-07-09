@@ -94,8 +94,13 @@ const formatRelative = (iso?: string | null) => {
   return new Date(iso).toLocaleDateString('en-IN');
 };
 
-const humanizeAction = (action: string) =>
-  action.replace(/[_-]+/g, ' ').replace(/\b\w/g, (char) => char.toUpperCase());
+const humanizeAction = (action: string) => {
+  if (action === 'ACCOUNT_ONBOARDED') return 'User Onboarded';
+  return action
+    .toLowerCase()
+    .replace(/[_-]+/g, ' ')
+    .replace(/\b\w/g, (char) => char.toUpperCase());
+};
 
 function MetricTile({
   label,
@@ -660,7 +665,7 @@ export default function Dashboard() {
                     <div className="min-w-0 flex-1 pb-1">
                       <div className="truncate text-sm font-medium text-slate-200">{humanizeAction(entry.action)}</div>
                       <div className="mt-0.5 flex items-center gap-2 text-xs text-slate-500">
-                        <span className="truncate">{entry.targetModel}</span>
+                        <span className="truncate">{entry.targetName || entry.targetModel}</span>
                         <span className="text-slate-700">•</span>
                         <span className="shrink-0">{formatRelative(entry.createdAt) ?? '—'}</span>
                       </div>

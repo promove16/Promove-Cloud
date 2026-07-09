@@ -46,35 +46,6 @@
     --dashboard-overlay: rgba(2, 6, 23, 0.6);
   }
 
-  html.light {
-    color-scheme: light;
-    scrollbar-color: rgba(148, 163, 184, 0.9) transparent;
-    --background: 210 40% 98%;
-    --foreground: 222 47% 11%;
-    --muted: 210 30% 92%;
-    --muted-foreground: 215 16% 40%;
-    --card: 0 0% 100%;
-    --card-foreground: 222 47% 11%;
-    --border: 215 27% 87%;
-    --dashboard-bg: #f8fafc;
-    --dashboard-sidebar-bg: rgba(255, 255, 255, 0.95);
-    --dashboard-header-bg: rgba(255, 255, 255, 0.86);
-    --dashboard-surface: rgba(255, 255, 255, 0.88);
-    --dashboard-surface-solid: #ffffff;
-    --dashboard-surface-hover: #f1f5f9;
-    --dashboard-popover: #ffffff;
-    --dashboard-border: #e2e8f0;
-    --dashboard-border-strong: #cbd5e1;
-    --dashboard-text: #0f172a;
-    --dashboard-text-muted: #334155;
-    --dashboard-text-subtle: #64748b;
-    --dashboard-text-faint: #94a3b8;
-    --dashboard-active-bg: rgba(59, 130, 246, 0.12);
-    --dashboard-active-text: #2563eb;
-    --dashboard-active-ring: rgba(59, 130, 246, 0.35);
-    --dashboard-overlay: rgba(15, 23, 42, 0.36);
-  }
-
   * {
     @apply border-slate-800;
     scrollbar-color: rgba(71, 85, 105, 0.9) transparent;

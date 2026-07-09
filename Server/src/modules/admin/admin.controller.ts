@@ -5,6 +5,7 @@ import { UserRole } from '../../types/roles.types';
 import {
   createAdminInstitutionMentorshipProgramSchema,
   reviewInstitutionMentorshipProgramSchema,
+  updateAdminInstitutionMentorshipProgramSchema,
 } from '../mentor/mentor.validation';
 import {
   analyticsLogsQuerySchema,
@@ -63,6 +64,8 @@ import {
   rejectPatent,
   resetStartupSoleInvestor,
   reviewMentorshipProgram,
+  updateMentorshipProgram,
+  deleteMentorshipProgram,
   updateDealInvestorRole,
   updateUserAccess,
   updateUserRole,
@@ -522,4 +525,20 @@ export const reviewMentorshipProgramController = async (req: Request, res: Respo
   if (!programId || !isObjectId(programId)) throw new ApiError(400, 'INVALID_ID', 'Invalid ID format');
   const payload = reviewInstitutionMentorshipProgramSchema.parse(req.body);
   res.status(200).json(new ApiResponse(await reviewMentorshipProgram(req.user._id, programId, payload)));
+};
+
+export const updateAdminMentorshipProgramController = async (req: Request, res: Response) => {
+  if (!req.user) throw new ApiError(401, 'UNAUTHORIZED', 'Invalid or expired token');
+  const programId = getParam(req.params.id);
+  if (!programId || !isObjectId(programId)) throw new ApiError(400, 'INVALID_ID', 'Invalid ID format');
+  const payload = updateAdminInstitutionMentorshipProgramSchema.parse(req.body);
+  res.status(200).json(new ApiResponse(await updateMentorshipProgram(req.user._id, programId, payload)));
+};
+
+export const deleteAdminMentorshipProgramController = async (req: Request, res: Response) => {
+  if (!req.user) throw new ApiError(401, 'UNAUTHORIZED', 'Invalid or expired token');
+  const programId = getParam(req.params.id);
+  if (!programId || !isObjectId(programId)) throw new ApiError(400, 'INVALID_ID', 'Invalid ID format');
+  await deleteMentorshipProgram(req.user._id, programId);
+  res.status(204).end();
 };

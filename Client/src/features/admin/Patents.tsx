@@ -449,7 +449,7 @@ export default function Patents() {
       />
 
       <Card className="overflow-hidden">
-        <div className="grid grid-cols-[1.4fr,1fr,160px,120px,100px,140px] border-b border-slate-800 bg-slate-900 px-5 py-4 text-xs uppercase tracking-[0.3em] text-slate-400">
+        <div className="grid grid-cols-[1.4fr,1fr,160px,120px,100px,140px] gap-4 border-b border-slate-800 bg-slate-900 px-5 py-4 text-xs uppercase tracking-[0.3em] text-slate-400">
           <div>Student</div>
           <div>Project</div>
           <div>Submitted</div>

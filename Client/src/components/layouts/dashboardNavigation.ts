@@ -1,5 +1,7 @@
 import {
+  Award,
   BarChart3,
+  BookMarked,
   BriefcaseBusiness,
   CalendarDays,
   FileText,
@@ -9,8 +11,11 @@ import {
   Handshake,
   Home,
   MessageCircle,
+  MessageSquare,
   Rocket,
   Sparkles,
+  Trophy,
+  Upload,
   UserPlus,
   Users,
   type LucideIcon,
@@ -77,13 +82,14 @@ export const SIDEBAR_CONFIG: Record<UserRole, DashboardNavItem[]> = {
   [UserRole.MENTOR]: [
     { kind: 'link', label: 'Dashboard', icon: Home, path: '/dashboard/mentor' },
     { kind: 'link', label: 'Problem Bank', icon: Sparkles, path: '/problem-bank' },
-    // { kind: 'link', label: 'Portfolio', icon: Trophy, path: '/portfolio' },
     { kind: 'link', label: 'Opportunities', icon: Globe, path: getMarketplaceBasePath(UserRole.MENTOR) },
     { kind: 'link', label: 'Student Feed', icon: Users, path: '/dashboard/mentor/students' },
     { kind: 'link', label: 'Sessions', icon: GraduationCap, path: '/dashboard/mentor/sessions' },
+    { kind: 'link', label: 'Mentor Score', icon: Trophy, path: '/dashboard/mentor/score' },
+    { kind: 'link', label: 'Evidence Center', icon: Upload, path: '/dashboard/mentor/evidence-center' },
+    { kind: 'link', label: 'Resources', icon: BookMarked, path: '/dashboard/mentor/resources' },
+    { kind: 'link', label: 'Forum', icon: MessageSquare, path: '/dashboard/mentor/forum' },
     { kind: 'link', label: 'Messages', icon: MessageCircle, path: '/dashboard/messages' },
-    // { kind: 'link', label: 'Settings', icon: Settings, path: '/dashboard/settings' },
-    // { kind: 'action', label: 'Logout', icon: LogOut, action: 'logout' },
   ],
   [UserRole.INVESTOR]: [
     { kind: 'link', label: 'Dashboard', icon: Home, path: '/dashboard/investor' },
@@ -112,6 +118,7 @@ export const SIDEBAR_CONFIG: Record<UserRole, DashboardNavItem[]> = {
     { kind: 'link', label: 'Startups', icon: Rocket, path: '/dashboard/admin/startups' },
     { kind: 'link', label: 'Deals', icon: BriefcaseBusiness, path: '/dashboard/admin/deals' },
     { kind: 'link', label: 'Mentorship', icon: GraduationCap, path: '/dashboard/admin/mentorship' },
+    { kind: 'link', label: 'Mentor Scores', icon: Award, path: '/dashboard/admin/mentor-scores' },
     { kind: 'link', label: 'Analytics', icon: BarChart3, path: '/dashboard/admin/analytics' },
   ],
 };
@@ -149,8 +156,15 @@ export const DASHBOARD_ROUTE_LABELS: Partial<Record<UserRole, DashboardRouteLabe
   ],
   [UserRole.ADMIN]: [
     { path: '/dashboard/admin/analytics/platform', label: 'Platform Analytics' },
+    { path: '/dashboard/admin/mentor-scores', label: 'Mentor Scores' },
   ],
-  [UserRole.MENTOR]: [{ path: '/product-workspace', label: 'Product Workspace' }],
+  [UserRole.MENTOR]: [
+    { path: '/product-workspace', label: 'Product Workspace' },
+    { path: '/dashboard/mentor/score', label: 'Mentor Score' },
+    { path: '/dashboard/mentor/evidence-center', label: 'Evidence Center' },
+    { path: '/dashboard/mentor/resources', label: 'Resource Library' },
+    { path: '/dashboard/mentor/forum', label: 'Forum' },
+  ],
   [UserRole.INVESTOR]: [
     { path: '/product-workspace', label: 'Product Workspace' },
     { path: '/dashboard/investor/pipeline', label: 'Pipeline' },

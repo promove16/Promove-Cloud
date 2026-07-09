@@ -2,7 +2,6 @@ export type NotificationChannel = 'email' | 'inApp';
 export type NotificationCategory = 'messages' | 'deals' | 'sessions' | 'patents' | 'platform';
 export type ProfileVisibility = 'public' | 'private' | 'connections';
 export type DmPermission = 'all' | 'connections' | 'none';
-export type AppTheme = 'dark' | 'light' | 'system';
 export type InnovationVisibility = 'public' | 'private';
 export type SessionType = 'video' | 'text' | 'in-person';
 
@@ -33,7 +32,6 @@ export interface UserSettings {
     showOnlineStatus: boolean;
   };
   appearance: {
-    theme: AppTheme;
     compactMode: boolean;
     showAnimations: boolean;
   };

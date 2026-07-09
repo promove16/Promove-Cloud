@@ -11,6 +11,7 @@ import { ApiError } from '../../utils/ApiError';
 import { readRedisJson } from '../../utils/redisJson';
 import { sanitizePlainText } from '../../utils/sanitizeText';
 import { applyScore, type ScoreTrigger } from '../../services/scoreEngine';
+import { onPrototypeMilestoneVerified } from '../mentorScore/mentorScore.hooks';
 import { NotificationService } from '../notification/notification.service';
 import { Patent } from '../patent/patent.model';
 import { Startup } from '../startup/startup.model';
@@ -73,12 +74,15 @@ import {
   AdminUserActivitySearchResponse,
   AdminUsersResponse,
   AdminAnalyticsLogsResponse,
+  AdminUpdateMentorshipProgramPayload,
 } from './admin.types';
 import {
   createAdminInstitutionMentorshipProgram,
+  deleteAdminMentorshipProgram,
   listAdminMentorshipPrograms,
   listAdminMentors,
   reviewInstitutionMentorshipProgram,
+  updateAdminMentorshipProgram,
 } from '../mentor/mentorshipProgram.service';
 
 type AuditAction =
@@ -104,6 +108,8 @@ type AuditAction =
   | 'PROJECT_MENTOR_ASSIGNED'
   | 'PROJECT_MENTOR_UNASSIGNED'
   | 'MENTORSHIP_PROGRAM_CREATED'
+  | 'MENTORSHIP_PROGRAM_UPDATED'
+  | 'MENTORSHIP_PROGRAM_DELETED'
   | 'MENTORSHIP_REQUEST_ASSIGNED'
   | 'MENTORSHIP_REQUEST_REJECTED'
   | 'PATENT_REQUEST_STATUS_UPDATED'
@@ -1441,6 +1447,12 @@ export const verifyMilestone = async (adminId: string, milestoneId: string, mile
   );
 
   await createAudit(adminId, 'MILESTONE_VERIFIED', String(workspace._id), 'Workspace', { milestoneId, milestoneType });
+
+  // Award prototype velocity points to all mentors who worked with this student
+  if (milestoneType === 'PROTOTYPE') {
+    void onPrototypeMilestoneVerified(String(workspace.ownerId), String(workspace._id));
+  }
+
   return newScore;
 };
 
@@ -2144,15 +2156,60 @@ export const getAnalytics = async (): Promise<AdminAnalyticsData> => {
       '151-200': users.filter((user) => user.innovationScore > 150).length,
     },
     topInnovators: topInnovators.map((user) => userListItem(user)),
-    recentAdminActions: auditLogs.map((entry) => ({
-      _id: String(entry._id),
-      adminId: String(entry.adminId),
-      action: entry.action,
-      targetId: String(entry.targetId),
-      targetModel: entry.targetModel,
-      ...(entry.metadata ? { metadata: entry.metadata } : {}),
-      createdAt: toIso(entry.createdAt),
-    })),
+    recentAdminActions: await Promise.all(
+      auditLogs.map(async (entry) => {
+        let targetName = '';
+        const targetIdStr = String(entry.targetId);
+
+        try {
+          if (entry.targetModel === 'User') {
+            const found = users.find((u) => String(u._id) === targetIdStr);
+            if (found) {
+              targetName = found.displayName || found.email || 'User';
+            }
+          } else if (entry.targetModel === 'Patent') {
+            const found = patents.find((p) => String(p._id) === targetIdStr);
+            if (found) {
+              targetName = found.projectTitle || 'Patent';
+            }
+          } else if (entry.targetModel === 'Deal') {
+            const found = deals.find((d) => String(d._id) === targetIdStr);
+            if (found) {
+              const startup = await Startup.findById(found.startupId).lean();
+              targetName = startup ? `${startup.name} Deal` : 'Deal';
+            }
+          } else if (entry.targetModel === 'Startup') {
+            const found = await Startup.findById(entry.targetId).lean();
+            if (found) {
+              targetName = found.name || 'Startup';
+            }
+          } else if (entry.targetModel === 'Workspace') {
+            const found = await Workspace.findById(entry.targetId).lean();
+            if (found) {
+              targetName = found.title || 'Workspace';
+            }
+          } else if (entry.targetModel === 'Award') {
+            const found = await AdminAward.findById(entry.targetId).lean();
+            if (found) {
+              targetName = found.title || 'Award';
+            }
+          }
+        } catch (err) {
+          // Ignore lookup errors
+        }
+
+        return {
+          _id: String(entry._id),
+          adminId: String(entry.adminId),
+          action: entry.action,
+          targetId: String(entry.targetId),
+          targetModel: entry.targetModel,
+          targetName: targetName || entry.targetModel,
+          ...(entry.metadata ? { metadata: entry.metadata } : {}),
+          createdAt: toIso(entry.createdAt),
+        };
+      }),
+    ),
     patentsPending: patents.filter((patent) => patent.status === 'submitted' || patent.status === 'under_review').length,
     awardsPending,
     investmentTypeBreakdown,
@@ -2568,4 +2625,22 @@ export const reviewMentorshipProgram = async (
     },
   );
   return updated;
+};
+
+export const updateMentorshipProgram = async (
+  adminId: string,
+  programId: string,
+  payload: AdminUpdateMentorshipProgramPayload,
+) => {
+  const updated = await updateAdminMentorshipProgram(adminId, programId, payload);
+  await createAudit(adminId, 'MENTORSHIP_PROGRAM_UPDATED', programId, 'InstitutionMentorshipProgram', {
+    institutionId: updated.institution._id,
+    ...(updated.mentor ? { mentorId: updated.mentor._id } : {}),
+  });
+  return updated;
+};
+
+export const deleteMentorshipProgram = async (adminId: string, programId: string) => {
+  await deleteAdminMentorshipProgram(adminId, programId);
+  await createAudit(adminId, 'MENTORSHIP_PROGRAM_DELETED', programId, 'InstitutionMentorshipProgram', {});
 };

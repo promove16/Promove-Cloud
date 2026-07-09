@@ -10,7 +10,7 @@ import type {
 import { cn } from "./utils";
 
 // Format: { THEME_NAME: CSS_SELECTOR }
-const THEMES = { light: "", dark: ".dark" } as const;
+const THEMES = { dark: ".dark" } as const;
 
 export type ChartConfig = {
   [k in string]: {

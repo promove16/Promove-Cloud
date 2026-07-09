@@ -2,6 +2,7 @@ import { Types } from 'mongoose';
 import { ALLOWED_CONNECTIONS } from '../../middleware/connectionGuard';
 import { ApiError } from '../../utils/ApiError';
 import { User } from '../user/user.model';
+import { MentorScore } from '../mentorScore/mentorScore.model';
 import { UserRole } from '../../types/roles.types';
 import { JobPost, type IJobApplicationRecord, type IJobPost } from '../recruiter/jobPost.model';
 import { mapJob } from '../recruiter/recruiter.mappers';
@@ -796,14 +797,24 @@ const buildStartupView = async (
   };
 };
 
+type MentorScoreSummary = {
+  total: number;
+  phase1: number;
+  phase2: number;
+  phase3: number;
+  rank: number;
+};
+
 const attachUserCardMetadata = (
   user: PublicUser,
   relatedCounts: MarketplaceUserRelatedCounts,
   options?: PublicUserMapOptions,
+  mentorScore?: MentorScoreSummary,
 ) => ({
   entityType: user.role as Extract<MarketplaceEntityType, UserRole>,
   ...mapPublicUser(user, options),
   relatedCounts,
+  ...(mentorScore ? { mentorScore } : {}),
 });
 
 const applyMarketplaceUserVisibility = (
@@ -860,10 +871,7 @@ export const listMarketplaceUsers = async (
     .lean();
 
   const userIds = users.map((user) => user._id);
-  const [jobCounts, startupCounts]: [
-    Array<{ _id: Types.ObjectId; total: number }>,
-    Array<{ _id: Types.ObjectId; total: number }>,
-  ] = await Promise.all([
+  const [jobCounts, startupCounts, mentorScores] = await Promise.all([
     role === UserRole.RECRUITER
       ? JobPost.aggregate<{ _id: Types.ObjectId; total: number }>([
           { $match: { recruiterId: { $in: userIds }, isActive: true } },
@@ -881,17 +889,34 @@ export const listMarketplaceUsers = async (
       { $match: { founderIds: { $in: userIds } } },
       { $group: { _id: '$founderIds', total: { $sum: 1 } } },
     ]),
+    role === UserRole.MENTOR
+      ? MentorScore.find({ mentorId: { $in: userIds } })
+          .select('mentorId totalScore phase1Score phase2Score phase3Score rank')
+          .lean()
+      : Promise.resolve([]),
   ]);
 
   const jobCountMap = new Map(jobCounts.map((entry) => [String(entry._id), entry.total]));
   const startupCountMap = new Map(startupCounts.map((entry) => [String(entry._id), entry.total]));
-
-  return users.map((user) =>
-    attachUserCardMetadata(user as PublicUser, {
-      jobs: jobCountMap.get(String(user._id)) ?? 0,
-      startups: startupCountMap.get(String(user._id)) ?? 0,
-    }, MARKETPLACE_CARD_LIMITS),
+  const scoreMap = new Map(
+    (mentorScores as Array<{ mentorId: Types.ObjectId; totalScore: number; phase1Score: number; phase2Score: number; phase3Score: number; rank: number }>)
+      .map((s) => [String(s.mentorId), s]),
   );
+
+  return users.map((user) => {
+    const score = scoreMap.get(String(user._id));
+    return attachUserCardMetadata(
+      user as PublicUser,
+      {
+        jobs: jobCountMap.get(String(user._id)) ?? 0,
+        startups: startupCountMap.get(String(user._id)) ?? 0,
+      },
+      MARKETPLACE_CARD_LIMITS,
+      score
+        ? { total: score.totalScore, phase1: score.phase1Score, phase2: score.phase2Score, phase3: score.phase3Score, rank: score.rank }
+        : undefined,
+    );
+  });
 };
 
 const listMarketplaceStartups = async (requesterRole: UserRole, search?: string, page = 1, limit = 20) => {
@@ -1023,11 +1048,27 @@ const getMarketplaceUserDetail = async (
   const workspaceMap = new Map(workspaces.map((workspace) => [String(workspace._id), workspace]));
   const viewerStudentId = requesterRole === UserRole.STUDENT ? requesterId : undefined;
 
+  const mentorScoreDoc = user.role === UserRole.MENTOR
+    ? await MentorScore.findOne({ mentorId: userId })
+        .select('totalScore phase1Score phase2Score phase3Score rank mentorshipRating')
+        .lean()
+    : null;
+
+  const mentorScore: MentorScoreSummary | undefined = mentorScoreDoc
+    ? {
+        total: mentorScoreDoc.totalScore,
+        phase1: mentorScoreDoc.phase1Score,
+        phase2: mentorScoreDoc.phase2Score,
+        phase3: mentorScoreDoc.phase3Score,
+        rank: mentorScoreDoc.rank,
+      }
+    : undefined;
+
   return {
     ...attachUserCardMetadata(user as PublicUser, {
       jobs: jobs.length,
       startups: startups.length,
-    }, MARKETPLACE_DETAIL_LIMITS),
+    }, MARKETPLACE_DETAIL_LIMITS, mentorScore),
     relatedJobs: jobs.map((job) => {
       const hasApplied = getStudentHasAppliedToJob(job, viewerStudentId);
       return mapJob(job, typeof hasApplied === 'boolean' ? { hasApplied } : undefined);
