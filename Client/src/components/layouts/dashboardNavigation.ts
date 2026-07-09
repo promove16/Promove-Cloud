@@ -44,6 +44,13 @@ export interface DashboardNavHeaderItem {
   label: string;
 }
 
+export interface DashboardNavActionItem {
+  kind: 'action';
+  label: string;
+  icon: LucideIcon;
+  action: 'logout';
+}
+
 export type DashboardNavItem =
   | DashboardNavLinkItem
   | DashboardNavGroupItem
