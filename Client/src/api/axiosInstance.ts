@@ -66,7 +66,7 @@ const axiosInstance = axios.create({
 
 let refreshPromise: Promise<AuthPayload | null> | null = null;
 let refreshBlocked = false;
-const SUPPORT_EMAIL = import.meta.env.VITE_SUPPORT_EMAIL ?? "charan.f.sde@gmail.com";
+const SUPPORT_EMAIL = import.meta.env.VITE_SUPPORT_EMAIL ?? "tech@promovecyc.com";
 const SERVICE_TOAST_DEBOUNCE_MS = 30_000;
 const serviceToastLastShownAt = new Map<string, number>();
 

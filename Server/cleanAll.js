@@ -5,7 +5,7 @@ async function clean() {
   await mongoose.connect(process.env.MONGODB_URI);
   console.log('Connected');
   
-  const email = 'charan.f.sde@gmail.com';
+  const email = 'tech@promovecyc.com';
   
   // Clean Users
   const userRes = await mongoose.connection.collection('users').deleteMany({ email });

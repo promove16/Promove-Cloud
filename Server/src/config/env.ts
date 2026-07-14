@@ -63,7 +63,7 @@ const envSchema = z.object({
   RATE_LIMIT_ENABLED: booleanFromEnv.default(true),
   CLIENT_URL: z.string().min(1),
   ALLOWED_ORIGINS: commaSeparatedListFromEnv.default([]),
-  SUPPORT_EMAIL: z.string().email().default("charan.f.sde@gmail.com"),
+  SUPPORT_EMAIL: z.string().email().default("tech@promovecyc.com"),
   DNS_RESOLVERS: z.string().min(1).optional(),
   GITHUB_CLIENT_ID: z.string().min(1).optional(),
   GITHUB_CLIENT_SECRET: z.string().min(1).optional(),

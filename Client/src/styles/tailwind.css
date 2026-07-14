@@ -136,9 +136,20 @@
     color: var(--dashboard-text);
   }
 
-  .dashboard-theme-menu-item:focus {
-    background-color: var(--dashboard-surface-hover);
-    color: var(--dashboard-text);
+  .dashboard-theme-menu-item:focus,
+  .dashboard-theme-menu-item[data-highlighted] {
+    background-color: hsla(280, 90%, 65%, 0.15) !important;
+    color: var(--dashboard-text) !important;
+  }
+
+  .dashboard-theme-menu-item:focus .dashboard-theme-subtle,
+  .dashboard-theme-menu-item[data-highlighted] .dashboard-theme-subtle {
+    color: var(--dashboard-text-muted) !important;
+  }
+
+  .dashboard-theme-menu-item:focus .dashboard-theme-faint,
+  .dashboard-theme-menu-item[data-highlighted] .dashboard-theme-faint {
+    color: var(--dashboard-text-subtle) !important;
   }
 
   .dashboard-theme-nav-active {
