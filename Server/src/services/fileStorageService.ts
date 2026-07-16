@@ -22,7 +22,6 @@ const MALICIOUS_PATTERNS = [
   /\bcmd\.exe\b/i,
   /\bwscript\.exe\b/i,
   /RAR!\x1a/i,
-  /PK\x03\x04/i,
 ];
 
 export type StoredFileProvider = 's3' | 'cloudinary';
@@ -33,6 +32,8 @@ export interface UploadedFileResult {
   key: string;
   provider: StoredFileProvider;
 }
+
+export type ContentDispositionType = 'inline' | 'attachment';
 
 const hasS3Config = Boolean(
   env.AWS_REGION &&
@@ -97,6 +98,13 @@ const DANGEROUS_EXTENSIONS = [
   '.rar', '.7z', '.ace', '.arc',
 ];
 
+const OFFICE_OPEN_XML_EXTENSIONS = new Set(['.docx', '.pptx', '.xlsx']);
+
+const isZipHeader = (header: string) =>
+  header.startsWith('504b0304') || header.startsWith('504b0506') || header.startsWith('504b0708');
+
+const isOfficeOpenXmlFile = (ext: string) => OFFICE_OPEN_XML_EXTENSIONS.has(ext);
+
 export const validateFileContent = (buffer: Buffer, originalName: string): boolean => {
   const ext = path.extname(originalName).toLowerCase();
   if (DANGEROUS_EXTENSIONS.includes(ext)) {
@@ -106,7 +114,11 @@ export const validateFileContent = (buffer: Buffer, originalName: string): boole
   const headerCheck = buffer.slice(0, 8);
   const header = headerCheck.toString('hex');
   
-  if (header.startsWith('4d5a') || header.startsWith('504b0304') || header.startsWith('504b0506') || header.startsWith('527878')) {
+  if (
+    header.startsWith('4d5a') ||
+    header.startsWith('527878') ||
+    (isZipHeader(header) && !isOfficeOpenXmlFile(ext))
+  ) {
     return false;
   }
   
@@ -122,7 +134,14 @@ export const validateFileContent = (buffer: Buffer, originalName: string): boole
   return true;
 };
 
-export const generatePresignedUrl = async (storageKey: string, expiresInSeconds = 3600): Promise<string> => {
+export const generatePresignedUrl = async (
+  storageKey: string,
+  expiresInSeconds = 3600,
+  responseHeaders?: {
+    contentDisposition?: string;
+    contentType?: string;
+  },
+): Promise<string> => {
   if (!hasS3Config || !s3) {
     throw new Error('S3 not configured');
   }
@@ -130,6 +149,10 @@ export const generatePresignedUrl = async (storageKey: string, expiresInSeconds 
   const command = new GetObjectCommand({
     Bucket: env.AWS_S3_BUCKET_NAME,
     Key: storageKey,
+    ...(responseHeaders?.contentDisposition
+      ? { ResponseContentDisposition: responseHeaders.contentDisposition }
+      : {}),
+    ...(responseHeaders?.contentType ? { ResponseContentType: responseHeaders.contentType } : {}),
   });
 
   return getSignedUrl(s3, command, { expiresIn: expiresInSeconds });
@@ -190,12 +213,29 @@ const encodeObjectKey = (key: string) =>
     .map((segment) => encodeURIComponent(segment))
     .join('/');
 
-const buildInlineContentDisposition = (fileName: string) => {
+export const buildContentDisposition = (
+  fileName: string,
+  disposition: ContentDispositionType = 'inline',
+) => {
   const fallbackName = sanitizeFileName(fileName).replace(/"/g, '');
   const encodedName = encodeURIComponent(fileName);
 
-  return `inline; filename="${fallbackName}"; filename*=UTF-8''${encodedName}`;
+  return `${disposition}; filename="${fallbackName}"; filename*=UTF-8''${encodedName}`;
 };
+
+const PREVIEWABLE_CONTENT_TYPES = [
+  'application/pdf',
+  'image/',
+  'video/',
+  'audio/',
+] as const;
+
+const getDispositionForContentType = (contentType: string): ContentDispositionType =>
+  PREVIEWABLE_CONTENT_TYPES.some((prefix) =>
+    prefix.endsWith('/') ? contentType.startsWith(prefix) : contentType === prefix,
+  )
+    ? 'inline'
+    : 'attachment';
 
 export const uploadFile = async (input: {
   buffer: Buffer;
@@ -244,7 +284,10 @@ export const uploadFile = async (input: {
       Key: key,
       Body: input.buffer,
       ContentType: input.contentType,
-      ContentDisposition: buildInlineContentDisposition(input.fileName),
+      ContentDisposition: buildContentDisposition(
+        input.fileName,
+        getDispositionForContentType(input.contentType),
+      ),
       CacheControl: 'public, max-age=31536000, immutable',
       Metadata: {
         originalname: input.fileName.slice(0, 200),
@@ -277,7 +320,10 @@ export const uploadFileToS3 = async (input: {
       Key: key,
       Body: input.buffer,
       ContentType: input.contentType,
-      ContentDisposition: buildInlineContentDisposition(input.fileName),
+      ContentDisposition: buildContentDisposition(
+        input.fileName,
+        getDispositionForContentType(input.contentType),
+      ),
       CacheControl: 'public, max-age=31536000, immutable',
       Metadata: {
         originalname: input.fileName.slice(0, 200),

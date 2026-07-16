@@ -56,6 +56,8 @@ export interface PatentSupportingDocument {
   fileSizeBytes: number;
   note?: string;
   documentCategory?: PatentDocumentCategory;
+  storageProvider?: 'cloudinary' | 's3';
+  storageKey?: string;
 }
 
 export type PatentStage = 'filed' | 'published' | 'granted';

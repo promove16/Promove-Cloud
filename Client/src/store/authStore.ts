@@ -70,7 +70,7 @@ export const useAuthStore = create<AuthState>()(
     }),
     {
       name: "promove-auth-user",
-      storage: createJSONStorage(() => sessionStorage),
+      storage: createJSONStorage(() => localStorage),
       partialize: (state) => ({
         user: state.user,
         isAuthenticated: state.isAuthenticated,

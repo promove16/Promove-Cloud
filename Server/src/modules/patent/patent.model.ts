@@ -51,6 +51,8 @@ const supportingDocumentSchema = new Schema<IPatent['supportingDocuments'][numbe
       enum: ['inventor_journal', 'prior_art_search', 'specification_draft', 'abstract_draft', 'claims_draft', 'drawings_diagrams', 'design_plan_sketch', 'examination_request', 'form3_foreign_filing', 'cost_management'],
       default: undefined,
     },
+    storageProvider: { type: String, enum: ['cloudinary', 's3'], default: undefined },
+    storageKey: { type: String, default: undefined },
   },
   { _id: false },
 );

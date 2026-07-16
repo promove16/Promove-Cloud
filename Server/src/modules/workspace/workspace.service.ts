@@ -3,6 +3,7 @@ import { z } from 'zod';
 import { redis } from '../../config/redis';
 import { sendTeamInviteEmail } from '../../services/emailService';
 import {
+  buildContentDisposition,
   deleteStoredAsset,
   generatePresignedUrl,
   uploadFile,
@@ -225,7 +226,14 @@ export const serializeWorkspace = async (workspace: WorkspaceSnapshot) => {
         }
       } else if (upload.storageProvider === 's3' && upload.storageKey) {
         try {
-          signedUrl = await generatePresignedUrl(upload.storageKey);
+          const shouldPreviewInline = ['pdf', 'image', 'video', 'audio'].includes(upload.fileType);
+          signedUrl = await generatePresignedUrl(upload.storageKey, 3600, {
+            contentDisposition: buildContentDisposition(
+              upload.fileName ?? 'file',
+              shouldPreviewInline ? 'inline' : 'attachment',
+            ),
+            ...(upload.mimeType ? { contentType: upload.mimeType } : {}),
+          });
         } catch (error) {
           console.error('Error generating S3 signed URL for workspace upload:', error);
         }

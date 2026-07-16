@@ -1,5 +1,7 @@
 import { z } from 'zod';
 import { notificationQueue } from '../../config/bullmq';
+import { buildContentDisposition, extractS3KeyFromUrl, generatePresignedUrl } from '../../services/fileStorageService';
+import { generateSignedCloudinaryUrl } from '../../services/cloudinaryService';
 import { ApiError } from '../../utils/ApiError';
 import { User } from '../user/user.model';
 import { UserRole } from '../../types/roles.types';
@@ -8,6 +10,7 @@ import { Startup } from '../startup/startup.model';
 import { recordStartupLifecycleEvent } from '../startupLifecycle/startupLifecycle.service';
 import { Patent } from './patent.model';
 import { PatentRequest } from './patentRequest.model';
+import type { IPatent, PatentSupportingDocument } from './patent.types';
 
 const filingDocumentsSchema = z
   .object({
@@ -106,6 +109,51 @@ export const patentSubmissionSchema = z.object({
   grantDate: z.string().datetime().optional(),
 });
 
+type PatentDocumentWithStorage = Pick<
+  PatentSupportingDocument,
+  'fileUrl' | 'fileType' | 'fileName' | 'storageProvider' | 'storageKey'
+>;
+
+export const getSignedPatentDocumentUrl = async (document: PatentDocumentWithStorage) => {
+  if (document.storageProvider === 'cloudinary' && document.storageKey) {
+    try {
+      return generateSignedCloudinaryUrl(document.storageKey, document.fileType === 'image' ? 'image' : 'raw');
+    } catch (error) {
+      console.error('Error generating Cloudinary signed URL for patent document:', error);
+      return document.fileUrl;
+    }
+  }
+
+  const s3Key = document.storageProvider === 's3' && document.storageKey
+    ? document.storageKey
+    : extractS3KeyFromUrl(document.fileUrl);
+
+  if (s3Key) {
+    try {
+      return await generatePresignedUrl(s3Key, 3600, {
+        contentDisposition: buildContentDisposition(
+          document.fileName ?? 'patent-document',
+          document.fileType === 'image' || document.fileType === 'pdf' ? 'inline' : 'attachment',
+        ),
+      });
+    } catch (error) {
+      console.error('Error generating S3 signed URL for patent document:', error);
+    }
+  }
+
+  return document.fileUrl;
+};
+
+const serializePatentForClient = async (patent: IPatent) => ({
+  ...patent,
+  supportingDocuments: await Promise.all(
+    (patent.supportingDocuments ?? []).map(async (document) => ({
+      ...document,
+      fileUrl: await getSignedPatentDocumentUrl(document),
+    })),
+  ),
+});
+
 export const resolveStartupForPatentSubmission = async (userId: string, workspaceId: string) => {
   const linkedStartup = await Startup.findOne({
     projectId: workspaceId,
@@ -171,6 +219,8 @@ export const submitPatent = async (userId: string, payload: z.infer<typeof paten
       fileSizeBytes: upload.fileSizeBytes,
       documentCategory: item.category,
       ...(upload.note ? { note: upload.note } : {}),
+      ...(upload.storageProvider ? { storageProvider: upload.storageProvider } : {}),
+      ...(upload.storageKey ? { storageKey: upload.storageKey } : {}),
     };
   });
 
@@ -250,11 +300,14 @@ export const submitPatent = async (userId: string, payload: z.infer<typeof paten
     ),
   );
 
-  return patent.toObject();
+  return serializePatentForClient(patent.toObject());
 };
 
 export const getMyPatents = async (userId: string) =>
-  Patent.find({ $or: [{ studentId: userId }, { coInventorIds: userId }] }).sort({ createdAt: -1 }).lean();
+  Promise.all(
+    (await Patent.find({ $or: [{ studentId: userId }, { coInventorIds: userId }] }).sort({ createdAt: -1 }).lean())
+      .map((patent) => serializePatentForClient(patent)),
+  );
 
 export const togglePatentShowcase = async (userId: string, patentId: string) => {
   const patent = await Patent.findOne({ _id: patentId, studentId: userId });
