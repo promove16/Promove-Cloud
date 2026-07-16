@@ -7,6 +7,7 @@ import { Workspace } from '../workspace/workspace.model';
 import { Startup } from '../startup/startup.model';
 import { recordStartupLifecycleEvent } from '../startupLifecycle/startupLifecycle.service';
 import { Patent } from './patent.model';
+import { PatentRequest } from './patentRequest.model';
 
 const filingDocumentsSchema = z
   .object({
@@ -105,6 +106,37 @@ export const patentSubmissionSchema = z.object({
   grantDate: z.string().datetime().optional(),
 });
 
+export const resolveStartupForPatentSubmission = async (userId: string, workspaceId: string) => {
+  const linkedStartup = await Startup.findOne({
+    projectId: workspaceId,
+    isActive: true,
+    $or: [{ founderIds: userId }, { teamMemberIds: userId }],
+  });
+
+  if (!linkedStartup) {
+    throw new ApiError(
+      400,
+      'STARTUP_REQUIRED_FOR_PATENT',
+      'Register a startup for this workspace before applying for a patent.',
+    );
+  }
+
+  const [existingPatent, existingPatentRequest] = await Promise.all([
+    Patent.exists({ workspaceId }),
+    PatentRequest.exists({ workspaceId }),
+  ]);
+
+  if (existingPatent || existingPatentRequest || linkedStartup.traction?.patentApplicationId) {
+    throw new ApiError(
+      409,
+      'STARTUP_PATENT_ALREADY_EXISTS',
+      'A patent workflow already exists for this startup. Each startup can only have one patent.',
+    );
+  }
+
+  return linkedStartup;
+};
+
 export const submitPatent = async (userId: string, payload: z.infer<typeof patentSubmissionSchema>) => {
   const workspace = await Workspace.findOne({
     _id: payload.workspaceId,
@@ -122,6 +154,8 @@ export const submitPatent = async (userId: string, payload: z.infer<typeof paten
       'Patent support is only available for your own product workspace. ProMove problem-bank workspaces are leaderboard-only.',
     );
   }
+
+  const linkedStartup = await resolveStartupForPatentSubmission(userId, payload.workspaceId);
 
   const supportingDocuments = payload.documentUploads.map((item) => {
     const upload = workspace.uploads.find((u) => String(u._id) === item.uploadId);
@@ -167,20 +201,17 @@ export const submitPatent = async (userId: string, payload: z.infer<typeof paten
     ...(payload.grantDate ? { grantDate: new Date(payload.grantDate) } : {}),
   });
 
-  const linkedStartup = await Startup.findOne({ projectId: payload.workspaceId, isActive: true });
-  if (linkedStartup) {
-    linkedStartup.traction = {
-      ...(linkedStartup.traction ?? {}),
-      patentFiled: true,
-      patentType: 'self_filed',
-      patentApplicationId: String(patent._id),
-    };
-    if (linkedStartup.innovationProfile?.tractionProfile) {
-      linkedStartup.innovationProfile.tractionProfile.patentStatus =
-        payload.patentStage === 'published' || payload.patentStage === 'granted' ? 'published' : 'filed';
-    }
-    await linkedStartup.save();
+  linkedStartup.traction = {
+    ...(linkedStartup.traction ?? {}),
+    patentFiled: true,
+    patentType: 'self_filed',
+    patentApplicationId: String(patent._id),
+  };
+  if (linkedStartup.innovationProfile?.tractionProfile) {
+    linkedStartup.innovationProfile.tractionProfile.patentStatus =
+      payload.patentStage === 'published' || payload.patentStage === 'granted' ? 'published' : 'filed';
   }
+  await linkedStartup.save();
 
   await recordStartupLifecycleEvent({
     startupId: linkedStartup?._id,

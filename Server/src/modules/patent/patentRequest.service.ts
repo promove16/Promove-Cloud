@@ -6,10 +6,10 @@ import { ApiError } from '../../utils/ApiError';
 import { User } from '../user/user.model';
 import { UserRole } from '../../types/roles.types';
 import { Workspace } from '../workspace/workspace.model';
-import { Startup } from '../startup/startup.model';
 import { recordStartupLifecycleEvent } from '../startupLifecycle/startupLifecycle.service';
 import { PatentRequest } from './patentRequest.model';
 import { LEGACY_STATUS_MAP, type PatentRequestStatus } from './patent.types';
+import { resolveStartupForPatentSubmission } from './patent.service';
 
 // ─── Zod schemas ──────────────────────────────────────────────────────────────
 
@@ -178,6 +178,8 @@ export const submitPatentRequest = async (userId: string, payload: z.infer<typeo
     );
   }
 
+  const linkedStartup = await resolveStartupForPatentSubmission(userId, payload.workspaceId);
+
   const documents = payload.documentUploads.map((item) => {
     const upload = workspace.uploads.find((u) => String(u._id) === item.uploadId);
     if (!upload) {
@@ -231,16 +233,13 @@ export const submitPatentRequest = async (userId: string, payload: z.infer<typeo
       : {}),
   });
 
-  const linkedStartup = await Startup.findOne({ projectId: payload.workspaceId, isActive: true });
-  if (linkedStartup) {
-    linkedStartup.traction = {
-      ...(linkedStartup.traction ?? {}),
-      patentFiled: true,
-      patentType: 'promove_assisted',
-      patentApplicationId: String(patentRequest._id),
-    };
-    await linkedStartup.save();
-  }
+  linkedStartup.traction = {
+    ...(linkedStartup.traction ?? {}),
+    patentFiled: true,
+    patentType: 'promove_assisted',
+    patentApplicationId: String(patentRequest._id),
+  };
+  await linkedStartup.save();
 
   await recordStartupLifecycleEvent({
     startupId: linkedStartup?._id,
@@ -513,6 +512,8 @@ export const createPatentSupportRequest = async (
     );
   }
 
+  const linkedStartup = await resolveStartupForPatentSubmission(userId, payload.workspaceId);
+
   const documents = (payload.documentUploads ?? []).map((item) => {
     const upload = workspace.uploads.find((entry) => String(entry._id) === item.uploadId);
     if (!upload) {
@@ -572,16 +573,13 @@ export const createPatentSupportRequest = async (
     documents,
   });
 
-  const linkedStartup = await Startup.findOne({ projectId: payload.workspaceId, isActive: true });
-  if (linkedStartup) {
-    linkedStartup.traction = {
-      ...(linkedStartup.traction ?? {}),
-      patentFiled: true,
-      patentType: 'promove_assisted',
-      patentApplicationId: String(patentRequest._id),
-    };
-    await linkedStartup.save();
-  }
+  linkedStartup.traction = {
+    ...(linkedStartup.traction ?? {}),
+    patentFiled: true,
+    patentType: 'promove_assisted',
+    patentApplicationId: String(patentRequest._id),
+  };
+  await linkedStartup.save();
 
   await recordStartupLifecycleEvent({
     startupId: linkedStartup?._id,
