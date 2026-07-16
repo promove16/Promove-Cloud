@@ -11,6 +11,7 @@ import { ApiError } from '../../utils/ApiError';
 import { readRedisJson } from '../../utils/redisJson';
 import { sanitizePlainText } from '../../utils/sanitizeText';
 import { applyScore, type ScoreTrigger } from '../../services/scoreEngine';
+import { createPatentSystemDocument } from '../../services/patentSystemDocument';
 import { onPrototypeMilestoneVerified } from '../mentorScore/mentorScore.hooks';
 import { NotificationService } from '../notification/notification.service';
 import { Patent } from '../patent/patent.model';
@@ -1239,6 +1240,7 @@ export const listPatents = async (status?: string): Promise<AdminPatentItem[]> =
       questionnaire: patent.questionnaire,
       filingDocuments: patent.filingDocuments,
       supportingDocuments: patent.supportingDocuments ?? [],
+      officialDocuments: patent.officialDocuments ?? [],
       ...(patent.patentStage ? { patentStage: patent.patentStage } : {}),
       ...(patent.ipoApplicationNumber ? { ipoApplicationNumber: patent.ipoApplicationNumber } : {}),
       ...(patent.ipoFilingDate ? { ipoFilingDate: toIso(patent.ipoFilingDate) } : {}),
@@ -1256,8 +1258,8 @@ export const approvePatent = async (adminId: string, patentId: string, trigger: 
     throw new ApiError(400, 'PATENT_NOT_REVIEWABLE', 'Patent cannot be approved in its current state');
   }
 
-  const studentExists = await User.exists({ _id: patent.studentId });
-  if (!studentExists) {
+  const student = await User.findById(patent.studentId).select('_id displayName email').lean();
+  if (!student) {
     throw new ApiError(
       400,
       'PATENT_STUDENT_NOT_FOUND',
@@ -1267,6 +1269,32 @@ export const approvePatent = async (adminId: string, patentId: string, trigger: 
 
   const reviewedAt = new Date();
   const reviewedBy = new Types.ObjectId(adminId);
+  const generatedDocument = await createPatentSystemDocument({
+    kind: 'approval_summary',
+    generatedAt: reviewedAt,
+    projectTitle: patent.projectTitle,
+    studentName: student.displayName ?? 'Student',
+    studentEmail: student.email,
+    workspaceId: patent.workspaceId ? String(patent.workspaceId) : undefined,
+    patentId: String(patent._id),
+    status: 'approved',
+    ipoApplicationNumber: patent.ipoApplicationNumber,
+    ipoFilingDate: patent.ipoFilingDate,
+    publicationDate: patent.publicationDate,
+    grantNumber: patent.grantNumber,
+    grantDate: patent.grantDate,
+  });
+  const officialDocument = {
+    fileUrl: generatedDocument.fileUrl,
+    fileType: generatedDocument.fileType,
+    fileName: generatedDocument.fileName,
+    fileSizeBytes: generatedDocument.fileSizeBytes,
+    documentCategory: generatedDocument.documentCategory,
+    note: generatedDocument.note,
+    storageProvider: generatedDocument.storageProvider,
+    storageKey: generatedDocument.storageKey,
+  };
+
   const updateResult = await Patent.updateOne(
     { _id: patent._id, status: { $in: ['submitted', 'under_review'] } },
     {
@@ -1275,6 +1303,15 @@ export const approvePatent = async (adminId: string, patentId: string, trigger: 
         adminReviewedAt: reviewedAt,
         adminReviewedBy: reviewedBy,
         scoreAwarded: true,
+      },
+      $push: {
+        officialDocuments: officialDocument,
+        trackingTimeline: {
+          status: 'system_document_generated',
+          note: `${officialDocument.fileName} generated on approval.`,
+          updatedAt: reviewedAt,
+          updatedBy: reviewedBy,
+        },
       },
     },
   );

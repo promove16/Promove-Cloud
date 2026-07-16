@@ -205,6 +205,7 @@ describe('admin patent review integration', () => {
       .patch(`/api/admin/patents/${secondPatent._id.toString()}/approve`)
       .set('Authorization', `Bearer ${accessToken}`);
     const scoreAfterSecond = await User.findById(studentUser._id).select('innovationScore scoreBreakdown').lean();
+    const approvedFirstPatent = await Patent.findById(firstPatent._id).lean();
 
     expect(firstApproval.status).toBe(200);
     expect(firstApproval.body.data.newScore).toBe(200);
@@ -217,6 +218,14 @@ describe('admin patent review integration', () => {
     expect(scoreAfterSecond?.innovationScore).toBe(325);
     expect(scoreAfterSecond?.scoreBreakdown.patentsSubmitted).toBe(1);
     expect(scoreAfterSecond?.scoreBreakdown.patentsApproved).toBe(2);
+    expect(approvedFirstPatent?.officialDocuments).toHaveLength(1);
+    expect(approvedFirstPatent?.officialDocuments?.[0]).toMatchObject({
+      fileType: 'pdf',
+      documentCategory: 'system_generated',
+      storageProvider: 's3',
+    });
+    expect(approvedFirstPatent?.officialDocuments?.[0]?.fileName).toContain('approval-summary.pdf');
+    expect(approvedFirstPatent?.officialDocuments?.[0]?.fileSizeBytes).toBeGreaterThan(1000);
 
     const events = await ScoreEvent.find({ userId: studentUser._id }).sort({ createdAt: 1 }).lean();
     expect(events.map((event) => event.trigger)).toEqual([

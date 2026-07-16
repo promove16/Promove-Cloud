@@ -2,6 +2,7 @@ import { HydratedDocument, Types } from 'mongoose';
 import { z } from 'zod';
 import { notificationQueue } from '../../config/bullmq';
 import { uploadFile } from '../../services/fileStorageService';
+import { createPatentSystemDocument } from '../../services/patentSystemDocument';
 import { ApiError } from '../../utils/ApiError';
 import { User } from '../user/user.model';
 import { UserRole } from '../../types/roles.types';
@@ -567,6 +568,23 @@ export const completeOfficialHandover = async (
   }
 
   const now = new Date();
+  const student = await User.findById(request.studentId).select('displayName email').lean();
+  const generatedDocument = await createPatentSystemDocument({
+    kind: 'handover_summary',
+    generatedAt: now,
+    projectTitle: request.inventionTitle ?? request.projectTitle ?? 'Patent request',
+    studentName: student?.displayName ?? 'Student',
+    studentEmail: student?.email,
+    workspaceId: request.workspaceId ? String(request.workspaceId) : undefined,
+    patentRequestId: String(request._id),
+    status: request.status,
+    ipoApplicationNumber: request.ipoApplicationNumber,
+    ipoFilingDate: request.ipoFilingDate,
+    publicationDate: request.publicationDate,
+    grantDate: request.grantDate,
+    note: payload.note,
+  });
+  request.officialHandover.documents.push(generatedDocument);
   request.officialHandover.note = payload.note?.trim() || undefined;
   request.officialHandover.handedOverAt = now;
   request.officialHandover.handedOverBy = new Types.ObjectId(adminId);

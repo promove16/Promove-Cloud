@@ -177,6 +177,14 @@ export interface AdminPatentItem {
     note?: string;
     documentCategory?: string;
   }>;
+  officialDocuments?: Array<{
+    fileUrl: string;
+    fileType: 'pdf' | 'image';
+    fileName: string;
+    fileSizeBytes: number;
+    note?: string;
+    documentCategory?: string;
+  }>;
   patentStage?: 'filed' | 'published' | 'granted';
   ipoApplicationNumber?: string;
   ipoFilingDate?: string;

@@ -545,6 +545,7 @@ const DOCUMENT_CATEGORY_LABELS: Record<string, string> = {
   assignment_deed: "Assignment deed",
   priority_document: "Priority document",
   patent_certificate: "Patent certificate",
+  system_generated: "System-generated document",
   supporting_evidence: "Supporting evidence",
   other: "Other",
 };
@@ -928,8 +929,21 @@ function StartupPatentRequestOverview({
 }) {
   const latestRequest = requests[0];
   const status = latestRequest?.status ?? latestSubmission?.status;
-  const documents =
+  const submittedDocuments =
     latestRequest?.documents ?? latestSubmission?.supportingDocuments ?? [];
+  const officialHandover = latestRequest?.officialHandover;
+  const officialDocuments =
+    officialHandover?.handedOverAt && officialHandover.documents?.length
+      ? officialHandover.documents
+      : latestSubmission?.officialDocuments ?? [];
+  const documents =
+    officialDocuments.length > 0 ? officialDocuments : submittedDocuments;
+  const documentsCardTitle =
+    officialDocuments.length > 0 ? "Official Patent Docs" : "Uploaded Data";
+  const documentsEmptyMessage =
+    officialDocuments.length > 0
+      ? "Official patent documents shared by ProMove will appear here."
+      : "Uploaded sketches, drafts, prior-art notes, and specification files will appear here after submission.";
   const title = latestRequest?.inventionTitle ?? latestSubmission?.projectTitle;
   const submittedAt =
     latestRequest?.submittedAt ?? latestSubmission?.submittedAt;
@@ -1033,11 +1047,18 @@ function StartupPatentRequestOverview({
 
       <div className="rounded-2xl border border-slate-800 bg-slate-900 p-5">
         <div className="text-xs uppercase tracking-[0.24em] text-cyan-300">
-          Uploaded Data
+          {documentsCardTitle}
         </div>
         <h2 className="mt-3 text-lg font-semibold text-white">
           {documents.length} file{documents.length === 1 ? "" : "s"} attached
         </h2>
+        {officialDocuments.length > 0 ? (
+          <div className="mt-2 text-xs text-emerald-300">
+            {officialHandover?.handedOverAt
+              ? `Final package shared ${formatDate(officialHandover.handedOverAt)}`
+              : "System-generated document available after approval"}
+          </div>
+        ) : null}
         {documents.length > 0 ? (
           <div className="mt-4 space-y-2">
             {documents.slice(0, 4).map((document, index) => (
@@ -1075,8 +1096,7 @@ function StartupPatentRequestOverview({
           </div>
         ) : (
           <p className="mt-3 text-sm leading-6 text-slate-400">
-            Uploaded sketches, drafts, prior-art notes, and specification files
-            will appear here after submission.
+            {documentsEmptyMessage}
           </p>
         )}
       </div>

@@ -243,6 +243,15 @@ export const uploadFile = async (input: {
   fileName: string;
   contentType: string;
 }) => {
+  if (env.NODE_ENV === 'test') {
+    const key = buildStorageKey(input.folder, input.fileName);
+    return {
+      url: `${getPublicBaseUrl()}/${encodeObjectKey(key)}`,
+      key,
+      provider: 's3' as const,
+    } satisfies UploadedFileResult;
+  }
+
   if (!hasS3Config) {
     if (!hasCloudinaryConfig) {
       throw new Error(

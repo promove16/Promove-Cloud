@@ -48,7 +48,19 @@ const supportingDocumentSchema = new Schema<IPatent['supportingDocuments'][numbe
     note: { type: String, default: undefined },
     documentCategory: {
       type: String,
-      enum: ['inventor_journal', 'prior_art_search', 'specification_draft', 'abstract_draft', 'claims_draft', 'drawings_diagrams', 'design_plan_sketch', 'examination_request', 'form3_foreign_filing', 'cost_management'],
+      enum: [
+        'inventor_journal',
+        'prior_art_search',
+        'specification_draft',
+        'abstract_draft',
+        'claims_draft',
+        'drawings_diagrams',
+        'design_plan_sketch',
+        'examination_request',
+        'form3_foreign_filing',
+        'cost_management',
+        'system_generated',
+      ],
       default: undefined,
     },
     storageProvider: { type: String, enum: ['cloudinary', 's3'], default: undefined },
@@ -82,6 +94,7 @@ const patentSchema = new Schema<IPatent>(
     },
     filingDocuments: { type: filingDocumentsSchema, default: undefined },
     supportingDocuments: { type: [supportingDocumentSchema], default: [] },
+    officialDocuments: { type: [supportingDocumentSchema], default: [] },
     status: {
       type: String,
       enum: ['submitted', 'under_review', 'approved', 'rejected'],

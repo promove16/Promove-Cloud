@@ -148,6 +148,7 @@ export interface AdminPatentItem {
   };
   filingDocuments?: PatentFilingDocuments;
   supportingDocuments: PatentSupportingDocument[];
+  officialDocuments?: PatentSupportingDocument[];
   patentStage?: 'filed' | 'published' | 'granted';
   ipoApplicationNumber?: string;
   ipoFilingDate?: string;

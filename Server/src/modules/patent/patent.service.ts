@@ -152,6 +152,12 @@ const serializePatentForClient = async (patent: IPatent) => ({
       fileUrl: await getSignedPatentDocumentUrl(document),
     })),
   ),
+  officialDocuments: await Promise.all(
+    (patent.officialDocuments ?? []).map(async (document) => ({
+      ...document,
+      fileUrl: await getSignedPatentDocumentUrl(document),
+    })),
+  ),
 });
 
 export const resolveStartupForPatentSubmission = async (userId: string, workspaceId: string) => {
