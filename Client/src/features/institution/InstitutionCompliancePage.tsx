@@ -7,7 +7,7 @@ import {
   FileCheck2,
   ShieldCheck,
 } from 'lucide-react';
-import { toast } from '../../app/components/ui/sonner';
+import { toast } from '../../components/ui/sonner';
 import { Button } from '../../components/ui/Button';
 import { Card } from '../../components/ui/Card';
 import { Spinner } from '../../components/ui/Spinner';

@@ -8,7 +8,7 @@ import { startupApi } from "../../api/startup.api";
 import { workspaceApi } from "../../api/workspace.api";
 import { useAuthStore } from "../../store/authStore";
 import { useWorkspaceChat } from "../../hooks/useWorkspaceChat";
-import { toast } from "../../app/components/ui/sonner";
+import { toast } from "../../components/ui/sonner";
 import { getApiErrorMessage } from "../../utils/apiError";
 import { ProductWorkspaceDetail } from "../../app/pages/ProductWorkspace";
 

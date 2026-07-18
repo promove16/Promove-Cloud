@@ -4,7 +4,7 @@ import { useSearchParams } from 'react-router-dom';
 import { BadgeCheck, Github, Sparkles, X } from 'lucide-react';
 import { userApi } from '../../api/user.api';
 import { Button } from '../ui/Button';
-import { toast } from '../../app/components/ui/sonner';
+import { toast } from '../ui/sonner';
 import { useAuthStore } from '../../store/authStore';
 
 const getDismissKey = (userId: string) => `promove-student-proof-dismissed:${userId}`;

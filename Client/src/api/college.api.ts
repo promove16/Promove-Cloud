@@ -37,6 +37,7 @@ import {
   InstitutionMentorshipProgramView,
 } from '../types/mentorship.types';
 import { PlacementTrackerData, PlacementStatus } from '../types/placement.types';
+import { RecruiterDriveView } from '../types/recruiter.types';
 
 export const collegeApi = {
   async getDashboard() {
@@ -374,6 +375,10 @@ export const collegeApi = {
       '/api/college/mentorship-programs',
       payload,
     );
+    return response.data.data;
+  },
+  async getCollegeDrives() {
+    const response = await api.get<ApiSuccessResponse<RecruiterDriveView[]>>('/api/college/drives');
     return response.data.data;
   },
 };

@@ -7,8 +7,12 @@ import { Event } from './event.model';
 import { EventParticipantView, EventRankingView } from './event.types';
 import { UserRole } from '../../types/roles.types';
 import { JobPost } from '../recruiter/jobPost.model';
-import { assertRecruiterLinkedToCollege } from '../recruiter/recruiter.drive.service';
+import {
+  assertRecruiterLinkedToCollege,
+  getCollegeDrivesView,
+} from '../recruiter/recruiter.drive.service';
 import { createBridge, notifyUser } from '../recruiter/recruiter.mappers';
+import { RequestRecord } from '../request/request.model';
 import { createRequestRecord, registerRequestHandler } from '../request/request.service';
 
 const HIRING_EVENT_TYPES = [
@@ -527,8 +531,6 @@ export const sendHiringEventInvite = async (
   collegeId: string,
   payload: z.infer<typeof sendHiringEventInviteSchema>,
 ) => {
-  await assertRecruiterLinkedToCollege(recruiterId, collegeId);
-
   const college = await User.findOne({ _id: collegeId, role: UserRole.COLLEGE, isActive: true })
     .select('_id displayName')
     .lean();
@@ -773,8 +775,6 @@ registerRequestHandler('college_event_invite', {
     const payload = collegeEventInviteMetadataSchema.parse(request.metadata ?? {});
     const collegeId = request.targetEntityId;
 
-    await assertRecruiterLinkedToCollege(String(request.fromUserId), collegeId);
-
     const college = await User.findOne({
       _id: collegeId,
       role: UserRole.COLLEGE,
@@ -839,6 +839,33 @@ registerRequestHandler('college_event_invite', {
     await request.save();
 
     const college = await User.findById(collegeId).select('displayName').lean();
+
+    await RequestRecord.findOneAndUpdate(
+      {
+        type: 'college_recruiter_partnership',
+        fromUserId: request.fromUserId,
+        targetEntityType: 'college',
+        targetEntityId: collegeId,
+      },
+      {
+        $setOnInsert: {
+          type: 'college_recruiter_partnership',
+          actionType: 'partner',
+          fromUserId: request.fromUserId,
+          toUserId: collegeId,
+          targetEntityType: 'college',
+          targetEntityId: collegeId,
+          targetEntityTitle: college?.displayName ?? 'College',
+          targetRole: UserRole.COLLEGE,
+          requestedRole: 'partner',
+          message: 'Partnership established by accepting a campus hiring event.',
+          expiresAt: new Date(Date.now() + 365 * 24 * 60 * 60 * 1000),
+        },
+        $set: { status: 'accepted', respondedAt: new Date() },
+      },
+      { upsert: true },
+    );
+
     await notifyUser(
       String(request.fromUserId),
       'Hiring event approved',
@@ -847,3 +874,7 @@ registerRequestHandler('college_event_invite', {
     );
   },
 });
+
+export const listStudentInstitutionDrives = async (institutionId: string) => {
+  return getCollegeDrivesView(institutionId);
+};

@@ -3,7 +3,7 @@ import { isAxiosError } from 'axios';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { KeyRound } from 'lucide-react';
 import { schoolApi } from '../../api/school.api';
-import { toast } from '../../app/components/ui/sonner';
+import { toast } from '../../components/ui/sonner';
 import { Button } from '../../components/ui/Button';
 import { ApiErrorResponse } from '../../types/auth.types';
 import {

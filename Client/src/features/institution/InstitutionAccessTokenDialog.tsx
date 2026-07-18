@@ -8,8 +8,8 @@ import {
   DialogDescription,
   DialogHeader,
   DialogTitle,
-} from '../../app/components/ui/dialog';
-import { toast } from '../../app/components/ui/sonner';
+} from '../../components/ui/dialog';
+import { toast } from '../../components/ui/sonner';
 import { Button } from '../../components/ui/Button';
 import { Input } from '../../components/ui/Input';
 import { ApiErrorResponse } from '../../types/auth.types';

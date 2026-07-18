@@ -2,7 +2,7 @@ import { ChangeEvent, FormEvent, useEffect, useMemo, useState } from "react";
 import { isAxiosError } from "axios";
 import { Link, useNavigate, useSearchParams } from "react-router-dom";
 import { BusinessLogo } from "../../components/branding/BusinessLogo";
-import { toast } from "../../app/components/ui/sonner";
+import { toast } from "../../components/ui/sonner";
 import { AuthPasswordField } from "./AuthPasswordField";
 import { useRegisterRequestMutation } from "./useAuth";
 import {

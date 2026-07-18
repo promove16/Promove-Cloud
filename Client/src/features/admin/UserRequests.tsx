@@ -2,7 +2,7 @@ import { useState, type ReactNode } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { Check, ExternalLink, FileCheck2, X } from 'lucide-react';
 import { adminApi, type AdminRegistrationRequestItem } from '../../api/admin.api';
-import { toast } from '../../app/components/ui/sonner';
+import { toast } from '../../components/ui/sonner';
 import { Spinner } from '../../components/ui/Spinner';
 import { UserRole } from '../../types/roles.types';
 import type {

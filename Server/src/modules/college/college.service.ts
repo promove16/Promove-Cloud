@@ -9,6 +9,7 @@ import { UserRole } from '../../types/roles.types';
 import { Event } from '../event/event.model';
 import { CampusDrive } from '../recruiter/campusDrive.model';
 import { JobPost } from '../recruiter/jobPost.model';
+import { getCollegeDrivesView } from '../recruiter/recruiter.drive.service';
 import {
   createInstitutionMentorshipProgram,
   listInstitutionMentorshipPrograms,
@@ -626,6 +627,8 @@ export const createCollegeMentorshipProgramRequest = (
 
 export const getCollegeMentorshipPrograms = (collegeId: string) =>
   listInstitutionMentorshipPrograms(collegeId, 'college');
+
+export const getCollegeDrivesForCollege = (collegeId: string) => getCollegeDrivesView(collegeId);
 
 export {
   createManagedStudentCredentialsSchema,

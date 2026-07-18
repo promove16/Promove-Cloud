@@ -50,7 +50,7 @@ import {
   marketplaceApi,
 } from "../../api/marketplace.api";
 import { requestApi } from "../../api/request.api";
-import { toast } from "../../app/components/ui/sonner";
+import { toast } from "../../components/ui/sonner";
 import { recruiterApi } from "../../api/recruiter.api";
 import { useAuthStore } from "../../store/authStore";
 import type { RecruiterJobView } from "../../types/recruiter.types";

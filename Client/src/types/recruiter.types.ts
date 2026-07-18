@@ -225,6 +225,8 @@ export interface RecruiterDriveView {
   minimumInnovationScore: number;
   registeredStudents: RecruiterDriveRegisteredStudent[];
   isActive: boolean;
+  recruiterName?: string;
+  recruiterCompany?: string;
   createdAt: string;
 }
 

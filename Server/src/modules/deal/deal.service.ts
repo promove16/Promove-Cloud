@@ -533,13 +533,25 @@ const fetchDealContext = async (deal: DealDocumentLike) => {
     throw new ApiError(404, 'DEAL_CONTEXT_NOT_FOUND', 'Deal context could not be loaded');
   }
 
-  const productWorkshop = deal.linkedWorkspaceId
-    ? await Workspace.findOne({ _id: deal.linkedWorkspaceId, isActive: true })
+  const workspaceId = deal.linkedWorkspaceId ?? startup.projectId;
+  const productWorkshop = workspaceId
+    ? await Workspace.findOne({ _id: workspaceId, isActive: true })
         .select('_id title category stage progressPercent')
         .lean<LeanProductWorkshop | null>()
     : null;
 
   return { startup, student, investor, productWorkshop };
+};
+
+const fetchDealContextSafe = async (deal: DealDocumentLike) => {
+  try {
+    return { deal, ...(await fetchDealContext(deal)) };
+  } catch (error) {
+    if (error instanceof ApiError && error.statusCode === 404) {
+      return null;
+    }
+    throw error;
+  }
 };
 
 const ensureInvestor = async (investorId: string) => {
@@ -1171,7 +1183,9 @@ export const listDealsForInvestor = async (investorId: string): Promise<DealGrou
     return STAGE_ORDER.map((stage) => ({ stage, label: STAGE_LABELS[stage], deals: [] }));
   }
 
-  const contexts = await Promise.all(deals.map(async (deal) => ({ deal, ...(await fetchDealContext(deal)) })));
+  const contexts = (await Promise.all(deals.map(fetchDealContextSafe))).filter(
+    (context): context is NonNullable<typeof context> => context !== null,
+  );
   const summaries = contexts.map(({ deal, startup, student, investor, productWorkshop }) =>
     buildSummary(deal, startup, student, investor, investor.displayName, productWorkshop),
   );
@@ -1190,7 +1204,9 @@ export const listDealsForParticipant = async (userId: string, role: UserRole): P
       .sort({ updatedAt: -1, createdAt: -1 })
       .lean<DealDocumentLike[]>();
 
-    const contexts = await Promise.all(deals.map(async (deal) => ({ deal, ...(await fetchDealContext(deal)) })));
+    const contexts = (await Promise.all(deals.map(fetchDealContextSafe))).filter(
+      (context): context is NonNullable<typeof context> => context !== null,
+    );
 
     return contexts.map(({ deal, startup, student, investor, productWorkshop }) =>
       buildSummary(deal, startup, student, investor, investor.displayName, productWorkshop),
@@ -1214,7 +1230,9 @@ export const listDealsForParticipant = async (userId: string, role: UserRole): P
     .sort({ updatedAt: -1, createdAt: -1 })
     .lean<DealDocumentLike[]>();
 
-  const contexts = await Promise.all(deals.map(async (deal) => ({ deal, ...(await fetchDealContext(deal)) })));
+  const contexts = (await Promise.all(deals.map(fetchDealContextSafe))).filter(
+    (context): context is NonNullable<typeof context> => context !== null,
+  );
 
   return contexts.map(({ deal, startup, student, investor, productWorkshop }) =>
     buildSummary(

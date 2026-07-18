@@ -3,7 +3,7 @@ import axios, {
   InternalAxiosRequestConfig,
   isAxiosError,
 } from "axios";
-import { toast } from "../app/components/ui/sonner";
+import { toast } from "../components/ui/sonner";
 import { useAuthStore } from "../store/authStore";
 import { ApiErrorResponse, ApiSuccessResponse, AuthPayload } from "../types/auth.types";
 import { buildLoginRedirectPath } from "../utils/authRedirect";

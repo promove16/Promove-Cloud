@@ -17,7 +17,7 @@ import {
   X,
 } from 'lucide-react';
 import { adminApi, AdminPatentRequestDetail, AdminPatentRequestListItem } from '../../api/admin.api';
-import { toast } from '../../app/components/ui/sonner';
+import { toast } from '../../components/ui/sonner';
 import { Button } from '../../components/ui/Button';
 import { Card } from '../../components/ui/Card';
 import { OptionTabs } from '../../components/ui/OptionTabs';

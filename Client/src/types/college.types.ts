@@ -85,6 +85,8 @@ export interface CollegeEvent {
   title: string;
   type: string;
   category?: 'internal' | 'hiring';
+  source?: 'event' | 'drive';
+  isActive?: boolean;
   description: string;
   scheduledAt: string;
   participantsCount: number;

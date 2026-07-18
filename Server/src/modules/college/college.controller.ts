@@ -34,6 +34,7 @@ import {
   reviewStudentVerificationSchema,
   updatePlacementStatus,
   getCollegeHiringEvents,
+  getCollegeDrivesForCollege,
 } from './college.service';
 import { createEventSchema } from '../event/event.service';
 import { generateCollegeReport } from '../../services/complianceReport';
@@ -367,4 +368,9 @@ export const createCollegeMentorshipProgramController = async (req: Request, res
   const payload = createInstitutionMentorshipProgramSchema.parse(req.body);
   const data = await createCollegeMentorshipProgramRequest(req.user!._id, req.user!._id, payload);
   res.status(201).json(new ApiResponse(data));
+};
+
+export const listCollegeDrivesController = async (req: Request, res: Response) => {
+  const data = await getCollegeDrivesForCollege(req.user!._id);
+  res.status(200).json(new ApiResponse(data));
 };

@@ -13,7 +13,7 @@ import {
   ChartContainer,
   ChartTooltip,
   ChartTooltipContent,
-} from '../../app/components/ui/chart';
+} from '../../components/ui/chart';
 import { Spinner } from '../../components/ui/Spinner';
 import type { CollegeDashboardData } from '../../types/college.types';
 import type { InstitutionMentorshipProgramView } from '../../types/mentorship.types';

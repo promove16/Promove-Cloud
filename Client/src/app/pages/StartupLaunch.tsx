@@ -58,7 +58,7 @@ import {
   normalizeStartupRouteId,
 } from "../../features/startup/navigation";
 import { Spinner } from "../../components/ui/Spinner";
-import { toast } from "../components/ui/sonner";
+import { toast } from "../../components/ui/sonner";
 import { getApiErrorMessage } from "../../utils/apiError";
 import type {
   Startup,

@@ -89,12 +89,18 @@ export default function HiringEvents({ embedded = false }: HiringEventsProps) {
     queryKey: ['recruiter', 'linked-colleges'],
     queryFn: recruiterApi.getLinkedColleges,
   });
+  const allCollegesQuery = useQuery({
+    queryKey: ['recruiter', 'all-colleges'],
+    queryFn: recruiterApi.getColleges,
+  });
   const jobsQuery = useQuery({
     queryKey: ['recruiter', 'jobs'],
     queryFn: recruiterApi.getJobs,
   });
 
-  const availableColleges = collegesQuery.data ?? [];
+  const linkedColleges = collegesQuery.data ?? [];
+  const allColleges = allCollegesQuery.data ?? [];
+  const availableColleges = createMode === 'invite' ? allColleges : linkedColleges;
   const events = hiringEventsQuery.data ?? [];
   const requestedEventId = searchParams.get('eventId');
 
@@ -138,6 +144,7 @@ export default function HiringEvents({ embedded = false }: HiringEventsProps) {
     await Promise.all([
       queryClient.invalidateQueries({ queryKey: ['recruiter', 'hiring-events'] }),
       queryClient.invalidateQueries({ queryKey: ['recruiter', 'linked-colleges'] }),
+      queryClient.invalidateQueries({ queryKey: ['recruiter', 'all-colleges'] }),
       queryClient.invalidateQueries({ queryKey: ['recruiter', 'jobs'] }),
       queryClient.invalidateQueries({ queryKey: ['recruiter', 'job-applications'] }),
       queryClient.invalidateQueries({ queryKey: ['recruiter', 'onboarding'] }),
@@ -249,14 +256,14 @@ export default function HiringEvents({ embedded = false }: HiringEventsProps) {
           <div className="mt-4 flex w-full rounded-full border border-slate-800 bg-slate-950 p-1">
             <button
               type="button"
-              onClick={() => { setCreateMode('direct'); setInviteSentNotice(''); }}
+              onClick={() => { setCreateMode('direct'); setInviteSentNotice(''); setForm((current) => ({ ...current, collegeId: '' })); }}
               className={`min-w-0 flex-1 rounded-full px-4 py-1.5 text-center text-xs font-semibold leading-5 transition ${createMode === 'direct' ? 'bg-slate-100 text-slate-950' : 'text-slate-400 hover:text-white'}`}
             >
               Create Directly
             </button>
             <button
               type="button"
-              onClick={() => { setCreateMode('invite'); setInviteSentNotice(''); }}
+              onClick={() => { setCreateMode('invite'); setInviteSentNotice(''); setForm((current) => ({ ...current, collegeId: '' })); }}
               className={`min-w-0 flex-1 rounded-full px-4 py-1.5 text-center text-xs font-semibold leading-5 transition ${createMode === 'invite' ? 'bg-slate-100 text-slate-950' : 'text-slate-400 hover:text-white'}`}
             >
               Send Invite for Approval
@@ -265,13 +272,15 @@ export default function HiringEvents({ embedded = false }: HiringEventsProps) {
 
           {createMode === 'invite' ? (
             <div className="mt-3 rounded-2xl border border-cyan-500/20 bg-cyan-500/5 px-4 py-3 text-sm text-cyan-200">
-              The college will receive this as an invitation in their invitations center. The event is only created after they accept.
+              Pick any college, even one you haven't partnered with yet. The college will receive this as an invitation in their invitations center, and accepting it both creates the event and establishes your partnership so you can send campus drives to them afterward.
             </div>
           ) : null}
 
           {availableColleges.length === 0 ? (
             <div className="mt-5 rounded-2xl border border-amber-500/20 bg-amber-500/10 px-4 py-3 text-sm text-amber-100">
-              No linked colleges yet. Ask a college to accept your partnership request before creating hiring events.
+              {createMode === 'invite'
+                ? 'No colleges found yet.'
+                : "No linked colleges yet. Send an event invite from the 'Send Invite for Approval' tab — accepting it establishes the partnership needed to create events directly."}
             </div>
           ) : null}
 
@@ -450,7 +459,12 @@ export default function HiringEvents({ embedded = false }: HiringEventsProps) {
                 <div className="text-xs uppercase tracking-[0.3em] text-cyan-300">Event Workspace</div>
                 <h2 className="mt-2 text-xl font-semibold text-white">Current hiring events</h2>
                 <p className="mt-2 text-sm leading-6 text-slate-400">
-                  Select an event to review participants, compute rankings, and push students into the recruiter pipeline.
+                  Select an event to review participants, compute rankings, and push students into the recruiter pipeline.{' '}
+                  {selectedEvent ? (
+                    <span className="text-cyan-400 font-medium block mt-1">
+                      Currently viewing <strong className="text-cyan-300 underline underline-offset-4 decoration-cyan-500/40">{selectedEvent.title}</strong> below. Click 'Viewing' or scroll down to manage.
+                    </span>
+                  ) : null}
                 </p>
               </div>
               <Badge className="border-slate-700 bg-slate-950 text-slate-300">{events.length} total</Badge>
@@ -487,14 +501,24 @@ export default function HiringEvents({ embedded = false }: HiringEventsProps) {
                           </div>
                         </div>
                         <Button
-                          variant="secondary"
+                          variant={isSelected ? 'outline' : 'secondary'}
+                          className={isSelected ? 'border-cyan-500/50 text-cyan-400 hover:bg-cyan-500/10' : ''}
                           onClick={() => {
-                            setSelectedEventId(event._id);
-                            setSearchParams((current) => {
-                              const next = new URLSearchParams(current);
-                              next.set('eventId', event._id);
-                              return next;
-                            });
+                            if (isSelected) {
+                              const element = document.getElementById('selected-event-details');
+                              element?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+                            } else {
+                              setSelectedEventId(event._id);
+                              setSearchParams((current) => {
+                                const next = new URLSearchParams(current);
+                                next.set('eventId', event._id);
+                                return next;
+                              });
+                              setTimeout(() => {
+                                const element = document.getElementById('selected-event-details');
+                                element?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+                              }, 100);
+                            }
                           }}
                         >
                           {isSelected ? 'Viewing' : 'View'}
@@ -522,10 +546,16 @@ export default function HiringEvents({ embedded = false }: HiringEventsProps) {
       </section>
 
       {selectedEvent ? (
-        <Card className="p-6">
+        <Card id="selected-event-details" className="p-6 border-cyan-500/30 bg-[#0c1630] scroll-mt-6">
           <div className="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
             <div>
               <div className="mb-2 flex items-center gap-2 text-xs uppercase tracking-[0.3em] text-cyan-300">
+                <span className="relative flex h-2 w-2">
+                  <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-cyan-400 opacity-75"></span>
+                  <span className="relative inline-flex rounded-full h-2 w-2 bg-cyan-500"></span>
+                </span>
+                <span>Active Event Workspace</span>
+                <span>•</span>
                 <Building2 className="h-4 w-4" />
                 {selectedEvent.collegeName}
               </div>

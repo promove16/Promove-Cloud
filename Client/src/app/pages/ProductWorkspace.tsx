@@ -39,7 +39,7 @@ import type {
 import { DashboardLayout } from "../components/DashboardLayout";
 import { workspaceApi } from "../../api/workspace.api";
 import { useWorkspaceChat } from "../../hooks/useWorkspaceChat";
-import { toast } from "../components/ui/sonner";
+import { toast } from "../../components/ui/sonner";
 import { useAuthStore } from "../../store/authStore";
 import { UserRole } from "../../types/roles.types";
 import { FileViewerModal } from "../../components/file-viewer/FileViewerModal";

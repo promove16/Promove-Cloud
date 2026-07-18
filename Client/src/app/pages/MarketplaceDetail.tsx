@@ -34,7 +34,7 @@ import {
   marketplaceApi,
 } from "../../api/marketplace.api";
 import { requestApi } from "../../api/request.api";
-import { toast } from "../components/ui/sonner";
+import { toast } from "../../components/ui/sonner";
 import {
   buildCollegeHiringRequestPayload,
   CollegeHiringRequestFormState,

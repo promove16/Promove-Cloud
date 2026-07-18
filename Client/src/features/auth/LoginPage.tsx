@@ -6,7 +6,7 @@ import { zodResolver } from '@hookform/resolvers/zod';
 import { Link, useNavigate, useSearchParams } from 'react-router-dom';
 import { z } from 'zod';
 import { BusinessLogo } from '../../components/branding/BusinessLogo';
-import { toast } from '../../app/components/ui/sonner';
+import { toast } from '../../components/ui/sonner';
 import { AuthPasswordField } from './AuthPasswordField';
 import { useLoginMutation } from './useAuth';
 import { getPostLoginRedirect } from '../../utils/postLoginRedirect';

@@ -17,7 +17,7 @@ import {
   Users,
   X,
 } from "lucide-react";
-import { toast as appToast } from "../../app/components/ui/sonner";
+import { toast as appToast } from "../../components/ui/sonner";
 import { recruiterApi } from "../../api/recruiter.api";
 import { getStudentPortfolioViewPath } from "../marketplace/navigation";
 import {

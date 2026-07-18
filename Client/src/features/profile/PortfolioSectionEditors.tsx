@@ -19,7 +19,7 @@ import {
   UserProfile,
   userApi,
 } from "../../api/user.api";
-import { toast } from "../../app/components/ui/sonner";
+import { toast } from "../../components/ui/sonner";
 import { useAuthStore } from "../../store/authStore";
 
 // ─── Section editor identifiers ──────────────────────────────────────────────

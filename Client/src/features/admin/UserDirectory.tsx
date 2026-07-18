@@ -16,7 +16,7 @@ import {
   DropdownMenuLabel,
   DropdownMenuSeparator,
   DropdownMenuTrigger,
-} from '../../app/components/ui/dropdown-menu';
+} from '../../components/ui/dropdown-menu';
 import { UserRole } from '../../types/roles.types';
 import { useAdminUsersContext } from './UserManagement';
 

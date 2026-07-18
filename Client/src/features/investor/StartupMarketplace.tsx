@@ -8,7 +8,7 @@ import { Button } from '../../components/ui/Button';
 import { Card } from '../../components/ui/Card';
 import { Input } from '../../components/ui/Input';
 import { Spinner } from '../../components/ui/Spinner';
-import { Slider } from '../../app/components/ui/slider';
+import { Slider } from '../../components/ui/slider';
 import { dealApi } from '../../api/deal.api';
 import { investorApi } from '../../api/investor.api';
 import { MAX_INNOVATION_SCORE } from '../../constants/score';

@@ -1707,6 +1707,14 @@ export const launchStartup = async (
     );
   }
 
+  if ((payload.launchTo === 'investors' || payload.launchTo === 'both') && !startup.projectId) {
+    throw new ApiError(
+      400,
+      'WORKSPACE_LINK_REQUIRED',
+      'Link a product workspace to this startup before launching it to investors.',
+    );
+  }
+
   const score = calculateStartupInnovationScore(startup.toObject());
 
   startup.launchedToInvestors =

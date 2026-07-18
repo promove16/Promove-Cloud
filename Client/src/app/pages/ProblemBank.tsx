@@ -21,7 +21,7 @@ import {
 import { DashboardLayout } from "../components/DashboardLayout";
 import { problemBankApi } from "../../api/problemBank.api";
 import { workspaceApi } from "../../api/workspace.api";
-import { toast } from "../components/ui/sonner";
+import { toast } from "../../components/ui/sonner";
 import {
   PROBLEM_CATEGORIES,
   Problem,

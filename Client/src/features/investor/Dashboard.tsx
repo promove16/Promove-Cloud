@@ -21,7 +21,7 @@ import {
   ChartContainer,
   ChartTooltip,
   ChartTooltipContent,
-} from '../../app/components/ui/chart';
+} from '../../components/ui/chart';
 import { DealDetail } from './DealDetail';
 import { PatentShowcase } from '../shared/PatentShowcase';
 import { InvestorWorkspaceLayout } from './InvestorWorkspaceLayout';

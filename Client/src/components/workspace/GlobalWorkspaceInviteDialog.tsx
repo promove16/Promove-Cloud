@@ -9,7 +9,7 @@ import {
   DialogFooter,
   DialogHeader,
   DialogTitle,
-} from '../../app/components/ui/dialog';
+} from '../ui/dialog';
 import { useAuthStore } from '../../store/authStore';
 import { UserRole } from '../../types/roles.types';
 import { Workspace } from '../../types/workspace.types';

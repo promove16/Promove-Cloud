@@ -12,6 +12,7 @@ import {
   joinEvent,
   listRecruiterHiringEvents,
   listStudentInstitutionEvents,
+  listStudentInstitutionDrives,
   selectStudentFromEventSchema,
   selectStudentFromHiringEvent,
   sendHiringEventInvite,
@@ -111,4 +112,9 @@ export const sendHiringEventInviteController = async (req: Request, res: Respons
   const payload = sendHiringEventInviteSchema.parse(req.body);
   const data = await sendHiringEventInvite(req.user!._id, String(req.params.collegeId), payload);
   res.status(201).json(new ApiResponse(data));
+};
+
+export const listStudentInstitutionDrivesController = async (req: Request, res: Response) => {
+  const data = await listStudentInstitutionDrives(String(req.user!.institutionId));
+  res.status(200).json(new ApiResponse(data));
 };

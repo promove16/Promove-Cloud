@@ -1,3 +1,4 @@
+import { Types } from 'mongoose';
 import { UserRole } from '../../types/roles.types';
 import { ApiError } from '../../utils/ApiError';
 import { normalizeInnovationScore } from '../innovationScore/score.utils';
@@ -111,6 +112,8 @@ export const createRecruiterDrive = async (
   recruiterId: string,
   payload: z.infer<typeof driveCreateSchema>,
 ) => {
+  await assertRecruiterLinkedToCollege(recruiterId, payload.collegeId);
+
   const drive = await CampusDrive.create({
     recruiterId,
     collegeId: payload.collegeId,
@@ -470,4 +473,42 @@ export const markStudentHired = async (recruiterId: string, studentId: string, c
   }
 
   return { updated: true };
+};
+
+export const getCollegeDrivesView = async (collegeId: string): Promise<RecruiterDriveView[]> => {
+  const objId = new Types.ObjectId(collegeId);
+  const drives = await CampusDrive.find({ collegeId: objId }).sort({ scheduledAt: -1 }).lean();
+
+  const recruiterIds = [...new Set(drives.map((d) => String(d.recruiterId)))];
+  const recruiters =
+    recruiterIds.length > 0
+      ? await User.find({ _id: { $in: recruiterIds } }).select('_id displayName domain avatar').lean()
+      : [];
+  const recruiterMap = new Map(recruiters.map((r) => [String(r._id), r]));
+
+  const college = await User.findById(objId).select('displayName').lean();
+  const collegeName = college?.displayName ?? 'Unknown College';
+
+  const mapped = await Promise.all(
+    drives.map(async (drive) => {
+      const recruiter = recruiterMap.get(String(drive.recruiterId));
+      const recruiterName = recruiter?.displayName ?? 'Unknown Recruiter';
+      const recruiterCompany = recruiter?.domain ? `${recruiter.domain} Hiring` : 'Campus Hiring Partner';
+
+      const students = drive.registeredStudents.length
+        ? await User.find({ _id: { $in: drive.registeredStudents.map((entry) => entry.studentId) } })
+            .select('_id displayName avatar innovationScore')
+            .lean()
+        : [];
+
+      const mappedDrive = await mapDrive(drive, collegeName, students);
+      return {
+        ...mappedDrive,
+        recruiterName,
+        recruiterCompany,
+      };
+    }),
+  );
+
+  return mapped;
 };

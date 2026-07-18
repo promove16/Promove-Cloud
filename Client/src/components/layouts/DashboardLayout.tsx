@@ -30,7 +30,7 @@ import {
   DropdownMenuLabel,
   DropdownMenuSeparator,
   DropdownMenuTrigger,
-} from '../../app/components/ui/dropdown-menu';
+} from '../ui/dropdown-menu';
 import { DASHBOARD_ROUTE_LABELS, DashboardNavItem, SIDEBAR_CONFIG } from './dashboardNavigation';
 import { BusinessLogo } from '../branding/BusinessLogo';
 import { GlobalWorkspaceInviteDialog } from '../workspace/GlobalWorkspaceInviteDialog';

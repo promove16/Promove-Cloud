@@ -13,7 +13,7 @@ import {
 import { Link, useNavigate, useSearchParams } from "react-router-dom";
 import { z } from "zod";
 import { BusinessLogo } from "../../components/branding/BusinessLogo";
-import { toast } from "../../app/components/ui/sonner";
+import { toast } from "../../components/ui/sonner";
 import { AuthPasswordField } from "./AuthPasswordField";
 import { useSignupMutation } from "./useAuth";
 import { UserRole } from "../../types/roles.types";

@@ -10,7 +10,7 @@ import { useSettings } from '../../hooks/useSettings';
 import { useAuthStore } from '../../store/authStore';
 import { UserRole } from '../../types/roles.types';
 import { OptionTabs } from '../../components/ui/OptionTabs';
-import { toast } from '../../app/components/ui/sonner';
+import { toast } from '../../components/ui/sonner';
 import { AuthPasswordField } from '../auth/AuthPasswordField';
 import { StudentInstitutionStatusPanel } from '../institution/studentInstitutionStatus';
 

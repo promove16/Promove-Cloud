@@ -13,6 +13,7 @@ import {
   listStudentInstitutionEventsController,
   selectStudentFromHiringEventController,
   sendHiringEventInviteController,
+  listStudentInstitutionDrivesController,
 } from './event.controller';
 
 const router = Router();
@@ -20,6 +21,7 @@ const router = Router();
 router.use(authenticate);
 
 router.get('/my-institution', authorize(UserRole.STUDENT), asyncHandler(listStudentInstitutionEventsController));
+router.get('/drives', authorize(UserRole.STUDENT), asyncHandler(listStudentInstitutionDrivesController));
 router.post('/hiring', authorize(UserRole.RECRUITER), asyncHandler(createHiringEventController));
 router.get('/hiring', authorize(UserRole.RECRUITER), asyncHandler(listRecruiterHiringEventsController));
 router.post('/hiring-invite/:collegeId', authorize(UserRole.RECRUITER), asyncHandler(sendHiringEventInviteController));

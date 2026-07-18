@@ -197,7 +197,8 @@ export const mapDrive = async (drive: {
   createdAt: Date;
 },
 collegeName: string,
-students: Array<{ _id: Types.ObjectId; displayName: string; avatar?: string; innovationScore: number }>) => {
+students: Array<{ _id: Types.ObjectId; displayName: string; avatar?: string; innovationScore: number }>,
+recruiter?: { displayName: string; domain?: string }) => {
   const studentMap = new Map(students.map((student) => [String(student._id), student]));
 
   return {
@@ -224,6 +225,8 @@ students: Array<{ _id: Types.ObjectId; displayName: string; avatar?: string; inn
       })
       .sort((left, right) => right.innovationScore - left.innovationScore),
     isActive: drive.isActive,
+    ...(recruiter?.displayName ? { recruiterName: recruiter.displayName } : {}),
+    ...(recruiter?.domain ? { recruiterCompany: `${recruiter.domain} Hiring` } : {}),
     createdAt: drive.createdAt.toISOString(),
   } satisfies RecruiterDriveView;
 };
