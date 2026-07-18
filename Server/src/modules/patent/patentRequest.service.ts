@@ -2,6 +2,7 @@ import { Types } from 'mongoose';
 import { z } from 'zod';
 import { notificationQueue } from '../../config/bullmq';
 import { uploadFile, deleteStoredAsset } from '../../services/fileStorageService';
+import { renderPatentSystemDocument } from '../../services/patentSystemDocument';
 import { ApiError } from '../../utils/ApiError';
 import { User } from '../user/user.model';
 import { UserRole } from '../../types/roles.types';
@@ -315,6 +316,39 @@ export const getPatentRequestById = async (userId: string, requestId: string) =>
     throw new ApiError(404, 'PATENT_REQUEST_NOT_FOUND', 'Patent request not found.');
   }
   return serializePatentRequestForClient(request);
+};
+
+// ─── Patent certificate (just-in-time PDF, generated from live data on every request) ──
+
+export const getPatentCertificatePdf = async (userId: string, requestId: string) => {
+  const request = await PatentRequest.findOne({ _id: requestId, studentId: userId }).lean();
+  if (!request) {
+    throw new ApiError(404, 'PATENT_REQUEST_NOT_FOUND', 'Patent request not found.');
+  }
+
+  if (normalizePatentRequestStatus(request.status) !== 'granted') {
+    throw new ApiError(
+      409,
+      'PATENT_CERTIFICATE_NOT_AVAILABLE',
+      'The patent certificate is only available after the patent has been granted.',
+    );
+  }
+
+  const student = await User.findById(request.studentId).select('displayName email').lean();
+
+  return renderPatentSystemDocument({
+    kind: 'patent_certificate',
+    generatedAt: new Date(),
+    projectTitle: request.inventionTitle ?? request.projectTitle ?? 'Patent request',
+    studentName: student?.displayName ?? 'Student',
+    studentEmail: student?.email,
+    workspaceId: request.workspaceId ? String(request.workspaceId) : undefined,
+    patentRequestId: String(request._id),
+    status: request.status,
+    ipoApplicationNumber: request.ipoApplicationNumber,
+    ipoFilingDate: request.ipoFilingDate,
+    grantDate: request.grantDate,
+  });
 };
 
 const getMutablePatentRequestForStudent = async (userId: string, requestId: string) => {

@@ -929,6 +929,9 @@ function StartupPatentRequestOverview({
 }) {
   const latestRequest = requests[0];
   const status = latestRequest?.status ?? latestSubmission?.status;
+  const downloadCertificateMutation = useMutation({
+    mutationFn: (requestId: string) => patentRequestApi.downloadCertificate(requestId),
+  });
   const submittedDocuments =
     latestRequest?.documents ?? latestSubmission?.supportingDocuments ?? [];
   const officialHandover = latestRequest?.officialHandover;
@@ -1043,6 +1046,28 @@ function StartupPatentRequestOverview({
             </div>
           ) : null}
         </div>
+        {latestRequest && isSuccessfulPatentRequestStatus(latestRequest.status) ? (
+          <div className="mt-4">
+            <button
+              type="button"
+              onClick={() => downloadCertificateMutation.mutate(latestRequest._id)}
+              disabled={downloadCertificateMutation.isPending}
+              className="flex w-full items-center justify-center gap-2 rounded-xl border border-emerald-500/40 bg-emerald-500/10 px-4 py-2.5 text-sm font-semibold text-emerald-300 transition hover:bg-emerald-500/20 disabled:cursor-not-allowed disabled:opacity-50"
+            >
+              {downloadCertificateMutation.isPending ? (
+                <Loader2 className="h-4 w-4 animate-spin" />
+              ) : (
+                <FileText className="h-4 w-4" />
+              )}
+              Download Patent Certificate (PDF)
+            </button>
+            {downloadCertificateMutation.isError ? (
+              <p className="mt-2 text-xs text-red-400">
+                Could not generate the certificate. Please try again.
+              </p>
+            ) : null}
+          </div>
+        ) : null}
       </div>
 
       <div className="rounded-2xl border border-slate-800 bg-slate-900 p-5">
@@ -1060,13 +1085,14 @@ function StartupPatentRequestOverview({
           </div>
         ) : null}
         {documents.length > 0 ? (
-          <div className="mt-4 space-y-2">
-            {documents.slice(0, 4).map((document, index) => (
+          <div className="mt-4 max-h-72 space-y-2 overflow-y-auto pr-1">
+            {documents.map((document, index) => (
               <a
                 key={`${document.fileUrl}-${index}`}
                 href={document.fileUrl}
                 target="_blank"
                 rel="noreferrer"
+                download={document.fileName}
                 className="flex items-start justify-between gap-3 rounded-xl border border-slate-800 bg-slate-950 px-3 py-2 transition hover:border-cyan-500/40"
               >
                 <span className="min-w-0">
@@ -1084,15 +1110,10 @@ function StartupPatentRequestOverview({
                   </span>
                 </span>
                 <span className="shrink-0 text-xs font-semibold text-cyan-300">
-                  Open
+                  Download
                 </span>
               </a>
             ))}
-            {documents.length > 4 ? (
-              <div className="text-xs text-slate-500">
-                +{documents.length - 4} more files in the submission detail.
-              </div>
-            ) : null}
           </div>
         ) : (
           <p className="mt-3 text-sm leading-6 text-slate-400">

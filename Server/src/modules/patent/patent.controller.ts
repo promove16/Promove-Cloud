@@ -5,6 +5,7 @@ import { getMyPatents, getShowcasedPatents, patentSubmissionSchema, submitPatent
 import {
   getMyPatentRequests,
   getPatentRequestById,
+  getPatentCertificatePdf,
   patentRequestSubmissionSchema,
   patentRequestDocumentUploadSchema,
   submitPatentRequest,
@@ -74,6 +75,13 @@ export const deletePatentRequestDocumentController = async (req: Request, res: R
 export const acknowledgeOfficialHandoverController = async (req: Request, res: Response) => {
   const request = await acknowledgeOfficialHandover(req.user!._id, String(req.params.id));
   res.status(200).json(new ApiResponse(request));
+};
+
+export const downloadPatentCertificateController = async (req: Request, res: Response) => {
+  const { buffer, fileName } = await getPatentCertificatePdf(req.user!._id, String(req.params.id));
+  res.setHeader('Content-Type', 'application/pdf');
+  res.setHeader('Content-Disposition', `attachment; filename="${fileName}"`);
+  res.send(buffer);
 };
 
 // ─── Simple Patent Support Request ──────────────────────────────────────────

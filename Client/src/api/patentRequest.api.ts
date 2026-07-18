@@ -100,6 +100,23 @@ export const patentRequestApi = {
     return response.data.data;
   },
 
+  async downloadCertificate(requestId: string) {
+    const response = await api.get(`/api/patents/requests/${requestId}/certificate`, {
+      responseType: 'blob',
+    });
+    const contentDisposition = response.headers['content-disposition'] as string | undefined;
+    const fileName = contentDisposition?.match(/filename="([^"]+)"/)?.[1] ?? 'patent-certificate.pdf';
+
+    const blobUrl = URL.createObjectURL(response.data as Blob);
+    const link = document.createElement('a');
+    link.href = blobUrl;
+    link.download = fileName;
+    document.body.appendChild(link);
+    link.click();
+    link.remove();
+    URL.revokeObjectURL(blobUrl);
+  },
+
   // ── Conversation ────────────────────────────────────────────────────────────
   async acknowledgeHandover(requestId: string) {
     const response = await api.patch<ApiSuccessResponse<PatentRequestSubmission>>(

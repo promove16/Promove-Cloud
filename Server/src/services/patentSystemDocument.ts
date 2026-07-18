@@ -4,7 +4,7 @@ import { uploadFile } from './fileStorageService';
 import { existsSync } from 'fs';
 import path from 'path';
 
-type PatentSystemDocumentKind = 'approval_summary' | 'handover_summary';
+type PatentSystemDocumentKind = 'approval_summary' | 'handover_summary' | 'patent_certificate';
 
 export interface PatentSystemDocumentInput {
   kind: PatentSystemDocumentKind;
@@ -65,13 +65,28 @@ const ensureSpace = (doc: PDFKit.PDFDocument, requiredHeight: number) => {
   doc.y = page.top;
 };
 
-const documentTitle = (kind: PatentSystemDocumentKind) =>
-  kind === 'handover_summary' ? 'ProMove Patent Handover Summary' : 'ProMove Patent Approval Summary';
+const documentTitle = (kind: PatentSystemDocumentKind) => {
+  if (kind === 'handover_summary') return 'ProMove Patent Handover Summary';
+  if (kind === 'patent_certificate') return 'ProMove Patent Grant Certificate';
+  return 'ProMove Patent Approval Summary';
+};
+
+const KIND_SUFFIX: Record<PatentSystemDocumentKind, string> = {
+  handover_summary: 'HND',
+  patent_certificate: 'CERT',
+  approval_summary: 'APR',
+};
+
+const KIND_FILE_STEM: Record<PatentSystemDocumentKind, string> = {
+  handover_summary: 'handover-summary',
+  patent_certificate: 'patent-certificate',
+  approval_summary: 'approval-summary',
+};
 
 const documentNumber = (data: PatentSystemDocumentInput) => {
   const sourceId = data.patentRequestId ?? data.patentId ?? data.workspaceId ?? 'record';
   const suffix = sourceId.replace(/[^a-zA-Z0-9]/g, '').slice(-8).toUpperCase() || 'RECORD';
-  return `PM-PAT-${data.kind === 'handover_summary' ? 'HND' : 'APR'}-${suffix}`;
+  return `PM-PAT-${KIND_SUFFIX[data.kind]}-${suffix}`;
 };
 
 const safeFileName = (data: PatentSystemDocumentInput) => {
@@ -80,7 +95,7 @@ const safeFileName = (data: PatentSystemDocumentInput) => {
     .replace(/[^a-z0-9]+/g, '-')
     .replace(/^-+|-+$/g, '')
     .slice(0, 50) || 'patent';
-  return `${stem}-${data.kind === 'handover_summary' ? 'handover-summary' : 'approval-summary'}.pdf`;
+  return `${stem}-${KIND_FILE_STEM[data.kind]}.pdf`;
 };
 
 const getLogoPath = (): string | null => {
@@ -267,6 +282,156 @@ const drawFooter = (doc: PDFKit.PDFDocument) => {
   }
 };
 
+const drawCertificateBorder = (doc: PDFKit.PDFDocument) => {
+  const inset = 20;
+  doc
+    .rect(inset, inset, doc.page.width - inset * 2, doc.page.height - inset * 2)
+    .lineWidth(1.5)
+    .strokeColor(colors.brandPurple)
+    .stroke();
+  doc
+    .rect(inset + 6, inset + 6, doc.page.width - (inset + 6) * 2, doc.page.height - (inset + 6) * 2)
+    .lineWidth(0.75)
+    .strokeColor(colors.brandBlue)
+    .stroke();
+};
+
+const drawCertificateBody = (doc: PDFKit.PDFDocument, data: PatentSystemDocumentInput) => {
+  drawCertificateBorder(doc);
+
+  doc.y = page.top + 20;
+
+  const logoPath = getLogoPath();
+  if (logoPath) {
+    doc.image(logoPath, doc.page.width / 2 - 20, doc.y, { width: 40, height: 40 });
+    doc.y += 52;
+  }
+
+  doc
+    .fillColor(colors.muted)
+    .font('Helvetica')
+    .fontSize(10)
+    .text('PROMOVE INNOVATION CLOUD', page.marginX, doc.y, {
+      width: page.width,
+      align: 'center',
+      characterSpacing: 2,
+    });
+  doc.y += 22;
+
+  doc
+    .fillColor(colors.title)
+    .font('Helvetica-Bold')
+    .fontSize(26)
+    .text('Patent Grant Certificate', page.marginX, doc.y, { width: page.width, align: 'center' });
+  doc.y += 42;
+
+  const grad = doc.linearGradient(doc.page.width / 2 - 60, doc.y, doc.page.width / 2 + 60, doc.y);
+  grad.stop(0, colors.brandBlue);
+  grad.stop(1, colors.brandPurple);
+  doc
+    .moveTo(doc.page.width / 2 - 60, doc.y)
+    .lineTo(doc.page.width / 2 + 60, doc.y)
+    .lineWidth(2)
+    .stroke(grad);
+  doc.y += 30;
+
+  doc
+    .fillColor(colors.muted)
+    .font('Helvetica')
+    .fontSize(11)
+    .text('This is to certify that the patent workflow for the invention titled', page.marginX, doc.y, {
+      width: page.width,
+      align: 'center',
+    });
+  doc.y += 24;
+
+  doc
+    .fillColor(colors.body)
+    .font('Helvetica-Bold')
+    .fontSize(18)
+    .text(data.projectTitle, page.marginX, doc.y, { width: page.width, align: 'center' });
+  doc.y += 34;
+
+  doc
+    .fillColor(colors.muted)
+    .font('Helvetica')
+    .fontSize(11)
+    .text(`submitted by ${data.studentName}, has been recorded as GRANTED on the ProMove platform.`, page.marginX, doc.y, {
+      width: page.width,
+      align: 'center',
+      lineGap: 3,
+    });
+  doc.y += 48;
+
+  const rows = [
+    { label: 'IPO application number', value: data.ipoApplicationNumber ?? 'Not recorded' },
+    { label: 'IPO filing date', value: formatDate(data.ipoFilingDate) },
+    { label: 'Grant date', value: formatDate(data.grantDate) },
+    { label: 'Certificate number', value: documentNumber(data) },
+  ];
+
+  const rowWidth = page.width / 2;
+  doc.roundedRect(page.marginX, doc.y, page.width, 78, 8).fillAndStroke(colors.panel, colors.softBorder);
+  const tableTop = doc.y;
+  rows.forEach((row, index) => {
+    const x = page.marginX + (index % 2) * rowWidth + 20;
+    const y = tableTop + Math.floor(index / 2) * 33 + 12;
+    doc
+      .fillColor(colors.muted)
+      .font('Helvetica-Bold')
+      .fontSize(8)
+      .text(row.label.toUpperCase(), x, y, { width: rowWidth - 40 });
+    doc
+      .fillColor(colors.body)
+      .font('Helvetica')
+      .fontSize(10.5)
+      .text(row.value, x, y + 12, { width: rowWidth - 40 });
+  });
+  doc.y = tableTop + 98;
+
+  const disclaimerTop = doc.page.height - page.bottom - 54;
+  const signatureY = doc.y + (disclaimerTop - doc.y) / 2 - 10;
+
+  doc
+    .moveTo(doc.page.width / 2 - 90, signatureY)
+    .lineTo(doc.page.width / 2 + 90, signatureY)
+    .lineWidth(1)
+    .strokeColor(colors.border)
+    .stroke();
+  doc
+    .fillColor(colors.body)
+    .font('Helvetica-Bold')
+    .fontSize(10)
+    .text('ProMove Patent Support Team', page.marginX, signatureY + 8, { width: page.width, align: 'center' });
+  doc
+    .fillColor(colors.muted)
+    .font('Helvetica')
+    .fontSize(8.5)
+    .text('Authorized platform record', page.marginX, signatureY + 21, { width: page.width, align: 'center' });
+
+  doc
+    .fillColor(colors.muted)
+    .font('Helvetica')
+    .fontSize(8.5)
+    .text(
+      'This certificate is a ProMove platform record confirming the grant status captured in the patent workflow. It is not a government-issued patent certificate, filing receipt, or legal proof of grant. Refer to the applicable patent office record for the official certificate.',
+      page.marginX + 20,
+      disclaimerTop,
+      { width: page.width - 40, align: 'center', lineGap: 2 },
+    );
+
+  doc
+    .fillColor(colors.muted)
+    .font('Helvetica')
+    .fontSize(9)
+    .text(
+      `Generated on ${formatDate(data.generatedAt)} - Document No. ${documentNumber(data)}`,
+      page.marginX,
+      doc.page.height - page.bottom - 8,
+      { width: page.width, align: 'center' },
+    );
+};
+
 const buildPatentSystemDocument = (data: PatentSystemDocumentInput): PDFKit.PDFDocument => {
   const doc = new PDFDocument({
     margin: page.marginX,
@@ -274,6 +439,11 @@ const buildPatentSystemDocument = (data: PatentSystemDocumentInput): PDFKit.PDFD
     bufferPages: true,
     autoFirstPage: true,
   });
+
+  if (data.kind === 'patent_certificate') {
+    drawCertificateBody(doc, data);
+    return doc;
+  }
 
   drawHeader(doc, data);
   drawInfoBlock(doc, data);
@@ -320,6 +490,11 @@ const finalizePatentSystemDocument = (doc: PDFKit.PDFDocument): Promise<Buffer> 
     doc.on('error', reject);
     doc.end();
   });
+
+export const renderPatentSystemDocument = async (data: PatentSystemDocumentInput) => ({
+  buffer: await finalizePatentSystemDocument(buildPatentSystemDocument(data)),
+  fileName: safeFileName(data),
+});
 
 export const createPatentSystemDocument = async (data: PatentSystemDocumentInput) => {
   const buffer = await finalizePatentSystemDocument(buildPatentSystemDocument(data));

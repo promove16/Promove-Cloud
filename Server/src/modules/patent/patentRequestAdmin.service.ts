@@ -273,6 +273,7 @@ export const updatePatentRequestStatus = async (
     // 6-month FER response deadline
     updates.ferResponseDeadline = new Date(now.getTime() + 6 * 30 * 24 * 60 * 60 * 1000);
   }
+
   if (targetStatus === 'granted') {
     if (!request.ipoApplicationNumber?.trim() || !request.ipoFilingDate) {
       throw new ApiError(
@@ -308,7 +309,10 @@ export const updatePatentRequestStatus = async (
     userId: String(request.studentId),
     type: 'patent_status',
     title: 'Patent case update',
-    body: `Your patent case "${request.inventionTitle ?? request.projectTitle}" status: ${targetStatus.replace(/_/g, ' ')}.`,
+    body:
+      targetStatus === 'granted'
+        ? `Your patent "${request.inventionTitle ?? request.projectTitle}" has been granted. Download your patent certificate now.`
+        : `Your patent case "${request.inventionTitle ?? request.projectTitle}" status: ${targetStatus.replace(/_/g, ' ')}.`,
     link: '/startup-launch',
   });
 
