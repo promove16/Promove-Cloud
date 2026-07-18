@@ -11,6 +11,16 @@ import { assertRecruiterLinkedToCollege } from '../recruiter/recruiter.drive.ser
 import { createBridge, notifyUser } from '../recruiter/recruiter.mappers';
 import { createRequestRecord, registerRequestHandler } from '../request/request.service';
 
+const HIRING_EVENT_TYPES = [
+  'Industry Connect Session',
+  'Placement Hackathon',
+  'Innovation Drive',
+  'Placement Drive',
+  'Internship Drive',
+  'Hackathon',
+  'Other',
+] as const;
+
 export const createEventSchema = z.object({
   title: z.string().trim().min(2).max(160),
   type: z.enum([
@@ -19,7 +29,9 @@ export const createEventSchema = z.object({
     'Innovation Drive',
     'Other',
   ]),
-  date: z.string().datetime(),
+  date: z.string().datetime().refine((val) => {
+    return new Date(val).getTime() >= Date.now() - 1000 * 60 * 5;
+  }, { message: "Event date cannot be in the past" }),
   description: z.string().trim().min(10).max(2000),
   targetRoles: z.array(z.enum(['student', 'all'])).optional(),
 });
@@ -30,13 +42,10 @@ export const eventSubmissionSchema = z.object({
 
 export const createHiringEventSchema = z.object({
   title: z.string().trim().min(2).max(160),
-  type: z.enum([
-    'Industry Connect Session',
-    'Placement Hackathon',
-    'Innovation Drive',
-    'Other',
-  ]),
-  date: z.string().datetime(),
+  type: z.enum(HIRING_EVENT_TYPES),
+  date: z.string().datetime().refine((val) => {
+    return new Date(val).getTime() >= Date.now() - 1000 * 60 * 5;
+  }, { message: "Event date cannot be in the past" }),
   description: z.string().trim().min(10).max(2000),
   collegeId: z.string().regex(/^[0-9a-fA-F]{24}$/, 'Invalid college ID'),
   linkedJobId: z.string().regex(/^[0-9a-fA-F]{24}$/).optional(),
@@ -50,13 +59,10 @@ export const selectStudentFromEventSchema = z.object({
 
 export const sendHiringEventInviteSchema = z.object({
   title: z.string().trim().min(2).max(160),
-  type: z.enum([
-    'Industry Connect Session',
-    'Placement Hackathon',
-    'Innovation Drive',
-    'Other',
-  ]),
-  date: z.string().datetime(),
+  type: z.enum(HIRING_EVENT_TYPES),
+  date: z.string().datetime().refine((val) => {
+    return new Date(val).getTime() >= Date.now() - 1000 * 60 * 5;
+  }, { message: "Event date cannot be in the past" }),
   description: z.string().trim().min(10).max(2000),
   linkedJobId: z.string().regex(/^[0-9a-fA-F]{24}$/).optional(),
   minimumInnovationScore: z.coerce.number().min(0).default(0),
@@ -65,12 +71,7 @@ export const sendHiringEventInviteSchema = z.object({
 
 const collegeEventInviteMetadataSchema = z.object({
   title: z.string().trim().min(2).max(160),
-  type: z.enum([
-    'Industry Connect Session',
-    'Placement Hackathon',
-    'Innovation Drive',
-    'Other',
-  ]),
+  type: z.enum(HIRING_EVENT_TYPES),
   date: z.string().datetime(),
   description: z.string().trim().min(10).max(2000),
   linkedJobId: z.string().regex(/^[0-9a-fA-F]{24}$/).optional(),
@@ -199,33 +200,52 @@ export const listInstitutionEvents = async (institutionId: string) => {
   ];
   const recruiters =
     recruiterIds.length > 0
-      ? await User.find({ _id: { $in: recruiterIds } }).select('_id displayName').lean()
+      ? await User.find({ _id: { $in: recruiterIds } }).select('_id displayName domain').lean()
       : [];
-  const recruiterMap = new Map(recruiters.map((r) => [String(r._id), r.displayName]));
+  const recruiterMap = new Map(recruiters.map((r) => [String(r._id), r]));
 
-  return events.map((event) => ({
-    _id: String(event._id),
-    title: event.title,
-    type: event.type,
-    category: event.category ?? 'internal',
-    description: event.description,
-    scheduledAt: event.scheduledAt.toISOString(),
-    participantsCount: event.participants.length,
-    participants: participantMap.get(String(event._id)) ?? [],
-    ...(event.rankingsComputedAt
-      ? { rankingsComputedAt: event.rankingsComputedAt.toISOString() }
-      : {}),
-    ...(event.recruiterId
-      ? {
-          recruiterId: String(event.recruiterId),
-          recruiterName: recruiterMap.get(String(event.recruiterId)) ?? 'Recruiter',
-        }
-      : {}),
-    ...(event.linkedJobId ? { linkedJobId: String(event.linkedJobId) } : {}),
-    ...(typeof event.minimumInnovationScore === 'number'
-      ? { minimumInnovationScore: event.minimumInnovationScore }
-      : {}),
-  }));
+  const jobIds = [
+    ...new Set(
+      events
+        .filter((event) => event.linkedJobId)
+        .map((event) => String(event.linkedJobId)),
+    ),
+  ];
+  const jobs =
+    jobIds.length > 0
+      ? await JobPost.find({ _id: { $in: jobIds } }).select('_id title company').lean()
+      : [];
+  const jobMap = new Map(jobs.map((j) => [String(j._id), j]));
+
+  return events.map((event) => {
+    const job = event.linkedJobId ? jobMap.get(String(event.linkedJobId)) : null;
+    const recruiter = event.recruiterId ? recruiterMap.get(String(event.recruiterId)) : null;
+    return {
+      _id: String(event._id),
+      title: event.title,
+      type: event.type,
+      category: event.category ?? 'internal',
+      description: event.description,
+      scheduledAt: event.scheduledAt.toISOString(),
+      participantsCount: event.participants.length,
+      participants: participantMap.get(String(event._id)) ?? [],
+      ...(event.rankingsComputedAt
+        ? { rankingsComputedAt: event.rankingsComputedAt.toISOString() }
+        : {}),
+      ...(event.recruiterId
+        ? {
+            recruiterId: String(event.recruiterId),
+            recruiterName: recruiter?.displayName ?? 'Recruiter',
+            recruiterCompany: recruiter?.domain ? `${recruiter.domain} Hiring` : undefined,
+          }
+        : {}),
+      ...(event.linkedJobId ? { linkedJobId: String(event.linkedJobId) } : {}),
+      ...(job ? { jobTitle: job.title, companyName: job.company } : {}),
+      ...(typeof event.minimumInnovationScore === 'number'
+        ? { minimumInnovationScore: event.minimumInnovationScore }
+        : {}),
+    };
+  });
 };
 
 export const joinEvent = async (
@@ -565,26 +585,43 @@ export const listRecruiterHiringEvents = async (recruiterId: string) => {
   );
   const rankingMap = new Map(rankingsAll.map((entry) => [entry.eventId, entry.rankings]));
 
-  return events.map((event) => ({
-    _id: String(event._id),
-    title: event.title,
-    type: event.type,
-    category: 'hiring' as const,
-    description: event.description,
-    scheduledAt: event.scheduledAt.toISOString(),
-    isActive: event.isActive,
-    institutionId: String(event.institutionId),
-    collegeName: collegeMap.get(String(event.institutionId)) ?? 'College',
-    recruiterId: String(event.recruiterId),
-    ...(event.linkedJobId ? { linkedJobId: String(event.linkedJobId) } : {}),
-    minimumInnovationScore: event.minimumInnovationScore ?? 0,
-    participantsCount: event.participants.length,
-    participants: participantMap.get(String(event._id)) ?? [],
-    ...(event.rankingsComputedAt
-      ? { rankingsComputedAt: event.rankingsComputedAt.toISOString() }
-      : {}),
-    rankings: rankingMap.get(String(event._id)) ?? [],
-  }));
+  const jobIds = [
+    ...new Set(
+      events
+        .filter((event) => event.linkedJobId)
+        .map((event) => String(event.linkedJobId)),
+    ),
+  ];
+  const jobs =
+    jobIds.length > 0
+      ? await JobPost.find({ _id: { $in: jobIds } }).select('_id title company').lean()
+      : [];
+  const jobMap = new Map(jobs.map((j) => [String(j._id), j]));
+
+  return events.map((event) => {
+    const job = event.linkedJobId ? jobMap.get(String(event.linkedJobId)) : null;
+    return {
+      _id: String(event._id),
+      title: event.title,
+      type: event.type,
+      category: 'hiring' as const,
+      description: event.description,
+      scheduledAt: event.scheduledAt.toISOString(),
+      isActive: event.isActive,
+      institutionId: String(event.institutionId),
+      collegeName: collegeMap.get(String(event.institutionId)) ?? 'College',
+      recruiterId: String(event.recruiterId),
+      ...(event.linkedJobId ? { linkedJobId: String(event.linkedJobId) } : {}),
+      ...(job ? { jobTitle: job.title, companyName: job.company } : {}),
+      minimumInnovationScore: event.minimumInnovationScore ?? 0,
+      participantsCount: event.participants.length,
+      participants: participantMap.get(String(event._id)) ?? [],
+      ...(event.rankingsComputedAt
+        ? { rankingsComputedAt: event.rankingsComputedAt.toISOString() }
+        : {}),
+      rankings: rankingMap.get(String(event._id)) ?? [],
+    };
+  });
 };
 
 export const listStudentInstitutionEvents = async (institutionId: string) => {
@@ -613,9 +650,9 @@ export const listCollegeHiringEvents = async (collegeId: string) => {
   ];
   const recruiters =
     recruiterIds.length > 0
-      ? await User.find({ _id: { $in: recruiterIds } }).select('_id displayName').lean()
+      ? await User.find({ _id: { $in: recruiterIds } }).select('_id displayName domain').lean()
       : [];
-  const recruiterMap = new Map(recruiters.map((r) => [String(r._id), r.displayName]));
+  const recruiterMap = new Map(recruiters.map((r) => [String(r._id), r]));
 
   const participantMap = await buildParticipantViewMap(events);
 
@@ -627,25 +664,44 @@ export const listCollegeHiringEvents = async (collegeId: string) => {
   );
   const rankingMap = new Map(rankingsAll.map((entry) => [entry.eventId, entry.rankings]));
 
-  return events.map((event) => ({
-    _id: String(event._id),
-    title: event.title,
-    type: event.type,
-    category: 'hiring' as const,
-    description: event.description,
-    scheduledAt: event.scheduledAt.toISOString(),
-    isActive: event.isActive,
-    participantsCount: event.participants.length,
-    participants: participantMap.get(String(event._id)) ?? [],
-    ...(event.rankingsComputedAt
-      ? { rankingsComputedAt: event.rankingsComputedAt.toISOString() }
-      : {}),
-    rankings: rankingMap.get(String(event._id)) ?? [],
-    recruiterId: String(event.recruiterId),
-    recruiterName: recruiterMap.get(String(event.recruiterId!)) ?? 'Recruiter',
-    ...(event.linkedJobId ? { linkedJobId: String(event.linkedJobId) } : {}),
-    minimumInnovationScore: event.minimumInnovationScore ?? 0,
-  }));
+  const jobIds = [
+    ...new Set(
+      events
+        .filter((event) => event.linkedJobId)
+        .map((event) => String(event.linkedJobId)),
+    ),
+  ];
+  const jobs =
+    jobIds.length > 0
+      ? await JobPost.find({ _id: { $in: jobIds } }).select('_id title company').lean()
+      : [];
+  const jobMap = new Map(jobs.map((j) => [String(j._id), j]));
+
+  return events.map((event) => {
+    const job = event.linkedJobId ? jobMap.get(String(event.linkedJobId)) : null;
+    const recruiter = event.recruiterId ? recruiterMap.get(String(event.recruiterId)) : null;
+    return {
+      _id: String(event._id),
+      title: event.title,
+      type: event.type,
+      category: 'hiring' as const,
+      description: event.description,
+      scheduledAt: event.scheduledAt.toISOString(),
+      isActive: event.isActive,
+      participantsCount: event.participants.length,
+      participants: participantMap.get(String(event._id)) ?? [],
+      ...(event.rankingsComputedAt
+        ? { rankingsComputedAt: event.rankingsComputedAt.toISOString() }
+        : {}),
+      rankings: rankingMap.get(String(event._id)) ?? [],
+      recruiterId: String(event.recruiterId),
+      recruiterName: recruiter?.displayName ?? 'Recruiter',
+      recruiterCompany: recruiter?.domain ? `${recruiter.domain} Hiring` : undefined,
+      ...(event.linkedJobId ? { linkedJobId: String(event.linkedJobId) } : {}),
+      ...(job ? { jobTitle: job.title, companyName: job.company } : {}),
+      minimumInnovationScore: event.minimumInnovationScore ?? 0,
+    };
+  });
 };
 
 export const selectStudentFromHiringEvent = async (

@@ -132,6 +132,8 @@ const normalizeHiringEventView = (event: Partial<RecruiterHiringEventView>): Rec
   collegeName: event.collegeName ?? 'College',
   recruiterId: event.recruiterId ?? '',
   ...(event.linkedJobId ? { linkedJobId: event.linkedJobId } : {}),
+  ...(event.jobTitle ? { jobTitle: event.jobTitle } : {}),
+  ...(event.companyName ? { companyName: event.companyName } : {}),
   minimumInnovationScore: event.minimumInnovationScore ?? 0,
   participantsCount: event.participantsCount ?? event.participants?.length ?? 0,
   participants: event.participants ?? [],
@@ -321,7 +323,15 @@ export const recruiterApi = {
   async createHiringEvent(payload: {
     title: string;
     collegeId: string;
-    type: 'Industry Connect Session' | 'Placement Hackathon' | 'Innovation Drive' | 'Other' | 'Walk-in Drive';
+    type:
+      | 'Placement Drive'
+      | 'Internship Drive'
+      | 'Hackathon'
+      | 'Industry Connect Session'
+      | 'Placement Hackathon'
+      | 'Innovation Drive'
+      | 'Other'
+      | 'Walk-in Drive';
     date: string;
     description: string;
     linkedJobId?: string;
@@ -345,7 +355,15 @@ export const recruiterApi = {
     collegeId: string,
     payload: {
       title: string;
-      type: 'Industry Connect Session' | 'Placement Hackathon' | 'Innovation Drive' | 'Other' | 'Walk-in Drive';
+      type:
+      | 'Placement Drive'
+      | 'Internship Drive'
+      | 'Hackathon'
+      | 'Industry Connect Session'
+      | 'Placement Hackathon'
+      | 'Innovation Drive'
+      | 'Other'
+      | 'Walk-in Drive';
       date: string;
       description: string;
       linkedJobId?: string;

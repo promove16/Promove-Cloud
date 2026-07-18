@@ -151,6 +151,19 @@ function StageMenuButton({
   const [showStageMenu, setShowStageMenu] = useState(false);
   const config = STAGE_CONFIG[applicant.stage];
   const Icon = config.icon;
+  const isAwaitingInviteResponse = applicant.source === 'recruiter_invite' && applicant.stage === 'Invited Pending';
+
+  if (isAwaitingInviteResponse) {
+    return (
+      <div
+        className={`flex items-center gap-2 rounded-lg border px-3 py-2 text-sm font-medium ${config.color} ${className}`}
+        title="Waiting for the student to accept or decline your invite"
+      >
+        <Icon className="h-4 w-4 shrink-0" />
+        <span className="truncate">Awaiting response</span>
+      </div>
+    );
+  }
 
   return (
     <div className={`relative ${className}`}>
@@ -173,6 +186,20 @@ function StageMenuButton({
 
       {showStageMenu ? (
         <div className="absolute bottom-full left-0 right-0 z-20 mb-2 max-h-56 overflow-y-auto rounded-xl border border-slate-700 bg-slate-900 p-1 shadow-xl">
+          {applicant.source === 'recruiter_invite' && applicant.stage !== 'Invited Pending' ? (
+            <button
+              type="button"
+              role="menuitem"
+              onClick={() => {
+                onMove('Invited Pending');
+                setShowStageMenu(false);
+              }}
+              disabled={isUpdating}
+              className="flex w-full items-center justify-between gap-2 rounded-lg px-3 py-2 text-sm text-slate-300 transition hover:bg-slate-800"
+            >
+              <span>Revert to Invited</span>
+            </button>
+          ) : null}
           {PIPELINE_STAGE_OPTIONS.map((option) => (
             <button
               key={`${applicant._id}-${option.stage}`}

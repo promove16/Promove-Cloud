@@ -39,6 +39,7 @@ export const jobUpdateSchema = jobCreateSchema.partial().extend({
 });
 
 export const jobApplicationStageSchema = z.enum([
+  'Invited Pending',
   'Applied',
   'Screening',
   'Shortlisted',
@@ -61,7 +62,9 @@ export const driveCreateSchema = z.object({
   title: z.string().trim().min(2).max(160),
   collegeId: objectIdSchema,
   type: z.enum(['Placement Drive', 'Internship Drive', 'Hackathon']),
-  scheduledAt: z.string().datetime(),
+  scheduledAt: z.string().datetime().refine((val) => {
+    return new Date(val).getTime() >= Date.now() - 1000 * 60 * 5;
+  }, { message: "Scheduled date cannot be in the past" }),
   description: z.string().trim().min(10).max(4000),
   minimumInnovationScore: z.coerce.number().min(0).max(MAX_INNOVATION_SCORE).default(0),
 });

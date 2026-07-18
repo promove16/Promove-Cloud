@@ -403,76 +403,78 @@ function NotificationBell({
         {notifications.length === 0 ? (
           <div className="dashboard-theme-subtle px-3 py-4 text-sm">You're all caught up.</div>
         ) : (
-          notifications.slice(0, 6).map((notification) => (
-            <DropdownMenuItem
-              key={notification._id}
-              className={`dashboard-theme-menu-item rounded-xl px-3 py-3 ${getNotificationNavigationTarget(notification, role) || notification.type === 'team_invite' ? 'cursor-pointer' : 'cursor-default'} ${notification.isRead ? 'opacity-70' : ''}`}
-              onSelect={(event) => {
-                const isTeamInvite = notification.type === 'team_invite';
-                if (isTeamInvite) {
-                  event.preventDefault();
-                }
-                markReadMutation.mutate(notification._id);
-                const target = getNotificationNavigationTarget(notification, role);
-                if (!isTeamInvite && target) {
-                  navigate(target);
-                }
-              }}
-            >
-              <div className="w-full space-y-1">
-                <div className="flex items-start justify-between gap-3">
-                  <div className="dashboard-theme-text text-sm font-semibold">{notification.title}</div>
-                  {!notification.isRead ? <span className="mt-1 h-2.5 w-2.5 rounded-full bg-cyan-400" /> : null}
-                </div>
-                <div className="dashboard-theme-subtle text-xs leading-5">{notification.body}</div>
-                <div className="dashboard-theme-faint text-[11px] uppercase tracking-[0.25em]">
-                  {new Date(notification.createdAt).toLocaleString('en-IN')}
-                </div>
-                {notification.type === 'team_invite' &&
-                notification.metadata?.workspaceId &&
-                notification.metadata?.requestId ? (
-                  <div className="flex gap-2 pt-2">
-                    <button
-                      type="button"
-                      onClick={(event) => {
-                        event.preventDefault();
-                        event.stopPropagation();
-                        setInviteFeedback(null);
-                        teamInviteActionMutation.mutate({
-                          action: 'accept',
-                          notificationId: notification._id,
-                          workspaceId: notification.metadata!.workspaceId!,
-                          requestId: notification.metadata!.requestId!,
-                        });
-                      }}
-                      disabled={teamInviteActionMutation.isPending}
-                      className="rounded-lg bg-gradient-to-r from-blue-600 to-purple-600 px-3 py-1.5 text-xs font-semibold text-white disabled:opacity-60"
-                    >
-                      Accept
-                    </button>
-                    <button
-                      type="button"
-                      onClick={(event) => {
-                        event.preventDefault();
-                        event.stopPropagation();
-                        setInviteFeedback(null);
-                        teamInviteActionMutation.mutate({
-                          action: 'decline',
-                          notificationId: notification._id,
-                          workspaceId: notification.metadata!.workspaceId!,
-                          requestId: notification.metadata!.requestId!,
-                        });
-                      }}
-                      disabled={teamInviteActionMutation.isPending}
-                      className="dashboard-theme-border-strong dashboard-theme-muted dashboard-theme-hover rounded-lg border px-3 py-1.5 text-xs font-semibold disabled:opacity-60"
-                    >
-                      Decline
-                    </button>
+          <div className="max-h-[380px] overflow-y-auto pr-1">
+            {notifications.slice(0, 20).map((notification) => (
+              <DropdownMenuItem
+                key={notification._id}
+                className={`dashboard-theme-menu-item rounded-xl px-3 py-3 ${getNotificationNavigationTarget(notification, role) || notification.type === 'team_invite' ? 'cursor-pointer' : 'cursor-default'} ${notification.isRead ? 'opacity-70' : ''}`}
+                onSelect={(event) => {
+                  const isTeamInvite = notification.type === 'team_invite';
+                  if (isTeamInvite) {
+                    event.preventDefault();
+                  }
+                  markReadMutation.mutate(notification._id);
+                  const target = getNotificationNavigationTarget(notification, role);
+                  if (!isTeamInvite && target) {
+                    navigate(target);
+                  }
+                }}
+              >
+                <div className="w-full space-y-1">
+                  <div className="flex items-start justify-between gap-3">
+                    <div className="dashboard-theme-text text-sm font-semibold">{notification.title}</div>
+                    {!notification.isRead ? <span className="mt-1 h-2.5 w-2.5 rounded-full bg-cyan-400" /> : null}
                   </div>
-                ) : null}
-              </div>
-            </DropdownMenuItem>
-          ))
+                  <div className="dashboard-theme-subtle text-xs leading-5">{notification.body}</div>
+                  <div className="dashboard-theme-faint text-[11px] uppercase tracking-[0.25em]">
+                    {new Date(notification.createdAt).toLocaleString('en-IN')}
+                  </div>
+                  {notification.type === 'team_invite' &&
+                  notification.metadata?.workspaceId &&
+                  notification.metadata?.requestId ? (
+                    <div className="flex gap-2 pt-2">
+                      <button
+                        type="button"
+                        onClick={(event) => {
+                          event.preventDefault();
+                          event.stopPropagation();
+                          setInviteFeedback(null);
+                          teamInviteActionMutation.mutate({
+                            action: 'accept',
+                            notificationId: notification._id,
+                            workspaceId: notification.metadata!.workspaceId!,
+                            requestId: notification.metadata!.requestId!,
+                          });
+                        }}
+                        disabled={teamInviteActionMutation.isPending}
+                        className="rounded-lg bg-gradient-to-r from-blue-600 to-purple-600 px-3 py-1.5 text-xs font-semibold text-white disabled:opacity-60"
+                      >
+                        Accept
+                      </button>
+                      <button
+                        type="button"
+                        onClick={(event) => {
+                          event.preventDefault();
+                          event.stopPropagation();
+                          setInviteFeedback(null);
+                          teamInviteActionMutation.mutate({
+                            action: 'decline',
+                            notificationId: notification._id,
+                            workspaceId: notification.metadata!.workspaceId!,
+                            requestId: notification.metadata!.requestId!,
+                          });
+                        }}
+                        disabled={teamInviteActionMutation.isPending}
+                        className="dashboard-theme-border-strong dashboard-theme-muted dashboard-theme-hover rounded-lg border px-3 py-1.5 text-xs font-semibold disabled:opacity-60"
+                      >
+                        Decline
+                      </button>
+                    </div>
+                  ) : null}
+                </div>
+              </DropdownMenuItem>
+            ))}
+          </div>
         )}
       </DropdownMenuContent>
     </DropdownMenu>

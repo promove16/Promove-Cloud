@@ -170,7 +170,7 @@ export function LeaderboardPageBase({
                     <StudentRow
                       key={student._id}
                       student={student}
-                      onViewJourney={() => navigate(getStudentPortfolioViewPath(student._id))}
+                      onViewJourney={() => navigate(`${basePath}/students/${student._id}`)}
                     />
                   ))
                 )}

@@ -125,7 +125,15 @@ export default function StudentEventsPage() {
                   <div className="mt-4 flex flex-wrap gap-3 text-sm text-slate-500">
                     <span>{new Date(event.scheduledAt).toLocaleString('en-IN')}</span>
                     <span>{event.participantsCount} participants</span>
-                    {event.recruiterName ? <span>Hosted by {event.recruiterName}</span> : null}
+                    {event.recruiterName ? (
+                      <span>
+                        Hosted by {event.recruiterName}
+                        {event.companyName ? ` (${event.companyName})` : event.recruiterCompany ? ` (${event.recruiterCompany})` : ''}
+                      </span>
+                    ) : null}
+                    {event.jobTitle ? (
+                      <span className="text-cyan-400 font-medium">Job: {event.jobTitle}</span>
+                    ) : null}
                     {typeof event.minimumInnovationScore === 'number' && event.category === 'hiring' ? (
                       <span>Minimum score {event.minimumInnovationScore}</span>
                     ) : null}

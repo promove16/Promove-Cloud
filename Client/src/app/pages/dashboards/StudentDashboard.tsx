@@ -1,6 +1,6 @@
-import { useMemo } from "react";
+import { useMemo, useState } from "react";
 import { Link } from "react-router-dom";
-import { useQuery } from "@tanstack/react-query";
+import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import {
   ArrowRight,
   Award,
@@ -10,9 +10,11 @@ import {
   CheckCircle2,
   Clock,
   Lightbulb,
+  Loader2,
   Rocket,
   Target,
   TrendingUp,
+  XCircle,
 } from "lucide-react";
 import { useAuth } from "../../context/AuthContext";
 import { OnboardingChecklist } from "../../../components/onboarding/OnboardingChecklist";
@@ -23,6 +25,7 @@ import { studentApi } from "../../../api/student.api";
 import { workspaceApi } from "../../../api/workspace.api";
 import {
   getStartupOverviewPath,
+  getStartupSectionPath,
   STARTUP_LAUNCH_NEW_PATH,
 } from "../../../features/startup/navigation";
 import { useInnovationScore } from "../../../hooks/useInnovationScore";
@@ -214,10 +217,30 @@ export function StudentDashboard() {
     queryFn: () => workspaceApi.list(),
   });
 
+  const queryClient = useQueryClient();
+
   const activeDealsQuery = useQuery({
     queryKey: ["student", "active-deals"],
     queryFn: dealApi.getMyDeals,
     refetchInterval: 60_000,
+  });
+
+  const [dealResponseError, setDealResponseError] = useState<string | null>(null);
+  const respondToDealMutation = useMutation({
+    mutationFn: ({
+      dealId,
+      decision,
+    }: {
+      dealId: string;
+      decision: "accepted" | "rejected";
+    }) => dealApi.respondToFounderDecision(dealId, { decision }),
+    onSuccess: async () => {
+      setDealResponseError(null);
+      await queryClient.invalidateQueries({ queryKey: ["student", "active-deals"] });
+    },
+    onError: () => {
+      setDealResponseError("Unable to record your decision right now. Please try again.");
+    },
   });
 
   const startupQuery = useQuery({
@@ -905,40 +928,105 @@ export function StudentDashboard() {
           </div>
         ) : (
           <div className="grid gap-4 md:grid-cols-2">
-            {activeDeals.map((deal, index) => (
-              <div
-                key={deal._id}
-                className="rounded-xl border border-slate-800 bg-slate-950 p-5"
-              >
-                <div className="flex items-start justify-between gap-3">
-                  <div>
-                    <h4 className="mb-1 font-bold text-white">
-                      {deal.currentStage < 2
-                        ? `Investor #${index + 1}`
-                        : deal.investorDisplayName}
-                    </h4>
-                    <p className="text-sm text-slate-400">
-                      Startup: {deal.startupName}
-                    </p>
+            {activeDeals.map((deal, index) => {
+              const canRespond =
+                deal.currentStage === 1 &&
+                deal.founderDecision?.status === "pending" &&
+                deal.status === "active";
+              const isResponding =
+                respondToDealMutation.isPending &&
+                respondToDealMutation.variables?.dealId === deal._id;
+
+              return (
+                <div
+                  key={deal._id}
+                  className="rounded-xl border border-slate-800 bg-slate-950 p-5"
+                >
+                  <div className="flex items-start justify-between gap-3">
+                    <div>
+                      <h4 className="mb-1 font-bold text-white">
+                        {deal.currentStage < 2
+                          ? `Investor #${index + 1}`
+                          : deal.investorDisplayName}
+                      </h4>
+                      <p className="text-sm text-slate-400">
+                        Startup: {deal.startupName}
+                      </p>
+                    </div>
+                    <span className="rounded bg-blue-500/10 px-2 py-1 text-xs font-semibold text-blue-400">
+                      Stage {deal.currentStage}
+                    </span>
                   </div>
-                  <span className="rounded bg-blue-500/10 px-2 py-1 text-xs font-semibold text-blue-400">
-                    Stage {deal.currentStage}
-                  </span>
+                  <p className="mt-4 text-sm text-slate-300">
+                    {deal.nextActionLabel}
+                  </p>
+                  <p className="mt-2 text-xs text-slate-500">
+                    {deal.currentStage === 1
+                      ? "Due diligence in progress"
+                      : deal.currentStage === 2
+                        ? "Payment placeholder pending"
+                        : deal.currentStage === 3
+                          ? "Awaiting equity verification by admin"
+                          : "Deal closed - check your portfolio!"}
+                  </p>
+
+                  {canRespond ? (
+                    <div className="mt-4 flex flex-wrap gap-2">
+                      <button
+                        type="button"
+                        disabled={respondToDealMutation.isPending}
+                        onClick={() => {
+                          setDealResponseError(null);
+                          respondToDealMutation.mutate({
+                            dealId: deal._id,
+                            decision: "accepted",
+                          });
+                        }}
+                        className="inline-flex items-center gap-2 rounded-lg bg-emerald-500/10 px-3 py-2 text-xs font-semibold text-emerald-300 transition hover:bg-emerald-500/20 disabled:opacity-50"
+                      >
+                        {isResponding && respondToDealMutation.variables?.decision === "accepted" ? (
+                          <Loader2 className="h-4 w-4 animate-spin" />
+                        ) : (
+                          <CheckCircle2 className="h-4 w-4" />
+                        )}
+                        Accept
+                      </button>
+                      <button
+                        type="button"
+                        disabled={respondToDealMutation.isPending}
+                        onClick={() => {
+                          setDealResponseError(null);
+                          respondToDealMutation.mutate({
+                            dealId: deal._id,
+                            decision: "rejected",
+                          });
+                        }}
+                        className="inline-flex items-center gap-2 rounded-lg bg-rose-500/10 px-3 py-2 text-xs font-semibold text-rose-300 transition hover:bg-rose-500/20 disabled:opacity-50"
+                      >
+                        {isResponding && respondToDealMutation.variables?.decision === "rejected" ? (
+                          <Loader2 className="h-4 w-4 animate-spin" />
+                        ) : (
+                          <XCircle className="h-4 w-4" />
+                        )}
+                        Decline
+                      </button>
+                    </div>
+                  ) : null}
+
+                  {dealResponseError && respondToDealMutation.variables?.dealId === deal._id ? (
+                    <p className="mt-2 text-xs text-rose-400">{dealResponseError}</p>
+                  ) : null}
+
+                  <Link
+                    to={getStartupSectionPath(deal.startupId, "cap-table")}
+                    className="mt-4 inline-flex items-center gap-1 text-xs font-semibold text-blue-400 hover:text-blue-300"
+                  >
+                    Open deal room
+                    <ArrowRight className="h-3 w-3" />
+                  </Link>
                 </div>
-                <p className="mt-4 text-sm text-slate-300">
-                  {deal.nextActionLabel}
-                </p>
-                <p className="mt-2 text-xs text-slate-500">
-                  {deal.currentStage === 1
-                    ? "Due diligence in progress"
-                    : deal.currentStage === 2
-                      ? "Payment placeholder pending"
-                      : deal.currentStage === 3
-                        ? "Awaiting equity verification by admin"
-                        : "Deal closed - check your portfolio!"}
-                </p>
-              </div>
-            ))}
+              );
+            })}
           </div>
         )}
       </div>

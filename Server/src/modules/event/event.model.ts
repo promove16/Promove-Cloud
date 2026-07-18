@@ -73,7 +73,15 @@ const eventSchema = new Schema<IEvent>(
     },
     type: {
       type: String,
-      enum: ['Industry Connect Session', 'Placement Hackathon', 'Innovation Drive', 'Other'],
+      enum: [
+        'Industry Connect Session',
+        'Placement Hackathon',
+        'Innovation Drive',
+        'Placement Drive',
+        'Internship Drive',
+        'Hackathon',
+        'Other',
+      ],
       required: true,
     },
     category: {

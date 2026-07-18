@@ -66,8 +66,14 @@ export function StudentJourneyDrawerBase({ journey, open, onClose }: Props) {
   );
 
   return (
-    <div className="fixed inset-0 z-50 flex justify-end bg-slate-950 backdrop-blur-sm">
-      <div className="flex h-full w-full max-w-2xl flex-col border-l border-slate-800 bg-slate-950">
+    <div
+      className="fixed inset-0 z-50 flex items-center justify-center bg-slate-950/60 p-4 backdrop-blur-sm"
+      onClick={onClose}
+    >
+      <div
+        className="flex max-h-[90vh] w-full max-w-2xl flex-col rounded-3xl border border-slate-800 bg-slate-950 shadow-2xl shadow-black/80"
+        onClick={(e) => e.stopPropagation()}
+      >
         {/* Header */}
         <div className="flex items-start justify-between gap-4 border-b border-slate-800 px-6 py-5">
           <div className="flex items-center gap-4">

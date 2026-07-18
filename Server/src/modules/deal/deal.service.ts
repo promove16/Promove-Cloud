@@ -839,7 +839,12 @@ export const validateInvestmentTerms = async ({
   return sharesToAllocate;
 };
 
-const pushFounderNotification = async (founderIds: Types.ObjectId[], title: string, body: string) =>
+const pushFounderNotification = async (
+  founderIds: Types.ObjectId[],
+  title: string,
+  body: string,
+  startupId: string,
+) =>
   Promise.all(
     founderIds.map((founderId) =>
       notificationQueue.add('investment-notification', {
@@ -847,7 +852,7 @@ const pushFounderNotification = async (founderIds: Types.ObjectId[], title: stri
         type: 'deal_interest' as const,
         title,
         body,
-        link: '/startup-launch',
+        link: `/startup-launch/${startupId}/cap-table`,
       }),
     ),
   );
@@ -1109,12 +1114,14 @@ export const createInvestorDealFromInterest = async (
       transactionResult.founderIds,
       'Founder decision required for sole investor deal',
       'A sole investor reserved shares in your startup. Accept or reject the deal before fund transfer can begin.',
+      startupId,
     );
   } else {
     await pushFounderNotification(
       transactionResult.founderIds,
       'Founder decision required for penny investor deal',
       `A penny investor reserved ${round(parsed.proposedEquityPercent)}% equity. Accept or reject the deal before fund transfer can begin.`,
+      startupId,
     );
   }
 
@@ -3177,6 +3184,7 @@ export const placeBidFromUser = async (
     parsed.investorType === 'sole'
       ? 'A sole investor placed a bid on your startup. Review it in your deal board.'
       : `A penny investor bid ₹${parsed.proposedAmountINR.toLocaleString()} for ${round(parsed.proposedEquityPercent)}% equity.`,
+    startupId,
   );
 
   const createdDeal = await Deal.findById(transactionResult.dealId).lean<DealDocumentLike | null>();

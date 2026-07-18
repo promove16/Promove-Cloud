@@ -4,6 +4,9 @@ export type EventType =
   | 'Industry Connect Session'
   | 'Placement Hackathon'
   | 'Innovation Drive'
+  | 'Placement Drive'
+  | 'Internship Drive'
+  | 'Hackathon'
   | 'Other';
 
 export type EventCategory = 'internal' | 'hiring';

@@ -292,6 +292,8 @@ export interface RecruiterHiringEventView {
   collegeName: string;
   recruiterId: string;
   linkedJobId?: string;
+  jobTitle?: string;
+  companyName?: string;
   minimumInnovationScore: number;
   participantsCount: number;
   participants: RecruiterHiringEventParticipant[];

@@ -15,6 +15,9 @@ import {
 } from './RecruiterSectionNav';
 
 const eventTypes = [
+  'Placement Drive',
+  'Internship Drive',
+  'Hackathon',
   'Industry Connect Session',
   'Placement Hackathon',
   'Innovation Drive',
@@ -67,6 +70,16 @@ export default function HiringEvents({ embedded = false }: HiringEventsProps) {
   const [createMode, setCreateMode] = useState<CreateMode>('direct');
   const [inviteMessage, setInviteMessage] = useState('');
   const [inviteSentNotice, setInviteSentNotice] = useState('');
+
+  const minDateTime = useMemo(() => {
+    const now = new Date();
+    const year = now.getFullYear();
+    const month = String(now.getMonth() + 1).padStart(2, '0');
+    const day = String(now.getDate()).padStart(2, '0');
+    const hours = String(now.getHours()).padStart(2, '0');
+    const minutes = String(now.getMinutes()).padStart(2, '0');
+    return `${year}-${month}-${day}T${hours}:${minutes}`;
+  }, []);
 
   const hiringEventsQuery = useQuery({
     queryKey: ['recruiter', 'hiring-events'],
@@ -305,6 +318,7 @@ export default function HiringEvents({ embedded = false }: HiringEventsProps) {
             <Input
               type="datetime-local"
               value={form.date}
+              min={minDateTime}
               onChange={(event) => setForm((current) => ({ ...current, date: event.target.value }))}
             />
             <div className="grid gap-1">
@@ -629,7 +643,7 @@ export default function HiringEvents({ embedded = false }: HiringEventsProps) {
                     <select
                       value={scoreDraft.studentId}
                       onChange={(event) => setScoreDraft((current) => ({ ...current, studentId: event.target.value }))}
-                      className="rounded-lg border border-slate-800 bg-slate-950 px-4 py-3 text-white"
+                      className="w-full max-w-full rounded-lg border border-slate-800 bg-slate-950 px-4 py-3 text-white"
                     >
                       <option value="">Select participant</option>
                       {selectedEvent.participants.map((participant) => (
@@ -647,6 +661,7 @@ export default function HiringEvents({ embedded = false }: HiringEventsProps) {
                       placeholder="Submission score"
                     />
                     <Button
+                      className="w-full justify-center"
                       onClick={() =>
                         scoreMutation.mutate({
                           eventId: selectedEvent._id,
@@ -687,7 +702,7 @@ export default function HiringEvents({ embedded = false }: HiringEventsProps) {
                   <select
                     value={selectionDraft.jobId}
                     onChange={(event) => setSelectionDraft((current) => ({ ...current, jobId: event.target.value }))}
-                    className="rounded-lg border border-slate-800 bg-slate-950 px-4 py-3 text-white"
+                    className="w-full max-w-full rounded-lg border border-slate-800 bg-slate-950 px-4 py-3 text-white"
                   >
                     <option value="">Select recruiter job</option>
                     {activeJobs.map((job) => (
@@ -702,6 +717,7 @@ export default function HiringEvents({ embedded = false }: HiringEventsProps) {
                     placeholder="Optional note for the student"
                   />
                   <Button
+                    className="w-full justify-center"
                     onClick={() =>
                       pipelineMutation.mutate({
                         eventId: selectedEvent._id,

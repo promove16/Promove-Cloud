@@ -724,11 +724,31 @@ export default function EventManager({
                             Host
                           </div>
                           <div className="mt-3 text-sm font-medium text-slate-100">
-                            {event.recruiterName ?? 'Institution managed'}
+                            {event.recruiterName ? (
+                              <>
+                                <span>{event.recruiterName}</span>
+                                {event.companyName ? (
+                                  <span className="block text-xs text-slate-400 mt-0.5 font-normal">
+                                    {event.companyName}
+                                  </span>
+                                ) : event.recruiterCompany ? (
+                                  <span className="block text-xs text-slate-400 mt-0.5 font-normal">
+                                    {event.recruiterCompany}
+                                  </span>
+                                ) : null}
+                              </>
+                            ) : (
+                              'Institution managed'
+                            )}
                           </div>
+                          {event.jobTitle ? (
+                            <div className="mt-2 text-xs text-cyan-300 font-medium">
+                              Job: {event.jobTitle}
+                            </div>
+                          ) : null}
                           {typeof event.minimumInnovationScore === 'number' &&
                           event.category === 'hiring' ? (
-                            <div className="mt-1 text-xs text-amber-300">
+                            <div className="mt-2 text-xs text-amber-300">
                               Minimum score {event.minimumInnovationScore}
                             </div>
                           ) : null}

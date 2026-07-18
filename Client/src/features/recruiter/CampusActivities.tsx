@@ -25,7 +25,7 @@ const MODE_CONFIG: Record<CampusMode, { label: string; description: string; Icon
 
 export default function CampusActivities() {
   const [searchParams, setSearchParams] = useSearchParams();
-  const mode: CampusMode = searchParams.get('mode') === 'events' ? 'events' : 'drives';
+  const mode: CampusMode = searchParams.get('mode') === 'drives' ? 'drives' : 'events';
 
   const setMode = (next: CampusMode) => {
     setSearchParams((current) => {

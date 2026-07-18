@@ -672,6 +672,23 @@ export const updateRecruiterJobApplicationStage = async (
   const now = new Date();
   const existingRecord = recordIndex >= 0 ? job.applicationRecords[recordIndex] : undefined;
   const previousStage = existingRecord?.stage;
+
+  if (getApplicationSource(existingRecord) === 'recruiter_invite' && previousStage === 'Invited Pending') {
+    throw new ApiError(
+      409,
+      'INVITE_NOT_ACCEPTED',
+      'This student has not accepted your invite yet. Withdraw the invite instead of updating the pipeline stage.',
+    );
+  }
+
+  if (parsed.stage === 'Invited Pending' && getApplicationSource(existingRecord) !== 'recruiter_invite') {
+    throw new ApiError(
+      400,
+      'INVALID_STAGE_FOR_APPLICATION',
+      '"Invited Pending" only applies to recruiter-initiated invites.',
+    );
+  }
+
   const nextRecord: IJobApplicationRecord = buildApplicationRecord({
     studentId,
     source: getApplicationSource(existingRecord),

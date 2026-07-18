@@ -93,7 +93,10 @@ export interface CollegeEvent {
   rankings: EventRanking[];
   recruiterId?: string;
   recruiterName?: string;
+  recruiterCompany?: string;
   linkedJobId?: string;
+  jobTitle?: string;
+  companyName?: string;
   minimumInnovationScore?: number;
 }
 

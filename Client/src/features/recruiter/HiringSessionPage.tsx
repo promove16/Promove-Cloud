@@ -300,43 +300,58 @@ export default function HiringSessionPage() {
           {isRecruiterView && (
             <Card className="p-6">
               <div className="mb-4 text-xs uppercase tracking-[0.22em] text-slate-500">Update Status</div>
-              <div className="space-y-4">
-                <select
-                  value={application.stage}
-                  onChange={(e) => {
-                    const newStage = e.target.value as RecruiterJobApplicationStage;
-                    stageMutation.mutate({
-                      jobId: application.job._id,
-                      studentId: application._id,
-                      stage: newStage,
-                    });
-                  }}
-                  className="w-full rounded-lg border border-slate-700 bg-slate-900 px-4 py-3 text-white"
-                >
-                  {Object.entries(STAGE_CONFIG).map(([stage, config]) => (
-                    <option key={stage} value={stage}>
-                      {config.label}
-                    </option>
-                  ))}
-                </select>
-                <Input
-                  value={note}
-                  onChange={(e) => setNote(e.target.value)}
-                  placeholder="Add a note for the student (optional)"
-                />
-                <Button
-                  onClick={() => {
-                    stageMutation.mutate({
-                      jobId: application.job._id,
-                      studentId: application._id,
-                      stage: application.stage,
-                    });
-                  }}
-                  disabled={stageMutation.isPending}
-                >
-                  {stageMutation.isPending ? 'Saving...' : 'Update Status'}
-                </Button>
-              </div>
+              {application.source === 'recruiter_invite' && application.stage === 'Invited Pending' ? (
+                <div className="rounded-lg border border-amber-500/20 bg-amber-500/10 px-4 py-3 text-sm text-amber-200">
+                  Waiting for the student to accept your invite. You can't move this pipeline stage until
+                  they respond — withdraw the invite from your requests if you want to cancel it.
+                </div>
+              ) : (
+                <div className="space-y-4">
+                  <select
+                    value={application.stage}
+                    onChange={(e) => {
+                      const newStage = e.target.value as RecruiterJobApplicationStage;
+                      stageMutation.mutate({
+                        jobId: application.job._id,
+                        studentId: application._id,
+                        stage: newStage,
+                      });
+                    }}
+                    className="w-full rounded-lg border border-slate-700 bg-slate-900 px-4 py-3 text-white"
+                  >
+                    {Object.entries(STAGE_CONFIG)
+                      .filter(([stage]) =>
+                        stage === 'Invite Accepted' || stage === 'Invite Declined'
+                          ? false
+                          : stage === 'Invited Pending'
+                            ? application.source === 'recruiter_invite'
+                            : true,
+                      )
+                      .map(([stage, config]) => (
+                        <option key={stage} value={stage}>
+                          {config.label}
+                        </option>
+                      ))}
+                  </select>
+                  <Input
+                    value={note}
+                    onChange={(e) => setNote(e.target.value)}
+                    placeholder="Add a note for the student (optional)"
+                  />
+                  <Button
+                    onClick={() => {
+                      stageMutation.mutate({
+                        jobId: application.job._id,
+                        studentId: application._id,
+                        stage: application.stage,
+                      });
+                    }}
+                    disabled={stageMutation.isPending}
+                  >
+                    {stageMutation.isPending ? 'Saving...' : 'Update Status'}
+                  </Button>
+                </div>
+              )}
             </Card>
           )}
         </div>
