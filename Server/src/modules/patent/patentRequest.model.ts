@@ -48,6 +48,7 @@ const requestDocSchema = new Schema<IPatentRequest['documents'][number]>(
         'assignment_deed',
         'priority_document',
         'patent_certificate',
+        'system_generated',
         'supporting_evidence',
         'other',
       ],

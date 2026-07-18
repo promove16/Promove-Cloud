@@ -4,6 +4,7 @@ import { Types } from 'mongoose';
 import request from 'supertest';
 import app from '../../src/app';
 import { PatentRequest } from '../../src/modules/patent/patentRequest.model';
+import { Startup } from '../../src/modules/startup/startup.model';
 import { User } from '../../src/modules/user/user.model';
 import { Workspace } from '../../src/modules/workspace/workspace.model';
 import { UserRole } from '../../src/types/roles.types';
@@ -80,52 +81,65 @@ describe('patent support request integration', () => {
         },
       ],
     });
+    await Startup.create({
+      founderIds: [studentUser._id],
+      projectId: workspace._id,
+      name: 'Support Request Startup',
+      tagline: 'Startup-backed patent support request',
+      category: 'Software',
+      stage: 'MVP',
+      activeProducts: 1,
+      teamSize: 1,
+      isActive: true,
+    });
 
     const accessToken = await loginAs(studentEmail);
+
+    const payload = {
+      workspaceId: workspace._id.toString(),
+      projectTitle: 'Adaptive Patent Workflow',
+      description:
+        'A guided workflow that collects invention context, routes supporting files, and sends a clean patent support request to the admin team.',
+      patentType: 'invention',
+      questionnaire: {
+        problemStatement:
+          'Student founders need one place to capture the invention problem and the people affected by it.',
+        solutionDifferentiation:
+          'The request combines a structured intake with workspace-linked files instead of scattered chat messages.',
+        coreInnovation:
+          'The core innovation is the workspace-to-patent support bridge with structured admin intake.',
+        priorArtStatus:
+          'The team reviewed prior-art workflow tools and attached notes for admin review.',
+        workingMechanism:
+          'Students answer the intake, attach files, and the system creates a patent support request with context.',
+        keyComponents: 'Workspace, intake questionnaire, admin queue, and supporting file links.',
+        developmentStage: 'prototype',
+        documentationReadiness:
+          'Early draft notes and supporting files are ready and attached.',
+        inventorOwnership: 'team',
+        developmentContext:
+          'The product was built independently inside the team workspace.',
+        targetMarkets:
+          'Incubators, colleges, and startup support teams can use this workflow.',
+        commercializationStrategy: 'build_startup',
+        publicDisclosureStatus:
+          'No public disclosure has happened outside the internal team.',
+        legalAgreements:
+          'No external legal agreements are currently in place.',
+        ipProtectionType: 'patent',
+      },
+      documentUploads: [
+        {
+          uploadId: uploadId.toString(),
+          category: 'prior_art_report',
+        },
+      ],
+    };
 
     const response = await request(app)
       .post('/api/patents/requests')
       .set('Authorization', `Bearer ${accessToken}`)
-      .send({
-        workspaceId: workspace._id.toString(),
-        projectTitle: 'Adaptive Patent Workflow',
-        description:
-          'A guided workflow that collects invention context, routes supporting files, and sends a clean patent support request to the admin team.',
-        patentType: 'invention',
-        questionnaire: {
-          problemStatement:
-            'Student founders need one place to capture the invention problem and the people affected by it.',
-          solutionDifferentiation:
-            'The request combines a structured intake with workspace-linked files instead of scattered chat messages.',
-          coreInnovation:
-            'The core innovation is the workspace-to-patent support bridge with structured admin intake.',
-          priorArtStatus:
-            'The team reviewed prior-art workflow tools and attached notes for admin review.',
-          workingMechanism:
-            'Students answer the intake, attach files, and the system creates a patent support request with context.',
-          keyComponents: 'Workspace, intake questionnaire, admin queue, and supporting file links.',
-          developmentStage: 'prototype',
-          documentationReadiness:
-            'Early draft notes and supporting files are ready and attached.',
-          inventorOwnership: 'team',
-          developmentContext:
-            'The product was built independently inside the team workspace.',
-          targetMarkets:
-            'Incubators, colleges, and startup support teams can use this workflow.',
-          commercializationStrategy: 'build_startup',
-          publicDisclosureStatus:
-            'No public disclosure has happened outside the internal team.',
-          legalAgreements:
-            'No external legal agreements are currently in place.',
-          ipProtectionType: 'patent',
-        },
-        documentUploads: [
-          {
-            uploadId: uploadId.toString(),
-            category: 'prior_art_report',
-          },
-        ],
-      });
+      .send(payload);
 
     expect(response.status).toBe(201);
     expect(response.body.data).toEqual(
@@ -155,5 +169,18 @@ describe('patent support request integration', () => {
         }),
       ]),
     );
+
+    const duplicateResponse = await request(app)
+      .post('/api/patents/requests')
+      .set('Authorization', `Bearer ${accessToken}`)
+      .send(payload);
+
+    expect(duplicateResponse.status).toBe(409);
+    expect(duplicateResponse.body.error).toEqual(
+      expect.objectContaining({
+        code: 'STARTUP_PATENT_ALREADY_EXISTS',
+      }),
+    );
+    expect(await PatentRequest.countDocuments({ workspaceId: workspace._id })).toBe(1);
   });
 });

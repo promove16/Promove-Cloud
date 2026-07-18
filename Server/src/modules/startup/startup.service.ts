@@ -19,6 +19,8 @@ import { DirectMessage } from '../dm/dm.model';
 import { serializeDirectMessage } from '../dm/dm.serializer';
 import { NotificationService } from '../notification/notification.service';
 import { RequestRecord } from '../request/request.model';
+import { Patent } from '../patent/patent.model';
+import { PatentRequest } from '../patent/patentRequest.model';
 import { io } from '../../config/socket';
 import type {
   StartupDocumentCategory,
@@ -44,6 +46,23 @@ const deleteRequestsLinkedToStartup = async (startupId: string) => {
       { 'metadata.startupId': startupId },
     ],
   });
+};
+
+const startupHasPatentWorkflow = async (startup: InstanceType<typeof Startup>) => {
+  if (startup.traction?.patentApplicationId) {
+    return true;
+  }
+
+  if (!startup.projectId) {
+    return false;
+  }
+
+  const [existingPatent, existingPatentRequest] = await Promise.all([
+    Patent.exists({ workspaceId: startup.projectId }),
+    PatentRequest.exists({ workspaceId: startup.projectId }),
+  ]);
+
+  return Boolean(existingPatent || existingPatentRequest);
 };
 
 const STARTUP_DOCUMENT_CATEGORIES = [
@@ -2187,6 +2206,14 @@ export const deleteStartup = async (startupId: string, userId: string) => {
       400,
       'STARTUP_HAS_INVESTORS',
       'Cannot delete a startup that has active investor deals. Cancel all deals first.',
+    );
+  }
+
+  if (await startupHasPatentWorkflow(startup)) {
+    throw new ApiError(
+      400,
+      'STARTUP_HAS_PATENT',
+      'This startup has a patent record and cannot be deleted. Contact admin if this startup must be archived.',
     );
   }
 

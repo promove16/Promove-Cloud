@@ -3,6 +3,7 @@ import { Types } from 'mongoose';
 import request from 'supertest';
 import app from '../../src/app';
 import { env } from '../../src/config/env';
+import { Patent } from '../../src/modules/patent/patent.model';
 import { Startup } from '../../src/modules/startup/startup.model';
 import { User } from '../../src/modules/user/user.model';
 import { Workspace } from '../../src/modules/workspace/workspace.model';
@@ -1023,6 +1024,65 @@ describe('startup route validation', () => {
         code: 'STARTUP_LAUNCHED_DELETION_REQUIRES_ADMIN',
       }),
     );
+    const persisted = await Startup.findById(startup._id).lean();
+    expect(persisted?.isActive).toBe(true);
+  });
+
+  it('blocks founder deletion when the startup has a patent record', async () => {
+    const founder = await createStudent('Patent Linked Delete Founder');
+    const workspace = await Workspace.create({
+      ownerId: founder._id,
+      teamMemberIds: [founder._id],
+      title: 'Patent Linked Delete Workspace',
+      category: 'AI',
+      stage: 'Patent',
+    });
+    const startup = await createApprovedLaunchStartup(founder, workspace, {
+      launchedToInvestors: false,
+      launchedToMentors: false,
+      launchedToRecruiters: false,
+      stage: 'MVP',
+    });
+
+    await Patent.create({
+      studentId: founder._id,
+      workspaceId: workspace._id,
+      projectTitle: 'Patent Linked Startup Record',
+      questionnaire: {
+        problemStatement: 'A startup deletion guard should preserve patent-linked startup history.',
+        solutionDifferentiation: 'The patent record belongs to this startup workspace.',
+        coreInnovation: 'Founder-side startup deletion is blocked once patent workflow exists.',
+        priorArtStatus: 'Prior art has been reviewed.',
+        workingMechanism: 'The startup record stays active when patent records exist.',
+        keyComponents: 'Startup, workspace, patent record, delete guard.',
+        developmentStage: 'prototype',
+        documentationReadiness: 'Patent documents are ready.',
+        inventorOwnership: 'team',
+        developmentContext: 'Student startup workspace.',
+        targetMarkets: 'Student innovation programs.',
+        commercializationStrategy: 'build_startup',
+        publicDisclosureStatus: 'No public disclosure.',
+        legalAgreements: 'No conflicting legal agreements.',
+        ipProtectionType: 'patent',
+      },
+      supportingDocuments: [],
+      status: 'submitted',
+      submittedAt: new Date(),
+      scoreAwarded: false,
+      showcasedInMarketplace: false,
+    });
+
+    const response = await request(app)
+      .delete(`/api/startup/${startup._id}`)
+      .set(authHeader(founder));
+
+    expect(response.status).toBe(400);
+    expect(response.body.error).toEqual(
+      expect.objectContaining({
+        code: 'STARTUP_HAS_PATENT',
+      }),
+    );
+
     const persisted = await Startup.findById(startup._id).lean();
     expect(persisted?.isActive).toBe(true);
   });

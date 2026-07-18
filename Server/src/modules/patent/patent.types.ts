@@ -10,7 +10,8 @@ export type PatentDocumentCategory =
   | 'design_plan_sketch'
   | 'examination_request'
   | 'form3_foreign_filing'
-  | 'cost_management';
+  | 'cost_management'
+  | 'system_generated';
 
 export type PatentInventionCategory =
   | 'mobile_app_backend'
@@ -56,6 +57,8 @@ export interface PatentSupportingDocument {
   fileSizeBytes: number;
   note?: string;
   documentCategory?: PatentDocumentCategory;
+  storageProvider?: 'cloudinary' | 's3';
+  storageKey?: string;
 }
 
 export type PatentStage = 'filed' | 'published' | 'granted';
@@ -85,6 +88,7 @@ export interface IPatent {
   };
   filingDocuments?: PatentFilingDocuments;
   supportingDocuments: PatentSupportingDocument[];
+  officialDocuments?: PatentSupportingDocument[];
   status: 'submitted' | 'under_review' | 'approved' | 'rejected';
   submittedAt: Date;
   adminReviewedAt?: Date;
@@ -169,6 +173,7 @@ export type PatentRequestDocCategory =
   | 'assignment_deed'
   | 'priority_document'
   | 'patent_certificate'
+  | 'system_generated'
   | 'supporting_evidence'
   | 'other';
 

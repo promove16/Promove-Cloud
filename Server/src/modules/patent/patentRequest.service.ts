@@ -6,10 +6,10 @@ import { ApiError } from '../../utils/ApiError';
 import { User } from '../user/user.model';
 import { UserRole } from '../../types/roles.types';
 import { Workspace } from '../workspace/workspace.model';
-import { Startup } from '../startup/startup.model';
 import { recordStartupLifecycleEvent } from '../startupLifecycle/startupLifecycle.service';
 import { PatentRequest } from './patentRequest.model';
-import { LEGACY_STATUS_MAP, type PatentRequestStatus } from './patent.types';
+import { LEGACY_STATUS_MAP, type IPatentRequest, type PatentRequestDocument, type PatentRequestStatus } from './patent.types';
+import { getSignedPatentDocumentUrl, resolveStartupForPatentSubmission } from './patent.service';
 
 // ─── Zod schemas ──────────────────────────────────────────────────────────────
 
@@ -58,6 +58,26 @@ const MUTABLE_PATENT_REQUEST_STATUSES = new Set<PatentRequestStatus>([
 
 const normalizePatentRequestStatus = (raw: string): PatentRequestStatus =>
   (LEGACY_STATUS_MAP[raw] as PatentRequestStatus) ?? (raw as PatentRequestStatus);
+
+const serializePatentRequestDocument = async (document: PatentRequestDocument) => ({
+  ...document,
+  fileUrl: await getSignedPatentDocumentUrl(document),
+});
+
+const serializePatentRequestForClient = async (request: IPatentRequest) => ({
+  ...request,
+  documents: await Promise.all((request.documents ?? []).map(serializePatentRequestDocument)),
+  ...(request.officialHandover
+    ? {
+        officialHandover: {
+          ...request.officialHandover,
+          documents: await Promise.all(
+            (request.officialHandover.documents ?? []).map(serializePatentRequestDocument),
+          ),
+        },
+      }
+    : {}),
+});
 
 export const patentRequestDocumentUploadSchema = z.object({
   documentCategory: z.enum(PATENT_REQUEST_DOC_CATEGORIES),
@@ -178,6 +198,8 @@ export const submitPatentRequest = async (userId: string, payload: z.infer<typeo
     );
   }
 
+  const linkedStartup = await resolveStartupForPatentSubmission(userId, payload.workspaceId);
+
   const documents = payload.documentUploads.map((item) => {
     const upload = workspace.uploads.find((u) => String(u._id) === item.uploadId);
     if (!upload) {
@@ -191,6 +213,8 @@ export const submitPatentRequest = async (userId: string, payload: z.infer<typeo
       fileSizeBytes: upload.fileSizeBytes,
       documentCategory: item.category,
       ...(upload.note ? { note: upload.note } : {}),
+      ...(upload.storageProvider ? { storageProvider: upload.storageProvider } : {}),
+      ...(upload.storageKey ? { storageKey: upload.storageKey } : {}),
     };
   });
 
@@ -231,16 +255,13 @@ export const submitPatentRequest = async (userId: string, payload: z.infer<typeo
       : {}),
   });
 
-  const linkedStartup = await Startup.findOne({ projectId: payload.workspaceId, isActive: true });
-  if (linkedStartup) {
-    linkedStartup.traction = {
-      ...(linkedStartup.traction ?? {}),
-      patentFiled: true,
-      patentType: 'promove_assisted',
-      patentApplicationId: String(patentRequest._id),
-    };
-    await linkedStartup.save();
-  }
+  linkedStartup.traction = {
+    ...(linkedStartup.traction ?? {}),
+    patentFiled: true,
+    patentType: 'promove_assisted',
+    patentApplicationId: String(patentRequest._id),
+  };
+  await linkedStartup.save();
 
   await recordStartupLifecycleEvent({
     startupId: linkedStartup?._id,
@@ -279,18 +300,21 @@ export const submitPatentRequest = async (userId: string, payload: z.infer<typeo
     ),
   );
 
-  return patentRequest.toObject();
+  return serializePatentRequestForClient(patentRequest.toObject());
 };
 
 export const getMyPatentRequests = async (userId: string) =>
-  PatentRequest.find({ studentId: userId }).sort({ createdAt: -1 }).lean();
+  Promise.all(
+    (await PatentRequest.find({ studentId: userId }).sort({ createdAt: -1 }).lean())
+      .map((request) => serializePatentRequestForClient(request)),
+  );
 
 export const getPatentRequestById = async (userId: string, requestId: string) => {
   const request = await PatentRequest.findOne({ _id: requestId, studentId: userId }).lean();
   if (!request) {
     throw new ApiError(404, 'PATENT_REQUEST_NOT_FOUND', 'Patent request not found.');
   }
-  return request;
+  return serializePatentRequestForClient(request);
 };
 
 const getMutablePatentRequestForStudent = async (userId: string, requestId: string) => {
@@ -376,7 +400,7 @@ export const uploadPatentRequestDocument = async (
     ),
   );
 
-  return request.toObject();
+  return serializePatentRequestForClient(request.toObject());
 };
 
 export const deletePatentRequestDocument = async (userId: string, requestId: string, documentId: string) => {
@@ -396,7 +420,7 @@ export const deletePatentRequestDocument = async (userId: string, requestId: str
   request.documents = request.documents.filter((item) => String(item._id) !== documentId);
   await request.save();
 
-  return request.toObject();
+  return serializePatentRequestForClient(request.toObject());
 };
 
 export const acknowledgeOfficialHandover = async (userId: string, requestId: string) => {
@@ -453,7 +477,7 @@ export const acknowledgeOfficialHandover = async (userId: string, requestId: str
     ),
   );
 
-  return request.toObject();
+  return serializePatentRequestForClient(request.toObject());
 };
 
 // ─── Simple Patent Support Request ───────────────────────────────────────────
@@ -513,6 +537,8 @@ export const createPatentSupportRequest = async (
     );
   }
 
+  const linkedStartup = await resolveStartupForPatentSubmission(userId, payload.workspaceId);
+
   const documents = (payload.documentUploads ?? []).map((item) => {
     const upload = workspace.uploads.find((entry) => String(entry._id) === item.uploadId);
     if (!upload) {
@@ -526,6 +552,8 @@ export const createPatentSupportRequest = async (
       fileSizeBytes: upload.fileSizeBytes,
       documentCategory: item.category,
       ...(upload.note ? { note: upload.note } : {}),
+      ...(upload.storageProvider ? { storageProvider: upload.storageProvider } : {}),
+      ...(upload.storageKey ? { storageKey: upload.storageKey } : {}),
     };
   });
 
@@ -572,16 +600,13 @@ export const createPatentSupportRequest = async (
     documents,
   });
 
-  const linkedStartup = await Startup.findOne({ projectId: payload.workspaceId, isActive: true });
-  if (linkedStartup) {
-    linkedStartup.traction = {
-      ...(linkedStartup.traction ?? {}),
-      patentFiled: true,
-      patentType: 'promove_assisted',
-      patentApplicationId: String(patentRequest._id),
-    };
-    await linkedStartup.save();
-  }
+  linkedStartup.traction = {
+    ...(linkedStartup.traction ?? {}),
+    patentFiled: true,
+    patentType: 'promove_assisted',
+    patentApplicationId: String(patentRequest._id),
+  };
+  await linkedStartup.save();
 
   await recordStartupLifecycleEvent({
     startupId: linkedStartup?._id,
@@ -611,5 +636,5 @@ export const createPatentSupportRequest = async (
     studentId: userId,
   });
 
-  return patentRequest.toObject();
+  return serializePatentRequestForClient(patentRequest.toObject());
 };

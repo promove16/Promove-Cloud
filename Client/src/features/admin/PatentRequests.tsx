@@ -101,6 +101,7 @@ const DOCUMENT_CATEGORY_LABELS: Record<string, string> = {
   assignment_deed: 'Assignment deed',
   priority_document: 'Priority document',
   patent_certificate: 'Patent certificate',
+  system_generated: 'System-generated document',
   supporting_evidence: 'Supporting evidence',
   other: 'Other',
 };
@@ -752,11 +753,13 @@ function CaseDetailModal({
                             onChange={(e) => setHandoverCategory(e.target.value as PatentRequestDocCategory)}
                             className="rounded-xl border border-slate-800 bg-slate-950 px-4 py-2.5 text-sm text-white"
                           >
-                            {Object.entries(DOCUMENT_CATEGORY_LABELS).map(([value, label]) => (
-                              <option key={value} value={value}>
-                                {label}
-                              </option>
-                            ))}
+                            {Object.entries(DOCUMENT_CATEGORY_LABELS)
+                              .filter(([value]) => value !== 'system_generated')
+                              .map(([value, label]) => (
+                                <option key={value} value={value}>
+                                  {label}
+                                </option>
+                              ))}
                           </select>
                           <input
                             value={handoverUploadNote}

@@ -5,6 +5,7 @@ import request from 'supertest';
 import app from '../../src/app';
 import { ScoreEvent } from '../../src/modules/innovationScore/score.model';
 import { Patent } from '../../src/modules/patent/patent.model';
+import { Startup } from '../../src/modules/startup/startup.model';
 import { User } from '../../src/modules/user/user.model';
 import { Workspace } from '../../src/modules/workspace/workspace.model';
 import { UserRole } from '../../src/types/roles.types';
@@ -187,6 +188,17 @@ describe('patent submission integration', () => {
       stage: 'Patent',
       uploads: [],
     });
+    await Startup.create({
+      founderIds: [studentUser._id],
+      projectId: workspace._id,
+      name: 'Independent Innovation Startup',
+      tagline: 'Patent-ready product workspace',
+      category: 'Healthcare',
+      stage: 'MVP',
+      activeProducts: 1,
+      teamSize: 1,
+      isActive: true,
+    });
 
     const accessToken = await loginAs(studentEmail);
 
@@ -213,5 +225,92 @@ describe('patent submission integration', () => {
     expect(scoreEvents).toHaveLength(0);
     expect(refreshedStudent?.innovationScore ?? 0).toBe(0);
     expect(refreshedStudent?.scoreBreakdown.patentsSubmitted ?? 0).toBe(0);
+  });
+
+  it('rejects patent submission when the workspace does not have a registered startup', async () => {
+    const { user: studentUser, email: studentEmail } = await createApprovedUser({
+      role: UserRole.STUDENT,
+      displayName: 'No Startup Founder',
+    });
+
+    const workspace = await Workspace.create({
+      ownerId: studentUser._id,
+      teamMemberIds: [studentUser._id],
+      title: 'Workspace Without Startup',
+      category: 'Healthcare',
+      stage: 'Patent',
+      uploads: [],
+    });
+
+    const accessToken = await loginAs(studentEmail);
+
+    const response = await request(app)
+      .post('/api/patents/submit')
+      .set('Authorization', `Bearer ${accessToken}`)
+      .send(buildPatentPayload({ workspaceId: workspace._id.toString(), includeFilingDocuments: false }));
+
+    expect(response.status).toBe(400);
+    expect(response.body.error).toEqual(
+      expect.objectContaining({
+        code: 'STARTUP_REQUIRED_FOR_PATENT',
+      }),
+    );
+
+    const patentCount = await Patent.countDocuments({ studentId: studentUser._id });
+    expect(patentCount).toBe(0);
+  });
+
+  it('rejects a second patent submission for the same startup', async () => {
+    const { user: studentUser, email: studentEmail } = await createApprovedUser({
+      role: UserRole.STUDENT,
+      displayName: 'Single Patent Founder',
+    });
+
+    const workspace = await Workspace.create({
+      ownerId: studentUser._id,
+      teamMemberIds: [studentUser._id],
+      title: 'Single Patent Workspace',
+      category: 'Healthcare',
+      stage: 'Patent',
+      uploads: [],
+    });
+    const startup = await Startup.create({
+      founderIds: [studentUser._id],
+      projectId: workspace._id,
+      name: 'Single Patent Startup',
+      tagline: 'Only one patent workflow is allowed',
+      category: 'Healthcare',
+      stage: 'MVP',
+      activeProducts: 1,
+      teamSize: 1,
+      isActive: true,
+    });
+
+    const accessToken = await loginAs(studentEmail);
+    const payload = buildPatentPayload({ workspaceId: workspace._id.toString(), includeFilingDocuments: false });
+
+    const firstResponse = await request(app)
+      .post('/api/patents/submit')
+      .set('Authorization', `Bearer ${accessToken}`)
+      .send(payload);
+
+    expect(firstResponse.status).toBe(201);
+
+    const secondResponse = await request(app)
+      .post('/api/patents/submit')
+      .set('Authorization', `Bearer ${accessToken}`)
+      .send(payload);
+
+    expect(secondResponse.status).toBe(409);
+    expect(secondResponse.body.error).toEqual(
+      expect.objectContaining({
+        code: 'STARTUP_PATENT_ALREADY_EXISTS',
+      }),
+    );
+
+    const patentCount = await Patent.countDocuments({ workspaceId: workspace._id });
+    expect(patentCount).toBe(1);
+    const refreshedStartup = await Startup.findById(startup._id).lean();
+    expect(refreshedStartup?.traction?.patentApplicationId).toBe(firstResponse.body.data._id);
   });
 });

@@ -1,27 +1,27 @@
 import PDFDocument from 'pdfkit';
+import { Types } from 'mongoose';
+import { uploadFile } from './fileStorageService';
 import { existsSync } from 'fs';
 import path from 'path';
 
-export interface DealContractData {
-  contractNumber: string;
+type PatentSystemDocumentKind = 'approval_summary' | 'handover_summary';
+
+export interface PatentSystemDocumentInput {
+  kind: PatentSystemDocumentKind;
   generatedAt: Date;
-  adminApprovedAt: Date;
-  mediatorLabel: string;
-  mediationStatus: string;
-  startupName: string;
-  startupCategory: string;
-  founderName: string;
-  investorName: string;
-  investorType: 'penny' | 'sole';
-  investorRole: 'shareholder' | 'director' | 'observer';
-  amountINR: number;
-  equityPercent: number;
-  sharesAllocated: number;
-  shareClassLabel: string;
-  sharePriceInr: number;
-  transferValueInr: number;
-  royaltyPercentage: number;
-  royaltyAmountINR: number;
+  projectTitle: string;
+  studentName: string;
+  studentEmail?: string;
+  workspaceId?: string;
+  patentId?: string;
+  patentRequestId?: string;
+  status: string;
+  ipoApplicationNumber?: string;
+  ipoFilingDate?: Date;
+  publicationDate?: Date;
+  grantNumber?: string;
+  grantDate?: Date;
+  note?: string;
 }
 
 const page = {
@@ -44,17 +44,16 @@ const colors = {
   brandPurple: '#8B5CF6',
 };
 
-const formatINR = (value: number) =>
-  new Intl.NumberFormat('en-IN', {
-    style: 'currency',
-    currency: 'INR',
-    maximumFractionDigits: 0,
-  }).format(value || 0);
+const formatDate = (value?: Date) =>
+  value ? value.toLocaleDateString('en-IN', { day: '2-digit', month: 'long', year: 'numeric' }) : 'Not recorded';
 
-const formatDate = (value: Date) =>
-  value.toLocaleDateString('en-IN', { day: '2-digit', month: 'long', year: 'numeric' });
-
-const titleCase = (value: string) => value.charAt(0).toUpperCase() + value.slice(1);
+const titleCase = (value: string) =>
+  value
+    .replace(/_/g, ' ')
+    .split(' ')
+    .filter(Boolean)
+    .map((part) => part.charAt(0).toUpperCase() + part.slice(1))
+    .join(' ');
 
 const pageBottom = (doc: PDFKit.PDFDocument) => doc.page.height - page.bottom;
 
@@ -64,6 +63,24 @@ const ensureSpace = (doc: PDFKit.PDFDocument, requiredHeight: number) => {
   }
   doc.addPage();
   doc.y = page.top;
+};
+
+const documentTitle = (kind: PatentSystemDocumentKind) =>
+  kind === 'handover_summary' ? 'ProMove Patent Handover Summary' : 'ProMove Patent Approval Summary';
+
+const documentNumber = (data: PatentSystemDocumentInput) => {
+  const sourceId = data.patentRequestId ?? data.patentId ?? data.workspaceId ?? 'record';
+  const suffix = sourceId.replace(/[^a-zA-Z0-9]/g, '').slice(-8).toUpperCase() || 'RECORD';
+  return `PM-PAT-${data.kind === 'handover_summary' ? 'HND' : 'APR'}-${suffix}`;
+};
+
+const safeFileName = (data: PatentSystemDocumentInput) => {
+  const stem = data.projectTitle
+    .toLowerCase()
+    .replace(/[^a-z0-9]+/g, '-')
+    .replace(/^-+|-+$/g, '')
+    .slice(0, 50) || 'patent';
+  return `${stem}-${data.kind === 'handover_summary' ? 'handover-summary' : 'approval-summary'}.pdf`;
 };
 
 const getLogoPath = (): string | null => {
@@ -79,7 +96,7 @@ const getLogoPath = (): string | null => {
   return null;
 };
 
-const drawHeader = (doc: PDFKit.PDFDocument, data: DealContractData) => {
+const drawHeader = (doc: PDFKit.PDFDocument, data: PatentSystemDocumentInput) => {
   doc.y = page.top;
 
   const logoPath = getLogoPath();
@@ -99,23 +116,23 @@ const drawHeader = (doc: PDFKit.PDFDocument, data: DealContractData) => {
     .fillColor(colors.muted)
     .fontSize(9)
     .font('Helvetica')
-    .text('OFFICIAL INVESTMENT CONTRACT', page.marginX + 320, page.top + 4, {
-      width: 167,
+    .text('SYSTEM GENERATED PATENT DOCUMENT', page.marginX + 300, page.top + 4, {
+      width: 187,
       align: 'right',
-      characterSpacing: 1.1,
+      characterSpacing: 0.8,
     });
 
   doc
     .fillColor(colors.body)
     .fontSize(12)
     .font('Helvetica')
-    .text('Admin-Verified Equity Transfer Agreement', titleX, doc.y + 4, { width: 320 });
+    .text(documentTitle(data.kind), titleX, doc.y + 4, { width: 320 });
 
   doc
     .fontSize(9)
     .fillColor(colors.muted)
-    .text(`No: ${data.contractNumber}`, page.marginX + 320, page.top + 28, {
-      width: 167,
+    .text(`No: ${documentNumber(data)}`, page.marginX + 300, page.top + 30, {
+      width: 187,
       align: 'right',
     });
 
@@ -132,17 +149,17 @@ const drawHeader = (doc: PDFKit.PDFDocument, data: DealContractData) => {
   doc.y = page.top + 82;
 };
 
-const drawInfoBlock = (doc: PDFKit.PDFDocument, data: DealContractData) => {
+const drawInfoBlock = (doc: PDFKit.PDFDocument, data: PatentSystemDocumentInput) => {
   const y = doc.y;
   const rowHeight = 33;
   const columns = [
-    { label: 'Startup', value: data.startupName },
-    { label: 'Category', value: data.startupCategory || 'Not specified' },
-    { label: 'Contract date', value: formatDate(data.generatedAt) },
-    { label: 'Admin verified', value: formatDate(data.adminApprovedAt) },
+    { label: 'Startup / project', value: data.projectTitle },
+    { label: 'Student', value: data.studentName },
+    { label: 'Workflow status', value: titleCase(data.status) },
+    { label: 'Generated on', value: formatDate(data.generatedAt) },
   ];
 
-  doc.roundedRect(page.marginX, y, page.width, 78, 10).fillAndStroke(colors.panel, colors.softBorder);
+  doc.roundedRect(page.marginX, y, page.width, 78, 8).fillAndStroke(colors.panel, colors.softBorder);
 
   columns.forEach((item, index) => {
     const columnWidth = page.width / 2;
@@ -205,18 +222,7 @@ const drawParagraph = (doc: PDFKit.PDFDocument, text: string) => {
 };
 
 const drawKeyValueTable = (doc: PDFKit.PDFDocument, rows: Array<{ label: string; value: string }>) => {
-  const headerHeight = 22;
   const rowHeight = 28;
-  const labelX = page.marginX + 12;
-  const valueX = page.marginX + 300;
-
-  ensureSpace(doc, headerHeight + rowHeight);
-  const headerY = doc.y;
-  doc.rect(page.marginX, headerY, page.width, headerHeight).fill(colors.panelAlt);
-  doc.fillColor(colors.muted).font('Helvetica-Bold').fontSize(8);
-  doc.text('TERM', labelX, headerY + 7, { width: 270, lineBreak: false });
-  doc.text('DETAIL', valueX, headerY + 7, { width: 175, align: 'right', lineBreak: false });
-  doc.y = headerY + headerHeight;
 
   rows.forEach((row, index) => {
     ensureSpace(doc, rowHeight);
@@ -230,9 +236,9 @@ const drawKeyValueTable = (doc: PDFKit.PDFDocument, rows: Array<{ label: string;
       .stroke();
 
     doc.fillColor(colors.body).font('Helvetica').fontSize(9.5);
-    doc.text(row.label, labelX, rowY + 9, { width: 270, ellipsis: true, lineBreak: false });
+    doc.text(row.label, page.marginX + 12, rowY + 9, { width: 245, ellipsis: true, lineBreak: false });
     doc.font('Helvetica-Bold');
-    doc.text(row.value, valueX, rowY + 9, { width: 175, align: 'right', ellipsis: true, lineBreak: false });
+    doc.text(row.value, page.marginX + 270, rowY + 9, { width: 205, align: 'right', ellipsis: true, lineBreak: false });
 
     doc.y = rowY + rowHeight;
   });
@@ -249,8 +255,8 @@ const drawFooter = (doc: PDFKit.PDFDocument) => {
       .fontSize(9)
       .font('Helvetica')
       .fillColor(colors.muted)
-      .text('Generated by ProMove Innovation Cloud | Virtual simulation — non-binding', page.marginX, footerY, {
-        width: 360,
+      .text('Generated by ProMove Innovation Cloud | Platform workflow record, not a government patent certificate', page.marginX, footerY, {
+        width: 380,
         lineBreak: false,
       });
     doc.text(`Page ${pageIndex + 1} of ${range.count}`, page.marginX, footerY, {
@@ -261,7 +267,7 @@ const drawFooter = (doc: PDFKit.PDFDocument) => {
   }
 };
 
-export const buildDealContractDocument = (data: DealContractData): PDFKit.PDFDocument => {
+const buildPatentSystemDocument = (data: PatentSystemDocumentInput): PDFKit.PDFDocument => {
   const doc = new PDFDocument({
     margin: page.marginX,
     size: 'A4',
@@ -272,52 +278,39 @@ export const buildDealContractDocument = (data: DealContractData): PDFKit.PDFDoc
   drawHeader(doc, data);
   drawInfoBlock(doc, data);
 
-  drawSectionTitle(doc, 'SECTION I: PARTIES');
+  drawSectionTitle(doc, 'SECTION I: WORKFLOW RECORD');
   drawKeyValueTable(doc, [
-    { label: 'Founder', value: data.founderName },
-    { label: 'Investor', value: data.investorName },
-    { label: 'Mediator', value: data.mediatorLabel || 'ProMove' },
+    { label: 'Document number', value: documentNumber(data) },
+    { label: 'Patent record', value: data.patentRequestId ?? data.patentId ?? 'Not recorded' },
+    { label: 'Workspace', value: data.workspaceId ?? 'Not recorded' },
+    { label: 'Student email', value: data.studentEmail ?? 'Not recorded' },
   ]);
 
-  drawSectionTitle(doc, 'SECTION II: FINAL TERMS');
+  drawSectionTitle(doc, 'SECTION II: PATENT STATUS');
   drawKeyValueTable(doc, [
-    { label: 'Investment type', value: data.investorType === 'sole' ? 'Sole Investor (lead)' : 'Penny Investor (portfolio)' },
-    { label: 'Investor role', value: titleCase(data.investorRole) },
-    { label: 'Investment amount', value: formatINR(data.amountINR) },
-    { label: 'Equity granted', value: `${data.equityPercent}%` },
-    { label: 'Shares allocated', value: `${data.sharesAllocated.toLocaleString('en-IN')} (${data.shareClassLabel})` },
-    { label: 'Indicative share price', value: formatINR(data.sharePriceInr) },
-    { label: 'Transfer value', value: formatINR(data.transferValueInr || data.amountINR) },
-    { label: `ProMove royalty (${data.royaltyPercentage}%)`, value: formatINR(data.royaltyAmountINR) },
+    { label: 'IPO application number', value: data.ipoApplicationNumber ?? 'Not recorded' },
+    { label: 'IPO filing date', value: formatDate(data.ipoFilingDate) },
+    { label: 'Publication date', value: formatDate(data.publicationDate) },
+    { label: 'Grant number', value: data.grantNumber ?? 'Not recorded' },
+    { label: 'Grant date', value: formatDate(data.grantDate) },
   ]);
 
-  drawSectionTitle(doc, 'SECTION III: ADMIN VERIFICATION');
-  drawKeyValueTable(doc, [
-    { label: 'Contract number', value: data.contractNumber },
-    { label: 'Mediation status', value: titleCase(data.mediationStatus.replace(/_/g, ' ')) },
-    { label: 'Equity transfer verified on', value: formatDate(data.adminApprovedAt) },
-  ]);
-
-  drawSectionTitle(doc, 'SECTION IV: NATURE OF AGREEMENT');
+  drawSectionTitle(doc, 'SECTION III: SYSTEM NOTE');
   drawParagraph(
     doc,
-    'This is a virtual, non-binding simulation generated by the ProMove platform for educational and ' +
-      'platform-internal record-keeping purposes only. It does not create real legal obligations and does ' +
-      'not represent a transfer of actual money or securities. Any binding agreement requires separate ' +
-      'offline execution.',
+    data.note?.trim() ||
+      'This document was generated by ProMove to record the patent workflow status available inside the platform at the time of generation.',
   );
   drawParagraph(
     doc,
-    `By accepting the underlying deal and completing ProMove mediation review, ${data.founderName} (Founder) ` +
-      `and ${data.investorName} (Investor) acknowledge the terms recorded above as their final, ` +
-      'admin-verified position within the ProMove simulation.',
+    'This system-generated document is an internal ProMove workflow record. It is not a government-issued patent certificate, filing receipt, or legal proof of patent grant. Official government documents must be uploaded separately when available.',
   );
 
   drawFooter(doc);
   return doc;
 };
 
-export const finalizeDealContract = (doc: PDFKit.PDFDocument): Promise<Buffer> =>
+const finalizePatentSystemDocument = (doc: PDFKit.PDFDocument): Promise<Buffer> =>
   new Promise<Buffer>((resolve, reject) => {
     const chunks: Buffer[] = [];
     doc.on('data', (chunk: Buffer | string) => {
@@ -327,3 +320,28 @@ export const finalizeDealContract = (doc: PDFKit.PDFDocument): Promise<Buffer> =
     doc.on('error', reject);
     doc.end();
   });
+
+export const createPatentSystemDocument = async (data: PatentSystemDocumentInput) => {
+  const buffer = await finalizePatentSystemDocument(buildPatentSystemDocument(data));
+  const fileName = safeFileName(data);
+  const uploaded = await uploadFile({
+    buffer,
+    folder: 'promove/patent-system-documents',
+    fileName,
+    contentType: 'application/pdf',
+  });
+
+  return {
+    _id: new Types.ObjectId(),
+    fileUrl: uploaded.url,
+    fileType: 'pdf' as const,
+    fileName,
+    fileSizeBytes: buffer.length,
+    documentCategory: 'system_generated' as const,
+    reviewStatus: 'approved' as const,
+    uploadedAt: data.generatedAt,
+    note: 'System-generated ProMove patent workflow summary.',
+    storageProvider: uploaded.provider,
+    storageKey: uploaded.key,
+  };
+};

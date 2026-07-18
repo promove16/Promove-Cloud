@@ -8,7 +8,8 @@ export type PatentDocumentCategory =
   | 'design_plan_sketch'
   | 'examination_request'
   | 'form3_foreign_filing'
-  | 'cost_management';
+  | 'cost_management'
+  | 'system_generated';
 
 export interface PatentQuestionnaire {
   problemStatement: string;
@@ -73,6 +74,8 @@ export interface PatentSupportingDocument {
   fileSizeBytes: number;
   note?: string;
   documentCategory?: PatentDocumentCategory;
+  storageProvider?: 'cloudinary' | 's3';
+  storageKey?: string;
 }
 
 export type PatentStage = 'filed' | 'published' | 'granted';
@@ -86,6 +89,7 @@ export interface PatentSubmission {
   questionnaire: PatentQuestionnaire;
   filingDocuments?: PatentFilingDocuments;
   supportingDocuments: PatentSupportingDocument[];
+  officialDocuments?: PatentSupportingDocument[];
   status: 'submitted' | 'under_review' | 'approved' | 'rejected';
   submittedAt: string;
   adminReviewedAt?: string;
