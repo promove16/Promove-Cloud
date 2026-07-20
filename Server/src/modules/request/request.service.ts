@@ -303,6 +303,10 @@ type UserSummary = {
   displayName: string;
   email: string;
   role: string;
+  avatar?: string;
+  domain?: string;
+  verificationStatus?: string;
+  adminApprovalStatus?: string;
 };
 
 type RequestView = {
@@ -353,18 +357,31 @@ export const serializeRequests = async (requests: IRequest[]): Promise<RequestVi
 
   const users = userIds.length
     ? await User.find({ _id: { $in: userIds } })
-        .select('_id displayName email role')
-        .lean<Array<{ _id: Types.ObjectId; displayName: string; email: string; role: string }>>()
+        .select('_id displayName email role avatar domain verificationStatus adminApprovalStatus')
+        .lean<Array<{
+          _id: Types.ObjectId;
+          displayName: string;
+          email: string;
+          role: string;
+          avatar?: string;
+          domain?: string;
+          verificationStatus?: string;
+          adminApprovalStatus?: string;
+        }>>()
     : [];
   const userMap = new Map(
     users.map((user) => [
       String(user._id),
       {
         _id: String(user._id),
-        displayName: user.displayName,
-        email: user.email,
-        role: user.role,
-      },
+         displayName: user.displayName,
+         email: user.email,
+         role: user.role,
+         ...(user.avatar ? { avatar: user.avatar } : {}),
+         ...(user.domain ? { domain: user.domain } : {}),
+         ...(user.verificationStatus ? { verificationStatus: user.verificationStatus } : {}),
+         ...(user.adminApprovalStatus ? { adminApprovalStatus: user.adminApprovalStatus } : {}),
+       },
     ]),
   );
 

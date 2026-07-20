@@ -381,3 +381,76 @@ export const sendInstitutionStudentInviteEmail = async ({
     }),
   });
 };
+
+export interface NotificationEmailParams {
+  toEmail: string;
+  userName: string;
+  notificationType: string;
+  title: string;
+  body: string;
+  link?: string;
+}
+
+const getNotificationEmailSubject = (type: string, title: string): string => {
+  const prefix = 'ProMove';
+  switch (type) {
+    case 'score_update':
+      return `${prefix} - Innovation Score Updated`;
+    case 'request':
+      return `${prefix} - New Request`;
+    case 'patent_status':
+      return `${prefix} - Patent Status Update`;
+    case 'deal_interest':
+      return `${prefix} - Deal Interest`;
+    case 'startup_launch':
+      return `${prefix} - Startup Launched`;
+    case 'system':
+      return `${prefix} - ${title}`;
+    default:
+      return `${prefix} - ${title}`;
+  }
+};
+
+const getNotificationCtaLabel = (type: string): string => {
+  switch (type) {
+    case 'score_update':
+      return 'View Score';
+    case 'request':
+      return 'View Request';
+    case 'patent_status':
+      return 'View Patent';
+    case 'deal_interest':
+      return 'View Deal';
+    case 'startup_launch':
+      return 'View Startup';
+    case 'system':
+      return 'View Details';
+    default:
+      return 'View Details';
+  }
+};
+
+export const sendNotificationEmail = async ({
+  toEmail,
+  userName,
+  notificationType,
+  title,
+  body,
+  link,
+}: NotificationEmailParams): Promise<void> => {
+  const ctaLabel = getNotificationCtaLabel(notificationType);
+  const ctaUrl = link ? buildClientUrl(link) : buildClientUrl('/dashboard');
+
+  await sendEmail({
+    toEmail,
+    subject: getNotificationEmailSubject(notificationType, title),
+    html: renderEmailShell({
+      preheader: title,
+      title,
+      intro: `Hello ${userName},`,
+      body: `<p style="margin:0;">${escapeHtml(body)}</p>`,
+      ctaLabel,
+      ctaUrl,
+    }),
+  });
+};

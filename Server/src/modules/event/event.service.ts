@@ -12,7 +12,6 @@ import {
   getCollegeDrivesView,
 } from '../recruiter/recruiter.drive.service';
 import { createBridge, notifyUser } from '../recruiter/recruiter.mappers';
-import { RequestRecord } from '../request/request.model';
 import { createRequestRecord, registerRequestHandler } from '../request/request.service';
 
 const HIRING_EVENT_TYPES = [
@@ -24,6 +23,20 @@ const HIRING_EVENT_TYPES = [
   'Hackathon',
   'Other',
 ] as const;
+
+const EVENT_NOTIFICATION_BATCH_SIZE = 50;
+
+const notifyUsersInBatches = async (
+  userIds: string[],
+  title: string,
+  body: string,
+  link: string,
+) => {
+  for (let index = 0; index < userIds.length; index += EVENT_NOTIFICATION_BATCH_SIZE) {
+    const batch = userIds.slice(index, index + EVENT_NOTIFICATION_BATCH_SIZE);
+    await Promise.allSettled(batch.map((userId) => notifyUser(userId, title, body, link)));
+  }
+};
 
 export const createEventSchema = z.object({
   title: z.string().trim().min(2).max(160),
@@ -231,6 +244,7 @@ export const listInstitutionEvents = async (institutionId: string) => {
       category: event.category ?? 'internal',
       description: event.description,
       scheduledAt: event.scheduledAt.toISOString(),
+      isActive: event.isActive,
       participantsCount: event.participants.length,
       participants: participantMap.get(String(event._id)) ?? [],
       ...(event.rankingsComputedAt
@@ -272,6 +286,10 @@ export const joinEvent = async (
 
   if (String(student.institutionId) !== String(event.institutionId)) {
     throw new ApiError(403, 'FORBIDDEN', 'Student cannot join an event outside their institution');
+  }
+
+  if (event.isActive === false || event.rankingsComputedAt) {
+    throw new ApiError(409, 'EVENT_REGISTRATION_CLOSED', 'Registration is closed for this event');
   }
 
   if (
@@ -558,9 +576,9 @@ export const sendHiringEventInvite = async (
     requestedRole: 'host',
     message: body,
     metadata: eventMetadata,
-    deepLink: '/dashboard/invitations',
+    deepLink: '/dashboard/college/events?tab=hiring',
     acceptRedirect: '/dashboard/college/events?tab=hiring',
-    declineRedirect: '/dashboard/college/events',
+    declineRedirect: '/dashboard/college/events?tab=hiring',
   });
 
   return { sent: true };
@@ -839,39 +857,39 @@ registerRequestHandler('college_event_invite', {
     await request.save();
 
     const college = await User.findById(collegeId).select('displayName').lean();
+    const eligibleStudents = await User.find({
+      institutionId: collegeId,
+      role: UserRole.STUDENT,
+      isActive: true,
+      ...(payload.minimumInnovationScore > 0
+        ? { innovationScore: { $gte: payload.minimumInnovationScore } }
+        : {}),
+    })
+      .select('_id')
+      .lean<Array<{ _id: { toString(): string } }>>();
 
-    await RequestRecord.findOneAndUpdate(
-      {
-        type: 'college_recruiter_partnership',
-        fromUserId: request.fromUserId,
-        targetEntityType: 'college',
-        targetEntityId: collegeId,
-      },
-      {
-        $setOnInsert: {
-          type: 'college_recruiter_partnership',
-          actionType: 'partner',
-          fromUserId: request.fromUserId,
-          toUserId: collegeId,
-          targetEntityType: 'college',
-          targetEntityId: collegeId,
-          targetEntityTitle: college?.displayName ?? 'College',
-          targetRole: UserRole.COLLEGE,
-          requestedRole: 'partner',
-          message: 'Partnership established by accepting a campus hiring event.',
-          expiresAt: new Date(Date.now() + 365 * 24 * 60 * 60 * 1000),
-        },
-        $set: { status: 'accepted', respondedAt: new Date() },
-      },
-      { upsert: true },
-    );
+    const collegeName = college?.displayName ?? 'The college';
+    const studentPath = '/dashboard/student/events';
+    const scheduledLabel = new Date(payload.date).toLocaleString('en-IN', {
+      dateStyle: 'medium',
+      timeStyle: 'short',
+      timeZone: 'Asia/Kolkata',
+    });
 
-    await notifyUser(
-      String(request.fromUserId),
-      'Hiring event approved',
-      `${college?.displayName ?? 'The college'} accepted "${payload.title}". You can now score participants and move top students into the hiring pipeline.`,
-      recruiterPath,
-    );
+    await Promise.all([
+      notifyUsersInBatches(
+        eligibleStudents.map((student) => String(student._id)),
+        `New hiring event: ${payload.title}`,
+        `${collegeName} approved a hiring event scheduled for ${scheduledLabel}. Open Events to review the details and register.`,
+        studentPath,
+      ),
+      notifyUser(
+        String(request.fromUserId),
+        'Hiring event approved',
+        `${collegeName} accepted "${payload.title}". You can now score participants and move top students into the hiring pipeline.`,
+        recruiterPath,
+      ),
+    ]);
   },
 });
 

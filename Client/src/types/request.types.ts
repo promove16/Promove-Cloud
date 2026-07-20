@@ -39,6 +39,10 @@ export interface RequestUserSummary {
   displayName: string;
   email?: string;
   role?: string;
+  avatar?: string;
+  domain?: string;
+  verificationStatus?: string;
+  adminApprovalStatus?: string;
 }
 
 export interface WorkflowRequest {

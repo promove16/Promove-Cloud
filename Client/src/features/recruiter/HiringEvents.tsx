@@ -1,9 +1,10 @@
 import { useEffect, useMemo, useState } from 'react';
 import { useNavigate, useSearchParams } from 'react-router-dom';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
-import { BriefcaseBusiness, Building2, CalendarDays, Link2, Trophy, Users } from 'lucide-react';
+import { BriefcaseBusiness, Building2, CalendarDays, Link2, SendHorizontal, Trophy, Users } from 'lucide-react';
 import { eventApi } from '../../api/event.api';
 import { recruiterApi } from '../../api/recruiter.api';
+import { requestApi } from '../../api/request.api';
 import { Badge } from '../../components/ui/Badge';
 import { Button } from '../../components/ui/Button';
 import { Card } from '../../components/ui/Card';
@@ -97,11 +98,16 @@ export default function HiringEvents({ embedded = false }: HiringEventsProps) {
     queryKey: ['recruiter', 'jobs'],
     queryFn: recruiterApi.getJobs,
   });
+  const outgoingRequestsQuery = useQuery({
+    queryKey: ['requests', 'outgoing'],
+    queryFn: requestApi.outgoing,
+  });
 
   const linkedColleges = collegesQuery.data ?? [];
   const allColleges = allCollegesQuery.data ?? [];
   const availableColleges = createMode === 'invite' ? allColleges : linkedColleges;
   const events = hiringEventsQuery.data ?? [];
+  const outgoingRequests = outgoingRequestsQuery.data ?? [];
   const requestedEventId = searchParams.get('eventId');
 
   useEffect(() => {
@@ -149,6 +155,7 @@ export default function HiringEvents({ embedded = false }: HiringEventsProps) {
       queryClient.invalidateQueries({ queryKey: ['recruiter', 'job-applications'] }),
       queryClient.invalidateQueries({ queryKey: ['recruiter', 'onboarding'] }),
       queryClient.invalidateQueries({ queryKey: ['student', 'applications'] }),
+      queryClient.invalidateQueries({ queryKey: ['requests'] }),
     ]);
   };
 
@@ -171,7 +178,7 @@ export default function HiringEvents({ embedded = false }: HiringEventsProps) {
       collegeId: string;
       payload: Parameters<typeof recruiterApi.sendHiringEventInvite>[1];
     }) => recruiterApi.sendHiringEventInvite(collegeId, payload),
-    onSuccess: (result) => {
+    onSuccess: async (result) => {
       setInviteSentNotice(
         result.alreadyPending
           ? 'An invite for this event title is already pending with this college.'
@@ -179,6 +186,14 @@ export default function HiringEvents({ embedded = false }: HiringEventsProps) {
       );
       setForm(createInitialForm());
       setInviteMessage('');
+      await refreshData();
+    },
+  });
+
+  const withdrawMutation = useMutation({
+    mutationFn: (requestId: string) => requestApi.withdraw(requestId),
+    onSuccess: async () => {
+      await refreshData();
     },
   });
 
@@ -423,7 +438,7 @@ export default function HiringEvents({ embedded = false }: HiringEventsProps) {
         </Card>
 
         <div className="min-w-0 space-y-4">
-          <div className="grid gap-4 md:grid-cols-3">
+          <div className="grid gap-4 sm:grid-cols-2 md:grid-cols-4">
             <Card className="p-5">
               <div className="flex items-center gap-3">
                 <CalendarDays className="h-5 w-5 text-cyan-300" />
@@ -448,6 +463,15 @@ export default function HiringEvents({ embedded = false }: HiringEventsProps) {
                 <div>
                   <div className="text-2xl font-semibold text-white">{eventMetrics.ranked}</div>
                   <div className="text-sm text-slate-400">Ranked events</div>
+                </div>
+              </div>
+            </Card>
+            <Card className="p-5">
+              <div className="flex items-center gap-3">
+                <SendHorizontal className="h-5 w-5 text-sky-300" />
+                <div>
+                  <div className="text-2xl font-semibold text-white">{outgoingRequests.length}</div>
+                  <div className="text-sm text-slate-400">Sent requests</div>
                 </div>
               </div>
             </Card>
@@ -538,6 +562,102 @@ export default function HiringEvents({ embedded = false }: HiringEventsProps) {
                 <p className="mt-2 max-w-2xl text-sm leading-6 text-slate-400">
                   Create your first event from the form on the left. Once colleges are linked, this workspace will show
                   event cards, participant counts, and ranking status here instead of an empty panel.
+                </p>
+              </div>
+            )}
+          </Card>
+
+          <Card className="p-6">
+            <div className="flex items-start justify-between gap-3">
+              <div>
+                <div className="text-xs uppercase tracking-[0.3em] text-cyan-300">Outbound Requests</div>
+                <h2 className="mt-2 text-xl font-semibold text-white">Sent Event Invites & Requests</h2>
+                <p className="mt-2 text-sm leading-6 text-slate-400">
+                  Track all invitations and event approval requests sent to colleges.
+                </p>
+              </div>
+              <Badge className="border-slate-700 bg-slate-950 text-slate-300">
+                {outgoingRequests.length} total
+              </Badge>
+            </div>
+
+            {outgoingRequestsQuery.isLoading ? (
+              <div className="mt-5 text-sm text-slate-400">Loading sent requests...</div>
+            ) : outgoingRequests.length > 0 ? (
+              <div className="mt-5 space-y-3">
+                {outgoingRequests.map((request) => {
+                  const title =
+                    (request.metadata?.title as string) ||
+                    (request.metadata?.subject as string) ||
+                    request.targetEntityTitle ||
+                    'Hiring Event Request';
+                  const collegeName =
+                    (request.metadata?.collegeName as string) ||
+                    request.targetEntityTitle ||
+                    'Target College';
+                  const eventType = (request.metadata?.type as string) || 'Event Invite';
+                  const isPending = request.status === 'pending';
+
+                  let statusBadgeClass = 'border-slate-700 bg-slate-800 text-slate-300';
+                  if (request.status === 'pending') {
+                    statusBadgeClass = 'border-amber-500/30 bg-amber-500/10 text-amber-300';
+                  } else if (request.status === 'accepted') {
+                    statusBadgeClass = 'border-emerald-500/30 bg-emerald-500/10 text-emerald-300';
+                  } else if (request.status === 'declined') {
+                    statusBadgeClass = 'border-rose-500/30 bg-rose-500/10 text-rose-300';
+                  }
+
+                  return (
+                    <div
+                      key={request._id}
+                      className="flex flex-col gap-4 rounded-2xl border border-slate-800 bg-slate-950/60 p-4 md:flex-row md:items-center md:justify-between"
+                    >
+                      <div className="space-y-1">
+                        <div className="flex flex-wrap items-center gap-2">
+                          <span className="text-base font-semibold text-white">{title}</span>
+                          <Badge className={statusBadgeClass}>
+                            {request.status.toUpperCase()}
+                          </Badge>
+                          <Badge className="border-slate-700 bg-slate-900 text-slate-300">
+                            {eventType}
+                          </Badge>
+                        </div>
+                        <div className="text-sm text-slate-400">
+                          College: <strong className="text-slate-200">{collegeName}</strong> • Sent{' '}
+                          {new Date(request.createdAt).toLocaleDateString('en-IN', {
+                            day: '2-digit',
+                            month: 'short',
+                            year: 'numeric',
+                          })}
+                        </div>
+                        {request.message ? (
+                          <p className="mt-1 text-xs text-slate-400 italic">
+                            "{request.message}"
+                          </p>
+                        ) : null}
+                      </div>
+
+                      {isPending ? (
+                        <Button
+                          variant="outline"
+                          className="border-rose-500/30 text-rose-300 hover:bg-rose-500/10 self-start md:self-center"
+                          disabled={withdrawMutation.isPending}
+                          onClick={() => withdrawMutation.mutate(request._id)}
+                        >
+                          {withdrawMutation.isPending && withdrawMutation.variables === request._id
+                            ? 'Withdrawing...'
+                            : 'Withdraw Request'}
+                        </Button>
+                      ) : null}
+                    </div>
+                  );
+                })}
+              </div>
+            ) : (
+              <div className="mt-5 rounded-2xl border border-dashed border-slate-800 px-5 py-8 text-center">
+                <div className="text-base font-semibold text-white">No sent requests yet</div>
+                <p className="mt-1 text-sm text-slate-400">
+                  When you send invitations for college event approval, all sent requests will appear here with live status updates.
                 </p>
               </div>
             )}

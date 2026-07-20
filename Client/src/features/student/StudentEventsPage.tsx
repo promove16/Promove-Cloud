@@ -1,6 +1,7 @@
 import { useMemo, useState } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { BriefcaseBusiness, CalendarDays, Sparkles, Trophy, Users } from 'lucide-react';
+import { toast } from 'sonner';
 import { eventApi } from '../../api/event.api';
 import { recruiterApi } from '../../api/recruiter.api';
 import { Badge } from '../../components/ui/Badge';
@@ -8,6 +9,7 @@ import { Button } from '../../components/ui/Button';
 import { Card } from '../../components/ui/Card';
 import { Spinner } from '../../components/ui/Spinner';
 import { useAuthStore } from '../../store/authStore';
+import { getApiErrorMessage } from '../../utils/apiError';
 
 const badgeClassFor = (category?: 'internal' | 'hiring') =>
   category === 'hiring'
@@ -35,7 +37,9 @@ export default function StudentEventsPage() {
     mutationFn: eventApi.joinEvent,
     onSuccess: async () => {
       await queryClient.invalidateQueries({ queryKey: ['student', 'events'] });
+      toast.success('Registration confirmed.');
     },
+    onError: (error) => toast.error(getApiErrorMessage(error, 'Unable to register for this event.')),
   });
 
   const registerDriveMutation = useMutation({
@@ -186,6 +190,8 @@ export default function StudentEventsPage() {
             {events.map((event) => {
               const joined = Boolean(currentUserId) && event.participants.some((participant) => participant.studentId === currentUserId);
               const isUpcoming = new Date(event.scheduledAt).getTime() >= Date.now();
+              const registrationOpen = event.isActive !== false && !event.rankingsComputedAt;
+              const eventStatus = isUpcoming ? 'Upcoming' : registrationOpen ? 'Registration Open' : 'Completed';
 
               return (
                 <Card key={event._id} className="p-6 border-slate-800 bg-[#0b1329]">
@@ -196,8 +202,8 @@ export default function StudentEventsPage() {
                         <Badge className={badgeClassFor(event.category)}>
                           {event.category === 'hiring' ? 'Hiring Event' : 'Internal Event'}
                         </Badge>
-                        <Badge className={isUpcoming ? 'border-emerald-500/30 bg-emerald-500/10 text-emerald-300' : 'border-slate-700 bg-slate-900 text-slate-300'}>
-                          {isUpcoming ? 'Upcoming' : 'Completed'}
+                        <Badge className={registrationOpen ? 'border-emerald-500/30 bg-emerald-500/10 text-emerald-300' : 'border-slate-700 bg-slate-900 text-slate-300'}>
+                          {eventStatus}
                         </Badge>
                       </div>
                       <h2 className="text-xl font-semibold text-white">{event.title}</h2>
@@ -233,10 +239,25 @@ export default function StudentEventsPage() {
                     <div className="flex flex-col items-stretch gap-3 sm:min-w-44">
                       <Button
                         onClick={() => joinMutation.mutate(event._id)}
-                        disabled={joined || joinMutation.isPending || !isUpcoming}
+                        disabled={joined || joinMutation.isPending || !registrationOpen}
                       >
-                        {joined ? 'Already Registered' : joinMutation.isPending && joinMutation.variables === event._id ? 'Registering...' : 'Register'}
+                        {joined
+                          ? 'Already Registered'
+                          : joinMutation.isPending && joinMutation.variables === event._id
+                            ? 'Registering...'
+                            : registrationOpen
+                              ? 'Register'
+                              : 'Registration Closed'}
                       </Button>
+                      {joined ? (
+                        <div className="text-center text-xs font-medium text-emerald-300">
+                          Your registration is confirmed.
+                        </div>
+                      ) : !registrationOpen ? (
+                        <div className="text-center text-xs font-medium text-slate-500">
+                          This event is no longer accepting registrations.
+                        </div>
+                      ) : null}
                       {event.rankings.length > 0 ? (
                         <div className="rounded-xl border border-slate-800 bg-slate-950 px-4 py-3 text-sm text-slate-300 text-center font-medium">
                           Rankings published
