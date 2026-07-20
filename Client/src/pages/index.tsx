@@ -115,7 +115,7 @@ const AdminProblemReviewQueue = lazy(() => import("../features/admin/ProblemRevi
 const RecruiterDashboard = lazy(() => import("../features/recruiter/RecruiterDashboardExperience"));
 const RecruiterOnboardingTracker = lazy(() => import("../features/recruiter/OnboardingTracker"));
 const RecruiterApplications = lazy(() => import("../features/recruiter/ApplicationsPipeline"));
-const RecruiterCampusActivities = lazy(() => import("../features/recruiter/CampusActivities"));
+const RecruiterCampusEvents = lazy(() => import("../features/recruiter/CampusEvents"));
 const HiringSessionPage = lazy(() => import("../features/recruiter/HiringSessionPage"));
 const RecruiterCollegeStudentsPage = lazy(() => import("../features/recruiter/CollegeStudentsPage"));
 
@@ -681,9 +681,9 @@ export const router = createBrowserRouter([
       {
         path: "/marketplace/jobs/:jobId",
         element: (
-          <ProtectedRoleRoute role={UserRole.STUDENT}>
+          <ProtectedRolesRoute roles={NON_ADMIN_DASHBOARD_ROLES}>
             <LazyPage component={MarketplaceJobDetail} />
-          </ProtectedRoleRoute>
+          </ProtectedRolesRoute>
         ),
       },
       {
@@ -781,9 +781,9 @@ export const router = createBrowserRouter([
               { path: "applications/:applicationId", element: <LazyPage component={HiringSessionPage} /> },
               { path: "colleges", element: <RecruiterMarketplaceRouteRedirect lane="colleges" /> },
               { path: "colleges/:collegeId/students", element: <LazyPage component={RecruiterCollegeStudentsPage} /> },
-              { path: "campus", element: <LazyPage component={RecruiterCampusActivities} /> },
-              { path: "drives", element: <Navigate to="/dashboard/recruiter/campus?mode=drives" replace /> },
-              { path: "hiring-events", element: <Navigate to="/dashboard/recruiter/campus?mode=events" replace /> },
+              { path: "campus", element: <LazyPage component={RecruiterCampusEvents} /> },
+              { path: "drives", element: <Navigate to="/dashboard/recruiter/campus" replace /> },
+              { path: "hiring-events", element: <Navigate to="/dashboard/recruiter/campus" replace /> },
               { path: "onboarding", element: <LazyPage component={RecruiterOnboardingTracker} /> },
               {
                 path: "messages",

@@ -7,9 +7,7 @@ import { NotificationService } from '../notification/notification.service';
 import { User } from '../user/user.model';
 import { UserRole } from '../../types/roles.types';
 import { Event } from '../event/event.model';
-import { CampusDrive } from '../recruiter/campusDrive.model';
 import { JobPost } from '../recruiter/jobPost.model';
-import { getCollegeDrivesView } from '../recruiter/recruiter.drive.service';
 import {
   createInstitutionMentorshipProgram,
   listInstitutionMentorshipPrograms,
@@ -104,24 +102,25 @@ export const getRecruiterDirectory = async (collegeId?: string): Promise<Recruit
     return cachedDirectory;
   }
 
-  const [placementRecords, activeDrives] = await Promise.all([
+  const [placementRecords, activeEvents] = await Promise.all([
     PlacementRecord.find({
       ...(collegeId ? { collegeId } : {}),
       recruiterId: { $exists: true },
     })
       .select('recruiterId collegeId status')
       .lean(),
-    CampusDrive.find({
+    Event.find({
+      category: 'hiring',
       isActive: true,
-      ...(collegeId ? { collegeId } : {}),
+      ...(collegeId ? { institutionId: collegeId } : {}),
     })
-      .select('recruiterId collegeId')
+      .select('recruiterId institutionId')
       .lean(),
   ]);
 
   const relevantRecruiterIds = Array.from(
     new Set(
-      [...placementRecords, ...activeDrives]
+      [...placementRecords, ...activeEvents]
         .map((entry) => entry.recruiterId)
         .filter((recruiterId): recruiterId is NonNullable<typeof recruiterId> => Boolean(recruiterId))
         .map((recruiterId) => String(recruiterId)),
@@ -159,16 +158,16 @@ export const getRecruiterDirectory = async (collegeId?: string): Promise<Recruit
     activeJobCountByRecruiter.set(key, (activeJobCountByRecruiter.get(key) ?? 0) + 1);
   }
 
-  const activeDriveCountByRecruiter = new Map<string, number>();
-  for (const drive of activeDrives) {
-    const key = String(drive.recruiterId);
-    activeDriveCountByRecruiter.set(key, (activeDriveCountByRecruiter.get(key) ?? 0) + 1);
+  const activeEventCountByRecruiter = new Map<string, number>();
+  for (const event of activeEvents) {
+    const key = String(event.recruiterId);
+    activeEventCountByRecruiter.set(key, (activeEventCountByRecruiter.get(key) ?? 0) + 1);
   }
 
   const payload = recruiters.map((recruiter) => {
     const recruiterId = String(recruiter._id);
     const activePositions = activeJobCountByRecruiter.get(recruiterId) ?? 0;
-    const driveCount = activeDriveCountByRecruiter.get(recruiterId) ?? 0;
+    const eventCount = activeEventCountByRecruiter.get(recruiterId) ?? 0;
 
     return {
       _id: recruiterId,
@@ -176,7 +175,7 @@ export const getRecruiterDirectory = async (collegeId?: string): Promise<Recruit
       ...(recruiter.avatar ? { avatar: recruiter.avatar } : {}),
       company: recruiter.domain ? `${recruiter.domain} Hiring` : 'Campus Hiring Partner',
       activePositions,
-      activeDrives: driveCount,
+      activeDrives: eventCount,
       domains: recruiter.domain ? [recruiter.domain] : [],
     };
   })
@@ -628,7 +627,7 @@ export const createCollegeMentorshipProgramRequest = (
 export const getCollegeMentorshipPrograms = (collegeId: string) =>
   listInstitutionMentorshipPrograms(collegeId, 'college');
 
-export const getCollegeDrivesForCollege = (collegeId: string) => getCollegeDrivesView(collegeId);
+export const getCollegeDrivesForCollege = (collegeId: string) => listCollegeHiringEventsService(collegeId);
 
 export {
   createManagedStudentCredentialsSchema,

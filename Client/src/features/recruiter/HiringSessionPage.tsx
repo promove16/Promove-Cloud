@@ -292,7 +292,7 @@ export default function HiringSessionPage() {
             {application.job.description && (
               <div className="mt-6">
                 <div className="text-xs uppercase tracking-[0.22em] text-slate-500">Job Description</div>
-                <p className="mt-3 text-sm leading-6 text-slate-300">{application.job.description}</p>
+                <p className="mt-3 whitespace-pre-wrap break-words [overflow-wrap:anywhere] text-sm leading-7 text-slate-300">{application.job.description}</p>
               </div>
             )}
           </Card>

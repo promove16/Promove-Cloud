@@ -1,7 +1,6 @@
 import api from './axiosInstance';
 import { ApiSuccessResponse } from '../types/auth.types';
 import { CollegeEvent, CollegeEventRankingsResponse } from '../types/college.types';
-import { RecruiterDriveView } from '../types/recruiter.types';
 
 export const eventApi = {
   async joinEvent(eventId: string) {
@@ -33,8 +32,10 @@ export const eventApi = {
     const response = await api.get<ApiSuccessResponse<CollegeEvent[]>>('/api/events/my-institution');
     return response.data.data;
   },
-  async listMyInstitutionDrives() {
-    const response = await api.get<ApiSuccessResponse<RecruiterDriveView[]>>('/api/events/drives');
+  async closeEvent(eventId: string) {
+    const response = await api.patch<ApiSuccessResponse<{ updated: boolean }>>(
+      `/api/events/${eventId}/close`,
+    );
     return response.data.data;
   },
 };

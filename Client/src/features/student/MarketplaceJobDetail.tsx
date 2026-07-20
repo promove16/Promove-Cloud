@@ -20,6 +20,7 @@ import {
 import { DashboardLayout } from '../../app/components/DashboardLayout';
 import { recruiterApi } from '../../api/recruiter.api';
 import { marketplaceApi } from '../../api/marketplace.api';
+import { useAuthStore } from '../../store/authStore';
 import { Spinner } from '../../components/ui/Spinner';
 import { Button } from '../../components/ui/Button';
 import { RecruiterJobView } from '../../types/recruiter.types';
@@ -135,8 +136,8 @@ function NumberedList({ items }: { items: string[] }) {
 
 function StatItem({ icon: Icon, label, value }: { icon: ElementType; label: string; value: string }) {
   return (
-    <div className="flex items-center gap-2 text-sm text-slate-300">
-      <Icon className="h-4 w-4 shrink-0 text-slate-500" />
+    <div className="inline-flex items-center gap-1.5 rounded-full border border-slate-800 bg-slate-900/80 px-3 py-1 text-xs">
+      <Icon className="h-3.5 w-3.5 text-cyan-400" />
       <span className="text-slate-500">{label}:</span>
       <span className="font-medium text-white">{value}</span>
     </div>
@@ -158,6 +159,9 @@ export function MarketplaceJobDetail() {
   const navigate = useNavigate();
   const queryClient = useQueryClient();
   const { jobId } = useParams();
+  const authUser = useAuthStore((state) => state.user);
+  const userRole = authUser?.role ?? 'student';
+  const isStudent = userRole === 'student';
   const [hasApplied, setHasApplied] = useState(false);
   const [applyError, setApplyError] = useState<string | null>(null);
 
@@ -181,7 +185,7 @@ export function MarketplaceJobDetail() {
 
   const job = jobQuery.data;
   const recruiter = recruiterQuery.data;
-  const isApplyLocked = hasApplied || !job?.isActive;
+  const isApplyLocked = !isStudent || hasApplied || !job?.isActive;
 
   const relatedJobs = useMemo(
     () => (relatedJobsQuery.data ?? []).filter((j) => j._id !== job?._id).slice(0, 4),
@@ -248,22 +252,24 @@ export function MarketplaceJobDetail() {
   };
 
   const handleApply = () => {
-    if (!job || hasApplied || applyToJob.isPending || !job.isActive) return;
+    if (!job || !isStudent || hasApplied || applyToJob.isPending || !job.isActive) return;
     applyToJob.mutate();
   };
 
-  const applyLabel = applyToJob.isPending
-    ? 'Applying…'
-    : hasApplied
-      ? job?.applicationSource === 'recruiter_invite'
-        ? 'Invited'
-        : 'Applied ✓'
-      : job?.isActive
-        ? 'Apply Now'
-        : 'Applications Closed';
+  const applyLabel = !isStudent
+    ? 'Job Active'
+    : applyToJob.isPending
+      ? 'Applying…'
+      : hasApplied
+        ? job?.applicationSource === 'recruiter_invite'
+          ? 'Invited'
+          : 'Applied ✓'
+        : job?.isActive
+          ? 'Apply Now'
+          : 'Applications Closed';
 
   return (
-    <DashboardLayout role="student">
+    <DashboardLayout role={userRole}>
       <div className="-mx-4 -my-6 min-h-[calc(100vh-5rem)] bg-[#080d1a] px-4 py-6 text-white sm:px-5 lg:-mx-8 lg:px-8 lg:py-8">
         <div className="mx-auto flex w-full max-w-[96rem] flex-col gap-5">
 
@@ -276,13 +282,23 @@ export function MarketplaceJobDetail() {
               <ArrowLeft className="h-4 w-4" />
               Back to marketplace
             </Link>
-            <Link
-              to="/dashboard/student/applications"
-              className="inline-flex items-center gap-2 rounded-full border border-slate-700 bg-slate-950 px-4 py-2 text-sm font-medium text-slate-300 transition hover:border-cyan-400/40 hover:text-white"
-            >
-              <BriefcaseBusiness className="h-4 w-4" />
-              My applications
-            </Link>
+            {isStudent ? (
+              <Link
+                to="/dashboard/student/applications"
+                className="inline-flex items-center gap-2 rounded-full border border-slate-700 bg-slate-950 px-4 py-2 text-sm font-medium text-slate-300 transition hover:border-cyan-400/40 hover:text-white"
+              >
+                <BriefcaseBusiness className="h-4 w-4" />
+                My applications
+              </Link>
+            ) : userRole === 'recruiter' ? (
+              <Link
+                to="/dashboard/recruiter/hiring-events"
+                className="inline-flex items-center gap-2 rounded-full border border-slate-700 bg-slate-950 px-4 py-2 text-sm font-medium text-slate-300 transition hover:border-cyan-400/40 hover:text-white"
+              >
+                <BriefcaseBusiness className="h-4 w-4" />
+                Hiring Events
+              </Link>
+            ) : null}
           </div>
 
           {/* ── Loading / Error ── */}
@@ -486,7 +502,7 @@ export function MarketplaceJobDetail() {
                   {/* About the Role */}
                   <section className="border-b border-slate-800 px-6 py-6">
                     <SectionHeader title="About the Role" />
-                    <p className="text-sm leading-7 text-slate-300">
+                    <p className="whitespace-pre-wrap break-words [overflow-wrap:anywhere] text-sm leading-7 text-slate-300">
                       {job.roleSummary ?? job.description}
                     </p>
                     <div className="mt-4 flex flex-wrap gap-2">

@@ -3,7 +3,6 @@ import { ApiSuccessResponse } from '../types/auth.types';
 import {
   RecruiterCollegeCard,
   RecruiterDashboardData,
-  RecruiterDriveView,
   RecruiterHiringEventView,
   RecruiterJobDetail,
   RecruiterJobApplicantView,
@@ -103,21 +102,6 @@ const normalizeJobDetail = (job: Partial<RecruiterJobDetail>): RecruiterJobDetai
   ...(job.expiresAt ? { expiresAt: job.expiresAt } : {}),
   applicantIds: job.applicantIds ?? [],
   shortlistedIds: job.shortlistedIds ?? [],
-});
-
-const normalizeDriveView = (drive: Partial<RecruiterDriveView>): RecruiterDriveView => ({
-  _id: drive._id ?? '',
-  recruiterId: drive.recruiterId ?? '',
-  collegeId: drive.collegeId ?? '',
-  collegeName: drive.collegeName ?? 'College',
-  title: drive.title ?? 'Recruitment drive',
-  description: drive.description ?? '',
-  type: drive.type ?? 'Placement Drive',
-  scheduledAt: drive.scheduledAt ?? new Date(0).toISOString(),
-  minimumInnovationScore: drive.minimumInnovationScore ?? 0,
-  registeredStudents: drive.registeredStudents ?? [],
-  isActive: drive.isActive ?? false,
-  createdAt: drive.createdAt ?? new Date(0).toISOString(),
 });
 
 const normalizeHiringEventView = (event: Partial<RecruiterHiringEventView>): RecruiterHiringEventView => ({
@@ -312,33 +296,9 @@ export const recruiterApi = {
     );
     return response.data.data;
   },
-  async getDrives() {
-    const response = await api.get<ApiSuccessResponse<RecruiterDriveView[]>>('/api/recruiter/drives');
-    return (response.data.data ?? []).map((drive) => normalizeDriveView(drive));
-  },
   async getHiringEvents() {
     const response = await api.get<ApiSuccessResponse<RecruiterHiringEventView[]>>('/api/events/hiring');
     return (response.data.data ?? []).map((event) => normalizeHiringEventView(event));
-  },
-  async createHiringEvent(payload: {
-    title: string;
-    collegeId: string;
-    type:
-      | 'Placement Drive'
-      | 'Internship Drive'
-      | 'Hackathon'
-      | 'Industry Connect Session'
-      | 'Placement Hackathon'
-      | 'Innovation Drive'
-      | 'Other'
-      | 'Walk-in Drive';
-    date: string;
-    description: string;
-    linkedJobId?: string;
-    minimumInnovationScore: number;
-  }) {
-    const response = await api.post<ApiSuccessResponse<RecruiterHiringEventView>>('/api/events/hiring', payload);
-    return response.data.data;
   },
   async selectStudentFromEvent(
     eventId: string,
@@ -377,36 +337,9 @@ export const recruiterApi = {
     );
     return response.data.data;
   },
-  async createDrive(payload: {
-    title: string;
-    collegeId: string;
-    type: 'Placement Drive' | 'Internship Drive' | 'Hackathon';
-    scheduledAt: string;
-    description: string;
-    minimumInnovationScore: number;
-  }) {
-    const response = await api.post<ApiSuccessResponse<RecruiterDriveView>>('/api/recruiter/drives', payload);
-    return response.data.data;
-  },
-  async registerForDrive(driveId: string) {
-    const response = await api.post<ApiSuccessResponse<{ registered: boolean }>>(
-      `/api/recruiter/drives/${driveId}/register`,
-    );
-    return response.data.data;
-  },
-  async submitDriveScore(
-    driveId: string,
-    payload: { studentId: string; submissionScore: number },
-  ) {
-    const response = await api.post<ApiSuccessResponse<{ updated: boolean }>>(
-      `/api/recruiter/drives/${driveId}/submit-score`,
-      payload,
-    );
-    return response.data.data;
-  },
-  async closeDrive(driveId: string) {
+  async closeEvent(eventId: string) {
     const response = await api.patch<ApiSuccessResponse<{ updated: boolean }>>(
-      `/api/recruiter/drives/${driveId}/close`,
+      `/api/events/${eventId}/close`,
     );
     return response.data.data;
   },

@@ -5,8 +5,8 @@ import { UserRole } from '../../types/roles.types';
 import { asyncHandler } from '../../utils/asyncHandler';
 import {
   addSubmissionScoreController,
+  closeEventController,
   computeEventRankingsController,
-  createHiringEventController,
   getEventRankingsController,
   joinEventController,
   listRecruiterHiringEventsController,
@@ -22,7 +22,6 @@ router.use(authenticate);
 
 router.get('/my-institution', authorize(UserRole.STUDENT), asyncHandler(listStudentInstitutionEventsController));
 router.get('/drives', authorize(UserRole.STUDENT), asyncHandler(listStudentInstitutionDrivesController));
-router.post('/hiring', authorize(UserRole.RECRUITER), asyncHandler(createHiringEventController));
 router.get('/hiring', authorize(UserRole.RECRUITER), asyncHandler(listRecruiterHiringEventsController));
 router.post('/hiring-invite/:collegeId', authorize(UserRole.RECRUITER), asyncHandler(sendHiringEventInviteController));
 router.post(
@@ -46,6 +45,11 @@ router.get(
   '/:eventId/rankings',
   authorize(UserRole.COLLEGE, UserRole.SCHOOL, UserRole.STUDENT, UserRole.RECRUITER),
   asyncHandler(getEventRankingsController),
+);
+router.post(
+  '/:eventId/close',
+  authorize(UserRole.COLLEGE, UserRole.SCHOOL, UserRole.RECRUITER),
+  asyncHandler(closeEventController),
 );
 
 export default router;

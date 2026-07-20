@@ -7,14 +7,11 @@ import { asyncHandler } from '../../utils/asyncHandler';
 import { UserRole } from '../../types/roles.types';
 import {
   applyJobController,
-  closeDriveController,
-  createDriveController,
   createJobController,
   deleteJobController,
   getCollegesController,
   getLinkedCollegesController,
   getDashboardController,
-  getDrivesController,
   getJobApplicationsController,
   getStudentApplicationsController,
   getPublicJobController,
@@ -27,13 +24,11 @@ import {
   hiredStudentController,
   inviteStudentToJobController,
   messageCheckController,
-  registerForDriveController,
   removeShortlistController,
   requestPartnershipController,
   sendMessageController,
   sendOnboardingReminderController,
   shortlistStudentController,
-  submitDriveScoreController,
   updateJobController,
   updateJobApplicationController,
 } from './recruiter.controller';
@@ -99,11 +94,6 @@ router.post(
   asyncHandler(inviteStudentToJobController),
 );
 router.post('/jobs/:jobId/apply', authenticate, authorize(UserRole.STUDENT), asyncHandler(applyJobController));
-router.get('/drives', authenticate, authorize(UserRole.RECRUITER), asyncHandler(getDrivesController));
-router.post('/drives', authenticate, authorize(UserRole.RECRUITER), asyncHandler(createDriveController));
-router.post('/drives/:driveId/register', authenticate, authorize(UserRole.STUDENT), asyncHandler(registerForDriveController));
-router.post('/drives/:driveId/submit-score', authenticate, authorize(UserRole.RECRUITER), asyncHandler(submitDriveScoreController));
-router.patch('/drives/:driveId/close', authenticate, authorize(UserRole.RECRUITER), asyncHandler(closeDriveController));
 router.get('/colleges', authenticate, authorize(UserRole.RECRUITER), connectionGuard(UserRole.COLLEGE), asyncHandler(getCollegesController));
 router.get('/colleges/linked', authenticate, authorize(UserRole.RECRUITER), asyncHandler(getLinkedCollegesController));
 router.get('/onboarding', authenticate, authorize(UserRole.RECRUITER), asyncHandler(getOnboardingController));

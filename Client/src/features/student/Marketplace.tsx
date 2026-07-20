@@ -927,7 +927,7 @@ function RecruiterJobCard({
                   <div className="mt-1 text-sm text-slate-400">
                     {job.company} - {job.location} - {job.type}
                   </div>
-                  <p className="mt-2 max-w-3xl text-sm leading-6 text-slate-300">{job.description}</p>
+                  <p className="mt-2 max-w-3xl whitespace-pre-wrap break-words [overflow-wrap:anywhere] text-sm leading-6 text-slate-300">{job.description}</p>
                 </div>
                 <div className="flex flex-wrap gap-2">
                   <Button
@@ -1090,7 +1090,7 @@ function MarketplaceRecruiterJobCard({
             ))}
           </div>
         ) : (
-          <p className="text-sm leading-6 text-slate-300">{job.description || 'Job description will appear here.'}</p>
+          <p className="whitespace-pre-wrap break-words [overflow-wrap:anywhere] text-sm leading-6 text-slate-300">{job.description || 'Job description will appear here.'}</p>
         )}
 
         <div className="flex flex-col gap-3 xl:flex-row xl:items-center xl:justify-between">

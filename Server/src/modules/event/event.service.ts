@@ -7,10 +7,6 @@ import { Event } from './event.model';
 import { EventParticipantView, EventRankingView } from './event.types';
 import { UserRole } from '../../types/roles.types';
 import { JobPost } from '../recruiter/jobPost.model';
-import {
-  assertRecruiterLinkedToCollege,
-  getCollegeDrivesView,
-} from '../recruiter/recruiter.drive.service';
 import { createBridge, notifyUser } from '../recruiter/recruiter.mappers';
 import { createRequestRecord, registerRequestHandler } from '../request/request.service';
 
@@ -26,12 +22,7 @@ const HIRING_EVENT_TYPES = [
 
 const EVENT_NOTIFICATION_BATCH_SIZE = 50;
 
-const notifyUsersInBatches = async (
-  userIds: string[],
-  title: string,
-  body: string,
-  link: string,
-) => {
+const notifyUsersInBatches = async (userIds: string[], title: string, body: string, link: string) => {
   for (let index = 0; index < userIds.length; index += EVENT_NOTIFICATION_BATCH_SIZE) {
     const batch = userIds.slice(index, index + EVENT_NOTIFICATION_BATCH_SIZE);
     await Promise.allSettled(batch.map((userId) => notifyUser(userId, title, body, link)));
@@ -40,33 +31,22 @@ const notifyUsersInBatches = async (
 
 export const createEventSchema = z.object({
   title: z.string().trim().min(2).max(160),
-  type: z.enum([
-    'Industry Connect Session',
-    'Placement Hackathon',
-    'Innovation Drive',
-    'Other',
-  ]),
-  date: z.string().datetime().refine((val) => {
-    return new Date(val).getTime() >= Date.now() - 1000 * 60 * 5;
-  }, { message: "Event date cannot be in the past" }),
+  type: z.enum(['Industry Connect Session', 'Placement Hackathon', 'Innovation Drive', 'Other']),
+  date: z
+    .string()
+    .datetime()
+    .refine(
+      (val) => {
+        return new Date(val).getTime() >= Date.now() - 1000 * 60 * 5;
+      },
+      { message: 'Event date cannot be in the past' },
+    ),
   description: z.string().trim().min(10).max(2000),
   targetRoles: z.array(z.enum(['student', 'all'])).optional(),
 });
 
 export const eventSubmissionSchema = z.object({
   score: z.number().min(0).max(100),
-});
-
-export const createHiringEventSchema = z.object({
-  title: z.string().trim().min(2).max(160),
-  type: z.enum(HIRING_EVENT_TYPES),
-  date: z.string().datetime().refine((val) => {
-    return new Date(val).getTime() >= Date.now() - 1000 * 60 * 5;
-  }, { message: "Event date cannot be in the past" }),
-  description: z.string().trim().min(10).max(2000),
-  collegeId: z.string().regex(/^[0-9a-fA-F]{24}$/, 'Invalid college ID'),
-  linkedJobId: z.string().regex(/^[0-9a-fA-F]{24}$/).optional(),
-  minimumInnovationScore: z.coerce.number().min(0).default(0),
 });
 
 export const selectStudentFromEventSchema = z.object({
@@ -77,11 +57,20 @@ export const selectStudentFromEventSchema = z.object({
 export const sendHiringEventInviteSchema = z.object({
   title: z.string().trim().min(2).max(160),
   type: z.enum(HIRING_EVENT_TYPES),
-  date: z.string().datetime().refine((val) => {
-    return new Date(val).getTime() >= Date.now() - 1000 * 60 * 5;
-  }, { message: "Event date cannot be in the past" }),
+  date: z
+    .string()
+    .datetime()
+    .refine(
+      (val) => {
+        return new Date(val).getTime() >= Date.now() - 1000 * 60 * 5;
+      },
+      { message: 'Event date cannot be in the past' },
+    ),
   description: z.string().trim().min(10).max(2000),
-  linkedJobId: z.string().regex(/^[0-9a-fA-F]{24}$/).optional(),
+  linkedJobId: z
+    .string()
+    .regex(/^[0-9a-fA-F]{24}$/)
+    .optional(),
   minimumInnovationScore: z.coerce.number().min(0).default(0),
   message: z.string().trim().max(500).optional(),
 });
@@ -91,7 +80,10 @@ const collegeEventInviteMetadataSchema = z.object({
   type: z.enum(HIRING_EVENT_TYPES),
   date: z.string().datetime(),
   description: z.string().trim().min(10).max(2000),
-  linkedJobId: z.string().regex(/^[0-9a-fA-F]{24}$/).optional(),
+  linkedJobId: z
+    .string()
+    .regex(/^[0-9a-fA-F]{24}$/)
+    .optional(),
   minimumInnovationScore: z.coerce.number().min(0).default(0),
 });
 
@@ -106,10 +98,7 @@ type EventManagementActor = {
   institutionId?: string | null;
 };
 
-const findManagedEvent = async (
-  eventId: string,
-  actor?: EventManagementActor,
-) => {
+const findManagedEvent = async (eventId: string, actor?: EventManagementActor) => {
   if (!actor) {
     return Event.findOne({ _id: eventId });
   }
@@ -132,11 +121,7 @@ const findManagedEvent = async (
   return Event.findOne(eventTenantFilter(eventId, actor.institutionId));
 };
 
-export const createEvent = async (
-  institutionId: string,
-  createdBy: string,
-  payload: z.infer<typeof createEventSchema>,
-) => {
+export const createEvent = async (institutionId: string, createdBy: string, payload: z.infer<typeof createEventSchema>) => {
   const event = await Event.create({
     institutionId,
     createdBy,
@@ -195,9 +180,7 @@ const buildParticipantViewMap = async (
           ...(student?.avatar ? { avatar: student.avatar } : {}),
           innovationScore: student?.innovationScore ?? 0,
           registeredAt: participant.joinedAt.toISOString(),
-          ...(typeof participant.submissionScore === 'number'
-            ? { submissionScore: participant.submissionScore }
-            : {}),
+          ...(typeof participant.submissionScore === 'number' ? { submissionScore: participant.submissionScore } : {}),
         } satisfies EventParticipantView;
       }),
     ]),
@@ -208,29 +191,21 @@ export const listInstitutionEvents = async (institutionId: string) => {
   const events = await Event.find({ institutionId }).sort({ scheduledAt: -1 }).lean();
   const participantMap = await buildParticipantViewMap(events);
 
-  const recruiterIds = [
-    ...new Set(
-      events
-        .filter((event) => event.category === 'hiring' && event.recruiterId)
-        .map((event) => String(event.recruiterId)),
-    ),
-  ];
+  const recruiterIds = [...new Set(events.filter((event) => event.category === 'hiring' && event.recruiterId).map((event) => String(event.recruiterId)))];
   const recruiters =
     recruiterIds.length > 0
-      ? await User.find({ _id: { $in: recruiterIds } }).select('_id displayName domain').lean()
+      ? await User.find({ _id: { $in: recruiterIds } })
+          .select('_id displayName domain')
+          .lean()
       : [];
   const recruiterMap = new Map(recruiters.map((r) => [String(r._id), r]));
 
-  const jobIds = [
-    ...new Set(
-      events
-        .filter((event) => event.linkedJobId)
-        .map((event) => String(event.linkedJobId)),
-    ),
-  ];
+  const jobIds = [...new Set(events.filter((event) => event.linkedJobId).map((event) => String(event.linkedJobId)))];
   const jobs =
     jobIds.length > 0
-      ? await JobPost.find({ _id: { $in: jobIds } }).select('_id title company').lean()
+      ? await JobPost.find({ _id: { $in: jobIds } })
+          .select('_id title company')
+          .lean()
       : [];
   const jobMap = new Map(jobs.map((j) => [String(j._id), j]));
 
@@ -247,9 +222,7 @@ export const listInstitutionEvents = async (institutionId: string) => {
       isActive: event.isActive,
       participantsCount: event.participants.length,
       participants: participantMap.get(String(event._id)) ?? [],
-      ...(event.rankingsComputedAt
-        ? { rankingsComputedAt: event.rankingsComputedAt.toISOString() }
-        : {}),
+      ...(event.rankingsComputedAt ? { rankingsComputedAt: event.rankingsComputedAt.toISOString() } : {}),
       ...(event.recruiterId
         ? {
             recruiterId: String(event.recruiterId),
@@ -259,18 +232,12 @@ export const listInstitutionEvents = async (institutionId: string) => {
         : {}),
       ...(event.linkedJobId ? { linkedJobId: String(event.linkedJobId) } : {}),
       ...(job ? { jobTitle: job.title, companyName: job.company } : {}),
-      ...(typeof event.minimumInnovationScore === 'number'
-        ? { minimumInnovationScore: event.minimumInnovationScore }
-        : {}),
+      ...(typeof event.minimumInnovationScore === 'number' ? { minimumInnovationScore: event.minimumInnovationScore } : {}),
     };
   });
 };
 
-export const joinEvent = async (
-  eventId: string,
-  studentId: string,
-  institutionId?: string | null,
-): Promise<void> => {
+export const joinEvent = async (eventId: string, studentId: string, institutionId?: string | null): Promise<void> => {
   const [event, student] = await Promise.all([
     Event.findOne(eventTenantFilter(eventId, institutionId)),
     User.findById(studentId).select('_id institutionId role innovationScore').lean(),
@@ -301,9 +268,7 @@ export const joinEvent = async (
     throw new ApiError(403, 'SCORE_TOO_LOW', 'Your innovation score does not meet the minimum requirement for this event');
   }
 
-  const alreadyJoined = event.participants.some(
-    (participant) => String(participant.studentId) === studentId,
-  );
+  const alreadyJoined = event.participants.some((participant) => String(participant.studentId) === studentId);
 
   if (!alreadyJoined) {
     event.participants.push({
@@ -314,12 +279,7 @@ export const joinEvent = async (
   }
 };
 
-export const addSubmissionScore = async (
-  eventId: string,
-  studentId: string,
-  score: number,
-  actor?: EventManagementActor,
-): Promise<void> => {
+export const addSubmissionScore = async (eventId: string, studentId: string, score: number, actor?: EventManagementActor): Promise<void> => {
   const event = await findManagedEvent(eventId, actor);
 
   if (!event) {
@@ -327,16 +287,10 @@ export const addSubmissionScore = async (
   }
 
   if (event.rankingsComputedAt) {
-    throw new ApiError(
-      409,
-      'EVENT_RANKINGS_FINALIZED',
-      'Submission scores cannot be changed after rankings are computed',
-    );
+    throw new ApiError(409, 'EVENT_RANKINGS_FINALIZED', 'Submission scores cannot be changed after rankings are computed');
   }
 
-  const participant = event.participants.find(
-    (item) => String(item.studentId) === studentId,
-  );
+  const participant = event.participants.find((item) => String(item.studentId) === studentId);
 
   if (!participant) {
     throw new ApiError(404, 'PARTICIPANT_NOT_FOUND', 'Student is not part of this event');
@@ -346,10 +300,7 @@ export const addSubmissionScore = async (
   await event.save();
 };
 
-export const computeEventRankings = async (
-  eventId: string,
-  actor?: EventManagementActor,
-): Promise<void> => {
+export const computeEventRankings = async (eventId: string, actor?: EventManagementActor): Promise<void> => {
   const event = await findManagedEvent(eventId, actor);
 
   if (!event) {
@@ -357,10 +308,19 @@ export const computeEventRankings = async (
   }
 
   if (event.rankingsComputedAt) {
+    throw new ApiError(409, 'EVENT_RANKINGS_FINALIZED', 'Rankings have already been computed for this event');
+  }
+
+  if (event.category === 'hiring' && event.participants.length === 0) {
+    throw new ApiError(409, 'EVENT_HAS_NO_PARTICIPANTS', 'At least one registered participant is required before rankings can be computed');
+  }
+
+  const unscoredParticipantCount = event.participants.filter((participant) => typeof participant.submissionScore !== 'number').length;
+  if (event.category === 'hiring' && unscoredParticipantCount > 0) {
     throw new ApiError(
       409,
-      'EVENT_RANKINGS_FINALIZED',
-      'Rankings have already been computed for this event',
+      'EVENT_SCORES_INCOMPLETE',
+      `Score all registered participants before computing rankings. ${unscoredParticipantCount} participant${unscoredParticipantCount === 1 ? '' : 's'} still need${unscoredParticipantCount === 1 ? 's' : ''} a score.`,
     );
   }
 
@@ -382,9 +342,7 @@ export const computeEventRankings = async (
       const user = userMap.get(String(participant.studentId));
       const innovationScore = user?.innovationScore ?? 0;
       const submissionScore = participant.submissionScore ?? 0;
-      const compositeScore = Number(
-        ((submissionScore * 0.6) + (innovationScore * 0.4)).toFixed(2),
-      );
+      const compositeScore = Number((submissionScore * 0.6 + innovationScore * 0.4).toFixed(2));
 
       return {
         studentId: participant.studentId,
@@ -422,19 +380,18 @@ export const computeEventRankings = async (
   }
 
   if (io) {
-    io.of('/score').to(`college:${String(event.institutionId)}`).emit('event:rankings-computed', {
-      eventId,
-      institutionId: String(event.institutionId),
-      formula: '(submissionScore * 0.6) + (innovationScore * 0.4)',
-      computedAt: event.rankingsComputedAt.toISOString(),
-    });
+    io.of('/score')
+      .to(`college:${String(event.institutionId)}`)
+      .emit('event:rankings-computed', {
+        eventId,
+        institutionId: String(event.institutionId),
+        formula: '(submissionScore * 0.6) + (innovationScore * 0.4)',
+        computedAt: event.rankingsComputedAt.toISOString(),
+      });
   }
 };
 
-export const getEventRankings = async (
-  eventId: string,
-  institutionId?: string | null,
-): Promise<EventRankingView[]> => {
+export const getEventRankings = async (eventId: string, institutionId?: string | null): Promise<EventRankingView[]> => {
   const event = await Event.findOne(eventTenantFilter(eventId, institutionId)).lean();
 
   if (!event) {
@@ -468,10 +425,7 @@ export const getEventRankings = async (
   });
 };
 
-export const getManagedEventRankings = async (
-  eventId: string,
-  actor: EventManagementActor,
-): Promise<EventRankingView[]> => {
+export const getManagedEventRankings = async (eventId: string, actor: EventManagementActor): Promise<EventRankingView[]> => {
   const event = await findManagedEvent(eventId, actor);
 
   if (!event) {
@@ -481,77 +435,8 @@ export const getManagedEventRankings = async (
   return getEventRankings(eventId, String(event.institutionId));
 };
 
-export const createHiringEvent = async (
-  recruiterId: string,
-  payload: z.infer<typeof createHiringEventSchema>,
-) => {
-  await assertRecruiterLinkedToCollege(recruiterId, payload.collegeId);
-
-  const college = await User.findOne({
-    _id: payload.collegeId,
-    role: UserRole.COLLEGE,
-    isActive: true,
-  })
-    .select('_id displayName')
-    .lean();
-
-  if (!college) {
-    throw new ApiError(404, 'COLLEGE_NOT_FOUND', 'College not found');
-  }
-
-  if (payload.linkedJobId) {
-    const job = await JobPost.findOne({ _id: payload.linkedJobId, recruiterId, isActive: true })
-      .select('_id')
-      .lean();
-    if (!job) {
-      throw new ApiError(404, 'JOB_NOT_FOUND', 'Linked job not found');
-    }
-  }
-
-  const event = await Event.create({
-    institutionId: payload.collegeId,
-    createdBy: recruiterId,
-    recruiterId,
-    title: payload.title,
-    type: payload.type,
-    category: 'hiring',
-    description: payload.description,
-    scheduledAt: new Date(payload.date),
-    isActive: true,
-    participants: [],
-    rankings: [],
-    ...(payload.linkedJobId ? { linkedJobId: payload.linkedJobId } : {}),
-    minimumInnovationScore: payload.minimumInnovationScore,
-  });
-
-  return {
-    _id: String(event._id),
-    title: event.title,
-    type: event.type,
-    category: 'hiring' as const,
-    description: event.description,
-    scheduledAt: event.scheduledAt.toISOString(),
-    isActive: true,
-    institutionId: String(event.institutionId),
-    collegeName: college.displayName,
-    recruiterId: String(event.recruiterId),
-    ...(event.linkedJobId ? { linkedJobId: String(event.linkedJobId) } : {}),
-    minimumInnovationScore: event.minimumInnovationScore ?? 0,
-    participantsCount: 0,
-    participants: [] as EventParticipantView[],
-    rankings: [],
-    rankingsComputedAt: undefined,
-  };
-};
-
-export const sendHiringEventInvite = async (
-  recruiterId: string,
-  collegeId: string,
-  payload: z.infer<typeof sendHiringEventInviteSchema>,
-) => {
-  const college = await User.findOne({ _id: collegeId, role: UserRole.COLLEGE, isActive: true })
-    .select('_id displayName')
-    .lean();
+export const sendHiringEventInvite = async (recruiterId: string, collegeId: string, payload: z.infer<typeof sendHiringEventInviteSchema>) => {
+  const college = await User.findOne({ _id: collegeId, role: UserRole.COLLEGE, isActive: true }).select('_id displayName').lean();
 
   if (!college) {
     throw new ApiError(404, 'COLLEGE_NOT_FOUND', 'College not found');
@@ -561,8 +446,7 @@ export const sendHiringEventInvite = async (
   const recruiterName = recruiter?.displayName ?? 'A recruiter';
 
   const { message, ...eventMetadata } = payload;
-  const body = message?.trim() ||
-    `${recruiterName} is requesting to host "${payload.title}" at ${college.displayName}.`;
+  const body = message?.trim() || `${recruiterName} is requesting to host "${payload.title}" at ${college.displayName}.`;
 
   await createRequestRecord({
     type: 'college_event_invite',
@@ -585,14 +469,14 @@ export const sendHiringEventInvite = async (
 };
 
 export const listRecruiterHiringEvents = async (recruiterId: string) => {
-  const events = await Event.find({ recruiterId, category: 'hiring' })
-    .sort({ scheduledAt: -1 })
-    .lean();
+  const events = await Event.find({ recruiterId, category: 'hiring' }).sort({ scheduledAt: -1 }).lean();
 
   const collegeIds = [...new Set(events.map((event) => String(event.institutionId)))];
   const colleges =
     collegeIds.length > 0
-      ? await User.find({ _id: { $in: collegeIds } }).select('_id displayName').lean()
+      ? await User.find({ _id: { $in: collegeIds } })
+          .select('_id displayName')
+          .lean()
       : [];
   const collegeMap = new Map(colleges.map((c) => [String(c._id), c.displayName]));
 
@@ -605,16 +489,12 @@ export const listRecruiterHiringEvents = async (recruiterId: string) => {
   );
   const rankingMap = new Map(rankingsAll.map((entry) => [entry.eventId, entry.rankings]));
 
-  const jobIds = [
-    ...new Set(
-      events
-        .filter((event) => event.linkedJobId)
-        .map((event) => String(event.linkedJobId)),
-    ),
-  ];
+  const jobIds = [...new Set(events.filter((event) => event.linkedJobId).map((event) => String(event.linkedJobId)))];
   const jobs =
     jobIds.length > 0
-      ? await JobPost.find({ _id: { $in: jobIds } }).select('_id title company').lean()
+      ? await JobPost.find({ _id: { $in: jobIds } })
+          .select('_id title company')
+          .lean()
       : [];
   const jobMap = new Map(jobs.map((j) => [String(j._id), j]));
 
@@ -636,9 +516,7 @@ export const listRecruiterHiringEvents = async (recruiterId: string) => {
       minimumInnovationScore: event.minimumInnovationScore ?? 0,
       participantsCount: event.participants.length,
       participants: participantMap.get(String(event._id)) ?? [],
-      ...(event.rankingsComputedAt
-        ? { rankingsComputedAt: event.rankingsComputedAt.toISOString() }
-        : {}),
+      ...(event.rankingsComputedAt ? { rankingsComputedAt: event.rankingsComputedAt.toISOString() } : {}),
       rankings: rankingMap.get(String(event._id)) ?? [],
     };
   });
@@ -661,16 +539,14 @@ export const listStudentInstitutionEvents = async (institutionId: string) => {
 };
 
 export const listCollegeHiringEvents = async (collegeId: string) => {
-  const events = await Event.find({ institutionId: collegeId, category: 'hiring' })
-    .sort({ scheduledAt: -1 })
-    .lean();
+  const events = await Event.find({ institutionId: collegeId, category: 'hiring' }).sort({ scheduledAt: -1 }).lean();
 
-  const recruiterIds = [
-    ...new Set(events.filter((e) => e.recruiterId).map((e) => String(e.recruiterId))),
-  ];
+  const recruiterIds = [...new Set(events.filter((e) => e.recruiterId).map((e) => String(e.recruiterId)))];
   const recruiters =
     recruiterIds.length > 0
-      ? await User.find({ _id: { $in: recruiterIds } }).select('_id displayName domain').lean()
+      ? await User.find({ _id: { $in: recruiterIds } })
+          .select('_id displayName domain')
+          .lean()
       : [];
   const recruiterMap = new Map(recruiters.map((r) => [String(r._id), r]));
 
@@ -684,16 +560,12 @@ export const listCollegeHiringEvents = async (collegeId: string) => {
   );
   const rankingMap = new Map(rankingsAll.map((entry) => [entry.eventId, entry.rankings]));
 
-  const jobIds = [
-    ...new Set(
-      events
-        .filter((event) => event.linkedJobId)
-        .map((event) => String(event.linkedJobId)),
-    ),
-  ];
+  const jobIds = [...new Set(events.filter((event) => event.linkedJobId).map((event) => String(event.linkedJobId)))];
   const jobs =
     jobIds.length > 0
-      ? await JobPost.find({ _id: { $in: jobIds } }).select('_id title company').lean()
+      ? await JobPost.find({ _id: { $in: jobIds } })
+          .select('_id title company')
+          .lean()
       : [];
   const jobMap = new Map(jobs.map((j) => [String(j._id), j]));
 
@@ -710,9 +582,7 @@ export const listCollegeHiringEvents = async (collegeId: string) => {
       isActive: event.isActive,
       participantsCount: event.participants.length,
       participants: participantMap.get(String(event._id)) ?? [],
-      ...(event.rankingsComputedAt
-        ? { rankingsComputedAt: event.rankingsComputedAt.toISOString() }
-        : {}),
+      ...(event.rankingsComputedAt ? { rankingsComputedAt: event.rankingsComputedAt.toISOString() } : {}),
       rankings: rankingMap.get(String(event._id)) ?? [],
       recruiterId: String(event.recruiterId),
       recruiterName: recruiter?.displayName ?? 'Recruiter',
@@ -724,23 +594,24 @@ export const listCollegeHiringEvents = async (collegeId: string) => {
   });
 };
 
-export const selectStudentFromHiringEvent = async (
-  recruiterId: string,
-  eventId: string,
-  studentId: string,
-  jobId: string,
-  note?: string,
-) => {
+export const selectStudentFromHiringEvent = async (recruiterId: string, eventId: string, studentId: string, jobId: string, note?: string) => {
   const event = await Event.findOne({ _id: eventId, recruiterId, category: 'hiring' }).lean();
   if (!event) {
     throw new ApiError(404, 'EVENT_NOT_FOUND', 'Hiring event not found');
   }
 
-  const isParticipant = event.participants.some(
-    (p) => String(p.studentId) === studentId,
-  );
+  const isParticipant = event.participants.some((p) => String(p.studentId) === studentId);
   if (!isParticipant) {
     throw new ApiError(404, 'PARTICIPANT_NOT_FOUND', 'Student is not a participant of this event');
+  }
+
+  if (!event.rankingsComputedAt) {
+    throw new ApiError(409, 'EVENT_RANKINGS_REQUIRED', 'Compute the event rankings before adding a participant to the hiring pipeline');
+  }
+
+  const isRankedParticipant = event.rankings.some((ranking) => String(ranking.studentId) === studentId);
+  if (!isRankedParticipant) {
+    throw new ApiError(409, 'PARTICIPANT_NOT_RANKED', 'Only ranked event participants can be added to the hiring pipeline');
   }
 
   const job = await JobPost.findOne({ _id: jobId, recruiterId, isActive: true });
@@ -748,9 +619,7 @@ export const selectStudentFromHiringEvent = async (
     throw new ApiError(404, 'JOB_NOT_FOUND', 'Job not found or inactive');
   }
 
-  const existingApplication = job.applicationRecords.find(
-    (r) => String(r.studentId) === studentId,
-  );
+  const existingApplication = job.applicationRecords.find((r) => String(r.studentId) === studentId);
   if (existingApplication) {
     throw new ApiError(409, 'ALREADY_APPLIED', 'Student already has an application for this job');
   }
@@ -782,6 +651,19 @@ export const selectStudentFromHiringEvent = async (
   );
 
   return { selected: true };
+};
+
+export const closeEvent = async (eventId: string, actor: EventManagementActor): Promise<{ updated: boolean }> => {
+  const event = await findManagedEvent(eventId, actor);
+
+  if (!event) {
+    throw new ApiError(404, 'EVENT_NOT_FOUND', 'Event not found');
+  }
+
+  event.isActive = false;
+  await event.save();
+
+  return { updated: true };
 };
 
 registerRequestHandler('college_event_invite', {
@@ -861,9 +743,7 @@ registerRequestHandler('college_event_invite', {
       institutionId: collegeId,
       role: UserRole.STUDENT,
       isActive: true,
-      ...(payload.minimumInnovationScore > 0
-        ? { innovationScore: { $gte: payload.minimumInnovationScore } }
-        : {}),
+      ...(payload.minimumInnovationScore > 0 ? { innovationScore: { $gte: payload.minimumInnovationScore } } : {}),
     })
       .select('_id')
       .lean<Array<{ _id: { toString(): string } }>>();
@@ -894,5 +774,68 @@ registerRequestHandler('college_event_invite', {
 });
 
 export const listStudentInstitutionDrives = async (institutionId: string) => {
-  return getCollegeDrivesView(institutionId);
+  const events = await Event.find({ institutionId, category: 'hiring' }).sort({ scheduledAt: -1 }).lean();
+
+  const recruiterIds = [...new Set(events.filter((e) => e.recruiterId).map((e) => String(e.recruiterId)))];
+  const recruiters =
+    recruiterIds.length > 0
+      ? await User.find({ _id: { $in: recruiterIds } })
+          .select('_id displayName domain')
+          .lean()
+      : [];
+  const recruiterMap = new Map(recruiters.map((r) => [String(r._id), r]));
+
+  const participantMap = await buildParticipantViewMap(events);
+
+  const collegeIds = [...new Set(events.map((e) => String(e.institutionId)))];
+  const colleges =
+    collegeIds.length > 0
+      ? await User.find({ _id: { $in: collegeIds } })
+          .select('_id displayName')
+          .lean()
+      : [];
+  const collegeMap = new Map(colleges.map((c) => [String(c._id), c.displayName]));
+
+  const jobIds = [...new Set(events.filter((event) => event.linkedJobId).map((event) => String(event.linkedJobId)))];
+  const jobs =
+    jobIds.length > 0
+      ? await JobPost.find({ _id: { $in: jobIds } })
+          .select('_id title company')
+          .lean()
+      : [];
+  const jobMap = new Map(jobs.map((j) => [String(j._id), j]));
+
+  const rankingsAll = await Promise.all(
+    events.map(async (event) => ({
+      eventId: String(event._id),
+      rankings: await getEventRankings(String(event._id), institutionId),
+    })),
+  );
+  const rankingMap = new Map(rankingsAll.map((entry) => [entry.eventId, entry.rankings]));
+
+  return events.map((event) => {
+    const job = event.linkedJobId ? jobMap.get(String(event.linkedJobId)) : null;
+    const recruiter = event.recruiterId ? recruiterMap.get(String(event.recruiterId)) : null;
+    return {
+      _id: String(event._id),
+      title: event.title,
+      type: event.type,
+      category: 'hiring' as const,
+      description: event.description,
+      scheduledAt: event.scheduledAt.toISOString(),
+      isActive: event.isActive,
+      institutionId: String(event.institutionId),
+      collegeName: collegeMap.get(String(event.institutionId)) ?? 'College',
+      recruiterId: String(event.recruiterId),
+      ...(event.linkedJobId ? { linkedJobId: String(event.linkedJobId) } : {}),
+      ...(job ? { jobTitle: job.title, companyName: job.company } : {}),
+      minimumInnovationScore: event.minimumInnovationScore ?? 0,
+      participantsCount: event.participants.length,
+      participants: participantMap.get(String(event._id)) ?? [],
+      ...(event.rankingsComputedAt ? { rankingsComputedAt: event.rankingsComputedAt.toISOString() } : {}),
+      rankings: rankingMap.get(String(event._id)) ?? [],
+      recruiterName: recruiter?.displayName ?? 'Recruiter',
+      recruiterCompany: recruiter?.domain ? `${recruiter.domain} Hiring` : undefined,
+    };
+  });
 };

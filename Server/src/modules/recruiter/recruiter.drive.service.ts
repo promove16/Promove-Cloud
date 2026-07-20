@@ -1,16 +1,12 @@
-import { Types } from 'mongoose';
 import { UserRole } from '../../types/roles.types';
 import { ApiError } from '../../utils/ApiError';
 import { normalizeInnovationScore } from '../innovationScore/score.utils';
-import { CampusDrive } from './campusDrive.model';
 import { PlacementRecord } from '../college/placementRecord.model';
 import { RequestRecord } from '../request/request.model';
 import { createRequestRecord } from '../request/request.service';
 import { User } from '../user/user.model';
-import { createBridge, getStudentCollegeId, mapCollege, mapDrive, notifyUser } from './recruiter.mappers';
-import { RecruiterCollegeCard, RecruiterDriveView, RecruiterPlacementRow } from './recruiter.types';
-import { driveCreateSchema } from './recruiter.schemas';
-import { z } from 'zod';
+import { getStudentCollegeId, mapCollege, notifyUser } from './recruiter.mappers';
+import { RecruiterCollegeCard, RecruiterPlacementRow } from './recruiter.types';
 import { JobPost, type JobApplicationStage } from './jobPost.model';
 
 type OnboardingRecordLike = {
@@ -90,107 +86,6 @@ export const assertRecruiterLinkedToCollege = async (
       'Recruiter can only create hiring events for colleges with an accepted partnership.',
     );
   }
-};
-
-export const getRecruiterDrives = async (recruiterId: string): Promise<RecruiterDriveView[]> => {
-  const drives = await CampusDrive.find({ recruiterId }).sort({ scheduledAt: -1 }).lean();
-  const mapped = await Promise.all(
-    drives.map(async (drive) => {
-      const college = await User.findById(drive.collegeId).select('displayName').lean();
-      const students = drive.registeredStudents.length
-        ? await User.find({ _id: { $in: drive.registeredStudents.map((entry) => entry.studentId) } })
-            .select('_id displayName avatar innovationScore')
-            .lean()
-        : [];
-      return mapDrive(drive, college?.displayName ?? 'Unknown College', students);
-    }),
-  );
-  return mapped;
-};
-
-export const createRecruiterDrive = async (
-  recruiterId: string,
-  payload: z.infer<typeof driveCreateSchema>,
-) => {
-  await assertRecruiterLinkedToCollege(recruiterId, payload.collegeId);
-
-  const drive = await CampusDrive.create({
-    recruiterId,
-    collegeId: payload.collegeId,
-    title: payload.title,
-    description: payload.description,
-    type: payload.type,
-    scheduledAt: new Date(payload.scheduledAt),
-    minimumInnovationScore: payload.minimumInnovationScore,
-  });
-
-  return mapDrive(
-    drive.toObject(),
-    (await User.findById(payload.collegeId).select('displayName').lean())?.displayName ?? 'Unknown College',
-    [],
-  );
-};
-
-export const registerForDrive = async (studentId: string, driveId: string) => {
-  const drive = await CampusDrive.findOne({ _id: driveId, isActive: true }).lean();
-  if (!drive) {
-    throw new ApiError(404, 'DRIVE_NOT_FOUND', 'Campus drive not found');
-  }
-
-  await createBridge(String(drive.recruiterId), studentId, 'ACTIVE_APPLICATION');
-
-  await CampusDrive.updateOne(
-    {
-      _id: driveId,
-      'registeredStudents.studentId': { $ne: studentId },
-    },
-    {
-      $push: {
-        registeredStudents: {
-          studentId,
-          registeredAt: new Date(),
-        },
-      },
-    },
-  );
-
-  return { registered: true };
-};
-
-export const submitDriveScore = async (
-  recruiterId: string,
-  driveId: string,
-  studentId: string,
-  submissionScore: number,
-) => {
-  const drive = await CampusDrive.findOne({ _id: driveId, recruiterId }).lean();
-  if (!drive) {
-    throw new ApiError(404, 'DRIVE_NOT_FOUND', 'Campus drive not found');
-  }
-
-  const existing = drive.registeredStudents.find((entry) => String(entry.studentId) === studentId);
-  if (!existing) {
-    throw new ApiError(404, 'STUDENT_NOT_REGISTERED', 'Student is not registered for this drive');
-  }
-
-  await CampusDrive.updateOne(
-    { _id: driveId, 'registeredStudents.studentId': studentId },
-    { $set: { 'registeredStudents.$.submissionScore': submissionScore } },
-  );
-
-  return { updated: true };
-};
-
-export const closeRecruiterDrive = async (recruiterId: string, driveId: string) => {
-  const drive = await CampusDrive.findOne({ _id: driveId, recruiterId });
-  if (!drive) {
-    throw new ApiError(404, 'DRIVE_NOT_FOUND', 'Campus drive not found');
-  }
-
-  drive.isActive = false;
-  await drive.save();
-
-  return { updated: true };
 };
 
 export const getRecruiterColleges = async (): Promise<RecruiterCollegeCard[]> => {
@@ -473,42 +368,4 @@ export const markStudentHired = async (recruiterId: string, studentId: string, c
   }
 
   return { updated: true };
-};
-
-export const getCollegeDrivesView = async (collegeId: string): Promise<RecruiterDriveView[]> => {
-  const objId = new Types.ObjectId(collegeId);
-  const drives = await CampusDrive.find({ collegeId: objId }).sort({ scheduledAt: -1 }).lean();
-
-  const recruiterIds = [...new Set(drives.map((d) => String(d.recruiterId)))];
-  const recruiters =
-    recruiterIds.length > 0
-      ? await User.find({ _id: { $in: recruiterIds } }).select('_id displayName domain avatar').lean()
-      : [];
-  const recruiterMap = new Map(recruiters.map((r) => [String(r._id), r]));
-
-  const college = await User.findById(objId).select('displayName').lean();
-  const collegeName = college?.displayName ?? 'Unknown College';
-
-  const mapped = await Promise.all(
-    drives.map(async (drive) => {
-      const recruiter = recruiterMap.get(String(drive.recruiterId));
-      const recruiterName = recruiter?.displayName ?? 'Unknown Recruiter';
-      const recruiterCompany = recruiter?.domain ? `${recruiter.domain} Hiring` : 'Campus Hiring Partner';
-
-      const students = drive.registeredStudents.length
-        ? await User.find({ _id: { $in: drive.registeredStudents.map((entry) => entry.studentId) } })
-            .select('_id displayName avatar innovationScore')
-            .lean()
-        : [];
-
-      const mappedDrive = await mapDrive(drive, collegeName, students);
-      return {
-        ...mappedDrive,
-        recruiterName,
-        recruiterCompany,
-      };
-    }),
-  );
-
-  return mapped;
 };

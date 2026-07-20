@@ -37,14 +37,12 @@ export const recruiterMarketplaceSectionItems: RecruiterSectionNavItem[] = [
 
 export const recruiterCampusSectionItems: RecruiterSectionNavItem[] = [
   {
-    label: 'Campus Drives',
+    label: 'Campus Events',
     path: '/dashboard/recruiter/campus',
     end: true,
     icon: BriefcaseBusiness,
     matchPrefixes: [
       '/dashboard/recruiter/campus',
-      '/dashboard/recruiter/drives',
-      '/dashboard/recruiter/hiring-events',
     ],
   },
   {

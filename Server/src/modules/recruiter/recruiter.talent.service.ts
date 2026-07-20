@@ -7,7 +7,7 @@ import { Patent } from '../patent/patent.model';
 import { Startup } from '../startup/startup.model';
 import { User } from '../user/user.model';
 import { UserRole } from '../../types/roles.types';
-import { CampusDrive } from './campusDrive.model';
+import { Event } from '../event/event.model';
 import { JobPost } from './jobPost.model';
 import { resolveEducationEntriesForUser } from '../user/user.service';
 import {
@@ -175,7 +175,7 @@ export const getRecruiterDashboard = async (recruiterId: string): Promise<Recrui
         status: 'Shortlisted',
         updatedAt: { $gte: new Date(Date.now() - 7 * 24 * 60 * 60 * 1000) },
       }),
-      CampusDrive.countDocuments({ recruiterId, isActive: true }),
+      Event.countDocuments({ createdBy: recruiterId, isActive: true }),
       RelevanceBridge.countDocuments({ recruiterId, bridgeType: 'SCORE_MATCH', isActive: true }),
       RelevanceBridge.find({ recruiterId, isActive: true }).select('studentId bridgeType').lean(),
     ]);

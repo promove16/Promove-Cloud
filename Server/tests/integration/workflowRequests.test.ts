@@ -167,6 +167,36 @@ describe('workflow requests', () => {
       auditTrail: [{ status: 'created', actorUserId: recruiter._id, at: new Date() }],
     });
 
+    const directCreationResponse = await request(app)
+      .post('/api/events/hiring')
+      .set(authHeader(recruiter))
+      .send({
+        collegeId: college._id.toString(),
+        title: 'Direct Creation Must Stay Blocked',
+        type: 'Placement Drive',
+        date: new Date(Date.now() + 24 * 60 * 60 * 1000).toISOString(),
+        description: 'A recruiter must not create an event without college approval.',
+        minimumInnovationScore: 0,
+      });
+
+    expect(directCreationResponse.status).toBe(404);
+    expect(await Event.find()).toHaveLength(0);
+
+    const legacyDriveCreationResponse = await request(app)
+      .post('/api/recruiter/drives')
+      .set(authHeader(recruiter))
+      .send({
+        collegeId: college._id.toString(),
+        title: 'Legacy Direct Creation Must Stay Blocked',
+        type: 'Placement Drive',
+        scheduledAt: new Date(Date.now() + 24 * 60 * 60 * 1000).toISOString(),
+        description: 'The legacy drive API must not bypass college event approval.',
+        minimumInnovationScore: 0,
+      });
+
+    expect(legacyDriveCreationResponse.status).toBe(404);
+    expect(await Event.find()).toHaveLength(0);
+
     const createResponse = await request(app)
       .post('/api/workflow-requests')
       .set(authHeader(recruiter))
