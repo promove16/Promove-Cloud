@@ -533,7 +533,7 @@ const fetchDealContext = async (deal: DealDocumentLike) => {
     throw new ApiError(404, 'DEAL_CONTEXT_NOT_FOUND', 'Deal context could not be loaded');
   }
 
-  const workspaceId = deal.linkedWorkspaceId ?? startup.projectId;
+  const workspaceId = deal.linkedWorkspaceId;
   const productWorkshop = workspaceId
     ? await Workspace.findOne({ _id: workspaceId, isActive: true })
         .select('_id title category stage progressPercent')

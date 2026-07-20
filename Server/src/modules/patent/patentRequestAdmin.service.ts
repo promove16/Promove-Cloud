@@ -9,6 +9,7 @@ import { UserRole } from '../../types/roles.types';
 import { AdminAuditLog } from '../admin/adminAuditLog.model';
 import { Startup } from '../startup/startup.model';
 import { PatentRequest } from './patentRequest.model';
+import { serializePatentRequestForClient } from './patentRequest.service';
 import { LEGACY_STATUS_MAP, type IPatentRequest, type PatentRequestStatus } from './patent.types';
 import {
   updateStatusSchema,
@@ -202,9 +203,10 @@ export const getPatentRequestDetail = async (requestId: string) => {
     .lean();
 
   const status = normalizeStatus(request.status);
+  const serializedRequest = await serializePatentRequestForClient(request);
 
   return {
-    ...request,
+    ...serializedRequest,
     _id: String(request._id),
     studentId: String(request.studentId),
     status,
@@ -488,7 +490,7 @@ export const reviewPatentRequestDocument = async (
     link: '/startup-launch',
   });
 
-  return request.toObject();
+  return serializePatentRequestForClient(request.toObject());
 };
 
 export const uploadOfficialHandoverDocument = async (
@@ -549,7 +551,7 @@ export const uploadOfficialHandoverDocument = async (
     link: '/startup-launch',
   });
 
-  return request.toObject();
+  return serializePatentRequestForClient(request.toObject());
 };
 
 export const completeOfficialHandover = async (
@@ -612,5 +614,5 @@ export const completeOfficialHandover = async (
     link: '/startup-launch',
   });
 
-  return request.toObject();
+  return serializePatentRequestForClient(request.toObject());
 };

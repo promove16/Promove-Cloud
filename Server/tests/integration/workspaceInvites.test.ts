@@ -150,3 +150,74 @@ describe('workspace invite acceptance flow', () => {
     expect(invite).toBeNull();
   });
 });
+
+describe('workspace upload URL serialization', () => {
+  it('returns a presigned HTTPS URL immediately after an S3 upload', async () => {
+    const owner = await createStudent('Workspace Upload Owner');
+    const workspace = await Workspace.create({
+      ownerId: owner._id,
+      teamMemberIds: [owner._id],
+      title: 'Private Upload Workspace',
+      category: 'Documents',
+      stage: 'Build',
+    });
+
+    const response = await request(app)
+      .post(`/api/workspace/${workspace._id}/upload`)
+      .set(authHeader(owner))
+      .attach('file', Buffer.from('%PDF-1.4\n% ProMove test PDF\n%%EOF'), {
+        filename: 'workspace-document.pdf',
+        contentType: 'application/pdf',
+      });
+
+    expect(response.status).toBe(200);
+    const uploaded = response.body.data.at(-1);
+    expect(uploaded).toEqual(
+      expect.objectContaining({
+        fileName: 'workspace-document.pdf',
+        storageProvider: 's3',
+      }),
+    );
+    expect(uploaded.fileUrl).toMatch(/^https:\/\//);
+    expect(uploaded.fileUrl).toContain('X-Amz-Algorithm=AWS4-HMAC-SHA256');
+    expect(uploaded.fileUrl).toContain('X-Amz-Signature=');
+
+    const persisted = await Workspace.findById(workspace._id).lean();
+    expect(persisted?.uploads.at(-1)?.fileUrl).not.toContain('X-Amz-Signature=');
+    expect(persisted?.uploads.at(-1)?.storageKey).toBeTruthy();
+  });
+
+  it('repairs and signs a legacy scheme-less S3 workspace URL', async () => {
+    const owner = await createStudent('Legacy Workspace Upload Owner');
+    const objectKey = 'promove/workspaces/legacy-workspace-document.pdf';
+    const workspace = await Workspace.create({
+      ownerId: owner._id,
+      teamMemberIds: [owner._id],
+      title: 'Legacy Private Upload Workspace',
+      category: 'Documents',
+      stage: 'Build',
+      uploads: [
+        {
+          fileUrl: `promove-test-bucket.s3.ap-south-1.amazonaws.com/${objectKey}`,
+          fileType: 'pdf',
+          fileName: 'legacy-workspace-document.pdf',
+          fileSizeBytes: 512,
+          uploadedBy: owner._id,
+          uploadedAt: new Date(),
+          category: 'other',
+          mimeType: 'application/pdf',
+        },
+      ],
+    });
+
+    const response = await request(app)
+      .get(`/api/workspace/${workspace._id}`)
+      .set(authHeader(owner));
+
+    expect(response.status).toBe(200);
+    const uploaded = response.body.data.uploads.at(-1);
+    expect(uploaded.fileUrl).toMatch(/^https:\/\//);
+    expect(uploaded.fileUrl).toContain(objectKey);
+    expect(uploaded.fileUrl).toContain('X-Amz-Signature=');
+  });
+});

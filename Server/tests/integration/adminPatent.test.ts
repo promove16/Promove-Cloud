@@ -5,6 +5,7 @@ import request from 'supertest';
 import app from '../../src/app';
 import { ScoreEvent } from '../../src/modules/innovationScore/score.model';
 import { Patent } from '../../src/modules/patent/patent.model';
+import { PatentRequest } from '../../src/modules/patent/patentRequest.model';
 import { User } from '../../src/modules/user/user.model';
 import { UserRole } from '../../src/types/roles.types';
 
@@ -49,6 +50,69 @@ const loginAs = async (email: string) => {
 };
 
 describe('admin patent review integration', () => {
+  it('returns presigned document URLs in the admin patent support case detail', async () => {
+    const { email: adminEmail } = await createApprovedUser({
+      role: UserRole.ADMIN,
+      displayName: 'Patent Support Admin',
+    });
+    const { user: studentUser } = await createApprovedUser({
+      role: UserRole.STUDENT,
+      displayName: 'Patent Support Student',
+    });
+    const objectKey = 'promove/workspaces/admin-patent-support-document.pdf';
+    const rawUrl = `https://promove-test-bucket.s3.ap-south-1.amazonaws.com/${objectKey}`;
+    const documentId = new Types.ObjectId();
+    const requestId = new Types.ObjectId();
+
+    await PatentRequest.collection.insertOne({
+      _id: requestId,
+      studentId: studentUser._id,
+      projectTitle: 'Admin signed document case',
+      inventionDescription: 'A patent support case used to verify private document access.',
+      abstractText: 'Private evidence must be signed for admin review.',
+      claimsText: 'The admin response must never expose an unsigned private S3 object URL.',
+      bestMode: 'Open the document from the authenticated patent support case.',
+      hasFiledAbroad: false,
+      inventorDeclarationConfirmed: true,
+      priorArtSearchSummary: 'Prior art review evidence is attached.',
+      noveltyStatement: 'The protected workflow signs private evidence at the API boundary.',
+      publicDisclosureStatus: false,
+      documents: [
+        {
+          _id: documentId,
+          fileUrl: rawUrl,
+          fileType: 'pdf',
+          fileName: 'PMV-CON-TEST.pdf',
+          fileSizeBytes: 4448,
+          documentCategory: 'drawings',
+          reviewStatus: 'pending',
+          uploadedAt: new Date(),
+          storageProvider: 's3',
+          storageKey: objectKey,
+        },
+      ],
+      status: 'documents_review',
+      submittedAt: new Date(),
+      trackingTimeline: [],
+      createdAt: new Date(),
+      updatedAt: new Date(),
+    });
+
+    const accessToken = await loginAs(adminEmail);
+    const response = await request(app)
+      .get(`/api/admin/patent-requests/${requestId}`)
+      .set('Authorization', `Bearer ${accessToken}`);
+
+    expect(response.status).toBe(200);
+    expect(response.body.data.documents[0].fileUrl).toMatch(/^https:\/\//);
+    expect(response.body.data.documents[0].fileUrl).toContain('X-Amz-Signature=');
+    expect(response.body.data.documents[0].fileUrl).not.toBe(rawUrl);
+
+    const persisted = await PatentRequest.findById(requestId).lean();
+    expect(persisted?.documents[0].fileUrl).toBe(rawUrl);
+    expect(persisted?.documents[0].storageKey).toBe(objectKey);
+  });
+
   it('rejects a legacy patent record that is missing filingDocuments', async () => {
     const { user: adminUser, email: adminEmail } = await createApprovedUser({
       role: UserRole.ADMIN,

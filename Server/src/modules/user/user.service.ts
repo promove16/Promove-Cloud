@@ -2086,16 +2086,18 @@ const ensureStudentProfileVisibility = async (
   const settings = await Settings.findOne({ userId: student._id })
     .select('privacy.profileVisibility')
     .lean<{ privacy?: { profileVisibility?: 'public' | 'connections' | 'private' } } | null>();
-  const profileVisibility = settings?.privacy?.profileVisibility ?? (student.isProfilePublic ? 'public' : 'private');
 
-  if (profileVisibility === 'public') {
+  if (settings?.privacy?.profileVisibility === 'private') {
+    throw new ApiError(404, 'USER_NOT_FOUND', 'User not found');
+  }
+
+  const profileVisibility = settings?.privacy?.profileVisibility ?? (student.isProfilePublic ? 'public' : 'connections');
+
+  if (profileVisibility === 'public' || requesterRole === UserRole.STUDENT) {
     return;
   }
 
-  if (
-    profileVisibility === 'connections' &&
-    (await hasProfileVisibilityRelationship(requesterId, requesterRole, student))
-  ) {
+  if (await hasProfileVisibilityRelationship(requesterId, requesterRole, student)) {
     return;
   }
 

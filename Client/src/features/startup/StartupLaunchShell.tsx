@@ -1,3 +1,4 @@
+import { useEffect } from "react";
 import { Outlet, useLocation, useNavigate, useParams } from "react-router-dom";
 import { ArrowLeft } from "lucide-react";
 import { useQuery } from "@tanstack/react-query";
@@ -19,6 +20,14 @@ export function StartupLaunchShell() {
   });
   const startup = startupQuery.data;
   const isLocked = Boolean(startup?.editAccess?.isLocked);
+
+  useEffect(() => {
+    window.scrollTo({ top: 0, left: 0 });
+    const mainEl = document.querySelector("main");
+    if (mainEl) {
+      mainEl.scrollTo({ top: 0, left: 0 });
+    }
+  }, [location.pathname]);
 
   return (
     <DashboardLayout role="student">

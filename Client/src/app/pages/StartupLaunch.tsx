@@ -55,6 +55,7 @@ import {
 } from "../../features/startup/innovationRubric";
 import {
   getStartupOverviewPath,
+  getStartupSectionPath,
   normalizeStartupRouteId,
 } from "../../features/startup/navigation";
 import { Spinner } from "../../components/ui/Spinner";
@@ -414,6 +415,14 @@ export function StartupLaunch() {
   useEffect(() => {
     setMode(startupId ? "dashboard" : "edit");
   }, [startupId]);
+
+  useEffect(() => {
+    window.scrollTo({ top: 0, left: 0 });
+    const mainEl = document.querySelector("main");
+    if (mainEl) {
+      mainEl.scrollTo({ top: 0, left: 0 });
+    }
+  }, [mode]);
 
   const [identity, setIdentity] = useState<IdentityForm>(DEFAULT_IDENTITY);
   const [innovationProfile, setInnovationProfile] =
@@ -1891,6 +1900,7 @@ function StartupDashboard({
   onEdit: () => void;
   canEdit: boolean;
 }) {
+  const navigate = useNavigate();
   const queryClient = useQueryClient();
   const reviewBadge = REVIEW_BADGE[startup.reviewStatus] ?? REVIEW_BADGE.draft;
   const isApproved = startup.reviewStatus === "approved";
@@ -2073,8 +2083,25 @@ function StartupDashboard({
         <div className="flex flex-wrap items-center gap-2">
           <button
             type="button"
+            onClick={() =>
+              navigate(getStartupSectionPath(startup._id, "product-workspace"))
+            }
+            className="inline-flex items-center gap-2 border border-slate-700 bg-slate-900 px-4 py-2 text-sm font-semibold text-slate-200 transition hover:border-cyan-500/60 hover:text-cyan-200"
+          >
+            <FolderKanban className="h-4 w-4" />
+            {startup.projectId
+              ? "View / Change Workspace"
+              : "Create / Link Workspace"}
+          </button>
+          <button
+            type="button"
             onClick={onEdit}
             disabled={!canEdit}
+            title={
+              isApproved
+                ? "Saving changes returns this startup to draft for admin verification"
+                : startup.editAccess?.reason
+            }
             className="inline-flex items-center gap-2 border border-slate-700 bg-slate-900 px-4 py-2 text-sm font-semibold text-slate-200 transition hover:border-cyan-500/60 hover:text-cyan-200 disabled:cursor-not-allowed disabled:opacity-60"
           >
             <Edit3 className="h-4 w-4" />
@@ -2127,6 +2154,13 @@ function StartupDashboard({
           )}
         </div>
       </section>
+
+      {isApproved ? (
+        <div className="border border-cyan-500/20 bg-cyan-500/5 px-4 py-3 text-sm text-cyan-100">
+          You can edit this startup or change its workspace. Saving any update returns it to draft,
+          and the founder must submit it for admin verification again before marketplace launch.
+        </div>
+      ) : null}
 
       {launchTarget ? (
         <div

@@ -60,12 +60,12 @@ const MUTABLE_PATENT_REQUEST_STATUSES = new Set<PatentRequestStatus>([
 const normalizePatentRequestStatus = (raw: string): PatentRequestStatus =>
   (LEGACY_STATUS_MAP[raw] as PatentRequestStatus) ?? (raw as PatentRequestStatus);
 
-const serializePatentRequestDocument = async (document: PatentRequestDocument) => ({
+export const serializePatentRequestDocument = async (document: PatentRequestDocument) => ({
   ...document,
   fileUrl: await getSignedPatentDocumentUrl(document),
 });
 
-const serializePatentRequestForClient = async (request: IPatentRequest) => ({
+export const serializePatentRequestForClient = async (request: IPatentRequest) => ({
   ...request,
   documents: await Promise.all((request.documents ?? []).map(serializePatentRequestDocument)),
   ...(request.officialHandover

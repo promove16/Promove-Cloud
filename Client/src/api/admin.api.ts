@@ -358,6 +358,12 @@ export interface AdminDealReviewItem extends AdminDealItem {
 
 export interface AdminStartupReviewItem {
   _id: string;
+  projectId?: string;
+  workspace?: {
+    _id: string;
+    title: string;
+    category: string;
+  };
   name: string;
   tagline: string;
   category: string;

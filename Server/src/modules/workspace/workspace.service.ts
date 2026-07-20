@@ -5,6 +5,7 @@ import { sendTeamInviteEmail } from '../../services/emailService';
 import {
   buildContentDisposition,
   deleteStoredAsset,
+  extractS3KeyFromUrl,
   generatePresignedUrl,
   uploadFile,
   validateFileContent,
@@ -172,6 +173,47 @@ type WorkspaceSnapshot = {
   [key: string]: any;
 };
 
+const serializeWorkspaceUpload = async (upload: any) => {
+  const rawUrl = typeof upload.fileUrl === 'string' ? upload.fileUrl.trim() : '';
+  const normalizedUrl =
+    rawUrl && !/^https?:\/\//i.test(rawUrl) && /^[\w.-]+\.s3[.-][\w-]+\.amazonaws\.com\//i.test(rawUrl)
+      ? `https://${rawUrl}`
+      : rawUrl;
+  const inferredS3Key = upload.storageKey || extractS3KeyFromUrl(normalizedUrl);
+  const storageProvider = upload.storageProvider || (inferredS3Key ? 's3' : undefined);
+  let signedUrl = normalizedUrl;
+
+  if (storageProvider === 'cloudinary' && upload.storageKey) {
+    try {
+      const resourceType = upload.fileType === 'image' ? 'image' : 'raw';
+      signedUrl = generateSignedCloudinaryUrl(upload.storageKey, resourceType);
+    } catch (error) {
+      console.error('Error generating signed URL for workspace upload:', error);
+    }
+  } else if (storageProvider === 's3' && inferredS3Key) {
+    try {
+      const shouldPreviewInline = ['pdf', 'image', 'video', 'audio'].includes(upload.fileType);
+      signedUrl = await generatePresignedUrl(inferredS3Key, 3600, {
+        contentDisposition: buildContentDisposition(
+          upload.fileName ?? 'file',
+          shouldPreviewInline ? 'inline' : 'attachment',
+        ),
+        ...(upload.mimeType ? { contentType: upload.mimeType } : {}),
+      });
+    } catch (error) {
+      console.error('Error generating S3 signed URL for workspace upload:', error);
+    }
+  }
+
+  return {
+    ...upload,
+    fileUrl: signedUrl,
+  };
+};
+
+const serializeWorkspaceUploads = (uploads: any[] = []) =>
+  Promise.all(uploads.map((upload) => serializeWorkspaceUpload(upload)));
+
 export const serializeWorkspace = async (workspace: WorkspaceSnapshot) => {
   const baseWorkspace: any =
     typeof workspace.toObject === 'function' ? workspace.toObject() : workspace;
@@ -215,34 +257,7 @@ export const serializeWorkspace = async (workspace: WorkspaceSnapshot) => {
   return {
     ...baseWorkspace,
     tasks: baseWorkspace.tasks || [],
-    uploads: await Promise.all((baseWorkspace.uploads || []).map(async (upload: any) => {
-      let signedUrl = upload.fileUrl;
-      if (upload.storageProvider === 'cloudinary' && upload.storageKey) {
-        try {
-          const resourceType = upload.fileType === 'image' ? 'image' : 'raw';
-          signedUrl = generateSignedCloudinaryUrl(upload.storageKey, resourceType);
-        } catch (error) {
-          console.error('Error generating signed URL for workspace upload:', error);
-        }
-      } else if (upload.storageProvider === 's3' && upload.storageKey) {
-        try {
-          const shouldPreviewInline = ['pdf', 'image', 'video', 'audio'].includes(upload.fileType);
-          signedUrl = await generatePresignedUrl(upload.storageKey, 3600, {
-            contentDisposition: buildContentDisposition(
-              upload.fileName ?? 'file',
-              shouldPreviewInline ? 'inline' : 'attachment',
-            ),
-            ...(upload.mimeType ? { contentType: upload.mimeType } : {}),
-          });
-        } catch (error) {
-          console.error('Error generating S3 signed URL for workspace upload:', error);
-        }
-      }
-      return {
-        ...upload,
-        fileUrl: signedUrl,
-      };
-    })),
+    uploads: await serializeWorkspaceUploads(baseWorkspace.uploads || []),
     repoSubmissions: baseWorkspace.repoSubmissions || [],
     codeSubmissions: baseWorkspace.codeSubmissions || [],
     progressUpdates: baseWorkspace.progressUpdates || [],
@@ -640,7 +655,7 @@ export const uploadWorkspaceFile = async (
     mimeType: file.mimetype,
   } as any);
   await workspace.save();
-  return workspace.uploads;
+  return serializeWorkspaceUploads(workspace.toObject().uploads);
 };
 
 export const deleteWorkspaceUpload = async (workspaceId: string, uploadId: string, userId: string) => {
@@ -659,7 +674,7 @@ export const deleteWorkspaceUpload = async (workspaceId: string, uploadId: strin
 
   workspace.uploads = workspace.uploads.filter((item) => String(item._id) !== uploadId);
   await workspace.save();
-  return workspace.uploads;
+  return serializeWorkspaceUploads(workspace.toObject().uploads);
 };
 
 export const addRepoSubmission = async (

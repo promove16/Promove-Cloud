@@ -7,6 +7,7 @@ import { DirectMessage } from '../../src/modules/dm/dm.model';
 import { Notification } from '../../src/modules/notification/notification.model';
 import { Startup } from '../../src/modules/startup/startup.model';
 import { User } from '../../src/modules/user/user.model';
+import { Workspace } from '../../src/modules/workspace/workspace.model';
 import { UserRole } from '../../src/types/roles.types';
 
 const makeAccessToken = (user: { _id: { toString(): string }; email: string; role: UserRole }) =>
@@ -331,6 +332,148 @@ describe('startup review readiness integration', () => {
     expect(unchangedStartup?.reviewStatus).toBe('review_requested');
   });
 
+  it('verifies workspace and details, then requires re-verification after an approved edit', async () => {
+    const founder = await User.create({
+      email: `student-${Math.random().toString(36).slice(2, 10)}@example.com`,
+      passwordHash: 'hashed-password',
+      role: UserRole.STUDENT,
+      displayName: 'Reverification Startup Founder',
+      accessGrantedBy: 'self_registered',
+      accessExpiresAt: new Date(Date.now() + 365 * 24 * 60 * 60 * 1000),
+      isActive: true,
+      innovationScore: 52,
+      profileComplete: true,
+      registrationStage: 'profile_setup',
+      verificationStatus: 'verified',
+      adminApprovalStatus: 'not_required',
+    });
+
+    const admin = await User.create({
+      email: `admin-${Math.random().toString(36).slice(2, 10)}@example.com`,
+      passwordHash: 'hashed-password',
+      role: UserRole.ADMIN,
+      displayName: 'Reverification Admin',
+      accessGrantedBy: 'admin',
+      accessExpiresAt: new Date(Date.now() + 365 * 24 * 60 * 60 * 1000),
+      isActive: true,
+      innovationScore: 0,
+      profileComplete: true,
+      registrationStage: 'complete',
+      verificationStatus: 'not_required',
+      adminApprovalStatus: 'approved',
+      adminApprovedAt: new Date(),
+    });
+
+    const startup = await Startup.create({
+      founderIds: [founder._id],
+      name: 'Reverification Ready Startup',
+      tagline: 'Every approved edit must return through admin verification',
+      category: 'Software',
+      stage: 'Pre-Launch',
+      teamSize: 1,
+      activeProducts: 1,
+      pitchDeckUrl: 'https://example.com/pitch.pdf',
+      traction: {
+        patentFiled: false,
+        mvpBuilt: true,
+        revenueGenerating: false,
+      },
+      registrationProfile: {
+        problemStatement: 'This innovation solves a verified logistics workflow issue for distributed student teams.',
+        solutionDifferentiation: 'It combines startup review readiness, patent gating, and launch approval into one workflow.',
+        coreInnovation: 'The core innovation is a governed startup launch workflow tied to admin decisions.',
+        priorArtStatus: 'Adjacent products were reviewed and no matching workflow was identified.',
+        workingMechanism: 'The system validates startup data, documents, and admin review before marketplace launch.',
+        keyComponents: 'Startup profile, review workflow, supporting documents, and approval history.',
+        developmentStage: 'idea',
+        documentationReadiness: 'Required startup documentation is complete.',
+        inventorOwnership: 'team',
+        developmentContext: 'Built in a student-led startup preparation flow.',
+        targetMarkets: 'Student founders, campus incubators, and early-stage investors.',
+        commercializationStrategy: 'build_startup',
+        publicDisclosureStatus: 'No harmful public disclosure has happened.',
+        legalAgreements: 'Founder ownership and consent are documented.',
+        ipProtectionType: 'patent',
+      },
+      documents: [
+        {
+          category: 'design_plan_sketch',
+          fileUrl: 'https://example.com/sketch.png',
+          fileType: 'image',
+          fileName: 'sketch.png',
+          fileSizeBytes: 512,
+          uploadedAt: new Date(),
+          uploadedBy: founder._id,
+        },
+      ],
+      reviewStatus: 'review_requested',
+      reviewRequestedAt: new Date(),
+      isActive: true,
+    });
+
+    const unlinkedVerification = await request(app)
+      .patch(`/api/admin/startups/${startup._id}/review`)
+      .set(authHeader(admin))
+      .send({ decision: 'approved' });
+
+    expect(unlinkedVerification.status).toBe(400);
+    expect(unlinkedVerification.body.error).toEqual(
+      expect.objectContaining({ code: 'STARTUP_INCOMPLETE' }),
+    );
+    expect(unlinkedVerification.body.error.message).toContain('linked workspace');
+
+    const workspace = await Workspace.create({
+      ownerId: founder._id,
+      teamMemberIds: [],
+      title: 'Reverification Workspace',
+      category: 'Software',
+      isActive: true,
+    });
+
+    const linkResponse = await request(app)
+      .patch(`/api/startup/${startup._id}`)
+      .set(authHeader(founder))
+      .send({ projectId: workspace._id.toString() });
+
+    expect(linkResponse.status).toBe(200);
+    expect(linkResponse.body.data.reviewStatus).toBe('review_requested');
+
+    const verification = await request(app)
+      .patch(`/api/admin/startups/${startup._id}/review`)
+      .set(authHeader(admin))
+      .send({ decision: 'approved' });
+
+    expect(verification.status).toBe(200);
+    expect(verification.body.data.reviewStatus).toBe('approved');
+
+    const editResponse = await request(app)
+      .patch(`/api/startup/${startup._id}`)
+      .set(authHeader(founder))
+      .send({ tagline: 'This approved update now requires another admin verification' });
+
+    expect(editResponse.status).toBe(200);
+    expect(editResponse.body.data.reviewStatus).toBe('draft');
+    expect(editResponse.body.data.editAccess.canEdit).toBe(true);
+
+    const verifyWithoutResubmission = await request(app)
+      .patch(`/api/admin/startups/${startup._id}/review`)
+      .set(authHeader(admin))
+      .send({ decision: 'approved' });
+
+    expect(verifyWithoutResubmission.status).toBe(409);
+    expect(verifyWithoutResubmission.body.error).toEqual(
+      expect.objectContaining({ code: 'STARTUP_NOT_SUBMITTED_FOR_REVIEW' }),
+    );
+
+    const resubmission = await request(app)
+      .post(`/api/startup/${startup._id}/request-review`)
+      .set(authHeader(founder))
+      .send();
+
+    expect(resubmission.status).toBe(200);
+    expect(resubmission.body.data.reviewStatus).toBe('review_requested');
+  });
+
   it('creates admin audit logs for startup approval and change requests', async () => {
     const founder = await User.create({
       email: `student-${Math.random().toString(36).slice(2, 10)}@example.com`,
@@ -363,8 +506,17 @@ describe('startup review readiness integration', () => {
       adminApprovedAt: new Date(),
     });
 
+    const workspace = await Workspace.create({
+      ownerId: founder._id,
+      teamMemberIds: [],
+      title: 'Audit Ready Workspace',
+      category: 'Software',
+      isActive: true,
+    });
+
     const startup = await Startup.create({
       founderIds: [founder._id],
+      projectId: workspace._id,
       name: 'Audit Ready Startup',
       tagline: 'A fully documented startup for audit review',
       category: 'Software',

@@ -44,6 +44,7 @@ export function StartupWorkspace() {
   const [chatAttachment, setChatAttachment] = useState<File | null>(null);
   const [isSendingChat, setIsSendingChat] = useState(false);
   const [selectedExistingWorkspaceId, setSelectedExistingWorkspaceId] = useState("");
+  const [showWorkspaceLinkEditor, setShowWorkspaceLinkEditor] = useState(false);
   const chatScrollerRef = useRef<HTMLDivElement | null>(null);
 
   const startupQuery = useQuery({ queryKey: ["startup", startupId], queryFn: () => startupApi.getById(startupId!), enabled: Boolean(startupId) });
@@ -60,7 +61,7 @@ export function StartupWorkspace() {
   const teamMembers = workspace?.teamMembers ?? [];
   const isOwner = workspace?.ownerId === currentUser?._id;
   const canManageWorkspace = currentUser?.role === "student" && Boolean(workspace);
-  const canEditStartupWorkspaceLink = Boolean(startup?.editAccess?.canEdit);
+  const canEditStartupWorkspaceLink = Boolean(startup?.editAccess?.canEdit) || !startup?.projectId;
   const chat = useWorkspaceChat(workspaceId);
   const availableWorkspaceOptions = useMemo(
     () =>
@@ -267,11 +268,97 @@ export function StartupWorkspace() {
   }
 
   if (startup.projectId && workspace) {
+    const isBusy = createWorkspaceAndAttach.isPending || attachExistingWorkspace.isPending;
     return (
-      <ProductWorkspaceDetail
-        projectIdOverride={startup.projectId}
-        embedded
-      />
+      <div className="space-y-4">
+        <div className="flex flex-wrap items-center justify-between gap-4 border border-slate-800 bg-slate-950 px-5 py-4">
+          <div>
+            <div className="flex items-center gap-2 text-xs uppercase tracking-[0.22em] text-cyan-300">
+              <Link2 className="h-4 w-4" />
+              Linked workspace
+            </div>
+            <div className="mt-2 text-base font-semibold text-white">{workspace.title}</div>
+            <div className="mt-0.5 text-sm text-slate-400">{workspace.category}</div>
+          </div>
+          <button
+            type="button"
+            onClick={() => setShowWorkspaceLinkEditor((current) => !current)}
+            disabled={!canEditStartupWorkspaceLink}
+            title={
+              canEditStartupWorkspaceLink
+                ? "Create a replacement workspace or link a different existing workspace"
+                : startup.editAccess?.reason
+            }
+            className="inline-flex items-center gap-2 border border-slate-700 bg-slate-900 px-4 py-2 text-sm font-semibold text-slate-200 transition hover:border-cyan-500/60 hover:text-cyan-200 disabled:cursor-not-allowed disabled:opacity-60"
+          >
+            <Link2 className="h-4 w-4" />
+            {showWorkspaceLinkEditor ? "Cancel Workspace Change" : "Change Workspace Link"}
+          </button>
+        </div>
+
+        {showWorkspaceLinkEditor ? (
+          <div className="grid gap-4 border border-cyan-500/20 bg-cyan-500/5 p-5 lg:grid-cols-2">
+            <section className="border border-slate-800 bg-slate-950 p-4">
+              <div className="text-sm font-semibold text-white">Create and link a new workspace</div>
+              <p className="mt-1 text-xs text-slate-400">
+                Creates a workspace using the startup name and category, then replaces the current link.
+              </p>
+              <button
+                type="button"
+                onClick={() => createWorkspaceAndAttach.mutate()}
+                disabled={isBusy}
+                className="mt-4 inline-flex items-center gap-2 bg-cyan-600 px-4 py-2.5 text-sm font-semibold text-white transition hover:bg-cyan-500 disabled:cursor-not-allowed disabled:opacity-60"
+              >
+                <FolderKanban className="h-4 w-4" />
+                {createWorkspaceAndAttach.isPending ? "Creating..." : "Create New Workspace"}
+              </button>
+            </section>
+
+            <section className="border border-slate-800 bg-slate-950 p-4">
+              <label className="block text-sm font-semibold text-white" htmlFor="replacement-workspace">
+                Link a different existing workspace
+              </label>
+              <select
+                id="replacement-workspace"
+                value={selectedExistingWorkspaceId}
+                onChange={(event) => setSelectedExistingWorkspaceId(event.target.value)}
+                disabled={availableWorkspaceOptions.length === 0 || isBusy}
+                className="mt-3 w-full border border-slate-800 bg-slate-950 px-3 py-3 text-sm text-white outline-none transition focus:border-cyan-400 disabled:cursor-not-allowed disabled:opacity-60"
+              >
+                {availableWorkspaceOptions.length === 0 ? (
+                  <option value="">No other workspaces available</option>
+                ) : (
+                  availableWorkspaceOptions.map((item) => (
+                    <option key={item._id} value={item._id}>
+                      {item.title} · {item.category} · {item.stage}
+                    </option>
+                  ))
+                )}
+              </select>
+              <button
+                type="button"
+                onClick={() => attachExistingWorkspace.mutate()}
+                disabled={!selectedExistingWorkspaceId || isBusy}
+                className="mt-4 inline-flex items-center gap-2 border border-slate-700 bg-slate-900 px-4 py-2.5 text-sm font-semibold text-white transition hover:border-slate-500 disabled:cursor-not-allowed disabled:opacity-60"
+              >
+                <Link2 className="h-4 w-4" />
+                {attachExistingWorkspace.isPending ? "Linking..." : "Change Workspace Link"}
+              </button>
+            </section>
+
+            {startup.reviewStatus === "approved" ? (
+              <p className="text-xs text-cyan-100 lg:col-span-2">
+                Changing this workspace link returns the startup to draft and requires admin verification again.
+              </p>
+            ) : null}
+          </div>
+        ) : null}
+
+        <ProductWorkspaceDetail
+          projectIdOverride={startup.projectId}
+          embedded
+        />
+      </div>
     );
   }
 
