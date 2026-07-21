@@ -24,6 +24,7 @@ import { useAuthStore } from '../../store/authStore';
 import { Spinner } from '../../components/ui/Spinner';
 import { Button } from '../../components/ui/Button';
 import { RecruiterJobView } from '../../types/recruiter.types';
+import { FormattedJobDescription, parseJobDescription } from '../../components/ui/FormattedJobDescription';
 
 // ─── Helpers ────────────────────────────────────────────────────────────────
 
@@ -56,7 +57,16 @@ const formatRelativeDate = (value?: string) => {
 
 const buildDetailList = (items: string[], fallbackText?: string) => {
   if (items.length > 0) return items;
-  return (fallbackText ?? '')
+  if (!fallbackText) return [];
+  const sections = parseJobDescription(fallbackText);
+  const listItems: string[] = [];
+  for (const sec of sections) {
+    if (sec.type === 'list' && sec.items) {
+      listItems.push(...sec.items);
+    }
+  }
+  if (listItems.length > 0) return listItems;
+  return fallbackText
     .split(/[\n.]/)
     .map((item) => item.trim())
     .filter(Boolean)
@@ -502,9 +512,7 @@ export function MarketplaceJobDetail() {
                   {/* About the Role */}
                   <section className="border-b border-slate-800 px-6 py-6">
                     <SectionHeader title="About the Role" />
-                    <p className="whitespace-pre-wrap break-words [overflow-wrap:anywhere] text-sm leading-7 text-slate-300">
-                      {job.roleSummary ?? job.description}
-                    </p>
+                    <FormattedJobDescription description={job.roleSummary ?? job.description} />
                     <div className="mt-4 flex flex-wrap gap-2">
                       <span className="rounded-full border border-slate-800 bg-slate-900 px-3 py-1 text-xs text-slate-400">{job.type}</span>
                       <span className="rounded-full border border-slate-800 bg-slate-900 px-3 py-1 text-xs text-slate-400">{job.domain}</span>

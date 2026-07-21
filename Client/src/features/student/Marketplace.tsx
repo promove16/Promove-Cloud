@@ -34,6 +34,7 @@ import { Button } from '../../components/ui/Button';
 import { Card } from '../../components/ui/Card';
 import { Input } from '../../components/ui/Input';
 import { Spinner } from '../../components/ui/Spinner';
+import { FormattedJobDescription } from '../../components/ui/FormattedJobDescription';
 
 const tabs: Array<{
   id: MarketplaceRole;
@@ -927,7 +928,7 @@ function RecruiterJobCard({
                   <div className="mt-1 text-sm text-slate-400">
                     {job.company} - {job.location} - {job.type}
                   </div>
-                  <p className="mt-2 max-w-3xl whitespace-pre-wrap break-words [overflow-wrap:anywhere] text-sm leading-6 text-slate-300">{job.description}</p>
+                  <FormattedJobDescription description={job.description} className="mt-2 max-w-3xl" />
                 </div>
                 <div className="flex flex-wrap gap-2">
                   <Button
@@ -1080,18 +1081,13 @@ function MarketplaceRecruiterJobCard({
           </div>
         </div>
 
-        {descriptionHighlights.length > 0 ? (
-          <div className="space-y-2 text-sm leading-6 text-slate-300">
-            {descriptionHighlights.map((line) => (
-              <div key={line} className="flex gap-3">
-                <span className="mt-2 h-1.5 w-1.5 rounded-full bg-cyan-300" />
-                <span>{line}</span>
-              </div>
-            ))}
-          </div>
-        ) : (
-          <p className="whitespace-pre-wrap break-words [overflow-wrap:anywhere] text-sm leading-6 text-slate-300">{job.description || 'Job description will appear here.'}</p>
-        )}
+        <FormattedJobDescription
+          description={job.description || 'Job description will appear here.'}
+          compact
+          maxItems={3}
+          onReadMore={() => onOpenDetails(job._id)}
+        />
+
 
         <div className="flex flex-col gap-3 xl:flex-row xl:items-center xl:justify-between">
           <div className="flex flex-wrap gap-2 text-xs text-slate-400">

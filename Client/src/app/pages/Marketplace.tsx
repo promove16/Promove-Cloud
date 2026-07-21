@@ -1,15 +1,17 @@
-import { useDeferredValue, useEffect, useMemo, useRef, useState } from "react";
+import React, { useDeferredValue, useEffect, useMemo, useRef, useState } from "react";
 import { useNavigate, useSearchParams } from "react-router-dom";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { isAxiosError } from "axios";
 import {
   ArrowRight,
+  Briefcase,
   BriefcaseBusiness,
   Building2,
   CalendarDays,
   ChevronDown,
   ChevronUp,
   Compass,
+  FileText,
   Filter,
   GraduationCap,
   LayoutGrid,
@@ -22,6 +24,7 @@ import {
   SlidersHorizontal,
   Sparkles,
   Users,
+  Wallet,
 } from "lucide-react";
 import { RecruiterMarketplace } from "../../features/recruiter/RecruiterMarketplace";
 import {
@@ -55,6 +58,7 @@ import { recruiterApi } from "../../api/recruiter.api";
 import { useAuthStore } from "../../store/authStore";
 import type { RecruiterJobView } from "../../types/recruiter.types";
 import { UserRole } from "../../types/roles.types";
+import { FormattedJobDescription } from "../../components/ui/FormattedJobDescription";
 
 type MarketplaceTab = {
   id: MarketplaceEntityType;
@@ -1026,160 +1030,131 @@ function MarketplaceRecruiterJobFeedCard({
     }
   };
 
-  const handleMessage = () => {
-    const storageKey = `dm_first_contact_${job.recruiterId}`;
-    if (!localStorage.getItem(storageKey)) {
-      localStorage.setItem(storageKey, "true");
+  const skillsList = useMemo(() => {
+    if (job.requirements && job.requirements.length > 0) {
+      return job.requirements.slice(0, 6);
     }
-    navigate(`/dashboard/messages/${job.recruiterId}`);
-  };
+    return [job.domain, job.type, job.workMode, "Python", "Problem Solving", "SQL"].filter(Boolean);
+  }, [job]);
+
+  const shortDescriptionPreview = useMemo(() => {
+    const text = (job.roleSummary ?? job.description ?? "").trim();
+    const cleanText = text
+      .replace(/(?:\s|^)(Job Title:|Location:|Type:|Experience:|Experiance:|Role Overview|Responsibilities|Qualifications Required:)[^\n]*/gi, "")
+      .trim();
+    if (cleanText.length > 140) {
+      return cleanText.slice(0, 140) + "...";
+    }
+    return cleanText || text.slice(0, 140) + "...";
+  }, [job]);
 
   return (
-    <article className="border-b border-slate-800 py-8">
-      <div className="flex flex-col gap-6 lg:flex-row lg:items-start lg:justify-between">
+    <article className="my-4 rounded-3xl border border-slate-800/80 bg-slate-950/80 p-6 shadow-xl transition hover:border-slate-700">
+      {/* ── Top Row: Title, Company Name & Recruiter Avatar ── */}
+      <div className="flex items-start justify-between gap-4">
         <div className="min-w-0 flex-1">
-          <div className="flex flex-wrap items-center gap-2 text-xs uppercase tracking-[0.22em] text-cyan-300">
-            <span>{job.type}</span>
-            <span className="text-slate-600">|</span>
-            <span>{job.domain}</span>
-            {job.workMode ? (
-              <>
-                <span className="text-slate-600">|</span>
-                <span>{job.workMode}</span>
-              </>
-            ) : null}
-            {postedLabel ? (
-              <>
-                <span className="text-slate-600">|</span>
-                <span>{postedLabel}</span>
-              </>
-            ) : null}
-          </div>
-
           <button
             type="button"
             onClick={() => navigate(`/marketplace/jobs/${job._id}`)}
-            className="mt-3 text-left text-2xl font-semibold tracking-tight text-white transition hover:text-cyan-200"
+            className="text-left text-xl font-bold tracking-tight text-white transition hover:text-cyan-300"
           >
             {job.title}
           </button>
-
-          <div className="mt-2 flex flex-wrap items-center gap-x-2 gap-y-1.5 text-sm text-slate-400">
-            <span className="font-medium text-slate-200">{job.company}</span>
-            <span className="text-slate-600">|</span>
-            <span>{job.recruiterName}</span>
-            <span className="text-slate-600">|</span>
-            <span className="inline-flex items-center gap-1.5">
-              <MapPin className="h-4 w-4 text-cyan-600" />
-              {job.location}
-            </span>
+          <div className="mt-1 text-sm font-medium text-slate-300">
+            {job.company} <span className="mx-1 text-slate-600">•</span> <span className="text-slate-400 font-normal">{job.recruiterName}</span>
           </div>
-
-          <p className="mt-5 max-w-3xl text-sm leading-6 text-slate-300">
-            {job.roleSummary ?? job.description}
-          </p>
-
-          <div className="mt-5 flex flex-wrap gap-2">
-            <span className="rounded-full border border-slate-700 bg-slate-900/70 px-3 py-1.5 text-xs font-medium text-slate-300">
-              Min score {job.minimumInnovationScore}+
-            </span>
-            <span className="rounded-full border border-slate-700 bg-slate-900/70 px-3 py-1.5 text-xs font-medium text-slate-300">
-              {job.applicantCount} applicants
-            </span>
-            <span className="rounded-full border border-slate-700 bg-slate-900/70 px-3 py-1.5 text-xs font-medium text-slate-300">
-              {job.shortlistedCount} shortlisted
-            </span>
-            <span className="rounded-full border border-slate-700 bg-slate-900/70 px-3 py-1.5 text-xs font-medium text-slate-300">
-              {job.isActive ? "Actively hiring" : "Closed"}
-            </span>
-          </div>
-
-          {applyError ? (
-            <div className="mt-4 text-sm text-rose-300">{applyError}</div>
-          ) : null}
         </div>
 
-        <div className="w-full max-w-[320px] shrink-0 pt-2">
-          <div className="flex items-center gap-3">
-            <div className="flex h-14 w-14 items-center justify-center overflow-hidden rounded-[18px] bg-[linear-gradient(135deg,#0f172a_0%,#1e293b_100%)] text-lg font-semibold text-white">
-              {job.recruiterAvatar ? (
-                <img
-                  src={job.recruiterAvatar}
-                  alt={job.recruiterName}
-                  className="h-14 w-14 object-cover"
-                />
-              ) : (
-                job.recruiterName.slice(0, 1).toUpperCase()
-              )}
-            </div>
-            <div className="min-w-0">
-              <div className="truncate text-sm font-semibold text-white">
-                {job.recruiterName}
-              </div>
-              <div className="mt-1 text-xs uppercase tracking-[0.22em] text-slate-500">
-                Hiring recruiter
-              </div>
-              {job.recruiterHeadline ? (
-                <div className="mt-1 line-clamp-2 text-sm text-slate-400">
-                  {job.recruiterHeadline}
-                </div>
-              ) : null}
-            </div>
-          </div>
-
-          <div className="mt-4 flex flex-wrap gap-2">
-            <button
-              type="button"
-              onClick={handleApply}
-              disabled={isApplyLocked || isApplying}
-              className={`inline-flex items-center gap-2 rounded-full px-4 py-2.5 text-sm font-semibold transition ${
-                hasApplied
-                  ? "cursor-not-allowed border border-emerald-400/20 bg-emerald-400/10 text-emerald-100"
-                  : "bg-cyan-400 text-slate-950 hover:bg-cyan-300 disabled:cursor-not-allowed disabled:bg-slate-700 disabled:text-slate-300"
-              }`}
-            >
-              {hasApplied ? <Lock className="h-4 w-4" /> : null}
-              {isApplying
-                ? "Applying..."
-                : getApplicationButtonLabel({
-                    hasApplied,
-                    applicationSource: job.applicationSource,
-                  })}
-            </button>
-            <button
-              type="button"
-              onClick={() => navigate(`/marketplace/jobs/${job._id}`)}
-              className={secondaryActionClassName}
-            >
-              View job
-              <ArrowRight className="h-4 w-4" />
-            </button>
-            <button
-              type="button"
-              onClick={() =>
-                navigate(
-                  getMarketplaceDetailPath(
-                    dashboardRole,
-                    "recruiter",
-                    job.recruiterId,
-                  ),
-                )
-              }
-              className={secondaryActionClassName}
-            >
-              Recruiter
-            </button>
-            <button
-              type="button"
-              onClick={handleMessage}
-              className={secondaryActionClassName}
-            >
-              <MessageCircle className="h-4 w-4" />
-              Message
-            </button>
-          </div>
+        <div className="flex h-12 w-12 shrink-0 items-center justify-center overflow-hidden rounded-2xl bg-gradient-to-br from-indigo-600 to-blue-600 font-bold text-white text-base shadow-inner">
+          {job.recruiterAvatar ? (
+            <img src={job.recruiterAvatar} alt={job.company} className="h-12 w-12 object-cover" />
+          ) : (
+            job.company.slice(0, 2).toUpperCase()
+          )}
         </div>
       </div>
+
+      {/* ── Key Meta Row with Icons (Naukri style: Experience | Salary | Location) ── */}
+      <div className="mt-4 flex flex-wrap items-center gap-x-4 gap-y-2 text-sm text-slate-300 font-medium">
+        <div className="inline-flex items-center gap-1.5">
+          <Briefcase className="h-4 w-4 text-slate-400 shrink-0" />
+          <span>{job.experienceLevel ?? "0-5 Yrs"}</span>
+        </div>
+
+        <span className="text-slate-700">|</span>
+
+        <div className="inline-flex items-center gap-1.5">
+          <Wallet className="h-4 w-4 text-slate-400 shrink-0" />
+          <span>{job.salaryExpectation ?? "Not Disclosed"}</span>
+        </div>
+
+        <span className="text-slate-700">|</span>
+
+        <div className="inline-flex items-center gap-1.5">
+          <MapPin className="h-4 w-4 text-slate-400 shrink-0" />
+          <span>{job.location} {job.workMode ? `(${job.workMode})` : ""}</span>
+        </div>
+      </div>
+
+      {/* ── Description Preview Row with Document Icon ── */}
+      <div className="mt-4 flex items-start gap-2.5 text-sm leading-relaxed text-slate-300">
+        <FileText className="mt-0.5 h-4 w-4 shrink-0 text-slate-400" />
+        <p className="min-w-0 flex-1 text-slate-300">
+          {shortDescriptionPreview}
+        </p>
+      </div>
+
+      {/* ── Skills Dot Separated Row ── */}
+      {skillsList.length > 0 && (
+        <div className="mt-3.5 text-xs text-slate-400 flex flex-wrap items-center gap-x-2 gap-y-1">
+          {skillsList.map((skill, sIdx) => (
+            <React.Fragment key={sIdx}>
+              {sIdx > 0 && <span className="text-slate-600">•</span>}
+              <span>{skill}</span>
+            </React.Fragment>
+          ))}
+        </div>
+      )}
+
+      {/* ── Footer Row: Posted time + Action Buttons ── */}
+      <div className="mt-5 flex flex-wrap items-center justify-between gap-3 border-t border-slate-800/80 pt-4">
+        <div className="text-xs text-slate-500 font-medium">
+          {postedLabel ?? "Posted recently"}
+        </div>
+
+        <div className="flex items-center gap-3">
+          <button
+            type="button"
+            onClick={() => navigate(`/marketplace/jobs/${job._id}`)}
+            className="inline-flex items-center gap-1 text-xs font-semibold text-cyan-400 transition hover:text-cyan-300 hover:underline px-2 py-1"
+          >
+            View job <ArrowRight className="h-3.5 w-3.5" />
+          </button>
+
+          <button
+            type="button"
+            onClick={handleApply}
+            disabled={isApplyLocked || isApplying}
+            className={`inline-flex items-center gap-1.5 rounded-full px-5 py-2 text-xs font-semibold transition ${
+              hasApplied
+                ? "cursor-not-allowed border border-emerald-400/20 bg-emerald-400/10 text-emerald-200"
+                : "bg-cyan-400 text-slate-950 hover:bg-cyan-300 disabled:cursor-not-allowed disabled:bg-slate-700 disabled:text-slate-300"
+            }`}
+          >
+            {hasApplied ? <Lock className="h-3.5 w-3.5" /> : null}
+            {isApplying
+              ? "Applying..."
+              : getApplicationButtonLabel({
+                  hasApplied,
+                  applicationSource: job.applicationSource,
+                })}
+          </button>
+        </div>
+      </div>
+
+      {applyError ? (
+        <div className="mt-2 text-xs text-rose-300">{applyError}</div>
+      ) : null}
     </article>
   );
 }
