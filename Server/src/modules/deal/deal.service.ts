@@ -18,6 +18,7 @@ import { recordStartupLifecycleEvent } from '../startupLifecycle/startupLifecycl
 import { Deal } from './deal.model';
 import { Bid } from '../bidding/bidding.model';
 import { BIDDING_EXPIRY_DAYS } from '../bidding/bidding.types';
+import { DirectMessage } from '../dm/dm.model';
 import {
   CapTableResponse,
   DealDetailView,
@@ -937,7 +938,7 @@ export const createInvestorDealFromInterest = async (
   await ensureBidderAccount(investorId);
 
   const transactionResult = await runMongoTransaction(async (session) => {
-    const startup = await Startup.findOne({
+    let startup = await Startup.findOne({
       _id: startupId,
       launchedToInvestors: true,
       reviewStatus: 'approved',
@@ -947,6 +948,31 @@ export const createInvestorDealFromInterest = async (
         '_id name tagline category stage pitchDeckUrl founderIds launchedToInvestors launchedAt innovationScoreAtLaunch traction totalShares availableShares reservedForSole maxPennyInvestors currentPennyCount hasSoleInvestor soleInvestorId',
       )
       .lean<LeanStartup | null>();
+
+    if (!startup) {
+      const fundingRequestedStartup = await Startup.findOne({
+        _id: startupId,
+        isActive: true,
+      })
+        .session(session)
+        .select(
+          '_id name tagline category stage pitchDeckUrl founderIds launchedToInvestors launchedAt innovationScoreAtLaunch traction totalShares availableShares reservedForSole maxPennyInvestors currentPennyCount hasSoleInvestor soleInvestorId',
+        )
+        .lean<LeanStartup | null>();
+
+      if (fundingRequestedStartup) {
+        const fundingRequest = await DirectMessage.exists({
+          senderId: { $in: fundingRequestedStartup.founderIds },
+          recipientId: investorId,
+          startupId,
+          messageType: 'funding_request',
+        }).session(session);
+
+        if (fundingRequest) {
+          startup = fundingRequestedStartup;
+        }
+      }
+    }
 
     if (!startup) {
       throw new ApiError(404, 'STARTUP_NOT_FOUND', 'Startup not found');
