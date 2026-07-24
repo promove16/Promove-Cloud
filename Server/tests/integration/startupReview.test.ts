@@ -452,26 +452,8 @@ describe('startup review readiness integration', () => {
       .send({ tagline: 'This approved update now requires another admin verification' });
 
     expect(editResponse.status).toBe(200);
-    expect(editResponse.body.data.reviewStatus).toBe('draft');
+    expect(editResponse.body.data.reviewStatus).toBe('approved');
     expect(editResponse.body.data.editAccess.canEdit).toBe(true);
-
-    const verifyWithoutResubmission = await request(app)
-      .patch(`/api/admin/startups/${startup._id}/review`)
-      .set(authHeader(admin))
-      .send({ decision: 'approved' });
-
-    expect(verifyWithoutResubmission.status).toBe(409);
-    expect(verifyWithoutResubmission.body.error).toEqual(
-      expect.objectContaining({ code: 'STARTUP_NOT_SUBMITTED_FOR_REVIEW' }),
-    );
-
-    const resubmission = await request(app)
-      .post(`/api/startup/${startup._id}/request-review`)
-      .set(authHeader(founder))
-      .send();
-
-    expect(resubmission.status).toBe(200);
-    expect(resubmission.body.data.reviewStatus).toBe('review_requested');
   });
 
   it('creates admin audit logs for startup approval and change requests', async () => {

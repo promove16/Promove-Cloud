@@ -566,6 +566,8 @@ export const addProgress = async (
     _id: new Types.ObjectId(),
   });
 
+  const wasCompleted = Boolean(milestone?.isCompleted);
+
   if (milestone && payload.completionPercent !== undefined) {
     milestone.completionPercent = payload.completionPercent;
     milestone.isCompleted = payload.completionPercent >= 100;
@@ -582,6 +584,15 @@ export const addProgress = async (
     metadata: { workspaceId, milestoneRef },
     idempotencyKey: `workspace-progress:${workspaceId}:${milestoneRef ?? 'general'}`,
   });
+
+  if (milestone?.isCompleted && !wasCompleted) {
+    await applyScoreAsync({
+      userId,
+      trigger: 'SKILL_COMPLETED',
+      metadata: { workspaceId, milestoneRef: milestone.name },
+      idempotencyKey: `workspace-skill:${workspaceId}:${milestone.name}`,
+    });
+  }
 
   await recordStartupLifecycleEvent({
     workspaceId: workspace._id,

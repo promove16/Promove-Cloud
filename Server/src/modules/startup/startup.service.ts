@@ -433,7 +433,7 @@ export const buildStartupEditAccess = (startup: Record<string, any>): StartupEdi
   } else if (reviewStatus === 'review_requested') {
     reason = 'Startup profile is locked while admin review is pending.';
   } else if (reviewStatus === 'approved') {
-    reason = 'Startup is approved. Saving an edit will move it back to draft for admin verification.';
+    reason = 'Startup is approved.';
   } else if (reviewStatus === 'changes_requested') {
     reason = 'Admin requested changes. Update the startup and submit it again for review.';
   }
@@ -514,9 +514,10 @@ const autoAdvancePhase = (startup: Record<string, any>): string => {
 const prepareStartupForEditableMutation = (startup: InstanceType<typeof Startup>) => {
   assertStartupEditable(startup.toObject());
 
-  if (startup.reviewStatus === 'approved' || startup.adminEditUnlockActive) {
-    startup.reviewStatus = 'draft';
-    clearReviewMetadata(startup);
+  if (startup.adminEditUnlockActive) {
+    if (startup.reviewStatus !== 'approved') {
+      startup.reviewStatus = 'draft';
+    }
     clearAdminEditUnlock(startup);
   }
 };

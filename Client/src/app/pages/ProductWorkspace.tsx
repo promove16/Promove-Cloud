@@ -38,6 +38,7 @@ import type {
 } from "../../types/workspace.types";
 import { DashboardLayout } from "../components/DashboardLayout";
 import { workspaceApi } from "../../api/workspace.api";
+import { problemBankApi } from "../../api/problemBank.api";
 import { useWorkspaceChat } from "../../hooks/useWorkspaceChat";
 import { toast } from "../../components/ui/sonner";
 import { useAuthStore } from "../../store/authStore";
@@ -371,6 +372,7 @@ export function ProductWorkspaceDetail({
     role: "mentor" as "mentor" | "investor",
   });
   const [selectedWorkspaceId, setSelectedWorkspaceId] = useState<string>("");
+  const [reviewNote, setReviewNote] = useState("");
   const [selectedUpload, setSelectedUpload] = useState<WorkspaceUpload | null>(
     null,
   );
@@ -405,6 +407,13 @@ export function ProductWorkspaceDetail({
     enabled: Boolean(workspaceId),
   });
   const workspace = workspaceQuery.data;
+  const claimedProblemId = workspace?.claimedProblemId;
+  const problemQuery = useQuery({
+    queryKey: ["problem", claimedProblemId],
+    queryFn: () => problemBankApi.getById(claimedProblemId!),
+    enabled: Boolean(claimedProblemId),
+  });
+  const problemReviewState = problemQuery.data?.viewerState;
   const teamMembers = workspace?.teamMembers ?? [];
   const isOwner = workspace?.ownerId === currentUser?._id;
   const isWorkspaceMember = teamMembers.some(
@@ -436,6 +445,10 @@ export function ProductWorkspaceDetail({
     currentUser?.role === "student" && Boolean(workspace);
   const canManageChatAccess = Boolean(isOwner);
   const chat = useWorkspaceChat(workspaceId);
+
+  useEffect(() => {
+    setReviewNote("");
+  }, [claimedProblemId]);
 
   useEffect(() => {
     if (!currentUser?._id) {
@@ -677,6 +690,29 @@ export function ProductWorkspaceDetail({
       toast.error(
         getApiErrorMessage(error, "Unable to upload progress right now."),
       ),
+  });
+
+  const requestProblemReview = useMutation({
+    mutationFn: () =>
+      problemBankApi.requestReview(claimedProblemId!, {
+        workspaceId: workspaceId!,
+        requestNote: reviewNote.trim(),
+      }),
+    onSuccess: async () => {
+      setReviewNote("");
+      toast.success("Review request sent to admin.");
+      await Promise.all([
+        queryClient.invalidateQueries({
+          queryKey: ["problem", claimedProblemId],
+        }),
+        queryClient.invalidateQueries({ queryKey: ["problems"] }),
+      ]);
+    },
+    onError: (error) => {
+      toast.error(
+        getApiErrorMessage(error, "Unable to send the review request right now."),
+      );
+    },
   });
 
   const onFile = async (file: File | null) => {
@@ -3534,6 +3570,118 @@ export function ProductWorkspaceDetail({
             </div>
           </div>
         </section>
+
+        {workspace?.claimedProblemId ? (
+          <section className="rounded-[28px] border border-slate-800 bg-slate-950 p-6 shadow-[0_20px_60px_rgba(2,6,23,0.3)] lg:p-8">
+            <div className="flex flex-col gap-6 lg:flex-row lg:items-start lg:justify-between">
+              <div className="max-w-2xl">
+                <div className="text-xs uppercase tracking-[0.3em] text-cyan-300/70">
+                  Admin review
+                </div>
+                <h2 className="mt-2 text-2xl font-bold text-white">
+                  {problemReviewState?.status === "approved"
+                    ? "Workspace approved"
+                    : problemReviewState?.status === "review_requested"
+                      ? "Waiting for admin review"
+                      : problemReviewState?.status === "changes_requested"
+                        ? "Admin requested changes"
+                        : "Submit this workspace for verification"}
+                </h2>
+                <p className="mt-3 text-sm leading-7 text-slate-400">
+                  {problemReviewState?.status === "approved"
+                    ? "The submitted evidence has been verified. Workspace MVP scoring is recorded, and any linked startup is advanced to market-ready."
+                    : problemReviewState?.status === "review_requested"
+                      ? "Your request is in the admin queue. You can keep working while the evidence is reviewed."
+                      : problemReviewState?.status === "changes_requested"
+                        ? "Address the admin notes, update the workspace evidence, and submit it again."
+                        : "Add progress, files, repository links, or code evidence, then tell the admin what the team completed."}
+                </p>
+
+                {problemReviewState?.adminNotes ? (
+                  <div className="mt-4 rounded-xl border border-amber-500/20 bg-amber-500/10 p-4 text-sm text-amber-100">
+                    <div className="mb-1 text-xs font-semibold uppercase tracking-[0.2em] text-amber-300">
+                      Admin notes
+                    </div>
+                    {problemReviewState.adminNotes}
+                  </div>
+                ) : null}
+              </div>
+
+              <div className="w-full rounded-2xl border border-slate-800 bg-slate-900 p-5 lg:max-w-xl">
+                {problemQuery.isLoading ? (
+                  <div className="flex items-center gap-3 text-sm text-slate-400">
+                    <Loader2 className="h-4 w-4 animate-spin" />
+                    Loading review status...
+                  </div>
+                ) : problemQuery.isError ? (
+                  <div className="text-sm text-rose-300">
+                    Review status could not be loaded. Refresh the page and try again.
+                  </div>
+                ) : problemReviewState?.status === "approved" ? (
+                  <div className="flex items-start gap-3 text-emerald-200">
+                    <CheckCircle className="mt-0.5 h-5 w-5 shrink-0" />
+                    <div>
+                      <div className="font-semibold">Verification complete</div>
+                      <div className="mt-1 text-sm text-emerald-200/70">
+                        Awarded {problemReviewState.pointsAwarded ?? 0} problem
+                        leaderboard points.
+                      </div>
+                    </div>
+                  </div>
+                ) : problemReviewState?.status === "review_requested" ? (
+                  <div className="flex items-start gap-3 text-amber-200">
+                    <Clock className="mt-0.5 h-5 w-5 shrink-0" />
+                    <div>
+                      <div className="font-semibold">Review request submitted</div>
+                      <div className="mt-1 text-sm text-amber-200/70">
+                        Sent {dt(problemReviewState.requestedAt)}.
+                      </div>
+                    </div>
+                  </div>
+                ) : (
+                  <div className="space-y-3">
+                    <textarea
+                      value={reviewNote}
+                      onChange={(event) => setReviewNote(event.target.value)}
+                      maxLength={1000}
+                      placeholder="Summarize what the team completed and which evidence the admin should verify."
+                      className="min-h-28 w-full resize-y rounded-xl border border-slate-700 bg-slate-950 px-4 py-3 text-sm text-white outline-none placeholder:text-slate-500 focus:border-cyan-500"
+                    />
+                    <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+                      <div className="text-xs text-slate-500">
+                        {evidenceCount === 0
+                          ? "Upload at least one progress update or evidence item first."
+                          : `${evidenceCount} evidence item${evidenceCount === 1 ? "" : "s"} ready for review.`}
+                      </div>
+                      <button
+                        type="button"
+                        onClick={() => requestProblemReview.mutate()}
+                        disabled={
+                          requestProblemReview.isPending ||
+                          reviewNote.trim().length < 20 ||
+                          evidenceCount === 0 ||
+                          !problemReviewState
+                        }
+                        className="inline-flex shrink-0 items-center justify-center gap-2 rounded-xl bg-gradient-to-r from-cyan-600 to-blue-600 px-5 py-3 text-sm font-semibold text-white transition hover:brightness-110 disabled:cursor-not-allowed disabled:opacity-50"
+                      >
+                        {requestProblemReview.isPending ? (
+                          <Loader2 className="h-4 w-4 animate-spin" />
+                        ) : (
+                          <Send className="h-4 w-4" />
+                        )}
+                        {requestProblemReview.isPending
+                          ? "Sending Review..."
+                          : problemReviewState?.status === "changes_requested"
+                            ? "Resubmit for Admin Review"
+                            : "Request Admin Review"}
+                      </button>
+                    </div>
+                  </div>
+                )}
+              </div>
+            </div>
+          </section>
+        ) : null}
 
         {!workspace && !listQuery.isLoading ? (
           <section className="rounded-[28px] border border-dashed border-slate-700 bg-slate-950 p-10 text-center">

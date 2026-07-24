@@ -2729,6 +2729,23 @@ const canEditDocuments = !!activeRequest &&
                         </div>
 
                         <div className={`flex justify-start md:justify-end ${isDisabled ? "cursor-not-allowed" : ""}`}>
+                          <input
+                            ref={(el) => {
+                              fileInputRefs.current[key] = el;
+                            }}
+                            type="file"
+                            accept=".pdf,image/*"
+                            className="hidden"
+                            tabIndex={-1}
+                            disabled={isDisabled}
+                            onChange={(e) => {
+                              const file = e.currentTarget.files?.[0];
+                              e.currentTarget.value = "";
+                              if (file) {
+                                void handleFileSelect(key, category, file);
+                              }
+                            }}
+                          />
                           {hasUpload ? (
                             <div className="flex w-full items-center justify-between gap-2 rounded-lg bg-cyan-500/10 px-3 py-2 md:w-[220px]">
                               <div className="flex min-w-0 items-center gap-2">
@@ -2749,12 +2766,16 @@ const canEditDocuments = !!activeRequest &&
                               </button>
                             </div>
                           ) : (
-                            <label
+                            <button
+                              type="button"
+                              onClick={() => fileInputRefs.current[key]?.click()}
+                              disabled={isDisabled}
                               className={`flex w-full items-center justify-center gap-2 rounded-lg border border-dashed px-3 py-2 text-center transition md:w-[220px] ${
                                 isDisabled
-                                  ? "pointer-events-none border-slate-800 opacity-50"
+                                  ? "cursor-not-allowed border-slate-800 opacity-50"
                                   : "cursor-pointer border-slate-700 hover:border-cyan-500/50 hover:bg-slate-950"
                               }`}
+                              aria-label={`Upload ${label}`}
                             >
                               {isUploading ? (
                                 <>
@@ -2773,23 +2794,7 @@ const canEditDocuments = !!activeRequest &&
                                   </span>
                                 </>
                               )}
-                              <input
-                                ref={(el) => {
-                                  fileInputRefs.current[key] = el;
-                                }}
-                                type="file"
-                                accept=".pdf,image/*"
-                                className="sr-only"
-                                tabIndex={-1}
-                                disabled={isDisabled}
-                                onChange={(e) => {
-                                  const file = e.target.files?.[0];
-                                  if (file) {
-                                    void handleFileSelect(key, category, file);
-                                  }
-                                }}
-                              />
-                            </label>
+                            </button>
                           )}
                         </div>
                       </div>
@@ -3321,14 +3326,6 @@ export function PatentSupport() {
     }
     setPatentOption("admin-assist");
   }, [hasActivePatentRequest]);
-
-  useEffect(() => {
-    window.scrollTo({ top: 0, left: 0 });
-    const mainEl = document.querySelector("main");
-    if (mainEl) {
-      mainEl.scrollTo({ top: 0, left: 0 });
-    }
-  }, [patentOption]);
 
   useEffect(() => {
     categorySlotsRef.current = categorySlots;

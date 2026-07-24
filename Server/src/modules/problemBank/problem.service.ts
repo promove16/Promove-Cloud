@@ -6,6 +6,7 @@ import { redis } from '../../config/redis';
 import { ApiError } from '../../utils/ApiError';
 import { applyScore } from '../../services/scoreEngine';
 import { NotificationService } from '../notification/notification.service';
+import { Startup } from '../startup/startup.model';
 import { User } from '../user/user.model';
 import { Workspace } from '../workspace/workspace.model';
 import problemBankSeedData from './problemBank.seed.json';
@@ -1037,13 +1038,8 @@ export const reviewProblemSubmission = async (
     throw new ApiError(404, 'REVIEW_REQUEST_NOT_FOUND', 'Problem review request not found');
   }
 
-  if (payload.decision === 'approved' && submission.reviewStatus === 'approved') {
-    throw new ApiError(
-      400,
-      'REVIEW_ALREADY_APPROVED',
-      'This submission has already been approved.',
-    );
-  }
+  const wasAlreadyApproved =
+    payload.decision === 'approved' && submission.reviewStatus === 'approved';
 
   const [problem, workspace] = await Promise.all([
     Problem.findById(submission.problemId).select('_id title').lean(),
@@ -1058,23 +1054,67 @@ export const reviewProblemSubmission = async (
     );
   }
 
-  submission.reviewStatus =
-    payload.decision === 'approved' ? 'approved' : 'changes_requested';
-  submission.adminReviewedAt = new Date();
-  submission.adminReviewedBy = new Types.ObjectId(adminId);
-  submission.adminNotes =
-    payload.decision === 'changes_requested'
-      ? payload.adminNotes?.trim() || 'Please update the submission and request review again.'
-      : payload.adminNotes?.trim() || undefined;
-  submission.pointsAwarded =
-    payload.decision === 'approved' ? payload.pointsAwarded ?? 0 : 0;
-  await submission.save();
+  if (!wasAlreadyApproved) {
+    submission.reviewStatus =
+      payload.decision === 'approved' ? 'approved' : 'changes_requested';
+    submission.adminReviewedAt = new Date();
+    submission.adminReviewedBy = new Types.ObjectId(adminId);
+    submission.adminNotes =
+      payload.decision === 'changes_requested'
+        ? payload.adminNotes?.trim() || 'Please update the submission and request review again.'
+        : payload.adminNotes?.trim() || undefined;
+    submission.pointsAwarded =
+      payload.decision === 'approved' ? payload.pointsAwarded ?? 0 : 0;
+    await submission.save();
+  }
 
   const teamMemberIds = Array.from(
     new Set(submission.teamMemberIds.map((memberId) => String(memberId))),
   );
 
   if (payload.decision === 'approved') {
+    await Workspace.updateOne(
+      {
+        _id: workspace._id,
+        stage: { $in: ['Ideation', 'Problem', 'Build'] },
+      },
+      {
+        $set: {
+          stage: 'Build',
+        },
+      },
+    );
+
+    const linkedStartup = await Startup.findOne(
+      {
+        projectId: workspace._id,
+        isActive: true,
+      },
+    )
+      .select('_id founderIds teamMemberIds stage innovationProfile.tractionProfile.startupStage')
+      .lean();
+
+    if (linkedStartup) {
+      const startupReadinessUpdates: Record<string, unknown> = {
+        'registrationProfile.developmentStage': 'market_ready',
+        'initializationProfile.productStage': 'market_ready',
+        'traction.mvpBuilt': true,
+      };
+
+      if (linkedStartup.stage !== 'Launched') {
+        startupReadinessUpdates.stage = 'Pre-Launch';
+      }
+
+      if (linkedStartup.innovationProfile?.tractionProfile.startupStage !== 'revenue_generating') {
+        startupReadinessUpdates['innovationProfile.tractionProfile.startupStage'] = 'market_ready';
+      }
+
+      await Startup.updateOne(
+        { _id: linkedStartup._id },
+        { $set: startupReadinessUpdates },
+      );
+    }
+
     await Promise.all(
       teamMemberIds.map(async (memberId) => {
         await applyScore({
@@ -1089,15 +1129,58 @@ export const reviewProblemSubmission = async (
           },
           idempotencyKey: `problem-completed:${submission._id}:${memberId}`,
         });
-        await NotificationService.create({
+        await applyScore({
           userId: memberId,
-          type: 'system',
-          title: 'Problem review approved',
-          body: `${problem.title} was approved. Your team earned ${submission.pointsAwarded} points on the problem leaderboard.`,
-          link: '/problem-bank',
+          trigger: 'MVP_VERIFIED',
+          metadata: {
+            adminId,
+            problemId: String(problem._id),
+            submissionId: String(submission._id),
+            workspaceId: String(workspace._id),
+            verificationSource: 'problem_review',
+          },
+          idempotencyKey: `problem-review-mvp:${submission._id}:${memberId}`,
         });
+
+        if (!wasAlreadyApproved) {
+          await NotificationService.create({
+            userId: memberId,
+            type: 'system',
+            title: 'Problem review approved',
+            body: `${problem.title} was approved. Your team earned ${submission.pointsAwarded} points on the problem leaderboard and the workspace MVP was verified.`,
+            link: `/product-workspace/${workspace._id}`,
+          });
+        }
       }),
     );
+
+    if (linkedStartup) {
+      const startupMemberIds = Array.from(
+        new Set(
+          [...linkedStartup.founderIds, ...linkedStartup.teamMemberIds].map((memberId) =>
+            String(memberId),
+          ),
+        ),
+      );
+
+      await Promise.all(
+        startupMemberIds.map((memberId) =>
+          applyScore({
+            userId: memberId,
+            trigger: 'MARKET_READY_VERIFIED',
+            metadata: {
+              adminId,
+              problemId: String(problem._id),
+              submissionId: String(submission._id),
+              startupId: String(linkedStartup._id),
+              workspaceId: String(workspace._id),
+              verificationSource: 'problem_review',
+            },
+            idempotencyKey: `problem-review-market-ready:${submission._id}:${linkedStartup._id}:${memberId}`,
+          }),
+        ),
+      );
+    }
   } else {
     await Promise.all(
       teamMemberIds.map((memberId) =>
