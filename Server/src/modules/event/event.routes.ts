@@ -46,10 +46,14 @@ router.get(
   authorize(UserRole.COLLEGE, UserRole.SCHOOL, UserRole.STUDENT, UserRole.RECRUITER),
   asyncHandler(getEventRankingsController),
 );
-router.post(
-  '/:eventId/close',
-  authorize(UserRole.COLLEGE, UserRole.SCHOOL, UserRole.RECRUITER),
-  asyncHandler(closeEventController),
-);
+router.route('/:eventId/close')
+  .post(
+    authorize(UserRole.COLLEGE, UserRole.SCHOOL, UserRole.RECRUITER),
+    asyncHandler(closeEventController),
+  )
+  .patch(
+    authorize(UserRole.COLLEGE, UserRole.SCHOOL, UserRole.RECRUITER),
+    asyncHandler(closeEventController),
+  );
 
 export default router;

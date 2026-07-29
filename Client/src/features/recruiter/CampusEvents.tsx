@@ -21,6 +21,8 @@ import { Button } from '../../components/ui/Button';
 import { Card } from '../../components/ui/Card';
 import { Input } from '../../components/ui/Input';
 import { Spinner } from '../../components/ui/Spinner';
+import { toast } from 'sonner';
+import { getApiErrorMessage } from '../../utils/apiError';
 import { RECRUITER_PAGE_CONTENT_CLASS, RecruiterSectionHeader, recruiterCampusSectionItems } from './RecruiterSectionNav';
 import { EventWorkspaceModal } from './EventWorkspaceModal';
 
@@ -199,24 +201,50 @@ export default function CampusEvents({ embedded = false }: CampusEventsProps) {
   const scoreMutation = useMutation({
     mutationFn: ({ eventId, studentId, score }: { eventId: string; studentId: string; score: number }) =>
       eventApi.addSubmissionScore(eventId, studentId, score),
-    onSuccess: async () => { setScoreDraft({ studentId: '', score: '' }); await refreshData(); },
+    onSuccess: async () => {
+      toast.success('Participant score saved.');
+      setScoreDraft({ studentId: '', score: '' });
+      await refreshData();
+    },
+    onError: (error) => {
+      toast.error(getApiErrorMessage(error, 'Failed to save participant score.'));
+    },
   });
 
-  const computeMutation = useMutation({ mutationFn: (eventId: string) => eventApi.computeRankings(eventId), onSuccess: refreshData });
+  const computeMutation = useMutation({
+    mutationFn: (eventId: string) => eventApi.computeRankings(eventId),
+    onSuccess: async () => {
+      toast.success('Rankings computed.');
+      await refreshData();
+    },
+    onError: (error) => {
+      toast.error(getApiErrorMessage(error, 'Failed to compute event rankings.'));
+    },
+  });
 
   const pipelineMutation = useMutation({
     mutationFn: ({ eventId, studentId, jobId, note }: { eventId: string; studentId: string; jobId: string; note?: string }) =>
       recruiterApi.selectStudentFromEvent(eventId, studentId, { jobId, note }),
     onSuccess: async (_, variables) => {
+      toast.success('Candidate added to hiring pipeline.');
       setSelectionDraft({ studentId: '', jobId: '', note: '' });
       await refreshData();
       navigate(`/dashboard/recruiter/applications/${variables.studentId}?jobId=${variables.jobId}`);
+    },
+    onError: (error) => {
+      toast.error(getApiErrorMessage(error, 'Failed to add candidate to pipeline.'));
     },
   });
 
   const closeEventMutation = useMutation({
     mutationFn: recruiterApi.closeEvent,
-    onSuccess: async () => { await refreshData(); },
+    onSuccess: async () => {
+      toast.success('Event closed.');
+      await refreshData();
+    },
+    onError: (error) => {
+      toast.error(getApiErrorMessage(error, 'Failed to close event.'));
+    },
   });
 
   const canCreateInvite =

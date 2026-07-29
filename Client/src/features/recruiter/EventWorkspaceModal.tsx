@@ -120,9 +120,13 @@ export function EventWorkspaceModal({
   };
 
   const selectRankedCandidate = (studentId: string) => {
+    const validJobId =
+      event.linkedJobId && activeJobs.some((j) => j._id === event.linkedJobId)
+        ? event.linkedJobId
+        : activeJobs[0]?._id ?? '';
     setSelectionDraft({
       studentId,
-      jobId: event.linkedJobId ?? activeJobs[0]?._id ?? '',
+      jobId: validJobId,
       note: '',
     });
     window.requestAnimationFrame(() => {
