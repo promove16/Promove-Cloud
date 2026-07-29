@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react';
 import { useMutation, useQuery } from '@tanstack/react-query';
-import { CalendarDays, FileText, Rocket, Shield, X, type LucideIcon } from 'lucide-react';
+import { CalendarDays, ChevronDown, ChevronUp, FileText, Rocket, Shield, X, type LucideIcon } from 'lucide-react';
 import { mentorApi } from '../../api/mentor.api';
 import { Badge } from '../../components/ui/Badge';
 import { Button } from '../../components/ui/Button';
@@ -24,11 +24,13 @@ const metricCards: Array<{ label: string; value: number; icon: LucideIcon }> = [
 ];
 
 export function StudentProfileDrawer({ open, studentId, onClose, onSchedule }: Props) {
+  const [showAllTimeline, setShowAllTimeline] = useState(false);
   const profileQuery = useQuery({
     queryKey: ['mentor-student-profile', studentId],
     queryFn: () => mentorApi.getStudent(studentId!),
     enabled: open && Boolean(studentId),
   });
+
   const [feedback, setFeedback] = useState('');
   const [statusMessage, setStatusMessage] = useState<string | null>(null);
 
@@ -50,11 +52,16 @@ export function StudentProfileDrawer({ open, studentId, onClose, onSchedule }: P
   useEffect(() => {
     setFeedback('');
     setStatusMessage(null);
+    setShowAllTimeline(false);
   }, [studentId]);
 
   if (!open || !studentId) {
     return null;
   }
+
+  const scoreEvents = profileQuery.data?.scoreEvents ?? [];
+  const INITIAL_TIMELINE_COUNT = 4;
+  const displayedScoreEvents = showAllTimeline ? scoreEvents : scoreEvents.slice(0, INITIAL_TIMELINE_COUNT);
 
   return (
     <div className="fixed inset-0 z-50 flex justify-end bg-slate-950 backdrop-blur-sm">
@@ -169,23 +176,56 @@ export function StudentProfileDrawer({ open, studentId, onClose, onSchedule }: P
                 </div>
               </Card>
 
-              <Card className="p-6">
-                <div className="mb-4 text-xs uppercase tracking-[0.3em] text-cyan-300">Timeline</div>
-                <div className="space-y-3">
-                  {profileQuery.data.scoreEvents.length === 0 ? (
+              <Card className="p-6 flex flex-col justify-between">
+                <div>
+                  <div className="mb-4 flex items-center justify-between">
+                    <div className="text-xs uppercase tracking-[0.3em] text-cyan-300">Timeline</div>
+                    {scoreEvents.length > 0 && (
+                      <span className="text-xs text-slate-500 font-medium">{scoreEvents.length} total</span>
+                    )}
+                  </div>
+                  {scoreEvents.length === 0 ? (
                     <div className="text-sm text-slate-500">No score events yet.</div>
                   ) : (
-                    profileQuery.data.scoreEvents.map((event) => (
-                      <div key={event._id} className="rounded-2xl border border-slate-800 bg-slate-900 p-4">
-                        <div className="flex items-center justify-between gap-3">
-                          <div className="font-semibold text-white">{event.trigger.replace(/_/g, ' ')}</div>
-                          <Badge>+{event.delta}</Badge>
+                    <div className="divide-y divide-slate-800/60 space-y-1">
+                      {displayedScoreEvents.map((event) => (
+                        <div key={event._id} className="flex items-center justify-between py-2.5 px-2 rounded-xl transition-colors hover:bg-slate-900/50">
+                          <div className="min-w-0 flex-1 pr-3">
+                            <div className="text-sm font-semibold uppercase text-white tracking-wide">
+                              {event.trigger.replace(/_/g, ' ')}
+                            </div>
+                            <div className="mt-0.5 text-xs text-slate-400">
+                              {new Date(event.createdAt).toLocaleString('en-IN')}
+                            </div>
+                          </div>
+                          <Badge className="flex-none border-emerald-500/30 bg-emerald-500/10 text-emerald-300">
+                            +{event.delta}
+                          </Badge>
                         </div>
-                        <div className="mt-2 text-sm text-slate-400">{new Date(event.createdAt).toLocaleString('en-IN')}</div>
-                      </div>
-                    ))
+                      ))}
+                    </div>
                   )}
                 </div>
+
+                {scoreEvents.length > INITIAL_TIMELINE_COUNT && (
+                  <button
+                    type="button"
+                    onClick={() => setShowAllTimeline((prev) => !prev)}
+                    className="mt-4 flex w-full items-center justify-center gap-1.5 rounded-xl border border-slate-800 bg-slate-900/60 py-2.5 text-xs font-semibold text-cyan-400 transition hover:bg-slate-800 hover:text-cyan-300"
+                  >
+                    {showAllTimeline ? (
+                      <>
+                        <span>Show Less</span>
+                        <ChevronUp className="h-3.5 w-3.5" />
+                      </>
+                    ) : (
+                      <>
+                        <span>Read More ({scoreEvents.length - INITIAL_TIMELINE_COUNT} more)</span>
+                        <ChevronDown className="h-3.5 w-3.5" />
+                      </>
+                    )}
+                  </button>
+                )}
               </Card>
             </div>
 

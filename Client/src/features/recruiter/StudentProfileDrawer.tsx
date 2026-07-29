@@ -1,6 +1,7 @@
+import { useState } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { useNavigate } from 'react-router-dom';
-import { BriefcaseBusiness, Mail, ShieldCheck, Sparkles, X } from 'lucide-react';
+import { BriefcaseBusiness, ChevronDown, ChevronUp, Mail, ShieldCheck, Sparkles, X } from 'lucide-react';
 import { recruiterApi } from '../../api/recruiter.api';
 import { Badge } from '../../components/ui/Badge';
 import { Button } from '../../components/ui/Button';
@@ -36,6 +37,7 @@ export function StudentProfileDrawer({
   activeJobCount = 0,
 }: Props) {
   const navigate = useNavigate();
+  const [showAllJourney, setShowAllJourney] = useState(false);
   const profileQuery = useQuery({
     queryKey: ['recruiter', 'student-profile', studentId],
     queryFn: () => recruiterApi.getTalentProfile(studentId!),
@@ -52,6 +54,9 @@ export function StudentProfileDrawer({
   const workspaces = profile?.workspaces ?? [];
   const patents = profile?.patents ?? [];
   const startups = profile?.startups ?? [];
+
+  const INITIAL_JOURNEY_COUNT = 4;
+  const displayedTimeline = showAllJourney ? scoreTimeline : scoreTimeline.slice(0, INITIAL_JOURNEY_COUNT);
 
   const handleMessage = () => {
     if (!studentId) return;
@@ -125,27 +130,56 @@ export function StudentProfileDrawer({
             </Card>
 
             <div className="grid gap-4 lg:grid-cols-2">
-              <Card className="p-5">
-                <div className="mb-3 text-sm uppercase tracking-[0.25em] text-slate-500">Journey</div>
-                <div className="space-y-3">
+              <Card className="p-5 flex flex-col justify-between">
+                <div>
+                  <div className="mb-3 flex items-center justify-between">
+                    <div className="text-sm font-semibold uppercase tracking-[0.25em] text-slate-400">Journey</div>
+                    {scoreTimeline.length > 0 && (
+                      <span className="text-xs font-medium text-slate-500">{scoreTimeline.length} total</span>
+                    )}
+                  </div>
                   {scoreTimeline.length > 0 ? (
-                    scoreTimeline.map((event) => (
-                      <div key={event._id} className="rounded-2xl border border-slate-800 bg-slate-950 p-4">
-                        <div className="flex items-center justify-between gap-3">
-                          <div className="font-semibold text-white">{event.trigger.replace(/_/g, ' ')}</div>
-                          <span className="rounded-full border border-emerald-500/30 bg-emerald-500/10 px-3 py-1 text-xs font-semibold text-emerald-300">
+                    <div className="divide-y divide-slate-800/60 space-y-1">
+                      {displayedTimeline.map((event) => (
+                        <div key={event._id} className="flex items-center justify-between py-2.5 px-2 rounded-xl transition-colors hover:bg-slate-900/50">
+                          <div className="min-w-0 flex-1 pr-3">
+                            <div className="text-sm font-semibold uppercase text-white tracking-wide">
+                              {event.trigger.replace(/_/g, ' ')}
+                            </div>
+                            <div className="mt-0.5 text-xs text-slate-400">
+                              {new Date(event.createdAt).toLocaleString('en-IN')}
+                            </div>
+                          </div>
+                          <span className="flex-none rounded-full border border-emerald-500/30 bg-emerald-500/10 px-2.5 py-0.5 text-xs font-semibold text-emerald-300">
                             +{event.delta}
                           </span>
                         </div>
-                        <div className="mt-2 text-sm text-slate-400">
-                          {new Date(event.createdAt).toLocaleString('en-IN')}
-                        </div>
-                      </div>
-                    ))
+                      ))}
+                    </div>
                   ) : (
-                    <div className="text-sm text-slate-400">No activity history yet.</div>
+                    <div className="py-4 text-sm text-slate-400">No activity history yet.</div>
                   )}
                 </div>
+
+                {scoreTimeline.length > INITIAL_JOURNEY_COUNT && (
+                  <button
+                    type="button"
+                    onClick={() => setShowAllJourney((prev) => !prev)}
+                    className="mt-4 flex w-full items-center justify-center gap-1.5 rounded-xl border border-slate-800 bg-slate-900/60 py-2.5 text-xs font-semibold text-cyan-400 transition hover:bg-slate-800 hover:text-cyan-300"
+                  >
+                    {showAllJourney ? (
+                      <>
+                        <span>Show Less</span>
+                        <ChevronUp className="h-3.5 w-3.5" />
+                      </>
+                    ) : (
+                      <>
+                        <span>Read More ({scoreTimeline.length - INITIAL_JOURNEY_COUNT} more)</span>
+                        <ChevronDown className="h-3.5 w-3.5" />
+                      </>
+                    )}
+                  </button>
+                )}
               </Card>
 
               <Card className="p-5">

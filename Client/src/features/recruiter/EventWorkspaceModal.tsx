@@ -47,21 +47,21 @@ const formatEventDate = (value: string) =>
   });
 
 const workflowStepClass: Record<WorkflowStepStatus, string> = {
-  complete: 'border-emerald-500/30 bg-emerald-500/10 text-emerald-200',
-  active: 'border-cyan-500/40 bg-cyan-500/10 text-cyan-100',
+  complete: 'border-emerald-500/40 bg-emerald-500/15 text-emerald-200 shadow-sm shadow-emerald-500/10',
+  active: 'border-cyan-400/60 bg-cyan-500/20 text-cyan-100 shadow-md shadow-cyan-500/20 ring-1 ring-cyan-400/30',
   locked: 'border-slate-800 bg-slate-950/70 text-slate-500',
 };
 
 const WorkflowStepIcon = ({ status }: { status: WorkflowStepStatus }) => {
   if (status === 'complete') {
-    return <CheckCircle2 className="h-5 w-5 text-emerald-300" />;
+    return <CheckCircle2 className="h-5 w-5 text-emerald-300 shrink-0" />;
   }
 
   if (status === 'locked') {
-    return <LockKeyhole className="h-5 w-5 text-slate-600" />;
+    return <LockKeyhole className="h-5 w-5 text-slate-600 shrink-0" />;
   }
 
-  return <Circle className="h-5 w-5 fill-cyan-400/20 text-cyan-300" />;
+  return <Circle className="h-5 w-5 fill-cyan-400/30 text-cyan-300 shrink-0" />;
 };
 
 export function EventWorkspaceModal({
@@ -113,10 +113,16 @@ export function EventWorkspaceModal({
       label: 'Select candidates',
       detail: !rankingsFinalized
         ? 'Unlocks after rankings'
-        : selectableRankings.length === 0
-          ? `All ${event.rankings.length} ranked student${event.rankings.length === 1 ? '' : 's'} selected`
-          : `${selectableRankings.length} of ${event.rankings.length} still available`,
-      status: rankingsFinalized ? 'active' : 'locked',
+        : event.rankings.length === 0
+          ? 'No ranked students'
+          : selectableRankings.length === 0
+            ? `All ${event.rankings.length} ranked student${event.rankings.length === 1 ? '' : 's'} selected`
+            : `${selectableRankings.length} of ${event.rankings.length} still available`,
+      status: !rankingsFinalized
+        ? 'locked'
+        : event.rankings.length > 0 && selectableRankings.length === 0
+          ? 'complete'
+          : 'active',
     },
   ];
 
