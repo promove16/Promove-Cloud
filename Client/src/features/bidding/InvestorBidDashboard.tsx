@@ -61,14 +61,14 @@ function InvestorBidCard({
   return (
     <Card
       onClick={() => onSelect(bid)}
-      className="p-5 bg-white/5 backdrop-blur-xl border border-white/10 rounded-2xl hover:border-white/20 transition-all duration-300 cursor-pointer"
+      className="p-5 bg-white/5 backdrop-blur-xl border border-white/10 rounded-2xl hover:border-white/20 transition-all duration-300 cursor-pointer overflow-hidden"
     >
-      <div className="flex items-start justify-between mb-4">
-        <div className="flex items-center gap-3">
-          <div className="w-10 h-10 rounded-full bg-gradient-to-br from-teal-500 to-emerald-600 flex items-center justify-center text-white font-bold text-sm">
+      <div className="flex items-start justify-between gap-3 mb-4">
+        <div className="flex min-w-0 flex-1 items-center gap-3">
+          <div className="w-10 h-10 shrink-0 rounded-full bg-gradient-to-br from-teal-500 to-emerald-600 flex items-center justify-center text-white font-bold text-sm">
             {bid.startupName?.charAt(0)?.toUpperCase() ?? '?'}
           </div>
-          <div className="min-w-0">
+          <div className="min-w-0 flex-1">
             <p className="text-white font-semibold truncate">{bid.startupName}</p>
             <p className="text-slate-400 text-xs truncate">{bid.startupTagline ?? ''}</p>
           </div>
@@ -78,34 +78,34 @@ function InvestorBidCard({
         </span>
       </div>
 
-      <div className={`mb-4 rounded-xl px-3 py-2 text-xs ${style.bg} ${style.text}`}>
+      <div className={`mb-4 rounded-xl px-3 py-2 text-xs leading-relaxed ${style.bg} ${style.text}`}>
         {STATUS_HELP[bid.status] ?? 'Track the founder response for this offer.'}
       </div>
 
       <div className="grid grid-cols-2 gap-3 mb-4">
-        <div className="p-3 bg-white/5 rounded-xl">
+        <div className="p-3 bg-white/5 rounded-xl min-w-0">
           <p className="text-xs text-slate-500">Your Bid</p>
-          <p className="text-white font-semibold">{formatINR(bid.proposedAmount)}</p>
+          <p className="text-white font-semibold truncate">{formatINR(bid.proposedAmount)}</p>
         </div>
-        <div className="p-3 bg-white/5 rounded-xl">
+        <div className="p-3 bg-white/5 rounded-xl min-w-0">
           <p className="text-xs text-slate-500">Equity</p>
-          <p className="text-white font-semibold">{bid.proposedEquity}%</p>
+          <p className="text-white font-semibold truncate">{bid.proposedEquity}%</p>
         </div>
-        <div className="p-3 bg-white/5 rounded-xl">
+        <div className="p-3 bg-white/5 rounded-xl min-w-0">
           <p className="text-xs text-slate-500">Type</p>
-          <p className="text-white font-semibold capitalize">{bid.bidType}</p>
+          <p className="text-white font-semibold truncate capitalize">{bid.bidType}</p>
         </div>
-        <div className="p-3 bg-white/5 rounded-xl">
+        <div className="p-3 bg-white/5 rounded-xl min-w-0">
           <p className="text-xs text-slate-500">Category</p>
           <p className="text-white font-semibold truncate">{bid.startupCategory ?? 'N/A'}</p>
         </div>
       </div>
 
       {bid.counterAmount && (
-        <div className="p-3 bg-purple-500/10 rounded-xl mb-3">
+        <div className="p-3 bg-purple-500/10 rounded-xl mb-3 min-w-0">
           <p className="text-xs text-slate-500">Counter-offer received</p>
-          <p className="text-purple-400 font-semibold">{formatINR(bid.counterAmount)} for {bid.counterEquity}% equity</p>
-          <p className="mt-1 text-xs text-slate-400">Compare this with your original offer before sending a new response.</p>
+          <p className="text-purple-400 font-semibold truncate">{formatINR(bid.counterAmount)} for {bid.counterEquity}% equity</p>
+          <p className="mt-1 text-xs text-slate-400 leading-relaxed">Compare this with your original offer before sending a new response.</p>
         </div>
       )}
 

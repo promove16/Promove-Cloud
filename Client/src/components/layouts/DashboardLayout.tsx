@@ -992,7 +992,7 @@ export function DashboardLayout({ children, role }: PropsWithChildren<DashboardL
 
         <div className="flex min-h-0 min-w-0 flex-1 flex-col">
           {!isPortfolioRoute ? (
-            <header className="dashboard-theme-border dashboard-theme-header sticky top-0 z-30 border-b backdrop-blur-xl">
+            <header className="dashboard-theme-border dashboard-theme-header shrink-0 sticky top-0 z-30 border-b backdrop-blur-xl">
               <div className="flex items-center justify-between gap-3 px-4 py-4 lg:px-8">
                 <div className="flex min-w-0 flex-1 items-center gap-3">
                   <Button variant="ghost" className="lg:hidden" onClick={() => setSidebarOpen(true)}>

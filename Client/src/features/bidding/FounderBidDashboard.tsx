@@ -47,36 +47,36 @@ function BidCard({ bid, onView, onRespond }: { bid: BidDetailView; onView: () =>
   const isActive = ['pending', 'viewed', 'negotiating', 'countered'].includes(bid.status);
 
   return (
-    <Card className="p-5 bg-white/5 backdrop-blur-xl border border-white/10 rounded-2xl hover:border-white/20 transition-all duration-300">
-      <div className="flex items-start justify-between mb-4">
-        <div className="flex items-center gap-3">
-          <div className="w-10 h-10 rounded-full bg-gradient-to-br from-indigo-500 to-purple-600 flex items-center justify-center text-white font-bold text-sm">
+    <Card className="p-5 bg-white/5 backdrop-blur-xl border border-white/10 rounded-2xl hover:border-white/20 transition-all duration-300 overflow-hidden">
+      <div className="flex items-start justify-between gap-3 mb-4">
+        <div className="flex min-w-0 flex-1 items-center gap-3">
+          <div className="w-10 h-10 shrink-0 rounded-full bg-gradient-to-br from-indigo-500 to-purple-600 flex items-center justify-center text-white font-bold text-sm">
             {bid.investorName.charAt(0).toUpperCase()}
           </div>
-          <div>
-            <p className="text-white font-semibold">{bid.investorName}</p>
-            <p className="text-slate-400 text-xs">Score: {bid.investorInnovationScore}</p>
+          <div className="min-w-0 flex-1">
+            <p className="text-white font-semibold truncate">{bid.investorName}</p>
+            <p className="text-slate-400 text-xs truncate">Score: {bid.investorInnovationScore}</p>
           </div>
         </div>
-        <span className={`px-3 py-1 rounded-full text-xs font-medium ${style.bg} ${style.text}`}>
+        <span className={`px-3 py-1 rounded-full text-xs font-medium shrink-0 ${style.bg} ${style.text}`}>
           {style.label}
         </span>
       </div>
 
       <div className="grid grid-cols-2 gap-3 mb-4">
-        <div className="p-3 bg-white/5 rounded-xl">
+        <div className="p-3 bg-white/5 rounded-xl min-w-0">
           <p className="text-xs text-slate-500">Amount</p>
-          <p className="text-white font-semibold">{formatINR(bid.proposedAmount)}</p>
+          <p className="text-white font-semibold truncate">{formatINR(bid.proposedAmount)}</p>
         </div>
-        <div className="p-3 bg-white/5 rounded-xl">
+        <div className="p-3 bg-white/5 rounded-xl min-w-0">
           <p className="text-xs text-slate-500">Equity</p>
-          <p className="text-white font-semibold">{bid.proposedEquity}%</p>
+          <p className="text-white font-semibold truncate">{bid.proposedEquity}%</p>
         </div>
-        <div className="p-3 bg-white/5 rounded-xl">
+        <div className="p-3 bg-white/5 rounded-xl min-w-0">
           <p className="text-xs text-slate-500">Type</p>
-          <p className="text-white font-semibold capitalize">{bid.bidType}</p>
+          <p className="text-white font-semibold truncate capitalize">{bid.bidType}</p>
         </div>
-        <div className="p-3 bg-white/5 rounded-xl">
+        <div className="p-3 bg-white/5 rounded-xl min-w-0">
           <p className="text-xs text-slate-500">Startup</p>
           <p className="text-white font-semibold truncate">{bid.startupName}</p>
         </div>
@@ -103,7 +103,7 @@ function BidCard({ bid, onView, onRespond }: { bid: BidDetailView; onView: () =>
       )}
 
       {bid.rejectionReason && (
-        <p className="text-xs text-red-400 mt-2">Reason: {bid.rejectionReason}</p>
+        <p className="text-xs text-red-400 mt-2 truncate">Reason: {bid.rejectionReason}</p>
       )}
     </Card>
   );
