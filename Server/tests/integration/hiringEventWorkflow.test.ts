@@ -77,6 +77,55 @@ describe('hiring event evaluation workflow', () => {
     });
   });
 
+  it('blocks a student already selected for another role in the same event', async () => {
+    const { event, recruiterId, studentId } = await createHiringEvent({ submissionScore: 84 });
+
+    await computeEventRankings(event._id.toString(), {
+      actorId: recruiterId.toString(),
+      role: UserRole.RECRUITER,
+    });
+
+    await Event.updateOne(
+      { _id: event._id, 'participants.studentId': studentId },
+      { $set: { 'participants.$.selectedJobId': new Types.ObjectId(), 'participants.$.selectedAt': new Date() } },
+    );
+
+    await expect(
+      selectStudentFromHiringEvent(
+        recruiterId.toString(),
+        event._id.toString(),
+        studentId.toString(),
+        new Types.ObjectId().toString(),
+      ),
+    ).rejects.toMatchObject({
+      statusCode: 409,
+      code: 'ALREADY_SELECTED_FROM_EVENT',
+    });
+  });
+
+  it('keeps a student selectable in a different hiring event', async () => {
+    const { event, recruiterId, studentId } = await createHiringEvent({ submissionScore: 84 });
+    const otherEvent = await createHiringEvent({ submissionScore: 84 });
+
+    await Event.updateOne(
+      { _id: event._id, 'participants.studentId': studentId },
+      { $set: { 'participants.$.selectedJobId': new Types.ObjectId(), 'participants.$.selectedAt': new Date() } },
+    );
+
+    // The other event has no selection recorded, so it fails on the rankings gate rather than the selection guard.
+    await expect(
+      selectStudentFromHiringEvent(
+        otherEvent.recruiterId.toString(),
+        otherEvent.event._id.toString(),
+        otherEvent.studentId.toString(),
+        new Types.ObjectId().toString(),
+      ),
+    ).rejects.toMatchObject({
+      statusCode: 409,
+      code: 'EVENT_RANKINGS_REQUIRED',
+    });
+  });
+
   it('computes rankings once every participant has a score', async () => {
     const { event, recruiterId, studentId } = await createHiringEvent({ submissionScore: 84 });
 

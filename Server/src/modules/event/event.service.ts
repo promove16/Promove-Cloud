@@ -154,6 +154,8 @@ const buildParticipantViewMap = async (
       studentId: { toString(): string };
       joinedAt: Date;
       submissionScore?: number;
+      selectedJobId?: { toString(): string };
+      selectedAt?: Date;
     }>;
   }>,
 ) => {
@@ -168,11 +170,29 @@ const buildParticipantViewMap = async (
 
   const studentMap = new Map(students.map((student) => [String(student._id), student]));
 
+  const selectedJobIds = [
+    ...new Set(
+      events.flatMap((event) =>
+        event.participants.filter((participant) => participant.selectedJobId).map((participant) => String(participant.selectedJobId)),
+      ),
+    ),
+  ];
+
+  const selectedJobs =
+    selectedJobIds.length > 0
+      ? await JobPost.find({ _id: { $in: selectedJobIds } })
+          .select('_id title')
+          .lean()
+      : [];
+
+  const selectedJobMap = new Map(selectedJobs.map((job) => [String(job._id), job.title]));
+
   return new Map(
     events.map((event) => [
       String(event._id),
       event.participants.map((participant) => {
         const student = studentMap.get(String(participant.studentId));
+        const selectedJobTitle = participant.selectedJobId ? selectedJobMap.get(String(participant.selectedJobId)) : undefined;
 
         return {
           studentId: String(participant.studentId),
@@ -181,6 +201,9 @@ const buildParticipantViewMap = async (
           innovationScore: student?.innovationScore ?? 0,
           registeredAt: participant.joinedAt.toISOString(),
           ...(typeof participant.submissionScore === 'number' ? { submissionScore: participant.submissionScore } : {}),
+          ...(participant.selectedJobId ? { selectedJobId: String(participant.selectedJobId) } : {}),
+          ...(selectedJobTitle ? { selectedJobTitle } : {}),
+          ...(participant.selectedAt ? { selectedAt: participant.selectedAt.toISOString() } : {}),
         } satisfies EventParticipantView;
       }),
     ]),
@@ -595,14 +618,25 @@ export const listCollegeHiringEvents = async (collegeId: string) => {
 };
 
 export const selectStudentFromHiringEvent = async (recruiterId: string, eventId: string, studentId: string, jobId: string, note?: string) => {
-  const event = await Event.findOne({ _id: eventId, recruiterId, category: 'hiring' }).lean();
+  const event = await Event.findOne({ _id: eventId, recruiterId, category: 'hiring' });
   if (!event) {
     throw new ApiError(404, 'EVENT_NOT_FOUND', 'Hiring event not found');
   }
 
-  const isParticipant = event.participants.some((p) => String(p.studentId) === studentId);
-  if (!isParticipant) {
+  const participant = event.participants.find((p) => String(p.studentId) === studentId);
+  if (!participant) {
     throw new ApiError(404, 'PARTICIPANT_NOT_FOUND', 'Student is not a participant of this event');
+  }
+
+  if (participant.selectedJobId) {
+    const selectedJob = await JobPost.findById(participant.selectedJobId).select('title').lean();
+    throw new ApiError(
+      409,
+      'ALREADY_SELECTED_FROM_EVENT',
+      selectedJob
+        ? `Student is already selected for "${selectedJob.title}" in this event and cannot be selected for another role.`
+        : 'Student is already selected for a role in this event and cannot be selected for another role.',
+    );
   }
 
   if (!event.rankingsComputedAt) {
@@ -638,6 +672,10 @@ export const selectStudentFromHiringEvent = async (recruiterId: string, eventId:
   }
 
   await job.save();
+
+  participant.selectedJobId = job._id;
+  participant.selectedAt = new Date();
+  await event.save();
 
   await createBridge(recruiterId, studentId, 'ACTIVE_APPLICATION');
 

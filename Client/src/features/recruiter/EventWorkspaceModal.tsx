@@ -86,8 +86,12 @@ export function EventWorkspaceModal({
   const remainingScores = event.participants.length - scoredParticipantsCount;
   const allParticipantsScored = event.participants.length > 0 && remainingScores === 0;
   const selectedParticipant = event.participants.find((participant) => participant.studentId === selectionDraft.studentId) ?? null;
+  const hiredParticipants = new Map(
+    event.participants.filter((participant) => participant.selectedJobId).map((participant) => [participant.studentId, participant]),
+  );
+  const selectableRankings = event.rankings.filter((ranking) => !hiredParticipants.has(ranking.studentId));
   const showScoringPanel = event.isActive && !rankingsFinalized;
-  const showPipelinePanel = rankingsFinalized && Boolean(selectedParticipant);
+  const showPipelinePanel = rankingsFinalized && Boolean(selectedParticipant) && !selectedParticipant?.selectedJobId;
   const showSidePanel = showScoringPanel || showPipelinePanel;
 
   const workflowSteps: Array<{
@@ -107,7 +111,11 @@ export function EventWorkspaceModal({
     },
     {
       label: 'Select candidates',
-      detail: rankingsFinalized ? 'Choose from ranked students' : 'Unlocks after rankings',
+      detail: !rankingsFinalized
+        ? 'Unlocks after rankings'
+        : selectableRankings.length === 0
+          ? `All ${event.rankings.length} ranked student${event.rankings.length === 1 ? '' : 's'} selected`
+          : `${selectableRankings.length} of ${event.rankings.length} still available`,
       status: rankingsFinalized ? 'active' : 'locked',
     },
   ];
@@ -120,6 +128,10 @@ export function EventWorkspaceModal({
   };
 
   const selectRankedCandidate = (studentId: string) => {
+    if (hiredParticipants.has(studentId)) {
+      return;
+    }
+
     const validJobId =
       event.linkedJobId && activeJobs.some((j) => j._id === event.linkedJobId)
         ? event.linkedJobId
@@ -288,6 +300,12 @@ export function EventWorkspaceModal({
                             </div>
                           </div>
                           <div className="flex flex-wrap items-center gap-2">
+                            {participant.selectedJobId ? (
+                              <Badge className="border-emerald-500/30 bg-emerald-500/10 text-emerald-300">
+                                <CheckCircle2 className="mr-1 h-3.5 w-3.5" />
+                                Selected{participant.selectedJobTitle ? ` — ${participant.selectedJobTitle}` : ''}
+                              </Badge>
+                            ) : null}
                             {participantRanking ? (
                               <Badge className="border-cyan-500/30 bg-cyan-500/10 text-cyan-200">Rank #{participantRanking.rank}</Badge>
                             ) : null}
@@ -310,7 +328,14 @@ export function EventWorkspaceModal({
               </div>
 
               <div className="rounded-2xl border border-slate-800 bg-slate-950 p-4">
-                <div className="mb-3 text-sm font-semibold uppercase tracking-[0.3em] text-cyan-300">Rankings</div>
+                <div className="mb-3 flex flex-wrap items-center justify-between gap-2">
+                  <div className="text-sm font-semibold uppercase tracking-[0.3em] text-cyan-300">Rankings</div>
+                  {rankingsFinalized && event.rankings.length > 0 ? (
+                    <Badge className="border-slate-700 bg-slate-900 text-slate-300">
+                      {selectableRankings.length} available to select
+                    </Badge>
+                  ) : null}
+                </div>
                 {event.rankings.length === 0 ? (
                   <div className="rounded-xl border border-dashed border-slate-800 px-4 py-5 text-sm text-slate-500">
                     {event.participants.length === 0
@@ -323,26 +348,44 @@ export function EventWorkspaceModal({
                   <div className="space-y-2">
                     {event.rankings.map((ranking) => {
                       const isSelected = selectionDraft.studentId === ranking.studentId;
+                      const hiredParticipant = hiredParticipants.get(ranking.studentId);
                       return (
                         <div
                           key={`${event._id}-${ranking.studentId}`}
-                          className="grid grid-cols-1 items-center gap-2 rounded-xl border border-slate-800 px-4 py-3 text-sm md:grid-cols-[70px,1fr,140px,140px,160px]"
+                          className={`grid grid-cols-1 items-center gap-2 rounded-xl border px-4 py-3 text-sm md:grid-cols-[70px,1fr,140px,140px,160px] ${
+                            hiredParticipant ? 'border-emerald-500/20 bg-emerald-500/[0.04]' : 'border-slate-800'
+                          }`}
                         >
                           <div className="font-semibold text-white">#{ranking.rank}</div>
                           <div className="font-medium text-white">{ranking.studentName}</div>
                           <div className="text-slate-300">Composite {ranking.compositeScore}</div>
                           <div className="text-slate-400">Submission {ranking.submissionScore}</div>
-                          <Button
-                            variant={isSelected ? 'outline' : 'secondary'}
-                            size="sm"
-                            className={isSelected ? 'border-cyan-500/50 text-cyan-300' : ''}
-                            onClick={() => selectRankedCandidate(ranking.studentId)}
-                          >
-                            {isSelected ? 'Selected' : 'Select Candidate'}
-                          </Button>
+                          {hiredParticipant ? (
+                            <Badge
+                              className="justify-center border-emerald-500/30 bg-emerald-500/10 text-emerald-300"
+                              title={`Already selected for ${hiredParticipant.selectedJobTitle ?? 'a role'} in this event`}
+                            >
+                              <CheckCircle2 className="mr-1 h-3.5 w-3.5" />
+                              <span className="truncate">{hiredParticipant.selectedJobTitle ?? 'Already selected'}</span>
+                            </Badge>
+                          ) : (
+                            <Button
+                              variant={isSelected ? 'outline' : 'secondary'}
+                              size="sm"
+                              className={isSelected ? 'border-cyan-500/50 text-cyan-300' : ''}
+                              onClick={() => selectRankedCandidate(ranking.studentId)}
+                            >
+                              {isSelected ? 'Selected' : 'Select Candidate'}
+                            </Button>
+                          )}
                         </div>
                       );
                     })}
+                    {rankingsFinalized && selectableRankings.length === 0 ? (
+                      <div className="rounded-xl border border-dashed border-slate-800 px-4 py-3 text-xs text-slate-500">
+                        Every ranked student is already selected for a role in this event. A student can hold only one role per event.
+                      </div>
+                    ) : null}
                   </div>
                 )}
               </div>
@@ -410,6 +453,9 @@ export function EventWorkspaceModal({
                   <div className="mt-3 rounded-xl border border-slate-800 px-4 py-3 text-sm text-slate-300">
                     Adding <span className="font-semibold text-white">{selectedParticipant?.studentName}</span> creates a hiring-event application and notifies
                     the student.
+                    <span className="mt-2 block text-xs text-slate-500">
+                      This locks the student to the chosen role for this event — they stay available for your other events.
+                    </span>
                   </div>
                   {!activeJobs.length ? (
                     <div className="mt-3 rounded-xl border border-dashed border-slate-800 px-4 py-4 text-sm text-slate-500">

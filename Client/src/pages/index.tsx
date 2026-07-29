@@ -3,6 +3,7 @@ import {
   type LazyExoticComponent,
   type PropsWithChildren,
   Suspense,
+  useEffect,
   lazy,
 } from "react";
 import { TermsAcceptanceGate } from "../features/auth/TermsAcceptanceGate";
@@ -32,6 +33,7 @@ import { UserRole } from "../types/roles.types";
 import { roleRedirect } from "../utils/roleRedirect";
 import { getMarketplaceBasePath, getMarketplaceDetailPath } from "../features/marketplace/navigation";
 import { getStudentPortfolioViewPath } from "../features/marketplace/navigation";
+import { safeLazy } from "../utils/safeLazy";
 
 function LazyPage({ component: Component }: { component: LazyExoticComponent<ComponentType> }) {
   return (
@@ -47,191 +49,191 @@ function LazyPage({ component: Component }: { component: LazyExoticComponent<Com
   );
 }
 
-const SchoolDashboard = lazy(() => import("../features/school/Dashboard"));
-const SchoolEventsPage = lazy(() => import("../features/school/EventsPage"));
-const SchoolProjectsPage = lazy(() => import("../features/school/ProjectsPage"));
-const SchoolPatentsPage = lazy(() => import("../features/school/PatentsPage"));
-const SchoolStartupsPage = lazy(() => import("../features/school/StartupsPage"));
-const SchoolMentorshipPage = lazy(() => import("../features/school/MentorshipPage"));
-const SchoolOperationsPage = lazy(() => import("../features/school/OperationsPage"));
-const SchoolStudentLeaderboard = lazy(() => import("../features/school/StudentLeaderboard"));
-const SchoolInvestorDirectory = lazy(() => import("../features/school/InvestorDirectory"));
-const SchoolAnalyticsPage = lazy(() => import("../features/school/AnalyticsPage"));
-const SchoolCompliancePage = lazy(() => import("../features/school/CompliancePage"));
+const SchoolDashboard = safeLazy(() => import("../features/school/Dashboard"));
+const SchoolEventsPage = safeLazy(() => import("../features/school/EventsPage"));
+const SchoolProjectsPage = safeLazy(() => import("../features/school/ProjectsPage"));
+const SchoolPatentsPage = safeLazy(() => import("../features/school/PatentsPage"));
+const SchoolStartupsPage = safeLazy(() => import("../features/school/StartupsPage"));
+const SchoolMentorshipPage = safeLazy(() => import("../features/school/MentorshipPage"));
+const SchoolOperationsPage = safeLazy(() => import("../features/school/OperationsPage"));
+const SchoolStudentLeaderboard = safeLazy(() => import("../features/school/StudentLeaderboard"));
+const SchoolInvestorDirectory = safeLazy(() => import("../features/school/InvestorDirectory"));
+const SchoolAnalyticsPage = safeLazy(() => import("../features/school/AnalyticsPage"));
+const SchoolCompliancePage = safeLazy(() => import("../features/school/CompliancePage"));
 
-const CollegeDashboard = lazy(() => import("../features/college/Dashboard"));
-const CollegeOperationsPage = lazy(() => import("../features/college/OperationsPage"));
-const CollegeProjectsPage = lazy(() => import("../features/college/ProjectsPage"));
-const CollegePatentsPage = lazy(() => import("../features/college/PatentsPage"));
-const CollegeStartupsPage = lazy(() => import("../features/college/StartupsPage"));
-const CollegeMentorshipPage = lazy(() => import("../features/college/MentorshipPage"));
-const CollegeStudentLeaderboard = lazy(() => import("../features/college/StudentLeaderboard"));
-const CollegeInvestorDirectory = lazy(() => import("../features/college/InvestorDirectory"));
-const RecruiterDirectory = lazy(() => import("../features/college/RecruiterDirectory"));
-const PlacementTracker = lazy(() => import("../features/college/PlacementTracker"));
-const EventManager = lazy(() => import("../features/college/EventManager"));
-const CollegeAnalyticsPage = lazy(() => import("../features/college/AnalyticsPage"));
-const CollegeCompliancePage = lazy(() => import("../features/college/CompliancePage"));
+const CollegeDashboard = safeLazy(() => import("../features/college/Dashboard"));
+const CollegeOperationsPage = safeLazy(() => import("../features/college/OperationsPage"));
+const CollegeProjectsPage = safeLazy(() => import("../features/college/ProjectsPage"));
+const CollegePatentsPage = safeLazy(() => import("../features/college/PatentsPage"));
+const CollegeStartupsPage = safeLazy(() => import("../features/college/StartupsPage"));
+const CollegeMentorshipPage = safeLazy(() => import("../features/college/MentorshipPage"));
+const CollegeStudentLeaderboard = safeLazy(() => import("../features/college/StudentLeaderboard"));
+const CollegeInvestorDirectory = safeLazy(() => import("../features/college/InvestorDirectory"));
+const RecruiterDirectory = safeLazy(() => import("../features/college/RecruiterDirectory"));
+const PlacementTracker = safeLazy(() => import("../features/college/PlacementTracker"));
+const EventManager = safeLazy(() => import("../features/college/EventManager"));
+const CollegeAnalyticsPage = safeLazy(() => import("../features/college/AnalyticsPage"));
+const CollegeCompliancePage = safeLazy(() => import("../features/college/CompliancePage"));
 
-const MentorDashboard = lazy(() => import("../features/mentor/Dashboard"));
-const MentorStudentFeed = lazy(() => import("../features/mentor/StudentFeed"));
-const MentorSessions = lazy(() => import("../features/mentor/Sessions"));
-const MentorMarketplace = lazy(() => import("../features/mentor/MentorMarketplace"));
-const MentorScorePage = lazy(() => import("../features/mentor/MentorScore"));
-const MentorEvidenceCenter = lazy(() => import("../features/mentor/EvidenceCenter"));
-const MentorForum = lazy(() => import("../features/mentor/Forum"));
-const MentorResources = lazy(() => import("../features/mentor/Resources"));
+const MentorDashboard = safeLazy(() => import("../features/mentor/Dashboard"));
+const MentorStudentFeed = safeLazy(() => import("../features/mentor/StudentFeed"));
+const MentorSessions = safeLazy(() => import("../features/mentor/Sessions"));
+const MentorMarketplace = safeLazy(() => import("../features/mentor/MentorMarketplace"));
+const MentorScorePage = safeLazy(() => import("../features/mentor/MentorScore"));
+const MentorEvidenceCenter = safeLazy(() => import("../features/mentor/EvidenceCenter"));
+const MentorForum = safeLazy(() => import("../features/mentor/Forum"));
+const MentorResources = safeLazy(() => import("../features/mentor/Resources"));
 
-const AdminDashboard = lazy(() => import("../features/admin/Dashboard"));
-const AdminOnboarding = lazy(() => import("../features/admin/Onboarding"));
-const AdminOnboardingAccounts = lazy(() => import("../features/admin/OnboardingAccounts"));
-const AdminUserDirectory = lazy(() => import("../features/admin/UserDirectory"));
-const AdminPatentsWorkspace = lazy(() => import("../features/admin/PatentsWorkspace"));
-const AdminPatents = lazy(() => import("../features/admin/Patents"));
-const AdminPatentRequests = lazy(() => import("../features/admin/PatentRequests"));
-const AdminStartups = lazy(() => import("../features/admin/Startups"));
-const AdminDeals = lazy(() => import("../features/admin/Deals"));
-const AdminDealsOverview = lazy(() => import("../features/admin/DealsOverview"));
-const AdminDealsRegister = lazy(() => import("../features/admin/DealsRegister"));
-const AdminDealReview = lazy(() => import("../features/admin/DealReview"));
-const AdminAnalytics = lazy(() => import("../features/admin/Analytics"));
-const AdminAnalyticsOverview = lazy(() => import("../features/admin/AnalyticsOverview"));
-const AdminAnalyticsUsage = lazy(() => import("../features/admin/AnalyticsUsage"));
-const AdminAnalyticsUsers = lazy(() => import("../features/admin/AnalyticsUsers"));
-const AdminAnalyticsLogs = lazy(() => import("../features/admin/AnalyticsLogs"));
-const AdminPlatformAnalytics = lazy(() => import("../features/analytics/AdminPlatformAnalytics"));
-const InvestorBidDashboard = lazy(() => import("../features/bidding/InvestorBidDashboard"));
-const AgreementPage = lazy(() => import("../features/agreement/AgreementPage"));
-const AdminMentorsLayout = lazy(() => import("../features/admin/AdminMentorsLayout"));
-const AdminMentorshipPrograms = lazy(() => import("../features/admin/MentorshipPrograms"));
-const AdminMentorshipMentors = lazy(() => import("../features/admin/MentorshipMentors"));
-const AdminMentorshipProgramCreation = lazy(() => import("../features/admin/MentorshipProgramCreation"));
-const AdminMentorshipRequests = lazy(() => import("../features/admin/MentorshipRequests"));
-const AdminMentorScores = lazy(() => import("../features/admin/MentorScores"));
-const AdminProblemBank = lazy(() => import("../features/admin/ProblemBank"));
-const AdminProblemLibrary = lazy(() => import("../features/admin/ProblemLibrary"));
-const AdminProblemReviewQueue = lazy(() => import("../features/admin/ProblemReviewQueue"));
+const AdminDashboard = safeLazy(() => import("../features/admin/Dashboard"));
+const AdminOnboarding = safeLazy(() => import("../features/admin/Onboarding"));
+const AdminOnboardingAccounts = safeLazy(() => import("../features/admin/OnboardingAccounts"));
+const AdminUserDirectory = safeLazy(() => import("../features/admin/UserDirectory"));
+const AdminPatentsWorkspace = safeLazy(() => import("../features/admin/PatentsWorkspace"));
+const AdminPatents = safeLazy(() => import("../features/admin/Patents"));
+const AdminPatentRequests = safeLazy(() => import("../features/admin/PatentRequests"));
+const AdminStartups = safeLazy(() => import("../features/admin/Startups"));
+const AdminDeals = safeLazy(() => import("../features/admin/Deals"));
+const AdminDealsOverview = safeLazy(() => import("../features/admin/DealsOverview"));
+const AdminDealsRegister = safeLazy(() => import("../features/admin/DealsRegister"));
+const AdminDealReview = safeLazy(() => import("../features/admin/DealReview"));
+const AdminAnalytics = safeLazy(() => import("../features/admin/Analytics"));
+const AdminAnalyticsOverview = safeLazy(() => import("../features/admin/AnalyticsOverview"));
+const AdminAnalyticsUsage = safeLazy(() => import("../features/admin/AnalyticsUsage"));
+const AdminAnalyticsUsers = safeLazy(() => import("../features/admin/AnalyticsUsers"));
+const AdminAnalyticsLogs = safeLazy(() => import("../features/admin/AnalyticsLogs"));
+const AdminPlatformAnalytics = safeLazy(() => import("../features/analytics/AdminPlatformAnalytics"));
+const InvestorBidDashboard = safeLazy(() => import("../features/bidding/InvestorBidDashboard"));
+const AgreementPage = safeLazy(() => import("../features/agreement/AgreementPage"));
+const AdminMentorsLayout = safeLazy(() => import("../features/admin/AdminMentorsLayout"));
+const AdminMentorshipPrograms = safeLazy(() => import("../features/admin/MentorshipPrograms"));
+const AdminMentorshipMentors = safeLazy(() => import("../features/admin/MentorshipMentors"));
+const AdminMentorshipProgramCreation = safeLazy(() => import("../features/admin/MentorshipProgramCreation"));
+const AdminMentorshipRequests = safeLazy(() => import("../features/admin/MentorshipRequests"));
+const AdminMentorScores = safeLazy(() => import("../features/admin/MentorScores"));
+const AdminProblemBank = safeLazy(() => import("../features/admin/ProblemBank"));
+const AdminProblemLibrary = safeLazy(() => import("../features/admin/ProblemLibrary"));
+const AdminProblemReviewQueue = safeLazy(() => import("../features/admin/ProblemReviewQueue"));
 
-const RecruiterDashboard = lazy(() => import("../features/recruiter/RecruiterDashboardExperience"));
-const RecruiterOnboardingTracker = lazy(() => import("../features/recruiter/OnboardingTracker"));
-const RecruiterApplications = lazy(() => import("../features/recruiter/ApplicationsPipeline"));
-const RecruiterCampusEvents = lazy(() => import("../features/recruiter/CampusEvents"));
-const HiringSessionPage = lazy(() => import("../features/recruiter/HiringSessionPage"));
-const RecruiterCollegeStudentsPage = lazy(() => import("../features/recruiter/CollegeStudentsPage"));
+const RecruiterDashboard = safeLazy(() => import("../features/recruiter/RecruiterDashboardExperience"));
+const RecruiterOnboardingTracker = safeLazy(() => import("../features/recruiter/OnboardingTracker"));
+const RecruiterApplications = safeLazy(() => import("../features/recruiter/ApplicationsPipeline"));
+const RecruiterCampusEvents = safeLazy(() => import("../features/recruiter/CampusEvents"));
+const HiringSessionPage = safeLazy(() => import("../features/recruiter/HiringSessionPage"));
+const RecruiterCollegeStudentsPage = safeLazy(() => import("../features/recruiter/CollegeStudentsPage"));
 
-const InvestorDashboard = lazy(() => import("../features/investor/Dashboard"));
-const InvestorStartupMarketplace = lazy(() => import("../features/investor/StartupMarketplace"));
-const InvestorInstitutions = lazy(() => import("../features/investor/Institutions"));
-const InvestorProductWorkshop = lazy(() => import("../features/investor/ProductWorkshop"));
-const InvestorPaymentPage = lazy(() => import("../features/investor/InvestorPaymentPage"));
-const InvestmentPipeline = lazy(() => import("../features/investor/InvestmentPipeline"));
+const InvestorDashboard = safeLazy(() => import("../features/investor/Dashboard"));
+const InvestorStartupMarketplace = safeLazy(() => import("../features/investor/StartupMarketplace"));
+const InvestorInstitutions = safeLazy(() => import("../features/investor/Institutions"));
+const InvestorProductWorkshop = safeLazy(() => import("../features/investor/ProductWorkshop"));
+const InvestorPaymentPage = safeLazy(() => import("../features/investor/InvestorPaymentPage"));
+const InvestmentPipeline = safeLazy(() => import("../features/investor/InvestmentPipeline"));
 
-const StartupCapTable = lazy(() => import("../features/startup/CapTable"));
-const MyStartups = lazy(() =>
+const StartupCapTable = safeLazy(() => import("../features/startup/CapTable"));
+const MyStartups = safeLazy(() =>
   import("../features/startup/MyStartups").then((module) => ({
     default: module.MyStartups,
   })),
 );
-const NewStartupPage = lazy(() =>
+const NewStartupPage = safeLazy(() =>
   import("../features/startup/NewStartupPage").then((module) => ({
     default: module.NewStartupPage,
   })),
 );
-const StartupLaunchShell = lazy(() =>
+const StartupLaunchShell = safeLazy(() =>
   import("../features/startup/StartupLaunchShell").then((module) => ({
     default: module.StartupLaunchShell,
   })),
 );
-const StartupWorkspace = lazy(() =>
+const StartupWorkspace = safeLazy(() =>
   import("../features/startup/StartupWorkspace").then((module) => ({
     default: module.StartupWorkspace,
   })),
 );
-const InvestorOutreach = lazy(() =>
+const InvestorOutreach = safeLazy(() =>
   import("../features/startup/InvestorOutreach").then((module) => ({
     default: module.InvestorOutreach,
   })),
 );
 
-const SettingsPage = lazy(() =>
+const SettingsPage = safeLazy(() =>
   import("../features/settings/SettingsPage").then((module) => ({
     default: module.SettingsPage,
   })),
 );
-const Homepage = lazy(() =>
+const Homepage = safeLazy(() =>
   import("../app/pages/Homepage").then((module) => ({
     default: module.Homepage,
   })),
 );
 
-const LegacyStudentDashboard = lazy(() =>
+const LegacyStudentDashboard = safeLazy(() =>
   import("../app/pages/dashboards/StudentDashboard").then((module) => ({
     default: module.StudentDashboard,
   })),
 );
-const StudentMentorSessions = lazy(() =>
+const StudentMentorSessions = safeLazy(() =>
   import("../app/pages/dashboards/StudentMentorSessions").then((module) => ({
     default: module.StudentMentorSessions,
   })),
 );
-const ProblemBank = lazy(() =>
+const ProblemBank = safeLazy(() =>
   import("../app/pages/ProblemBank").then((module) => ({
     default: module.ProblemBank,
   })),
 );
-const ProductWorkspace = lazy(() =>
+const ProductWorkspace = safeLazy(() =>
   import("../app/pages/ProductWorkspace").then((module) => ({
     default: module.ProductWorkspace,
   })),
 );
-const PatentSupport = lazy(() =>
+const PatentSupport = safeLazy(() =>
   import("../app/pages/PatentSupport").then((module) => ({
     default: module.PatentSupport,
   })),
 );
-const StartupLaunch = lazy(() =>
+const StartupLaunch = safeLazy(() =>
   import("../app/pages/StartupLaunch").then((module) => ({
     default: module.StartupLaunch ?? module.default,
   })),
 );
-const Portfolio = lazy(() =>
+const Portfolio = safeLazy(() =>
   import("../app/pages/Portfolio").then((module) => ({
     default: module.Portfolio ?? module.default,
   })),
 );
-const StudentApplicationsPage = lazy(() => import("../features/student/ApplicationsPage"));
-const StudentEventsPage = lazy(() => import("../features/student/StudentEventsPage"));
-const MarketplaceJobDetail = lazy(() =>
+const StudentApplicationsPage = safeLazy(() => import("../features/student/ApplicationsPage"));
+const StudentEventsPage = safeLazy(() => import("../features/student/StudentEventsPage"));
+const MarketplaceJobDetail = safeLazy(() =>
   import("../features/student/MarketplaceJobDetail").then((module) => ({
     default: module.MarketplaceJobDetail,
   })),
 );
-const InnovationScorePage = lazy(() =>
+const InnovationScorePage = safeLazy(() =>
   import("../app/pages/InnovationScore").then((module) => ({
     default: module.InnovationScorePage,
   })),
 );
-const Marketplace = lazy(() =>
+const Marketplace = safeLazy(() =>
   import("../app/pages/Marketplace").then((module) => ({
     default: module.Marketplace,
   })),
 );
-const MarketplaceDetail = lazy(() =>
+const MarketplaceDetail = safeLazy(() =>
   import("../app/pages/MarketplaceDetail").then((module) => ({
     default: module.MarketplaceDetail,
   })),
 );
-const PublicStudentProfilePage = lazy(() =>
+const PublicStudentProfilePage = safeLazy(() =>
   import("../features/student/PublicStudentProfilePage").then((module) => ({
     default: module.PublicStudentProfilePage,
   })),
 );
-const StudentPortfolioViewPage = lazy(() =>
+const StudentPortfolioViewPage = safeLazy(() =>
   import("../features/student/StudentPortfolioViewPage").then((module) => ({
     default: module.StudentPortfolioViewPage,
   })),
 );
-const MessagesPage = lazy(() =>
+const MessagesPage = safeLazy(() =>
   import("../app/pages/Messages").then((module) => ({
     default: module.MessagesPage,
   })),
@@ -250,22 +252,51 @@ function RootLayout() {
 
 function RouteErrorPage() {
   const error = useRouteError();
-  const title = isRouteErrorResponse(error)
-    ? `${error.status} ${error.statusText}`
-    : "Something went wrong";
-  const description = isRouteErrorResponse(error)
+  const rawMessage = isRouteErrorResponse(error)
     ? typeof error.data === "string"
       ? error.data
-      : "The page could not be loaded."
+      : error.statusText
     : error instanceof Error
       ? error.message
-      : "An unexpected error interrupted this page.";
+      : String(error ?? "");
+
+  const isChunkError =
+    rawMessage.includes("Failed to fetch dynamically imported module") ||
+    rawMessage.includes("Importing a module script failed") ||
+    rawMessage.includes("Loading chunk") ||
+    rawMessage.includes("ChunkLoadError");
+
+  useEffect(() => {
+    if (isChunkError) {
+      const timer = setTimeout(() => {
+        sessionStorage.clear();
+        window.location.reload();
+      }, 1500);
+      return () => clearTimeout(timer);
+    }
+  }, [isChunkError]);
+
+  const title = isChunkError
+    ? "New Version Available"
+    : isRouteErrorResponse(error)
+      ? `${error.status} ${error.statusText}`
+      : "Something went wrong";
+
+  const description = isChunkError
+    ? "A new update for ProMove was deployed. Updating to the latest version..."
+    : isRouteErrorResponse(error)
+      ? typeof error.data === "string"
+        ? error.data
+        : "The page could not be loaded."
+      : error instanceof Error
+        ? error.message
+        : "An unexpected error interrupted this page.";
 
   return (
     <div className="flex min-h-screen items-center justify-center bg-slate-950 px-4">
       <Card className="w-full max-w-2xl p-8">
         <div className="text-xs uppercase tracking-[0.3em] text-cyan-300">
-          Route Error
+          {isChunkError ? "App Update" : "Route Error"}
         </div>
         <h1 className="mt-4 text-3xl font-bold text-white">{title}</h1>
         <p className="mt-3 text-slate-400">{description}</p>
@@ -278,7 +309,10 @@ function RouteErrorPage() {
           </Link>
           <button
             type="button"
-            onClick={() => window.location.reload()}
+            onClick={() => {
+              sessionStorage.clear();
+              window.location.reload();
+            }}
             className="inline-flex items-center justify-center rounded-2xl border border-slate-700 px-5 py-3 text-sm font-semibold text-slate-200 transition hover:border-slate-500 hover:text-white"
           >
             Reload Page

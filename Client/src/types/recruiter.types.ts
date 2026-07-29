@@ -256,6 +256,9 @@ export interface RecruiterHiringEventParticipant {
   innovationScore: number;
   registeredAt: string;
   submissionScore?: number;
+  selectedJobId?: string;
+  selectedJobTitle?: string;
+  selectedAt?: string;
 }
 
 export interface RecruiterHiringEventView {
