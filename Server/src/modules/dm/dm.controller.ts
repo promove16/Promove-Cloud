@@ -74,6 +74,7 @@ const getPitchContextString = (
 const resolveInvestorPitchContext = async (
   senderId: string,
   pitchContext?: { startupId?: unknown; workspaceId?: unknown },
+  requireMarketplaceLaunch = false,
 ) => {
   const startupId = getPitchContextString(pitchContext, 'startupId');
   const explicitWorkspaceId = getPitchContextString(pitchContext, 'workspaceId');
@@ -87,6 +88,9 @@ const resolveInvestorPitchContext = async (
         _id: startupId,
         isActive: true,
         founderIds: new Types.ObjectId(senderId),
+        ...(requireMarketplaceLaunch
+          ? { launchedToInvestors: true, reviewStatus: 'approved' }
+          : {}),
       })
         .select('_id name projectId')
         .lean()
@@ -380,20 +384,26 @@ export const sendMessage = async (req: Request, res: Response) => {
     throw new ApiError(400, 'INVALID_QUERY_TYPE', 'Invalid message query type');
   }
 
-  await ensureDmAccess(req.user!._id, userId, queryType || 'general');
-  const attachmentStorage = validateDmAttachmentStorage(
-    req.user!._id,
-    attachmentStorageProvider,
-    attachmentStorageKey,
-  );
-
   // Resolve the pitched startup up front so investor pitches and founder funding
   // requests can be persisted with a direct reference, letting the recipient act on
-  // the startup straight from the chat. The resolver verifies founder ownership.
+  // the startup straight from the chat. Investor first contact additionally requires
+  // an approved startup that is live in the investor marketplace.
   const investorPitchContext =
     queryType === 'investor' || type === 'funding_request'
-      ? await resolveInvestorPitchContext(req.user!._id, pitchContext)
+      ? await resolveInvestorPitchContext(
+          req.user!._id,
+          pitchContext,
+          queryType === 'investor',
+        )
       : {};
+
+  if (queryType === 'investor' && !investorPitchContext.startupId) {
+    throw new ApiError(
+      409,
+      'INVESTOR_PITCH_NOT_ELIGIBLE',
+      'Only an approved startup that is live in the investor marketplace can be pitched',
+    );
+  }
 
   if (type === 'funding_request' && !investorPitchContext.startupId) {
     throw new ApiError(
@@ -402,6 +412,15 @@ export const sendMessage = async (req: Request, res: Response) => {
       'A funding request must reference one of your startups',
     );
   }
+
+  await ensureDmAccess(req.user!._id, userId, queryType || 'general', {
+    allowConnectionRequest: queryType === 'investor' && Boolean(investorPitchContext.startupId),
+  });
+  const attachmentStorage = validateDmAttachmentStorage(
+    req.user!._id,
+    attachmentStorageProvider,
+    attachmentStorageKey,
+  );
 
   const msg = await DirectMessage.create({
     senderId: myId,

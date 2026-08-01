@@ -143,6 +143,10 @@ function TaskList({ tasks }: { tasks: MentorVerificationTask[] }) {
 
 // ─── Tab Forms ────────────────────────────────────────────────────────────────
 
+function parseErrorMessage(err: any): string {
+  return err?.response?.data?.error?.message ?? err?.response?.data?.message ?? err?.message ?? 'Submission failed. Please try again.';
+}
+
 function LabSyncForm({ onSuccess }: { onSuccess: () => void }) {
   const [photoUrls, setPhotoUrls] = useState('');
   const [kitDesc, setKitDesc] = useState('');
@@ -150,10 +154,12 @@ function LabSyncForm({ onSuccess }: { onSuccess: () => void }) {
   const [success, setSuccess] = useState(false);
   const [error, setError] = useState('');
 
+  const todayStr = new Date().toISOString().split('T')[0];
+
   const mutation = useMutation({
     mutationFn: mentorScoreApi.submitLabSync,
     onSuccess: () => { setSuccess(true); setPhotoUrls(''); setKitDesc(''); setLabDate(''); onSuccess(); },
-    onError: (e: Error) => setError(e.message),
+    onError: (e: any) => setError(parseErrorMessage(e)),
   });
 
   const handleSubmit = (ev: React.FormEvent) => {
@@ -162,6 +168,7 @@ function LabSyncForm({ onSuccess }: { onSuccess: () => void }) {
     setSuccess(false);
     const urls = photoUrls.split('\n').map((u) => u.trim()).filter(Boolean);
     if (!urls.length) return setError('At least one photo URL is required');
+    if (labDate > todayStr) return setError('Lab date cannot be in the future.');
     mutation.mutate({ photoUrls: urls, kitDescription: kitDesc, labDate });
   };
 
@@ -179,7 +186,7 @@ function LabSyncForm({ onSuccess }: { onSuccess: () => void }) {
       </div>
       <div>
         <Label text="Lab date" />
-        <Input type="date" value={labDate} onChange={(e) => setLabDate(e.target.value)} required />
+        <Input type="date" max={todayStr} value={labDate} onChange={(e) => setLabDate(e.target.value)} required />
       </div>
       <SubmitBtn pending={mutation.isPending} />
     </form>
@@ -196,7 +203,7 @@ function CurriculumForm({ onSuccess }: { onSuccess: () => void }) {
   const mutation = useMutation({
     mutationFn: mentorScoreApi.submitCurriculumPdf,
     onSuccess: () => { setSuccess(true); setPdfUrl(''); setClassCount(''); setYear(''); onSuccess(); },
-    onError: (e: Error) => setError(e.message),
+    onError: (e: any) => setError(parseErrorMessage(e)),
   });
 
   const handleSubmit = (ev: React.FormEvent) => {
@@ -237,6 +244,8 @@ function ClassPhotoForm({ onSuccess }: { onSuccess: () => void }) {
   const [success, setSuccess] = useState(false);
   const [error, setError] = useState('');
 
+  const todayStr = new Date().toISOString().split('T')[0];
+
   const submissionsQuery = useQuery({
     queryKey: ['mentor-score', 'submissions', 'curriculum_pdf', 'approved'],
     queryFn: () => mentorScoreApi.getMySubmissions({ type: 'curriculum_pdf', status: 'approved' }),
@@ -245,7 +254,7 @@ function ClassPhotoForm({ onSuccess }: { onSuccess: () => void }) {
   const mutation = useMutation({
     mutationFn: mentorScoreApi.submitClassPhoto,
     onSuccess: () => { setSuccess(true); setPhotoUrls(''); setClassIndex(''); setClassDate(''); setTopic(''); onSuccess(); },
-    onError: (e: Error) => setError(e.message),
+    onError: (e: any) => setError(parseErrorMessage(e)),
   });
 
   const handleSubmit = (ev: React.FormEvent) => {
@@ -256,6 +265,7 @@ function ClassPhotoForm({ onSuccess }: { onSuccess: () => void }) {
     if (!urls.length || !curriculumId || !classIndex || !classDate || !topic) {
       return setError('All fields are required');
     }
+    if (classDate > todayStr) return setError('Class date cannot be in the future.');
     mutation.mutate({ photoUrls: urls, curriculumTaskId: curriculumId, classIndex: Number(classIndex), classDate, topic });
   };
 
@@ -290,7 +300,7 @@ function ClassPhotoForm({ onSuccess }: { onSuccess: () => void }) {
         </div>
         <div>
           <Label text="Class date" />
-          <Input type="date" value={classDate} onChange={(e) => setClassDate(e.target.value)} required />
+          <Input type="date" max={todayStr} value={classDate} onChange={(e) => setClassDate(e.target.value)} required />
         </div>
       </div>
       <div>
@@ -307,10 +317,12 @@ function IndustrySessionForm({ onSuccess }: { onSuccess: () => void }) {
   const [success, setSuccess] = useState(false);
   const [error, setError] = useState('');
 
+  const todayStr = new Date().toISOString().split('T')[0];
+
   const mutation = useMutation({
     mutationFn: mentorScoreApi.submitIndustrySession,
     onSuccess: () => { setSuccess(true); setForm({ founderName: '', companyName: '', sessionDate: '', topic: '', attendeeCount: '', evidenceUrl: '' }); onSuccess(); },
-    onError: (e: Error) => setError(e.message),
+    onError: (e: any) => setError(parseErrorMessage(e)),
   });
 
   const handleSubmit = (ev: React.FormEvent) => {
@@ -320,6 +332,7 @@ function IndustrySessionForm({ onSuccess }: { onSuccess: () => void }) {
     if (!form.founderName || !form.companyName || !form.sessionDate || !form.topic) {
       return setError('Founder name, company, date and topic are required');
     }
+    if (form.sessionDate > todayStr) return setError('Session date cannot be in the future.');
     mutation.mutate({
       founderName:   form.founderName,
       companyName:   form.companyName,
@@ -350,7 +363,7 @@ function IndustrySessionForm({ onSuccess }: { onSuccess: () => void }) {
       <div className="grid grid-cols-2 gap-3">
         <div>
           <Label text="Session date" />
-          <Input type="date" value={form.sessionDate} onChange={set('sessionDate')} required />
+          <Input type="date" max={todayStr} value={form.sessionDate} onChange={set('sessionDate')} required />
         </div>
         <div>
           <Label text="Attendee count" />

@@ -423,18 +423,26 @@ function ForumList({ onOpen }: { onOpen: (id: string) => void }) {
 
 // ─── Root ─────────────────────────────────────────────────────────────────────
 
-export default function MentorForum() {
+export interface ForumPageProps {
+  backPath?: string;
+  backLabel?: string;
+}
+
+export default function MentorForum({
+  backPath = '/dashboard/mentor/score',
+  backLabel = 'Mentor Score',
+}: ForumPageProps) {
   const [openPostId, setOpenPostId] = useState<string | null>(null);
 
   if (openPostId) {
     return (
       <div className="space-y-5">
         <Link
-          to="/dashboard/mentor/score"
+          to={backPath}
           className="inline-flex items-center gap-1.5 text-sm text-slate-400 transition hover:text-white"
         >
           <ArrowLeft className="h-3.5 w-3.5" />
-          Mentor Score
+          {backLabel}
         </Link>
         <PostDetail postId={openPostId} onBack={() => setOpenPostId(null)} />
       </div>
@@ -444,11 +452,11 @@ export default function MentorForum() {
   return (
     <div className="space-y-5">
       <Link
-        to="/dashboard/mentor/score"
+        to={backPath}
         className="inline-flex items-center gap-1.5 text-sm text-slate-400 transition hover:text-white"
       >
         <ArrowLeft className="h-3.5 w-3.5" />
-        Mentor Score
+        {backLabel}
       </Link>
       <ForumList onOpen={(id) => setOpenPostId(id)} />
     </div>

@@ -4,6 +4,7 @@ import { notificationQueue } from '../../config/bullmq';
 import { uploadFile } from '../../services/fileStorageService';
 import { createPatentSystemDocument } from '../../services/patentSystemDocument';
 import { ApiError } from '../../utils/ApiError';
+import { applyScore } from '../../services/scoreEngine';
 import { User } from '../user/user.model';
 import { UserRole } from '../../types/roles.types';
 import { AdminAuditLog } from '../admin/adminAuditLog.model';
@@ -304,6 +305,12 @@ export const updatePatentRequestStatus = async (
 
   if (targetStatus === 'granted') {
     await autoVerifyLinkedStartup(adminId, request, now);
+    await applyScore({
+      userId: String(request.studentId),
+      trigger: 'PATENT_APPROVED',
+      metadata: { patentRequestId: String(request._id), adminId },
+      idempotencyKey: `patent-approved:${request._id}`,
+    });
   }
 
   // Notify student

@@ -14,6 +14,7 @@ export const SCORE_DELTAS = {
   PROBLEM_CLAIMED:         0,
   PROBLEM_COMPLETED:       100,
   SKILL_COMPLETED:         40,
+  TASK_COMPLETED:          10,
   PROGRESS_UPLOADED:       15,
   PATENT_SUBMITTED:        75,
   PATENT_APPROVED:         125,
@@ -33,9 +34,10 @@ export const SCORE_DELTAS = {
 export type ScoreTrigger = keyof typeof SCORE_DELTAS;
 
 const BREAKDOWN_FIELD_MAP: Record<ScoreTrigger, keyof IUser['scoreBreakdown'] | null> = {
-  PROBLEM_CLAIMED:        null,
+  PROBLEM_CLAIMED:        'problemsClaimed',
   PROBLEM_COMPLETED:      'problemsCompleted',
   SKILL_COMPLETED:        'skillsCompleted',
+  TASK_COMPLETED:         'tasksCompleted',
   PROGRESS_UPLOADED:      'progressUploads',
   PATENT_SUBMITTED:       'patentsSubmitted',
   PATENT_APPROVED:        'patentsApproved',
@@ -67,7 +69,7 @@ const REQUIRES_IDEMPOTENCY_KEY_TRIGGERS: ScoreTrigger[] = (
   Object.keys(SCORE_DELTAS) as ScoreTrigger[]
 ).filter(
   (trigger) =>
-    SCORE_DELTAS[trigger] > 0 &&
+    (SCORE_DELTAS[trigger] > 0 || BREAKDOWN_FIELD_MAP[trigger] !== null) &&
     !ONE_TIME_SCORE_TRIGGERS.includes(trigger),
 );
 
@@ -101,7 +103,8 @@ export const applyScore = async ({
   idempotencyKey,
 }: ApplyScoreParams): Promise<number> => {
   const delta = SCORE_DELTAS[trigger];
-  if (delta === 0) return 0;
+  const breakdownField = BREAKDOWN_FIELD_MAP[trigger];
+  if (delta === 0 && !breakdownField) return 0;
 
   if (
     REQUIRES_IDEMPOTENCY_KEY_TRIGGERS.includes(trigger) &&
@@ -110,7 +113,6 @@ export const applyScore = async ({
     throw new Error(`Score trigger ${trigger} requires an idempotencyKey`);
   }
 
-  const breakdownField = BREAKDOWN_FIELD_MAP[trigger];
   const awardKey = getScoreIdempotencyKey(trigger, idempotencyKey);
 
   let result: {
@@ -171,7 +173,7 @@ export const applyScore = async ({
       const newScore = Math.min(MAX_INNOVATION_SCORE, currentScore + delta);
       const actualDelta = newScore - currentScore;
 
-      if (actualDelta <= 0) {
+      if (actualDelta <= 0 && !breakdownField) {
         return {
           awarded: false,
           newScore: currentScore,

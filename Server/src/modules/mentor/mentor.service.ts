@@ -14,6 +14,7 @@ import { Workspace } from '../workspace/workspace.model';
 import { MentorSession } from './mentorSession.model';
 import { MentorFeedback } from './mentorFeedback.model';
 import { MentorBid } from './mentorBid.model';
+import { hasMentorStudentAssignment } from './mentorAssignment.service';
 import { Problem } from '../problemBank/problem.model';
 import {
   assertMentorAvailability,
@@ -112,20 +113,6 @@ const readMentorFeed = async (mentorId: string) => {
     .sort((left, right) => Date.parse(right.timestamp) - Date.parse(left.timestamp));
 };
 
-const getStudentSummary = async (studentId: string) => {
-  const [student, recentEvent] = await Promise.all([
-    User.findById(studentId).select('_id displayName avatar innovationScore createdAt').lean(),
-    ScoreEvent.findOne({ userId: studentId }).sort({ createdAt: -1 }).lean(),
-  ]);
-
-  return {
-    student,
-    summary: recentEvent
-      ? `${recentEvent.trigger.replace(/_/g, ' ').toLowerCase()} for +${recentEvent.delta} pts`
-      : 'Recent activity available',
-  };
-};
-
 type MentorWorkspaceAccess = {
   _id: Types.ObjectId;
   ownerId: Types.ObjectId;
@@ -165,16 +152,7 @@ const getMentorAssignedStudentIds = (workspaces: MentorWorkspaceAccess[]) =>
   );
 
 const assertMentorStudentAccess = async (mentorId: string, studentId: string) => {
-  const hasAssignment = await Workspace.exists({
-    isActive: true,
-    chatParticipants: {
-      $elemMatch: {
-        userId: new Types.ObjectId(mentorId),
-        role: 'mentor',
-      },
-    },
-    $or: [{ ownerId: new Types.ObjectId(studentId) }, { teamMemberIds: new Types.ObjectId(studentId) }],
-  });
+  const hasAssignment = await hasMentorStudentAssignment(mentorId, studentId);
 
   if (!hasAssignment) {
     throw new ApiError(403, 'MENTOR_ASSIGNMENT_REQUIRED', 'This student is not assigned to you');
@@ -258,37 +236,75 @@ export const getMentorStudents = async (mentorId: string): Promise<MentorFeedStu
   const watched = new Set((await redis.smembers(`mentor:watch:${mentorId}`)) as string[]);
   const workspaces = await getMentorAssignedWorkspaces(mentorId);
   const workspaceIds = workspaces.map((workspace) => String(workspace._id));
-  const startups =
+  const studentIds = getMentorAssignedStudentIds(workspaces);
+  const [startups, students, recentScoreEvents] = await Promise.all([
     workspaceIds.length > 0
-      ? await Startup.find({ projectId: { $in: workspaceIds }, isActive: true })
+      ? Startup.find({ projectId: { $in: workspaceIds }, isActive: true })
           .sort({ innovationScoreAtLaunch: -1, createdAt: -1 })
           .lean()
-      : [];
+      : [],
+    studentIds.length > 0
+      ? User.find({ _id: { $in: studentIds }, role: UserRole.STUDENT })
+          .select('_id displayName avatar innovationScore createdAt')
+          .lean()
+      : [],
+    studentIds.length > 0
+      ? ScoreEvent.aggregate<{ _id: Types.ObjectId; trigger: string; delta: number }>([
+          { $match: { userId: { $in: studentIds.map((studentId) => new Types.ObjectId(studentId)) } } },
+          { $sort: { createdAt: -1 } },
+          {
+            $group: {
+              _id: '$userId',
+              trigger: { $first: '$trigger' },
+              delta: { $first: '$delta' },
+            },
+          },
+        ])
+      : [],
+  ]);
   const startupMap = new Map(
     startups
       .filter((startup) => startup.projectId)
       .map((startup) => [String(startup.projectId), startup]),
   );
+  const studentMap = new Map(students.map((student) => [String(student._id), student]));
+  const recentEventMap = new Map(recentScoreEvents.map((event) => [String(event._id), event]));
+  const includedStudentIds = new Set<string>();
 
-  return Promise.all(workspaces.map(async (workspace) => {
-    const leadStudentId = String(workspace.ownerId);
-    const { student: leadStudent, summary } = await getStudentSummary(leadStudentId);
+  return workspaces.flatMap((workspace) => {
     const startup = startupMap.get(String(workspace._id));
+    const assignedStudentIds = [
+      String(workspace.ownerId),
+      ...getWorkspaceTeamMemberIds(workspace).map((memberId) => String(memberId)),
+    ];
 
-    return {
-      _id: String(workspace._id),
-      workspaceId: String(workspace._id),
-      studentId: leadStudentId,
-      displayName: leadStudent?.displayName ?? 'Student',
-      ...(leadStudent?.avatar ? { avatar: leadStudent.avatar } : {}),
-      startupName: startup?.name ?? workspace.title,
-      category: startup?.category ?? workspace.category,
-      innovationScore: leadStudent?.innovationScore ?? 0,
-      recentActivitySummary: summary,
-      isWatched: watched.has(leadStudentId),
-      activeSince: leadStudent?.createdAt ? toIso(leadStudent.createdAt) : toIso(workspace.updatedAt),
-    };
-  }));
+    return assignedStudentIds.flatMap((studentId): MentorFeedStudent[] => {
+      const student = studentMap.get(studentId);
+      if (!student || includedStudentIds.has(studentId)) return [];
+      includedStudentIds.add(studentId);
+
+      const recentEvent = recentEventMap.get(studentId);
+      const scoreDelta = recentEvent
+        ? `${recentEvent.delta >= 0 ? '+' : ''}${recentEvent.delta}`
+        : null;
+
+      return [{
+        _id: studentId,
+        workspaceId: String(workspace._id),
+        studentId,
+        displayName: student.displayName,
+        ...(student.avatar ? { avatar: student.avatar } : {}),
+        startupName: startup?.name ?? workspace.title,
+        category: startup?.category ?? workspace.category,
+        innovationScore: student.innovationScore ?? 0,
+        recentActivitySummary: recentEvent
+          ? `${recentEvent.trigger.replace(/_/g, ' ').toLowerCase()} for ${scoreDelta} pts`
+          : 'No score activity recorded yet',
+        isWatched: watched.has(studentId),
+        activeSince: student.createdAt ? toIso(student.createdAt) : toIso(workspace.updatedAt),
+      }];
+    });
+  });
 };
 
 export const getMentorStudentProfile = async (mentorId: string, studentId: string): Promise<MentorStudentProfile> => {

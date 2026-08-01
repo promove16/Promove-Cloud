@@ -12,6 +12,7 @@ const scoreBreakdownSchema = new Schema<IUser['scoreBreakdown']>(
     problemsClaimed: { type: Number, default: 0 },
     problemsCompleted: { type: Number, default: 0 },
     skillsCompleted: { type: Number, default: 0 },
+    tasksCompleted: { type: Number, default: 0 },
     progressUploads: { type: Number, default: 0 },
     patentsSubmitted: { type: Number, default: 0 },
     patentsApproved: { type: Number, default: 0 },

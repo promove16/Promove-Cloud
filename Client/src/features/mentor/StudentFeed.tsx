@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useState } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
-import { CalendarDays, Search, Pin } from 'lucide-react';
+import { CalendarDays, MessageCircle, Pin, Search, UserRound } from 'lucide-react';
 import { useNavigate, useParams } from 'react-router-dom';
 import { mentorApi, MentorFeedStudent } from '../../api/mentor.api';
 import { getMentorSocket } from '../../lib/socket';
@@ -8,9 +8,10 @@ import { Badge } from '../../components/ui/Badge';
 import { Button } from '../../components/ui/Button';
 import { Card } from '../../components/ui/Card';
 import { Input } from '../../components/ui/Input';
+import { Spinner } from '../../components/ui/Spinner';
 import { MAX_INNOVATION_SCORE } from '../../constants/score';
+import { getApiErrorMessage } from '../../utils/apiError';
 import { StudentProfileDrawer } from './StudentProfileDrawer';
-import { getStudentPortfolioViewPath } from '../marketplace/navigation';
 
 type SessionFormState = {
   studentId: string;
@@ -19,6 +20,16 @@ type SessionFormState = {
   durationMinutes: number;
   workspaceId: string;
   meetLink: string;
+};
+
+type Notice = {
+  tone: 'success' | 'error';
+  text: string;
+};
+
+type MentorWatchResponse = {
+  success: boolean;
+  message?: string;
 };
 
 const emptySessionForm = (studentId = ''): SessionFormState => ({
@@ -133,7 +144,7 @@ export default function StudentFeed() {
   const [selectedStudentId, setSelectedStudentId] = useState<string | null>(params.id ?? null);
   const [scheduleStudentId, setScheduleStudentId] = useState<string | null>(null);
   const [sessionForm, setSessionForm] = useState<SessionFormState>(emptySessionForm());
-  const [message, setMessage] = useState<string | null>(null);
+  const [notice, setNotice] = useState<Notice | null>(null);
 
   const studentsQuery = useQuery({
     queryKey: ['mentor-students'],
@@ -144,10 +155,16 @@ export default function StudentFeed() {
   const scheduleMutation = useMutation({
     mutationFn: mentorApi.createSession,
     onSuccess: async () => {
-      setMessage('Session scheduled successfully.');
+      setNotice({ tone: 'success', text: 'Session scheduled successfully.' });
       setScheduleStudentId(null);
       setSessionForm(emptySessionForm());
       await queryClient.invalidateQueries({ queryKey: ['mentor-sessions'] });
+    },
+    onError: (error) => {
+      setNotice({
+        tone: 'error',
+        text: getApiErrorMessage(error, 'Unable to schedule this session right now.'),
+      });
     },
   });
 
@@ -157,10 +174,39 @@ export default function StudentFeed() {
       if (!socket.connected) {
         socket.connect();
       }
-      socket.emit(watched ? 'mentor:unwatch' : 'mentor:watch', { studentId });
+
+      await new Promise<void>((resolve, reject) => {
+        const timeoutId = window.setTimeout(
+          () => reject(new Error('The pin request timed out. Please try again.')),
+          8_000,
+        );
+
+        socket.emit(
+          watched ? 'mentor:unwatch' : 'mentor:watch',
+          { studentId },
+          (response: MentorWatchResponse) => {
+            window.clearTimeout(timeoutId);
+            if (response.success) {
+              resolve();
+              return;
+            }
+            reject(new Error(response.message ?? 'Unable to update this student pin.'));
+          },
+        );
+      });
     },
-    onSuccess: async () => {
+    onSuccess: async (_data, variables) => {
+      setNotice({
+        tone: 'success',
+        text: variables.watched ? 'Student unpinned.' : 'Student pinned to your live feed.',
+      });
       await queryClient.invalidateQueries({ queryKey: ['mentor-students'] });
+    },
+    onError: (error) => {
+      setNotice({
+        tone: 'error',
+        text: error instanceof Error ? error.message : 'Unable to update this student pin.',
+      });
     },
   });
 
@@ -170,9 +216,21 @@ export default function StudentFeed() {
 
   useEffect(() => {
     const socket = getMentorSocket();
+    const handleMentorError = ({ message: socketMessage }: { message?: string }) => {
+      setNotice({
+        tone: 'error',
+        text: socketMessage ?? 'Live mentor feed is temporarily unavailable.',
+      });
+    };
+
+    socket.on('mentor:error', handleMentorError);
     if (!socket.connected) {
       socket.connect();
     }
+
+    return () => {
+      socket.off('mentor:error', handleMentorError);
+    };
   }, []);
 
   const students = useMemo(
@@ -220,14 +278,36 @@ export default function StudentFeed() {
         </div>
       </div>
 
-      {message ? (
-        <div className="rounded-2xl border border-emerald-500/20 bg-emerald-500/10 px-4 py-3 text-sm text-emerald-200">
-          {message}
+      {notice ? (
+        <div
+          role="status"
+          className={`rounded-2xl border px-4 py-3 text-sm ${
+            notice.tone === 'success'
+              ? 'border-emerald-500/20 bg-emerald-500/10 text-emerald-200'
+              : 'border-rose-500/20 bg-rose-500/10 text-rose-200'
+          }`}
+        >
+          {notice.text}
         </div>
       ) : null}
 
-      <div className="grid gap-4 xl:grid-cols-2">
-        {students.map((student) => (
+      {studentsQuery.isLoading ? (
+        <div className="flex items-center justify-center py-16">
+          <Spinner />
+        </div>
+      ) : studentsQuery.isError ? (
+        <Card className="border-rose-500/20 p-6 text-sm text-rose-200">
+          {getApiErrorMessage(studentsQuery.error, 'Unable to load your assigned students right now.')}
+        </Card>
+      ) : students.length === 0 ? (
+        <Card className="p-8 text-center text-sm text-slate-400">
+          {search
+            ? 'No assigned students match your search.'
+            : 'No students are assigned to your mentor workspaces yet.'}
+        </Card>
+      ) : (
+        <div className="grid gap-4 xl:grid-cols-2">
+          {students.map((student) => (
           <Card 
             key={student._id} 
             className={`p-5 transition-all duration-300 relative ${
@@ -249,6 +329,8 @@ export default function StudentFeed() {
                   <div className="flex items-center gap-2">
                     <div className="text-xl font-semibold text-white">{student.displayName}</div>
                     <button
+                      type="button"
+                      disabled={toggleWatchMutation.isPending}
                       onClick={(e) => {
                         e.stopPropagation();
                         toggleWatchMutation.mutate({ studentId: student.studentId, watched: student.isWatched });
@@ -273,8 +355,13 @@ export default function StudentFeed() {
                 </div>
               </div>
               <div className="flex flex-col gap-2">
-                <Button variant="secondary" onClick={() => navigate(getStudentPortfolioViewPath(student.studentId))}>
-                  View Full Profile
+                <Button variant="secondary" onClick={() => setSelectedStudentId(student.studentId)}>
+                  <UserRound className="mr-2 h-4 w-4" />
+                  View Mentee
+                </Button>
+                <Button variant="secondary" onClick={() => navigate(`/dashboard/messages/${student.studentId}`)}>
+                  <MessageCircle className="mr-2 h-4 w-4" />
+                  Message Student
                 </Button>
                 <Button variant="secondary" onClick={() => openSchedule(student.studentId)}>
                   <CalendarDays className="mr-2 h-4 w-4" />
@@ -283,8 +370,9 @@ export default function StudentFeed() {
               </div>
             </div>
           </Card>
-        ))}
-      </div>
+          ))}
+        </div>
+      )}
 
       <StudentProfileDrawer
         open={Boolean(selectedStudentId)}

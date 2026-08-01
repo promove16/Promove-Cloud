@@ -203,6 +203,8 @@ const Portfolio = safeLazy(() =>
 );
 const StudentApplicationsPage = safeLazy(() => import("../features/student/ApplicationsPage"));
 const StudentEventsPage = safeLazy(() => import("../features/student/StudentEventsPage"));
+const StudentForum = safeLazy(() => import("../features/student/StudentForum"));
+const StudentResources = safeLazy(() => import("../features/student/StudentResources"));
 const MarketplaceJobDetail = safeLazy(() =>
   import("../features/student/MarketplaceJobDetail").then((module) => ({
     default: module.MarketplaceJobDetail,
@@ -755,6 +757,8 @@ export const router = createBrowserRouter([
               { index: true, element: <LazyPage component={LegacyStudentDashboard} /> },
               { path: "workspaces", element: <Navigate to="/product-workspace" replace /> },
               { path: "score", element: <LazyPage component={InnovationScorePage} /> },
+              { path: "forum", element: <LazyPage component={StudentForum} /> },
+              { path: "resources", element: <LazyPage component={StudentResources} /> },
               { path: "mentor-sessions", element: <LazyPage component={StudentMentorSessions} /> },
               { path: "investor-deals", element: <Navigate to="/startup-launch" replace /> },
               { path: "applications", element: <LazyPage component={StudentApplicationsPage} /> },

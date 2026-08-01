@@ -146,6 +146,91 @@ describe('admin mentorship integration', () => {
     expect(mentorDashboardResponse.body.data.activeStudentCount).toBe(1);
   });
 
+  it('routes an accepted startup mentor invite into the student feed and session selector contract', async () => {
+    const { user: mentorUser, email: mentorEmail } = await createApprovedUser({
+      role: UserRole.MENTOR,
+      displayName: 'Invited Startup Mentor',
+    });
+    const { user: studentUser, email: studentEmail } = await createApprovedUser({
+      role: UserRole.STUDENT,
+      displayName: 'Inviting Founder',
+    });
+
+    const workspace = await Workspace.create({
+      ownerId: studentUser._id,
+      teamMemberIds: [],
+      title: 'Founder Invite Workspace',
+      category: 'ClimateTech',
+      stage: 'Build',
+      progressPercent: 35,
+    });
+    const startup = await Startup.create({
+      founderIds: [studentUser._id],
+      teamMemberIds: [],
+      projectId: workspace._id,
+      name: 'Founder Invite Startup',
+      tagline: 'A startup inviting a marketplace mentor',
+      category: 'ClimateTech',
+      stage: 'MVP',
+      isActive: true,
+    });
+
+    const studentAccessToken = await loginAs(studentEmail);
+    const mentorAccessToken = await loginAs(mentorEmail);
+    const inviteResponse = await request(app)
+      .post('/api/workflow-requests')
+      .set('Authorization', `Bearer ${studentAccessToken}`)
+      .send({
+        requestType: 'mentor_assignment',
+        actionType: 'mentor',
+        toUserId: mentorUser._id.toString(),
+        targetEntityType: 'startup',
+        targetEntityId: startup._id.toString(),
+        targetEntityTitle: startup.name,
+        targetRole: 'mentor',
+        requestedRole: 'Product strategy mentor',
+        metadata: { workspaceId: workspace._id.toString() },
+      });
+
+    expect(inviteResponse.status).toBe(201);
+
+    const acceptResponse = await request(app)
+      .post(`/api/workflow-requests/${inviteResponse.body.data._id}/accept`)
+      .set('Authorization', `Bearer ${mentorAccessToken}`);
+
+    expect(acceptResponse.status).toBe(200);
+
+    const studentsResponse = await request(app)
+      .get('/api/mentor/students')
+      .set('Authorization', `Bearer ${mentorAccessToken}`);
+
+    expect(studentsResponse.status).toBe(200);
+    expect(studentsResponse.body.data).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({
+          studentId: studentUser._id.toString(),
+          workspaceId: workspace._id.toString(),
+          startupName: startup.name,
+        }),
+      ]),
+    );
+
+    const sessionResponse = await request(app)
+      .post('/api/mentor/sessions')
+      .set('Authorization', `Bearer ${mentorAccessToken}`)
+      .send({
+        studentId: studentUser._id.toString(),
+        workspaceId: workspace._id.toString(),
+        title: 'Accepted invite mentoring session',
+        scheduledAt: new Date(Date.now() + 24 * 60 * 60 * 1000).toISOString(),
+        durationMinutes: 45,
+    });
+
+    expect(sessionResponse.status).toBe(201);
+    expect(sessionResponse.body.data.studentId).toBe(studentUser._id.toString());
+    expect(sessionResponse.body.data.workspaceId).toBe(workspace._id.toString());
+  });
+
   it('removes admin project mentorship access endpoints', async () => {
     const { email: adminEmail } = await createApprovedUser({
       role: UserRole.ADMIN,

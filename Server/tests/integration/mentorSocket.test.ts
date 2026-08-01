@@ -1,5 +1,5 @@
 import { redis } from '../../src/config/redis';
-import { MentorSession } from '../../src/modules/mentor/mentorSession.model';
+import { Workspace } from '../../src/modules/workspace/workspace.model';
 import { initMentorSocket } from '../../src/sockets/mentorSocket';
 
 const flushPromises = async () =>
@@ -73,18 +73,38 @@ describe('mentor socket Redis error handling', () => {
   });
 
   it('emits mentor:error when Redis fails during mentor:watch', async () => {
-    jest.spyOn(MentorSession, 'exists').mockResolvedValueOnce({ _id: 'session-id' } as any);
+    jest.spyOn(Workspace, 'exists').mockResolvedValueOnce({ _id: 'workspace-id' } as any);
     jest.spyOn(redis, 'sadd').mockRejectedValueOnce(new Error('TimeoutError'));
+    const acknowledge = jest.fn();
 
     const harness = createHarness();
     harness.connect();
 
     const watchHandler = harness.getHandler('mentor:watch');
-    await watchHandler({ studentId: '507f191e810c19729de860ea' });
+    await watchHandler({ studentId: '507f191e810c19729de860ea' }, acknowledge);
 
     expect(harness.socket.leave).toHaveBeenCalledWith('student-feed:507f191e810c19729de860ea');
     expect(harness.socket.emit).toHaveBeenCalledWith('mentor:error', {
       message: 'Unable to watch this student right now',
     });
+    expect(acknowledge).toHaveBeenCalledWith({
+      success: false,
+      message: 'Unable to watch this student right now',
+    });
+  });
+
+  it('pins a student from an assigned mentor workspace and acknowledges success', async () => {
+    jest.spyOn(Workspace, 'exists').mockResolvedValueOnce({ _id: 'workspace-id' } as any);
+    jest.spyOn(redis, 'sadd').mockResolvedValue(1);
+    const acknowledge = jest.fn();
+
+    const harness = createHarness();
+    harness.connect();
+
+    const watchHandler = harness.getHandler('mentor:watch');
+    await watchHandler({ studentId: '507f191e810c19729de860ea' }, acknowledge);
+
+    expect(harness.socket.join).toHaveBeenCalledWith('student-feed:507f191e810c19729de860ea');
+    expect(acknowledge).toHaveBeenCalledWith({ success: true });
   });
 });

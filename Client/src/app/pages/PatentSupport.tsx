@@ -2155,6 +2155,9 @@ const TRACKING_STAGES = [
   },
 ];
 
+const PATENT_SUPPORT_PROJECT_TITLE_MIN_LENGTH = 3;
+const PATENT_SUPPORT_DESCRIPTION_MIN_LENGTH = 20;
+
 function AdminAssistPatentForm({
   activeWorkspace,
   initialAnswers,
@@ -2389,10 +2392,18 @@ function AdminAssistPatentForm({
   const allIntakeValid = QUESTION_SECTIONS.every((section) =>
     section.questions.every((question) => {
       const value = (intakeAnswers[question.key] || "").trim();
-      if (question.type === "select") return value.length > 0;
-      return value.length >= question.minLength;
+      return value.length > 0;
     }),
   );
+  const effectiveProjectTitle = (
+    projectTitle ||
+    activeWorkspace?.title ||
+    ""
+  ).trim();
+  const isProjectTitleValid =
+    effectiveProjectTitle.length >= PATENT_SUPPORT_PROJECT_TITLE_MIN_LENGTH;
+  const isRequestDescriptionValid =
+    requestDescription.trim().length >= PATENT_SUPPORT_DESCRIPTION_MIN_LENGTH;
   const documentUploads = useMemo(
     () =>
       PATENT_SUPPORT_FILE_SLOTS.filter(
@@ -2410,15 +2421,22 @@ function AdminAssistPatentForm({
 
   const submitMutation = useMutation({
     mutationFn: async () => {
-      if (!projectTitle.trim()) throw new Error("Project title is required");
-      if (!requestDescription.trim())
-        throw new Error("Description is required");
+      if (!isProjectTitleValid) {
+        throw new Error(
+          `Project title must be at least ${PATENT_SUPPORT_PROJECT_TITLE_MIN_LENGTH} characters`,
+        );
+      }
+      if (!isRequestDescriptionValid) {
+        throw new Error(
+          `Description must be at least ${PATENT_SUPPORT_DESCRIPTION_MIN_LENGTH} characters`,
+        );
+      }
       if (!selectedWorkspaceId) throw new Error("Workspace is required");
 
         return patentRequestApi.create({
           workspaceId: selectedWorkspaceId,
-          projectTitle: projectTitle,
-          description: requestDescription,
+          projectTitle: effectiveProjectTitle,
+          description: requestDescription.trim(),
           patentType,
           questionnaire: mergePatentAnswers(intakeAnswers, initialAnswers),
           documentUploads,
@@ -2565,7 +2583,7 @@ const canEditDocuments = !!activeRequest &&
               </div>
               <div>
                 <label className="mb-2 block text-sm font-semibold text-white">
-                  Project Title
+                  Project Title <span className="text-red-400">*</span>
                 </label>
                 <input
                   value={projectTitle || activeWorkspace?.title || ""}
@@ -2573,6 +2591,14 @@ const canEditDocuments = !!activeRequest &&
                   className={fieldCls}
                   placeholder="What do you want to patent?"
                 />
+                <div
+                  className={`mt-1 text-xs ${
+                    isProjectTitleValid ? "text-green-400" : "text-slate-500"
+                  }`}
+                >
+                  {effectiveProjectTitle.length}/
+                  {PATENT_SUPPORT_PROJECT_TITLE_MIN_LENGTH} minimum
+                </div>
               </div>
               <div>
                 <label className="mb-2 block text-sm font-semibold text-white">
@@ -2593,7 +2619,7 @@ const canEditDocuments = !!activeRequest &&
             </div>
             <div className="mt-4">
               <label className="mb-2 block text-sm font-semibold text-white">
-                Brief Description
+                Brief Description <span className="text-red-400">*</span>
               </label>
               <textarea
                 value={requestDescription}
@@ -2601,6 +2627,16 @@ const canEditDocuments = !!activeRequest &&
                 className={fieldCls + " min-h-[80px]"}
                 placeholder="Briefly describe what you want to patent..."
               />
+              <div
+                className={`mt-1 text-xs ${
+                  isRequestDescriptionValid
+                    ? "text-green-400"
+                    : "text-slate-500"
+                }`}
+              >
+                {requestDescription.trim().length}/
+                {PATENT_SUPPORT_DESCRIPTION_MIN_LENGTH} minimum
+              </div>
             </div>
           </section>
 
@@ -2625,7 +2661,8 @@ const canEditDocuments = !!activeRequest &&
                       {section.questions.map((question) => (
                         <div key={question.key}>
                           <label className="mb-1 block text-sm text-slate-400">
-                            {question.label}
+                            {question.label}{" "}
+                            <span className="text-red-400">*</span>
                           </label>
                           {question.type === "select" ? (
                             <select
@@ -2660,14 +2697,16 @@ const canEditDocuments = !!activeRequest &&
                               />
                               <div
                                 className={`mt-1 text-xs ${
-                                  (intakeAnswers[question.key] || "").trim().length >=
-                                  question.minLength
-                                    ? "text-slate-600"
+                                  (intakeAnswers[question.key] || "").trim()
+                                    .length > 0
+                                    ? "text-green-400"
                                     : "text-amber-500/70"
                                 }`}
                               >
-                                {(intakeAnswers[question.key] || "").trim().length}/
-                                {question.minLength}
+                                {(intakeAnswers[question.key] || "").trim()
+                                  .length > 0
+                                  ? "Completed"
+                                  : "Required"}
                               </div>
                             </div>
                           )}
@@ -2811,8 +2850,8 @@ const canEditDocuments = !!activeRequest &&
             type="button"
             onClick={() => submitMutation.mutate()}
             disabled={
-              !projectTitle.trim() ||
-              !requestDescription.trim() ||
+              !isProjectTitleValid ||
+              !isRequestDescriptionValid ||
               !allIntakeValid ||
               anySlotUploading ||
               submitMutation.isPending
@@ -2826,6 +2865,11 @@ const canEditDocuments = !!activeRequest &&
           {!allIntakeValid && (
             <p className="text-xs text-slate-500">
               Complete all intake questions to enable submission.
+            </p>
+          )}
+          {(!isProjectTitleValid || !isRequestDescriptionValid) && (
+            <p className="text-xs text-slate-500">
+              Add a project title and a brief description to enable submission.
             </p>
           )}
           {anySlotUploading ? (

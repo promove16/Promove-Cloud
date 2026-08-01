@@ -792,6 +792,13 @@ export const claimProblem = async (problemId: string, userId: string) => {
     throw error;
   }
 
+  await applyScore({
+    userId,
+    trigger: 'PROBLEM_CLAIMED',
+    metadata: { problemId, workspaceId: String(workspace._id) },
+    idempotencyKey: `problem-claimed:${workspace._id}:${userId}`,
+  });
+
   await clearProblemCaches();
 
   return workspace.toObject();

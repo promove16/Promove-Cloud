@@ -1930,6 +1930,7 @@ function StartupDashboard({
       setLaunchTarget(null);
       toast.success("Startup launched to marketplace.");
       await queryClient.invalidateQueries({ queryKey: ["startup", startup._id] });
+      await queryClient.invalidateQueries({ queryKey: ["score", "me"] });
     },
     onError: (err) => {
       toast.error(getApiErrorMessage(err, "Unable to launch right now."));

@@ -4,7 +4,9 @@ import request from 'supertest';
 import app from '../../src/app';
 import { redis } from '../../src/config/redis';
 import { ScoreEvent } from '../../src/modules/innovationScore/score.model';
+import { Startup } from '../../src/modules/startup/startup.model';
 import { User } from '../../src/modules/user/user.model';
+import { Workspace } from '../../src/modules/workspace/workspace.model';
 import { UserRole } from '../../src/types/roles.types';
 
 const PASSWORD = 'Password123!';
@@ -50,6 +52,59 @@ const loginAs = async (email: string) => {
 };
 
 describe('score integration', () => {
+  it('reconciles progress uploads and launched startups from authoritative records', async () => {
+    const { user, email } = await createApprovedStudent({
+      displayName: 'Activity Builder',
+    });
+
+    const workspace = await Workspace.create({
+      ownerId: user._id,
+      teamMemberIds: [],
+      title: 'Activity Workspace',
+      category: 'DeepTech',
+      stage: 'Launch',
+      progressUpdates: [
+        {
+          submittedBy: user._id,
+          note: 'Completed the first verified progress update.',
+          submittedAt: new Date(),
+        },
+        {
+          submittedBy: user._id,
+          note: 'Completed the second verified progress update.',
+          submittedAt: new Date(),
+        },
+      ],
+    });
+
+    await Startup.create({
+      founderIds: [user._id],
+      teamMemberIds: [],
+      projectId: workspace._id,
+      name: 'Activity Startup',
+      tagline: 'A launched startup used for score reconciliation',
+      category: 'DeepTech',
+      stage: 'Launched',
+      phase: 'launched',
+      launchedToMentors: true,
+      launchedAt: new Date(),
+      isActive: true,
+    });
+
+    const accessToken = await loginAs(email);
+    const response = await request(app)
+      .get('/api/score/me')
+      .set('Authorization', `Bearer ${accessToken}`);
+
+    expect(response.status).toBe(200);
+    expect(response.body.data.breakdown.progressUploads).toBe(2);
+    expect(response.body.data.breakdown.startupsLaunched).toBe(1);
+
+    const updatedUser = await User.findById(user._id).lean();
+    expect(updatedUser?.scoreBreakdown.progressUploads).toBe(2);
+    expect(updatedUser?.scoreBreakdown.startupsLaunched).toBe(1);
+  });
+
   it('normalizes legacy scores, sums only recent deltas, and uses reverse leaderboard rank', async () => {
     const now = Date.now();
     const { user, email } = await createApprovedStudent({

@@ -4,6 +4,7 @@ import { notificationQueue } from '../../config/bullmq';
 import { uploadFile, deleteStoredAsset } from '../../services/fileStorageService';
 import { renderPatentSystemDocument } from '../../services/patentSystemDocument';
 import { ApiError } from '../../utils/ApiError';
+import { applyScore } from '../../services/scoreEngine';
 import { User } from '../user/user.model';
 import { UserRole } from '../../types/roles.types';
 import { Workspace } from '../workspace/workspace.model';
@@ -191,14 +192,6 @@ export const submitPatentRequest = async (userId: string, payload: z.infer<typeo
     throw new ApiError(404, 'WORKSPACE_NOT_FOUND', 'Select a valid workspace before submitting a patent request.');
   }
 
-  if (workspace.claimedProblemId) {
-    throw new ApiError(
-      400,
-      'PATENT_WORKSPACE_NOT_ELIGIBLE',
-      'Patent support is only available for your own product workspace. ProMove problem-bank workspaces are leaderboard-only.',
-    );
-  }
-
   const linkedStartup = await resolveStartupForPatentSubmission(userId, payload.workspaceId);
 
   const documents = payload.documentUploads.map((item) => {
@@ -254,6 +247,13 @@ export const submitPatentRequest = async (userId: string, payload: z.infer<typeo
     ...(payload.specificationType === 'provisional'
       ? { completeSpecDeadline: new Date(Date.now() + 365 * 24 * 60 * 60 * 1000) }
       : {}),
+  });
+
+  await applyScore({
+    userId,
+    trigger: 'PATENT_SUBMITTED',
+    metadata: { workspaceId: payload.workspaceId, patentRequestId: String(patentRequest._id) },
+    idempotencyKey: `patent-submitted:${patentRequest._id}`,
   });
 
   linkedStartup.traction = {
@@ -632,6 +632,13 @@ export const createPatentSupportRequest = async (
     status: 'submitted',
     submittedAt: new Date(),
     documents,
+  });
+
+  await applyScore({
+    userId,
+    trigger: 'PATENT_SUBMITTED',
+    metadata: { workspaceId: payload.workspaceId, patentRequestId: String(patentRequest._id) },
+    idempotencyKey: `patent-submitted:${patentRequest._id}`,
   });
 
   linkedStartup.traction = {

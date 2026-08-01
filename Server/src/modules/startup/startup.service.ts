@@ -1,7 +1,7 @@
 import { Types } from 'mongoose';
 import { z } from 'zod';
 import { notificationQueue } from '../../config/bullmq';
-import { applyScoreAsync } from '../../services/scoreEngine';
+import { applyScore, applyScoreAsync } from '../../services/scoreEngine';
 import { deleteStoredAsset, extractS3KeyFromUrl, generatePresignedUrl, uploadFile } from '../../services/fileStorageService';
 import { generateSignedCloudinaryUrl } from '../../services/cloudinaryService';
 import { User } from '../user/user.model';
@@ -1807,14 +1807,26 @@ export const launchStartup = async (
         );
       }
     }
-  } else {
-    await applyScoreAsync({
-      userId,
-      trigger: 'STARTUP_LAUNCHED',
-      metadata: { startupId, launchTo: payload.launchTo },
-      idempotencyKey: `startup-launched:${startupId}`,
-    });
   }
+
+  const founderAndTeamIds = Array.from(
+    new Set([
+      userId,
+      ...startup.founderIds.map((id) => String(id)),
+      ...startup.teamMemberIds.map((id) => String(id)),
+    ]),
+  );
+
+  await Promise.all(
+    founderAndTeamIds.map((memberId) =>
+      applyScore({
+        userId: memberId,
+        trigger: 'STARTUP_LAUNCHED',
+        metadata: { startupId, launchTo: payload.launchTo },
+        idempotencyKey: `startup-launched:${startupId}:${memberId}`,
+      }),
+    ),
+  );
 
   const targetRoles =
     payload.launchTo === 'both'

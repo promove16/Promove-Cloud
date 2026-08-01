@@ -4,7 +4,7 @@ import { Server } from 'socket.io';
 import { env } from '../config/env';
 import { logError } from '../config/logger';
 import { redis } from '../config/redis';
-import { MentorSession } from '../modules/mentor/mentorSession.model';
+import { hasMentorStudentAssignment } from '../modules/mentor/mentorAssignment.service';
 import { UserRole } from '../types/roles.types';
 
 interface MentorSocketPayload extends jwt.JwtPayload {
@@ -14,16 +14,13 @@ interface MentorSocketPayload extends jwt.JwtPayload {
   type: 'access';
 }
 
-// A mentor may watch a student only if at least one MentorSession exists
-// linking them. This is the canonical relationship - if the student has not
-// agreed to be mentored by this user, no session record exists.
+// The live-feed policy must match the assignment policy used by GET
+// /api/mentor/students; otherwise a student can appear in the feed but cannot
+// be pinned until a session already exists.
 const isMentorOfStudent = async (mentorId: string, studentId: string) =>
-  Boolean(
-    await MentorSession.exists({
-      mentorId: new Types.ObjectId(mentorId),
-      studentId: new Types.ObjectId(studentId),
-    }),
-  );
+  hasMentorStudentAssignment(mentorId, studentId);
+
+type MentorWatchAck = (response: { success: boolean; message?: string }) => void;
 
 const emitMentorError = (
   socket: {
@@ -99,17 +96,19 @@ export const initMentorSocket = (io: Server) => {
     // and we don't want stale Redis entries to keep them subscribed.
     void restoreWatchedStudents(socket, mentorId);
 
-    socket.on('mentor:watch', async ({ studentId }: { studentId: string }) => {
+    socket.on('mentor:watch', async ({ studentId }: { studentId?: string } = {}, acknowledge?: MentorWatchAck) => {
       try {
         if (!studentId || !Types.ObjectId.isValid(studentId)) {
           emitMentorError(socket, 'Invalid student id');
+          acknowledge?.({ success: false, message: 'Invalid student id' });
           return;
         }
 
-        // Tenant check: only mentors who actually have a session with this
-        // student may subscribe to their activity feed.
+        // Tenant check: only mentors assigned to one of this student's active
+        // workspaces may subscribe to their activity feed.
         if (!(await isMentorOfStudent(mentorId, studentId))) {
           emitMentorError(socket, 'No mentorship relationship with this student');
+          acknowledge?.({ success: false, message: 'No mentorship relationship with this student' });
           return;
         }
 
@@ -118,17 +117,20 @@ export const initMentorSocket = (io: Server) => {
           redis.sadd(`student:watchers:${studentId}`, mentorId),
         ]);
         socket.join(`student-feed:${studentId}`);
+        acknowledge?.({ success: true });
       } catch (error) {
         logError(`Failed to watch student ${studentId} for mentor ${mentorId}`, error);
         socket.leave(`student-feed:${studentId}`);
         emitMentorError(socket, 'Unable to watch this student right now');
+        acknowledge?.({ success: false, message: 'Unable to watch this student right now' });
       }
     });
 
-    socket.on('mentor:unwatch', async ({ studentId }: { studentId: string }) => {
+    socket.on('mentor:unwatch', async ({ studentId }: { studentId?: string } = {}, acknowledge?: MentorWatchAck) => {
       try {
         if (!studentId || !Types.ObjectId.isValid(studentId)) {
           emitMentorError(socket, 'Invalid student id');
+          acknowledge?.({ success: false, message: 'Invalid student id' });
           return;
         }
 
@@ -137,9 +139,11 @@ export const initMentorSocket = (io: Server) => {
           redis.srem(`mentor:watch:${mentorId}`, studentId),
           redis.srem(`student:watchers:${studentId}`, mentorId),
         ]);
+        acknowledge?.({ success: true });
       } catch (error) {
         logError(`Failed to unwatch student ${studentId} for mentor ${mentorId}`, error);
         emitMentorError(socket, 'Unable to stop watching this student right now');
+        acknowledge?.({ success: false, message: 'Unable to stop watching this student right now' });
       }
     });
 

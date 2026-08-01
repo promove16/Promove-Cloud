@@ -85,24 +85,26 @@ export const downloadResource = async (req: Request, res: Response) => {
 
   const uniqueCount       = resource.downloadedByUsers.length;
   const expectedMilestones = Math.floor(uniqueCount / DOWNLOAD_MILESTONE);
-  const currentMilestones  = resource.milestonesAwarded ?? 0;
 
-  if (expectedMilestones > currentMilestones) {
+  // Replay every reached milestone through the idempotent score gateway before
+  // recording it on the resource. This also heals a previous partial failure
+  // where the resource milestone was saved but the score event was not.
+  for (let milestone = 1; milestone <= expectedMilestones; milestone += 1) {
+    await awardMentorPoints({
+      mentorId: resource.mentorId,
+      trigger: MentorScoreTrigger.RESOURCE_MILESTONE_REACHED,
+      delta: MILESTONE_POINTS,
+      phase: 3,
+      idempotencyKey: `resource_milestone:${resourceId}:${milestone}`,
+      metadata: { resourceId, milestone, uniqueCount },
+    });
+  }
+
+  if (expectedMilestones > 0) {
     await MentorResource.updateOne(
       { _id: resourceId },
-      { $set: { milestonesAwarded: expectedMilestones } },
+      { $max: { milestonesAwarded: expectedMilestones } },
     );
-
-    for (let m = currentMilestones + 1; m <= expectedMilestones; m++) {
-      await awardMentorPoints({
-        mentorId:       resource.mentorId,
-        trigger:        MentorScoreTrigger.RESOURCE_MILESTONE_REACHED,
-        delta:          MILESTONE_POINTS,
-        phase:          3,
-        idempotencyKey: `resource_milestone:${resourceId}:${m}`,
-        metadata:       { resourceId, milestone: m, uniqueCount },
-      });
-    }
   }
 
   res.json(new ApiResponse({ fileUrl: resource.fileUrl, title: resource.title }));

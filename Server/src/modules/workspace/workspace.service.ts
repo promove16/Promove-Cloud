@@ -11,13 +11,13 @@ import {
   validateFileContent,
 } from '../../services/fileStorageService';
 import { generateSignedCloudinaryUrl } from '../../services/cloudinaryService';
-import { applyScoreAsync } from '../../services/scoreEngine';
+import { applyScore, applyScoreAsync } from '../../services/scoreEngine';
 import { NotificationService } from '../notification/notification.service';
 import { User } from '../user/user.model';
 import { ChatMessage } from '../chat/chat.model';
 import { serializeChatMessage } from '../chat/chat.serializer';
 import { TeamRequest } from '../social/teamRequest.model';
-import { RequestRecord } from '../request/request.model';
+import { RequestDocument, RequestRecord } from '../request/request.model';
 import {
   acceptRequest,
   createRequest,
@@ -558,12 +558,13 @@ export const addProgress = async (
     );
   }
 
+  const updateId = new Types.ObjectId();
   workspace.progressUpdates.push({
     submittedBy: objectId(userId),
     note: payload.note,
     milestoneRef,
     submittedAt: new Date(),
-    _id: new Types.ObjectId(),
+    _id: updateId,
   });
 
   const wasCompleted = Boolean(milestone?.isCompleted);
@@ -573,20 +574,25 @@ export const addProgress = async (
     milestone.isCompleted = payload.completionPercent >= 100;
     milestone.completedAt = milestone.isCompleted ? new Date() : undefined;
     milestone.completedBy = milestone.isCompleted ? objectId(userId) : undefined;
+  } else if (milestone && !milestone.isCompleted && payload.note?.trim()) {
+    milestone.completionPercent = 100;
+    milestone.isCompleted = true;
+    milestone.completedAt = new Date();
+    milestone.completedBy = objectId(userId);
   }
 
   workspace.progressPercent = recalcProgressPercent(workspace);
   await workspace.save();
 
-  await applyScoreAsync({
+  await applyScore({
     userId,
     trigger: 'PROGRESS_UPLOADED',
-    metadata: { workspaceId, milestoneRef },
-    idempotencyKey: `workspace-progress:${workspaceId}:${milestoneRef ?? 'general'}`,
+    metadata: { workspaceId, milestoneRef, progressUpdateId: String(updateId) },
+    idempotencyKey: `workspace-progress:${workspaceId}:${updateId}`,
   });
 
   if (milestone?.isCompleted && !wasCompleted) {
-    await applyScoreAsync({
+    await applyScore({
       userId,
       trigger: 'SKILL_COMPLETED',
       metadata: { workspaceId, milestoneRef: milestone.name },
@@ -814,6 +820,8 @@ export const updateTask = async (
     throw new ApiError(404, 'TASK_NOT_FOUND', 'Task not found');
   }
 
+  const wasDone = task.done;
+
   if (payload.title !== undefined) task.title = payload.title;
   if (payload.priority !== undefined) task.priority = payload.priority;
   if (payload.assignedTo !== undefined) task.assignedTo = payload.assignedTo ? objectId(payload.assignedTo) : undefined;
@@ -821,6 +829,16 @@ export const updateTask = async (
   if (payload.done !== undefined) task.done = payload.done;
 
   await workspace.save();
+
+  if (task.done && !wasDone) {
+    await applyScore({
+      userId,
+      trigger: 'TASK_COMPLETED',
+      metadata: { workspaceId, taskId },
+      idempotencyKey: `workspace-task:${workspaceId}:${taskId}`,
+    });
+  }
+
   await recordStartupLifecycleEvent({
     workspaceId: workspace._id,
     actorId: userId,
@@ -1338,6 +1356,53 @@ const validateWorkspaceChatRequest = async (workspaceId: string, userId: string)
   }
 };
 
+const resolveStartupMentorWorkspaceId = async (request: RequestDocument) => {
+  if (request.targetEntityType !== 'startup' || !Types.ObjectId.isValid(request.targetEntityId)) {
+    throw new ApiError(
+      400,
+      'INVALID_MENTOR_ASSIGNMENT_TARGET',
+      'Mentor invitations must target a valid startup.',
+    );
+  }
+
+  const startup = await Startup.findOne({
+    _id: request.targetEntityId,
+    isActive: true,
+    founderIds: request.fromUserId,
+  })
+    .select('_id projectId')
+    .lean();
+
+  if (!startup) {
+    throw new ApiError(
+      403,
+      'STARTUP_FOUNDER_REQUIRED',
+      'Only a startup founder can grant mentor access.',
+    );
+  }
+
+  const workspaceId = startup.projectId ? String(startup.projectId) : '';
+  if (!workspaceId) {
+    throw new ApiError(
+      400,
+      'WORKSPACE_LINK_REQUIRED',
+      'Link a workspace to the startup before inviting a mentor.',
+    );
+  }
+
+  const requestedWorkspaceId =
+    typeof request.metadata?.workspaceId === 'string' ? request.metadata.workspaceId.trim() : '';
+  if (requestedWorkspaceId && requestedWorkspaceId !== workspaceId) {
+    throw new ApiError(
+      400,
+      'MENTOR_ASSIGNMENT_WORKSPACE_MISMATCH',
+      'The mentor invitation does not match the startup workspace.',
+    );
+  }
+
+  return workspaceId;
+};
+
 registerRequestHandler('workspace_member', {
   validateAccept: async (request, actorUserId) => {
     if (request.targetEntityType !== 'workspace') {
@@ -1380,6 +1445,17 @@ registerRequestHandler('workspace_chat_access', {
       return;
     }
     await grantWorkspaceChatRequest(request.targetEntityId, actorUserId);
+  },
+});
+
+registerRequestHandler('mentor_assignment', {
+  validateAccept: async (request, actorUserId) => {
+    const workspaceId = await resolveStartupMentorWorkspaceId(request);
+    await validateWorkspaceChatRequest(workspaceId, actorUserId);
+  },
+  onAccept: async (request, actorUserId) => {
+    const workspaceId = await resolveStartupMentorWorkspaceId(request);
+    await grantWorkspaceChatRequest(workspaceId, actorUserId);
   },
 });
 
