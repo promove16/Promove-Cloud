@@ -140,4 +140,70 @@ describe('score integration', () => {
     expect(response.status).toBe(403);
     expect(response.body.error.code).toBe('SCORE_HISTORY_FORBIDDEN');
   });
+
+  it('persists an onboarding achievement score before the claim succeeds and prevents duplicate awards', async () => {
+    const { user, email } = await createApprovedStudent({
+      displayName: 'Onboarding Builder',
+    });
+    await User.updateOne(
+      { _id: user._id },
+      {
+        bio: 'Building verified products',
+        domain: 'Product Engineering',
+      },
+    );
+    const accessToken = await loginAs(email);
+
+    const initialScore = await request(app)
+      .get('/api/score/me')
+      .set('Authorization', `Bearer ${accessToken}`);
+    expect(initialScore.status).toBe(200);
+    expect(initialScore.body.data.score).toBe(0);
+
+    const firstClaim = await request(app)
+      .post('/api/users/me/onboarding/claim/profile')
+      .set('Authorization', `Bearer ${accessToken}`);
+
+    expect(firstClaim.status).toBe(200);
+    expect(firstClaim.body.data.awarded).toBe(50);
+
+    const [studentAfterFirstClaim, scoreEvents] = await Promise.all([
+      User.findById(user._id).select('innovationScore').lean(),
+      ScoreEvent.find({ userId: user._id, trigger: 'ONBOARDING_PROFILE' }).lean(),
+    ]);
+    expect(studentAfterFirstClaim?.innovationScore).toBe(50);
+    expect(scoreEvents).toHaveLength(1);
+    expect(scoreEvents[0]?.delta).toBe(50);
+
+    const visibleScore = await request(app)
+      .get('/api/score/me')
+      .set('Authorization', `Bearer ${accessToken}`);
+    expect(visibleScore.status).toBe(200);
+    expect(visibleScore.body.data.score).toBe(50);
+
+    const onboardingStatus = await request(app)
+      .get('/api/users/me/onboarding')
+      .set('Authorization', `Bearer ${accessToken}`);
+
+    expect(onboardingStatus.status).toBe(200);
+    expect(onboardingStatus.body.data.earnedPoints).toBe(50);
+    expect(onboardingStatus.body.data.steps).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({ id: 'profile', completed: true, claimed: true }),
+      ]),
+    );
+
+    const secondClaim = await request(app)
+      .post('/api/users/me/onboarding/claim/profile')
+      .set('Authorization', `Bearer ${accessToken}`);
+
+    expect(secondClaim.status).toBe(200);
+    expect(secondClaim.body.data.awarded).toBe(0);
+    await expect(
+      ScoreEvent.countDocuments({ userId: user._id, trigger: 'ONBOARDING_PROFILE' }),
+    ).resolves.toBe(1);
+    await expect(
+      User.findById(user._id).select('innovationScore').lean(),
+    ).resolves.toEqual(expect.objectContaining({ innovationScore: 50 }));
+  });
 });

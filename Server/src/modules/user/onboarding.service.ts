@@ -1,6 +1,6 @@
 import { User } from './user.model';
 import { ApiError } from '../../utils/ApiError';
-import { applyScoreAsync, SCORE_DELTAS, ScoreTrigger } from '../../services/scoreEngine';
+import { applyScore, SCORE_DELTAS, ScoreTrigger } from '../../services/scoreEngine';
 import { ScoreEvent } from '../innovationScore/score.model';
 import { isGithubOauthAvailable } from './githubProof';
 
@@ -128,6 +128,6 @@ export const claimOnboardingStep = async (
     throw new ApiError(400, 'STEP_NOT_COMPLETE', 'Complete this step before claiming points');
   if (step.claimed) return { awarded: 0 };
 
-  await applyScoreAsync({ userId, trigger, metadata: { onboardingStep: stepId } });
+  await applyScore({ userId, trigger, metadata: { onboardingStep: stepId } });
   return { awarded: step.points };
 };
