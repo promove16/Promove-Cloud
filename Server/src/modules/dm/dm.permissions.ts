@@ -139,9 +139,6 @@ const hasAcceptedConversationRequest = async (userIdA: string, userIdB: string) 
   const [idA, idB] = [new Types.ObjectId(userIdA), new Types.ObjectId(userIdB)];
   return Boolean(
     await RequestRecord.exists({
-      type: 'generic',
-      actionType: 'connect',
-      targetEntityType: 'conversation',
       status: 'accepted',
       $or: [
         { fromUserId: idA, toUserId: idB },
@@ -155,9 +152,6 @@ const hasConversationRequest = async (userIdA: string, userIdB: string) => {
   const [idA, idB] = [new Types.ObjectId(userIdA), new Types.ObjectId(userIdB)];
   return Boolean(
     await RequestRecord.exists({
-      type: 'generic',
-      actionType: 'connect',
-      targetEntityType: 'conversation',
       $or: [
         { fromUserId: idA, toUserId: idB },
         { fromUserId: idB, toUserId: idA },

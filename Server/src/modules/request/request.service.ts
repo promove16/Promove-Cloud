@@ -491,12 +491,17 @@ const queueRequestResponseNotification = async (
         ? request.metadata.workspaceTitle
         : request.targetEntityType);
 
+  const notificationLink =
+    status === 'accepted'
+      ? request.acceptRedirect || request.deepLink || (request.toUserId ? `/dashboard/messages/${String(request.toUserId)}` : '/dashboard/invitations')
+      : '/dashboard/invitations';
+
   await notificationQueue.add('request-updated', {
     userId: String(request.fromUserId),
     type: 'request',
     title: `Request ${status}`,
     body: `${actorName} ${status} your request for ${entityName}.`,
-    link: '/dashboard/invitations',
+    link: notificationLink,
     metadata: {
       requestId: String(request._id),
       requestType: request.type,
@@ -506,6 +511,7 @@ const queueRequestResponseNotification = async (
       targetEntityTitle: request.targetEntityTitle,
       status,
       deepLink: request.deepLink,
+      acceptRedirect: request.acceptRedirect,
     },
   });
 };

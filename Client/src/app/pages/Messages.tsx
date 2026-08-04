@@ -2398,11 +2398,16 @@ export function MessagesPage() {
       })),
     ].filter(
       ({ request, direction }) =>
-        request.type === "generic" &&
-        request.actionType === "connect" &&
-        request.targetEntityType === "conversation" &&
-        ((direction === "incoming" && request.fromUserId === partnerId) ||
-          (direction === "outgoing" && request.toUserId === partnerId)),
+        (direction === "incoming" &&
+          (request.fromUserId === partnerId ||
+            (request.targetEntityType === "user_profile" &&
+              request.targetEntityId?.startsWith(`${partnerId}:`)))) ||
+        (direction === "outgoing" &&
+          (request.toUserId === partnerId ||
+            request.targetEntityId === partnerId ||
+            (request.targetEntityType === "user_profile" &&
+              request.targetEntityId?.startsWith(`${partnerId}:`)) ||
+            request.metadata?.recipientId === partnerId)),
     );
 
     if (entries.length === 0) {
@@ -2491,10 +2496,12 @@ export function MessagesPage() {
       ...sidebarOutgoing,
     ].some(
       (request) =>
-        request.type === "generic" &&
-        request.actionType === "connect" &&
-        request.targetEntityType === "conversation" &&
-        (request.fromUserId === pid || request.toUserId === pid),
+        request.fromUserId === pid ||
+        request.toUserId === pid ||
+        (request.targetEntityType === "user_profile" &&
+          request.targetEntityId?.startsWith(`${pid}:`)) ||
+        request.targetEntityId === pid ||
+        request.metadata?.recipientId === pid,
     );
 
     if (existingPartnerIds.has(pid) || hasConversationRequest) {

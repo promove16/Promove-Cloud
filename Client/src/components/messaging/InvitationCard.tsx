@@ -55,22 +55,12 @@ export function InvitationCard({
 
   const handleAccept = () => {
     if (!requestId) return;
-    
-    if (entityType === 'workspace') {
-      acceptWorkspaceMutation.mutate({ workspaceId: entityTitle, requestId });
-    } else {
-      acceptRequestMutation.mutate(requestId);
-    }
+    acceptRequestMutation.mutate(requestId);
   };
 
   const handleDecline = () => {
     if (!requestId) return;
-    
-    if (entityType === 'workspace') {
-      declineWorkspaceMutation.mutate({ workspaceId: entityTitle, requestId });
-    } else {
-      declineRequestMutation.mutate(requestId);
-    }
+    declineRequestMutation.mutate(requestId);
   };
 
   const isLoading = acceptWorkspaceMutation.isPending || declineWorkspaceMutation.isPending 

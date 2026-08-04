@@ -156,13 +156,25 @@ const isRequestInboxPath = (path: string) =>
   path.startsWith('/dashboard/messages?view=requests&');
 
 function getConversationRequestPartnerId(request: WorkflowRequest, viewerUserId?: string) {
-  if (request.type !== 'generic' || request.actionType !== 'connect' || request.targetEntityType !== 'conversation') {
+  const isGenericChat =
+    request.type === 'generic' &&
+    request.actionType === 'connect' &&
+    request.targetEntityType === 'conversation';
+
+  const isDmPermissionRequest =
+    Boolean(request.requestedPermission?.startsWith('dm_')) ||
+    Boolean(request.metadata?.queryType) ||
+    request.targetEntityType === 'user_profile' ||
+    Boolean(request.acceptRedirect?.startsWith('/dashboard/messages')) ||
+    Boolean(request.deepLink?.startsWith('/dashboard/messages'));
+
+  if (!isGenericChat && !isDmPermissionRequest) {
     return null;
   }
 
   if (viewerUserId) {
     if (request.fromUserId === viewerUserId) {
-      return request.toUserId ?? request.targetEntityId ?? null;
+      return request.toUserId ?? (request.targetEntityType === 'user_profile' ? request.targetEntityId?.split(':')[0] : request.targetEntityId) ?? null;
     }
 
     if (request.toUserId === viewerUserId || request.targetEntityId === viewerUserId) {
