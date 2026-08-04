@@ -40,6 +40,7 @@ import {
   adminCancelInstitutionRosterInvite,
   adminImportInstitutionRoster,
   adminImportInstitutionRosterWithCredentials,
+  adminPreviewInstitutionRosterWithCredentials,
   adminCreateInstitutionStudentCredentials,
   getMentorDirectory,
   getMentorshipPrograms,
@@ -506,6 +507,25 @@ export const importOnboardingInstitutionRosterWithCredentialsController = async 
   res.status(200).json(
     new ApiResponse(
       await adminImportInstitutionRosterWithCredentials(req.user._id, institutionId, {
+        originalname: req.file.originalname,
+        buffer: req.file.buffer,
+      }),
+    ),
+  );
+};
+
+export const previewOnboardingInstitutionRosterWithCredentialsController = async (
+  req: Request,
+  res: Response,
+) => {
+  if (!req.user) throw new ApiError(401, 'UNAUTHORIZED', 'Invalid or expired token');
+  const institutionId = getInstitutionId(req);
+  if (!req.file?.buffer) {
+    throw new ApiError(400, 'FILE_REQUIRED', 'An Excel or CSV file is required.');
+  }
+  res.status(200).json(
+    new ApiResponse(
+      await adminPreviewInstitutionRosterWithCredentials(institutionId, {
         originalname: req.file.originalname,
         buffer: req.file.buffer,
       }),

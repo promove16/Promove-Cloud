@@ -642,14 +642,14 @@ const parseStartupHandshake = (
 function StartupHandshakeCard({
   details,
   isMine,
+  status,
 }: {
   details: StartupHandshakeDetails;
   isMine: boolean;
+  status?: WorkflowRequest["status"];
 }) {
   const config = getStartupHandshakeCardConfig(details.action);
-  const statusLabel = details.status
-    ? details.status.replace(/_/g, " ")
-    : "pending";
+  const statusLabel = (status ?? details.status ?? "pending").replace(/_/g, " ");
 
   return (
     <div
@@ -1161,6 +1161,7 @@ function MessageBubble({
   showInvestorPitchReplyActions = false,
   currentUserRole,
   onInvest,
+  requestStatusById,
 }: {
   msg: DMMessage;
   isMine: boolean;
@@ -1174,12 +1175,16 @@ function MessageBubble({
   showInvestorPitchReplyActions?: boolean;
   currentUserRole?: string;
   onInvest?: (startupId: string) => void;
+  requestStatusById?: ReadonlyMap<string, WorkflowRequest["status"]>;
 }) {
   const isImage = msg.attachmentType === "image";
   const isPdf = msg.attachmentType === "pdf";
   const investorPitch =
     msg.queryType === "investor" ? parseInvestorPitch(msg.message) : null;
   const startupHandshake = parseStartupHandshake(msg.message);
+  const startupHandshakeStatus = startupHandshake?.requestId
+    ? requestStatusById?.get(startupHandshake.requestId)
+    : undefined;
   const attachmentImage = msg.attachmentUrl ? (
     <img
       src={msg.attachmentUrl}
@@ -1367,6 +1372,7 @@ function MessageBubble({
               <StartupHandshakeCard
                 details={startupHandshake}
                 isMine={isMine}
+                status={startupHandshakeStatus}
               />
             </div>
           ) : (
@@ -1661,6 +1667,7 @@ function ChatPanel({
   onAcceptConversationRequest,
   onDeclineConversationRequest,
   onWithdrawConversationRequest,
+  requestStatusById,
   dm,
 }: {
   partnerName: string;
@@ -1675,6 +1682,7 @@ function ChatPanel({
   onAcceptConversationRequest?: (request: WorkflowRequest) => void;
   onDeclineConversationRequest?: (request: WorkflowRequest) => void;
   onWithdrawConversationRequest?: (request: WorkflowRequest) => void;
+  requestStatusById?: ReadonlyMap<string, WorkflowRequest["status"]>;
   dm: DMHookState;
 }) {
   const currentUser = useAuthStore((s) => s.user);
@@ -1966,6 +1974,7 @@ function ChatPanel({
                       state: { highlightStartupId: startupId },
                     })
                   }
+                  requestStatusById={requestStatusById}
                 />
               );
             })}
@@ -2259,6 +2268,7 @@ export function MessagesPage() {
     enabled:
       (canAccessRequestsView && searchParams.get("view") === "requests") ||
       Boolean(partnerId),
+    refetchInterval: 15_000,
   });
   const outgoingRequestsQuery = useQuery({
     queryKey: ["requests", "outgoing"],
@@ -2266,9 +2276,20 @@ export function MessagesPage() {
     enabled:
       (canAccessRequestsView && searchParams.get("view") === "requests") ||
       Boolean(partnerId),
+    refetchInterval: 15_000,
   });
   const sidebarIncoming = incomingRequestsQuery.data ?? [];
   const sidebarOutgoing = outgoingRequestsQuery.data ?? [];
+  const requestStatusById = useMemo(
+    () =>
+      new Map(
+        [...sidebarIncoming, ...sidebarOutgoing].map((request) => [
+          request._id,
+          request.status,
+        ]),
+      ),
+    [sidebarIncoming, sidebarOutgoing],
+  );
   const selectedRequestId = searchParams.get("requestId");
   const sidebarRequestEntries = [
     ...sidebarIncoming.map((request) => ({
@@ -3241,6 +3262,7 @@ export function MessagesPage() {
               onAcceptConversationRequest={handleAcceptConversationRequest}
               onDeclineConversationRequest={handleDeclineConversationRequest}
               onWithdrawConversationRequest={handleWithdrawConversationRequest}
+              requestStatusById={requestStatusById}
               dm={dm}
               onSendWithQuery={async (message, queryType) => {
                 if (!partnerId) {

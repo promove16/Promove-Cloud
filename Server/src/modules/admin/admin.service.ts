@@ -32,6 +32,7 @@ import {
 import {
   bulkCreateManagedStudentCredentials,
   createManagedStudentCredentials,
+  previewManagedStudentCredentialsImport,
 } from '../institution/institutionAccess.service';
 import { UserRole } from '../../types/roles.types';
 import { Workspace } from '../workspace/workspace.model';
@@ -2625,6 +2626,14 @@ export const adminImportInstitutionRosterWithCredentials = async (
 ) => {
   const institutionRole = await resolveOnboardingInstitutionRole(institutionId);
   return bulkCreateManagedStudentCredentials(institutionId, institutionRole, adminId, file);
+};
+
+export const adminPreviewInstitutionRosterWithCredentials = async (
+  institutionId: string,
+  file: { originalname: string; buffer: Buffer },
+) => {
+  const institutionRole = await resolveOnboardingInstitutionRole(institutionId);
+  return previewManagedStudentCredentialsImport(institutionId, institutionRole, file);
 };
 
 export const adminCreateInstitutionStudentCredentials = async (

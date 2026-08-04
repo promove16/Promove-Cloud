@@ -19,7 +19,7 @@ import {
   StudentLeaderboardItem,
   StudentVerificationReviewResponse,
 } from '../types/college.types';
-import { BulkCredentialImportResult } from '../types/school.types';
+import { BulkCredentialImportResult, ManagedStudentCredentialPreview } from '../types/school.types';
 import {
   ComplianceReportRecord,
   ComplianceOverviewData,
@@ -359,6 +359,16 @@ export const collegeApi = {
     formData.append('file', file);
     const response = await api.post<ApiSuccessResponse<BulkCredentialImportResult>>(
       '/api/college/student-roster/import-credentials',
+      formData,
+      { headers: { 'Content-Type': 'multipart/form-data' } },
+    );
+    return response.data.data;
+  },
+  async previewStudentRosterWithCredentials(file: File) {
+    const formData = new FormData();
+    formData.append('file', file);
+    const response = await api.post<ApiSuccessResponse<ManagedStudentCredentialPreview>>(
+      '/api/college/student-roster/preview-credentials',
       formData,
       { headers: { 'Content-Type': 'multipart/form-data' } },
     );

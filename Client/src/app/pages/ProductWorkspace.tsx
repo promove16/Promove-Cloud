@@ -405,6 +405,7 @@ export function ProductWorkspaceDetail({
     queryKey: ["workspace", workspaceId],
     queryFn: () => workspaceApi.getById(workspaceId!),
     enabled: Boolean(workspaceId),
+    refetchInterval: 15_000,
   });
   const workspace = workspaceQuery.data;
   const claimedProblemId = workspace?.claimedProblemId;

@@ -14,6 +14,7 @@ import {
   InstitutionPatent,
   InstitutionStartup,
   LeaderboardPage,
+  ManagedStudentCredentialPreview,
   PendingStudentVerification,
   RecentProject,
   SchoolDashboardData,
@@ -330,6 +331,16 @@ export const schoolApi = {
     formData.append('file', file);
     const response = await api.post<ApiSuccessResponse<BulkCredentialImportResult>>(
       '/api/school/student-roster/import-credentials',
+      formData,
+      { headers: { 'Content-Type': 'multipart/form-data' } },
+    );
+    return response.data.data;
+  },
+  async previewStudentRosterWithCredentials(file: File) {
+    const formData = new FormData();
+    formData.append('file', file);
+    const response = await api.post<ApiSuccessResponse<ManagedStudentCredentialPreview>>(
+      '/api/school/student-roster/preview-credentials',
       formData,
       { headers: { 'Content-Type': 'multipart/form-data' } },
     );

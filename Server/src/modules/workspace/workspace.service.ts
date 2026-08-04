@@ -1294,6 +1294,109 @@ const validateWorkspaceMemberRequest = async (workspaceId: string, userId: strin
   }
 };
 
+const resolveStartupMemberRequestContext = async (
+  request: RequestDocument,
+  actorUserId: string,
+) => {
+  if (request.targetEntityType !== 'startup' || !Types.ObjectId.isValid(request.targetEntityId)) {
+    throw new ApiError(400, 'STARTUP_INVITE_INVALID', 'This startup invite is invalid.');
+  }
+
+  const [startup, invitee] = await Promise.all([
+    Startup.findOne({ _id: request.targetEntityId, isActive: true })
+      .select('founderIds teamMemberIds projectId teamSize isActive'),
+    User.findOne({ _id: actorUserId, isActive: true }).select('_id role'),
+  ]);
+
+  if (!startup) {
+    throw new ApiError(404, 'STARTUP_NOT_FOUND', 'Startup not found');
+  }
+  if (!startup.founderIds.some((founderId) => String(founderId) === String(request.fromUserId))) {
+    throw new ApiError(403, 'STARTUP_INVITE_FORBIDDEN', 'Only a startup founder can invite a teammate.');
+  }
+  if (!invitee || invitee.role !== 'student') {
+    throw new ApiError(400, 'ROLE_MISMATCH', 'Only students can accept startup teammate invites.');
+  }
+
+  const workspaceId = startup.projectId ? String(startup.projectId) : '';
+  if (!workspaceId) {
+    throw new ApiError(
+      400,
+      'WORKSPACE_LINK_REQUIRED',
+      'Link a workspace to the startup before accepting teammate invites.',
+    );
+  }
+
+  const requestedWorkspaceId =
+    typeof request.metadata?.workspaceId === 'string' ? request.metadata.workspaceId.trim() : '';
+  if (requestedWorkspaceId && requestedWorkspaceId !== workspaceId) {
+    throw new ApiError(
+      400,
+      'STARTUP_INVITE_WORKSPACE_MISMATCH',
+      'The startup invitation does not match its linked workspace.',
+    );
+  }
+
+  const workspace = await Workspace.findOne({ _id: workspaceId, isActive: true })
+    .select('ownerId teamMemberIds isActive');
+  if (!workspace) {
+    throw new ApiError(404, 'WORKSPACE_NOT_FOUND', 'Workspace not found');
+  }
+
+  const senderCanManageWorkspace =
+    String(workspace.ownerId) === String(request.fromUserId) ||
+    workspace.teamMemberIds.some((memberId) => String(memberId) === String(request.fromUserId));
+  if (!senderCanManageWorkspace) {
+    throw new ApiError(
+      403,
+      'STARTUP_INVITE_WORKSPACE_FORBIDDEN',
+      'The startup founder cannot add members to this workspace.',
+    );
+  }
+
+  const isWorkspaceMember = workspace.teamMemberIds.some(
+    (memberId) => String(memberId) === actorUserId,
+  );
+  if (!isWorkspaceMember && workspace.teamMemberIds.length >= 5) {
+    throw new ApiError(400, 'TEAM_LIMIT_REACHED', 'A workspace can have at most 5 team members.');
+  }
+
+  return { startup, workspace, isWorkspaceMember };
+};
+
+const validateStartupMemberRequest = async (request: RequestDocument, actorUserId: string) => {
+  await resolveStartupMemberRequestContext(request, actorUserId);
+};
+
+const grantStartupMemberRequest = async (request: RequestDocument, actorUserId: string) => {
+  const { startup, workspace, isWorkspaceMember } = await resolveStartupMemberRequestContext(
+    request,
+    actorUserId,
+  );
+
+  if (!isWorkspaceMember) {
+    workspace.teamMemberIds.push(objectId(actorUserId));
+    await workspace.save();
+  }
+
+  const isStartupFounder = startup.founderIds.some(
+    (founderId) => String(founderId) === actorUserId,
+  );
+  const isStartupMember = startup.teamMemberIds.some(
+    (memberId) => String(memberId) === actorUserId,
+  );
+  if (!isStartupFounder && !isStartupMember) {
+    startup.teamMemberIds.push(objectId(actorUserId));
+  }
+
+  const persistedTeamSize = new Set([
+    ...startup.founderIds.map((founderId) => String(founderId)),
+    ...startup.teamMemberIds.map((memberId) => String(memberId)),
+  ]).size;
+  startup.teamSize = Math.max(startup.teamSize ?? 1, persistedTeamSize);
+  await startup.save();
+};
+
 const grantWorkspaceChatRequest = async (workspaceId: string, userId: string) => {
   const workspace = await Workspace.findById(workspaceId);
   if (!workspace || !workspace.isActive) {
@@ -1430,6 +1533,15 @@ registerRequestHandler('workspace_member', {
         },
       );
     }
+  },
+});
+
+registerRequestHandler('startup_member', {
+  validateAccept: async (request, actorUserId) => {
+    await validateStartupMemberRequest(request, actorUserId);
+  },
+  onAccept: async (request, actorUserId) => {
+    await grantStartupMemberRequest(request, actorUserId);
   },
 });
 

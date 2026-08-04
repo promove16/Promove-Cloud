@@ -32,6 +32,7 @@ import {
   createStudentAccessTokenSchema,
   listPendingStudentVerifications,
   listStudentAccessTokens,
+  previewManagedStudentCredentialsImport,
   reviewStudentVerification,
   reviewStudentVerificationSchema,
 } from '../institution/institutionAccess.service';
@@ -957,6 +958,11 @@ export const importSchoolStudentCredentials = (
   actorId: string,
   file: { originalname: string; buffer: Buffer },
 ) => bulkCreateManagedStudentCredentials(schoolId, UserRole.SCHOOL, actorId, file);
+
+export const previewSchoolStudentCredentials = (
+  schoolId: string,
+  file: { originalname: string; buffer: Buffer },
+) => previewManagedStudentCredentialsImport(schoolId, UserRole.SCHOOL, file);
 
 export const getSchoolStudentRoster = (
   schoolId: string,

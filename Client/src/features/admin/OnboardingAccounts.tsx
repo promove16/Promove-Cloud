@@ -614,7 +614,10 @@ function StudentOnboardingSection() {
             cancellingInviteId={cancellingInviteId}
             onCreateManualEntry={(payload) => manualMutation.mutateAsync(payload)}
             onImportFile={(file) => importMutation.mutate(file)}
-            onImportFileWithCredentials={(file) => importCredentialsMutation.mutate(file)}
+            onPreviewImportFile={(file) =>
+              adminApi.previewInstitutionRosterWithCredentials(institutionId, file)
+            }
+            onImportFileWithCredentials={(file) => importCredentialsMutation.mutateAsync(file)}
             onCreateTemporaryCredentials={(payload) => temporaryCredentialMutation.mutate(payload)}
             onCancelInvite={(rosterEntryId) => cancelInviteMutation.mutate(rosterEntryId)}
           />

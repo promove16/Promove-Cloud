@@ -15,6 +15,7 @@ import {
   createOnboardingInstitutionStudentCredentialsController,
   importOnboardingInstitutionRosterController,
   importOnboardingInstitutionRosterWithCredentialsController,
+  previewOnboardingInstitutionRosterWithCredentialsController,
   approveRegistrationRequestController,
   approveAwardController,
   approveDealStageController,
@@ -148,6 +149,11 @@ router.post(
   '/onboarding/institutions/:institutionId/roster/import',
   rosterUpload.single('file'),
   asyncHandler(importOnboardingInstitutionRosterController),
+);
+router.post(
+  '/onboarding/institutions/:institutionId/roster/preview-credentials',
+  rosterUpload.single('file'),
+  asyncHandler(previewOnboardingInstitutionRosterWithCredentialsController),
 );
 router.post(
   '/onboarding/institutions/:institutionId/roster/import-credentials',

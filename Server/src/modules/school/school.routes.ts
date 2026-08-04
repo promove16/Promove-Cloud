@@ -25,6 +25,7 @@ import {
   getSchoolStudentJourneyController,
   importSchoolStudentCredentialsController,
   importSchoolStudentRosterController,
+  previewSchoolStudentCredentialsController,
   listSchoolEventsController,
   listSchoolComplianceActionsController,
   listSchoolComplianceAlertsController,
@@ -137,6 +138,11 @@ router.post(
   '/student-roster/import',
   rosterUpload.single('file'),
   asyncHandler(importSchoolStudentRosterController),
+);
+router.post(
+  '/student-roster/preview-credentials',
+  rosterUpload.single('file'),
+  asyncHandler(previewSchoolStudentCredentialsController),
 );
 router.post(
   '/student-roster/import-credentials',

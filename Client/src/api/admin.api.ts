@@ -9,6 +9,7 @@ import {
   BulkCredentialImportResult,
   InstitutionPolicySubmissionListResponse,
   InstitutionPolicySubmissionRecord,
+  ManagedStudentCredentialPreview,
   StudentRosterEntry,
   StudentRosterImportResult,
   TemporaryStudentCredentials,
@@ -1091,6 +1092,16 @@ export const adminApi = {
     formData.append('file', file);
     const response = await api.post<ApiSuccessResponse<BulkCredentialImportResult>>(
       `/api/admin/onboarding/institutions/${institutionId}/roster/import-credentials`,
+      formData,
+      { headers: { 'Content-Type': 'multipart/form-data' } },
+    );
+    return response.data.data;
+  },
+  async previewInstitutionRosterWithCredentials(institutionId: string, file: File) {
+    const formData = new FormData();
+    formData.append('file', file);
+    const response = await api.post<ApiSuccessResponse<ManagedStudentCredentialPreview>>(
+      `/api/admin/onboarding/institutions/${institutionId}/roster/preview-credentials`,
       formData,
       { headers: { 'Content-Type': 'multipart/form-data' } },
     );
