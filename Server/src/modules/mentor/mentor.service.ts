@@ -14,8 +14,9 @@ import { Workspace } from '../workspace/workspace.model';
 import { MentorSession } from './mentorSession.model';
 import { MentorFeedback } from './mentorFeedback.model';
 import { MentorBid } from './mentorBid.model';
-import { hasMentorStudentAssignment } from './mentorAssignment.service';
+import { onMentorBidAccepted } from '../mentorScore/mentorScore.hooks';
 import { Problem } from '../problemBank/problem.model';
+import { hasMentorStudentAssignment } from './mentorAssignment.service';
 import {
   assertMentorAvailability,
   listMentorAssignedInstitutionPrograms,
@@ -835,4 +836,98 @@ export const withdrawMentorBid = async (mentorId: string, bidId: string) => {
   bid.status = 'withdrawn';
   await bid.save();
   return { updated: true };
+};
+
+export const getStartupMentorBids = async (startupId: string, userId: string) => {
+  const startup = await Startup.findById(startupId).select('founderIds teamMemberIds').lean();
+  if (!startup) {
+    throw new ApiError(404, 'NOT_FOUND', 'Startup not found');
+  }
+
+  const isMember =
+    (startup.founderIds ?? []).some((id) => String(id) === userId) ||
+    (startup.teamMemberIds ?? []).some((id) => String(id) === userId);
+
+  if (!isMember) {
+    throw new ApiError(403, 'FORBIDDEN', 'Access denied to this startup');
+  }
+
+  const bids = await MentorBid.find({ opportunityId: startupId, kind: 'startup' })
+    .sort({ createdAt: -1 })
+    .lean();
+
+  const mentorIds = [...new Set(bids.map((b) => String(b.mentorId)))];
+  const mentors = await User.find({ _id: { $in: mentorIds } })
+    .select('displayName avatar email bio domain innovationScore')
+    .lean();
+
+  const mentorMap = new Map(mentors.map((m) => [String(m._id), m]));
+
+  return bids.map((bid) => {
+    const mentor = mentorMap.get(String(bid.mentorId));
+    return {
+      _id: String(bid._id),
+      mentorId: String(bid.mentorId),
+      opportunityId: String(bid.opportunityId),
+      opportunityTitle: bid.opportunityTitle,
+      kind: bid.kind,
+      expertise: bid.expertise,
+      hoursPerWeek: bid.hoursPerWeek,
+      proposedDurationWeeks: bid.proposedDurationWeeks,
+      coverNote: bid.coverNote,
+      status: bid.status,
+      createdAt: toIso(bid.createdAt),
+      mentor: mentor
+        ? {
+            displayName: mentor.displayName,
+            avatar: mentor.avatar,
+            email: mentor.email,
+            bio: mentor.bio,
+            domain: mentor.domain,
+            innovationScore: mentor.innovationScore,
+          }
+        : undefined,
+    };
+  });
+};
+
+export const respondStartupMentorBid = async (
+  startupId: string,
+  bidId: string,
+  userId: string,
+  status: 'accepted' | 'rejected',
+) => {
+  const startup = await Startup.findById(startupId).select('founderIds teamMemberIds').lean();
+  if (!startup) {
+    throw new ApiError(404, 'NOT_FOUND', 'Startup not found');
+  }
+
+  const isMember =
+    (startup.founderIds ?? []).some((id) => String(id) === userId) ||
+    (startup.teamMemberIds ?? []).some((id) => String(id) === userId);
+
+  if (!isMember) {
+    throw new ApiError(403, 'FORBIDDEN', 'Access denied to this startup');
+  }
+
+  const bid = await MentorBid.findOne({ _id: bidId, opportunityId: startupId, kind: 'startup' });
+  if (!bid) {
+    throw new ApiError(404, 'BID_NOT_FOUND', 'Mentor bid not found for this startup');
+  }
+
+  if (bid.status === 'withdrawn') {
+    throw new ApiError(400, 'BID_WITHDRAWN', 'Cannot respond to a withdrawn bid');
+  }
+
+  bid.status = status;
+  await bid.save();
+
+  if (status === 'accepted') {
+    await onMentorBidAccepted(String(bid.mentorId), String(bid._id));
+  }
+
+  return {
+    _id: String(bid._id),
+    status: bid.status,
+  };
 };

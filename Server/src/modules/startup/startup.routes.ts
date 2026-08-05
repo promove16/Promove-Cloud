@@ -21,6 +21,8 @@ import {
   sendPitchRequestController,
   respondToPitchRequestController,
   getPitchRequestsController,
+  getStartupMentorBidsController,
+  respondStartupMentorBidController,
 } from './startup.controller';
 import { listStartupLifecycleEventsController } from '../startupLifecycle/startupLifecycle.controller';
 import {
@@ -98,5 +100,8 @@ router.post(
 
 router.post('/:id/pitch-request', authorize(UserRole.STUDENT), asyncHandler(sendPitchRequestController));
 router.patch('/:id/pitch-request/:requestId', authorize(UserRole.STUDENT), asyncHandler(respondToPitchRequestController));
+
+router.get('/:id/mentor-bids', authorize(UserRole.STUDENT), asyncHandler(getStartupMentorBidsController));
+router.patch('/:id/mentor-bids/:bidId', authorize(UserRole.STUDENT), asyncHandler(respondStartupMentorBidController));
 
 export default router;

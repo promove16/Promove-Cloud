@@ -207,6 +207,82 @@ export interface MentorWorkspaceDetail {
   }>;
 }
 
+export interface MentorSessionItem {
+  _id: string;
+  mentor: { _id: string; displayName: string; avatar?: string };
+  student: { _id: string; displayName: string; avatar?: string };
+  workspaceId?: string;
+  workspaceName?: string;
+  title: string;
+  scheduledAt: string;
+  durationMinutes: number;
+  meetLink?: string;
+  status: 'Scheduled' | 'Completed' | 'Cancelled';
+  mentorNotes?: string;
+  studentFeedback?: string;
+  createdAt: string;
+  studentProfile?: {
+    innovationScore: number;
+    scoreBreakdown: MentorStudentProfile['student']['scoreBreakdown'];
+  };
+}
+
+export interface MentorSessionsResponse {
+  upcoming: MentorSessionItem[];
+  completed: MentorSessionItem[];
+  cancelled: MentorSessionItem[];
+}
+
+export interface CreateMentorSessionInput {
+  studentId: string;
+  workspaceId?: string;
+  title: string;
+  scheduledAt: string;
+  durationMinutes: number;
+  meetLink?: string;
+}
+
+export interface UpdateMentorSessionInput {
+  status?: 'Scheduled' | 'Completed' | 'Cancelled';
+  mentorNotes?: string;
+  meetLink?: string;
+}
+
+export interface MentorWorkspaceDetail {
+  _id: string;
+  title: string;
+  category: string;
+  stage: string;
+  progressPercent: number;
+  milestones: Array<{
+    _id: string;
+    name: string;
+    isCompleted: boolean;
+    completionPercent: number;
+    completedAt?: string;
+    completedBy?: string;
+  }>;
+  tasks: Array<{
+    _id: string;
+    title: string;
+    priority: 'High' | 'Medium' | 'Low';
+    done: boolean;
+    dueDate?: string;
+  }>;
+  uploads: Array<{
+    _id: string;
+    fileUrl: string;
+    fileType: 'pdf' | 'image';
+    fileName: string;
+    uploadedAt: string;
+  }>;
+  progressUpdates: Array<{
+    _id: string;
+    note: string;
+    submittedAt: string;
+  }>;
+}
+
 export interface CreateMentorFeedbackInput {
   workspaceId?: string;
   feedbackText: string;
@@ -245,6 +321,18 @@ export interface MentorBid {
   coverNote: string;
   status: MentorBidStatus;
   createdAt: string;
+}
+
+export interface StartupMentorBid extends MentorBid {
+  mentorId: string;
+  mentor?: {
+    displayName: string;
+    avatar?: string;
+    email?: string;
+    bio?: string;
+    domain?: string;
+    innovationScore?: number;
+  };
 }
 
 export interface SubmitMentorBidPayload {
@@ -319,6 +407,17 @@ export const mentorApi = {
   },
   async withdrawBid(bidId: string) {
     const response = await api.delete<ApiSuccessResponse<{ updated: true }>>(`/api/mentor/bids/${bidId}`);
+    return response.data.data;
+  },
+  async getStartupMentorBids(startupId: string) {
+    const response = await api.get<ApiSuccessResponse<StartupMentorBid[]>>(`/api/startups/${startupId}/mentor-bids`);
+    return response.data.data;
+  },
+  async respondStartupMentorBid(startupId: string, bidId: string, status: 'accepted' | 'rejected') {
+    const response = await api.patch<ApiSuccessResponse<{ _id: string; status: MentorBidStatus }>>(
+      `/api/startups/${startupId}/mentor-bids/${bidId}`,
+      { status },
+    );
     return response.data.data;
   },
 };

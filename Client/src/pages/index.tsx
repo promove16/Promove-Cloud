@@ -154,6 +154,11 @@ const InvestorOutreach = safeLazy(() =>
     default: module.InvestorOutreach,
   })),
 );
+const StartupMentorBids = safeLazy(() =>
+  import("../features/startup/StartupMentorBids").then((module) => ({
+    default: module.StartupMentorBids,
+  })),
+);
 
 const SettingsPage = safeLazy(() =>
   import("../features/settings/SettingsPage").then((module) => ({
@@ -672,6 +677,7 @@ export const router = createBrowserRouter([
             { path: "bids", element: <Navigate to="../cap-table?view=pipeline" replace /> },
             { path: "investor-deals", element: <Navigate to="../cap-table" replace /> },
             { path: "patent-support", element: <LazyPage component={PatentSupport} /> },
+            { path: "mentor-bids", element: <LazyPage component={StartupMentorBids} /> },
           ],
         },
       {
