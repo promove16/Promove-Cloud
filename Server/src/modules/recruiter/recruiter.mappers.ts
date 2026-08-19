@@ -1,5 +1,5 @@
 import { Types } from 'mongoose';
-import { NotificationService } from '../notification/notification.service';
+import { queueNotification } from '../notification/notification.delivery';
 import { io } from '../../config/socket';
 import { RelevanceBridge, RelevanceBridgeType } from './relevanceBridge.model';
 import { Startup } from '../startup/startup.model';
@@ -287,17 +287,13 @@ export const notifyUser = async (
   body: string,
   link = '/dashboard/student',
 ) => {
-  const notification = await NotificationService.create({
+  await queueNotification({
     userId,
     type: 'system',
     title,
     body,
     link,
   });
-  if (io) {
-    io.of('/notifications').to(`user:${userId}`).emit('notification:new', notification);
-  }
-  return notification;
 };
 
 export type HiringUpdateAction =

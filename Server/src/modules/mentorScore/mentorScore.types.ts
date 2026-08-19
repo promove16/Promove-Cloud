@@ -22,6 +22,7 @@ export const MentorScoreTrigger = {
   SESSION_TOKEN_RELEASED:       'SESSION_TOKEN_RELEASED',
   EQUITY_LOI_SIGNED:            'EQUITY_LOI_SIGNED',
   MENTEE_OUTCOME_BONUS:         'MENTEE_OUTCOME_BONUS',
+  CONTENT_CREATOR_BONUS:        'CONTENT_CREATOR_BONUS',
 
   // System
   SCORE_DECAY:                  'SCORE_DECAY',
@@ -84,6 +85,7 @@ export interface IMentorPhase3Breakdown {
   sessions:        number;
   equityLOIs:      number;
   outcomeBonuses:  number;
+  contentCreatorBonus: number;
 }
 
 export interface IMentorScore {
@@ -110,6 +112,7 @@ export type VerificationTaskType =
   | 'curriculum_pdf'
   | 'class_photo'
   | 'industry_session'
+  | 'prototype_velocity'
   | 'demo_day'
   | 'outcome_bonus';
 

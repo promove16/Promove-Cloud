@@ -1,6 +1,5 @@
 import { HydratedDocument, Types } from 'mongoose';
 import { z } from 'zod';
-import { notificationQueue } from '../../config/bullmq';
 import { uploadFile } from '../../services/fileStorageService';
 import { createPatentSystemDocument } from '../../services/patentSystemDocument';
 import { ApiError } from '../../utils/ApiError';
@@ -9,6 +8,7 @@ import { User } from '../user/user.model';
 import { UserRole } from '../../types/roles.types';
 import { AdminAuditLog } from '../admin/adminAuditLog.model';
 import { Startup } from '../startup/startup.model';
+import { queueNotification } from '../notification/notification.delivery';
 import { PatentRequest } from './patentRequest.model';
 import { serializePatentRequestForClient } from './patentRequest.service';
 import { LEGACY_STATUS_MAP, type IPatentRequest, type PatentRequestStatus } from './patent.types';
@@ -119,7 +119,7 @@ const autoVerifyLinkedStartup = async (
     },
   });
 
-  await notificationQueue.add('startup-auto-verified-by-patent', {
+  await queueNotification({
     userId: String(startup.founderIds[0]),
     type: 'startup_launch',
     title: 'Startup auto-verified',
@@ -314,7 +314,7 @@ export const updatePatentRequestStatus = async (
   }
 
   // Notify student
-  await notificationQueue.add('patent-request-status-update', {
+  await queueNotification({
     userId: String(request.studentId),
     type: 'patent_status',
     title: 'Patent case update',
@@ -489,7 +489,7 @@ export const reviewPatentRequestDocument = async (
 
   await request.save();
 
-  await notificationQueue.add('patent-request-document-reviewed', {
+  await queueNotification({
     userId: String(request.studentId),
     type: 'patent_status',
     title: 'Patent document reviewed',
@@ -550,7 +550,7 @@ export const uploadOfficialHandoverDocument = async (
 
   await request.save();
 
-  await notificationQueue.add('patent-request-handover-document-uploaded', {
+  await queueNotification({
     userId: String(request.studentId),
     type: 'patent_status',
     title: 'Official patent document uploaded',
@@ -613,7 +613,7 @@ export const completeOfficialHandover = async (
 
   await request.save();
 
-  await notificationQueue.add('patent-request-handover-completed', {
+  await queueNotification({
     userId: String(request.studentId),
     type: 'patent_status',
     title: 'Official patent handover ready',

@@ -38,4 +38,11 @@ export const eventApi = {
     );
     return response.data.data;
   },
+  async postponeEvent(eventId: string, payload: { newDate: string; reason: string }) {
+    const response = await api.patch<ApiSuccessResponse<{ requestId: string; eventId: string; newDate: string }>>(
+      `/api/events/${eventId}/postpone`,
+      payload,
+    );
+    return response.data.data;
+  },
 };

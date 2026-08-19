@@ -53,6 +53,7 @@ const TASK_TYPE_LABEL: Record<MentorVerificationTask['type'], string> = {
   curriculum_pdf: 'Curriculum PDF',
   class_photo: 'Class Photo',
   industry_session: 'Industry Session',
+  prototype_velocity: 'Prototype Velocity',
   demo_day: 'Demo Day',
   outcome_bonus: 'Outcome Bonus',
 };
@@ -78,7 +79,7 @@ type EarningRule = {
 const earningRules: EarningRule[] = [
   {
     id: 'training',
-    label: 'Complete training modules',
+    label: 'Complete mentor training & certification quizzes',
     points: 'up to 60 pts',
     icon: BookOpen,
     count: (b) => b.phase1Breakdown.training,
@@ -428,6 +429,7 @@ export default function MentorScore() {
               <PhaseBreakdownRow label="Session Tokens" value={score.phase3Breakdown.sessions} cap={null} />
               <PhaseBreakdownRow label="Equity LOIs" value={score.phase3Breakdown.equityLOIs} cap={null} />
               <PhaseBreakdownRow label="Outcome Bonuses" value={score.phase3Breakdown.outcomeBonuses} cap={null} />
+              <PhaseBreakdownRow label="Content Creator Bonus" value={score.phase3Breakdown.contentCreatorBonus ?? 0} cap={null} />
             </div>
           ) : (
             <div className="px-5 py-4 text-sm text-slate-400">

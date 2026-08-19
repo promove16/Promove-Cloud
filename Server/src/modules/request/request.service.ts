@@ -1,10 +1,10 @@
 import { FilterQuery, Types } from 'mongoose';
-import { notificationQueue } from '../../config/bullmq';
 import { ApiError } from '../../utils/ApiError';
 import { UserRole } from '../../types/roles.types';
 import { Startup } from '../startup/startup.model';
 import { User } from '../user/user.model';
 import { Workspace } from '../workspace/workspace.model';
+import { queueNotification } from '../notification/notification.delivery';
 import {
   IRequest,
   RequestActionType,
@@ -445,12 +445,27 @@ const queueRequestNotification = async (request: IRequest) => {
         : request.targetEntityType;
   const link = `/dashboard/invitations?requestId=${String(request._id)}`;
   const requestedAction = request.actionType?.replace(/_/g, ' ') ?? request.targetRole ?? request.type.replace(/_/g, ' ');
+  const isEventReschedule = request.type === 'college_event_reschedule';
+  const requestedEventDate =
+    isEventReschedule && typeof request.metadata?.newDate === 'string'
+      ? new Date(request.metadata.newDate).toLocaleString('en-IN', {
+          dateStyle: 'medium',
+          timeStyle: 'short',
+          timeZone: 'Asia/Kolkata',
+        })
+      : null;
+  const rescheduleReason =
+    isEventReschedule && typeof request.metadata?.reason === 'string'
+      ? request.metadata.reason.trim()
+      : '';
 
-  await notificationQueue.add('request-created', {
+  await queueNotification({
     userId: String(request.toUserId),
     type: 'request',
-    title: 'New request',
-    body: `${senderName} requested ${requestedAction} for ${entityName}.`,
+    title: isEventReschedule ? 'Event postponement approval requested' : 'New request',
+    body: isEventReschedule
+      ? `${senderName} requested to postpone ${entityName}${requestedEventDate ? ` to ${requestedEventDate}` : ''}.${rescheduleReason ? ` Reason: ${rescheduleReason}` : ''}`
+      : `${senderName} requested ${requestedAction} for ${entityName}.`,
     link,
     metadata: {
       requestId: String(request._id),
@@ -496,7 +511,7 @@ const queueRequestResponseNotification = async (
       ? request.acceptRedirect || request.deepLink || (request.toUserId ? `/dashboard/messages/${String(request.toUserId)}` : '/dashboard/invitations')
       : '/dashboard/invitations';
 
-  await notificationQueue.add('request-updated', {
+  await queueNotification({
     userId: String(request.fromUserId),
     type: 'request',
     title: `Request ${status}`,

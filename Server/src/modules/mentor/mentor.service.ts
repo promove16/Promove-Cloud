@@ -1,8 +1,7 @@
 import { Types } from 'mongoose';
 import { redis } from '../../config/redis';
-import { io } from '../../config/socket';
 import { ApiError } from '../../utils/ApiError';
-import { NotificationService } from '../notification/notification.service';
+import { queueNotification } from '../notification/notification.delivery';
 import { Patent } from '../patent/patent.model';
 import { ScoreEvent } from '../innovationScore/score.model';
 import { ProfileView } from '../social/profileView.model';
@@ -478,17 +477,13 @@ export const createMentorSession = async (mentorId: string, payload: CreateMento
     status: 'Scheduled',
   });
 
-  const notification = await NotificationService.create({
+  await queueNotification({
     userId: payload.studentId,
     type: 'system',
     title: `${mentor.displayName} scheduled a session with you`,
     body: `${mentor.displayName} scheduled a mentor session titled "${payload.title}".`,
     link: '/dashboard/student',
   });
-
-  if (io) {
-    io.of('/notifications').to(`user:${payload.studentId}`).emit('notification:new', notification);
-  }
 
   return session;
 };
@@ -597,16 +592,13 @@ export const updateMentorSession = async (
   await session.save();
 
   if (session.status === 'Completed') {
-    const notification = await NotificationService.create({
+    await queueNotification({
       userId: String(session.studentId),
       type: 'system',
       title: 'Mentor notes added to your session',
       body: session.mentorNotes ?? 'Your mentor marked the session as completed.',
       link: '/dashboard/student',
     });
-    if (io) {
-      io.of('/notifications').to(`user:${String(session.studentId)}`).emit('notification:new', notification);
-    }
   }
 
   const [mentorProfile, studentProfile] = await Promise.all([
@@ -639,16 +631,13 @@ export const deleteMentorSession = async (mentorId: string, sessionId: string) =
   session.status = 'Cancelled';
   await session.save();
 
-  const notification = await NotificationService.create({
+  await queueNotification({
     userId: String(session.studentId),
     type: 'system',
     title: 'Mentor session cancelled',
     body: `${session.title} was cancelled by your mentor.`,
     link: '/dashboard/student',
   });
-  if (io) {
-    io.of('/notifications').to(`user:${String(session.studentId)}`).emit('notification:new', notification);
-  }
 };
 
 export const createMentorFeedback = async (
@@ -673,17 +662,13 @@ export const createMentorFeedback = async (
     rating: payload.rating,
   });
 
-  const notification = await NotificationService.create({
+  await queueNotification({
     userId: payload.studentId,
     type: 'system',
     title: 'New mentor feedback received',
     body: `Your mentor shared feedback and rated your progress ${payload.rating}/5.`,
     link: '/dashboard/student',
   });
-
-  if (io) {
-    io.of('/notifications').to(`user:${payload.studentId}`).emit('notification:new', notification);
-  }
 
   return {
     _id: String(feedback._id),
@@ -778,14 +763,18 @@ export const submitMentorBid = async (
 ) => {
   // Verify opportunity exists
   let opportunityTitle = 'Unknown';
+  let startupFounderIds: string[] = [];
+  let problemCreatorIds: string[] = [];
   if (payload.kind === 'startup') {
-    const startup = await Startup.findById(payload.opportunityId).select('name').lean();
+    const startup = await Startup.findById(payload.opportunityId).select('name founderIds').lean();
     if (!startup) throw new ApiError(404, 'NOT_FOUND', 'Startup not found');
     opportunityTitle = startup.name || 'Untitled Startup';
+    startupFounderIds = (startup.founderIds ?? []).map((id) => String(id));
   } else {
-    const problem = await Problem.findById(payload.opportunityId).select('title').lean();
+    const problem = await Problem.findById(payload.opportunityId).select('title createdByAdminId claimedBy').lean();
     if (!problem) throw new ApiError(404, 'NOT_FOUND', 'Problem not found');
     opportunityTitle = problem.title;
+    problemCreatorIds = [problem.createdByAdminId ? String(problem.createdByAdminId) : null, problem.claimedBy ? String(problem.claimedBy) : null].filter(Boolean) as string[];
   }
 
   // Check for duplicate active bid
@@ -810,6 +799,34 @@ export const submitMentorBid = async (
     coverNote: payload.coverNote,
     status: 'pending',
   });
+
+  if (startupFounderIds.length > 0) {
+    await Promise.all(
+      startupFounderIds.map((founderId) =>
+        queueNotification({
+          userId: founderId,
+          type: 'system',
+          title: 'A mentor sent a bid on your startup',
+          body: `A mentor submitted a bid to mentor ${opportunityTitle}. Review it in your startup's mentor bids.`,
+          link: `/startup-launch/${payload.opportunityId}/mentor-bids`,
+        }),
+      ),
+    );
+  }
+
+  if (payload.kind === 'problem_bank' && problemCreatorIds.length > 0) {
+    await Promise.all(
+      problemCreatorIds.map((userId) =>
+        queueNotification({
+          userId,
+          type: 'system',
+          title: 'A mentor bid on a problem',
+          body: `A mentor submitted a bid to help with "${opportunityTitle}". Review it in your problem bank.`,
+          link: `/dashboard/student`,
+        }),
+      ),
+    );
+  }
 
   return {
     _id: String(bid._id),
@@ -897,7 +914,7 @@ export const respondStartupMentorBid = async (
   userId: string,
   status: 'accepted' | 'rejected',
 ) => {
-  const startup = await Startup.findById(startupId).select('founderIds teamMemberIds').lean();
+  const startup = await Startup.findById(startupId).select('founderIds teamMemberIds name').lean();
   if (!startup) {
     throw new ApiError(404, 'NOT_FOUND', 'Startup not found');
   }
@@ -924,7 +941,44 @@ export const respondStartupMentorBid = async (
 
   if (status === 'accepted') {
     await onMentorBidAccepted(String(bid.mentorId), String(bid._id));
+
+    // Add the mentor to the startup's workspace chatParticipants so they can
+    // communicate directly and mentor score attribution works correctly.
+    if (startup.projectId) {
+      const workspace = await Workspace.findById(String(startup.projectId)).lean();
+      if (workspace?.isActive) {
+        const alreadyParticipant = workspace.chatParticipants?.some(
+          (p) => String(p.userId) === String(bid.mentorId),
+        );
+        if (!alreadyParticipant) {
+          await Workspace.updateOne(
+            { _id: startup.projectId },
+            {
+              $push: {
+                chatParticipants: {
+                  userId: new Types.ObjectId(String(bid.mentorId)),
+                  role: 'mentor',
+                  addedBy: new Types.ObjectId(userId),
+                  addedAt: new Date(),
+                },
+              },
+            },
+          );
+        }
+      }
+    }
   }
+
+  await queueNotification({
+    userId: String(bid.mentorId),
+    type: 'system',
+    title: status === 'accepted' ? 'Your mentor bid was accepted' : 'Your mentor bid was declined',
+    body:
+      status === 'accepted'
+        ? `The ${startup.name ?? 'startup'} team accepted your bid to mentor ${bid.opportunityTitle}.`
+        : `The ${startup.name ?? 'startup'} team declined your bid to mentor ${bid.opportunityTitle}.`,
+    link: '/dashboard/mentor/marketplace',
+  });
 
   return {
     _id: String(bid._id),

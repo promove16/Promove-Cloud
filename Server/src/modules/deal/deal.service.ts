@@ -1,6 +1,5 @@
 import { ClientSession, Types } from 'mongoose';
 import { z } from 'zod';
-import { notificationQueue } from '../../config/bullmq';
 import { redis } from '../../config/redis';
 import { extractS3KeyFromUrl, generatePresignedUrl } from '../../services/fileStorageService';
 import { generateSignedCloudinaryUrl } from '../../services/cloudinaryService';
@@ -18,6 +17,7 @@ import { recordStartupLifecycleEvent } from '../startupLifecycle/startupLifecycl
 import { Deal } from './deal.model';
 import { Bid } from '../bidding/bidding.model';
 import { BIDDING_EXPIRY_DAYS } from '../bidding/bidding.types';
+import { queueNotification } from '../notification/notification.delivery';
 import { DirectMessage } from '../dm/dm.model';
 import {
   CapTableResponse,
@@ -860,7 +860,7 @@ const pushFounderNotification = async (
 ) =>
   Promise.all(
     founderIds.map((founderId) =>
-      notificationQueue.add('investment-notification', {
+      queueNotification({
         userId: String(founderId),
         type: 'deal_interest' as const,
         title,
@@ -869,6 +869,48 @@ const pushFounderNotification = async (
       }),
     ),
   );
+
+type DealCounterpartySource = {
+  _id: Types.ObjectId;
+  studentId: Types.ObjectId;
+  investorId: Types.ObjectId;
+  startupId: Types.ObjectId;
+};
+
+const pushDealCounterpartyNotification = async (
+  deal: DealCounterpartySource,
+  actorUserId: string,
+  title: string,
+  buildBody: (actorName: string, startupName: string) => string,
+) => {
+  const actorIsFounder = String(deal.studentId) === String(actorUserId);
+  const counterpartyId = actorIsFounder ? String(deal.investorId) : String(deal.studentId);
+  if (!counterpartyId) {
+    return;
+  }
+
+  const [actor, startup] = await Promise.all([
+    User.findById(actorUserId).select('displayName').lean(),
+    Startup.findById(deal.startupId).select('name').lean(),
+  ]);
+  const actorName = actor?.displayName ?? (actorIsFounder ? 'The founder' : 'An investor');
+  const startupName = startup?.name ?? 'the startup';
+
+  await queueNotification({
+    userId: counterpartyId,
+    type: 'deal_interest' as const,
+    title,
+    body: buildBody(actorName, startupName),
+    link: actorIsFounder
+      ? '/dashboard/investor/bids'
+      : `/startup-launch/${String(deal.startupId)}/cap-table`,
+    metadata: {
+      dealId: String(deal._id),
+      startupId: String(deal.startupId),
+      actorUserId,
+    },
+  });
+};
 
 const isActiveStudentFounder = (
   user?: LeanUser | null,
@@ -1427,7 +1469,7 @@ export const recordFounderDecision = async (
   }
 
   const context = await fetchDealContext(deal);
-  await notificationQueue.add('deal-stage', {
+  await queueNotification({
     userId: transactionResult.investorId,
     type: 'deal_interest',
     title:
@@ -1546,14 +1588,14 @@ export const reviewPaymentApproval = async (
       : result.reviewNotes || 'ProMove admin declined the payment approval request.';
 
   await Promise.all([
-    notificationQueue.add('deal-stage', {
+    queueNotification({
       userId: result.investorId,
       type: 'deal_interest',
       title,
       body,
       link: '/dashboard/investor/deals',
     }),
-    notificationQueue.add('deal-stage', {
+    queueNotification({
       userId: result.studentId,
       type: 'deal_interest',
       title,
@@ -1621,7 +1663,7 @@ export const requestPaymentApproval = async (
   }
   const context = await fetchDealContext(deal);
 
-  await notificationQueue.add('deal-stage', {
+  await queueNotification({
     userId: transactionResult.studentId,
     type: 'deal_interest',
     title: 'Payment approval requested',
@@ -1830,7 +1872,7 @@ export const advanceDealStage = async (
     }
 
     const context = await fetchDealContext(notifiedDeal);
-    await notificationQueue.add('deal-stage', {
+    await queueNotification({
       userId: String(notifiedDeal.studentId),
       type: 'deal_interest',
       title: `Your deal has moved to Stage ${parsed.newStage}`,
@@ -1868,7 +1910,7 @@ export const advanceDealStage = async (
     },
   });
 
-  await notificationQueue.add('deal-stage', {
+  await queueNotification({
     userId: String(deal.studentId),
     type: 'deal_interest',
     title: `Your deal has moved to Stage ${parsed.newStage}`,
@@ -2655,6 +2697,14 @@ export const addNegotiationMessage = async (
   deal.negotiation.lastUpdatedAt = new Date();
 
   await deal.save();
+
+  await pushDealCounterpartyNotification(
+    deal,
+    userId,
+    'New negotiation message on your deal',
+    (actorName, startupName) => `${actorName} sent a new negotiation message on the ${startupName} deal.`,
+  );
+
   return deal.negotiation;
 };
 
@@ -2727,6 +2777,14 @@ export const proposeNegotiationTerms = async (
 
   deal.negotiation.lastUpdatedAt = new Date();
   await deal.save();
+
+  await pushDealCounterpartyNotification(
+    deal,
+    userId,
+    'New deal terms proposed',
+    (actorName, startupName) => `${actorName} proposed new investment terms for ${startupName}.`,
+  );
+
   return deal.negotiation;
 };
 
@@ -2875,6 +2933,17 @@ export const agreeNegotiationTerms = async (
   deal.negotiation.lastUpdatedAt = new Date();
   await deal.save();
   await invalidateInvestmentCaches(String(deal.startupId), String(deal.investorId));
+
+  await pushDealCounterpartyNotification(
+    deal,
+    userId,
+    deal.negotiation.status === 'terms_agreed' ? 'Deal terms agreed' : 'Deal terms accepted',
+    (actorName, startupName) =>
+      deal.negotiation.status === 'terms_agreed'
+        ? `Both parties agreed to the investment terms for ${startupName}. The deal is moving forward.`
+        : `${actorName} accepted the proposed terms for ${startupName}.`,
+  );
+
   return deal.negotiation;
 };
 
@@ -3316,13 +3385,21 @@ export const cancelDealByParticipant = async (
 
     await deal.save();
 
+    await pushDealCounterpartyNotification(
+      deal,
+      userId,
+      'Deal cancellation requested',
+      (actorName, startupName) =>
+        `${actorName} requested to cancel the ${startupName} deal. It is pending admin review.`,
+    );
+
     const dealObject = deal.toObject() as DealDocumentLike;
     const context = await fetchDealContext(dealObject);
 
     const admins = await User.find({ role: UserRole.ADMIN, isActive: true }).select('_id').lean();
     await Promise.all(
       admins.map((admin) =>
-        notificationQueue.add('deal-cancellation-requested', {
+        queueNotification({
           userId: String(admin._id),
           type: 'system',
           title: 'Deal cancellation requested',
@@ -3384,6 +3461,13 @@ export const cancelDealByParticipant = async (
 
   await deal.save();
   await invalidateInvestmentCaches(String(deal.startupId), String(deal.investorId));
+
+  await pushDealCounterpartyNotification(
+    deal,
+    userId,
+    'Deal cancelled',
+    (actorName, startupName) => `${actorName} cancelled the ${startupName} deal.`,
+  );
 
   const dealObject = deal.toObject() as DealDocumentLike;
   const context = await fetchDealContext(dealObject);

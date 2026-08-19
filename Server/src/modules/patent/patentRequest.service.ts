@@ -1,6 +1,5 @@
 import { Types } from 'mongoose';
 import { z } from 'zod';
-import { notificationQueue } from '../../config/bullmq';
 import { uploadFile, deleteStoredAsset } from '../../services/fileStorageService';
 import { renderPatentSystemDocument } from '../../services/patentSystemDocument';
 import { ApiError } from '../../utils/ApiError';
@@ -9,6 +8,7 @@ import { User } from '../user/user.model';
 import { UserRole } from '../../types/roles.types';
 import { Workspace } from '../workspace/workspace.model';
 import { recordStartupLifecycleEvent } from '../startupLifecycle/startupLifecycle.service';
+import { queueNotification } from '../notification/notification.delivery';
 import { PatentRequest } from './patentRequest.model';
 import { LEGACY_STATUS_MAP, type IPatentRequest, type PatentRequestDocument, type PatentRequestStatus } from './patent.types';
 import { getSignedPatentDocumentUrl, resolveStartupForPatentSubmission } from './patent.service';
@@ -280,7 +280,7 @@ export const submitPatentRequest = async (userId: string, payload: z.infer<typeo
     },
   });
 
-  await notificationQueue.add('patent-request-submitted', {
+  await queueNotification({
     userId,
     type: 'patent_status',
     title: 'Patent filing request received',
@@ -291,7 +291,7 @@ export const submitPatentRequest = async (userId: string, payload: z.infer<typeo
   const admins = await User.find({ role: UserRole.ADMIN }).select('_id').lean();
   await Promise.all(
     admins.map((admin) =>
-      notificationQueue.add('patent-request-admin-notify', {
+      queueNotification({
         userId: String(admin._id),
         type: 'patent_status',
         title: 'New assisted filing request',
@@ -413,7 +413,7 @@ export const uploadPatentRequestDocument = async (
 
   await request.save();
 
-  await notificationQueue.add('patent-request-document-uploaded', {
+  await queueNotification({
     userId,
     type: 'patent_status',
     title: 'Patent document uploaded',
@@ -424,7 +424,7 @@ export const uploadPatentRequestDocument = async (
   const admins = await User.find({ role: UserRole.ADMIN }).select('_id').lean();
   await Promise.all(
     admins.map((admin) =>
-      notificationQueue.add('patent-request-document-admin-notify', {
+      queueNotification({
         userId: String(admin._id),
         type: 'patent_status',
         title: 'New patent document uploaded',
@@ -501,7 +501,7 @@ export const acknowledgeOfficialHandover = async (userId: string, requestId: str
 
   await Promise.all(
     notifyAdminIds.map((adminId) =>
-      notificationQueue.add('patent-request-handover-acknowledged', {
+      queueNotification({
         userId: adminId,
         type: 'patent_status',
         title: 'Official patent handover acknowledged',
@@ -571,7 +571,10 @@ export const createPatentSupportRequest = async (
     );
   }
 
-  const linkedStartup = await resolveStartupForPatentSubmission(userId, payload.workspaceId);
+  const linkedStartup = await resolveStartupForPatentSubmission(userId, payload.workspaceId, {
+    requireStartup: false,
+  });
+  const requiresStartupRegistration = !linkedStartup;
 
   const documents = (payload.documentUploads ?? []).map((item) => {
     const upload = workspace.uploads.find((entry) => String(entry._id) === item.uploadId);
@@ -591,6 +594,7 @@ export const createPatentSupportRequest = async (
     };
   });
 
+  const submittedAt = new Date();
   const patentRequest = await PatentRequest.create({
     studentId: userId,
     workspaceId: payload.workspaceId,
@@ -629,53 +633,99 @@ export const createPatentSupportRequest = async (
     proposedExaminationType: 'normal',
     publicDisclosureStatus: false,
     ...(payload.questionnaire ? { questionnaire: payload.questionnaire } : {}),
-    status: 'submitted',
-    submittedAt: new Date(),
+    status: requiresStartupRegistration ? 'draft' : 'submitted',
+    ...(requiresStartupRegistration ? {} : { submittedAt }),
+    ...(requiresStartupRegistration
+      ? {
+          nextActionRequired: 'Register a startup for this workspace to begin assisted patent filing.',
+          trackingTimeline: [
+            {
+              status: 'draft',
+              note: 'Patent support request received. Register a startup for this workspace so the patent team can begin drafting.',
+              updatedAt: submittedAt,
+              updatedBy: new Types.ObjectId(userId),
+            },
+          ],
+        }
+      : {
+          trackingTimeline: [
+            {
+              status: 'submitted',
+              note: 'Patent support request submitted for admin review.',
+              updatedAt: submittedAt,
+              updatedBy: new Types.ObjectId(userId),
+            },
+          ],
+        }),
     documents,
   });
 
-  await applyScore({
+  if (linkedStartup) {
+    await applyScore({
+      userId,
+      trigger: 'PATENT_SUBMITTED',
+      metadata: { workspaceId: payload.workspaceId, patentRequestId: String(patentRequest._id) },
+      idempotencyKey: `patent-submitted:${patentRequest._id}`,
+    });
+
+    linkedStartup.traction = {
+      ...(linkedStartup.traction ?? {}),
+      patentFiled: true,
+      patentType: 'promove_assisted',
+      patentApplicationId: String(patentRequest._id),
+    };
+    await linkedStartup.save();
+
+    await recordStartupLifecycleEvent({
+      startupId: linkedStartup?._id,
+      workspaceId: payload.workspaceId,
+      actorId: userId,
+      source: 'patent',
+      type: 'PATENT_SUPPORT_REQUESTED',
+      title: 'Patent support requested',
+      description: `${payload.projectTitle} was submitted for patent support.`,
+      status: patentRequest.status,
+      metadata: {
+        patentRequestId: String(patentRequest._id),
+        patentType: payload.patentType,
+        documentCount: documents.length,
+      },
+    });
+  }
+
+  await queueNotification({
     userId,
-    trigger: 'PATENT_SUBMITTED',
-    metadata: { workspaceId: payload.workspaceId, patentRequestId: String(patentRequest._id) },
-    idempotencyKey: `patent-submitted:${patentRequest._id}`,
+    type: 'patent_status',
+    title: requiresStartupRegistration
+      ? 'Patent support request received'
+      : 'Patent support request submitted',
+    body: requiresStartupRegistration
+      ? `Your patent support request for "${payload.projectTitle}" is saved as a draft. Register a startup for this workspace so the patent team can begin.`
+      : `Your patent support request for "${payload.projectTitle}" is now under review.`,
+    link: '/startup-launch',
   });
 
-  linkedStartup.traction = {
-    ...(linkedStartup.traction ?? {}),
-    patentFiled: true,
-    patentType: 'promove_assisted',
-    patentApplicationId: String(patentRequest._id),
-  };
-  await linkedStartup.save();
-
-  await recordStartupLifecycleEvent({
-    startupId: linkedStartup?._id,
-    workspaceId: payload.workspaceId,
-    actorId: userId,
-    source: 'patent',
-    type: 'PATENT_SUPPORT_REQUESTED',
-    title: 'Patent support requested',
-    description: `${payload.projectTitle} was submitted for patent support.`,
-    status: patentRequest.status,
-    metadata: {
-      patentRequestId: String(patentRequest._id),
-      patentType: payload.patentType,
-      documentCount: documents.length,
-    },
-  });
-
-  await notificationQueue.add('patent-request-submitted', {
-    userId,
-    requestId: patentRequest._id.toString(),
-    projectTitle: payload.projectTitle,
-  });
-
-  await notificationQueue.add('patent-request-admin-notify', {
-    requestId: patentRequest._id.toString(),
-    projectTitle: payload.projectTitle,
-    studentId: userId,
-  });
+  const admins = await User.find({ role: UserRole.ADMIN, isActive: true }).select('_id').lean();
+  await Promise.all(
+    admins.map((admin) =>
+      queueNotification({
+        userId: String(admin._id),
+        type: 'patent_status',
+        title: requiresStartupRegistration
+          ? 'New patent support draft awaiting startup'
+          : 'New patent support request',
+        body: requiresStartupRegistration
+          ? `${payload.projectTitle} was submitted but no startup is linked to the workspace yet.`
+          : `${payload.projectTitle} has been submitted for patent support.`,
+        link: '/admin/patents',
+        metadata: {
+          requestId: patentRequest._id.toString(),
+          studentId: userId,
+          requiresStartupRegistration,
+        },
+      }),
+    ),
+  );
 
   return serializePatentRequestForClient(patentRequest.toObject());
 };

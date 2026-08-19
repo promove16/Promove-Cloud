@@ -14,6 +14,7 @@ import {
   selectStudentFromHiringEventController,
   sendHiringEventInviteController,
   listStudentInstitutionDrivesController,
+  postponeHiringEventController,
 } from './event.controller';
 
 const router = Router();
@@ -24,6 +25,11 @@ router.get('/my-institution', authorize(UserRole.STUDENT), asyncHandler(listStud
 router.get('/drives', authorize(UserRole.STUDENT), asyncHandler(listStudentInstitutionDrivesController));
 router.get('/hiring', authorize(UserRole.RECRUITER), asyncHandler(listRecruiterHiringEventsController));
 router.post('/hiring-invite/:collegeId', authorize(UserRole.RECRUITER), asyncHandler(sendHiringEventInviteController));
+router.patch(
+  '/:eventId/postpone',
+  authorize(UserRole.RECRUITER),
+  asyncHandler(postponeHiringEventController),
+);
 router.post(
   '/hiring/:eventId/select/:studentId',
   authorize(UserRole.RECRUITER),

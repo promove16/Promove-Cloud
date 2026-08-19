@@ -51,6 +51,7 @@ type PatentQuestionConfig =
       minLength: number;
       type?: "textarea";
       options?: never;
+      required?: boolean;
     }
   | {
       key: keyof PatentQuestionnaire;
@@ -58,6 +59,7 @@ type PatentQuestionConfig =
       type: "select";
       options: readonly PatentQuestionOption[];
       minLength?: never;
+      required?: boolean;
     };
 
 type PatentQuestionSection = {
@@ -101,12 +103,14 @@ const QUESTION_SECTIONS: readonly PatentQuestionSection[] = [
         label:
           "What problem does your innovation solve, and who are the primary users or stakeholders affected by this problem?",
         minLength: 40,
+        required: true,
       },
       {
         key: "solutionDifferentiation",
         label:
           "How is your solution different from existing solutions currently available in the market?",
         minLength: 40,
+        required: true,
       },
     ],
   },
@@ -118,6 +122,7 @@ const QUESTION_SECTIONS: readonly PatentQuestionSection[] = [
         label:
           "What is the core unique feature or innovation in your solution?",
         minLength: 30,
+        required: true,
       },
       {
         key: "priorArtStatus",
@@ -135,6 +140,7 @@ const QUESTION_SECTIONS: readonly PatentQuestionSection[] = [
         label:
           "Explain the working mechanism or process flow of your innovation.",
         minLength: 40,
+        required: true,
       },
       {
         key: "keyComponents",
@@ -2389,12 +2395,17 @@ function AdminAssistPatentForm({
     }
   };
 
-  const allIntakeValid = QUESTION_SECTIONS.every((section) =>
-    section.questions.every((question) => {
-      const value = (intakeAnswers[question.key] || "").trim();
-      return value.length > 0;
-    }),
-  );
+  const allQuestions = QUESTION_SECTIONS.flatMap((section) => section.questions);
+  const requiredQuestionCount = allQuestions.filter(
+    (question) => question.required !== false,
+  ).length;
+  const completedRequiredQuestionCount = allQuestions.filter(
+    (question) =>
+      question.required !== false &&
+      (intakeAnswers[question.key] || "").trim().length > 0,
+  ).length;
+  const allIntakeValid =
+    requiredQuestionCount === completedRequiredQuestionCount;
   const effectiveProjectTitle = (
     projectTitle ||
     activeWorkspace?.title ||
@@ -2648,7 +2659,8 @@ const canEditDocuments = !!activeRequest &&
                   Patent Intake Questionnaire
                 </div>
                 <div className="text-xs text-slate-500">
-                  Complete each field to submit your request
+                  Complete the required fields; optional questions may be left
+                  blank
                 </div>
               </div>
               <div className="space-y-4">
@@ -2662,7 +2674,13 @@ const canEditDocuments = !!activeRequest &&
                         <div key={question.key}>
                           <label className="mb-1 block text-sm text-slate-400">
                             {question.label}{" "}
-                            <span className="text-red-400">*</span>
+                            {question.required !== false ? (
+                              <span className="text-red-400">*</span>
+                            ) : (
+                              <span className="text-slate-600">
+                                Optional
+                              </span>
+                            )}
                           </label>
                           {question.type === "select" ? (
                             <select
@@ -2700,13 +2718,17 @@ const canEditDocuments = !!activeRequest &&
                                   (intakeAnswers[question.key] || "").trim()
                                     .length > 0
                                     ? "text-green-400"
-                                    : "text-amber-500/70"
+                                    : question.required !== false
+                                      ? "text-amber-500/70"
+                                      : "text-slate-600"
                                 }`}
                               >
                                 {(intakeAnswers[question.key] || "").trim()
                                   .length > 0
                                   ? "Completed"
-                                  : "Required"}
+                                  : question.required !== false
+                                    ? "Required"
+                                    : "Optional"}
                               </div>
                             </div>
                           )}
@@ -2846,6 +2868,12 @@ const canEditDocuments = !!activeRequest &&
 
           {submitError && <p className="text-sm text-red-400">{submitError}</p>}
 
+          <p className="text-xs text-slate-500">
+            If no startup is registered for this workspace yet, your request
+            will be saved as a draft and the patent team will guide you to
+            register one before filing begins.
+          </p>
+
           <button
             type="button"
             onClick={() => submitMutation.mutate()}
@@ -2864,7 +2892,9 @@ const canEditDocuments = !!activeRequest &&
           </button>
           {!allIntakeValid && (
             <p className="text-xs text-slate-500">
-              Complete all intake questions to enable submission.
+              Complete the {requiredQuestionCount} required intake questions (
+              {completedRequiredQuestionCount} of {requiredQuestionCount} done)
+              to enable submission. Optional questions may be left blank.
             </p>
           )}
           {(!isProjectTitleValid || !isRequestDescriptionValid) && (
@@ -2905,6 +2935,24 @@ const canEditDocuments = !!activeRequest &&
               </span>
             </div>
           </div>
+
+          {activeRequest.status === "draft" ? (
+            <div className="rounded-xl border border-amber-500/20 bg-amber-500/5 px-5 py-4">
+              <div className="flex items-start gap-3">
+                <FileText className="mt-0.5 h-5 w-5 shrink-0 text-amber-400" />
+                <div>
+                  <div className="text-sm font-semibold text-amber-200">
+                    Startup registration required
+                  </div>
+                  <p className="mt-1 text-sm leading-6 text-amber-100/80">
+                    Your patent support request is saved as a draft. Register a
+                    startup for this workspace before filing so the patent team
+                    can begin drafting.
+                  </p>
+                </div>
+              </div>
+            </div>
+          ) : null}
 
           {/* Tabs */}
           <div className="flex gap-1 border-b border-slate-800">

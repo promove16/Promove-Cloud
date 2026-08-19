@@ -1,6 +1,5 @@
 import { Types } from 'mongoose';
 import { z } from 'zod';
-import { notificationQueue } from '../../config/bullmq';
 import { applyScore, applyScoreAsync } from '../../services/scoreEngine';
 import { deleteStoredAsset, extractS3KeyFromUrl, generatePresignedUrl, uploadFile } from '../../services/fileStorageService';
 import { generateSignedCloudinaryUrl } from '../../services/cloudinaryService';
@@ -18,6 +17,7 @@ import { recordStartupLifecycleEvent } from '../startupLifecycle/startupLifecycl
 import { DirectMessage } from '../dm/dm.model';
 import { serializeDirectMessage } from '../dm/dm.serializer';
 import { NotificationService } from '../notification/notification.service';
+import { queueNotification } from '../notification/notification.delivery';
 import { RequestRecord } from '../request/request.model';
 import { Patent } from '../patent/patent.model';
 import { PatentRequest } from '../patent/patentRequest.model';
@@ -1870,7 +1870,7 @@ export const launchStartup = async (
 
   await Promise.all(
     recipients.map((recipient) =>
-      notificationQueue.add('startup-launch', {
+      queueNotification({
         userId: String(recipient._id),
         ...getLaunchNotification(recipient.role),
       }),
@@ -2003,12 +2003,17 @@ export const sendPitchRequest = async (
     },
   });
 
-  await notificationQueue.add('send-pitch-request-notification', {
-    recipientId: investorObjectId.toString(),
-    startupId: startup._id.toString(),
-    startupName: startup.name,
-    founderName: startup.founderIds[0]?.toString(),
-    type: 'pitch_request',
+  await queueNotification({
+    userId: investorObjectId.toString(),
+    type: 'request',
+    title: 'New startup pitch request',
+    body: `${startup.name} sent you a pitch request. Review the startup and request details.`,
+    link: '/dashboard/investor',
+    metadata: {
+      startupId: startup._id.toString(),
+      startupName: startup.name,
+      founderId: studentObjectId.toString(),
+    },
   });
 
   return serializeStartup(startup);
@@ -2065,13 +2070,18 @@ export const respondToPitchRequest = async (
     },
   });
 
-  await notificationQueue.add('pitch-request-response-notification', {
-    recipientId: request.investorId.toString(),
-    startupId: startup._id.toString(),
-    startupName: startup.name,
-    decision,
-    note,
-    type: 'pitch_request_response',
+  await queueNotification({
+    userId: request.investorId.toString(),
+    type: 'request',
+    title: `Pitch request ${decision}`,
+    body: `${startup.name} ${decision} your pitch request${note ? `: ${note}` : '.'}`,
+    link: '/dashboard/investor',
+    metadata: {
+      startupId: startup._id.toString(),
+      startupName: startup.name,
+      decision,
+      ...(note ? { note } : {}),
+    },
   });
 
   return serializeStartup(startup);

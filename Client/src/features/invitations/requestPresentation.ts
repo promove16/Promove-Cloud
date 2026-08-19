@@ -11,6 +11,7 @@ export const REQUEST_TYPE_LABELS: Record<WorkflowRequest['type'], string> = {
   recruiter_job_invite: 'Job invite',
   campus_drive_registration: 'Campus drive registration',
   college_event_invite: 'Event invite',
+  college_event_reschedule: 'Event postponement',
   college_recruiter_partnership: 'Recruiter partnership',
   patent_coinventor: 'Patent co-inventor',
   problem_review: 'Problem review',
@@ -60,6 +61,9 @@ const METADATA_LABELS: Record<string, string> = {
   title: 'Event title',
   type: 'Event type',
   date: 'Scheduled for',
+  previousDate: 'Previous date',
+  newDate: 'Requested date',
+  reason: 'Reason',
   description: 'Event brief',
   minimumInnovationScore: 'Minimum score',
   subject: 'Request subject',
@@ -233,7 +237,7 @@ const getJobPath = (request: WorkflowRequest) => {
 };
 
 const getCollegeEventInviteAction = (request: WorkflowRequest, viewerUserId?: string) => {
-  if (request.type !== 'college_event_invite') {
+  if (request.type !== 'college_event_invite' && request.type !== 'college_event_reschedule') {
     return null;
   }
 

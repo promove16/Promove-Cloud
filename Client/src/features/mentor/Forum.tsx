@@ -14,6 +14,8 @@ import {
 import { Link } from 'react-router-dom';
 import { forumApi, ForumPost, ForumAnswer } from '../../api/forum.api';
 import { useAuthStore } from '../../store/authStore';
+import { UserRole } from '../../types/roles.types';
+import { toast } from 'sonner';
 import { ResearchNote } from '../../components/ui/ResearchSpotlight';
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
@@ -115,20 +117,37 @@ function AnswerCard({
   answer,
   myId,
   postId,
+  canVerify,
+  postSolved,
 }: {
   answer: ForumAnswer;
   myId: string;
   postId: string;
+  canVerify: boolean;
+  postSolved: boolean;
 }) {
   const queryClient = useQueryClient();
   const alreadyVoted = answer.helpfulVotes.includes(myId);
+  const invalidate = () => {
+    void queryClient.invalidateQueries({ queryKey: ['forum', 'post', postId] });
+    void queryClient.invalidateQueries({ queryKey: ['forum', 'posts'] });
+  };
 
   const mutation = useMutation({
     mutationFn: () => forumApi.markHelpful(answer._id),
-    onSuccess: () => {
-      void queryClient.invalidateQueries({ queryKey: ['forum', 'post', postId] });
-    },
+    onSuccess: invalidate,
   });
+
+  const verifyMutation = useMutation({
+    mutationFn: () => forumApi.markVerifiedSolution(answer._id),
+    onSuccess: () => {
+      toast.success('Marked as the verified solution');
+      invalidate();
+    },
+    onError: (error: Error) => toast.error(error.message),
+  });
+
+  const showVerifyButton = canVerify && !postSolved && !answer.isVerifiedSolution;
 
   return (
     <div
@@ -145,24 +164,36 @@ function AnswerCard({
         </div>
       )}
       <p className="text-sm text-slate-200 whitespace-pre-wrap">{answer.body}</p>
-      <div className="mt-3 flex items-center justify-between gap-3">
+      <div className="mt-3 flex flex-wrap items-center justify-between gap-3">
         <div className="flex items-center gap-3 text-xs text-slate-500">
           <span>{answer.authorId?.displayName}</span>
           <RoleBadge role={answer.authorRole} />
           <span>{fmt(answer.createdAt)}</span>
         </div>
-        <button
-          onClick={() => mutation.mutate()}
-          disabled={mutation.isPending}
-          className={`inline-flex items-center gap-1.5 rounded-lg border px-2.5 py-1.5 text-xs font-semibold transition ${
-            alreadyVoted
-              ? 'border-violet-500/30 bg-violet-500/10 text-violet-300'
-              : 'border-slate-700 text-slate-400 hover:border-violet-500/30 hover:text-violet-300'
-          }`}
-        >
-          <ThumbsUp className="h-3 w-3" />
-          {answer.helpfulCount} helpful
-        </button>
+        <div className="flex items-center gap-2">
+          {showVerifyButton && (
+            <button
+              onClick={() => verifyMutation.mutate()}
+              disabled={verifyMutation.isPending}
+              className="inline-flex items-center gap-1.5 rounded-lg border border-emerald-500/30 bg-emerald-500/10 px-2.5 py-1.5 text-xs font-semibold text-emerald-300 transition hover:bg-emerald-500/20 disabled:opacity-50"
+            >
+              <CheckCircle2 className="h-3 w-3" />
+              {verifyMutation.isPending ? 'Marking…' : 'Mark as Solution'}
+            </button>
+          )}
+          <button
+            onClick={() => mutation.mutate()}
+            disabled={mutation.isPending}
+            className={`inline-flex items-center gap-1.5 rounded-lg border px-2.5 py-1.5 text-xs font-semibold transition ${
+              alreadyVoted
+                ? 'border-violet-500/30 bg-violet-500/10 text-violet-300'
+                : 'border-slate-700 text-slate-400 hover:border-violet-500/30 hover:text-violet-300'
+            }`}
+          >
+            <ThumbsUp className="h-3 w-3" />
+            {answer.helpfulCount} helpful
+          </button>
+        </div>
       </div>
     </div>
   );
@@ -236,7 +267,14 @@ function PostDetail({ postId, onBack }: { postId: string; onBack: () => void }) 
           <div className="space-y-3">
             <h2 className="text-sm font-semibold text-white">{answers.length} Answer{answers.length !== 1 ? 's' : ''}</h2>
             {answers.map((a) => (
-              <AnswerCard key={a._id} answer={a} myId={user?._id ?? ''} postId={postId} />
+              <AnswerCard
+                key={a._id}
+                answer={a}
+                myId={user?._id ?? ''}
+                postId={postId}
+                canVerify={Boolean(user && (user.role === UserRole.ADMIN || user._id === post.authorId._id))}
+                postSolved={post.solved}
+              />
             ))}
           </div>
 
@@ -245,6 +283,9 @@ function PostDetail({ postId, onBack }: { postId: string; onBack: () => void }) 
             <h2 className="text-sm font-semibold text-white">Your Answer</h2>
             <p className="text-xs text-slate-500">
               Mentor answers earn +5 pts per helpful vote and +15 pts when marked as a verified solution.
+              {user?._id === post.authorId._id
+                ? ' You asked this question — mark a mentor answer as the solution to award +15 pts.'
+                : ''}
             </p>
             <ResearchNote
               icon={Users}

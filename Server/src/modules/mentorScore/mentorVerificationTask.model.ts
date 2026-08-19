@@ -6,6 +6,7 @@ const TASK_TYPES = [
   'curriculum_pdf',
   'class_photo',
   'industry_session',
+  'prototype_velocity',
   'demo_day',
   'outcome_bonus',
 ] as const;

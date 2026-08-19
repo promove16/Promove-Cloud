@@ -343,6 +343,13 @@ export const recruiterApi = {
     );
     return response.data.data;
   },
+  async postponeEvent(eventId: string, payload: { newDate: string; reason: string }) {
+    const response = await api.patch<ApiSuccessResponse<{ requested: boolean; requestId: string; newDate: string }>>(
+      `/api/events/${eventId}/postpone`,
+      payload,
+    );
+    return response.data.data;
+  },
   async getColleges() {
     const response = await api.get<ApiSuccessResponse<RecruiterCollegeCard[]>>('/api/recruiter/colleges');
     return (response.data.data ?? []).map((college) => normalizeCollegeCard(college));

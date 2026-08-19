@@ -30,12 +30,13 @@ const daysSince = (d: string) =>
   Math.floor((Date.now() - new Date(d).getTime()) / 86_400_000);
 
 const TASK_TYPE_LABEL: Record<MentorVerificationTask['type'], string> = {
-  lab_sync:         'Lab Hardware Sync',
-  curriculum_pdf:   'Curriculum PDF',
-  class_photo:      'Class Photo',
-  industry_session: 'Industry Session',
-  demo_day:         'Demo Day',
-  outcome_bonus:    'Outcome Bonus',
+  lab_sync:            'Lab Hardware Sync',
+  curriculum_pdf:      'Curriculum PDF',
+  class_photo:         'Class Photo',
+  industry_session:    'Industry Session',
+  prototype_velocity:  'Prototype Velocity',
+  demo_day:            'Demo Day',
+  outcome_bonus:       'Outcome Bonus',
 };
 
 function Input(props: React.InputHTMLAttributes<HTMLInputElement>) {
@@ -329,6 +330,7 @@ function VerificationsTab() {
           <option value="curriculum_pdf">Curriculum PDF</option>
           <option value="class_photo">Class Photo</option>
           <option value="industry_session">Industry Session</option>
+          <option value="prototype_velocity">Prototype Velocity</option>
           <option value="demo_day">Demo Day</option>
           <option value="outcome_bonus">Outcome Bonus</option>
         </select>

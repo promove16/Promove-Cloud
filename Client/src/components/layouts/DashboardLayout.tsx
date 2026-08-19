@@ -276,6 +276,7 @@ const getUnreadSidebarNotificationState = (notifications: NotificationItem[]) =>
         !state.events &&
         (hasNotificationTarget(targets, SIDEBAR_NOTIFICATION_PATHS.events) ||
           notification.metadata?.requestType === 'college_event_invite' ||
+          notification.metadata?.requestType === 'college_event_reschedule' ||
           notification.metadata?.requestType === 'campus_drive_registration')
       ) {
         state.events = true;

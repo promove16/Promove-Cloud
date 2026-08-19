@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { useQuery } from '@tanstack/react-query';
+import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { useNavigate } from 'react-router-dom';
 import { BriefcaseBusiness, ChevronDown, ChevronUp, Mail, ShieldCheck, Sparkles, X } from 'lucide-react';
 import { recruiterApi } from '../../api/recruiter.api';
@@ -7,6 +7,8 @@ import { Badge } from '../../components/ui/Badge';
 import { Button } from '../../components/ui/Button';
 import { Card } from '../../components/ui/Card';
 import { Spinner } from '../../components/ui/Spinner';
+import { toast } from 'sonner';
+import { getApiErrorMessage } from '../../utils/apiError';
 
 type Props = {
   studentId: string | null;
@@ -37,6 +39,7 @@ export function StudentProfileDrawer({
   activeJobCount = 0,
 }: Props) {
   const navigate = useNavigate();
+  const queryClient = useQueryClient();
   const [showAllJourney, setShowAllJourney] = useState(false);
   const profileQuery = useQuery({
     queryKey: ['recruiter', 'student-profile', studentId],
@@ -63,10 +66,24 @@ export function StudentProfileDrawer({
     navigate(`/dashboard/messages/${studentId}`);
   };
 
-  const handleShortlist = async () => {
-    if (!studentId) return;
-    await recruiterApi.shortlistStudent(studentId);
-    onChanged?.();
+  const shortlistMutation = useMutation({
+    mutationFn: (targetStudentId: string) => recruiterApi.shortlistStudent(targetStudentId),
+    onSuccess: async (_, targetStudentId) => {
+      await Promise.all([
+        queryClient.invalidateQueries({ queryKey: ['recruiter', 'student-profile', targetStudentId] }),
+        queryClient.invalidateQueries({ queryKey: ['recruiter', 'talent'] }),
+      ]);
+      toast.success('Candidate shortlisted and connected!');
+      onChanged?.();
+    },
+    onError: (error) => {
+      toast.error(getApiErrorMessage(error, 'Failed to shortlist this candidate.'));
+    },
+  });
+
+  const handleShortlist = () => {
+    if (!studentId || shortlistMutation.isPending) return;
+    shortlistMutation.mutate(studentId);
   };
 
   const handleInvite = () => {
@@ -287,11 +304,16 @@ export function StudentProfileDrawer({
               <Button
                 data-testid="shortlist-btn"
                 onClick={handleShortlist}
-                disabled={profile.canContact}
+                disabled={profile.canContact || shortlistMutation.isPending}
                 variant={onInviteToJob ? 'secondary' : 'primary'}
+                title={profile.canContact ? 'This candidate is already shortlisted and available to message.' : undefined}
               >
                 <ShieldCheck className="mr-2 h-4 w-4" />
-                Shortlist to Connect
+                {profile.canContact
+                  ? 'Connected / Shortlisted'
+                  : shortlistMutation.isPending
+                    ? 'Shortlisting...'
+                    : 'Shortlist to Connect'}
               </Button>
               <Button variant="secondary" onClick={onClose}>
                 Close

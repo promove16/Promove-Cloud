@@ -21,6 +21,7 @@ import {
   VerificationTaskStatus,
 } from './mentorScore.types';
 import { getPhaseForTrigger as _getPhase } from './mentorScore.service';
+import { CURRICULUM_PDF_POINTS, getClassPhotoPoints } from './mentorScore.curriculum';
 
 // ─── Verification Queue ───────────────────────────────────────────────────────
 
@@ -60,15 +61,49 @@ export const approveVerificationTask = async (req: Request, res: Response) => {
     throw new ApiError(400, 'TASK_ALREADY_REVIEWED', 'Task has already been reviewed');
   }
 
+  let defaultPoints = task.pointsToAward;
+  if (task.type === 'curriculum_pdf') {
+    defaultPoints = CURRICULUM_PDF_POINTS;
+  } else if (task.type === 'class_photo') {
+    const curriculumTaskId = String(task.submissionData.curriculumTaskId ?? '');
+    const classIndex = Number(task.submissionData.classIndex);
+    const curriculum = await MentorVerificationTask.findOne({
+      _id: curriculumTaskId,
+      mentorId: task.mentorId,
+      type: 'curriculum_pdf',
+      status: 'approved',
+    })
+      .select('submissionData.plannedClassesCount')
+      .lean();
+    const plannedClasses = Number(curriculum?.submissionData.plannedClassesCount);
+
+    if (
+      !curriculum ||
+      !Number.isInteger(plannedClasses) ||
+      plannedClasses < 1 ||
+      !Number.isInteger(classIndex) ||
+      classIndex < 1 ||
+      classIndex > plannedClasses
+    ) {
+      throw new ApiError(
+        400,
+        'INVALID_CURRICULUM_EVIDENCE',
+        'Class photo must reference a valid approved curriculum and planned class index',
+      );
+    }
+    defaultPoints = getClassPhotoPoints(plannedClasses, classIndex);
+  }
+
   const finalPoints = (typeof pointsOverride === 'number' && pointsOverride >= 0)
     ? pointsOverride
-    : task.pointsToAward;
+    : defaultPoints;
 
   const triggerMap: Record<string, MentorScoreTriggerType> = {
     lab_sync:          MentorScoreTrigger.LAB_HARDWARE_VERIFIED,
     curriculum_pdf:    MentorScoreTrigger.CURRICULUM_APPROVED,
     class_photo:       MentorScoreTrigger.CLASS_PHOTO_VERIFIED,
     industry_session:  MentorScoreTrigger.INDUSTRY_SESSION_VERIFIED,
+    prototype_velocity: MentorScoreTrigger.STUDENT_PROTOTYPE_TRANSITION,
     demo_day:          MentorScoreTrigger.DEMO_DAY_VERIFIED,
     outcome_bonus:     MentorScoreTrigger.MENTEE_OUTCOME_BONUS,
   };
@@ -78,16 +113,25 @@ export const approveVerificationTask = async (req: Request, res: Response) => {
 
   const phase = _getPhase(trigger);
 
+  // Prototype velocity is credited once per student per mentor — use a shared
+  // idempotency key so the milestone-verification hook and this task cannot
+  // double-award the same transition.
+  const idempotencyKey =
+    task.type === 'prototype_velocity'
+      ? `prototype:${String(task.submissionData.studentId ?? '')}:${task.mentorId}`
+      : `task_approved:${task._id}`;
+
   const newTotal = await awardMentorPoints({
     mentorId:       task.mentorId,
     trigger,
     delta:          finalPoints,
     phase,
-    idempotencyKey: `task_approved:${task._id}`,
+    idempotencyKey,
     metadata:       { adminId: req.user._id, taskId: task._id, taskType: task.type },
   });
 
   task.status     = 'approved';
+  task.pointsToAward = finalPoints;
   task.reviewedBy = new Types.ObjectId(String(req.user._id));
   task.reviewedAt = new Date();
   await task.save();
@@ -225,6 +269,37 @@ export const adminAdjustMentorScore = async (req: Request, res: Response) => {
   });
 
   res.json(new ApiResponse({ mentorId, delta, newTotal }));
+};
+
+// ─── Content Creator Bonus ──────────────────────────────────────────────────────
+
+export const awardContentCreatorBonus = async (req: Request, res: Response) => {
+  if (!req.user) throw new ApiError(401, 'UNAUTHORIZED', 'Not authenticated');
+
+  const { mentorId, points, reason } = req.body as {
+    mentorId: string;
+    points: number;
+    reason: string;
+  };
+
+  if (!mentorId || !points) {
+    throw new ApiError(400, 'MISSING_FIELDS', 'mentorId and points are required');
+  }
+
+  if (points <= 0 || points > 50) {
+    throw new ApiError(400, 'INVALID_POINTS', 'Points must be between 1 and 50');
+  }
+
+  const newTotal = await awardMentorPoints({
+    mentorId,
+    trigger:        MentorScoreTrigger.CONTENT_CREATOR_BONUS,
+    delta:          points,
+    phase:          3,
+    idempotencyKey: `content_creator:${mentorId}:${Date.now()}`,
+    metadata:       { points, reason, adminId: String(req.user._id) },
+  });
+
+  res.json(new ApiResponse({ mentorId, pointsAwarded: points, newTotal }));
 };
 
 // ─── Outcome Bonus ────────────────────────────────────────────────────────────

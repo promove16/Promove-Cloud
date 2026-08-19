@@ -247,6 +247,18 @@ export default function CampusEvents({ embedded = false }: CampusEventsProps) {
     },
   });
 
+  const postponeEventMutation = useMutation({
+    mutationFn: ({ eventId, newDate, reason }: { eventId: string; newDate: string; reason: string }) =>
+      recruiterApi.postponeEvent(eventId, { newDate, reason }),
+    onSuccess: async () => {
+      toast.success('Postponement request sent to the college for approval.');
+      await refreshData();
+    },
+    onError: (error) => {
+      toast.error(getApiErrorMessage(error, 'Failed to request event postponement.'));
+    },
+  });
+
   const canCreateInvite =
     Boolean(inviteForm.title.trim()) && Boolean(inviteForm.collegeId) && Boolean(inviteForm.date) && Boolean(inviteForm.description.trim()) && availableColleges.length > 0;
 
@@ -686,11 +698,15 @@ export default function CampusEvents({ embedded = false }: CampusEventsProps) {
           isSavingScore={scoreMutation.isPending && scoreMutation.variables?.eventId === selectedEvent._id}
           isAddingToPipeline={pipelineMutation.isPending && pipelineMutation.variables?.eventId === selectedEvent._id}
           isClosingEvent={closeEventMutation.isPending && closeEventMutation.variables === selectedEvent._id}
+          isPostponingEvent={postponeEventMutation.isPending && postponeEventMutation.variables?.eventId === selectedEvent._id}
           onClose={closeEventWorkspace}
           onComputeRankings={() => computeMutation.mutate(selectedEvent._id)}
           onSaveScore={() => scoreMutation.mutate({ eventId: selectedEvent._id, studentId: scoreDraft.studentId, score: Number(scoreDraft.score) })}
           onAddToPipeline={() => pipelineMutation.mutate({ eventId: selectedEvent._id, studentId: selectionDraft.studentId, jobId: selectionDraft.jobId, ...(selectionDraft.note.trim() ? { note: selectionDraft.note.trim() } : {}) })}
           onCloseEvent={() => closeEventMutation.mutate(selectedEvent._id)}
+          onPostponeEvent={async ({ newDate, reason }) => {
+            await postponeEventMutation.mutateAsync({ eventId: selectedEvent._id, newDate, reason });
+          }}
         />
       ) : null}
     </div>

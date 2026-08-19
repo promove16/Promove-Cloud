@@ -22,6 +22,7 @@ export interface MentorScoreBreakdown {
     sessions: number;
     equityLOIs: number;
     outcomeBonuses: number;
+    contentCreatorBonus: number;
   };
   mentorshipRating: number;
   incubationRate?: number;
@@ -41,7 +42,7 @@ export interface MentorScoreEvent {
 
 export interface MentorVerificationTask {
   _id: string;
-  type: 'lab_sync' | 'curriculum_pdf' | 'class_photo' | 'industry_session' | 'demo_day' | 'outcome_bonus';
+  type: 'lab_sync' | 'curriculum_pdf' | 'class_photo' | 'industry_session' | 'prototype_velocity' | 'demo_day' | 'outcome_bonus';
   status: 'pending' | 'approved' | 'rejected';
   pointsToAward: number;
   submissionUrls: string[];
@@ -129,6 +130,16 @@ export const mentorScoreApi = {
     evidenceUrl?: string;
   }) {
     const res = await api.post<ApiSuccessResponse<MentorVerificationTask>>('/api/mentor-score/submit/industry-session', body);
+    return res.data.data;
+  },
+
+  async submitPrototypeVelocity(body: {
+    studentId: string;
+    projectTitle: string;
+    stage: string;
+    photoUrls: string[];
+  }) {
+    const res = await api.post<ApiSuccessResponse<MentorVerificationTask>>('/api/mentor-score/submit/prototype-velocity', body);
     return res.data.data;
   },
 

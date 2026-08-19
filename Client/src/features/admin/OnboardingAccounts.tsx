@@ -27,6 +27,7 @@ import { InstitutionSearchField } from './InstitutionSearchField';
 import { StudentIntakePanel } from '../institution/StudentIntakePanel';
 import { formLabelClassName, getInstitutionLabel } from './mentorshipAdminShared';
 import UserRequests from './UserRequests';
+import UserDirectoryPanel from './UserDirectoryPanel';
 
 type OnboardRole =
   | UserRole.STUDENT
@@ -712,6 +713,7 @@ export default function OnboardingAccounts() {
               : 'xl:border-l xl:border-slate-800/80 xl:pl-8'
           }`}
         >
+          <UserDirectoryPanel role={role} />
           <div className="rounded-2xl border border-dashed border-slate-800 bg-slate-950/60 px-5 py-4 text-sm text-slate-400">
             <div className="text-xs font-semibold uppercase tracking-[0.22em] text-cyan-300">
               Direct requests

@@ -12,6 +12,7 @@ import { initMentorSocket } from '../sockets/mentorSocket';
 import { initDmSocket } from '../sockets/dmSocket';
 import { initBidSocket } from '../sockets/bidSocket';
 import { socketConnections } from '../middleware/metrics';
+import { ensureNotificationFanoutSubscription } from './notificationFanout';
 
 let warnedAboutMissingSocketServer = false;
 
@@ -116,6 +117,7 @@ export const initSocket = async (httpServer: HttpServer): Promise<SocketServer> 
 
   await attachRedisAdapter(io);
   attachConnectionMetrics(io);
+  ensureNotificationFanoutSubscription(io);
 
   initScoreSocket(io);
   initChatSocket(io);

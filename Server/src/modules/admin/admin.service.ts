@@ -1488,7 +1488,7 @@ export const verifyMilestone = async (adminId: string, milestoneId: string, mile
 
   // Award prototype velocity points to all mentors who worked with this student
   if (milestoneType === 'PROTOTYPE') {
-    void onPrototypeMilestoneVerified(String(workspace.ownerId), String(workspace._id));
+    await onPrototypeMilestoneVerified(String(workspace.ownerId), String(workspace._id));
   }
 
   return newScore;

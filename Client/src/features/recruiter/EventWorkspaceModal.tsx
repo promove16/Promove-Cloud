@@ -1,5 +1,5 @@
-import { useEffect, type Dispatch, type SetStateAction } from 'react';
-import { BriefcaseBusiness, Building2, CheckCircle2, Circle, Link2, LockKeyhole, X, XCircle } from 'lucide-react';
+import { useEffect, useState, type Dispatch, type SetStateAction } from 'react';
+import { BriefcaseBusiness, Building2, CalendarClock, CheckCircle2, Circle, Link2, LockKeyhole, X, XCircle } from 'lucide-react';
 import { Badge } from '../../components/ui/Badge';
 import { Button } from '../../components/ui/Button';
 import { Card } from '../../components/ui/Card';
@@ -28,11 +28,13 @@ type EventWorkspaceModalProps = {
   isSavingScore: boolean;
   isAddingToPipeline: boolean;
   isClosingEvent: boolean;
+  isPostponingEvent: boolean;
   onClose: () => void;
   onComputeRankings: () => void;
   onSaveScore: () => void;
   onAddToPipeline: () => void;
   onCloseEvent: () => void;
+  onPostponeEvent: (payload: { newDate: string; reason: string }) => Promise<void>;
 };
 
 type WorkflowStepStatus = 'complete' | 'active' | 'locked';
@@ -45,6 +47,11 @@ const formatEventDate = (value: string) =>
     hour: '2-digit',
     minute: '2-digit',
   });
+
+const toLocalDateTimeInput = (value: Date) => {
+  const offsetMs = value.getTimezoneOffset() * 60 * 1000;
+  return new Date(value.getTime() - offsetMs).toISOString().slice(0, 16);
+};
 
 const workflowStepClass: Record<WorkflowStepStatus, string> = {
   complete: 'border-emerald-500/40 bg-emerald-500/15 text-emerald-200 shadow-sm shadow-emerald-500/10',
@@ -75,12 +82,17 @@ export function EventWorkspaceModal({
   isSavingScore,
   isAddingToPipeline,
   isClosingEvent,
+  isPostponingEvent,
   onClose,
   onComputeRankings,
   onSaveScore,
   onAddToPipeline,
   onCloseEvent,
+  onPostponeEvent,
 }: EventWorkspaceModalProps) {
+  const [isPostponeOpen, setIsPostponeOpen] = useState(false);
+  const [postponeDate, setPostponeDate] = useState('');
+  const [postponeReason, setPostponeReason] = useState('');
   const rankingsFinalized = Boolean(event.rankingsComputedAt);
   const scoredParticipantsCount = event.participants.filter((participant) => typeof participant.submissionScore === 'number').length;
   const remainingScores = event.participants.length - scoredParticipantsCount;
@@ -93,6 +105,13 @@ export function EventWorkspaceModal({
   const showScoringPanel = event.isActive && !rankingsFinalized;
   const showPipelinePanel = rankingsFinalized && Boolean(selectedParticipant) && !selectedParticipant?.selectedJobId;
   const showSidePanel = showScoringPanel || showPipelinePanel;
+  const minimumPostponeDate = toLocalDateTimeInput(
+    new Date(Math.max(Date.now(), new Date(event.scheduledAt).getTime()) + 60 * 1000),
+  );
+  const canSubmitPostponement =
+    postponeReason.trim().length >= 5 &&
+    Boolean(postponeDate) &&
+    new Date(postponeDate).getTime() > new Date(event.scheduledAt).getTime();
 
   const workflowSteps: Array<{
     label: string;
@@ -156,7 +175,11 @@ export function EventWorkspaceModal({
     const previousOverflow = document.body.style.overflow;
     const handleKeyDown = (keyboardEvent: KeyboardEvent) => {
       if (keyboardEvent.key === 'Escape') {
-        onClose();
+        if (isPostponeOpen) {
+          setIsPostponeOpen(false);
+        } else {
+          onClose();
+        }
       }
     };
 
@@ -167,7 +190,7 @@ export function EventWorkspaceModal({
       document.body.style.overflow = previousOverflow;
       window.removeEventListener('keydown', handleKeyDown);
     };
-  }, [onClose]);
+  }, [isPostponeOpen, onClose]);
 
   return (
     <div
@@ -218,6 +241,21 @@ export function EventWorkspaceModal({
                   }
                 >
                   {isComputingRankings ? 'Computing...' : 'Compute Rankings'}
+                </Button>
+              ) : null}
+              {event.isActive ? (
+                <Button
+                  variant="secondary"
+                  onClick={() => {
+                    setPostponeDate(minimumPostponeDate);
+                    setPostponeReason('');
+                    setIsPostponeOpen(true);
+                  }}
+                  disabled={isPostponingEvent || rankingsFinalized}
+                  title={rankingsFinalized ? 'An event with finalized rankings cannot be postponed.' : undefined}
+                >
+                  <CalendarClock className="mr-2 h-4 w-4" />
+                  Postpone Event
                 </Button>
               ) : null}
               {event.isActive ? (
@@ -501,6 +539,91 @@ export function EventWorkspaceModal({
           </div>
         </div>
       </section>
+
+      {isPostponeOpen ? (
+        <div
+          className="absolute inset-0 z-20 flex items-center justify-center bg-slate-950/80 p-4 backdrop-blur-sm"
+          onMouseDown={(mouseEvent) => {
+            if (mouseEvent.target === mouseEvent.currentTarget && !isPostponingEvent) {
+              setIsPostponeOpen(false);
+            }
+          }}
+        >
+          <section
+            role="dialog"
+            aria-modal="true"
+            aria-labelledby="postpone-event-title"
+            className="w-full max-w-lg rounded-2xl border border-cyan-500/30 bg-[#0c1630] p-6 shadow-2xl shadow-black/60"
+          >
+            <div className="flex items-start justify-between gap-4">
+              <div>
+                <div className="text-xs font-semibold uppercase tracking-[0.25em] text-cyan-300">College approval required</div>
+                <h3 id="postpone-event-title" className="mt-2 text-xl font-semibold text-white">Postpone {event.title}</h3>
+                <p className="mt-2 text-sm leading-6 text-slate-400">
+                  The current date remains unchanged until {event.collegeName} accepts this request.
+                </p>
+              </div>
+              <Button
+                variant="ghost"
+                size="sm"
+                className="h-9 w-9 rounded-full p-0"
+                aria-label="Close postponement request"
+                onClick={() => setIsPostponeOpen(false)}
+                disabled={isPostponingEvent}
+              >
+                <X className="h-4 w-4" />
+              </Button>
+            </div>
+
+            <div className="mt-5 space-y-4">
+              <label className="block text-sm text-slate-300">
+                New date and time
+                <Input
+                  type="datetime-local"
+                  min={minimumPostponeDate}
+                  value={postponeDate}
+                  onChange={(changeEvent) => setPostponeDate(changeEvent.target.value)}
+                  className="mt-2"
+                />
+              </label>
+              <label className="block text-sm text-slate-300">
+                Reason
+                <textarea
+                  value={postponeReason}
+                  onChange={(changeEvent) => setPostponeReason(changeEvent.target.value)}
+                  rows={4}
+                  maxLength={500}
+                  placeholder="Explain why the event needs to move"
+                  className="mt-2 w-full rounded-lg border border-slate-800 bg-slate-950 px-4 py-3 text-white outline-none focus:border-cyan-500"
+                />
+              </label>
+            </div>
+
+            <div className="mt-6 flex justify-end gap-3">
+              <Button variant="secondary" onClick={() => setIsPostponeOpen(false)} disabled={isPostponingEvent}>
+                Cancel
+              </Button>
+              <Button
+                onClick={async () => {
+                  try {
+                    await onPostponeEvent({
+                      newDate: new Date(postponeDate).toISOString(),
+                      reason: postponeReason.trim(),
+                    });
+                    setIsPostponeOpen(false);
+                  } catch {
+                    // The parent mutation reports the API error and keeps this form open for correction.
+                  }
+                }}
+                disabled={isPostponingEvent || !canSubmitPostponement}
+              >
+                <CalendarClock className="mr-2 h-4 w-4" />
+                {isPostponingEvent ? 'Sending...' : 'Send for Approval'}
+              </Button>
+            </div>
+          </section>
+        </div>
+      ) : null}
     </div>
   );
 }

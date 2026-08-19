@@ -1,3 +1,4 @@
+import { HydratedDocument } from 'mongoose';
 import { z } from 'zod';
 import { notificationQueue } from '../../config/bullmq';
 import { buildContentDisposition, extractS3KeyFromUrl, generatePresignedUrl } from '../../services/fileStorageService';
@@ -8,6 +9,7 @@ import { User } from '../user/user.model';
 import { UserRole } from '../../types/roles.types';
 import { Workspace } from '../workspace/workspace.model';
 import { Startup } from '../startup/startup.model';
+import type { IStartup } from '../startup/startup.types';
 import { recordStartupLifecycleEvent } from '../startupLifecycle/startupLifecycle.service';
 import { Patent } from './patent.model';
 import { PatentRequest } from './patentRequest.model';
@@ -161,7 +163,22 @@ const serializePatentForClient = async (patent: IPatent) => ({
   ),
 });
 
-export const resolveStartupForPatentSubmission = async (userId: string, workspaceId: string) => {
+type PatentLinkedStartup = HydratedDocument<IStartup>;
+
+export async function resolveStartupForPatentSubmission(
+  userId: string,
+  workspaceId: string,
+): Promise<PatentLinkedStartup>;
+export async function resolveStartupForPatentSubmission(
+  userId: string,
+  workspaceId: string,
+  options: { requireStartup: false },
+): Promise<PatentLinkedStartup | null>;
+export async function resolveStartupForPatentSubmission(
+  userId: string,
+  workspaceId: string,
+  options?: { requireStartup?: boolean },
+): Promise<PatentLinkedStartup | null> {
   const linkedStartup = await Startup.findOne({
     projectId: workspaceId,
     isActive: true,
@@ -169,6 +186,10 @@ export const resolveStartupForPatentSubmission = async (userId: string, workspac
   });
 
   if (!linkedStartup) {
+    if (options?.requireStartup === false) {
+      return null;
+    }
+
     throw new ApiError(
       400,
       'STARTUP_REQUIRED_FOR_PATENT',
@@ -190,7 +211,7 @@ export const resolveStartupForPatentSubmission = async (userId: string, workspac
   }
 
   return linkedStartup;
-};
+}
 
 export const submitPatent = async (userId: string, payload: z.infer<typeof patentSubmissionSchema>) => {
   const workspace = await Workspace.findOne({

@@ -280,7 +280,7 @@ export default function EventManager({
   const eventInviteRequests = useMemo(
     () =>
       (eventRequestsQuery.data ?? []).filter(
-        (request) => request.type === 'college_event_invite',
+        (request) => request.type === 'college_event_invite' || request.type === 'college_event_reschedule',
       ),
     [eventRequestsQuery.data],
   );
@@ -366,10 +366,18 @@ export default function EventManager({
       const eventId = getRequestMetadataString(request, 'eventId');
       if (variables.action === 'accept' && eventId) {
         nextSearchParams.set('eventId', eventId);
-        toast.success('Event added to the hiring calendar. The recruiter and eligible students were notified.');
+        toast.success(
+          request.type === 'college_event_reschedule'
+            ? 'New event date approved. The recruiter and registered students were notified.'
+            : 'Event added to the hiring calendar. The recruiter and eligible students were notified.',
+        );
       } else {
         nextSearchParams.delete('eventId');
-        toast.success('Event request declined.');
+        toast.success(
+          request.type === 'college_event_reschedule'
+            ? 'Event postponement declined. The current date is unchanged.'
+            : 'Event request declined.',
+        );
       }
       setSearchParams(nextSearchParams, { replace: true });
     },
@@ -780,8 +788,12 @@ export default function EventManager({
           ) : (
             <div className="divide-y divide-slate-800">
               {eventInviteRequests.map((request) => {
-                const title = getRequestMetadataString(request, 'title') ?? 'Untitled event';
-                const scheduledAt = getRequestMetadataString(request, 'date');
+                const isReschedule = request.type === 'college_event_reschedule';
+                const title =
+                  getRequestMetadataString(request, 'title') ??
+                  getRequestMetadataString(request, 'entityName') ??
+                  'Untitled event';
+                const scheduledAt = getRequestMetadataString(request, isReschedule ? 'newDate' : 'date');
                 return (
                   <div
                     key={request._id}
@@ -790,6 +802,7 @@ export default function EventManager({
                     <div className="min-w-0">
                       <div className="flex flex-wrap items-center gap-2">
                         <span className="font-semibold text-white">{title}</span>
+                        {isReschedule ? <Badge className="border-cyan-500/30 bg-cyan-950/50 text-cyan-300">Postponement</Badge> : null}
                         <Badge className={getRequestStatusClassName(request.status)}>
                           {request.status.replace(/_/g, ' ')}
                         </Badge>
@@ -1360,10 +1373,17 @@ export default function EventManager({
         ).length;
         const declinedRequests = recruiterRequests.filter((item) => item.status === 'declined').length;
         const totalParticipants = recruiterEvents.reduce((sum, event) => sum + event.participantsCount, 0);
-        const title = getRequestMetadataString(request, 'title') ?? 'Untitled event';
-        const eventType = getRequestMetadataString(request, 'type') ?? 'Hiring event';
-        const scheduledAt = getRequestMetadataString(request, 'date');
-        const description = getRequestMetadataString(request, 'description') ?? 'No event description supplied.';
+        const isReschedule = request.type === 'college_event_reschedule';
+        const title =
+          getRequestMetadataString(request, 'title') ??
+          getRequestMetadataString(request, 'entityName') ??
+          'Untitled event';
+        const eventType = isReschedule ? 'Postponement' : getRequestMetadataString(request, 'type') ?? 'Hiring event';
+        const scheduledAt = getRequestMetadataString(request, isReschedule ? 'newDate' : 'date');
+        const previousDate = getRequestMetadataString(request, 'previousDate');
+        const description = isReschedule
+          ? getRequestMetadataString(request, 'reason') ?? 'No postponement reason supplied.'
+          : getRequestMetadataString(request, 'description') ?? 'No event description supplied.';
         const linkedJobId = getRequestMetadataString(request, 'linkedJobId');
         const minimumScore = request.metadata?.minimumInnovationScore;
         const accountApproved =
@@ -1375,7 +1395,9 @@ export default function EventManager({
             <div className="max-h-[92vh] w-full max-w-5xl overflow-y-auto rounded-3xl border border-slate-700 bg-[#071322] shadow-2xl">
               <div className="sticky top-0 z-10 flex items-start justify-between gap-4 border-b border-slate-800 bg-[#071322]/95 px-6 py-5 backdrop-blur-md">
                 <div>
-                  <div className="text-xs font-bold uppercase tracking-[0.24em] text-cyan-300">Event Request Review</div>
+                  <div className="text-xs font-bold uppercase tracking-[0.24em] text-cyan-300">
+                    {isReschedule ? 'Event Postponement Review' : 'Event Request Review'}
+                  </div>
                   <h2 className="mt-2 text-2xl font-bold text-white break-words">{title}</h2>
                   <div className="mt-2 flex flex-wrap gap-2">
                     <Badge className="border-amber-500/30 bg-amber-950/50 text-amber-300">{eventType}</Badge>
@@ -1395,21 +1417,38 @@ export default function EventManager({
               <div className="grid gap-6 p-6 lg:grid-cols-[minmax(0,1.35fr)_minmax(280px,0.65fr)]">
                 <div className="space-y-6 min-w-0">
                   <section className="rounded-2xl border border-slate-800 bg-slate-950/60 p-5">
-                    <div className="text-xs font-bold uppercase tracking-[0.2em] text-slate-500">Proposal Details</div>
+                    <div className="text-xs font-bold uppercase tracking-[0.2em] text-slate-500">
+                      {isReschedule ? 'Schedule Change' : 'Proposal Details'}
+                    </div>
                     <p className="mt-4 whitespace-pre-wrap break-words [overflow-wrap:anywhere] text-sm leading-7 text-slate-200">{description}</p>
                     <div className="mt-5 grid gap-3 sm:grid-cols-2">
-                      <div className="rounded-xl border border-slate-800 bg-[#091525] p-4">
-                        <div className="text-xs text-slate-500">Scheduled for</div>
-                        <div className="mt-1 font-semibold text-white">{scheduledAt ? formatDateTime(scheduledAt) : 'Not provided'}</div>
-                      </div>
-                      <div className="rounded-xl border border-slate-800 bg-[#091525] p-4">
-                        <div className="text-xs text-slate-500">Minimum innovation score</div>
-                        <div className="mt-1 font-semibold text-white">{typeof minimumScore === 'number' ? minimumScore : 'No minimum'}</div>
-                      </div>
-                      <div className="rounded-xl border border-slate-800 bg-[#091525] p-4 sm:col-span-2">
-                        <div className="text-xs text-slate-500">Linked recruiter job</div>
-                        <div className="mt-1 break-all font-mono text-sm text-white">{linkedJobId ?? 'No linked job'}</div>
-                      </div>
+                      {isReschedule ? (
+                        <>
+                          <div className="rounded-xl border border-slate-800 bg-[#091525] p-4">
+                            <div className="text-xs text-slate-500">Current schedule</div>
+                            <div className="mt-1 font-semibold text-white">{previousDate ? formatDateTime(previousDate) : 'Not provided'}</div>
+                          </div>
+                          <div className="rounded-xl border border-cyan-500/30 bg-cyan-950/20 p-4">
+                            <div className="text-xs text-cyan-300">Requested schedule</div>
+                            <div className="mt-1 font-semibold text-white">{scheduledAt ? formatDateTime(scheduledAt) : 'Not provided'}</div>
+                          </div>
+                        </>
+                      ) : (
+                        <>
+                          <div className="rounded-xl border border-slate-800 bg-[#091525] p-4">
+                            <div className="text-xs text-slate-500">Scheduled for</div>
+                            <div className="mt-1 font-semibold text-white">{scheduledAt ? formatDateTime(scheduledAt) : 'Not provided'}</div>
+                          </div>
+                          <div className="rounded-xl border border-slate-800 bg-[#091525] p-4">
+                            <div className="text-xs text-slate-500">Minimum innovation score</div>
+                            <div className="mt-1 font-semibold text-white">{typeof minimumScore === 'number' ? minimumScore : 'No minimum'}</div>
+                          </div>
+                          <div className="rounded-xl border border-slate-800 bg-[#091525] p-4 sm:col-span-2">
+                            <div className="text-xs text-slate-500">Linked recruiter job</div>
+                            <div className="mt-1 break-all font-mono text-sm text-white">{linkedJobId ?? 'No linked job'}</div>
+                          </div>
+                        </>
+                      )}
                     </div>
                     {request.message ? (
                       <div className="mt-5 rounded-xl border border-cyan-900/60 bg-cyan-950/20 p-4">
@@ -1505,9 +1544,9 @@ export default function EventManager({
 
               <div className="sticky bottom-0 flex flex-wrap items-center justify-between gap-3 border-t border-slate-800 bg-[#071322]/95 px-6 py-4 backdrop-blur-md">
                 <div className="max-w-2xl text-xs leading-5 text-slate-400">
-                  Accepting adds this event to the college hiring calendar, makes it visible to eligible students,
-                  notifies the recruiter and eligible students, and records the decision. It does not approve an
-                  ongoing recruiter partnership.
+                  {isReschedule
+                    ? 'Approving changes the event date and notifies the recruiter and registered students. Declining keeps the current schedule.'
+                    : 'Accepting adds this event to the college hiring calendar, makes it visible to eligible students, notifies the recruiter and eligible students, and records the decision. It does not approve an ongoing recruiter partnership.'}
                 </div>
                 <div className="flex gap-2">
                   <Button variant="secondary" onClick={closeEventRequest} disabled={isUpdating}>Close</Button>
@@ -1524,7 +1563,11 @@ export default function EventManager({
                         disabled={isUpdating}
                         onClick={() => eventRequestMutation.mutate({ requestId: request._id, action: 'accept' })}
                       >
-                        {isUpdating && eventRequestMutation.variables?.action === 'accept' ? 'Accepting...' : 'Accept Event'}
+                        {isUpdating && eventRequestMutation.variables?.action === 'accept'
+                          ? 'Accepting...'
+                          : isReschedule
+                            ? 'Approve New Date'
+                            : 'Accept Event'}
                       </Button>
                     </>
                   ) : null}

@@ -4,7 +4,7 @@
  */
 
 import { MentorSession } from '../mentor/mentorSession.model';
-import { User } from '../user/user.model';
+import { Workspace } from '../workspace/workspace.model';
 import { MentorScore } from './mentorScore.model';
 import { awardMentorPoints } from './mentorScore.service';
 import { MentorScoreTrigger, MENTOR_PHASE2_CAPS } from './mentorScore.types';
@@ -16,7 +16,8 @@ const PROTOTYPE_POINTS_PER_STUDENT = 10;
 
 /**
  * Call this when a student's PROTOTYPE milestone is verified by admin.
- * Awards points to every mentor who has had a completed session with that student.
+ * Awards points to the mentors assigned to the student's workspace ("under the
+ * teacher's ID"), plus any mentor who had a completed session with the student.
  *
  * @param studentId  - the student (workspace owner) whose milestone was just verified
  * @param workspaceId - the workspace containing the milestone (for idempotency)
@@ -26,7 +27,16 @@ export const onPrototypeMilestoneVerified = async (
   workspaceId: string,
 ): Promise<void> => {
   try {
-    // Find all mentors with at least one completed session with this student
+    // ① Mentors assigned to the workspace — the "teacher's ID" for this project
+    const workspace = await Workspace.findById(workspaceId)
+      .select('chatParticipants')
+      .lean();
+
+    const assignedMentorIds = (workspace?.chatParticipants ?? [])
+      .filter((p) => p.role === 'mentor')
+      .map((p) => String(p.userId));
+
+    // ② Any mentor who completed a session with the student (fallback attribution)
     const sessions = await MentorSession.find({
       studentId,
       status: 'Completed',
@@ -34,9 +44,13 @@ export const onPrototypeMilestoneVerified = async (
       .select('mentorId')
       .lean();
 
-    if (!sessions.length) return;
+    const sessionMentorIds = sessions.map((s) => String(s.mentorId));
 
-    const uniqueMentorIds = [...new Set(sessions.map((s) => String(s.mentorId)))];
+    const uniqueMentorIds = [
+      ...new Set([...assignedMentorIds, ...sessionMentorIds]),
+    ];
+
+    if (!uniqueMentorIds.length) return;
 
     await Promise.all(
       uniqueMentorIds.map(async (mentorId) => {
@@ -53,7 +67,7 @@ export const onPrototypeMilestoneVerified = async (
           trigger:        MentorScoreTrigger.STUDENT_PROTOTYPE_TRANSITION,
           delta:          PROTOTYPE_POINTS_PER_STUDENT,
           phase:          2,
-          idempotencyKey: `prototype:${workspaceId}:${mentorId}`,
+          idempotencyKey: `prototype:${studentId}:${mentorId}`,
           metadata:       { studentId, workspaceId },
         });
       }),

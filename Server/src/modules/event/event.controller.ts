@@ -12,6 +12,8 @@ import {
   listRecruiterHiringEvents,
   listStudentInstitutionEvents,
   listStudentInstitutionDrives,
+  postponeHiringEventSchema,
+  requestHiringEventPostponement,
   selectStudentFromEventSchema,
   selectStudentFromHiringEvent,
   sendHiringEventInvite,
@@ -119,4 +121,14 @@ export const closeEventController = async (req: Request, res: Response) => {
     institutionId: req.user!.institutionId,
   });
   res.status(200).json(new ApiResponse(data));
+};
+
+export const postponeHiringEventController = async (req: Request, res: Response) => {
+  const payload = postponeHiringEventSchema.parse(req.body);
+  const data = await requestHiringEventPostponement(
+    req.user!._id,
+    String(req.params.eventId),
+    payload,
+  );
+  res.status(201).json(new ApiResponse(data));
 };

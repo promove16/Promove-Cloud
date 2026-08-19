@@ -3,6 +3,7 @@ import { z } from 'zod';
 import { UserRole } from '../../types/roles.types';
 import { ApiError } from '../../utils/ApiError';
 import { PlacementRecord } from '../college/placementRecord.model';
+import { queueNotification } from '../notification/notification.delivery';
 import { RequestRecord } from '../request/request.model';
 import { createRequest, registerRequestHandler } from '../request/request.service';
 import { User } from '../user/user.model';
@@ -246,6 +247,18 @@ export const createRecruiterJob = async (recruiterId: string, payload: z.infer<t
       .lean();
 
     await Promise.all(students.map((student) => createBridge(recruiterId, String(student._id), 'SCORE_MATCH')));
+
+    await Promise.all(
+      students.map((student) =>
+        queueNotification({
+          userId: String(student._id),
+          type: 'system',
+          title: 'A new job matches your profile',
+          body: `${payload.title} at ${payload.company} is looking for candidates with your score.`,
+          link: `/marketplace/jobs?recruiterId=${recruiterId}`,
+        }),
+      ),
+    );
   }
 
   return mapJob(job.toObject());

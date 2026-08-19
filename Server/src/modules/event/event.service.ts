@@ -75,6 +75,16 @@ export const sendHiringEventInviteSchema = z.object({
   message: z.string().trim().max(500).optional(),
 });
 
+export const postponeHiringEventSchema = z.object({
+  newDate: z
+    .string()
+    .datetime()
+    .refine((value) => new Date(value).getTime() >= Date.now() - 1000 * 60, {
+      message: 'The requested event date must be in the future',
+    }),
+  reason: z.string().trim().min(5).max(500),
+});
+
 const collegeEventInviteMetadataSchema = z.object({
   title: z.string().trim().min(2).max(160),
   type: z.enum(HIRING_EVENT_TYPES),
@@ -85,6 +95,13 @@ const collegeEventInviteMetadataSchema = z.object({
     .regex(/^[0-9a-fA-F]{24}$/)
     .optional(),
   minimumInnovationScore: z.coerce.number().min(0).default(0),
+});
+
+const collegeEventRescheduleMetadataSchema = z.object({
+  eventId: z.string().regex(/^[0-9a-fA-F]{24}$/),
+  previousDate: z.string().datetime(),
+  newDate: z.string().datetime(),
+  reason: z.string().trim().min(5).max(500),
 });
 
 const eventTenantFilter = (eventId: string, institutionId?: string | null) => ({
@@ -545,6 +562,71 @@ export const listRecruiterHiringEvents = async (recruiterId: string) => {
   });
 };
 
+export const requestHiringEventPostponement = async (
+  recruiterId: string,
+  eventId: string,
+  payload: z.infer<typeof postponeHiringEventSchema>,
+) => {
+  const event = await Event.findOne({
+    _id: eventId,
+    recruiterId,
+    category: 'hiring',
+  });
+
+  if (!event) {
+    throw new ApiError(404, 'EVENT_NOT_FOUND', 'Hiring event not found');
+  }
+
+  if (!event.isActive) {
+    throw new ApiError(409, 'EVENT_CLOSED', 'A closed event cannot be postponed');
+  }
+
+  if (event.rankingsComputedAt) {
+    throw new ApiError(409, 'EVENT_RANKINGS_FINALIZED', 'An event with finalized rankings cannot be postponed');
+  }
+
+  const requestedDate = new Date(payload.newDate);
+  if (requestedDate.getTime() <= Date.now()) {
+    throw new ApiError(400, 'EVENT_DATE_IN_PAST', 'The requested event date must be in the future');
+  }
+
+  if (requestedDate.getTime() <= event.scheduledAt.getTime()) {
+    throw new ApiError(400, 'EVENT_DATE_NOT_POSTPONED', 'The requested date must be later than the current event date');
+  }
+
+  const recruiterPath = `/dashboard/recruiter/hiring-events?eventId=${String(event._id)}`;
+  const collegePath = `/dashboard/college/events?tab=hiring&eventId=${String(event._id)}`;
+  const requested = await createRequestRecord({
+    type: 'college_event_reschedule',
+    actionType: 'approve',
+    fromUserId: recruiterId,
+    toUserId: String(event.institutionId),
+    targetEntityType: 'event',
+    targetEntityId: String(event._id),
+    targetEntityTitle: event.title,
+    targetRole: UserRole.COLLEGE,
+    requestedRole: 'event_host',
+    requestedPermission: 'event_reschedule',
+    message: `Please approve postponing "${event.title}". Reason: ${payload.reason.trim()}`,
+    metadata: {
+      eventId: String(event._id),
+      entityName: event.title,
+      previousDate: event.scheduledAt.toISOString(),
+      newDate: requestedDate.toISOString(),
+      reason: payload.reason.trim(),
+    },
+    deepLink: collegePath,
+    acceptRedirect: recruiterPath,
+    declineRedirect: recruiterPath,
+  });
+
+  return {
+    requested: true,
+    requestId: requested._id,
+    newDate: requestedDate.toISOString(),
+  };
+};
+
 export const listStudentInstitutionEvents = async (institutionId: string) => {
   const events = await listInstitutionEvents(institutionId);
   const rankingsAll = await Promise.all(
@@ -808,6 +890,70 @@ registerRequestHandler('college_event_invite', {
         recruiterPath,
       ),
     ]);
+  },
+});
+
+registerRequestHandler('college_event_reschedule', {
+  validateAccept: async (request, actorUserId) => {
+    if (String(request.toUserId) !== actorUserId) {
+      throw new ApiError(403, 'FORBIDDEN', 'Only the host college can approve this event postponement');
+    }
+
+    const payload = collegeEventRescheduleMetadataSchema.parse(request.metadata ?? {});
+    const event = await Event.findOne({
+      _id: payload.eventId,
+      institutionId: actorUserId,
+      recruiterId: request.fromUserId,
+      category: 'hiring',
+    })
+      .select('scheduledAt isActive rankingsComputedAt')
+      .lean();
+
+    if (!event) {
+      throw new ApiError(404, 'EVENT_NOT_FOUND', 'Hiring event not found');
+    }
+    if (!event.isActive) {
+      throw new ApiError(409, 'EVENT_CLOSED', 'A closed event cannot be postponed');
+    }
+    if (event.rankingsComputedAt) {
+      throw new ApiError(409, 'EVENT_RANKINGS_FINALIZED', 'An event with finalized rankings cannot be postponed');
+    }
+    if (new Date(payload.newDate).getTime() <= Date.now()) {
+      throw new ApiError(409, 'EVENT_DATE_IN_PAST', 'The requested event date is no longer in the future');
+    }
+    if (event.scheduledAt.toISOString() !== new Date(payload.previousDate).toISOString()) {
+      throw new ApiError(409, 'EVENT_SCHEDULE_CHANGED', 'The event schedule changed after this request was sent');
+    }
+  },
+  onAccept: async (request) => {
+    const payload = collegeEventRescheduleMetadataSchema.parse(request.metadata ?? {});
+    const event = await Event.findOne({
+      _id: payload.eventId,
+      institutionId: request.toUserId,
+      recruiterId: request.fromUserId,
+      category: 'hiring',
+      isActive: true,
+    });
+
+    if (!event) {
+      throw new ApiError(404, 'EVENT_NOT_FOUND', 'Hiring event not found');
+    }
+
+    event.scheduledAt = new Date(payload.newDate);
+    await event.save();
+
+    const scheduledLabel = event.scheduledAt.toLocaleString('en-IN', {
+      dateStyle: 'medium',
+      timeStyle: 'short',
+      timeZone: 'Asia/Kolkata',
+    });
+
+    await notifyUsersInBatches(
+      event.participants.map((participant) => String(participant.studentId)),
+      `Hiring event postponed: ${event.title}`,
+      `The event is now scheduled for ${scheduledLabel}. Reason: ${payload.reason}`,
+      '/dashboard/student/events',
+    );
   },
 });
 

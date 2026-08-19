@@ -58,6 +58,21 @@ const canPreviewInline = (fileType: WorkspaceUploadFileType): boolean => {
   return fileType === "image" || fileType === "video" || fileType === "audio" || fileType === "pdf";
 };
 
+const getDocumentPreviewUrl = (fileUrl: string) => {
+  try {
+    const parsed = new URL(fileUrl);
+    if (parsed.hostname !== "drive.google.com") {
+      return fileUrl;
+    }
+
+    const fileIdFromPath = parsed.pathname.match(/\/file\/d\/([^/]+)/)?.[1];
+    const fileId = fileIdFromPath ?? parsed.searchParams.get("id");
+    return fileId ? `https://drive.google.com/file/d/${fileId}/preview` : fileUrl;
+  } catch {
+    return fileUrl;
+  }
+};
+
 export function FileViewerModal({ upload, onClose }: FileViewerModalProps) {
   if (!upload) return null;
 
@@ -111,12 +126,30 @@ export function FileViewerModal({ upload, onClose }: FileViewerModalProps) {
                 </audio>
               </div>
             ) : (
-              <div className="flex justify-center">
-                <iframe
-                  src={upload.fileUrl}
-                  className="h-[70vh] w-full rounded-lg border border-slate-700"
-                  title={upload.fileName}
-                />
+              <div className="flex flex-col gap-3">
+                <object
+                  data={getDocumentPreviewUrl(upload.fileUrl)}
+                  type="application/pdf"
+                  className="h-[65vh] w-full rounded-lg border border-slate-700 bg-slate-950"
+                  aria-label={upload.fileName}
+                >
+                  <div className="flex h-full flex-col items-center justify-center p-8 text-center">
+                    <FileText className="h-12 w-12 text-red-500" />
+                    <p className="mt-4 text-sm text-slate-300">This host does not allow an embedded preview.</p>
+                    <a
+                      href={upload.fileUrl}
+                      target="_blank"
+                      rel="noreferrer"
+                      className="mt-4 inline-flex items-center gap-2 rounded-xl bg-cyan-600 px-4 py-2 text-sm font-semibold text-white hover:bg-cyan-500"
+                    >
+                      <ExternalLink className="h-4 w-4" />
+                      Open in New Tab
+                    </a>
+                  </div>
+                </object>
+                <p className="text-center text-xs text-slate-400">
+                  If the preview is blank or blocked by the file host, use Open External below.
+                </p>
               </div>
             )
           ) : (
