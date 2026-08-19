@@ -4,7 +4,6 @@ import { notificationQueue } from '../../config/bullmq';
 import { buildContentDisposition, extractS3KeyFromUrl, generatePresignedUrl } from '../../services/fileStorageService';
 import { generateSignedCloudinaryUrl } from '../../services/cloudinaryService';
 import { ApiError } from '../../utils/ApiError';
-import { applyScore } from '../../services/scoreEngine';
 import { User } from '../user/user.model';
 import { UserRole } from '../../types/roles.types';
 import { Workspace } from '../workspace/workspace.model';
@@ -223,6 +222,14 @@ export const submitPatent = async (userId: string, payload: z.infer<typeof paten
     throw new ApiError(404, 'WORKSPACE_NOT_FOUND', 'Select a valid workspace before submitting for patent review.');
   }
 
+  if (workspace.claimedProblemId) {
+    throw new ApiError(
+      400,
+      'PATENT_WORKSPACE_NOT_ELIGIBLE',
+      'Patent support is only available for your own product workspace. ProMove problem-bank workspaces are leaderboard-only.',
+    );
+  }
+
   const linkedStartup = await resolveStartupForPatentSubmission(userId, payload.workspaceId);
 
   const supportingDocuments = payload.documentUploads.map((item) => {
@@ -269,13 +276,6 @@ export const submitPatent = async (userId: string, payload: z.infer<typeof paten
     ...(payload.publicationDate ? { publicationDate: new Date(payload.publicationDate) } : {}),
     ...(payload.grantNumber ? { grantNumber: payload.grantNumber } : {}),
     ...(payload.grantDate ? { grantDate: new Date(payload.grantDate) } : {}),
-  });
-
-  await applyScore({
-    userId,
-    trigger: 'PATENT_SUBMITTED',
-    metadata: { workspaceId: payload.workspaceId, patentId: String(patent._id) },
-    idempotencyKey: `patent-submitted:${patent._id}`,
   });
 
   linkedStartup.traction = {

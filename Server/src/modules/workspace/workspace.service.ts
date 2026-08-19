@@ -584,20 +584,22 @@ export const addProgress = async (
   workspace.progressPercent = recalcProgressPercent(workspace);
   await workspace.save();
 
-  await applyScore({
-    userId,
-    trigger: 'PROGRESS_UPLOADED',
-    metadata: { workspaceId, milestoneRef, progressUpdateId: String(updateId) },
-    idempotencyKey: `workspace-progress:${workspaceId}:${updateId}`,
-  });
-
-  if (milestone?.isCompleted && !wasCompleted) {
+  if (!workspace.claimedProblemId) {
     await applyScore({
       userId,
-      trigger: 'SKILL_COMPLETED',
-      metadata: { workspaceId, milestoneRef: milestone.name },
-      idempotencyKey: `workspace-skill:${workspaceId}:${milestone.name}`,
+      trigger: 'PROGRESS_UPLOADED',
+      metadata: { workspaceId, milestoneRef, progressUpdateId: String(updateId) },
+      idempotencyKey: `workspace-progress:${workspaceId}:${updateId}`,
     });
+
+    if (milestone?.isCompleted && !wasCompleted) {
+      await applyScore({
+        userId,
+        trigger: 'SKILL_COMPLETED',
+        metadata: { workspaceId, milestoneRef: milestone.name },
+        idempotencyKey: `workspace-skill:${workspaceId}:${milestone.name}`,
+      });
+    }
   }
 
   await recordStartupLifecycleEvent({
