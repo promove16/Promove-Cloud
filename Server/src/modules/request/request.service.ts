@@ -1,7 +1,14 @@
 import { FilterQuery, Types } from 'mongoose';
 import { notificationQueue } from '../../config/bullmq';
+import { env } from '../../config/env';
+import { logger } from '../../config/logger';
 import { ApiError } from '../../utils/ApiError';
 import { UserRole } from '../../types/roles.types';
+import {
+  sendJobInviteEmail,
+  sendJobInviteAcceptedEmail,
+  sendJobInviteDeclinedEmail,
+} from '../../services/emailService';
 import { Startup } from '../startup/startup.model';
 import { User } from '../user/user.model';
 import { Workspace } from '../workspace/workspace.model';
@@ -412,6 +419,11 @@ export const mapRequest = async (request: IRequest) => {
   return view;
 };
 
+const buildClientUrl = (path: string) => {
+  const base = env.CLIENT_URL.replace(/\/+$/, '');
+  return `${base}/${path.replace(/^\/+/, '')}`;
+};
+
 const queueRequestNotification = async (request: IRequest) => {
   if (!request.toUserId) {
     return;
@@ -456,6 +468,26 @@ const queueRequestNotification = async (request: IRequest) => {
       declineRedirect: request.declineRedirect,
     },
   });
+
+  if (request.type === 'recruiter_job_invite') {
+    const toUser = await User.findById(request.toUserId).select('displayName email').lean();
+    if (toUser?.email) {
+      const jobTitle = (request.targetEntityTitle as string) ?? (typeof request.metadata?.jobTitle === 'string' ? request.metadata.jobTitle : 'a position');
+      const company = typeof request.metadata?.company === 'string' ? request.metadata.company : '';
+      const note = typeof request.message === 'string' ? request.message : undefined;
+      const inviteLink = buildClientUrl(`/marketplace/jobs/${request.targetEntityId}`);
+
+      sendJobInviteEmail({
+        toEmail: toUser.email,
+        studentName: getUserLabel(toUser),
+        recruiterName: senderName,
+        jobTitle,
+        company,
+        note,
+        inviteLink,
+      }).catch((error) => logger.error('Failed to send job invite email', error));
+    }
+  }
 };
 
 const queueRequestResponseNotification = async (
@@ -491,6 +523,35 @@ const queueRequestResponseNotification = async (
       deepLink: request.deepLink,
     },
   });
+
+  if (request.type === 'recruiter_job_invite' && (status === 'accepted' || status === 'declined')) {
+    const recruiter = await User.findById(request.fromUserId).select('displayName email').lean();
+    if (recruiter?.email) {
+      const jobTitle = (request.targetEntityTitle as string) ?? (typeof request.metadata?.jobTitle === 'string' ? request.metadata.jobTitle : 'a position');
+      const company = typeof request.metadata?.company === 'string' ? request.metadata.company : '';
+      const dashboardLink = buildClientUrl('/dashboard/recruiter/applications');
+
+      const emailParams = {
+        toEmail: recruiter.email,
+        recruiterName: getUserLabel(recruiter),
+        studentName: actorName,
+        jobTitle,
+        company,
+        accepted: status === 'accepted',
+        dashboardLink,
+      };
+
+      if (status === 'accepted') {
+        sendJobInviteAcceptedEmail(emailParams).catch((error) =>
+          logger.error('Failed to send job invite accepted email', error),
+        );
+      } else {
+        sendJobInviteDeclinedEmail(emailParams).catch((error) =>
+          logger.error('Failed to send job invite declined email', error),
+        );
+      }
+    }
+  }
 };
 
 const assertCollegeHiringRequestCooldown = async (params: {

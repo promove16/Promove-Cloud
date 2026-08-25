@@ -381,3 +381,102 @@ export const sendInstitutionStudentInviteEmail = async ({
     }),
   });
 };
+
+export interface JobInviteEmailParams {
+  toEmail: string;
+  studentName: string;
+  recruiterName: string;
+  jobTitle: string;
+  company: string;
+  note?: string;
+  inviteLink: string;
+}
+
+export const sendJobInviteEmail = async ({
+  toEmail,
+  studentName,
+  recruiterName,
+  jobTitle,
+  company,
+  note,
+  inviteLink,
+}: JobInviteEmailParams): Promise<void> => {
+  const noteBlock = note
+    ? `<p style="margin:0 0 14px;padding:12px 16px;background:#f8fafc;border:1px solid #e2e8f0;border-radius:8px;font-style:italic;color:#475569;">"${escapeHtml(note)}"</p>`
+    : '';
+
+  await sendEmail({
+    toEmail,
+    subject: `${recruiterName} from ${company} invited you to apply for ${jobTitle}`,
+    html: renderEmailShell({
+      preheader: `${recruiterName} from ${company} invited you for the ${jobTitle} role.`,
+      title: 'You have a job invitation',
+      intro: `Hello ${studentName}, ${recruiterName} from ${company} has invited you to apply for the ${jobTitle} position.`,
+      body: `
+        ${noteBlock}
+        <p style="margin:0 0 14px;">Review the job details and decide whether to accept or decline the invitation.</p>
+        <p style="margin:0;">If you accept, your application will be submitted automatically and you can track it from your dashboard.</p>
+      `,
+      ctaLabel: 'View job invitation',
+      ctaUrl: inviteLink,
+    }),
+  });
+};
+
+export interface JobInviteResponseEmailParams {
+  toEmail: string;
+  recruiterName: string;
+  studentName: string;
+  jobTitle: string;
+  company: string;
+  accepted: boolean;
+  dashboardLink: string;
+}
+
+export const sendJobInviteAcceptedEmail = async ({
+  toEmail,
+  recruiterName,
+  studentName,
+  jobTitle,
+  company,
+  dashboardLink,
+}: JobInviteResponseEmailParams): Promise<void> => {
+  await sendEmail({
+    toEmail,
+    subject: `${studentName} accepted your invitation for ${jobTitle}`,
+    html: renderEmailShell({
+      preheader: `${studentName} accepted your job invitation for ${jobTitle}.`,
+      title: 'Invite accepted',
+      intro: `Hello ${recruiterName}, ${studentName} has accepted your invitation to apply for the ${jobTitle} position at ${company}.`,
+      body: `
+        <p style="margin:0 0 14px;">The candidate's application is now active. You can review their profile and move them through your hiring pipeline.</p>
+      `,
+      ctaLabel: 'View application',
+      ctaUrl: dashboardLink,
+    }),
+  });
+};
+
+export const sendJobInviteDeclinedEmail = async ({
+  toEmail,
+  recruiterName,
+  studentName,
+  jobTitle,
+  company,
+  dashboardLink,
+}: JobInviteResponseEmailParams): Promise<void> => {
+  await sendEmail({
+    toEmail,
+    subject: `${studentName} declined your invitation for ${jobTitle}`,
+    html: renderEmailShell({
+      preheader: `${studentName} declined your job invitation for ${jobTitle}.`,
+      title: 'Invite declined',
+      intro: `Hello ${recruiterName}, ${studentName} has declined your invitation to apply for the ${jobTitle} position at ${company}.`,
+      body: `
+        <p style="margin:0 0 14px;">You can explore other candidates in the talent marketplace or update the job post to attract more applicants.</p>
+      `,
+      ctaLabel: 'View pipeline',
+      ctaUrl: dashboardLink,
+    }),
+  });
+};

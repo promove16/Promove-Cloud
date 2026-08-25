@@ -24,7 +24,9 @@ export const slowQueryPlugin = (schema: mongoose.Schema) => {
     if (typeof this.getQuery === 'function') {
       this.__startedAt = process.hrtime.bigint();
     }
-    next();
+    if (typeof next === 'function') {
+      next();
+    }
   });
 
   schema.post(/.*/, function (this: QueryWithStartTime) {

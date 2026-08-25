@@ -876,6 +876,13 @@ registerRequestHandler('recruiter_job_invite', {
 
     await job.save();
 
+    await notifyUser(
+      String(request.fromUserId),
+      `Invite declined for ${job.title}`,
+      'A student declined your recruiter invite.',
+      '/dashboard/recruiter/applications',
+    );
+
     emitHiringUpdate([String(request.fromUserId), actorUserId], {
       action: 'invite_decline',
       jobId: String(job._id),
