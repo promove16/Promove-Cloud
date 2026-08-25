@@ -352,15 +352,6 @@ export const createManagedStudentCredentials = async (
 ) => {
   const institution = await assertInstitutionRole(institutionId, institutionRole);
   const institutionDomain = extractEmailDomain(institution.email);
-  const studentDomain = extractEmailDomain(payload.email);
-
-  if (!institutionDomain || institutionDomain !== studentDomain) {
-    throw new ApiError(
-      400,
-      'INSTITUTION_EMAIL_DOMAIN_REQUIRED',
-      'Student email must use the same email domain as your institution account.',
-    );
-  }
 
   const existingUser = await User.findOne({ email: payload.email.toLowerCase() }).lean();
   if (existingUser) {
@@ -453,6 +444,100 @@ export type BulkCredentialResult = {
     temporaryPassword: string;
   }>;
   errors: Array<{ row: number; email?: string; message: string }>;
+};
+
+export type ManagedStudentCredentialPreview = {
+  fileName: string;
+  rows: Array<{
+    row: number;
+    displayName: string;
+    email: string;
+    gradeOrProgram: string;
+    rollNumber: string;
+    notes: string;
+    status: 'ready' | 'error';
+    errors: string[];
+  }>;
+  summary: {
+    total: number;
+    ready: number;
+    errors: number;
+  };
+};
+
+export const previewManagedStudentCredentialsImport = async (
+  institutionId: string,
+  institutionRole: UserRole.SCHOOL | UserRole.COLLEGE,
+  file: { originalname: string; buffer: Buffer },
+): Promise<ManagedStudentCredentialPreview> => {
+  await assertInstitutionRole(institutionId, institutionRole);
+
+  const rows = await workbookRowsToPayloads(file.buffer, file.originalname);
+  if (rows.length === 0) {
+    throw new ApiError(400, 'EMPTY_STUDENT_ROSTER_FILE', 'The uploaded file has no student rows.');
+  }
+
+  const normalizedEmails = rows
+    .map((row) => String(row.email ?? '').trim().toLowerCase())
+    .filter((email) => z.string().email().safeParse(email).success);
+  const emailCounts = normalizedEmails.reduce<Map<string, number>>((counts, email) => {
+    counts.set(email, (counts.get(email) ?? 0) + 1);
+    return counts;
+  }, new Map());
+  const existingUsers = normalizedEmails.length
+    ? await User.find({ email: { $in: [...new Set(normalizedEmails)] } }).select('email').lean()
+    : [];
+  const registeredEmails = new Set(existingUsers.map((user) => user.email.toLowerCase()));
+
+  const previewRows = rows.map((row) => {
+    const displayName = String(row.displayName ?? '').trim();
+    const email = String(row.email ?? '').trim().toLowerCase();
+    const gradeOrProgram = String(row.gradeOrProgram ?? '').trim();
+    const rollNumber = String(row.rollNumber ?? '').trim();
+    const notes = String(row.notes ?? '').trim();
+    const parsed = studentRosterEntrySchema.safeParse({
+      displayName,
+      email,
+      gradeOrProgram,
+      rollNumber,
+      notes,
+    });
+    const errors = parsed.success
+      ? []
+      : parsed.error.issues.map((issue) => {
+          const field = issue.path[0] ? String(issue.path[0]) : 'row';
+          return `${field}: ${issue.message}`;
+        });
+
+    if (email && (emailCounts.get(email) ?? 0) > 1) {
+      errors.push('email: Duplicate email in this file');
+    }
+    if (email && registeredEmails.has(email)) {
+      errors.push('email: Email already registered');
+    }
+
+    return {
+      row: row.__rowNumber,
+      displayName,
+      email,
+      gradeOrProgram,
+      rollNumber,
+      notes,
+      status: errors.length === 0 ? ('ready' as const) : ('error' as const),
+      errors,
+    };
+  });
+  const ready = previewRows.filter((row) => row.status === 'ready').length;
+
+  return {
+    fileName: file.originalname,
+    rows: previewRows,
+    summary: {
+      total: previewRows.length,
+      ready,
+      errors: previewRows.length - ready,
+    },
+  };
 };
 
 export const bulkCreateManagedStudentCredentials = async (

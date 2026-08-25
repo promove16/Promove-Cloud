@@ -7,6 +7,7 @@ import { uploadFile } from '../../services/fileStorageService';
 import { serializeDirectMessage, serializeDirectMessages } from './dm.serializer';
 import { ensureDmAccess, ensureDmThreadAccess } from './dm.permissions';
 import { createRequest } from '../request/request.service';
+import { RequestRecord } from '../request/request.model';
 import { Settings } from '../settings/settings.model';
 import { Startup } from '../startup/startup.model';
 import { Workspace } from '../workspace/workspace.model';
@@ -74,6 +75,7 @@ const getPitchContextString = (
 const resolveInvestorPitchContext = async (
   senderId: string,
   pitchContext?: { startupId?: unknown; workspaceId?: unknown },
+  requireMarketplaceLaunch = false,
 ) => {
   const startupId = getPitchContextString(pitchContext, 'startupId');
   const explicitWorkspaceId = getPitchContextString(pitchContext, 'workspaceId');
@@ -87,6 +89,9 @@ const resolveInvestorPitchContext = async (
         _id: startupId,
         isActive: true,
         founderIds: new Types.ObjectId(senderId),
+        ...(requireMarketplaceLaunch
+          ? { launchedToInvestors: true, reviewStatus: 'approved' }
+          : {}),
       })
         .select('_id name projectId')
         .lean()
@@ -201,9 +206,36 @@ export const listConversations = async (req: Request, res: Response) => {
   ]);
 
   const filteredRecent = recent.filter((conversation) => String(conversation._id) !== String(myId));
+  const existingPartnerIdSet = new Set(filteredRecent.map((r) => String(r._id)));
+
+  // Find users with accepted requests who don't have a DM document yet
+  const acceptedRequests = await RequestRecord.find({
+    status: 'accepted',
+    $or: [{ fromUserId: myId }, { toUserId: myId }],
+  })
+    .sort({ updatedAt: -1 })
+    .lean();
+
+  const extraPartnersMap = new Map<string, { partnerId: Types.ObjectId; acceptedAt: Date; fromUserId: Types.ObjectId }>();
+  for (const reqRecord of acceptedRequests) {
+    const partnerIdObj = String(reqRecord.fromUserId) === String(myId) ? reqRecord.toUserId : reqRecord.fromUserId;
+    if (partnerIdObj && String(partnerIdObj) !== String(myId)) {
+      const pidStr = String(partnerIdObj);
+      if (!existingPartnerIdSet.has(pidStr) && !extraPartnersMap.has(pidStr)) {
+        extraPartnersMap.set(pidStr, {
+          partnerId: partnerIdObj,
+          acceptedAt: reqRecord.updatedAt || reqRecord.createdAt || new Date(),
+          fromUserId: reqRecord.fromUserId,
+        });
+      }
+    }
+  }
 
   // Fetch user profiles for conversation partners
-  const partnerIds = filteredRecent.map((r) => r._id);
+  const partnerIds = [
+    ...filteredRecent.map((r) => r._id),
+    ...Array.from(extraPartnersMap.values()).map((item) => item.partnerId),
+  ];
   const users = await User.find({ _id: { $in: partnerIds } })
     .select('_id displayName avatar role')
     .lean();
@@ -219,7 +251,7 @@ export const listConversations = async (req: Request, res: Response) => {
     ]),
   );
 
-  const conversations = filteredRecent.map((r) => ({
+  const existingConversations = filteredRecent.map((r) => ({
     partnerId: r._id,
     partner: userMap.get(r._id.toString()) ?? null,
     lastMessage: {
@@ -233,6 +265,23 @@ export const listConversations = async (req: Request, res: Response) => {
     unreadCount: r.unreadCount,
     isOnline: onlineUsers.has(r._id.toString()) && (onlineVisibilityMap.get(r._id.toString()) ?? true),
   }));
+
+  const extraConversations = Array.from(extraPartnersMap.values()).map((item) => ({
+    partnerId: item.partnerId,
+    partner: userMap.get(item.partnerId.toString()) ?? null,
+    lastMessage: {
+      _id: `accepted_${String(item.partnerId)}`,
+      message: 'Invitation accepted! Send a message to start chatting.',
+      messageType: 'text' as const,
+      sentAt: item.acceptedAt,
+      senderId: item.fromUserId,
+      readAt: new Date(),
+    },
+    unreadCount: 0,
+    isOnline: onlineUsers.has(item.partnerId.toString()) && (onlineVisibilityMap.get(item.partnerId.toString()) ?? true),
+  }));
+
+  const conversations = [...existingConversations, ...extraConversations];
 
   res.json({ success: true, data: conversations });
 };
@@ -380,20 +429,26 @@ export const sendMessage = async (req: Request, res: Response) => {
     throw new ApiError(400, 'INVALID_QUERY_TYPE', 'Invalid message query type');
   }
 
-  await ensureDmAccess(req.user!._id, userId, queryType || 'general');
-  const attachmentStorage = validateDmAttachmentStorage(
-    req.user!._id,
-    attachmentStorageProvider,
-    attachmentStorageKey,
-  );
-
   // Resolve the pitched startup up front so investor pitches and founder funding
   // requests can be persisted with a direct reference, letting the recipient act on
-  // the startup straight from the chat. The resolver verifies founder ownership.
+  // the startup straight from the chat. Investor first contact additionally requires
+  // an approved startup that is live in the investor marketplace.
   const investorPitchContext =
     queryType === 'investor' || type === 'funding_request'
-      ? await resolveInvestorPitchContext(req.user!._id, pitchContext)
+      ? await resolveInvestorPitchContext(
+          req.user!._id,
+          pitchContext,
+          queryType === 'investor',
+        )
       : {};
+
+  if (queryType === 'investor' && !investorPitchContext.startupId) {
+    throw new ApiError(
+      409,
+      'INVESTOR_PITCH_NOT_ELIGIBLE',
+      'Only an approved startup that is live in the investor marketplace can be pitched',
+    );
+  }
 
   if (type === 'funding_request' && !investorPitchContext.startupId) {
     throw new ApiError(
@@ -402,6 +457,15 @@ export const sendMessage = async (req: Request, res: Response) => {
       'A funding request must reference one of your startups',
     );
   }
+
+  await ensureDmAccess(req.user!._id, userId, queryType || 'general', {
+    allowConnectionRequest: queryType === 'investor' && Boolean(investorPitchContext.startupId),
+  });
+  const attachmentStorage = validateDmAttachmentStorage(
+    req.user!._id,
+    attachmentStorageProvider,
+    attachmentStorageKey,
+  );
 
   const msg = await DirectMessage.create({
     senderId: myId,

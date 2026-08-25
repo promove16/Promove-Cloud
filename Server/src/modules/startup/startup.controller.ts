@@ -21,6 +21,7 @@ import {
   getInvestorPitchRequests,
 } from './startup.service';
 import { ApiError } from '../../utils/ApiError';
+import { getStartupMentorBids, respondStartupMentorBid } from '../mentor/mentor.service';
 
 const objectIdSchema = /^[0-9a-fA-F]{24}$/;
 
@@ -158,3 +159,21 @@ export const getPitchRequestsController = async (req: Request, res: Response) =>
   const pitchRequests = await getInvestorPitchRequests(req.user!._id);
   res.json(new ApiResponse(pitchRequests));
 };
+
+export const getStartupMentorBidsController = async (req: Request, res: Response) => {
+  const startupId = getRequiredObjectIdParam(req.params.id, 'STARTUP_REQUIRED', 'Startup id is required');
+  const bids = await getStartupMentorBids(startupId, req.user!._id);
+  res.json(new ApiResponse(bids));
+};
+
+export const respondStartupMentorBidController = async (req: Request, res: Response) => {
+  const startupId = getRequiredObjectIdParam(req.params.id, 'STARTUP_REQUIRED', 'Startup id is required');
+  const bidId = getRequiredObjectIdParam(req.params.bidId, 'BID_REQUIRED', 'Bid id is required');
+  const { status } = req.body;
+  if (!status || !['accepted', 'rejected'].includes(status)) {
+    throw new ApiError(400, 'INVALID_STATUS', 'Status must be accepted or rejected');
+  }
+  const result = await respondStartupMentorBid(startupId, bidId, req.user!._id, status);
+  res.json(new ApiResponse(result));
+};
+

@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { useQuery } from '@tanstack/react-query';
+import { ExternalLink } from 'lucide-react';
 import { Badge } from '../../components/ui/Badge';
 import { Button } from '../../components/ui/Button';
 import { Card } from '../../components/ui/Card';
@@ -529,11 +530,15 @@ export function StartupDetailDrawer({
               <Card className="p-5">
                 <div className="text-xs uppercase tracking-[0.3em] text-cyan-300">Pitch Deck</div>
                 {detail.startup.pitchDeckUrl ? (
-                  <iframe
-                    title="Pitch deck PDF"
-                    src={detail.startup.pitchDeckUrl}
-                    className="mt-4 h-[340px] w-full rounded-2xl border border-slate-800 bg-slate-900"
-                  />
+                  <a
+                    href={detail.startup.pitchDeckUrl}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="mt-4 flex items-center gap-2 rounded-lg border border-slate-800 bg-slate-900 px-4 py-3 text-sm text-cyan-300 transition hover:bg-slate-800"
+                  >
+                    <ExternalLink className="h-4 w-4" />
+                    Open Pitch Deck in New Tab
+                  </a>
                 ) : (
                   <div className="mt-4 flex h-[340px] items-center justify-center rounded-2xl border border-dashed border-slate-700 bg-slate-900 text-slate-400">
                     No pitch deck uploaded yet

@@ -31,6 +31,7 @@ const phase3BreakdownSchema = new Schema<IMentorPhase3Breakdown>(
     sessions:        { type: Number, default: 0, min: 0 },
     equityLOIs:      { type: Number, default: 0, min: 0 },
     outcomeBonuses:  { type: Number, default: 0, min: 0 },
+    contentCreatorBonus: { type: Number, default: 0, min: 0 },
   },
   { _id: false },
 );

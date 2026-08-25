@@ -1,6 +1,9 @@
+import { useState } from 'react';
 import {
   Award,
   Briefcase,
+  ChevronDown,
+  ChevronUp,
   Lightbulb,
   Rocket,
   Target,
@@ -56,6 +59,7 @@ const metricCards = [
 ] as const;
 
 export function StudentJourneyDrawerBase({ journey, open, onClose }: Props) {
+  const [showAllTimeline, setShowAllTimeline] = useState(false);
   if (!open || !journey) return null;
 
   const currentStage = journey.workspaces[0]?.stage;
@@ -222,14 +226,17 @@ export function StudentJourneyDrawerBase({ journey, open, onClose }: Props) {
             {/* Timeline */}
             {journey.scoreEvents.length > 0 ? (
               <div>
-                <div className="mb-3 text-[10px] font-semibold uppercase tracking-widest text-slate-500">
-                  Timeline
+                <div className="mb-3 flex items-center justify-between">
+                  <div className="text-[10px] font-semibold uppercase tracking-widest text-slate-500">
+                    Timeline
+                  </div>
+                  <span className="text-[11px] text-slate-500 font-medium">{journey.scoreEvents.length} total</span>
                 </div>
-                <div className="space-y-2">
-                  {journey.scoreEvents.map((event) => (
+                <div className="divide-y divide-slate-800/60 space-y-1">
+                  {(showAllTimeline ? journey.scoreEvents : journey.scoreEvents.slice(0, 5)).map((event) => (
                     <div
                       key={event._id}
-                      className="flex items-center gap-3 rounded-xl border border-slate-800 bg-slate-900 px-4 py-3"
+                      className="flex items-center gap-3 py-2.5 px-2 rounded-xl transition-colors hover:bg-slate-900/50"
                     >
                       <div className="flex h-7 w-7 flex-none items-center justify-center rounded-full bg-cyan-500/10">
                         <TrendingUp className="h-3.5 w-3.5 text-cyan-400" />
@@ -254,6 +261,26 @@ export function StudentJourneyDrawerBase({ journey, open, onClose }: Props) {
                     </div>
                   ))}
                 </div>
+
+                {journey.scoreEvents.length > 5 && (
+                  <button
+                    type="button"
+                    onClick={() => setShowAllTimeline((prev) => !prev)}
+                    className="mt-3 flex w-full items-center justify-center gap-1.5 rounded-xl border border-slate-800 bg-slate-900/60 py-2.5 text-xs font-semibold text-cyan-400 transition hover:bg-slate-800 hover:text-cyan-300"
+                  >
+                    {showAllTimeline ? (
+                      <>
+                        <span>Show Less</span>
+                        <ChevronUp className="h-3.5 w-3.5" />
+                      </>
+                    ) : (
+                      <>
+                        <span>Read More ({journey.scoreEvents.length - 5} more)</span>
+                        <ChevronDown className="h-3.5 w-3.5" />
+                      </>
+                    )}
+                  </button>
+                )}
               </div>
             ) : null}
           </div>

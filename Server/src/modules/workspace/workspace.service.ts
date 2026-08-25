@@ -5,18 +5,19 @@ import { sendTeamInviteEmail } from '../../services/emailService';
 import {
   buildContentDisposition,
   deleteStoredAsset,
+  extractS3KeyFromUrl,
   generatePresignedUrl,
   uploadFile,
   validateFileContent,
 } from '../../services/fileStorageService';
 import { generateSignedCloudinaryUrl } from '../../services/cloudinaryService';
-import { applyScoreAsync } from '../../services/scoreEngine';
+import { applyScore, applyScoreAsync } from '../../services/scoreEngine';
 import { NotificationService } from '../notification/notification.service';
 import { User } from '../user/user.model';
 import { ChatMessage } from '../chat/chat.model';
 import { serializeChatMessage } from '../chat/chat.serializer';
 import { TeamRequest } from '../social/teamRequest.model';
-import { RequestRecord } from '../request/request.model';
+import { RequestDocument, RequestRecord } from '../request/request.model';
 import {
   acceptRequest,
   createRequest,
@@ -172,6 +173,47 @@ type WorkspaceSnapshot = {
   [key: string]: any;
 };
 
+const serializeWorkspaceUpload = async (upload: any) => {
+  const rawUrl = typeof upload.fileUrl === 'string' ? upload.fileUrl.trim() : '';
+  const normalizedUrl =
+    rawUrl && !/^https?:\/\//i.test(rawUrl) && /^[\w.-]+\.s3[.-][\w-]+\.amazonaws\.com\//i.test(rawUrl)
+      ? `https://${rawUrl}`
+      : rawUrl;
+  const inferredS3Key = upload.storageKey || extractS3KeyFromUrl(normalizedUrl);
+  const storageProvider = upload.storageProvider || (inferredS3Key ? 's3' : undefined);
+  let signedUrl = normalizedUrl;
+
+  if (storageProvider === 'cloudinary' && upload.storageKey) {
+    try {
+      const resourceType = upload.fileType === 'image' ? 'image' : 'raw';
+      signedUrl = generateSignedCloudinaryUrl(upload.storageKey, resourceType);
+    } catch (error) {
+      console.error('Error generating signed URL for workspace upload:', error);
+    }
+  } else if (storageProvider === 's3' && inferredS3Key) {
+    try {
+      const shouldPreviewInline = ['pdf', 'image', 'video', 'audio'].includes(upload.fileType);
+      signedUrl = await generatePresignedUrl(inferredS3Key, 3600, {
+        contentDisposition: buildContentDisposition(
+          upload.fileName ?? 'file',
+          shouldPreviewInline ? 'inline' : 'attachment',
+        ),
+        ...(upload.mimeType ? { contentType: upload.mimeType } : {}),
+      });
+    } catch (error) {
+      console.error('Error generating S3 signed URL for workspace upload:', error);
+    }
+  }
+
+  return {
+    ...upload,
+    fileUrl: signedUrl,
+  };
+};
+
+const serializeWorkspaceUploads = (uploads: any[] = []) =>
+  Promise.all(uploads.map((upload) => serializeWorkspaceUpload(upload)));
+
 export const serializeWorkspace = async (workspace: WorkspaceSnapshot) => {
   const baseWorkspace: any =
     typeof workspace.toObject === 'function' ? workspace.toObject() : workspace;
@@ -215,34 +257,7 @@ export const serializeWorkspace = async (workspace: WorkspaceSnapshot) => {
   return {
     ...baseWorkspace,
     tasks: baseWorkspace.tasks || [],
-    uploads: await Promise.all((baseWorkspace.uploads || []).map(async (upload: any) => {
-      let signedUrl = upload.fileUrl;
-      if (upload.storageProvider === 'cloudinary' && upload.storageKey) {
-        try {
-          const resourceType = upload.fileType === 'image' ? 'image' : 'raw';
-          signedUrl = generateSignedCloudinaryUrl(upload.storageKey, resourceType);
-        } catch (error) {
-          console.error('Error generating signed URL for workspace upload:', error);
-        }
-      } else if (upload.storageProvider === 's3' && upload.storageKey) {
-        try {
-          const shouldPreviewInline = ['pdf', 'image', 'video', 'audio'].includes(upload.fileType);
-          signedUrl = await generatePresignedUrl(upload.storageKey, 3600, {
-            contentDisposition: buildContentDisposition(
-              upload.fileName ?? 'file',
-              shouldPreviewInline ? 'inline' : 'attachment',
-            ),
-            ...(upload.mimeType ? { contentType: upload.mimeType } : {}),
-          });
-        } catch (error) {
-          console.error('Error generating S3 signed URL for workspace upload:', error);
-        }
-      }
-      return {
-        ...upload,
-        fileUrl: signedUrl,
-      };
-    })),
+    uploads: await serializeWorkspaceUploads(baseWorkspace.uploads || []),
     repoSubmissions: baseWorkspace.repoSubmissions || [],
     codeSubmissions: baseWorkspace.codeSubmissions || [],
     progressUpdates: baseWorkspace.progressUpdates || [],
@@ -543,30 +558,49 @@ export const addProgress = async (
     );
   }
 
+  const updateId = new Types.ObjectId();
   workspace.progressUpdates.push({
     submittedBy: objectId(userId),
     note: payload.note,
     milestoneRef,
     submittedAt: new Date(),
-    _id: new Types.ObjectId(),
+    _id: updateId,
   });
+
+  const wasCompleted = Boolean(milestone?.isCompleted);
 
   if (milestone && payload.completionPercent !== undefined) {
     milestone.completionPercent = payload.completionPercent;
     milestone.isCompleted = payload.completionPercent >= 100;
     milestone.completedAt = milestone.isCompleted ? new Date() : undefined;
     milestone.completedBy = milestone.isCompleted ? objectId(userId) : undefined;
+  } else if (milestone && !milestone.isCompleted && payload.note?.trim()) {
+    milestone.completionPercent = 100;
+    milestone.isCompleted = true;
+    milestone.completedAt = new Date();
+    milestone.completedBy = objectId(userId);
   }
 
   workspace.progressPercent = recalcProgressPercent(workspace);
   await workspace.save();
 
-  await applyScoreAsync({
-    userId,
-    trigger: 'PROGRESS_UPLOADED',
-    metadata: { workspaceId, milestoneRef },
-    idempotencyKey: `workspace-progress:${workspaceId}:${milestoneRef ?? 'general'}`,
-  });
+  if (!workspace.claimedProblemId) {
+    await applyScore({
+      userId,
+      trigger: 'PROGRESS_UPLOADED',
+      metadata: { workspaceId, milestoneRef, progressUpdateId: String(updateId) },
+      idempotencyKey: `workspace-progress:${workspaceId}:${updateId}`,
+    });
+
+    if (milestone?.isCompleted && !wasCompleted) {
+      await applyScore({
+        userId,
+        trigger: 'SKILL_COMPLETED',
+        metadata: { workspaceId, milestoneRef: milestone.name },
+        idempotencyKey: `workspace-skill:${workspaceId}:${milestone.name}`,
+      });
+    }
+  }
 
   await recordStartupLifecycleEvent({
     workspaceId: workspace._id,
@@ -640,7 +674,7 @@ export const uploadWorkspaceFile = async (
     mimeType: file.mimetype,
   } as any);
   await workspace.save();
-  return workspace.uploads;
+  return serializeWorkspaceUploads(workspace.toObject().uploads);
 };
 
 export const deleteWorkspaceUpload = async (workspaceId: string, uploadId: string, userId: string) => {
@@ -659,7 +693,7 @@ export const deleteWorkspaceUpload = async (workspaceId: string, uploadId: strin
 
   workspace.uploads = workspace.uploads.filter((item) => String(item._id) !== uploadId);
   await workspace.save();
-  return workspace.uploads;
+  return serializeWorkspaceUploads(workspace.toObject().uploads);
 };
 
 export const addRepoSubmission = async (
@@ -788,6 +822,8 @@ export const updateTask = async (
     throw new ApiError(404, 'TASK_NOT_FOUND', 'Task not found');
   }
 
+  const wasDone = task.done;
+
   if (payload.title !== undefined) task.title = payload.title;
   if (payload.priority !== undefined) task.priority = payload.priority;
   if (payload.assignedTo !== undefined) task.assignedTo = payload.assignedTo ? objectId(payload.assignedTo) : undefined;
@@ -795,6 +831,16 @@ export const updateTask = async (
   if (payload.done !== undefined) task.done = payload.done;
 
   await workspace.save();
+
+  if (task.done && !wasDone) {
+    await applyScore({
+      userId,
+      trigger: 'TASK_COMPLETED',
+      metadata: { workspaceId, taskId },
+      idempotencyKey: `workspace-task:${workspaceId}:${taskId}`,
+    });
+  }
+
   await recordStartupLifecycleEvent({
     workspaceId: workspace._id,
     actorId: userId,
@@ -1250,6 +1296,109 @@ const validateWorkspaceMemberRequest = async (workspaceId: string, userId: strin
   }
 };
 
+const resolveStartupMemberRequestContext = async (
+  request: RequestDocument,
+  actorUserId: string,
+) => {
+  if (request.targetEntityType !== 'startup' || !Types.ObjectId.isValid(request.targetEntityId)) {
+    throw new ApiError(400, 'STARTUP_INVITE_INVALID', 'This startup invite is invalid.');
+  }
+
+  const [startup, invitee] = await Promise.all([
+    Startup.findOne({ _id: request.targetEntityId, isActive: true })
+      .select('founderIds teamMemberIds projectId teamSize isActive'),
+    User.findOne({ _id: actorUserId, isActive: true }).select('_id role'),
+  ]);
+
+  if (!startup) {
+    throw new ApiError(404, 'STARTUP_NOT_FOUND', 'Startup not found');
+  }
+  if (!startup.founderIds.some((founderId) => String(founderId) === String(request.fromUserId))) {
+    throw new ApiError(403, 'STARTUP_INVITE_FORBIDDEN', 'Only a startup founder can invite a teammate.');
+  }
+  if (!invitee || invitee.role !== 'student') {
+    throw new ApiError(400, 'ROLE_MISMATCH', 'Only students can accept startup teammate invites.');
+  }
+
+  const workspaceId = startup.projectId ? String(startup.projectId) : '';
+  if (!workspaceId) {
+    throw new ApiError(
+      400,
+      'WORKSPACE_LINK_REQUIRED',
+      'Link a workspace to the startup before accepting teammate invites.',
+    );
+  }
+
+  const requestedWorkspaceId =
+    typeof request.metadata?.workspaceId === 'string' ? request.metadata.workspaceId.trim() : '';
+  if (requestedWorkspaceId && requestedWorkspaceId !== workspaceId) {
+    throw new ApiError(
+      400,
+      'STARTUP_INVITE_WORKSPACE_MISMATCH',
+      'The startup invitation does not match its linked workspace.',
+    );
+  }
+
+  const workspace = await Workspace.findOne({ _id: workspaceId, isActive: true })
+    .select('ownerId teamMemberIds isActive');
+  if (!workspace) {
+    throw new ApiError(404, 'WORKSPACE_NOT_FOUND', 'Workspace not found');
+  }
+
+  const senderCanManageWorkspace =
+    String(workspace.ownerId) === String(request.fromUserId) ||
+    workspace.teamMemberIds.some((memberId) => String(memberId) === String(request.fromUserId));
+  if (!senderCanManageWorkspace) {
+    throw new ApiError(
+      403,
+      'STARTUP_INVITE_WORKSPACE_FORBIDDEN',
+      'The startup founder cannot add members to this workspace.',
+    );
+  }
+
+  const isWorkspaceMember = workspace.teamMemberIds.some(
+    (memberId) => String(memberId) === actorUserId,
+  );
+  if (!isWorkspaceMember && workspace.teamMemberIds.length >= 5) {
+    throw new ApiError(400, 'TEAM_LIMIT_REACHED', 'A workspace can have at most 5 team members.');
+  }
+
+  return { startup, workspace, isWorkspaceMember };
+};
+
+const validateStartupMemberRequest = async (request: RequestDocument, actorUserId: string) => {
+  await resolveStartupMemberRequestContext(request, actorUserId);
+};
+
+const grantStartupMemberRequest = async (request: RequestDocument, actorUserId: string) => {
+  const { startup, workspace, isWorkspaceMember } = await resolveStartupMemberRequestContext(
+    request,
+    actorUserId,
+  );
+
+  if (!isWorkspaceMember) {
+    workspace.teamMemberIds.push(objectId(actorUserId));
+    await workspace.save();
+  }
+
+  const isStartupFounder = startup.founderIds.some(
+    (founderId) => String(founderId) === actorUserId,
+  );
+  const isStartupMember = startup.teamMemberIds.some(
+    (memberId) => String(memberId) === actorUserId,
+  );
+  if (!isStartupFounder && !isStartupMember) {
+    startup.teamMemberIds.push(objectId(actorUserId));
+  }
+
+  const persistedTeamSize = new Set([
+    ...startup.founderIds.map((founderId) => String(founderId)),
+    ...startup.teamMemberIds.map((memberId) => String(memberId)),
+  ]).size;
+  startup.teamSize = Math.max(startup.teamSize ?? 1, persistedTeamSize);
+  await startup.save();
+};
+
 const grantWorkspaceChatRequest = async (workspaceId: string, userId: string) => {
   const workspace = await Workspace.findById(workspaceId);
   if (!workspace || !workspace.isActive) {
@@ -1312,6 +1461,53 @@ const validateWorkspaceChatRequest = async (workspaceId: string, userId: string)
   }
 };
 
+const resolveStartupMentorWorkspaceId = async (request: RequestDocument) => {
+  if (request.targetEntityType !== 'startup' || !Types.ObjectId.isValid(request.targetEntityId)) {
+    throw new ApiError(
+      400,
+      'INVALID_MENTOR_ASSIGNMENT_TARGET',
+      'Mentor invitations must target a valid startup.',
+    );
+  }
+
+  const startup = await Startup.findOne({
+    _id: request.targetEntityId,
+    isActive: true,
+    founderIds: request.fromUserId,
+  })
+    .select('_id projectId')
+    .lean();
+
+  if (!startup) {
+    throw new ApiError(
+      403,
+      'STARTUP_FOUNDER_REQUIRED',
+      'Only a startup founder can grant mentor access.',
+    );
+  }
+
+  const workspaceId = startup.projectId ? String(startup.projectId) : '';
+  if (!workspaceId) {
+    throw new ApiError(
+      400,
+      'WORKSPACE_LINK_REQUIRED',
+      'Link a workspace to the startup before inviting a mentor.',
+    );
+  }
+
+  const requestedWorkspaceId =
+    typeof request.metadata?.workspaceId === 'string' ? request.metadata.workspaceId.trim() : '';
+  if (requestedWorkspaceId && requestedWorkspaceId !== workspaceId) {
+    throw new ApiError(
+      400,
+      'MENTOR_ASSIGNMENT_WORKSPACE_MISMATCH',
+      'The mentor invitation does not match the startup workspace.',
+    );
+  }
+
+  return workspaceId;
+};
+
 registerRequestHandler('workspace_member', {
   validateAccept: async (request, actorUserId) => {
     if (request.targetEntityType !== 'workspace') {
@@ -1342,6 +1538,15 @@ registerRequestHandler('workspace_member', {
   },
 });
 
+registerRequestHandler('startup_member', {
+  validateAccept: async (request, actorUserId) => {
+    await validateStartupMemberRequest(request, actorUserId);
+  },
+  onAccept: async (request, actorUserId) => {
+    await grantStartupMemberRequest(request, actorUserId);
+  },
+});
+
 registerRequestHandler('workspace_chat_access', {
   validateAccept: async (request, actorUserId) => {
     if (request.targetEntityType !== 'workspace') {
@@ -1354,6 +1559,17 @@ registerRequestHandler('workspace_chat_access', {
       return;
     }
     await grantWorkspaceChatRequest(request.targetEntityId, actorUserId);
+  },
+});
+
+registerRequestHandler('mentor_assignment', {
+  validateAccept: async (request, actorUserId) => {
+    const workspaceId = await resolveStartupMentorWorkspaceId(request);
+    await validateWorkspaceChatRequest(workspaceId, actorUserId);
+  },
+  onAccept: async (request, actorUserId) => {
+    const workspaceId = await resolveStartupMentorWorkspaceId(request);
+    await grantWorkspaceChatRequest(workspaceId, actorUserId);
   },
 });
 

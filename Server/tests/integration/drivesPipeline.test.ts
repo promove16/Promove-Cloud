@@ -2,7 +2,7 @@ import jwt from 'jsonwebtoken';
 import request from 'supertest';
 import app from '../../src/app';
 import { env } from '../../src/config/env';
-import { CampusDrive } from '../../src/modules/recruiter/campusDrive.model';
+import { Event } from '../../src/modules/event/event.model';
 import { RequestRecord } from '../../src/modules/request/request.model';
 import { User } from '../../src/modules/user/user.model';
 import { UserRole } from '../../src/types/roles.types';
@@ -84,27 +84,31 @@ describe('College & Student Campus Drives Opportunities Pipeline', () => {
       expiresAt: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000),
     });
 
-    drive = await CampusDrive.create({
+    drive = await Event.create({
+      institutionId: college._id,
+      createdBy: recruiter._id,
       recruiterId: recruiter._id,
-      collegeId: college._id,
       title: 'Software Engineer Drive',
       description: 'Full-time role drive at Google.',
       type: 'Placement Drive',
+      category: 'hiring',
       scheduledAt: new Date(Date.now() + 24 * 60 * 60 * 1000), // tomorrow
       minimumInnovationScore: 600,
       isActive: true,
+      participants: [],
+      rankings: [],
     });
   });
 
   afterEach(async () => {
     await User.deleteMany({ _id: { $in: [college._id, student._id, recruiter._id] } });
-    await CampusDrive.deleteMany({ _id: drive._id });
+    await Event.deleteMany({ _id: drive._id });
     await RequestRecord.deleteMany({ targetEntityId: college._id });
   });
 
   it('allows college to retrieve scheduled drives with recruiter company context', async () => {
     const res = await request(app)
-      .get('/api/college/drives')
+      .get('/api/college/events/hiring')
       .set(authHeader(college))
       .expect(200);
 
@@ -137,17 +141,17 @@ describe('College & Student Campus Drives Opportunities Pipeline', () => {
 
   it('allows students to register for campus drives', async () => {
     const res = await request(app)
-      .post(`/api/recruiter/drives/${drive._id}/register`)
+      .post(`/api/events/${drive._id}/join`)
       .set(authHeader(student))
       .expect(200);
 
     expect(res.body.success).toBe(true);
-    expect(res.body.data.registered).toBe(true);
+    expect(res.body.data.success).toBe(true);
 
     // Verify registration lists student in roster
-    const updatedDrive = await CampusDrive.findById(drive._id).lean();
-    expect(updatedDrive?.registeredStudents.length).toBe(1);
-    expect(updatedDrive?.registeredStudents[0].studentId.toString()).toBe(student._id.toString());
+    const updatedDrive = await Event.findById(drive._id).lean();
+    expect(updatedDrive?.participants.length).toBe(1);
+    expect(updatedDrive?.participants[0].studentId.toString()).toBe(student._id.toString());
   });
 });
 
@@ -174,10 +178,10 @@ describe('Recruiter-College partnership establishment via hiring event acceptanc
   afterEach(async () => {
     await User.deleteMany({ _id: { $in: [college._id, recruiter._id] } });
     await RequestRecord.deleteMany({ fromUserId: recruiter._id });
-    await CampusDrive.deleteMany({ recruiterId: recruiter._id });
+    await Event.deleteMany({ recruiterId: recruiter._id });
   });
 
-  it('rejects drive creation for a college the recruiter has no accepted partnership with', async () => {
+  it('does not expose legacy direct drive creation to recruiters', async () => {
     const res = await request(app)
       .post('/api/recruiter/drives')
       .set(authHeader(recruiter))
@@ -190,11 +194,11 @@ describe('Recruiter-College partnership establishment via hiring event acceptanc
         minimumInnovationScore: 0,
       });
 
-    expect(res.status).toBe(403);
-    expect(res.body.error).toEqual(expect.objectContaining({ code: 'COLLEGE_NOT_LINKED' }));
+    expect(res.status).toBe(404);
+    expect(await Event.find({ recruiterId: recruiter._id })).toHaveLength(0);
   });
 
-  it('lets a recruiter send a hiring event invite without a prior partnership, and establishes the partnership once the college accepts it', async () => {
+  it('creates a hiring event only after the target college accepts the proposal', async () => {
     const inviteRes = await request(app)
       .post(`/api/events/hiring-invite/${college._id.toString()}`)
       .set(authHeader(recruiter))
@@ -214,6 +218,7 @@ describe('Recruiter-College partnership establishment via hiring event acceptanc
       targetEntityId: college._id.toString(),
     });
     expect(pendingRequest).not.toBeNull();
+    expect(await Event.find({ recruiterId: recruiter._id })).toHaveLength(0);
 
     const acceptRes = await request(app)
       .post(`/api/workflow-requests/${pendingRequest!._id}/accept`)
@@ -222,15 +227,10 @@ describe('Recruiter-College partnership establishment via hiring event acceptanc
 
     expect(acceptRes.status).toBe(200);
 
-    const partnership = await RequestRecord.findOne({
-      type: 'college_recruiter_partnership',
-      fromUserId: recruiter._id,
-      targetEntityType: 'college',
-      targetEntityId: college._id.toString(),
-    }).lean();
-
-    expect(partnership).not.toBeNull();
-    expect(partnership?.status).toBe('accepted');
+    const approvedEvents = await Event.find({ recruiterId: recruiter._id }).lean();
+    expect(approvedEvents).toHaveLength(1);
+    expect(String(approvedEvents[0].sourceRequestId)).toBe(String(pendingRequest!._id));
+    expect(String(approvedEvents[0].institutionId)).toBe(college._id.toString());
 
     const driveRes = await request(app)
       .post('/api/recruiter/drives')
@@ -240,10 +240,11 @@ describe('Recruiter-College partnership establishment via hiring event acceptanc
         collegeId: college._id.toString(),
         type: 'Placement Drive',
         scheduledAt: new Date(Date.now() + 24 * 60 * 60 * 1000).toISOString(),
-        description: 'Should succeed now that the partnership is established.',
+        description: 'A prior approval must not grant permission for a different event.',
         minimumInnovationScore: 0,
       });
 
-    expect(driveRes.status).toBe(201);
+    expect(driveRes.status).toBe(404);
+    expect(await Event.find({ recruiterId: recruiter._id })).toHaveLength(1);
   });
 });

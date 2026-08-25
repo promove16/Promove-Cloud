@@ -1,6 +1,5 @@
 import { Types } from 'mongoose';
 import { z } from 'zod';
-import { notificationQueue } from '../../config/bullmq';
 import { ApiError } from '../../utils/ApiError';
 import { User } from '../user/user.model';
 import { UserRole } from '../../types/roles.types';
@@ -16,6 +15,7 @@ import {
 } from '../deal/deal.service';
 import { IBid, ICounterOfferEntry } from './bidding.types';
 import { NotificationService } from '../notification/notification.service';
+import { queueNotification } from '../notification/notification.delivery';
 import { ActivityLogService } from '../activityLog/activityLog.service';
 import { broadcastStartupActivity } from '../activityLog/activity.broadcaster';
 import { hasActiveInterest } from '../interest/interest.service';
@@ -238,7 +238,7 @@ export const placeBid = async (
     },
   });
 
-  await notificationQueue.add('bid-placed', {
+  await queueNotification({
     userId: String(founderId),
     type: 'deal_interest',
     title: `New ${parsed.bidType} investment bid`,
@@ -377,7 +377,7 @@ export const counterBid = async (
   await bid.save();
 
   const notifyUserId = isFounder ? String(bid.investorId) : String(bid.founderId);
-  await notificationQueue.add('bid-countered', {
+  await queueNotification({
     userId: notifyUserId,
     type: 'deal_interest',
     title: 'Counter-offer received',
@@ -443,7 +443,7 @@ export const respondToBid = async (
 
     await bid.save();
 
-    await notificationQueue.add('bid-rejected', {
+    await queueNotification({
       userId: String(bid.investorId),
       type: 'deal_interest',
       title: 'Bid was not accepted',
@@ -479,7 +479,7 @@ export const respondToBid = async (
 
     await bid.save();
 
-    await notificationQueue.add('bid-accepted', {
+    await queueNotification({
       userId: String(bid.investorId),
       type: 'deal_interest',
       title: 'Your bid was accepted!',
@@ -555,7 +555,7 @@ export const closeOtherSoleBids = async (acceptedBid: IBid) => {
     );
 
     for (const bid of otherSoleBids) {
-      await notificationQueue.add('bid-closed-other-selected', {
+      await queueNotification({
         userId: String(bid.investorId),
         type: 'deal_interest',
         title: 'Startup secured exclusive investment',
@@ -588,7 +588,7 @@ export const expireBid = async (bidId: string): Promise<void> => {
   bid.expiredAt = new Date();
   await bid.save();
 
-  await notificationQueue.add('bid-expired', {
+  await queueNotification({
     userId: String(bid.investorId),
     type: 'deal_interest',
     title: 'Your bid has expired',

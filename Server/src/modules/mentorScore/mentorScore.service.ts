@@ -53,6 +53,7 @@ const PHASE3_FIELD_MAP: Partial<Record<MentorScoreTriggerType, keyof IMentorScor
   [MentorScoreTrigger.SESSION_TOKEN_RELEASED]:     'sessions',
   [MentorScoreTrigger.EQUITY_LOI_SIGNED]:          'equityLOIs',
   [MentorScoreTrigger.MENTEE_OUTCOME_BONUS]:       'outcomeBonuses',
+  [MentorScoreTrigger.CONTENT_CREATOR_BONUS]:      'contentCreatorBonus',
 };
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
@@ -261,7 +262,7 @@ export const rebuildMentorScoreCache = async (mentorId: string): Promise<void> =
 
   const phase1Breakdown = { training: 0, labSync: 0, curriculumMapping: 0 };
   const phase2Breakdown = { industryConnects: 0, prototypeVelocity: 0, demoDay: 0 };
-  const phase3Breakdown = { resourceLibrary: 0, forum: 0, sessions: 0, equityLOIs: 0, outcomeBonuses: 0 };
+  const phase3Breakdown = { resourceLibrary: 0, forum: 0, sessions: 0, equityLOIs: 0, outcomeBonuses: 0, contentCreatorBonus: 0 };
   let phase1Score = 0, phase2Score = 0, phase3Score = 0;
 
   for (const event of events) {

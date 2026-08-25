@@ -2,7 +2,13 @@ import { ChangeEvent, FormEvent, useMemo, useState } from 'react';
 import { AlertCircle, ChevronDown, Copy, Download, FileSpreadsheet, Info, ShieldCheck, Upload, UserPlus, X, Users, type LucideIcon } from 'lucide-react';
 import { Button } from '../../components/ui/Button';
 import { OptionTabs } from '../../components/ui/OptionTabs';
-import { BulkCredentialImportResult, TemporaryStudentCredentials, StudentRosterEntry } from '../../types/school.types';
+import {
+  BulkCredentialImportResult,
+  ManagedStudentCredentialPreview,
+  ManagedStudentCredentialPreviewRow,
+  TemporaryStudentCredentials,
+  StudentRosterEntry,
+} from '../../types/school.types';
 
 const rosterTone: Record<StudentRosterEntry['status'], string> = {
   invited: 'border-cyan-700 bg-cyan-900 text-cyan-200',
@@ -68,7 +74,8 @@ type StudentIntakePanelProps = {
   isImportWithCredentialsSubmitting?: boolean;
   bulkCredentialResult?: BulkCredentialImportResult | null;
   onImportFile: (file: File) => void;
-  onImportFileWithCredentials: (file: File) => void;
+  onPreviewImportFile: (file: File) => Promise<ManagedStudentCredentialPreview>;
+  onImportFileWithCredentials: (file: File) => Promise<BulkCredentialImportResult>;
   onCreateTemporaryCredentials: (payload: {
     displayName: string;
     email: string;
@@ -104,6 +111,7 @@ export function StudentIntakePanel({
   onCancelInvite,
   cancellingInviteId,
   onImportFile,
+  onPreviewImportFile,
   onImportFileWithCredentials,
   onCreateTemporaryCredentials,
 }: StudentIntakePanelProps) {
@@ -128,6 +136,12 @@ export function StudentIntakePanel({
   });
   const [lastImportMessage, setLastImportMessage] = useState('');
   const [withCredentials, setWithCredentials] = useState(false);
+  const [credentialPreview, setCredentialPreview] = useState<ManagedStudentCredentialPreview | null>(null);
+  const [editedPreviewRows, setEditedPreviewRows] = useState<Set<number>>(new Set());
+  const [isPreviewing, setIsPreviewing] = useState(false);
+  const [isConfirmingPreview, setIsConfirmingPreview] = useState(false);
+  const [previewError, setPreviewError] = useState('');
+  const [hideBulkCredentialResult, setHideBulkCredentialResult] = useState(false);
 
   const summary = useMemo(
     () => ({
@@ -155,16 +169,99 @@ export function StudentIntakePanel({
     }
   };
 
-  const handleFileChange = (event: ChangeEvent<HTMLInputElement>) => {
+  const handleFileChange = async (event: ChangeEvent<HTMLInputElement>) => {
     const file = event.target.files?.[0];
     if (!file) return;
+    event.target.value = '';
+
     if (withCredentials) {
-      onImportFileWithCredentials(file);
+      setIsPreviewing(true);
+      setPreviewError('');
+      setHideBulkCredentialResult(true);
+      setLastImportMessage(`Reading ${file.name}...`);
+      try {
+        const preview = await onPreviewImportFile(file);
+        setCredentialPreview(preview);
+        setEditedPreviewRows(new Set());
+        setLastImportMessage('');
+      } catch (error) {
+        setPreviewError(error instanceof Error ? error.message : 'Unable to preview this file.');
+        setLastImportMessage('');
+      } finally {
+        setIsPreviewing(false);
+      }
     } else {
       onImportFile(file);
+      setLastImportMessage(`${file.name} queued for import`);
     }
-    setLastImportMessage(withCredentials ? `Creating accounts for students in ${file.name}...` : `${file.name} queued for import`);
-    event.target.value = '';
+  };
+
+  const updatePreviewRow = (
+    rowNumber: number,
+    field: keyof Pick<
+      ManagedStudentCredentialPreviewRow,
+      'displayName' | 'email' | 'gradeOrProgram' | 'rollNumber' | 'notes'
+    >,
+    value: string,
+  ) => {
+    setCredentialPreview((current) =>
+      current
+        ? {
+            ...current,
+            rows: current.rows.map((row) => (row.row === rowNumber ? { ...row, [field]: value } : row)),
+          }
+        : current,
+    );
+    setEditedPreviewRows((current) => new Set(current).add(rowNumber));
+    setPreviewError('');
+  };
+
+  const createEditedRosterFile = (preview: ManagedStudentCredentialPreview) => {
+    const escapeCsv = (value: string) => `"${value.replace(/"/g, '""')}"`;
+    const header = ['displayName', 'email', 'gradeOrProgram', 'rollNumber', 'notes'];
+    const body = preview.rows.map((row) =>
+      [row.displayName, row.email, row.gradeOrProgram, row.rollNumber, row.notes]
+        .map(escapeCsv)
+        .join(','),
+    );
+    const baseName = preview.fileName.replace(/\.[^.]+$/, '') || 'student-roster';
+    return new File([[header.join(','), ...body].join('\n')], `${baseName}-reviewed.csv`, {
+      type: 'text/csv',
+    });
+  };
+
+  const handleConfirmPreview = async () => {
+    if (!credentialPreview) return;
+
+    setIsConfirmingPreview(true);
+    setPreviewError('');
+    try {
+      const reviewedFile = createEditedRosterFile(credentialPreview);
+      const validatedPreview = await onPreviewImportFile(reviewedFile);
+      setCredentialPreview(validatedPreview);
+      setEditedPreviewRows(new Set());
+
+      if (validatedPreview.summary.errors > 0) {
+        setPreviewError('Fix the highlighted rows before creating student accounts.');
+        return;
+      }
+
+      await onImportFileWithCredentials(reviewedFile);
+      setCredentialPreview(null);
+      setHideBulkCredentialResult(false);
+      setLastImportMessage('');
+    } catch (error) {
+      setPreviewError(error instanceof Error ? error.message : 'Unable to create student accounts.');
+    } finally {
+      setIsConfirmingPreview(false);
+    }
+  };
+
+  const cancelCredentialPreview = () => {
+    setCredentialPreview(null);
+    setEditedPreviewRows(new Set());
+    setPreviewError('');
+    setLastImportMessage('');
   };
 
   const handleTemporarySubmit = (event: FormEvent<HTMLFormElement>) => {
@@ -193,7 +290,7 @@ export function StudentIntakePanel({
       required: true,
       accepted: ['email', 'emailAddress', 'email_address', 'studentEmail', 'student_email', 'gmail'],
       description: withCredentials
-        ? `Institutional email. Must end with your institution's domain (e.g. @school.edu)`
+        ? 'Any valid student email address; the domain does not need to match the institution'
         : 'Student email address',
     },
     {
@@ -296,7 +393,11 @@ export function StudentIntakePanel({
           />
 
           {/* Panel */}
-          <div className="relative flex h-full w-full max-w-[480px] flex-col border-l border-slate-800 bg-slate-950 shadow-2xl">
+          <div
+            className={`relative flex h-full w-full flex-col border-l border-slate-800 bg-slate-950 shadow-2xl transition-[max-width] duration-200 ${
+              activeTab === 'import' && credentialPreview ? 'max-w-[1120px]' : 'max-w-[480px]'
+            }`}
+          >
             {/* Header */}
             <div className="flex items-center justify-between border-b border-slate-800 px-6 py-5">
               <div>
@@ -371,6 +472,170 @@ export function StudentIntakePanel({
 
               {/* Import Roster */}
               {activeTab === 'import' && (
+                credentialPreview ? (
+                  <div className="flex min-h-full flex-col gap-4">
+                    <div className="flex flex-wrap items-start justify-between gap-4">
+                      <div>
+                        <div className="flex items-center gap-2 text-sm font-semibold text-white">
+                          <FileSpreadsheet className="h-4 w-4 text-cyan-300" />
+                          Review uploaded students
+                        </div>
+                        <p className="mt-1 text-xs text-slate-400">
+                          Edit any value below. No accounts are created until you confirm this review.
+                        </p>
+                        <p className="mt-1 max-w-[520px] truncate text-xs text-slate-500" title={credentialPreview.fileName}>
+                          {credentialPreview.fileName}
+                        </p>
+                      </div>
+                      <div className="flex flex-wrap gap-2 text-xs">
+                        <span className="rounded-md border border-slate-700 bg-slate-900 px-2.5 py-1.5 text-slate-300">
+                          {credentialPreview.summary.total} rows
+                        </span>
+                        <span className="rounded-md border border-emerald-800 bg-emerald-950 px-2.5 py-1.5 text-emerald-300">
+                          {credentialPreview.summary.ready} ready
+                        </span>
+                        {credentialPreview.summary.errors > 0 ? (
+                          <span className="rounded-md border border-rose-800 bg-rose-950 px-2.5 py-1.5 text-rose-300">
+                            {credentialPreview.summary.errors} need attention
+                          </span>
+                        ) : null}
+                        {editedPreviewRows.size > 0 ? (
+                          <span className="rounded-md border border-amber-800 bg-amber-950 px-2.5 py-1.5 text-amber-300">
+                            {editedPreviewRows.size} edited
+                          </span>
+                        ) : null}
+                      </div>
+                    </div>
+
+                    {editedPreviewRows.size > 0 ? (
+                      <div className="rounded-lg border border-amber-800 bg-amber-950 px-3 py-2 text-xs text-amber-200">
+                        Edited rows will be checked again before any student account is created.
+                      </div>
+                    ) : null}
+
+                    {previewError ? (
+                      <div className="flex items-start gap-2 rounded-lg border border-rose-800 bg-rose-950 px-3 py-2 text-xs text-rose-200">
+                        <AlertCircle className="mt-0.5 h-3.5 w-3.5 flex-shrink-0" />
+                        {previewError}
+                      </div>
+                    ) : null}
+
+                    <div className="min-h-0 flex-1 overflow-auto rounded-xl border border-slate-800 bg-slate-900">
+                      <table className="min-w-[1040px] w-full border-collapse text-left text-xs">
+                        <thead className="sticky top-0 z-10 bg-slate-900 text-[10px] uppercase tracking-[0.16em] text-slate-400">
+                          <tr className="border-b border-slate-700">
+                            <th className="w-16 px-3 py-3 font-medium">Row</th>
+                            <th className="w-[190px] px-2 py-3 font-medium">Display name</th>
+                            <th className="w-[230px] px-2 py-3 font-medium">Email</th>
+                            <th className="w-[175px] px-2 py-3 font-medium">{secondaryFieldLabel}</th>
+                            <th className="w-[150px] px-2 py-3 font-medium">Roll number</th>
+                            <th className="min-w-[210px] px-2 py-3 font-medium">Notes</th>
+                            <th className="w-28 px-3 py-3 font-medium">Status</th>
+                          </tr>
+                        </thead>
+                        <tbody>
+                          {credentialPreview.rows.map((row) => {
+                            const wasEdited = editedPreviewRows.has(row.row);
+                            const cellInputClass =
+                              'w-full rounded-md border border-slate-700 bg-slate-950 px-2.5 py-2 text-xs text-white outline-none transition placeholder:text-slate-600 focus:border-cyan-500';
+
+                            return (
+                              <tr key={row.row} className="border-b border-slate-800 align-top last:border-b-0">
+                                <td className="px-3 py-3 font-mono text-slate-500">{row.row}</td>
+                                <td className="px-2 py-2">
+                                  <input
+                                    value={row.displayName}
+                                    onChange={(event) => updatePreviewRow(row.row, 'displayName', event.target.value)}
+                                    className={cellInputClass}
+                                    aria-label={`Display name for row ${row.row}`}
+                                  />
+                                </td>
+                                <td className="px-2 py-2">
+                                  <input
+                                    type="email"
+                                    value={row.email}
+                                    onChange={(event) => updatePreviewRow(row.row, 'email', event.target.value)}
+                                    className={cellInputClass}
+                                    aria-label={`Email for row ${row.row}`}
+                                  />
+                                </td>
+                                <td className="px-2 py-2">
+                                  <input
+                                    value={row.gradeOrProgram}
+                                    onChange={(event) => updatePreviewRow(row.row, 'gradeOrProgram', event.target.value)}
+                                    className={cellInputClass}
+                                    aria-label={`${secondaryFieldLabel} for row ${row.row}`}
+                                  />
+                                </td>
+                                <td className="px-2 py-2">
+                                  <input
+                                    value={row.rollNumber}
+                                    onChange={(event) => updatePreviewRow(row.row, 'rollNumber', event.target.value)}
+                                    className={cellInputClass}
+                                    aria-label={`Roll number for row ${row.row}`}
+                                  />
+                                </td>
+                                <td className="px-2 py-2">
+                                  <input
+                                    value={row.notes}
+                                    onChange={(event) => updatePreviewRow(row.row, 'notes', event.target.value)}
+                                    className={cellInputClass}
+                                    aria-label={`Notes for row ${row.row}`}
+                                  />
+                                </td>
+                                <td className="px-3 py-3">
+                                  <span
+                                    className={`inline-flex rounded-md border px-2 py-1 text-[10px] font-semibold uppercase tracking-wider ${
+                                      wasEdited
+                                        ? 'border-amber-800 bg-amber-950 text-amber-300'
+                                        : row.status === 'ready'
+                                          ? 'border-emerald-800 bg-emerald-950 text-emerald-300'
+                                          : 'border-rose-800 bg-rose-950 text-rose-300'
+                                    }`}
+                                  >
+                                    {wasEdited ? 'Edited' : row.status === 'ready' ? 'Ready' : 'Check row'}
+                                  </span>
+                                  {!wasEdited && row.errors.length > 0 ? (
+                                    <div className="mt-2 space-y-1 text-[11px] leading-4 text-rose-300">
+                                      {row.errors.map((error) => (
+                                        <div key={error}>{error}</div>
+                                      ))}
+                                    </div>
+                                  ) : null}
+                                </td>
+                              </tr>
+                            );
+                          })}
+                        </tbody>
+                      </table>
+                    </div>
+
+                    <div className="flex flex-wrap items-center justify-between gap-3 border-t border-slate-800 pt-4">
+                      <p className="text-xs text-slate-500">
+                        All rows are revalidated against current account data when you confirm.
+                      </p>
+                      <div className="flex gap-2">
+                        <Button
+                          type="button"
+                          variant="outline"
+                          onClick={cancelCredentialPreview}
+                          disabled={isConfirmingPreview}
+                        >
+                          Cancel preview
+                        </Button>
+                        <Button
+                          type="button"
+                          onClick={handleConfirmPreview}
+                          disabled={isConfirmingPreview || credentialPreview.rows.length === 0}
+                        >
+                          {isConfirmingPreview
+                            ? 'Validating...'
+                            : `Validate & create ${credentialPreview.rows.length} accounts`}
+                        </Button>
+                      </div>
+                    </div>
+                  </div>
+                ) : (
                 <div className="space-y-4">
 
                   {/* Column Name Guide */}
@@ -496,7 +761,7 @@ export function StudentIntakePanel({
                   <label className={`flex cursor-pointer flex-col items-center justify-center gap-3 rounded-xl border border-dashed px-6 py-10 text-center transition ${withCredentials ? 'border-cyan-700 bg-cyan-950 hover:border-cyan-500' : 'border-slate-700 bg-slate-900 hover:border-cyan-700'}`}>
                     <Upload className={`h-7 w-7 ${withCredentials ? 'text-cyan-400' : 'text-cyan-300'}`} />
                     <div className="text-sm font-medium text-white">
-                      {(isImportSubmitting || isImportWithCredentialsSubmitting) ? 'Processing...' : (withCredentials ? 'Choose file & create logins' : 'Choose roster file')}
+                      {(isImportSubmitting || isImportWithCredentialsSubmitting || isPreviewing) ? 'Processing...' : (withCredentials ? 'Choose file & preview' : 'Choose roster file')}
                     </div>
                     <div className="text-xs text-slate-500">Supports .csv, .xlsx, .xls</div>
                     <input
@@ -504,15 +769,22 @@ export function StudentIntakePanel({
                       accept=".csv,.xlsx,.xls"
                       className="hidden"
                       onChange={handleFileChange}
-                      disabled={isImportSubmitting || isImportWithCredentialsSubmitting}
+                      disabled={isImportSubmitting || isImportWithCredentialsSubmitting || isPreviewing}
                     />
                   </label>
 
-                  {lastImportMessage && !bulkCredentialResult && (
+                  {lastImportMessage && (!bulkCredentialResult || hideBulkCredentialResult) && (
                     <div className="rounded-lg border border-cyan-700 bg-cyan-900 px-4 py-3 text-xs text-cyan-100">
                       {lastImportMessage}
                     </div>
                   )}
+
+                  {previewError ? (
+                    <div className="flex items-start gap-2 rounded-lg border border-rose-800 bg-rose-950 px-3 py-2 text-xs text-rose-200">
+                      <AlertCircle className="mt-0.5 h-3.5 w-3.5 flex-shrink-0" />
+                      {previewError}
+                    </div>
+                  ) : null}
 
                   {!bulkCredentialResult && !withCredentials ? (
                     <div className="rounded-lg border border-slate-800 bg-slate-950 px-4 py-3 text-xs text-slate-400">
@@ -521,7 +793,7 @@ export function StudentIntakePanel({
                   ) : null}
 
                   {/* Bulk credential results */}
-                  {bulkCredentialResult && (
+                  {bulkCredentialResult && !hideBulkCredentialResult && (
                     <div className="space-y-3">
                       <div className="flex items-center justify-between">
                         <div className="text-xs font-semibold uppercase tracking-[0.2em] text-cyan-300">
@@ -579,7 +851,7 @@ export function StudentIntakePanel({
                     </div>
                   )}
 
-                  {!bulkCredentialResult && (
+                  {(!bulkCredentialResult || hideBulkCredentialResult) && (
                     <div className="grid grid-cols-3 gap-3">
                       {[
                         { label: 'Invited', value: summary.invited, color: 'text-cyan-300' },
@@ -594,13 +866,14 @@ export function StudentIntakePanel({
                     </div>
                   )}
                 </div>
+                )
               )}
 
               {/* Temporary Credentials */}
               {activeTab === 'credentials' && (
                 <form onSubmit={handleTemporarySubmit} className="space-y-3">
                   <p className="text-xs text-slate-500">
-                    Create a one-time password using a verified institutional email. The temporary credentials will be emailed to the student.
+                    Create a one-time password using any valid student email address. The temporary credentials will be emailed to the student.
                   </p>
                   <input
                     type="text"
@@ -652,9 +925,7 @@ export function StudentIntakePanel({
                     className={`${inputCls} min-h-[72px] resize-none`}
                   />
                   <div className="text-xs text-slate-500">
-                    {institutionDomainHint
-                      ? `Use @${institutionDomainHint} domain. Generated credentials are emailed to the student.`
-                      : 'Use a school or college email domain you control. Credentials are emailed to the student.'}
+                    Any valid email domain is accepted. Generated credentials are emailed to the student.
                   </div>
                   <Button type="submit" disabled={isTemporaryCredentialSubmitting} className="w-full">
                     {isTemporaryCredentialSubmitting ? 'Creating...' : 'Create Temporary Login'}

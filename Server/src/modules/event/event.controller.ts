@@ -3,9 +3,8 @@ import { ApiError } from '../../utils/ApiError';
 import { ApiResponse } from '../../utils/ApiResponse';
 import {
   addSubmissionScore,
+  closeEvent,
   computeEventRankings,
-  createHiringEvent,
-  createHiringEventSchema,
   eventSubmissionSchema,
   getEventRankings,
   getManagedEventRankings,
@@ -13,6 +12,8 @@ import {
   listRecruiterHiringEvents,
   listStudentInstitutionEvents,
   listStudentInstitutionDrives,
+  postponeHiringEventSchema,
+  requestHiringEventPostponement,
   selectStudentFromEventSchema,
   selectStudentFromHiringEvent,
   sendHiringEventInvite,
@@ -85,12 +86,6 @@ export const listStudentInstitutionEventsController = async (req: Request, res: 
   res.status(200).json(new ApiResponse(data));
 };
 
-export const createHiringEventController = async (req: Request, res: Response) => {
-  const payload = createHiringEventSchema.parse(req.body);
-  const data = await createHiringEvent(req.user!._id, payload);
-  res.status(201).json(new ApiResponse(data));
-};
-
 export const listRecruiterHiringEventsController = async (req: Request, res: Response) => {
   const data = await listRecruiterHiringEvents(req.user!._id);
   res.status(200).json(new ApiResponse(data));
@@ -117,4 +112,23 @@ export const sendHiringEventInviteController = async (req: Request, res: Respons
 export const listStudentInstitutionDrivesController = async (req: Request, res: Response) => {
   const data = await listStudentInstitutionDrives(String(req.user!.institutionId));
   res.status(200).json(new ApiResponse(data));
+};
+
+export const closeEventController = async (req: Request, res: Response) => {
+  const data = await closeEvent(String(req.params.eventId), {
+    actorId: req.user!._id,
+    role: req.user!.role,
+    institutionId: req.user!.institutionId,
+  });
+  res.status(200).json(new ApiResponse(data));
+};
+
+export const postponeHiringEventController = async (req: Request, res: Response) => {
+  const payload = postponeHiringEventSchema.parse(req.body);
+  const data = await requestHiringEventPostponement(
+    req.user!._id,
+    String(req.params.eventId),
+    payload,
+  );
+  res.status(201).json(new ApiResponse(data));
 };

@@ -32,6 +32,7 @@ import {
 import {
   bulkCreateManagedStudentCredentials,
   createManagedStudentCredentials,
+  previewManagedStudentCredentialsImport,
 } from '../institution/institutionAccess.service';
 import { UserRole } from '../../types/roles.types';
 import { Workspace } from '../workspace/workspace.model';
@@ -1487,7 +1488,7 @@ export const verifyMilestone = async (adminId: string, milestoneId: string, mile
 
   // Award prototype velocity points to all mentors who worked with this student
   if (milestoneType === 'PROTOTYPE') {
-    void onPrototypeMilestoneVerified(String(workspace.ownerId), String(workspace._id));
+    await onPrototypeMilestoneVerified(String(workspace.ownerId), String(workspace._id));
   }
 
   return newScore;
@@ -2625,6 +2626,14 @@ export const adminImportInstitutionRosterWithCredentials = async (
 ) => {
   const institutionRole = await resolveOnboardingInstitutionRole(institutionId);
   return bulkCreateManagedStudentCredentials(institutionId, institutionRole, adminId, file);
+};
+
+export const adminPreviewInstitutionRosterWithCredentials = async (
+  institutionId: string,
+  file: { originalname: string; buffer: Buffer },
+) => {
+  const institutionRole = await resolveOnboardingInstitutionRole(institutionId);
+  return previewManagedStudentCredentialsImport(institutionId, institutionRole, file);
 };
 
 export const adminCreateInstitutionStudentCredentials = async (

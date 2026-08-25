@@ -42,14 +42,14 @@ export default function PlacementTracker() {
     queryFn: collegeApi.getPlacementTracker,
   });
 
-  const drivesQuery = useQuery({
-    queryKey: ['college-drives'],
-    queryFn: collegeApi.getCollegeDrives,
+  const eventsQuery = useQuery({
+    queryKey: ['college-events'],
+    queryFn: collegeApi.getCollegeEvents,
     enabled: activeTab === 'drives',
   });
 
   const data = placementQuery.data;
-  const drives = drivesQuery.data ?? [];
+  const drives = eventsQuery.data ?? [];
   const copy = VIEW_COPY.overview;
 
   const inProgressCount = useMemo(
@@ -178,7 +178,7 @@ export default function PlacementTracker() {
         </>
       ) : (
         <div className="space-y-6">
-          {drivesQuery.isLoading ? (
+          {eventsQuery.isLoading ? (
             <div className="flex justify-center items-center py-12">
               <Spinner />
             </div>
@@ -222,7 +222,7 @@ export default function PlacementTracker() {
                           </span>
                           <span>|</span>
                           <span>
-                            Registered Students: <strong className="text-slate-300">{drive.registeredStudents.length}</strong>
+                            Registered Students: <strong className="text-slate-300">{drive.participantsCount}</strong>
                           </span>
                         </div>
                       </div>
@@ -251,7 +251,7 @@ export default function PlacementTracker() {
                     {isExpanded && (
                       <div className="mt-6 border-t border-slate-800/80 pt-6 space-y-4">
                         <h4 className="text-sm font-semibold uppercase tracking-[0.15em] text-cyan-300">Registered Students Roster</h4>
-                        {drive.registeredStudents.length === 0 ? (
+                        {drive.participants.length === 0 ? (
                           <div className="text-sm text-slate-500 italic">No students registered for this drive yet.</div>
                         ) : (
                           <div className="overflow-x-auto rounded-xl border border-slate-850 bg-slate-950/40">
@@ -265,7 +265,7 @@ export default function PlacementTracker() {
                                 </tr>
                               </thead>
                               <tbody className="divide-y divide-slate-850">
-                                {drive.registeredStudents.map((registration) => (
+                                {drive.participants.map((registration: { studentId: string; studentName: string; innovationScore: number; registeredAt: string; submissionScore?: number }) => (
                                   <tr key={registration.studentId} className="hover:bg-slate-900/10 text-slate-300">
                                     <td className="px-5 py-4 font-semibold text-white">
                                       {registration.studentName}

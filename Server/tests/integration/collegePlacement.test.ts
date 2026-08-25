@@ -3,6 +3,7 @@ import request from 'supertest';
 import app from '../../src/app';
 import { env } from '../../src/config/env';
 import { PlacementRecord } from '../../src/modules/college/placementRecord.model';
+import { Event } from '../../src/modules/event/event.model';
 import { CampusDrive } from '../../src/modules/recruiter/campusDrive.model';
 import { JobPost } from '../../src/modules/recruiter/jobPost.model';
 import { User } from '../../src/modules/user/user.model';
@@ -121,6 +122,33 @@ describe('college placement data', () => {
         collegeId: collegeB._id,
         title: 'Beta Campus Drive',
         description: 'Drive for Beta College students.',
+        type: 'Placement Drive',
+        scheduledAt: new Date('2026-04-22T00:00:00.000Z'),
+        minimumInnovationScore: 55,
+        isActive: true,
+      },
+    ]);
+
+    await Event.create([
+      {
+        recruiterId: recruiterA._id,
+        institutionId: collegeA._id,
+        createdBy: recruiterA._id,
+        title: 'Alpha Campus Drive',
+        description: 'Drive for Alpha College students.',
+        category: 'hiring',
+        type: 'Placement Drive',
+        scheduledAt: new Date('2026-04-20T00:00:00.000Z'),
+        minimumInnovationScore: 65,
+        isActive: true,
+      },
+      {
+        recruiterId: recruiterB._id,
+        institutionId: collegeB._id,
+        createdBy: recruiterB._id,
+        title: 'Beta Campus Drive',
+        description: 'Drive for Beta College students.',
+        category: 'hiring',
         type: 'Placement Drive',
         scheduledAt: new Date('2026-04-22T00:00:00.000Z'),
         minimumInnovationScore: 55,

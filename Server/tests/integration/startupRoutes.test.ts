@@ -424,9 +424,18 @@ describe('startup route validation', () => {
 
   it('calculates the full 1000-point rubric score for a fully evidenced startup launch', async () => {
     const founder = await createStudent('Rubric Score Founder');
+    const workspace = await Workspace.create({
+      ownerId: founder._id,
+      teamMemberIds: [founder._id],
+      title: 'Rubric Score Workspace',
+      category: 'DeepTech',
+      stage: 'Launch',
+      progressPercent: 100,
+    });
 
     const startup = await Startup.create({
       founderIds: [founder._id],
+      projectId: workspace._id,
       name: 'Rubric Score Startup',
       tagline: 'A fully evidenced startup innovation submission',
       category: 'DeepTech',
@@ -966,9 +975,17 @@ describe('startup route validation', () => {
     );
   });
 
-  it('allows investor launch for an approved startup without workspace or patent coupling', async () => {
+  it('allows investor launch for an approved startup with an active workspace', async () => {
     const founder = await createStudent('Investor Launch Founder');
-    const startup = await createApprovedLaunchStartup(founder);
+    const workspace = await Workspace.create({
+      ownerId: founder._id,
+      teamMemberIds: [founder._id],
+      title: 'Investor Launch Workspace',
+      category: 'AI',
+      stage: 'Launch',
+      progressPercent: 100,
+    });
+    const startup = await createApprovedLaunchStartup(founder, workspace);
 
     const response = await request(app)
       .post(`/api/startup/${startup._id}/launch`)
@@ -1005,7 +1022,15 @@ describe('startup route validation', () => {
 
   it('blocks founder deletion after marketplace launch and keeps the startup active', async () => {
     const founder = await createStudent('Launched Delete Founder');
-    const startup = await createApprovedLaunchStartup(founder);
+    const workspace = await Workspace.create({
+      ownerId: founder._id,
+      teamMemberIds: [founder._id],
+      title: 'Launched Delete Workspace',
+      category: 'AI',
+      stage: 'Launch',
+      progressPercent: 100,
+    });
+    const startup = await createApprovedLaunchStartup(founder, workspace);
 
     const launchResponse = await request(app)
       .post(`/api/startup/${startup._id}/launch`)

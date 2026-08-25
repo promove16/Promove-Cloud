@@ -5,7 +5,7 @@ import { recruiterApi } from "../../api/recruiter.api";
 import { getStudentPortfolioViewPath } from "../marketplace/navigation";
 import { RECRUITER_PAGE_CONTENT_CLASS } from "./RecruiterSectionNav";
 import type {
-  RecruiterDriveView,
+  RecruiterHiringEventView,
   RecruiterTalentSummary,
 } from "../../types/recruiter.types";
 import {
@@ -140,15 +140,15 @@ const mapTalentToStudent = (student: RecruiterTalentSummary): Student => ({
     : [],
 });
 
-const mapDrive = (drive: RecruiterDriveView): Drive => ({
-  id: drive._id,
-  name: drive.title,
-  college: drive.collegeName,
-  applications: drive.registeredStudents.length,
+const mapEvent = (event: RecruiterHiringEventView): Drive => ({
+  id: event._id,
+  name: event.title,
+  college: event.collegeName,
+  applications: event.participantsCount,
   shortlisted: 0,
-  interviewed: drive.registeredStudents.filter((student) => typeof student.submissionScore === "number").length,
+  interviewed: event.participants.filter((student) => typeof student.submissionScore === "number").length,
   offered: 0,
-  status: drive.isActive ? "Active" : "Closed",
+  status: event.isActive ? "Active" : "Closed",
 });
 
 const initialJobForm = {
@@ -181,9 +181,9 @@ export function RecruiterDashboardExperience({ initialView = "home" }: Recruiter
     queryFn: recruiterApi.getJobs,
   });
 
-  const drivesQuery = useQuery({
-    queryKey: ["recruiter", "drives"],
-    queryFn: recruiterApi.getDrives,
+  const eventsQuery = useQuery({
+    queryKey: ["recruiter", "hiring-events"],
+    queryFn: recruiterApi.getHiringEvents,
   });
 
   const pipelineQuery = useQuery({
@@ -235,10 +235,10 @@ export function RecruiterDashboardExperience({ initialView = "home" }: Recruiter
     return baseTalent.map(mapTalentToStudent);
   }, [baseTalent]);
 
-  const sourceDrives = drivesQuery.data ?? [];
-  const activeDrives: Drive[] = useMemo(
-    () => sourceDrives.map(mapDrive),
-    [sourceDrives],
+  const sourceEvents = eventsQuery.data ?? [];
+  const activeEvents: Drive[] = useMemo(
+    () => sourceEvents.map(mapEvent),
+    [sourceEvents],
   );
 
   const recentActivity = useMemo(
@@ -257,7 +257,7 @@ export function RecruiterDashboardExperience({ initialView = "home" }: Recruiter
     openPositions: dashboardQuery.data?.openPositions ?? 0,
     totalApplicants:
       (jobsQuery.data ?? []).reduce((sum, job) => sum + job.applicantCount, 0) +
-      sourceDrives.reduce((sum, drive) => sum + drive.registeredStudents.length, 0),
+      sourceEvents.reduce((sum, event) => sum + event.participantsCount, 0),
     shortlistedThisWeek: dashboardQuery.data?.shortlistedThisWeek ?? 0,
     newScoreMatchCandidates: dashboardQuery.data?.newScoreMatchCandidates ?? 0,
   };
@@ -336,9 +336,9 @@ export function RecruiterDashboardExperience({ initialView = "home" }: Recruiter
           <div className="w-14 h-14 bg-gradient-to-br from-purple-500 to-pink-500 rounded-xl flex items-center justify-center mb-4 shadow-lg shadow-purple-500/30">
             <Users className="w-7 h-7 text-white" />
           </div>
-          <div className="text-4xl font-bold text-white mb-2">{activeDrives.filter((drive) => drive.status === "Active").length}</div>
-          <div className="text-sm font-semibold text-white mb-1">Active Campus Drives</div>
-          <div className="text-xs text-slate-400">Across {new Set(activeDrives.map(d => d.college)).size} institutions</div>
+          <div className="text-4xl font-bold text-white mb-2">{activeEvents.filter((event) => event.status === "Active").length}</div>
+          <div className="text-sm font-semibold text-white mb-1">Active Campus Events</div>
+          <div className="text-xs text-slate-400">Across {new Set(activeEvents.map(d => d.college)).size} institutions</div>
         </div>
       </div>
 

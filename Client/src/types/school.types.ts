@@ -354,6 +354,27 @@ export interface BulkCredentialImportResult {
   errors: Array<{ row: number; email?: string; message: string }>;
 }
 
+export interface ManagedStudentCredentialPreviewRow {
+  row: number;
+  displayName: string;
+  email: string;
+  gradeOrProgram: string;
+  rollNumber: string;
+  notes: string;
+  status: 'ready' | 'error';
+  errors: string[];
+}
+
+export interface ManagedStudentCredentialPreview {
+  fileName: string;
+  rows: ManagedStudentCredentialPreviewRow[];
+  summary: {
+    total: number;
+    ready: number;
+    errors: number;
+  };
+}
+
 export interface StudentRosterImportResult {
   createdCount: number;
   updatedCount: number;

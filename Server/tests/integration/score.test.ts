@@ -4,7 +4,9 @@ import request from 'supertest';
 import app from '../../src/app';
 import { redis } from '../../src/config/redis';
 import { ScoreEvent } from '../../src/modules/innovationScore/score.model';
+import { Startup } from '../../src/modules/startup/startup.model';
 import { User } from '../../src/modules/user/user.model';
+import { Workspace } from '../../src/modules/workspace/workspace.model';
 import { UserRole } from '../../src/types/roles.types';
 
 const PASSWORD = 'Password123!';
@@ -50,6 +52,59 @@ const loginAs = async (email: string) => {
 };
 
 describe('score integration', () => {
+  it('reconciles progress uploads and launched startups from authoritative records', async () => {
+    const { user, email } = await createApprovedStudent({
+      displayName: 'Activity Builder',
+    });
+
+    const workspace = await Workspace.create({
+      ownerId: user._id,
+      teamMemberIds: [],
+      title: 'Activity Workspace',
+      category: 'DeepTech',
+      stage: 'Launch',
+      progressUpdates: [
+        {
+          submittedBy: user._id,
+          note: 'Completed the first verified progress update.',
+          submittedAt: new Date(),
+        },
+        {
+          submittedBy: user._id,
+          note: 'Completed the second verified progress update.',
+          submittedAt: new Date(),
+        },
+      ],
+    });
+
+    await Startup.create({
+      founderIds: [user._id],
+      teamMemberIds: [],
+      projectId: workspace._id,
+      name: 'Activity Startup',
+      tagline: 'A launched startup used for score reconciliation',
+      category: 'DeepTech',
+      stage: 'Launched',
+      phase: 'launched',
+      launchedToMentors: true,
+      launchedAt: new Date(),
+      isActive: true,
+    });
+
+    const accessToken = await loginAs(email);
+    const response = await request(app)
+      .get('/api/score/me')
+      .set('Authorization', `Bearer ${accessToken}`);
+
+    expect(response.status).toBe(200);
+    expect(response.body.data.breakdown.progressUploads).toBe(2);
+    expect(response.body.data.breakdown.startupsLaunched).toBe(1);
+
+    const updatedUser = await User.findById(user._id).lean();
+    expect(updatedUser?.scoreBreakdown.progressUploads).toBe(2);
+    expect(updatedUser?.scoreBreakdown.startupsLaunched).toBe(1);
+  });
+
   it('normalizes legacy scores, sums only recent deltas, and uses reverse leaderboard rank', async () => {
     const now = Date.now();
     const { user, email } = await createApprovedStudent({
@@ -139,5 +194,71 @@ describe('score integration', () => {
 
     expect(response.status).toBe(403);
     expect(response.body.error.code).toBe('SCORE_HISTORY_FORBIDDEN');
+  });
+
+  it('persists an onboarding achievement score before the claim succeeds and prevents duplicate awards', async () => {
+    const { user, email } = await createApprovedStudent({
+      displayName: 'Onboarding Builder',
+    });
+    await User.updateOne(
+      { _id: user._id },
+      {
+        bio: 'Building verified products',
+        domain: 'Product Engineering',
+      },
+    );
+    const accessToken = await loginAs(email);
+
+    const initialScore = await request(app)
+      .get('/api/score/me')
+      .set('Authorization', `Bearer ${accessToken}`);
+    expect(initialScore.status).toBe(200);
+    expect(initialScore.body.data.score).toBe(0);
+
+    const firstClaim = await request(app)
+      .post('/api/users/me/onboarding/claim/profile')
+      .set('Authorization', `Bearer ${accessToken}`);
+
+    expect(firstClaim.status).toBe(200);
+    expect(firstClaim.body.data.awarded).toBe(50);
+
+    const [studentAfterFirstClaim, scoreEvents] = await Promise.all([
+      User.findById(user._id).select('innovationScore').lean(),
+      ScoreEvent.find({ userId: user._id, trigger: 'ONBOARDING_PROFILE' }).lean(),
+    ]);
+    expect(studentAfterFirstClaim?.innovationScore).toBe(50);
+    expect(scoreEvents).toHaveLength(1);
+    expect(scoreEvents[0]?.delta).toBe(50);
+
+    const visibleScore = await request(app)
+      .get('/api/score/me')
+      .set('Authorization', `Bearer ${accessToken}`);
+    expect(visibleScore.status).toBe(200);
+    expect(visibleScore.body.data.score).toBe(50);
+
+    const onboardingStatus = await request(app)
+      .get('/api/users/me/onboarding')
+      .set('Authorization', `Bearer ${accessToken}`);
+
+    expect(onboardingStatus.status).toBe(200);
+    expect(onboardingStatus.body.data.earnedPoints).toBe(50);
+    expect(onboardingStatus.body.data.steps).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({ id: 'profile', completed: true, claimed: true }),
+      ]),
+    );
+
+    const secondClaim = await request(app)
+      .post('/api/users/me/onboarding/claim/profile')
+      .set('Authorization', `Bearer ${accessToken}`);
+
+    expect(secondClaim.status).toBe(200);
+    expect(secondClaim.body.data.awarded).toBe(0);
+    await expect(
+      ScoreEvent.countDocuments({ userId: user._id, trigger: 'ONBOARDING_PROFILE' }),
+    ).resolves.toBe(1);
+    await expect(
+      User.findById(user._id).select('innovationScore').lean(),
+    ).resolves.toEqual(expect.objectContaining({ innovationScore: 50 }));
   });
 });

@@ -4,6 +4,7 @@ import {
   FolderKanban,
   Rocket,
   Send,
+  UserCheck,
   type LucideIcon,
 } from "lucide-react";
 
@@ -43,6 +44,13 @@ export const STARTUP_LAUNCH_SECTION_LINKS: StartupLaunchSectionLink[] = [
     description: "Manage equity, investment bids, and deal pipeline for this startup",
     segment: "cap-table",
     icon: BarChart3,
+  },
+  {
+    label: "Mentor Bids",
+    shortLabel: "Mentor Bids",
+    description: "Review and respond to mentorship proposals submitted by mentors",
+    segment: "mentor-bids",
+    icon: UserCheck,
   },
   {
     label: "Patent System",

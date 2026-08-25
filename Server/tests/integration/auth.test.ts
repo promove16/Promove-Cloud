@@ -1363,9 +1363,9 @@ describe('auth integration', () => {
       expect(loginResponse.body.data.user.accessGrantedBy).toBe('institution_admin');
     });
 
-    it('rejects temporary student credentials for a different email domain', async () => {
+    it('allows temporary student credentials for a different email domain', async () => {
       const collegeEmail = `dean-${randomUUID()}@college.test`;
-      await createApprovedUser({
+      const { user: college } = await createApprovedUser({
         role: UserRole.COLLEGE,
         email: collegeEmail,
         displayName: 'Future College',
@@ -1378,20 +1378,25 @@ describe('auth integration', () => {
       });
 
       const collegeLogin = await loginAs(collegeEmail);
+      const studentEmail = `student-${randomUUID()}@external.test`;
       const response = await request(app)
         .post('/api/college/student-temp-credentials')
         .set('Authorization', `Bearer ${collegeLogin.accessToken}`)
         .send({
           displayName: 'External Student',
-          email: `student-${randomUUID()}@external.test`,
+          email: studentEmail,
           gradeOrProgram: 'B.Tech',
         });
 
-      expect(response.status).toBe(400);
-      expect(response.body.error.code).toBe('INSTITUTION_EMAIL_DOMAIN_REQUIRED');
+      expect(response.status).toBe(201);
+      expect(response.body.data.student.email).toBe(studentEmail);
+
+      const student = await User.findOne({ email: studentEmail }).lean();
+      expect(String(student?.institutionId)).toBe(college._id.toString());
+      expect(student?.verificationStatus).toBe('verified');
     });
 
-    it('creates student credentials from an Excel roster import and allows login', async () => {
+    it('creates student credentials from a mixed-domain Excel roster import and allows login', async () => {
       const schoolEmail = `excel-${randomUUID()}@campus.test`;
       const { user: schoolUser } = await createApprovedUser({
         role: UserRole.SCHOOL,
@@ -1411,13 +1416,13 @@ describe('auth integration', () => {
       const rows = [
         {
           displayName: 'Excel Student One',
-          email: `excel-one-${randomUUID()}@campus.test`,
+          email: `excel-one-${randomUUID()}@personal.test`,
           gradeOrProgram: 'Class 11',
           rollNumber: 'EX-001',
         },
         {
           displayName: 'Excel Student Two',
-          email: `excel-two-${randomUUID()}@campus.test`,
+          email: `excel-two-${randomUUID()}@another-domain.test`,
           gradeOrProgram: 'Class 12',
           rollNumber: 'EX-002',
         },
@@ -1430,6 +1435,41 @@ describe('auth integration', () => {
       ];
       worksheet.addRows(rows);
       const workbookBuffer = Buffer.from(await workbook.xlsx.writeBuffer());
+
+      const previewResponse = await request(app)
+        .post('/api/school/student-roster/preview-credentials')
+        .set('Authorization', `Bearer ${schoolLogin.accessToken}`)
+        .attach('file', workbookBuffer, 'students.xlsx');
+
+      expect(previewResponse.status).toBe(200);
+      expect(previewResponse.body.data).toMatchObject({
+        fileName: 'students.xlsx',
+        summary: { total: 2, ready: 2, errors: 0 },
+        rows: [
+          expect.objectContaining({
+            displayName: rows[0].displayName,
+            email: rows[0].email,
+            gradeOrProgram: rows[0].gradeOrProgram,
+            rollNumber: rows[0].rollNumber,
+            status: 'ready',
+          }),
+          expect.objectContaining({
+            displayName: rows[1].displayName,
+            email: rows[1].email,
+            gradeOrProgram: rows[1].gradeOrProgram,
+            rollNumber: rows[1].rollNumber,
+            status: 'ready',
+          }),
+        ],
+      });
+      expect(await User.countDocuments({ email: { $in: rows.map((row) => row.email) } })).toBe(0);
+      expect(
+        await InstitutionStudentRosterEntry.countDocuments({
+          institutionId: schoolUser._id,
+          email: { $in: rows.map((row) => row.email) },
+        }),
+      ).toBe(0);
+      expect(sendTemporaryStudentCredentialsEmail).not.toHaveBeenCalled();
 
       const importResponse = await request(app)
         .post('/api/school/student-roster/import-credentials')

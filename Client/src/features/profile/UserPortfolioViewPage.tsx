@@ -139,7 +139,7 @@ function RecruiterOpenRoleCard({
             <span>Created {formatDate(job.createdAt)}</span>
             {job.expiresAt ? <span>Closes {formatDate(job.expiresAt)}</span> : null}
           </div>
-          <p className="mt-3 max-w-4xl text-sm leading-6 text-slate-300">{job.description}</p>
+          <p className="mt-3 max-w-4xl whitespace-pre-wrap break-words [overflow-wrap:anywhere] text-sm leading-6 text-slate-300">{job.description}</p>
           <div className="mt-4 flex flex-wrap gap-2">
             {canApply ? (
               <button

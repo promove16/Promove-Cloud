@@ -150,15 +150,15 @@ function UserActionMenu({
           Actions
         </DropdownMenuLabel>
         <DropdownMenuSeparator className="bg-slate-800" />
-        <DropdownMenuItem className="cursor-pointer rounded-lg px-3 py-2 focus:bg-slate-900" onSelect={onViewActivity}>
+        <DropdownMenuItem className="cursor-pointer rounded-lg px-3 py-2 text-slate-200 focus:bg-slate-900 focus:text-white" onSelect={onViewActivity}>
           <Eye className="h-4 w-4 text-slate-400" />
           View Activity
         </DropdownMenuItem>
-        <DropdownMenuItem className="cursor-pointer rounded-lg px-3 py-2 focus:bg-slate-900" onSelect={onChangeRole}>
+        <DropdownMenuItem className="cursor-pointer rounded-lg px-3 py-2 text-slate-200 focus:bg-slate-900 focus:text-white" onSelect={onChangeRole}>
           <UserCog className="h-4 w-4 text-slate-400" />
           Change Role
         </DropdownMenuItem>
-        <DropdownMenuItem className="cursor-pointer rounded-lg px-3 py-2 focus:bg-slate-900" onSelect={onToggleAccess}>
+        <DropdownMenuItem className="cursor-pointer rounded-lg px-3 py-2 text-slate-200 focus:bg-slate-900 focus:text-white" onSelect={onToggleAccess}>
           {user.isActive ? (
             <ShieldOff className="h-4 w-4 text-rose-300" />
           ) : (
@@ -170,7 +170,7 @@ function UserActionMenu({
           <>
             <DropdownMenuSeparator className="bg-slate-800" />
             <DropdownMenuItem
-              className="cursor-pointer rounded-lg px-3 py-2 text-rose-200 focus:bg-rose-950/40 focus:text-rose-100"
+              className="cursor-pointer rounded-lg px-3 py-2 text-rose-300 focus:bg-rose-950/40 focus:text-rose-100"
               onSelect={onDelete}
             >
               <Trash2 className="h-4 w-4 text-rose-300" />

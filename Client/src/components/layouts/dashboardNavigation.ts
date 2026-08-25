@@ -70,6 +70,8 @@ export const SIDEBAR_CONFIG: Record<UserRole, DashboardNavItem[]> = {
     // { kind: 'link', label: 'Portfolio', icon: Trophy, path: '/portfolio' },
     { kind: 'link', label: 'Marketplace', icon: Globe, path: getMarketplaceBasePath(UserRole.STUDENT) },
     { kind: 'link', label: 'Events', icon: CalendarDays, path: '/dashboard/student/events' },
+    { kind: 'link', label: 'Resources', icon: BookMarked, path: '/dashboard/student/resources' },
+    { kind: 'link', label: 'Forum', icon: MessageSquare, path: '/dashboard/student/forum' },
     { kind: 'link', label: 'Messages', icon: MessageCircle, path: '/dashboard/messages' },
   ],
   [UserRole.SCHOOL]: [
@@ -114,7 +116,7 @@ export const SIDEBAR_CONFIG: Record<UserRole, DashboardNavItem[]> = {
   [UserRole.RECRUITER]: [
     { kind: 'link', label: 'Dashboard', icon: Home, path: '/dashboard/recruiter' },
     { kind: 'link', label: 'Marketplace', icon: Globe, path: getMarketplaceBasePath(UserRole.RECRUITER) },
-    { kind: 'link', label: 'Campus Hiring', icon: BarChart3, path: '/dashboard/recruiter/campus' },
+    { kind: 'link', label: 'Campus Events', icon: BarChart3, path: '/dashboard/recruiter/campus' },
     { kind: 'link', label: 'Messages', icon: MessageCircle, path: '/dashboard/messages' },
     // { kind: 'action', label: 'Logout', icon: LogOut, action: 'logout' },
   ],
@@ -137,6 +139,8 @@ export const DASHBOARD_ROUTE_LABELS: Partial<Record<UserRole, DashboardRouteLabe
     { path: '/dashboard/student/mentor-sessions', label: 'Mentor Sessions' },
     { path: '/dashboard/student/events', label: 'Events' },
     { path: '/dashboard/student/applications', label: 'Applications' },
+    { path: '/dashboard/student/forum', label: 'Forum' },
+    { path: '/dashboard/student/resources', label: 'Resource Library' },
   ],
   [UserRole.SCHOOL]: [
     { path: '/dashboard/school/operations', label: 'Operations' },
@@ -178,7 +182,7 @@ export const DASHBOARD_ROUTE_LABELS: Partial<Record<UserRole, DashboardRouteLabe
     { path: '/dashboard/investor/pipeline', label: 'Pipeline' },
   ],
   [UserRole.RECRUITER]: [
-    { path: '/dashboard/recruiter/campus', label: 'Campus Activities' },
+    { path: '/dashboard/recruiter/campus', label: 'Campus Events' },
     { path: '/dashboard/recruiter/applications', label: 'Applications' },
     { path: '/dashboard/recruiter/colleges', label: 'College Students' },
     { path: '/dashboard/recruiter/onboarding', label: 'Onboarding Tracker' },

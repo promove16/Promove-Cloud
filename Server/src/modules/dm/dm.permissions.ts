@@ -25,6 +25,10 @@ type DmAccessContext = {
   hasExistingConversation: boolean;
 };
 
+type DmAccessOptions = {
+  allowConnectionRequest?: boolean;
+};
+
 const specificQueryTypeRules: Partial<Record<QueryType, { senderRoles?: UserRole[]; recipientRoles: UserRole[] }>> = {
   project_mentor: {
     senderRoles: [UserRole.STUDENT, UserRole.SCHOOL, UserRole.COLLEGE],
@@ -135,9 +139,6 @@ const hasAcceptedConversationRequest = async (userIdA: string, userIdB: string) 
   const [idA, idB] = [new Types.ObjectId(userIdA), new Types.ObjectId(userIdB)];
   return Boolean(
     await RequestRecord.exists({
-      type: 'generic',
-      actionType: 'connect',
-      targetEntityType: 'conversation',
       status: 'accepted',
       $or: [
         { fromUserId: idA, toUserId: idB },
@@ -151,9 +152,6 @@ const hasConversationRequest = async (userIdA: string, userIdB: string) => {
   const [idA, idB] = [new Types.ObjectId(userIdA), new Types.ObjectId(userIdB)];
   return Boolean(
     await RequestRecord.exists({
-      type: 'generic',
-      actionType: 'connect',
-      targetEntityType: 'conversation',
       $or: [
         { fromUserId: idA, toUserId: idB },
         { fromUserId: idB, toUserId: idA },
@@ -165,7 +163,11 @@ const hasConversationRequest = async (userIdA: string, userIdB: string) => {
 const hasAllowedRolePair = (senderRole: UserRole, recipientRole: UserRole) =>
   (ALLOWED_CONNECTIONS[senderRole] ?? []).includes(recipientRole);
 
-const recipientAllowsFirstContact = async (sender: MessagingUser, recipient: MessagingUser) => {
+const recipientAllowsFirstContact = async (
+  sender: MessagingUser,
+  recipient: MessagingUser,
+  allowConnectionRequest = false,
+) => {
   if (sender.role === UserRole.ADMIN || recipient.role === UserRole.ADMIN) {
     return true;
   }
@@ -180,6 +182,10 @@ const recipientAllowsFirstContact = async (sender: MessagingUser, recipient: Mes
   }
 
   if (allowDMs === 'connections') {
+    if (allowConnectionRequest) {
+      return true;
+    }
+
     return hasAcceptedConversationRequest(String(sender._id), String(recipient._id));
   }
 
@@ -264,12 +270,17 @@ const canInitiateSpecificFirstContact = async (
   return false;
 };
 
-const canInitiateFirstContact = async (sender: MessagingUser, recipient: MessagingUser, queryType: QueryType) => {
+const canInitiateFirstContact = async (
+  sender: MessagingUser,
+  recipient: MessagingUser,
+  queryType: QueryType,
+  options: DmAccessOptions = {},
+) => {
   if (sender.role === UserRole.ADMIN || recipient.role === UserRole.ADMIN) {
     return true;
   }
 
-  if (!(await recipientAllowsFirstContact(sender, recipient))) {
+  if (!(await recipientAllowsFirstContact(sender, recipient, options.allowConnectionRequest))) {
     return false;
   }
 
@@ -298,7 +309,12 @@ const buildAccessContext = async (senderId: string, recipientId: string): Promis
   };
 };
 
-export const ensureDmAccess = async (senderId: string, recipientId: string, queryType: QueryType = 'general') => {
+export const ensureDmAccess = async (
+  senderId: string,
+  recipientId: string,
+  queryType: QueryType = 'general',
+  options: DmAccessOptions = {},
+) => {
   const context = await buildAccessContext(senderId, recipientId);
 
   if (String(context.sender._id) === String(context.recipient._id)) {
@@ -313,7 +329,7 @@ export const ensureDmAccess = async (senderId: string, recipientId: string, quer
     return context;
   }
 
-  if (await canInitiateFirstContact(context.sender, context.recipient, queryType)) {
+  if (await canInitiateFirstContact(context.sender, context.recipient, queryType, options)) {
     return context;
   }
 

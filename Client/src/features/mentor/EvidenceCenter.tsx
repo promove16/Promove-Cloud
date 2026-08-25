@@ -13,6 +13,7 @@ import {
   ImagePlus,
   Mic2,
   Plus,
+  Rocket,
   Trash2,
   Trophy,
   Upload,
@@ -20,18 +21,20 @@ import {
 } from 'lucide-react';
 import { Link } from 'react-router-dom';
 import { mentorScoreApi, MentorVerificationTask } from '../../api/mentorScore.api';
+import { mentorApi, MentorFeedStudent } from '../../api/mentor.api';
 import { mentorResourceApi } from '../../api/mentorResource.api';
 import { ResearchNote } from '../../components/ui/ResearchSpotlight';
 
 // ─── Types / Constants ────────────────────────────────────────────────────────
 
-type Tab = 'lab' | 'curriculum' | 'class' | 'industry' | 'demo' | 'resources';
+type Tab = 'lab' | 'curriculum' | 'class' | 'industry' | 'prototype' | 'demo' | 'resources';
 
 const TABS: { id: Tab; label: string; icon: React.ElementType; points: string }[] = [
   { id: 'lab',        label: 'Lab Sync',         icon: Cpu,         points: '+40 pts' },
-  { id: 'curriculum', label: 'Curriculum PDF',    icon: BookOpen,    points: '+5 pts approval' },
-  { id: 'class',      label: 'Class Photos',      icon: ImagePlus,   points: '+35 pts total' },
+  { id: 'curriculum', label: 'Curriculum PDF',    icon: BookOpen,    points: '+20 pts approval' },
+  { id: 'class',      label: 'Class Photos',      icon: ImagePlus,   points: '+20 pts total' },
   { id: 'industry',   label: 'Industry Session',  icon: Mic2,        points: '+10 pts each' },
+  { id: 'prototype',  label: 'Prototype Velocity', icon: Rocket,     points: '+10 pts each' },
   { id: 'demo',       label: 'Demo Day',          icon: Trophy,      points: '+50 pts/year' },
   { id: 'resources',  label: 'Resources',         icon: Globe,       points: '+20 per milestone' },
 ];
@@ -47,6 +50,7 @@ const TASK_TYPE_FOR_TAB: Record<Tab, MentorVerificationTask['type'] | null> = {
   curriculum: 'curriculum_pdf',
   class:      'class_photo',
   industry:   'industry_session',
+  prototype:  'prototype_velocity',
   demo:       'demo_day',
   resources:  null,
 };
@@ -143,6 +147,10 @@ function TaskList({ tasks }: { tasks: MentorVerificationTask[] }) {
 
 // ─── Tab Forms ────────────────────────────────────────────────────────────────
 
+function parseErrorMessage(err: any): string {
+  return err?.response?.data?.error?.message ?? err?.response?.data?.message ?? err?.message ?? 'Submission failed. Please try again.';
+}
+
 function LabSyncForm({ onSuccess }: { onSuccess: () => void }) {
   const [photoUrls, setPhotoUrls] = useState('');
   const [kitDesc, setKitDesc] = useState('');
@@ -150,10 +158,12 @@ function LabSyncForm({ onSuccess }: { onSuccess: () => void }) {
   const [success, setSuccess] = useState(false);
   const [error, setError] = useState('');
 
+  const todayStr = new Date().toISOString().split('T')[0];
+
   const mutation = useMutation({
     mutationFn: mentorScoreApi.submitLabSync,
     onSuccess: () => { setSuccess(true); setPhotoUrls(''); setKitDesc(''); setLabDate(''); onSuccess(); },
-    onError: (e: Error) => setError(e.message),
+    onError: (e: any) => setError(parseErrorMessage(e)),
   });
 
   const handleSubmit = (ev: React.FormEvent) => {
@@ -162,6 +172,7 @@ function LabSyncForm({ onSuccess }: { onSuccess: () => void }) {
     setSuccess(false);
     const urls = photoUrls.split('\n').map((u) => u.trim()).filter(Boolean);
     if (!urls.length) return setError('At least one photo URL is required');
+    if (labDate > todayStr) return setError('Lab date cannot be in the future.');
     mutation.mutate({ photoUrls: urls, kitDescription: kitDesc, labDate });
   };
 
@@ -179,7 +190,7 @@ function LabSyncForm({ onSuccess }: { onSuccess: () => void }) {
       </div>
       <div>
         <Label text="Lab date" />
-        <Input type="date" value={labDate} onChange={(e) => setLabDate(e.target.value)} required />
+        <Input type="date" max={todayStr} value={labDate} onChange={(e) => setLabDate(e.target.value)} required />
       </div>
       <SubmitBtn pending={mutation.isPending} />
     </form>
@@ -196,7 +207,7 @@ function CurriculumForm({ onSuccess }: { onSuccess: () => void }) {
   const mutation = useMutation({
     mutationFn: mentorScoreApi.submitCurriculumPdf,
     onSuccess: () => { setSuccess(true); setPdfUrl(''); setClassCount(''); setYear(''); onSuccess(); },
-    onError: (e: Error) => setError(e.message),
+    onError: (e: any) => setError(parseErrorMessage(e)),
   });
 
   const handleSubmit = (ev: React.FormEvent) => {
@@ -220,8 +231,8 @@ function CurriculumForm({ onSuccess }: { onSuccess: () => void }) {
         <Input type="number" min={1} value={classCount} onChange={(e) => setClassCount(e.target.value)} placeholder="12" required />
       </div>
       <div>
-        <Label text="Academic year (e.g. 2024-25)" />
-        <Input value={year} onChange={(e) => setYear(e.target.value)} placeholder="2024-25" required />
+        <Label text="Academic year (e.g. 2025-2026)" />
+        <Input value={year} onChange={(e) => setYear(e.target.value)} placeholder="2025-2026" required />
       </div>
       <SubmitBtn pending={mutation.isPending} />
     </form>
@@ -237,6 +248,8 @@ function ClassPhotoForm({ onSuccess }: { onSuccess: () => void }) {
   const [success, setSuccess] = useState(false);
   const [error, setError] = useState('');
 
+  const todayStr = new Date().toISOString().split('T')[0];
+
   const submissionsQuery = useQuery({
     queryKey: ['mentor-score', 'submissions', 'curriculum_pdf', 'approved'],
     queryFn: () => mentorScoreApi.getMySubmissions({ type: 'curriculum_pdf', status: 'approved' }),
@@ -245,7 +258,7 @@ function ClassPhotoForm({ onSuccess }: { onSuccess: () => void }) {
   const mutation = useMutation({
     mutationFn: mentorScoreApi.submitClassPhoto,
     onSuccess: () => { setSuccess(true); setPhotoUrls(''); setClassIndex(''); setClassDate(''); setTopic(''); onSuccess(); },
-    onError: (e: Error) => setError(e.message),
+    onError: (e: any) => setError(parseErrorMessage(e)),
   });
 
   const handleSubmit = (ev: React.FormEvent) => {
@@ -256,6 +269,7 @@ function ClassPhotoForm({ onSuccess }: { onSuccess: () => void }) {
     if (!urls.length || !curriculumId || !classIndex || !classDate || !topic) {
       return setError('All fields are required');
     }
+    if (classDate > todayStr) return setError('Class date cannot be in the future.');
     mutation.mutate({ photoUrls: urls, curriculumTaskId: curriculumId, classIndex: Number(classIndex), classDate, topic });
   };
 
@@ -290,7 +304,7 @@ function ClassPhotoForm({ onSuccess }: { onSuccess: () => void }) {
         </div>
         <div>
           <Label text="Class date" />
-          <Input type="date" value={classDate} onChange={(e) => setClassDate(e.target.value)} required />
+          <Input type="date" max={todayStr} value={classDate} onChange={(e) => setClassDate(e.target.value)} required />
         </div>
       </div>
       <div>
@@ -307,10 +321,12 @@ function IndustrySessionForm({ onSuccess }: { onSuccess: () => void }) {
   const [success, setSuccess] = useState(false);
   const [error, setError] = useState('');
 
+  const todayStr = new Date().toISOString().split('T')[0];
+
   const mutation = useMutation({
     mutationFn: mentorScoreApi.submitIndustrySession,
     onSuccess: () => { setSuccess(true); setForm({ founderName: '', companyName: '', sessionDate: '', topic: '', attendeeCount: '', evidenceUrl: '' }); onSuccess(); },
-    onError: (e: Error) => setError(e.message),
+    onError: (e: any) => setError(parseErrorMessage(e)),
   });
 
   const handleSubmit = (ev: React.FormEvent) => {
@@ -320,6 +336,7 @@ function IndustrySessionForm({ onSuccess }: { onSuccess: () => void }) {
     if (!form.founderName || !form.companyName || !form.sessionDate || !form.topic) {
       return setError('Founder name, company, date and topic are required');
     }
+    if (form.sessionDate > todayStr) return setError('Session date cannot be in the future.');
     mutation.mutate({
       founderName:   form.founderName,
       companyName:   form.companyName,
@@ -350,7 +367,7 @@ function IndustrySessionForm({ onSuccess }: { onSuccess: () => void }) {
       <div className="grid grid-cols-2 gap-3">
         <div>
           <Label text="Session date" />
-          <Input type="date" value={form.sessionDate} onChange={set('sessionDate')} required />
+          <Input type="date" max={todayStr} value={form.sessionDate} onChange={set('sessionDate')} required />
         </div>
         <div>
           <Label text="Attendee count" />
@@ -364,6 +381,97 @@ function IndustrySessionForm({ onSuccess }: { onSuccess: () => void }) {
       <div>
         <Label text="Evidence URL (optional – photo, video)" />
         <Input value={form.evidenceUrl} onChange={set('evidenceUrl')} placeholder="https://…" />
+      </div>
+      <SubmitBtn pending={mutation.isPending} />
+    </form>
+  );
+}
+
+function PrototypeVelocityForm({ onSuccess }: { onSuccess: () => void }) {
+  const [studentId, setStudentId] = useState('');
+  const [projectTitle, setProjectTitle] = useState('');
+  const [stage, setStage] = useState('Prototype');
+  const [photoUrls, setPhotoUrls] = useState('');
+  const [success, setSuccess] = useState(false);
+  const [error, setError] = useState('');
+
+  const studentsQuery = useQuery({
+    queryKey: ['mentor', 'students'],
+    queryFn: mentorApi.getStudents,
+  });
+
+  const mutation = useMutation({
+    mutationFn: mentorScoreApi.submitPrototypeVelocity,
+    onSuccess: () => {
+      setSuccess(true);
+      setStudentId('');
+      setProjectTitle('');
+      setStage('Prototype');
+      setPhotoUrls('');
+      onSuccess();
+    },
+    onError: (e: any) => setError(parseErrorMessage(e)),
+  });
+
+  const students = studentsQuery.data ?? [];
+  const selectedStudent = students.find((s) => s.studentId === studentId) ?? students.find((s) => s._id === studentId);
+
+  const handleSubmit = (ev: React.FormEvent) => {
+    ev.preventDefault();
+    setError('');
+    setSuccess(false);
+    const urls = photoUrls.split('\n').map((u) => u.trim()).filter(Boolean);
+    if (!studentId || !projectTitle || !urls.length) {
+      return setError('Student, project title and at least one photo URL are required');
+    }
+    mutation.mutate({ studentId, projectTitle, stage, photoUrls: urls });
+  };
+
+  return (
+    <form onSubmit={handleSubmit} className="space-y-4">
+      {success && <SuccessBanner message="Prototype transition submitted for admin review." onDismiss={() => setSuccess(false)} />}
+      {error && <ErrorBanner message={error} />}
+      <p className="text-xs text-slate-500">
+        Report a student who moved from the Idea Phase to the Prototype Phase under your mentorship. Earn +10 pts per student (max 100).
+      </p>
+      <div>
+        <Label text="Student" />
+        <select
+          value={studentId}
+          onChange={(e) => setStudentId(e.target.value)}
+          required
+          className="w-full rounded-lg border border-slate-700 bg-slate-800 px-3 py-2 text-sm text-white focus:border-violet-500 focus:outline-none"
+        >
+          <option value="">Select student…</option>
+          {students.map((s) => (
+            <option key={s.studentId} value={s.studentId}>
+              {s.displayName} — {s.startupName || s.category}
+            </option>
+          ))}
+        </select>
+        {selectedStudent?.recentActivitySummary && (
+          <p className="mt-1 text-xs text-slate-500">{selectedStudent.recentActivitySummary}</p>
+        )}
+      </div>
+      <div>
+        <Label text="Project title" />
+        <Input value={projectTitle} onChange={(e) => setProjectTitle(e.target.value)} placeholder="Smart Irrigation System" required />
+      </div>
+      <div>
+        <Label text="Stage reached" />
+        <select
+          value={stage}
+          onChange={(e) => setStage(e.target.value)}
+          className="w-full rounded-lg border border-slate-700 bg-slate-800 px-3 py-2 text-sm text-white focus:border-violet-500 focus:outline-none"
+        >
+          <option value="Prototype">Prototype</option>
+          <option value="MVP">MVP</option>
+          <option value="Working Prototype">Working Prototype</option>
+        </select>
+      </div>
+      <div>
+        <Label text="Photo / evidence URLs (one per line)" />
+        <Textarea value={photoUrls} onChange={(e) => setPhotoUrls(e.target.value)} placeholder="https://…" required />
       </div>
       <SubmitBtn pending={mutation.isPending} />
     </form>
@@ -406,7 +514,7 @@ function DemoDayForm({ onSuccess }: { onSuccess: () => void }) {
       </div>
       <div>
         <Label text="Academic year" />
-        <Input value={year} onChange={(e) => setYear(e.target.value)} placeholder="2024-25" required />
+        <Input value={year} onChange={(e) => setYear(e.target.value)} placeholder="2025-2026" required />
       </div>
       <div>
         <div className="flex items-center justify-between mb-2">
@@ -581,6 +689,7 @@ export default function EvidenceCenter() {
         {activeTab === 'curriculum' && <CurriculumForm onSuccess={onSuccess} />}
         {activeTab === 'class'      && <ClassPhotoForm onSuccess={onSuccess} />}
         {activeTab === 'industry'   && <IndustrySessionForm onSuccess={onSuccess} />}
+        {activeTab === 'prototype'  && <PrototypeVelocityForm onSuccess={onSuccess} />}
         {activeTab === 'demo'       && <DemoDayForm onSuccess={onSuccess} />}
         {activeTab === 'resources'  && <ResourcesForm onSuccess={onSuccess} />}
       </div>

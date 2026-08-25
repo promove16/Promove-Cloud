@@ -174,7 +174,8 @@ export default function StudentLeaderboard() {
             onCancelInvite={(rosterEntryId) => cancelInviteMutation.mutate(rosterEntryId)}
             cancellingInviteId={cancelInviteMutation.isPending ? cancelInviteMutation.variables : null}
             onImportFile={(file) => importRosterMutation.mutate(file)}
-            onImportFileWithCredentials={(file) => importRosterWithCredentialsMutation.mutate(file)}
+            onPreviewImportFile={schoolApi.previewStudentRosterWithCredentials}
+            onImportFileWithCredentials={(file) => importRosterWithCredentialsMutation.mutateAsync(file)}
             onCreateTemporaryCredentials={(payload) =>
               createTemporaryCredentialMutation.mutate(payload)
             }

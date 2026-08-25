@@ -1,7 +1,6 @@
 import { Types } from 'mongoose';
 import { z } from 'zod';
-import { notificationQueue } from '../../config/bullmq';
-import { applyScoreAsync } from '../../services/scoreEngine';
+import { applyScore, applyScoreAsync } from '../../services/scoreEngine';
 import { deleteStoredAsset, extractS3KeyFromUrl, generatePresignedUrl, uploadFile } from '../../services/fileStorageService';
 import { generateSignedCloudinaryUrl } from '../../services/cloudinaryService';
 import { User } from '../user/user.model';
@@ -18,6 +17,7 @@ import { recordStartupLifecycleEvent } from '../startupLifecycle/startupLifecycl
 import { DirectMessage } from '../dm/dm.model';
 import { serializeDirectMessage } from '../dm/dm.serializer';
 import { NotificationService } from '../notification/notification.service';
+import { queueNotification } from '../notification/notification.delivery';
 import { RequestRecord } from '../request/request.model';
 import { Patent } from '../patent/patent.model';
 import { PatentRequest } from '../patent/patentRequest.model';
@@ -425,8 +425,7 @@ const clearAdminEditUnlock = (startup: InstanceType<typeof Startup>) => {
 export const buildStartupEditAccess = (startup: Record<string, any>): StartupEditAccess => {
   const reviewStatus = startup.reviewStatus ?? 'draft';
   const unlockedByAdmin = Boolean(startup.adminEditUnlockActive);
-  const isLocked =
-    (reviewStatus === 'review_requested' || reviewStatus === 'approved') && !unlockedByAdmin;
+  const isLocked = reviewStatus === 'review_requested' && !unlockedByAdmin;
 
   let reason = 'Startup profile can be edited.';
   if (unlockedByAdmin && (reviewStatus === 'review_requested' || reviewStatus === 'approved')) {
@@ -434,7 +433,7 @@ export const buildStartupEditAccess = (startup: Record<string, any>): StartupEdi
   } else if (reviewStatus === 'review_requested') {
     reason = 'Startup profile is locked while admin review is pending.';
   } else if (reviewStatus === 'approved') {
-    reason = 'Startup profile is locked after approval. Raise a Smart Help request if you need updates.';
+    reason = 'Startup is approved.';
   } else if (reviewStatus === 'changes_requested') {
     reason = 'Admin requested changes. Update the startup and submit it again for review.';
   }
@@ -515,12 +514,10 @@ const autoAdvancePhase = (startup: Record<string, any>): string => {
 const prepareStartupForEditableMutation = (startup: InstanceType<typeof Startup>) => {
   assertStartupEditable(startup.toObject());
 
-  if (
-    startup.adminEditUnlockActive &&
-    (startup.reviewStatus === 'review_requested' || startup.reviewStatus === 'approved')
-  ) {
-    startup.reviewStatus = 'draft';
-    clearReviewMetadata(startup);
+  if (startup.adminEditUnlockActive) {
+    if (startup.reviewStatus !== 'approved') {
+      startup.reviewStatus = 'draft';
+    }
     clearAdminEditUnlock(startup);
   }
 };
@@ -924,6 +921,7 @@ const toIsoString = (value: unknown) => {
 };
 
 const buildLegacyStartupReadiness = (startup: {
+  projectId?: unknown;
   name?: string;
   tagline?: string;
   category?: string;
@@ -993,6 +991,7 @@ const buildLegacyStartupReadiness = (startup: {
   addMissing(!startup.name?.trim(), 'startup name');
   addMissing(!startup.tagline?.trim(), 'startup tagline');
   addMissing(!startup.category?.trim(), 'startup category');
+  addMissing(!startup.projectId, 'linked workspace');
   addMissing(founderIds.length === 0, 'at least one founder');
 
   if (hasInitializationNarrative) {
@@ -1058,6 +1057,7 @@ const buildInnovationStartupReadiness = (startup: Record<string, any>): StartupR
   addMissing(!startup.name?.trim(), 'startup name');
   addMissing(!startup.tagline?.trim(), 'startup tagline');
   addMissing(!startup.category?.trim(), 'startup category');
+  addMissing(!startup.projectId, 'linked workspace');
   addMissing(founderIds.length === 0, 'at least one founder');
   addMissing(!companyProfile.legalStructure?.trim(), 'legal structure');
   addMissing(
@@ -1112,6 +1112,48 @@ const buildStartupReadiness = (startup: Record<string, any>): StartupReadiness =
   usesInnovationRubric(startup)
     ? buildInnovationStartupReadiness(startup)
     : buildLegacyStartupReadiness(startup as never);
+
+const getActiveLinkedWorkspace = async (startup: Record<string, any>) => {
+  if (!startup.projectId) {
+    throw new ApiError(
+      400,
+      'STARTUP_WORKSPACE_REQUIRED',
+      'Link an active workspace before the startup can be verified.',
+      [{ missingItems: ['linked workspace'] }],
+    );
+  }
+
+  const workspace = await Workspace.findOne({ _id: startup.projectId, isActive: true })
+    .select('_id title category')
+    .lean<{ _id: Types.ObjectId; title: string; category: string }>();
+
+  if (!workspace) {
+    throw new ApiError(
+      400,
+      'STARTUP_WORKSPACE_INVALID',
+      'The linked workspace is unavailable. Link an active workspace before verification.',
+      [{ missingItems: ['active workspace link'] }],
+    );
+  }
+
+  return workspace;
+};
+
+const assertStartupVerificationReady = async (startup: Record<string, any>) => {
+  const readiness = buildStartupReadiness(startup);
+
+  if (!readiness.isReviewReady) {
+    throw new ApiError(
+      400,
+      'STARTUP_INCOMPLETE',
+      `Complete the startup profile before verification. Missing: ${formatMissingItems(readiness.missingItems)}.`,
+      [{ missingItems: readiness.missingItems }],
+    );
+  }
+
+  const workspace = await getActiveLinkedWorkspace(startup);
+  return { readiness, workspace };
+};
 
 const formatMissingItems = (items: string[]) => {
   if (items.length <= 1) return items[0] ?? '';
@@ -1552,7 +1594,13 @@ export const updateStartupProfile = async (
   const startup = await getStartupForFounder(startupId, userId);
   const previousProjectId = startup.projectId ? String(startup.projectId) : undefined;
   const previousReviewStatus = startup.reviewStatus;
-  prepareStartupForEditableMutation(startup);
+  const isInitialWorkspaceLink = !startup.projectId && Boolean(payload.projectId);
+  const canAttachMissingWorkspaceDuringReview =
+    isInitialWorkspaceLink && startup.reviewStatus === 'review_requested';
+
+  if (!canAttachMissingWorkspaceDuringReview) {
+    prepareStartupForEditableMutation(startup);
+  }
   const startupSnapshot = startup.toObject();
   const mergedPayload = buildStartupInput({
     ...startupSnapshot,
@@ -1647,16 +1695,6 @@ export const updateStartupProfile = async (
 
 export const requestStartupReview = async (startupId: string, userId: string) => {
   const startup = await getStartupForFounder(startupId, userId);
-  const readiness = buildStartupReadiness(startup.toObject());
-
-  if (!readiness.isReviewReady) {
-    throw new ApiError(
-      400,
-      'STARTUP_INCOMPLETE',
-      `Complete the startup profile before requesting review. Missing: ${formatMissingItems(readiness.missingItems)}.`,
-      [{ missingItems: readiness.missingItems }],
-    );
-  }
 
   if (startup.reviewStatus === 'approved') {
     throw new ApiError(409, 'STARTUP_ALREADY_APPROVED', 'Startup has already been approved.');
@@ -1665,6 +1703,8 @@ export const requestStartupReview = async (startupId: string, userId: string) =>
   if (startup.reviewStatus === 'review_requested') {
     throw new ApiError(409, 'STARTUP_ALREADY_UNDER_REVIEW', 'Startup review is already pending.');
   }
+
+  const { readiness } = await assertStartupVerificationReady(startup.toObject());
 
   startup.reviewStatus = 'review_requested';
   startup.reviewRequestedAt = new Date();
@@ -1767,14 +1807,26 @@ export const launchStartup = async (
         );
       }
     }
-  } else {
-    await applyScoreAsync({
-      userId,
-      trigger: 'STARTUP_LAUNCHED',
-      metadata: { startupId, launchTo: payload.launchTo },
-      idempotencyKey: `startup-launched:${startupId}`,
-    });
   }
+
+  const founderAndTeamIds = Array.from(
+    new Set([
+      userId,
+      ...startup.founderIds.map((id) => String(id)),
+      ...startup.teamMemberIds.map((id) => String(id)),
+    ]),
+  );
+
+  await Promise.all(
+    founderAndTeamIds.map((memberId) =>
+      applyScore({
+        userId: memberId,
+        trigger: 'STARTUP_LAUNCHED',
+        metadata: { startupId, launchTo: payload.launchTo },
+        idempotencyKey: `startup-launched:${startupId}:${memberId}`,
+      }),
+    ),
+  );
 
   const targetRoles =
     payload.launchTo === 'both'
@@ -1818,7 +1870,7 @@ export const launchStartup = async (
 
   await Promise.all(
     recipients.map((recipient) =>
-      notificationQueue.add('startup-launch', {
+      queueNotification({
         userId: String(recipient._id),
         ...getLaunchNotification(recipient.role),
       }),
@@ -1859,6 +1911,7 @@ export const uploadPitchDeck = async (startupId: string, userId: string, file: E
     throw new ApiError(400, 'INVALID_FILE_TYPE', 'Only PDF, PPT, or PPTX files are allowed');
   }
   const startup = await getStartupForFounder(startupId, userId);
+  prepareStartupForEditableMutation(startup);
 
   await deleteStoredAsset({
     storageProvider: startup.pitchDeckStorageProvider,
@@ -1950,12 +2003,17 @@ export const sendPitchRequest = async (
     },
   });
 
-  await notificationQueue.add('send-pitch-request-notification', {
-    recipientId: investorObjectId.toString(),
-    startupId: startup._id.toString(),
-    startupName: startup.name,
-    founderName: startup.founderIds[0]?.toString(),
-    type: 'pitch_request',
+  await queueNotification({
+    userId: investorObjectId.toString(),
+    type: 'request',
+    title: 'New startup pitch request',
+    body: `${startup.name} sent you a pitch request. Review the startup and request details.`,
+    link: '/dashboard/investor',
+    metadata: {
+      startupId: startup._id.toString(),
+      startupName: startup.name,
+      founderId: studentObjectId.toString(),
+    },
   });
 
   return serializeStartup(startup);
@@ -2012,13 +2070,18 @@ export const respondToPitchRequest = async (
     },
   });
 
-  await notificationQueue.add('pitch-request-response-notification', {
-    recipientId: request.investorId.toString(),
-    startupId: startup._id.toString(),
-    startupName: startup.name,
-    decision,
-    note,
-    type: 'pitch_request_response',
+  await queueNotification({
+    userId: request.investorId.toString(),
+    type: 'request',
+    title: `Pitch request ${decision}`,
+    body: `${startup.name} ${decision} your pitch request${note ? `: ${note}` : '.'}`,
+    link: '/dashboard/investor',
+    metadata: {
+      startupId: startup._id.toString(),
+      startupName: startup.name,
+      decision,
+      ...(note ? { note } : {}),
+    },
   });
 
   return serializeStartup(startup);
@@ -2098,6 +2161,7 @@ export const uploadStartupDocument = async (
     throw new ApiError(400, 'EMPTY_FILE', 'Document file cannot be empty');
   }
   const startup = await getStartupForFounder(startupId, userId);
+  prepareStartupForEditableMutation(startup);
   const fileType = file.mimetype === 'application/pdf' ? 'pdf' : 'image';
   const uploaded = await uploadFile({
     buffer: file.buffer,
@@ -2152,6 +2216,7 @@ export const uploadStartupDocument = async (
 
 export const deleteStartupDocument = async (startupId: string, userId: string, documentId: string) => {
   const startup = await getStartupForFounder(startupId, userId);
+  prepareStartupForEditableMutation(startup);
   const document = startup.documents.find((item) => String(item._id) === documentId);
 
   if (!document) {
@@ -2366,6 +2431,7 @@ export const listStartupsForAdmin = async (status?: 'draft' | 'review_requested'
     .lean<Array<{
       _id: Types.ObjectId;
       founderIds: Types.ObjectId[];
+      projectId?: Types.ObjectId;
       name: string;
       tagline: string;
       category: string;
@@ -2466,15 +2532,51 @@ export const listStartupsForAdmin = async (status?: 'draft' | 'review_requested'
       : [];
 
   const founderMap = new Map(founders.map((founder) => [String(founder._id), founder]));
+  const workspaceIds = [
+    ...new Set(startups.map((startup) => startup.projectId).filter(Boolean).map(String)),
+  ];
+  const linkedWorkspaces =
+    workspaceIds.length > 0
+      ? await Workspace.find({ _id: { $in: workspaceIds }, isActive: true })
+          .select('_id title category')
+          .lean<Array<{ _id: Types.ObjectId; title: string; category: string }>>()
+      : [];
+  const workspaceMap = new Map(
+    linkedWorkspaces.map((workspace) => [String(workspace._id), workspace]),
+  );
 
   const adminStartupRows = await Promise.all(startups.map(async (startup) => {
     const founderIds = Array.isArray(startup.founderIds) ? startup.founderIds : [];
     const documents = Array.isArray(startup.documents) ? startup.documents : [];
-    const readiness = buildStartupReadiness(startup);
+    const linkedWorkspace = startup.projectId
+      ? workspaceMap.get(String(startup.projectId))
+      : undefined;
+    const baseReadiness = buildStartupReadiness(startup);
+    const readiness =
+      startup.projectId && !linkedWorkspace
+        ? {
+            ...baseReadiness,
+            isReviewReady: false,
+            missingItems: [
+              ...baseReadiness.missingItems.filter((item) => item !== 'linked workspace'),
+              'active workspace link',
+            ],
+          }
+        : baseReadiness;
     const pitchDeckUrl = await getSignedStartupPitchDeckUrl(startup);
 
     return {
       _id: String(startup._id),
+      ...(startup.projectId ? { projectId: String(startup.projectId) } : {}),
+      ...(linkedWorkspace
+        ? {
+            workspace: {
+              _id: String(linkedWorkspace._id),
+              title: linkedWorkspace.title,
+              category: linkedWorkspace.category,
+            },
+          }
+        : {}),
       name: startup.name,
       tagline: startup.tagline,
       category: startup.category,
@@ -2608,6 +2710,18 @@ export const reviewStartupSubmission = async (
 
   if (!startup || !startup.isActive) {
     throw new ApiError(404, 'STARTUP_NOT_FOUND', 'Startup not found');
+  }
+
+  if (payload.decision === 'approved') {
+    if (startup.reviewStatus !== 'review_requested') {
+      throw new ApiError(
+        409,
+        'STARTUP_NOT_SUBMITTED_FOR_REVIEW',
+        'The founder must submit the latest startup updates before verification.',
+      );
+    }
+
+    await assertStartupVerificationReady(startup.toObject());
   }
 
   startup.reviewStatus = payload.decision;

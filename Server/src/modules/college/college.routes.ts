@@ -25,6 +25,7 @@ import {
   getLatestCollegeComplianceReportController,
   importCollegeStudentCredentialsController,
   importCollegeStudentRosterController,
+  previewCollegeStudentCredentialsController,
   listCollegeMentorshipProgramsController,
   listCollegeComplianceActionsController,
   listCollegeComplianceAlertsController,
@@ -48,7 +49,6 @@ import {
   updateCollegeComplianceIncidentController,
   updatePlacementStatusController,
   listCollegeHiringEventsController,
-  listCollegeDrivesController,
 } from './college.controller';
 
 const router = Router();
@@ -87,7 +87,6 @@ router.get(
   asyncHandler(listCollegeRecruitersController),
 );
 router.get('/placement', authorize(UserRole.COLLEGE), asyncHandler(getCollegePlacementController));
-router.get('/drives', authorize(UserRole.COLLEGE), asyncHandler(listCollegeDrivesController));
 router.patch(
   '/placement/:studentId/status',
   authorize(UserRole.RECRUITER),
@@ -227,6 +226,12 @@ router.post(
   authorize(UserRole.COLLEGE),
   rosterUpload.single('file'),
   asyncHandler(importCollegeStudentRosterController),
+);
+router.post(
+  '/student-roster/preview-credentials',
+  authorize(UserRole.COLLEGE),
+  rosterUpload.single('file'),
+  asyncHandler(previewCollegeStudentCredentialsController),
 );
 router.post(
   '/student-roster/import-credentials',

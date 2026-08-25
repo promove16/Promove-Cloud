@@ -5,6 +5,7 @@ import { env } from '../../src/config/env';
 import { Startup } from '../../src/modules/startup/startup.model';
 import { User } from '../../src/modules/user/user.model';
 import { Workspace } from '../../src/modules/workspace/workspace.model';
+import { DirectMessage } from '../../src/modules/dm/dm.model';
 import { UserRole } from '../../src/types/roles.types';
 
 const makeAccessToken = (user: { _id: { toString(): string }; email: string; role: UserRole }) =>
@@ -135,6 +136,69 @@ const approveDealThroughAdmin = async ({
 };
 
 describe('investment workflow integration', () => {
+  it('allows an investor to offer on an active startup after its founder requests funding in chat', async () => {
+    const founder = await createUser(UserRole.STUDENT, { displayName: 'Chat Funding Founder' });
+    const investor = await createUser(UserRole.INVESTOR, { displayName: 'Chat Funding Investor' });
+    const startup = await createStartup(founder._id.toString(), {
+      stage: 'MVP',
+      launchedToInvestors: false,
+      reviewStatus: 'draft',
+      isActive: true,
+    });
+
+    await DirectMessage.create({
+      senderId: founder._id,
+      recipientId: investor._id,
+      message: "I'd like to move forward on funding.",
+      messageType: 'funding_request',
+      queryType: 'general',
+      startupId: startup._id,
+    });
+
+    const response = await request(app)
+      .post(`/api/investor/express-interest/${startup._id}`)
+      .set(authHeader(investor))
+      .send({
+        investorType: 'penny',
+        proposedAmountINR: 20000,
+        proposedEquityPercent: 2,
+        chosenRole: 'shareholder',
+      });
+
+    expect(response.status).toBe(201);
+    expect(response.body.data).toEqual(
+      expect.objectContaining({
+        startupId: startup._id.toString(),
+        investorId: investor._id.toString(),
+        studentId: founder._id.toString(),
+      }),
+    );
+  });
+
+  it('does not let an investor bypass launch approval without a founder funding request', async () => {
+    const founder = await createUser(UserRole.STUDENT, { displayName: 'Private Startup Founder' });
+    const investor = await createUser(UserRole.INVESTOR, { displayName: 'Unrequested Investor' });
+    const startup = await createStartup(founder._id.toString(), {
+      stage: 'MVP',
+      launchedToInvestors: false,
+      reviewStatus: 'draft',
+      isActive: true,
+    });
+
+    const response = await request(app)
+      .post(`/api/investor/express-interest/${startup._id}`)
+      .set(authHeader(investor))
+      .send({
+        investorType: 'penny',
+        proposedAmountINR: 20000,
+        proposedEquityPercent: 2,
+        chosenRole: 'shareholder',
+      });
+
+    expect(response.status).toBe(404);
+    expect(response.body.error.code).toBe('STARTUP_NOT_FOUND');
+  });
+
   it('filters investor marketplace startups by visible live founder score instead of launch snapshot', async () => {
     const investor = await createUser(UserRole.INVESTOR, { displayName: 'Score Range Investor' });
     const highLiveFounder = await createUser(UserRole.STUDENT, {

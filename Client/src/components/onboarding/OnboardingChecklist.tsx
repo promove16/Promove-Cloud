@@ -28,9 +28,12 @@ export function OnboardingChecklist() {
 
   const claimMutation = useMutation({
     mutationFn: (stepId: string) => userApi.claimOnboardingStep(stepId),
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["onboarding"] });
-      queryClient.invalidateQueries({ queryKey: ["innovation-score"] });
+    onSuccess: async () => {
+      await Promise.all([
+        queryClient.invalidateQueries({ queryKey: ["onboarding"] }),
+        queryClient.invalidateQueries({ queryKey: ["score", "me"] }),
+        queryClient.invalidateQueries({ queryKey: ["score", "history", "me"] }),
+      ]);
     },
   });
 

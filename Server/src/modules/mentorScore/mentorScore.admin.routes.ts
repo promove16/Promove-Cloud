@@ -14,6 +14,7 @@ import {
   triggerDecay,
   recordEquityLOI,
   awardOutcomeBonus,
+  awardContentCreatorBonus,
 } from './mentorScore.admin.controller';
 
 const router = Router();
@@ -39,6 +40,9 @@ router.post('/loi',                             asyncHandler(recordEquityLOI));
 
 // Outcome Bonus (student wins competition or gets funded)
 router.post('/outcome-bonus',                   asyncHandler(awardOutcomeBonus));
+
+// Content Creator Bonus (syllabus content selected)
+router.post('/content-creator-bonus',          asyncHandler(awardContentCreatorBonus));
 
 // Maintenance (dev/admin tools)
 router.post('/score/rebuild/:mentorId',         asyncHandler(triggerRebuildCache));

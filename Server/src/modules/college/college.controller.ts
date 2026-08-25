@@ -23,6 +23,7 @@ import {
   getRecruiterDirectory,
   importCollegeStudentCredentials,
   importCollegeStudentRosterEntries,
+  previewCollegeStudentCredentials,
   listStudentRosterQuerySchema,
   listCollegeEvents,
   getCollegePatents,
@@ -353,6 +354,18 @@ export const importCollegeStudentCredentialsController = async (req: Request, re
   }
 
   const data = await importCollegeStudentCredentials(req.user!._id, req.user!._id, {
+    originalname: req.file.originalname,
+    buffer: req.file.buffer,
+  });
+  res.status(200).json(new ApiResponse(data));
+};
+
+export const previewCollegeStudentCredentialsController = async (req: Request, res: Response) => {
+  if (!req.file?.buffer) {
+    throw new ApiError(400, 'FILE_REQUIRED', 'An Excel or CSV file is required.');
+  }
+
+  const data = await previewCollegeStudentCredentials(req.user!._id, {
     originalname: req.file.originalname,
     buffer: req.file.buffer,
   });

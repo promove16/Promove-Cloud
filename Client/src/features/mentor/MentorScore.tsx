@@ -53,6 +53,7 @@ const TASK_TYPE_LABEL: Record<MentorVerificationTask['type'], string> = {
   curriculum_pdf: 'Curriculum PDF',
   class_photo: 'Class Photo',
   industry_session: 'Industry Session',
+  prototype_velocity: 'Prototype Velocity',
   demo_day: 'Demo Day',
   outcome_bonus: 'Outcome Bonus',
 };
@@ -69,6 +70,7 @@ type EarningRule = {
   id: string;
   label: string;
   points: string;
+  href?: string;
   icon: LucideIcon;
   count: (b: MentorScoreBreakdown) => number;
   completedText: (n: number) => string;
@@ -77,7 +79,7 @@ type EarningRule = {
 const earningRules: EarningRule[] = [
   {
     id: 'training',
-    label: 'Complete training modules',
+    label: 'Complete mentor training & certification quizzes',
     points: 'up to 60 pts',
     icon: BookOpen,
     count: (b) => b.phase1Breakdown.training,
@@ -87,6 +89,7 @@ const earningRules: EarningRule[] = [
     id: 'lab-sync',
     label: 'Sync lab hardware (admin-verified photo)',
     points: '+40 pts',
+    href: '/dashboard/mentor/evidence-center',
     icon: Cpu,
     count: (b) => b.phase1Breakdown.labSync,
     completedText: () => 'Verified',
@@ -95,6 +98,7 @@ const earningRules: EarningRule[] = [
     id: 'curriculum',
     label: 'Map curriculum & submit class photos',
     points: '+40 pts total',
+    href: '/dashboard/mentor/evidence-center',
     icon: FlaskConical,
     count: (b) => b.phase1Breakdown.curriculumMapping,
     completedText: (n) => `${n} pts earned`,
@@ -103,6 +107,7 @@ const earningRules: EarningRule[] = [
     id: 'industry',
     label: 'Host verified industry/founder sessions',
     points: '+10 pts each (max 95)',
+    href: '/dashboard/mentor/evidence-center',
     icon: Mic2,
     count: (b) => b.phase2Breakdown.industryConnects,
     completedText: (n) => `${n} pts earned`,
@@ -111,6 +116,7 @@ const earningRules: EarningRule[] = [
     id: 'prototype',
     label: 'Guide students to prototype stage',
     points: '+10 pts each (max 100)',
+    href: '/dashboard/mentor/students',
     icon: Zap,
     count: (b) => b.phase2Breakdown.prototypeVelocity,
     completedText: (n) => `${n} pts earned`,
@@ -119,6 +125,7 @@ const earningRules: EarningRule[] = [
     id: 'demo-day',
     label: 'Run a Local Demo Day (video + winners)',
     points: '+50 pts once/year',
+    href: '/dashboard/mentor/evidence-center',
     icon: Trophy,
     count: (b) => b.phase2Breakdown.demoDay,
     completedText: (n) => `${n} pts earned`,
@@ -127,6 +134,7 @@ const earningRules: EarningRule[] = [
     id: 'resources',
     label: 'Publish resources that reach 10 downloads',
     points: '+20 pts per milestone',
+    href: '/dashboard/mentor/resources',
     icon: Globe,
     count: (b) => b.phase3Breakdown.resourceLibrary,
     completedText: (n) => `${n} pts earned`,
@@ -135,6 +143,7 @@ const earningRules: EarningRule[] = [
     id: 'forum',
     label: 'Answer forum questions (helpful votes + solutions)',
     points: '+5 helpful / +15 verified',
+    href: '/dashboard/mentor/forum',
     icon: MessageSquare,
     count: (b) => b.phase3Breakdown.forum,
     completedText: (n) => `${n} pts earned`,
@@ -143,6 +152,7 @@ const earningRules: EarningRule[] = [
     id: 'sessions',
     label: 'Complete mentoring sessions (student releases token)',
     points: '+10 pts per 30 min (max 30)',
+    href: '/dashboard/mentor/students',
     icon: Clock3,
     count: (b) => b.phase3Breakdown.sessions,
     completedText: (n) => `${n} pts earned`,
@@ -151,6 +161,7 @@ const earningRules: EarningRule[] = [
     id: 'loi',
     label: 'Sign Equity Letter of Intent with a startup',
     points: '+15 pts per LOI',
+    href: '/dashboard/mentor/marketplace',
     icon: Award,
     count: (b) => b.phase3Breakdown.equityLOIs,
     completedText: (n) => `${n} pts earned`,
@@ -159,6 +170,7 @@ const earningRules: EarningRule[] = [
     id: 'outcome',
     label: 'Mentee wins a competition or gets funded',
     points: '+50 pts per outcome',
+    href: '/dashboard/mentor/students',
     icon: Users,
     count: (b) => b.phase3Breakdown.outcomeBonuses,
     completedText: (n) => `${n} pts earned`,
@@ -365,9 +377,10 @@ export default function MentorScore() {
               <span className={`text-xs font-medium ${item.isStarted ? 'text-violet-300' : 'text-slate-500'}`}>
                 {item.isStarted ? item.completedText(item.earned) : item.points}
               </span>
-              {!item.isStarted && (
+              {item.href && (
                 <Link
-                  to="/dashboard/mentor"
+                  to={item.href}
+                  aria-label={`Open ${item.label}`}
                   className="flex-shrink-0 text-slate-500 transition hover:text-violet-400"
                 >
                   <ArrowRight className="h-3.5 w-3.5" />
@@ -416,6 +429,7 @@ export default function MentorScore() {
               <PhaseBreakdownRow label="Session Tokens" value={score.phase3Breakdown.sessions} cap={null} />
               <PhaseBreakdownRow label="Equity LOIs" value={score.phase3Breakdown.equityLOIs} cap={null} />
               <PhaseBreakdownRow label="Outcome Bonuses" value={score.phase3Breakdown.outcomeBonuses} cap={null} />
+              <PhaseBreakdownRow label="Content Creator Bonus" value={score.phase3Breakdown.contentCreatorBonus ?? 0} cap={null} />
             </div>
           ) : (
             <div className="px-5 py-4 text-sm text-slate-400">

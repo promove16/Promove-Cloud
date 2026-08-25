@@ -3,21 +3,15 @@ import { UserRole } from '../../types/roles.types';
 import { ApiResponse } from '../../utils/ApiResponse';
 import {
   applyToRecruiterJob,
-  closeRecruiterDrive,
   collegeIdSchema,
-  createRecruiterDrive,
   createRecruiterJob,
   deleteRecruiterJob,
-  driveCreateSchema,
-  driveIdSchema,
-  driveScoreSchema,
   getPublicRecruiterJobs,
   getPublicRecruiterJob,
   getRecruiterJobApplications,
   getRecruiterColleges,
   getRecruiterLinkedColleges,
   getRecruiterDashboard,
-  getRecruiterDrives,
   getRecruiterJobs,
   getStudentRecruiterApplications,
   getRecruiterMessageCheck,
@@ -35,7 +29,6 @@ import {
   messageSchema,
   partnershipRequestSchema,
   publicJobsQuerySchema,
-  registerForDrive,
   reminderSchema,
   recruiterJobInviteSchema,
   removeShortlist,
@@ -44,7 +37,6 @@ import {
   sendRecruiterMessage,
   shortlistStudent,
   studentIdSchema,
-  submitDriveScore,
   talentQuerySchema,
   updateRecruiterJob,
   updateRecruiterJobApplicationStage,
@@ -152,36 +144,6 @@ export const updateJobApplicationController = async (req: Request, res: Response
   const { jobId, studentId } = jobApplicationParamsSchema.parse(req.params);
   const payload = jobApplicationUpdateSchema.parse(req.body);
   const data = await updateRecruiterJobApplicationStage(req.user!._id, jobId, studentId, payload);
-  res.status(200).json(new ApiResponse(data));
-};
-
-export const getDrivesController = async (req: Request, res: Response) => {
-  const data = await getRecruiterDrives(req.user!._id);
-  res.status(200).json(new ApiResponse(data));
-};
-
-export const createDriveController = async (req: Request, res: Response) => {
-  const payload = driveCreateSchema.parse(req.body);
-  const data = await createRecruiterDrive(req.user!._id, payload);
-  res.status(201).json(new ApiResponse(data));
-};
-
-export const registerForDriveController = async (req: Request, res: Response) => {
-  const { driveId } = driveIdSchema.parse(req.params);
-  const data = await registerForDrive(req.user!._id, driveId);
-  res.status(200).json(new ApiResponse(data));
-};
-
-export const submitDriveScoreController = async (req: Request, res: Response) => {
-  const { driveId } = driveIdSchema.parse(req.params);
-  const payload = driveScoreSchema.parse(req.body);
-  const data = await submitDriveScore(req.user!._id, driveId, payload.studentId, payload.submissionScore);
-  res.status(200).json(new ApiResponse(data));
-};
-
-export const closeDriveController = async (req: Request, res: Response) => {
-  const { driveId } = driveIdSchema.parse(req.params);
-  const data = await closeRecruiterDrive(req.user!._id, driveId);
   res.status(200).json(new ApiResponse(data));
 };
 

@@ -1,4 +1,5 @@
 import { Request, Response } from 'express';
+import { Types } from 'mongoose';
 import { ApiError } from '../../utils/ApiError';
 import { ApiResponse } from '../../utils/ApiResponse';
 import { MentorVerificationTask } from './mentorVerificationTask.model';
@@ -6,8 +7,13 @@ import { getMentorScore, awardMentorPoints, updateMentorRating } from './mentorS
 import { MentorScoreEvent } from './mentorScoreEvent.model';
 import { MentorScoreTrigger } from './mentorScore.types';
 import { MentorSession } from '../mentor/mentorSession.model';
+import { User } from '../user/user.model';
+import { UserRole } from '../../types/roles.types';
 import { MentorScore } from './mentorScore.model';
 import { onTrainingModuleCompleted, onQuizPassed } from './mentorScore.hooks';
+import { CURRICULUM_PDF_POINTS, getClassPhotoPoints } from './mentorScore.curriculum';
+
+const PROTOTYPE_POINTS_PER_STUDENT = 10;
 
 // ─── My Score Dashboard ───────────────────────────────────────────────────────
 
@@ -97,14 +103,32 @@ export const submitLabSync = async (req: Request, res: Response) => {
     throw new ApiError(400, 'PHOTOS_REQUIRED', 'At least one photo URL is required');
   }
 
-  // One lab sync approval per mentor — check if one is already pending/approved
+  const todayStr = new Date().toISOString().split('T')[0];
+  if (labDate && labDate > todayStr) {
+    throw new ApiError(400, 'FUTURE_DATE_NOT_ALLOWED', 'Lab date cannot be in the future');
+  }
+
   const existing = await MentorVerificationTask.findOne({
     mentorId: req.user._id,
     type:     'lab_sync',
-    status:   { $in: ['pending', 'approved'] },
   });
+
   if (existing) {
-    throw new ApiError(409, 'LAB_SYNC_EXISTS', 'A lab sync submission is already pending or approved');
+    if (existing.status === 'pending') {
+      existing.submissionUrls = photoUrls;
+      existing.submissionData = { kitDescription, labDate };
+      await existing.save();
+      return res.status(200).json(new ApiResponse(existing));
+    }
+    if (existing.status === 'approved') {
+      throw new ApiError(400, 'LAB_SYNC_APPROVED', 'A lab sync submission has already been approved for your account');
+    }
+    existing.submissionUrls = photoUrls;
+    existing.submissionData = { kitDescription, labDate };
+    existing.status = 'pending';
+    existing.rejectionNote = undefined;
+    await existing.save();
+    return res.status(200).json(new ApiResponse(existing));
   }
 
   const task = await MentorVerificationTask.create({
@@ -128,18 +152,34 @@ export const submitCurriculumPdf = async (req: Request, res: Response) => {
   };
 
   if (!pdfUrl) throw new ApiError(400, 'PDF_REQUIRED', 'PDF URL is required');
-  if (!plannedClassesCount || plannedClassesCount < 1) {
-    throw new ApiError(400, 'INVALID_CLASS_COUNT', 'plannedClassesCount must be at least 1');
+  if (!Number.isInteger(plannedClassesCount) || plannedClassesCount < 1) {
+    throw new ApiError(400, 'INVALID_CLASS_COUNT', 'plannedClassesCount must be a positive integer');
   }
 
   const existing = await MentorVerificationTask.findOne({
     mentorId: req.user._id,
     type:     'curriculum_pdf',
-    status:   { $in: ['pending', 'approved'] },
     'submissionData.academicYear': academicYear,
   });
+
   if (existing) {
-    throw new ApiError(409, 'CURRICULUM_EXISTS', 'A curriculum submission already exists for this academic year');
+    if (existing.status === 'pending') {
+      existing.submissionUrls = [pdfUrl];
+      existing.submissionData = { plannedClassesCount, academicYear };
+      existing.pointsToAward = CURRICULUM_PDF_POINTS;
+      await existing.save();
+      return res.status(200).json(new ApiResponse(existing));
+    }
+    if (existing.status === 'approved') {
+      throw new ApiError(400, 'CURRICULUM_APPROVED', `Curriculum mapping for academic year ${academicYear} is already approved`);
+    }
+    existing.submissionUrls = [pdfUrl];
+    existing.submissionData = { plannedClassesCount, academicYear };
+    existing.pointsToAward = CURRICULUM_PDF_POINTS;
+    existing.status = 'pending';
+    existing.rejectionNote = undefined;
+    await existing.save();
+    return res.status(200).json(new ApiResponse(existing));
   }
 
   const task = await MentorVerificationTask.create({
@@ -147,7 +187,7 @@ export const submitCurriculumPdf = async (req: Request, res: Response) => {
     mentorId:       req.user._id,
     submissionUrls: [pdfUrl],
     submissionData: { plannedClassesCount, academicYear },
-    pointsToAward:  5, // initial approval; rest distributed per class photo
+    pointsToAward:  CURRICULUM_PDF_POINTS,
   });
 
   res.status(201).json(new ApiResponse(task));
@@ -166,6 +206,14 @@ export const submitClassPhoto = async (req: Request, res: Response) => {
 
   if (!photoUrls?.length) throw new ApiError(400, 'PHOTOS_REQUIRED', 'At least one photo is required');
   if (!curriculumTaskId)  throw new ApiError(400, 'CURRICULUM_REQUIRED', 'curriculumTaskId is required');
+  if (!Number.isInteger(classIndex) || classIndex < 1) {
+    throw new ApiError(400, 'INVALID_CLASS_INDEX', 'classIndex must be a positive integer');
+  }
+
+  const todayStr = new Date().toISOString().split('T')[0];
+  if (classDate && classDate > todayStr) {
+    throw new ApiError(400, 'FUTURE_DATE_NOT_ALLOWED', 'Class date cannot be in the future');
+  }
 
   const curriculum = await MentorVerificationTask.findOne({
     _id:      curriculumTaskId,
@@ -178,30 +226,41 @@ export const submitClassPhoto = async (req: Request, res: Response) => {
     throw new ApiError(404, 'CURRICULUM_NOT_FOUND', 'Approved curriculum mapping not found');
   }
 
-  const plannedClasses = (curriculum.submissionData.plannedClassesCount as number) || 1;
-  const basePointsPerClass = Math.floor(35 / plannedClasses);
-
-  // Count already-approved class photos to know if this is the last class
-  const approvedPhotoCount = await MentorVerificationTask.countDocuments({
-    mentorId: req.user._id,
-    type:     'class_photo',
-    status:   'approved',
-    'submissionData.curriculumTaskId': curriculumTaskId,
-  });
-  const isLastClass = approvedPhotoCount + 1 >= plannedClasses;
-  const pointsPerClass = isLastClass
-    ? 35 - approvedPhotoCount * basePointsPerClass
-    : basePointsPerClass;
+  const plannedClasses = Math.max(1, (curriculum.submissionData.plannedClassesCount as number) || 1);
+  if (classIndex > plannedClasses) {
+    throw new ApiError(
+      400,
+      'INVALID_CLASS_INDEX',
+      `classIndex cannot exceed the ${plannedClasses} planned classes`,
+    );
+  }
+  const pointsPerClass = getClassPhotoPoints(plannedClasses, classIndex);
 
   const duplicate = await MentorVerificationTask.findOne({
     mentorId: req.user._id,
     type:     'class_photo',
-    status:   { $in: ['pending', 'approved'] },
     'submissionData.curriculumTaskId': curriculumTaskId,
     'submissionData.classIndex':       classIndex,
   });
+
   if (duplicate) {
-    throw new ApiError(409, 'CLASS_ALREADY_SUBMITTED', 'This class index has already been submitted');
+    if (duplicate.status === 'pending') {
+      duplicate.submissionUrls = photoUrls;
+      duplicate.submissionData = { curriculumTaskId, classIndex, classDate, topic };
+      duplicate.pointsToAward = pointsPerClass;
+      await duplicate.save();
+      return res.status(200).json(new ApiResponse(duplicate));
+    }
+    if (duplicate.status === 'approved') {
+      throw new ApiError(400, 'CLASS_ALREADY_APPROVED', `Photos for Class #${classIndex} have already been approved`);
+    }
+    duplicate.submissionUrls = photoUrls;
+    duplicate.submissionData = { curriculumTaskId, classIndex, classDate, topic };
+    duplicate.pointsToAward = pointsPerClass;
+    duplicate.status = 'pending';
+    duplicate.rejectionNote = undefined;
+    await duplicate.save();
+    return res.status(200).json(new ApiResponse(duplicate));
   }
 
   const task = await MentorVerificationTask.create({
@@ -217,6 +276,60 @@ export const submitClassPhoto = async (req: Request, res: Response) => {
 
 // ─── Phase 2 Submissions ──────────────────────────────────────────────────────
 
+export const submitPrototypeVelocity = async (req: Request, res: Response) => {
+  if (!req.user) throw new ApiError(401, 'UNAUTHORIZED', 'Not authenticated');
+
+  const { studentId, projectTitle, stage, photoUrls } = req.body as {
+    studentId:    string;
+    projectTitle: string;
+    stage:        string;
+    photoUrls:    string[];
+  };
+
+  if (!studentId) throw new ApiError(400, 'STUDENT_REQUIRED', 'studentId is required');
+  if (!projectTitle) throw new ApiError(400, 'PROJECT_REQUIRED', 'projectTitle is required');
+  if (!photoUrls?.length) throw new ApiError(400, 'PHOTOS_REQUIRED', 'At least one photo URL is required');
+
+  if (!Types.ObjectId.isValid(studentId)) {
+    throw new ApiError(400, 'INVALID_STUDENT_ID', 'Invalid studentId format');
+  }
+
+  const student = await User.findOne({
+    _id:  new Types.ObjectId(studentId),
+    role: UserRole.STUDENT,
+  })
+    .select('_id displayName')
+    .lean();
+  if (!student) throw new ApiError(404, 'STUDENT_NOT_FOUND', 'Student not found');
+
+  const existing = await MentorVerificationTask.findOne({
+    mentorId: req.user._id,
+    type:     'prototype_velocity',
+    'submissionData.studentId': studentId,
+    status:   { $in: ['pending', 'approved'] },
+  });
+
+  if (existing) {
+    if (existing.status === 'approved') {
+      throw new ApiError(400, 'PROTOTYPE_ALREADY_APPROVED', 'Prototype transition already approved for this student');
+    }
+    existing.submissionUrls = photoUrls;
+    existing.submissionData = { studentId, studentName: student.displayName, projectTitle, stage };
+    await existing.save();
+    return res.status(200).json(new ApiResponse(existing));
+  }
+
+  const task = await MentorVerificationTask.create({
+    type:           'prototype_velocity',
+    mentorId:       req.user._id,
+    submissionUrls: photoUrls,
+    submissionData: { studentId, studentName: student.displayName, projectTitle, stage },
+    pointsToAward:  PROTOTYPE_POINTS_PER_STUDENT,
+  });
+
+  res.status(201).json(new ApiResponse(task));
+};
+
 export const submitIndustrySession = async (req: Request, res: Response) => {
   if (!req.user) throw new ApiError(401, 'UNAUTHORIZED', 'Not authenticated');
 
@@ -231,6 +344,11 @@ export const submitIndustrySession = async (req: Request, res: Response) => {
 
   if (!founderName || !companyName || !sessionDate || !topic) {
     throw new ApiError(400, 'MISSING_FIELDS', 'founderName, companyName, sessionDate, and topic are required');
+  }
+
+  const todayStr = new Date().toISOString().split('T')[0];
+  if (sessionDate && sessionDate > todayStr) {
+    throw new ApiError(400, 'FUTURE_DATE_NOT_ALLOWED', 'Session date cannot be in the future');
   }
 
   const task = await MentorVerificationTask.create({

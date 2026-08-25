@@ -22,17 +22,12 @@ export {
   updateRecruiterJob,
 } from './recruiter.job.service';
 export {
-  closeRecruiterDrive,
-  createRecruiterDrive,
   getRecruiterColleges,
   getRecruiterLinkedColleges,
-  getRecruiterDrives,
   getRecruiterOnboarding,
   markStudentHired,
-  registerForDrive,
   requestCollegePartnership,
   sendOnboardingReminder,
-  submitDriveScore,
 } from './recruiter.drive.service';
 export {
   collegeIdSchema,

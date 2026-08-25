@@ -3,11 +3,10 @@ import { randomBytes } from 'crypto';
 import { Types } from 'mongoose';
 import { env } from '../../config/env';
 import { redis } from '../../config/redis';
-import { io } from '../../config/socket';
 import { UserRole } from '../../types/roles.types';
 import { ApiError } from '../../utils/ApiError';
 import { sanitizePlainText } from '../../utils/sanitizeText';
-import { NotificationService } from '../notification/notification.service';
+import { queueNotification } from '../notification/notification.delivery';
 import { Startup } from '../startup/startup.model';
 import { User } from '../user/user.model';
 import { Workspace } from '../workspace/workspace.model';
@@ -670,7 +669,7 @@ export const createInstitutionMentorshipProgram = async (
   const admins = await User.find({ role: UserRole.ADMIN, isActive: true }).select('_id').lean();
   await Promise.all(
     admins.map((admin) =>
-      NotificationService.create({
+      queueNotification({
         userId: String(admin._id),
         type: 'system',
         title: 'New mentorship program request',
@@ -744,14 +743,14 @@ export const createAdminInstitutionMentorshipProgram = async (
   await invalidateInstitutionMentorshipCaches(String(institution._id));
 
   await Promise.all([
-    NotificationService.create({
+    queueNotification({
       userId: String(mentor._id),
       type: 'system',
       title: 'New institution mentorship assignment',
       body: `You were assigned to "${created.title}" for an institution mentorship session.`,
       link: '/dashboard/mentor',
     }),
-    NotificationService.create({
+    queueNotification({
       userId: String(institution._id),
       type: 'system',
       title: 'Mentorship program scheduled',
@@ -759,10 +758,6 @@ export const createAdminInstitutionMentorshipProgram = async (
       link: institution.role === UserRole.COLLEGE ? '/dashboard/college' : '/dashboard/school',
     }),
   ]);
-
-  if (io) {
-    io.of('/notifications').to(`user:${String(mentor._id)}`).emit('notification:new');
-  }
 
   return mapProgram(
     created.toObject(),
@@ -949,17 +944,13 @@ export const reviewInstitutionMentorshipProgram = async (
     program.adminNotes = payload.adminNotes ? sanitizePlainText(payload.adminNotes) : undefined;
     program.rejectionReason = undefined;
 
-    await NotificationService.create({
+    await queueNotification({
       userId: String(mentor._id),
       type: 'system',
       title: 'New institution mentorship assignment',
       body: `You were assigned to "${program.title}" for an institution mentorship session.`,
       link: '/dashboard/mentor',
     });
-
-    if (io) {
-      io.of('/notifications').to(`user:${String(mentor._id)}`).emit('notification:new');
-    }
   }
 
   await program.save();
@@ -973,7 +964,7 @@ export const reviewInstitutionMentorshipProgram = async (
     ? await User.findById(program.mentorId).select('_id displayName email avatar domain bio').lean()
     : undefined;
 
-  await NotificationService.create({
+  await queueNotification({
     userId: String(program.institutionId),
     type: 'system',
     title:
@@ -1027,7 +1018,7 @@ export const assignProjectMentor = async (
     if (existingMentor) {
       const existingMentorId = String(existingMentor.userId);
       await removeMentorWatchersForWorkspace(existingMentorId, workspaceId, studentIds);
-      await NotificationService.create({
+      await queueNotification({
         userId: existingMentorId,
         type: 'system',
         title: 'Project mentorship assignment removed',
@@ -1063,7 +1054,7 @@ export const assignProjectMentor = async (
 
     if (existingMentor && String(existingMentor.userId) !== payload.mentorId) {
       await removeMentorWatchersForWorkspace(String(existingMentor.userId), workspaceId, studentIds);
-      await NotificationService.create({
+      await queueNotification({
         userId: String(existingMentor.userId),
         type: 'system',
         title: 'Project mentorship assignment updated',
@@ -1072,7 +1063,7 @@ export const assignProjectMentor = async (
       });
     }
 
-    await NotificationService.create({
+    await queueNotification({
       userId: payload.mentorId,
       type: 'system',
       title: 'New project mentorship assignment',
@@ -1084,7 +1075,7 @@ export const assignProjectMentor = async (
   const workspacePath = `/product-workspace/${workspaceId}`;
   await Promise.all(
     studentIds.map((studentId) =>
-      NotificationService.create({
+      queueNotification({
         userId: studentId,
         type: 'system',
         title:

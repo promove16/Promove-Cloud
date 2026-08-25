@@ -19,7 +19,7 @@ import {
   StudentLeaderboardItem,
   StudentVerificationReviewResponse,
 } from '../types/college.types';
-import { BulkCredentialImportResult } from '../types/school.types';
+import { BulkCredentialImportResult, ManagedStudentCredentialPreview } from '../types/school.types';
 import {
   ComplianceReportRecord,
   ComplianceOverviewData,
@@ -37,7 +37,7 @@ import {
   InstitutionMentorshipProgramView,
 } from '../types/mentorship.types';
 import { PlacementTrackerData, PlacementStatus } from '../types/placement.types';
-import { RecruiterDriveView } from '../types/recruiter.types';
+
 
 export const collegeApi = {
   async getDashboard() {
@@ -364,6 +364,16 @@ export const collegeApi = {
     );
     return response.data.data;
   },
+  async previewStudentRosterWithCredentials(file: File) {
+    const formData = new FormData();
+    formData.append('file', file);
+    const response = await api.post<ApiSuccessResponse<ManagedStudentCredentialPreview>>(
+      '/api/college/student-roster/preview-credentials',
+      formData,
+      { headers: { 'Content-Type': 'multipart/form-data' } },
+    );
+    return response.data.data;
+  },
   async getMentorshipPrograms() {
     const response = await api.get<ApiSuccessResponse<InstitutionMentorshipProgramView>>(
       '/api/college/mentorship-programs',
@@ -377,8 +387,8 @@ export const collegeApi = {
     );
     return response.data.data;
   },
-  async getCollegeDrives() {
-    const response = await api.get<ApiSuccessResponse<RecruiterDriveView[]>>('/api/college/drives');
+  async getCollegeEvents() {
+    const response = await api.get<ApiSuccessResponse<CollegeEvent[]>>('/api/college/events');
     return response.data.data;
   },
 };

@@ -167,6 +167,36 @@ describe('workflow requests', () => {
       auditTrail: [{ status: 'created', actorUserId: recruiter._id, at: new Date() }],
     });
 
+    const directCreationResponse = await request(app)
+      .post('/api/events/hiring')
+      .set(authHeader(recruiter))
+      .send({
+        collegeId: college._id.toString(),
+        title: 'Direct Creation Must Stay Blocked',
+        type: 'Placement Drive',
+        date: new Date(Date.now() + 24 * 60 * 60 * 1000).toISOString(),
+        description: 'A recruiter must not create an event without college approval.',
+        minimumInnovationScore: 0,
+      });
+
+    expect(directCreationResponse.status).toBe(404);
+    expect(await Event.find()).toHaveLength(0);
+
+    const legacyDriveCreationResponse = await request(app)
+      .post('/api/recruiter/drives')
+      .set(authHeader(recruiter))
+      .send({
+        collegeId: college._id.toString(),
+        title: 'Legacy Direct Creation Must Stay Blocked',
+        type: 'Placement Drive',
+        scheduledAt: new Date(Date.now() + 24 * 60 * 60 * 1000).toISOString(),
+        description: 'The legacy drive API must not bypass college event approval.',
+        minimumInnovationScore: 0,
+      });
+
+    expect(legacyDriveCreationResponse.status).toBe(404);
+    expect(await Event.find()).toHaveLength(0);
+
     const createResponse = await request(app)
       .post('/api/workflow-requests')
       .set(authHeader(recruiter))
@@ -222,6 +252,84 @@ describe('workflow requests', () => {
         eventId: String(events[0]._id),
       }),
     );
+  });
+
+  it('keeps the original hiring-event date until the college approves a recruiter postponement', async () => {
+    const recruiter = await createUser(UserRole.RECRUITER, 'Reschedule Recruiter');
+    const otherRecruiter = await createUser(UserRole.RECRUITER, 'Other Recruiter');
+    const college = await createUser(UserRole.COLLEGE, 'Reschedule College');
+    const originalDate = new Date(Date.now() + 24 * 60 * 60 * 1000);
+    const postponedDate = new Date(Date.now() + 3 * 24 * 60 * 60 * 1000);
+    const event = await Event.create({
+      institutionId: college._id,
+      createdBy: recruiter._id,
+      recruiterId: recruiter._id,
+      title: 'Approved Placement Drive',
+      type: 'Placement Drive',
+      category: 'hiring',
+      description: 'An approved event that needs a later date.',
+      scheduledAt: originalDate,
+      isActive: true,
+      participants: [],
+      rankings: [],
+    });
+
+    const unauthorizedResponse = await request(app)
+      .patch(`/api/events/${event._id.toString()}/postpone`)
+      .set(authHeader(otherRecruiter))
+      .send({
+        newDate: postponedDate.toISOString(),
+        reason: 'The interview panel is unavailable on the original date.',
+      });
+
+    expect(unauthorizedResponse.status).toBe(404);
+
+    const postponeResponse = await request(app)
+      .patch(`/api/events/${event._id.toString()}/postpone`)
+      .set(authHeader(recruiter))
+      .send({
+        newDate: postponedDate.toISOString(),
+        reason: 'The interview panel is unavailable on the original date.',
+      });
+
+    expect(postponeResponse.status).toBe(201);
+    expect(postponeResponse.body.data).toEqual(
+      expect.objectContaining({
+        requested: true,
+        requestId: expect.any(String),
+        newDate: postponedDate.toISOString(),
+      }),
+    );
+
+    const pendingEvent = await Event.findById(event._id).lean();
+    expect(pendingEvent?.scheduledAt.toISOString()).toBe(originalDate.toISOString());
+
+    const postponementRequest = await RequestRecord.findById(postponeResponse.body.data.requestId).lean();
+    expect(postponementRequest).toEqual(
+      expect.objectContaining({
+        type: 'college_event_reschedule',
+        status: 'pending',
+        fromUserId: recruiter._id,
+        toUserId: college._id,
+        targetEntityId: event._id.toString(),
+        metadata: expect.objectContaining({
+          eventId: event._id.toString(),
+          previousDate: originalDate.toISOString(),
+          newDate: postponedDate.toISOString(),
+        }),
+      }),
+    );
+
+    const acceptResponse = await request(app)
+      .post(`/api/workflow-requests/${postponeResponse.body.data.requestId}/accept`)
+      .set(authHeader(college))
+      .send();
+
+    expect(acceptResponse.status).toBe(200);
+    expect(acceptResponse.body.data.status).toBe('accepted');
+
+    const postponedEvent = await Event.findById(event._id).lean();
+    expect(postponedEvent?.scheduledAt.toISOString()).toBe(postponedDate.toISOString());
   });
 
   it('expires stale pending requests before returning the messages list', async () => {

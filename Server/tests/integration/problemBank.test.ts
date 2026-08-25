@@ -4,6 +4,7 @@ import request from 'supertest';
 import app from '../../src/app';
 import { ScoreEvent } from '../../src/modules/innovationScore/score.model';
 import { Problem } from '../../src/modules/problemBank/problem.model';
+import { Startup } from '../../src/modules/startup/startup.model';
 import { User } from '../../src/modules/user/user.model';
 import { Workspace } from '../../src/modules/workspace/workspace.model';
 import { UserRole } from '../../src/types/roles.types';
@@ -242,6 +243,17 @@ describe('problem bank integration', () => {
     expect(claimResponse.status).toBe(200);
     const workspaceId = claimResponse.body.data._id as string;
 
+    const linkedStartup = await Startup.create({
+      founderIds: [studentUser._id],
+      teamMemberIds: [],
+      projectId: workspaceId,
+      name: 'Problem Review Startup',
+      tagline: 'A startup linked to the claimed problem workspace',
+      category: 'Software',
+      stage: 'MVP',
+      isActive: true,
+    });
+
     const progressResponse = await request(app)
       .post(`/api/workspace/${workspaceId}/progress`)
       .set('Authorization', `Bearer ${studentToken}`)
@@ -309,8 +321,39 @@ describe('problem bank integration', () => {
     expect(detailResponse.body.data.viewerState.status).toBe('approved');
     expect(detailResponse.body.data.viewerState.pointsAwarded).toBe(40);
 
+    const retryApproveResponse = await request(app)
+      .patch(`/api/admin/problems/review-requests/${submissionId}`)
+      .set('Authorization', `Bearer ${adminToken}`)
+      .send({
+        decision: 'approved',
+        pointsAwarded: 40,
+        adminNotes: 'Verified team completion and evidence quality.',
+      });
+
+    expect(retryApproveResponse.status).toBe(200);
+
     const updatedStudent = await User.findById(studentUser._id).lean();
-    expect(updatedStudent?.innovationScore).toBe(100);
+    expect(updatedStudent?.innovationScore).toBe(350);
     expect(updatedStudent?.scoreBreakdown.problemsCompleted).toBe(1);
+    expect(updatedStudent?.scoreBreakdown.mvpsVerified).toBe(1);
+    expect(updatedStudent?.scoreBreakdown.marketReadyVerified).toBe(1);
+
+    const updatedWorkspace = await Workspace.findById(workspaceId).lean();
+    expect(updatedWorkspace?.stage).toBe('Build');
+
+    const updatedStartup = await Startup.findById(linkedStartup._id).lean();
+    expect(updatedStartup?.stage).toBe('Pre-Launch');
+    expect(updatedStartup?.traction.mvpBuilt).toBe(true);
+    expect(updatedStartup?.registrationProfile.developmentStage).toBe('market_ready');
+    expect(updatedStartup?.initializationProfile.productStage).toBe('market_ready');
+    expect(updatedStartup?.innovationProfile?.tractionProfile.startupStage).toBe('market_ready');
+
+    const verificationEvents = await ScoreEvent.find({
+      userId: studentUser._id,
+      trigger: {
+        $in: ['PROBLEM_COMPLETED', 'MVP_VERIFIED', 'MARKET_READY_VERIFIED'],
+      },
+    }).lean();
+    expect(verificationEvents).toHaveLength(3);
   });
 });

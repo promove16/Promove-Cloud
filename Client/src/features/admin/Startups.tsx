@@ -11,6 +11,7 @@ import {
   Coins,
   ExternalLink,
   FileText,
+  FolderKanban,
   History,
   Package,
   Rocket,
@@ -369,6 +370,14 @@ export default function Startups() {
   ) => {
     const adminNotes = notesByStartup[startup._id]?.trim();
 
+    if (decision === 'approved' && !startup.readiness.isReviewReady) {
+      setFeedback({
+        message: `Startup cannot be verified yet. Missing: ${startup.readiness.missingItems.join(', ')}.`,
+        tone: 'error',
+      });
+      return;
+    }
+
     if (decision === 'changes_requested' && !adminNotes) {
       setFeedback({
         message: 'Admin notes are required when requesting changes.',
@@ -637,6 +646,20 @@ export default function Startups() {
 
               {/* Quick facts */}
               <div className="grid gap-3 sm:grid-cols-2">
+                <Fact icon={<FolderKanban className="h-4 w-4" />} label="Workspace">
+                  {selected.workspace ? (
+                    <span>
+                      <span className="block font-medium text-emerald-200">
+                        {selected.workspace.title}
+                      </span>
+                      <span className="mt-0.5 block text-xs text-slate-500">
+                        {selected.workspace.category} · Active link
+                      </span>
+                    </span>
+                  ) : (
+                    <span className="text-amber-200">No active workspace linked</span>
+                  )}
+                </Fact>
                 <Fact icon={<Users className="h-4 w-4" />} label="Founders">
                   {selected.founders.map((founder) => founder.displayName).join(', ') ||
                     'No founders mapped'}
@@ -1084,13 +1107,18 @@ export default function Startups() {
                     placeholder="Add context for approval or describe the changes needed…"
                   />
                   <div className="mt-3 flex flex-wrap gap-3">
-                    {selected.reviewStatus !== 'approved' ? (
+                    {selected.reviewStatus === 'review_requested' ? (
                       <Button
                         onClick={() => handleReview(selected, 'approved')}
-                        disabled={reviewMutation.isPending}
+                        disabled={reviewMutation.isPending || !selected.readiness.isReviewReady}
+                        title={
+                          selected.readiness.isReviewReady
+                            ? 'Verify the workspace link and completed startup details'
+                            : `Complete before verification: ${selected.readiness.missingItems.join(', ')}`
+                        }
                       >
-                        <CheckCircle2 className="mr-2 h-4 w-4" />
-                        Approve startup
+                        <ShieldCheck className="mr-2 h-4 w-4" />
+                        Verify startup
                       </Button>
                     ) : null}
                     <Button
@@ -1107,10 +1135,12 @@ export default function Startups() {
                   <p className="mt-3 flex items-center gap-1.5 text-xs text-slate-500">
                     <Rocket className="h-3.5 w-3.5 text-cyan-400/70" />
                     {selected.reviewStatus === 'approved'
-                      ? 'Already approved — reopen only if the founder must make changes before launch.'
+                      ? 'Verified. Any founder edit returns the startup to draft and requires a new submission.'
                       : selected.reviewStatus === 'changes_requested'
-                        ? 'Changes requested — approve once the founder resubmits, or update the requested changes.'
-                        : 'Launch to the investor marketplace stays blocked until you approve.'}
+                        ? 'Changes requested — verification stays unavailable until the founder resubmits.'
+                        : selected.readiness.isReviewReady
+                          ? 'Workspace and required details are complete. Verify to allow marketplace launch.'
+                          : 'Verification is blocked until the workspace and all required details are complete.'}
                   </p>
                 </div>
               )}
@@ -1268,4 +1298,3 @@ function SnapshotRow({ label, value }: { label: string; value: React.ReactNode }
     </div>
   );
 }
-

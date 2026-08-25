@@ -204,31 +204,7 @@ export interface RecruiterStudentApplicationView {
   note?: string;
 }
 
-export interface RecruiterDriveRegisteredStudent {
-  studentId: string;
-  studentName: string;
-  avatar?: string;
-  innovationScore: number;
-  registeredAt: string;
-  submissionScore?: number;
-}
 
-export interface RecruiterDriveView {
-  _id: string;
-  recruiterId: string;
-  collegeId: string;
-  collegeName: string;
-  title: string;
-  description: string;
-  type: 'Placement Drive' | 'Internship Drive' | 'Hackathon';
-  scheduledAt: string;
-  minimumInnovationScore: number;
-  registeredStudents: RecruiterDriveRegisteredStudent[];
-  isActive: boolean;
-  recruiterName?: string;
-  recruiterCompany?: string;
-  createdAt: string;
-}
 
 export interface RecruiterCollegeCard {
   _id: string;
@@ -280,6 +256,9 @@ export interface RecruiterHiringEventParticipant {
   innovationScore: number;
   registeredAt: string;
   submissionScore?: number;
+  selectedJobId?: string;
+  selectedJobTitle?: string;
+  selectedAt?: string;
 }
 
 export interface RecruiterHiringEventView {

@@ -11,6 +11,7 @@ export const REQUEST_TYPE_LABELS: Record<WorkflowRequest['type'], string> = {
   recruiter_job_invite: 'Job invite',
   campus_drive_registration: 'Campus drive registration',
   college_event_invite: 'Event invite',
+  college_event_reschedule: 'Event postponement',
   college_recruiter_partnership: 'Recruiter partnership',
   patent_coinventor: 'Patent co-inventor',
   problem_review: 'Problem review',
@@ -60,6 +61,9 @@ const METADATA_LABELS: Record<string, string> = {
   title: 'Event title',
   type: 'Event type',
   date: 'Scheduled for',
+  previousDate: 'Previous date',
+  newDate: 'Requested date',
+  reason: 'Reason',
   description: 'Event brief',
   minimumInnovationScore: 'Minimum score',
   subject: 'Request subject',
@@ -156,13 +160,25 @@ const isRequestInboxPath = (path: string) =>
   path.startsWith('/dashboard/messages?view=requests&');
 
 function getConversationRequestPartnerId(request: WorkflowRequest, viewerUserId?: string) {
-  if (request.type !== 'generic' || request.actionType !== 'connect' || request.targetEntityType !== 'conversation') {
+  const isGenericChat =
+    request.type === 'generic' &&
+    request.actionType === 'connect' &&
+    request.targetEntityType === 'conversation';
+
+  const isDmPermissionRequest =
+    Boolean(request.requestedPermission?.startsWith('dm_')) ||
+    Boolean(request.metadata?.queryType) ||
+    request.targetEntityType === 'user_profile' ||
+    Boolean(request.acceptRedirect?.startsWith('/dashboard/messages')) ||
+    Boolean(request.deepLink?.startsWith('/dashboard/messages'));
+
+  if (!isGenericChat && !isDmPermissionRequest) {
     return null;
   }
 
   if (viewerUserId) {
     if (request.fromUserId === viewerUserId) {
-      return request.toUserId ?? request.targetEntityId ?? null;
+      return request.toUserId ?? (request.targetEntityType === 'user_profile' ? request.targetEntityId?.split(':')[0] : request.targetEntityId) ?? null;
     }
 
     if (request.toUserId === viewerUserId || request.targetEntityId === viewerUserId) {
@@ -220,6 +236,31 @@ const getJobPath = (request: WorkflowRequest) => {
   return jobId ? `/marketplace/jobs/${jobId}` : null;
 };
 
+const getCollegeEventInviteAction = (request: WorkflowRequest, viewerUserId?: string) => {
+  if (request.type !== 'college_event_invite' && request.type !== 'college_event_reschedule') {
+    return null;
+  }
+
+  const isRecipient = viewerUserId ? request.toUserId === viewerUserId : request.targetRole === 'college';
+  const eventId = getMetadataString(request, 'eventId');
+
+  if (isRecipient) {
+    return eventId && isTerminalPositiveStatus(request)
+      ? { label: 'Open Event', path: `/dashboard/college/events?tab=hiring&eventId=${eventId}` }
+      : {
+          label: 'Open Event Request',
+          path: `/dashboard/college/events?tab=hiring&requestId=${request._id}`,
+        };
+  }
+
+  return eventId && isTerminalPositiveStatus(request)
+    ? { label: 'Open Event', path: `/dashboard/recruiter/hiring-events?eventId=${eventId}` }
+    : {
+        label: 'Open Event Request',
+        path: `/dashboard/recruiter/hiring-events?requestId=${request._id}`,
+      };
+};
+
 const labelForPath = (path: string) => (isMessagePath(path) ? 'Continue Chat' : 'Open Linked Content');
 
 export function getRequestEntityName(request: WorkflowRequest) {
@@ -241,6 +282,11 @@ export function getRequestActorLabel(request: WorkflowRequest, direction: 'incom
 }
 
 export function getRequestPrimaryAction(request: WorkflowRequest, viewerUserId?: string) {
+  const collegeEventInviteAction = getCollegeEventInviteAction(request, viewerUserId);
+  if (collegeEventInviteAction) {
+    return collegeEventInviteAction;
+  }
+
   const conversationPartnerId = getConversationRequestPartnerId(request, viewerUserId);
   if (conversationPartnerId) {
     return {

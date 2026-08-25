@@ -15,7 +15,7 @@ const PATENT_APPROVAL_SCORE = 25;
 type TabKey = 'submitted' | 'under_review' | 'approved' | 'rejected';
 
 const tabs: Array<{ key: TabKey; label: string }> = [
-  { key: 'submitted', label: 'Pending' },
+  { key: 'submitted', label: 'Submitted' },
   { key: 'under_review', label: 'Under Review' },
   { key: 'approved', label: 'Approved' },
   { key: 'rejected', label: 'Rejected' },
@@ -152,61 +152,55 @@ function SupportingDocsModal({
                         : 'border-slate-800 bg-slate-900 text-slate-300 hover:border-slate-700'
                     }`}
                   >
-                    {doc.fileType === 'image' ? (
-                      <ImageIcon className="mt-0.5 h-4 w-4 shrink-0 text-cyan-400" />
-                    ) : (
-                      <FileText className="mt-0.5 h-4 w-4 shrink-0 text-cyan-400" />
-                    )}
-                    <div className="min-w-0">
-                      <div className="truncate text-sm font-medium">{doc.fileName}</div>
-                      <div className="mt-0.5 text-xs uppercase tracking-[0.15em] text-slate-500">
-                        {doc.fileType} · {formatBytes(doc.fileSizeBytes)}
-                      </div>
+                    <FileText className="mt-0.5 h-4 w-4 shrink-0 text-cyan-400" />
+                    <div className="min-w-0 flex-1">
+                      <div className="truncate text-xs font-semibold">{doc.fileName}</div>
+                      <div className="mt-1 text-[10px] text-slate-400">{formatBytes(doc.fileSizeBytes)}</div>
                     </div>
                   </button>
                 ))}
               </div>
 
-              {/* Preview pane */}
-              <div className="flex min-h-0 flex-col overflow-hidden rounded-3xl border border-slate-800 bg-slate-950">
-                <div className="flex items-center justify-between gap-4 border-b border-slate-800 px-5 py-4">
-                  <div>
-                    <div className="font-semibold text-white">{active.fileName}</div>
-                    <div className="mt-0.5 text-xs uppercase tracking-[0.15em] text-slate-500">
-                      {active.fileType} · {formatBytes(active.fileSizeBytes)}
+              {/* Main Preview Area */}
+              <div className="flex min-h-0 flex-1 flex-col overflow-hidden rounded-2xl border border-slate-800 bg-slate-900 p-4">
+                {active ? (
+                  <div className="flex flex-1 flex-col justify-between gap-4">
+                    <div className="flex items-center justify-between border-b border-slate-800 pb-3">
+                      <div>
+                        <div className="text-sm font-semibold text-white">{active.fileName}</div>
+                        <div className="text-xs text-slate-400">{formatBytes(active.fileSizeBytes)}</div>
+                      </div>
+                      <a
+                        href={active.fileUrl}
+                        target="_blank"
+                        rel="noreferrer"
+                        className="inline-flex items-center gap-1.5 rounded-xl border border-cyan-500/30 bg-cyan-500/10 px-3 py-1.5 text-xs font-medium text-cyan-300 hover:bg-cyan-500/20 transition-colors"
+                      >
+                        <FileText className="h-3.5 w-3.5" />
+                        Open Original
+                      </a>
                     </div>
+                    {active.fileUrl.match(/\.(png|jpe?g|webp|gif|svg)$/i) ? (
+                      <div className="flex flex-1 items-center justify-center overflow-auto rounded-xl bg-slate-950 p-4">
+                        <img src={active.fileUrl} alt={active.fileName} className="max-h-96 max-w-full rounded-lg object-contain" />
+                      </div>
+                    ) : (
+                      <div className="flex flex-1 flex-col items-center justify-center rounded-xl bg-slate-950 p-8 text-center text-slate-400">
+                        <ImageIcon className="h-12 w-12 mb-3 text-cyan-400/60" />
+                        <div className="text-sm font-semibold text-white">{active.fileName}</div>
+                        <div className="mt-1 text-xs text-slate-500">Document preview available in popup.</div>
+                        <a
+                          href={active.fileUrl}
+                          target="_blank"
+                          rel="noreferrer"
+                          className="mt-4 inline-flex items-center gap-2 rounded-xl bg-cyan-600 px-4 py-2 text-xs font-semibold text-white hover:bg-cyan-500 transition-colors"
+                        >
+                          Open Document
+                        </a>
+                      </div>
+                    )}
                   </div>
-                  <a
-                    href={active.fileUrl}
-                    target="_blank"
-                    rel="noreferrer"
-                    className="shrink-0 rounded-xl border border-cyan-500/40 bg-cyan-500/10 px-4 py-2 text-sm font-medium text-cyan-300 hover:bg-cyan-500/20 transition-colors"
-                  >
-                    Open in new tab
-                  </a>
-                </div>
-
-                {active.note && (
-                  <div className="border-b border-slate-800 px-5 py-3 text-sm text-slate-400">
-                    <span className="font-medium text-slate-300">Note: </span>{active.note}
-                  </div>
-                )}
-
-                <div className="flex min-h-0 flex-1 items-center justify-center overflow-hidden p-4">
-                  {active.fileType === 'image' ? (
-                    <img
-                      src={active.fileUrl}
-                      alt={active.fileName}
-                      className="max-h-full max-w-full rounded-2xl object-contain"
-                    />
-                  ) : (
-                    <iframe
-                      src={active.fileUrl}
-                      title={active.fileName}
-                      className="h-full min-h-[480px] w-full rounded-2xl border-0"
-                    />
-                  )}
-                </div>
+                ) : null}
               </div>
             </div>
           )}
@@ -227,33 +221,32 @@ function ReviewModal({
 }) {
   const queryClient = useQueryClient();
   const [reason, setReason] = useState('');
-  const [docsOpen, setDocsOpen] = useState(false);
   const [actionError, setActionError] = useState('');
+  const [docsOpen, setDocsOpen] = useState(false);
+  const [showConfirmApprove, setShowConfirmApprove] = useState(false);
 
   const approveMutation = useMutation({
     mutationFn: () => adminApi.approvePatent(patent!._id),
     onSuccess: async () => {
-      onClose();
       setActionError('');
+      setShowConfirmApprove(false);
       await queryClient.invalidateQueries({ queryKey: ['admin-patents'] });
-      await queryClient.invalidateQueries({ queryKey: ['admin-analytics'] });
+      onClose();
     },
-    onError: (err: unknown) => {
-      setActionError(getApiErrorMessage(err, 'Failed to approve patent. Please try again.'));
+    onError: (error: unknown) => {
+      setActionError(getApiErrorMessage(error, 'Unable to approve this patent.'));
     },
   });
 
   const rejectMutation = useMutation({
-    mutationFn: () => adminApi.rejectPatent(patent!._id, reason),
+    mutationFn: () => adminApi.rejectPatent(patent!._id, reason.trim()),
     onSuccess: async () => {
-      onClose();
-      setReason('');
       setActionError('');
       await queryClient.invalidateQueries({ queryKey: ['admin-patents'] });
-      await queryClient.invalidateQueries({ queryKey: ['admin-analytics'] });
+      onClose();
     },
-    onError: (err: unknown) => {
-      setActionError(getApiErrorMessage(err, 'Failed to reject patent. Please try again.'));
+    onError: (error: unknown) => {
+      setActionError(getApiErrorMessage(error, 'Unable to reject this patent.'));
     },
   });
 
@@ -262,83 +255,96 @@ function ReviewModal({
   return (
     <div className="fixed inset-0 z-50 overflow-y-auto bg-slate-950 p-4 backdrop-blur-sm sm:p-6">
       <div className="mx-auto flex min-h-full w-full items-start justify-center">
-        <Card className="flex w-full max-w-4xl flex-col overflow-hidden p-6 max-h-[calc(100vh-2rem)] sm:max-h-[calc(100vh-3rem)]">
+        <Card className="flex w-full max-w-6xl flex-col overflow-hidden p-6 max-h-[calc(100vh-2rem)] sm:max-h-[calc(100vh-3rem)]">
           <div className="flex items-start justify-between gap-4">
             <div>
-              <div className="text-xs uppercase tracking-[0.3em] text-cyan-300">Patent Review</div>
-              <h3 className="mt-2 text-2xl font-bold text-white">{patent.projectTitle}</h3>
+              <div className="text-xs uppercase tracking-[0.3em] text-cyan-300">Direct Intake Review</div>
+              <h2 className="mt-2 text-2xl font-bold text-white">{patent.projectTitle}</h2>
+              <div className="mt-1 text-sm text-slate-400">
+                Submitted by <span className="font-semibold text-white">{patent.student?.displayName ?? 'Unknown'}</span>
+              </div>
             </div>
             <Button variant="ghost" onClick={onClose}>
               <X className="h-4 w-4" />
             </Button>
           </div>
 
-          <div className="mt-6 grid min-h-0 flex-1 gap-8 overflow-y-auto pr-2 lg:grid-cols-[1.2fr,0.9fr]">
+          <div className="mt-6 grid min-h-0 flex-1 gap-6 overflow-y-auto pr-1 lg:grid-cols-[1fr,340px]">
             <section className="min-w-0 space-y-6">
               <div>
-                <div className="mb-4 text-xs uppercase tracking-[0.3em] text-cyan-300">Questionnaire</div>
+                <div className="mb-4 text-xs uppercase tracking-[0.3em] text-cyan-300">Intake Questionnaire</div>
                 <div className="overflow-hidden rounded-3xl border border-slate-800 bg-slate-950">
-                  {Object.entries(patent.questionnaire).map(([label, value], index, entries) => (
-                    <div
-                      key={label}
-                      className={`px-5 py-5 ${index !== entries.length - 1 ? 'border-b border-slate-800' : ''}`}
-                    >
-                      <div className="text-sm font-medium text-slate-500">{QUESTION_LABELS[label as keyof AdminPatentItem['questionnaire']] ?? formatKey(label)}</div>
-                      <div className="mt-3 text-base leading-8 text-white">{formatQuestionValue(label, value)}</div>
+                  {Object.entries(patent.questionnaire).map(([key, value]) => (
+                    <div key={key} className="border-b border-slate-800 px-5 py-4 last:border-b-0">
+                      <div className="text-xs font-semibold uppercase tracking-wider text-slate-500">
+                        {QUESTION_LABELS[key as keyof AdminPatentItem['questionnaire']] ?? formatKey(key)}
+                      </div>
+                      <div className="mt-2 text-sm leading-relaxed text-white">
+                        {formatQuestionValue(key, value as string) || <span className="text-slate-600">Not provided</span>}
+                      </div>
                     </div>
                   ))}
                 </div>
               </div>
 
               <div>
-                <div className="mb-4 text-xs uppercase tracking-[0.3em] text-cyan-300">Filing Checklist</div>
+                <div className="mb-4 text-xs uppercase tracking-[0.3em] text-cyan-300">Government Filing Details</div>
                 <div className="overflow-hidden rounded-3xl border border-slate-800 bg-slate-950">
                   {!patent.filingDocuments ? (
-                    <div className="px-5 py-5 text-base text-slate-500">No filing documents submitted.</div>
-                  ) : [
-                    ['Invention category', INVENTION_CATEGORY_LABELS[patent.filingDocuments.inventionCategory]],
-                    ['Specification type', SPECIFICATION_TYPE_LABELS[patent.filingDocuments.specificationType]],
-                    ['Prototype status', PROTOTYPE_STATUS_LABELS[patent.filingDocuments.prototypeStatus]],
-                    ['Inventor journal summary', patent.filingDocuments.inventorJournalSummary],
-                    ['Prior art search summary', patent.filingDocuments.priorArtSearchSummary],
-                    ['Specification draft', patent.filingDocuments.specificationDraft],
-                    ['Abstract draft', patent.filingDocuments.abstractDraft],
-                    ['Claims draft', patent.filingDocuments.claimsDraft],
-                    ['Drawings prepared', formatBoolean(patent.filingDocuments.drawingsPrepared)],
-                    ['Drawings notes', patent.filingDocuments.drawingsNotes],
-                    ['Form 1 confirmed', formatBoolean(patent.filingDocuments.form1ApplicantDetailsConfirmed)],
-                    ['Form 3 details', patent.filingDocuments.form3ForeignFilingDetails || 'Not provided'],
-                    ['Form 5 confirmed', formatBoolean(patent.filingDocuments.form5InventorshipConfirmed)],
-                    ['Form 26 required', formatBoolean(patent.filingDocuments.form26PowerOfAttorneyRequired)],
-                    ['Form 26 details', patent.filingDocuments.form26PowerOfAttorneyDetails || 'Not required'],
-                    ['Examination request plan', patent.filingDocuments.examinationRequestPlan],
-                    ['Public disclosure checked', formatBoolean(patent.filingDocuments.publicDisclosureChecked)],
-                    ['Professional support needed', formatBoolean(patent.filingDocuments.professionalSupportNeeded)],
-                    ['Cost management notes', patent.filingDocuments.costManagementNotes || 'Not provided'],
-                  ].map(([label, value], index, entries) => (
-                    <div
-                      key={label}
-                      className={`px-5 py-5 ${index !== entries.length - 1 ? 'border-b border-slate-800' : ''}`}
-                    >
-                      <div className="text-sm font-medium text-slate-500">{label}</div>
-                      <div className="mt-3 text-base leading-8 text-white">{value}</div>
-                    </div>
-                  ))}
+                    <div className="px-5 py-6 text-sm text-slate-500">No government filing documents attached.</div>
+                  ) : (
+                    [
+                      ['Invention category', patent.filingDocuments.inventionCategory ? INVENTION_CATEGORY_LABELS[patent.filingDocuments.inventionCategory] : '—'],
+                      ['Specification type', patent.filingDocuments.specificationType ? SPECIFICATION_TYPE_LABELS[patent.filingDocuments.specificationType] : '—'],
+                      ['Prototype status', patent.filingDocuments.prototypeStatus ? PROTOTYPE_STATUS_LABELS[patent.filingDocuments.prototypeStatus] : '—'],
+                      ['Inventor journal summary', patent.filingDocuments.inventorJournalSummary || '—'],
+                      ['Prior art search summary', patent.filingDocuments.priorArtSearchSummary || '—'],
+                      ['Specification draft', patent.filingDocuments.specificationDraft || '—'],
+                      ['Abstract draft', patent.filingDocuments.abstractDraft || '—'],
+                      ['Claims draft', patent.filingDocuments.claimsDraft || '—'],
+                      ['Drawings prepared', formatBoolean(patent.filingDocuments.drawingsPrepared)],
+                      ['Drawings notes', patent.filingDocuments.drawingsNotes || '—'],
+                      ['Form 1 confirmed', formatBoolean(patent.filingDocuments.form1ApplicantDetailsConfirmed)],
+                      ['Form 3 details', patent.filingDocuments.form3ForeignFilingDetails || 'Not provided'],
+                      ['Form 5 confirmed', formatBoolean(patent.filingDocuments.form5InventorshipConfirmed)],
+                      ['Form 26 required', formatBoolean(patent.filingDocuments.form26PowerOfAttorneyRequired)],
+                      ['Form 26 details', patent.filingDocuments.form26PowerOfAttorneyDetails || 'Not required'],
+                      ['Examination request plan', patent.filingDocuments.examinationRequestPlan || '—'],
+                      ['Public disclosure checked', formatBoolean(patent.filingDocuments.publicDisclosureChecked)],
+                      ['Professional support needed', formatBoolean(patent.filingDocuments.professionalSupportNeeded)],
+                      ['Cost management notes', patent.filingDocuments.costManagementNotes || 'Not provided'],
+                    ].map(([label, value], index, entries) => (
+                      <div
+                        key={label}
+                        className={`px-5 py-4 ${index !== entries.length - 1 ? 'border-b border-slate-800' : ''}`}
+                      >
+                        <div className="text-xs font-semibold uppercase tracking-wider text-slate-500">{label}</div>
+                        <div className="mt-1 text-sm leading-relaxed text-white">{value}</div>
+                      </div>
+                    ))
+                  )}
                 </div>
               </div>
             </section>
 
             <section className="min-w-0 space-y-6">
               <div>
-                <div className="mb-4 text-xs uppercase tracking-[0.3em] text-cyan-300">Student Score</div>
+                <div className="mb-4 text-xs uppercase tracking-[0.3em] text-cyan-300">Student Innovation Score</div>
                 <div className="rounded-3xl border border-slate-800 bg-slate-950 p-5">
-                  <div className="text-5xl font-bold leading-none text-white">{patent.student.innovationScore}</div>
-                  <div className="mt-3 text-sm text-slate-400">Full score breakdown is visible before review.</div>
-                  <div className="mt-6 space-y-2">
+                  <div className="flex items-baseline justify-between">
+                    <div className="text-5xl font-bold leading-none text-white">{patent.student.innovationScore}</div>
+                    <span className="rounded-full bg-cyan-500/10 border border-cyan-500/20 px-2.5 py-1 text-[11px] font-medium text-cyan-300">
+                      Auto-Calculated
+                    </span>
+                  </div>
+                  <div className="mt-3 text-xs text-slate-400 leading-relaxed">
+                    Student's score breakdown from innovation assessment (+{PATENT_APPROVAL_SCORE} pts awarded upon patent approval).
+                  </div>
+                  <div className="mt-5 space-y-2">
                     {Object.entries(patent.student.scoreBreakdown).map(([label, value]) => (
                       <div
                         key={label}
-                        className="flex items-center justify-between rounded-xl border border-slate-800 bg-slate-900 px-4 py-3 text-sm"
+                        className="flex items-center justify-between rounded-xl border border-slate-800 bg-slate-900 px-4 py-2.5 text-xs"
                       >
                         <span className="text-slate-300">{formatKey(label)}</span>
                         <span className="font-semibold text-white">{value}</span>
@@ -360,7 +366,7 @@ function ReviewModal({
                       </div>
                       <Button variant="secondary" onClick={() => setDocsOpen(true)}>
                         <Files className="mr-2 h-4 w-4" />
-                        View Documents
+                        View Documents ({patent.supportingDocuments.length})
                       </Button>
                     </div>
                   )}
@@ -375,43 +381,59 @@ function ReviewModal({
             </div>
           )}
 
-          {patent && ['submitted', 'under_review'].includes(patent.status) ? (
+          {/* Custom Confirmation Banner */}
+          {showConfirmApprove && (
+            <div className="mt-4 flex flex-col gap-3 rounded-2xl border border-emerald-500/30 bg-emerald-500/10 p-4 text-sm text-emerald-200 sm:flex-row sm:items-center sm:justify-between">
+              <div>
+                <div className="font-semibold text-emerald-300">Confirm Patent Approval</div>
+                <div className="text-xs text-emerald-200/80">
+                  This action will approve the direct intake submission and award +{PATENT_APPROVAL_SCORE} Innovation Score points to {patent.student.displayName}.
+                </div>
+              </div>
+              <div className="flex gap-2">
+                <Button variant="secondary" size="sm" onClick={() => setShowConfirmApprove(false)}>
+                  Cancel
+                </Button>
+                <Button size="sm" onClick={() => approveMutation.mutate()} disabled={approveMutation.isPending}>
+                  {approveMutation.isPending ? 'Approving...' : 'Confirm & Approve'}
+                </Button>
+              </div>
+            </div>
+          )}
+
+          {patent && ['submitted', 'under_review'].includes(patent.status) && !showConfirmApprove ? (
             <div className="mt-6 flex shrink-0 flex-col gap-4 border-t border-slate-800 bg-slate-900 pt-5 lg:flex-row lg:items-end lg:justify-between">
               <div className="w-full max-w-xl">
-                <div className="text-sm text-slate-400">Approve will award {PATENT_APPROVAL_SCORE} Innovation Score.</div>
+                <div className="text-sm text-slate-400">Approving will award +{PATENT_APPROVAL_SCORE} Innovation Score to student.</div>
                 <textarea
                   value={reason}
                   onChange={(event) => setReason(event.target.value)}
                   placeholder="Enter a rejection reason (minimum 20 characters)"
-                  className="mt-3 min-h-28 w-full rounded-2xl border border-slate-800 bg-slate-950 px-4 py-3 text-white placeholder:text-slate-500"
+                  className="mt-3 min-h-24 w-full rounded-2xl border border-slate-800 bg-slate-950 px-4 py-3 text-sm text-white placeholder:text-slate-500"
                 />
               </div>
               <div className="flex flex-wrap gap-3">
                 <Button variant="secondary" onClick={() => rejectMutation.mutate()} disabled={reason.trim().length < 20 || rejectMutation.isPending}>
-                  Reject
+                  {rejectMutation.isPending ? 'Rejecting...' : 'Reject'}
                 </Button>
-                <Button onClick={() => {
-                  if (window.confirm(`This will award ${PATENT_APPROVAL_SCORE} Innovation Score. Confirm?`)) {
-                    approveMutation.mutate();
-                  }
-                }} disabled={approveMutation.isPending}>
+                <Button onClick={() => setShowConfirmApprove(true)}>
                   Approve (+{PATENT_APPROVAL_SCORE} pts)
                 </Button>
               </div>
             </div>
-          ) : (
+          ) : !showConfirmApprove ? (
             <div className="mt-6 flex shrink-0 items-center gap-3 border-t border-slate-800 pt-5">
               <span className={`rounded-full px-3 py-1 text-xs font-semibold ${
-                patent?.status === 'approved' ? 'bg-green-500/20 text-green-300' : 'bg-red-500/20 text-red-300'
+                patent?.status === 'approved' ? 'bg-emerald-500/20 text-emerald-300' : 'bg-red-500/20 text-red-300'
               }`}>
                 {patent?.status === 'approved' ? 'Approved' : 'Rejected'}
               </span>
               <span className="text-sm text-slate-400">
-                {patent?.status === 'approved' ? 'This patent has already been approved.' : 'This patent has already been rejected.'}
+                {patent?.status === 'approved' ? 'This patent intake has been approved and score awarded.' : 'This patent intake was rejected.'}
                 {patent?.adminNotes && ` Reason: ${patent.adminNotes}`}
               </span>
             </div>
-          )}
+          ) : null}
         </Card>
       </div>
       {patent && (
@@ -445,54 +467,64 @@ export default function Patents() {
         items={tabs.map((tab) => ({ id: tab.key, label: tab.label }))}
         activeId={activeTab}
         onChange={setActiveTab}
-        aria-label="Patent status filters"
+        aria-label="Direct patent intake filters"
       />
 
       <Card className="overflow-hidden">
-        <div className="grid grid-cols-[1.4fr,1fr,160px,120px,100px,140px] gap-4 border-b border-slate-800 bg-slate-900 px-5 py-4 text-xs uppercase tracking-[0.3em] text-slate-400">
-          <div>Student</div>
-          <div>Project</div>
-          <div>Submitted</div>
-          <div>Status</div>
-          <div>Docs</div>
-          <div>Actions</div>
-        </div>
-        <div className="divide-y divide-slate-800">
-          {patentsQuery.isLoading ? (
-            <div className="flex items-center justify-center py-12"><Spinner /></div>
-          ) : patents.length === 0 ? (
-            <div className="px-5 py-12 text-sm text-slate-400">No patents in this bucket.</div>
-          ) : (
-            patents.map((patent) => (
-              <div key={patent._id} className="grid grid-cols-[1.4fr,1fr,160px,120px,100px,140px] items-center gap-4 px-5 py-5">
-                <div className="font-semibold text-white">{patent.student.displayName}</div>
-                <div className="text-slate-300">{patent.projectTitle}</div>
-                <div className="text-slate-400">{new Date(patent.submittedAt).toLocaleDateString('en-IN')}</div>
-                <div>
-                  <Badge>{patent.status}</Badge>
+        <div className="overflow-x-auto">
+          <div className="min-w-[850px]">
+            <div className="grid grid-cols-[1.4fr,1fr,160px,120px,100px,140px] gap-4 border-b border-slate-800 bg-slate-900 px-5 py-4 text-xs uppercase tracking-[0.3em] text-slate-400">
+              <div>Student</div>
+              <div>Project</div>
+              <div>Submitted</div>
+              <div>Status</div>
+              <div>Docs</div>
+              <div>Actions</div>
+            </div>
+            <div className="divide-y divide-slate-800">
+              {patentsQuery.isLoading ? (
+                <div className="flex items-center justify-center py-12"><Spinner /></div>
+              ) : patents.length === 0 ? (
+                <div className="flex flex-col items-center justify-center py-12 text-slate-500">
+                  <Shield className="mb-3 h-8 w-8 opacity-40 text-emerald-400" />
+                  <div className="text-sm font-medium text-slate-300">No submissions in this bucket</div>
+                  <div className="mt-1 text-xs text-slate-500 max-w-sm text-center">
+                    Direct patent intake submissions in state <span className="font-semibold text-slate-400">{activeTab}</span> will appear here automatically.
+                  </div>
                 </div>
-                <div>
-                  {patent.supportingDocuments?.length ? (
-                    <button
-                      onClick={() => setDocsPatent(patent)}
-                      className="flex items-center gap-1.5 rounded-xl border border-slate-700 bg-slate-800 px-3 py-1.5 text-xs font-medium text-slate-300 hover:border-cyan-500/50 hover:text-cyan-300 transition-colors"
-                    >
-                      <Files className="h-3.5 w-3.5" />
-                      {patent.supportingDocuments.length}
-                    </button>
-                  ) : (
-                    <span className="text-xs text-slate-600">—</span>
-                  )}
-                </div>
-                <div>
-                  <Button variant="secondary" onClick={() => setSelectedPatent(patent)}>
-                    <Shield className="mr-2 h-4 w-4" />
-                    Review
-                  </Button>
-                </div>
-              </div>
-            ))
-          )}
+              ) : (
+                patents.map((patent) => (
+                  <div key={patent._id} className="grid grid-cols-[1.4fr,1fr,160px,120px,100px,140px] items-center gap-4 px-5 py-4 transition-colors hover:bg-slate-900/60">
+                    <div className="font-semibold text-white">{patent.student.displayName}</div>
+                    <div className="text-slate-300">{patent.projectTitle}</div>
+                    <div className="text-slate-400">{new Date(patent.submittedAt).toLocaleDateString('en-IN')}</div>
+                    <div>
+                      <Badge>{patent.status}</Badge>
+                    </div>
+                    <div>
+                      {patent.supportingDocuments?.length ? (
+                        <button
+                          onClick={() => setDocsPatent(patent)}
+                          className="flex items-center gap-1.5 rounded-xl border border-slate-700 bg-slate-800 px-3 py-1.5 text-xs font-medium text-slate-300 hover:border-emerald-500/50 hover:text-emerald-300 transition-colors"
+                        >
+                          <Files className="h-3.5 w-3.5" />
+                          {patent.supportingDocuments.length}
+                        </button>
+                      ) : (
+                        <span className="text-xs text-slate-600">—</span>
+                      )}
+                    </div>
+                    <div>
+                      <Button variant="secondary" onClick={() => setSelectedPatent(patent)}>
+                        <Shield className="mr-2 h-4 w-4" />
+                        Review
+                      </Button>
+                    </div>
+                  </div>
+                ))
+              )}
+            </div>
+          </div>
         </div>
       </Card>
 

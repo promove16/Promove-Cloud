@@ -153,15 +153,44 @@ export const markHelpful = async (req: Request, res: Response) => {
   res.json(new ApiResponse({ helpful: true }));
 };
 
-// ─── Admin: Mark Verified Solution ────────────────────────────────────────────
+// ─── Mark Verified Solution ──────────────────────────────────────────────────
+// The student who asked the question can verify one answer as the solution.
+// Admins can verify on behalf of the author as well.
 
 export const markVerifiedSolution = async (req: Request, res: Response) => {
+  if (!req.user) throw new ApiError(401, 'UNAUTHORIZED', 'Not authenticated');
+
   const answerId = String(req.params.answerId);
 
   const answer = await ForumAnswer.findById(answerId);
   if (!answer) throw new ApiError(404, 'ANSWER_NOT_FOUND', 'Answer not found');
+
   if (answer.isVerifiedSolution) {
     return res.json(new ApiResponse({ message: 'Already marked as verified solution' }));
+  }
+
+  // One verified solution per post
+  const alreadyHasSolution = await ForumAnswer.exists({
+    postId: answer.postId,
+    isVerifiedSolution: true,
+  });
+  if (alreadyHasSolution) {
+    throw new ApiError(400, 'POST_ALREADY_SOLVED', 'This post already has a verified solution');
+  }
+
+  const post = await ForumPost.findById(answer.postId).select('authorId').lean();
+  if (!post) throw new ApiError(404, 'POST_NOT_FOUND', 'Post not found');
+
+  const isAdmin      = req.user.role === UserRole.ADMIN;
+  const isPostAuthor = post.authorId.equals(req.user._id);
+
+  if (!isAdmin && !isPostAuthor) {
+    throw new ApiError(403, 'NOT_ALLOWED', 'Only the post author or an admin can verify a solution');
+  }
+
+  // A user cannot verify their own answer as the solution
+  if (answer.authorId.equals(req.user._id)) {
+    throw new ApiError(400, 'CANNOT_VERIFY_OWN', 'You cannot mark your own answer as the verified solution');
   }
 
   await ForumAnswer.updateOne({ _id: answerId }, { $set: { isVerifiedSolution: true } });

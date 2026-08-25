@@ -5,8 +5,8 @@ import { UserRole } from '../../types/roles.types';
 import { asyncHandler } from '../../utils/asyncHandler';
 import {
   addSubmissionScoreController,
+  closeEventController,
   computeEventRankingsController,
-  createHiringEventController,
   getEventRankingsController,
   joinEventController,
   listRecruiterHiringEventsController,
@@ -14,6 +14,7 @@ import {
   selectStudentFromHiringEventController,
   sendHiringEventInviteController,
   listStudentInstitutionDrivesController,
+  postponeHiringEventController,
 } from './event.controller';
 
 const router = Router();
@@ -22,9 +23,13 @@ router.use(authenticate);
 
 router.get('/my-institution', authorize(UserRole.STUDENT), asyncHandler(listStudentInstitutionEventsController));
 router.get('/drives', authorize(UserRole.STUDENT), asyncHandler(listStudentInstitutionDrivesController));
-router.post('/hiring', authorize(UserRole.RECRUITER), asyncHandler(createHiringEventController));
 router.get('/hiring', authorize(UserRole.RECRUITER), asyncHandler(listRecruiterHiringEventsController));
 router.post('/hiring-invite/:collegeId', authorize(UserRole.RECRUITER), asyncHandler(sendHiringEventInviteController));
+router.patch(
+  '/:eventId/postpone',
+  authorize(UserRole.RECRUITER),
+  asyncHandler(postponeHiringEventController),
+);
 router.post(
   '/hiring/:eventId/select/:studentId',
   authorize(UserRole.RECRUITER),
@@ -47,5 +52,14 @@ router.get(
   authorize(UserRole.COLLEGE, UserRole.SCHOOL, UserRole.STUDENT, UserRole.RECRUITER),
   asyncHandler(getEventRankingsController),
 );
+router.route('/:eventId/close')
+  .post(
+    authorize(UserRole.COLLEGE, UserRole.SCHOOL, UserRole.RECRUITER),
+    asyncHandler(closeEventController),
+  )
+  .patch(
+    authorize(UserRole.COLLEGE, UserRole.SCHOOL, UserRole.RECRUITER),
+    asyncHandler(closeEventController),
+  );
 
 export default router;

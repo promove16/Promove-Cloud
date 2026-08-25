@@ -1,5 +1,4 @@
 import { z } from 'zod';
-import { notificationQueue } from '../../config/bullmq';
 import { io } from '../../config/socket';
 import { emitInterestExpressed, emitInterestWithdrawn } from '../../sockets/bidSocket';
 import { ApiError } from '../../utils/ApiError';
@@ -9,6 +8,7 @@ import { Startup } from '../startup/startup.model';
 import { recomputeStartupFunding } from '../startup/funding.service';
 import { User } from '../user/user.model';
 import { UserRole } from '../../types/roles.types';
+import { queueNotification } from '../notification/notification.delivery';
 import { Interest } from './interest.model';
 import type { IInterest, InterestView, StartupInterestSummary } from './interest.types';
 
@@ -111,7 +111,7 @@ export const expressInterest = async (
     },
   });
 
-  await notificationQueue.add('interest-expressed', {
+  await queueNotification({
     userId: String(founderId),
     type: 'deal_interest',
     title: 'An investor expressed interest',
@@ -192,6 +192,19 @@ export const withdrawInterest = async (
     Startup.findById(startupId).select('name tagline category').lean(),
     User.findById(investorId).select('displayName avatar').lean(),
   ]);
+
+  await queueNotification({
+    userId: String(interest.founderId),
+    type: 'deal_interest',
+    title: 'An investor withdrew their interest',
+    body: `${investor?.displayName ?? 'An investor'} withdrew interest in ${startup?.name ?? 'your startup'}.`,
+    link: `/dashboard/startup/${startupId}`,
+    metadata: {
+      interestId: String(interest._id),
+      startupId,
+      investorId,
+    },
+  });
 
   return serializeInterest(
     interest,

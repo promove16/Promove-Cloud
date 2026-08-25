@@ -253,7 +253,15 @@ function UploadForm() {
 
 // ─── Main ─────────────────────────────────────────────────────────────────────
 
-export default function MentorResources() {
+export interface MentorResourcesProps {
+  backPath?: string;
+  backLabel?: string;
+}
+
+export default function MentorResources({
+  backPath = '/dashboard/mentor/score',
+  backLabel = 'Mentor Score',
+}: MentorResourcesProps) {
   const user = useAuthStore((state) => state.user);
   const isMentor = user?.role === UserRole.MENTOR;
 
@@ -274,11 +282,11 @@ export default function MentorResources() {
       {/* Header */}
       <div>
         <Link
-          to="/dashboard/mentor/score"
+          to={backPath}
           className="inline-flex items-center gap-1.5 text-sm text-slate-400 transition hover:text-white"
         >
           <ArrowLeft className="h-3.5 w-3.5" />
-          Mentor Score
+          {backLabel}
         </Link>
         <h1 className="mt-2 text-2xl font-bold text-white">Resource Library</h1>
         <p className="mt-1 text-sm text-slate-400">

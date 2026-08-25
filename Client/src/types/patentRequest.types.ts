@@ -180,6 +180,7 @@ export interface PatentRequestSubmission {
   adminAssignedTo?: string;
   adminNotes?: string;
   scoreAwarded?: boolean;
+  nextActionRequired?: string;
 
   // Deadlines
   completeSpecDeadline?: string;

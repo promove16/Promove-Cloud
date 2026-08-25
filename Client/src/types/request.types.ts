@@ -11,6 +11,7 @@ export type RequestType =
   | 'recruiter_job_invite'
   | 'campus_drive_registration'
   | 'college_event_invite'
+  | 'college_event_reschedule'
   | 'college_recruiter_partnership'
   | 'patent_coinventor'
   | 'problem_review'
@@ -39,6 +40,10 @@ export interface RequestUserSummary {
   displayName: string;
   email?: string;
   role?: string;
+  avatar?: string;
+  domain?: string;
+  verificationStatus?: string;
+  adminApprovalStatus?: string;
 }
 
 export interface WorkflowRequest {

@@ -18,6 +18,15 @@ const participantSchema = new Schema<IEvent['participants'][number]>(
       required: true,
       default: () => new Date(),
     },
+    selectedJobId: {
+      type: Schema.Types.ObjectId,
+      ref: 'JobPost',
+      default: undefined,
+    },
+    selectedAt: {
+      type: Date,
+      default: undefined,
+    },
   },
   { _id: false },
 );

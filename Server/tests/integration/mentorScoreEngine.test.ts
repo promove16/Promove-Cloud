@@ -1,5 +1,10 @@
 import { Types } from 'mongoose';
+import jwt from 'jsonwebtoken';
+import request from 'supertest';
+import app from '../../src/app';
+import { env } from '../../src/config/env';
 import { awardMentorPoints, getMentorScore, applyMentorScoreDecay, rebuildMentorScoreCache, refreshMentorRanks } from '../../src/modules/mentorScore/mentorScore.service';
+import { MentorResource } from '../../src/modules/mentorScore/mentorResource.model';
 import { MentorScore } from '../../src/modules/mentorScore/mentorScore.model';
 import { MentorScoreEvent } from '../../src/modules/mentorScore/mentorScoreEvent.model';
 import { MentorScoreTrigger } from '../../src/modules/mentorScore/mentorScore.types';
@@ -21,7 +26,72 @@ const createMentorUser = async (email: string, name: string) =>
     adminApprovalStatus: 'approved',
   });
 
+const makeAccessToken = (user: { _id: Types.ObjectId; email: string; role: UserRole }) =>
+  jwt.sign(
+    {
+      _id: user._id.toString(),
+      email: user.email,
+      role: user.role,
+      type: 'access',
+    },
+    env.JWT_ACCESS_SECRET,
+    { algorithm: 'RS256', expiresIn: '15m' },
+  );
+
 describe('Mentor Score Engine', () => {
+  it('awards and recovers the resource milestone at ten unique downloaders', async () => {
+    const owner = await createMentorUser('resource-owner@example.com', 'Resource Owner');
+    const downloaders = await Promise.all(
+      Array.from({ length: 10 }, (_, index) =>
+        User.create({
+          email: `resource-downloader-${index}@example.com`,
+          passwordHash: 'hashed',
+          role: UserRole.STUDENT,
+          displayName: `Resource Downloader ${index}`,
+          profileComplete: true,
+          registrationStage: 'profile_setup',
+          accessGrantedBy: 'admin',
+          accessExpiresAt: new Date(Date.now() + 365 * 24 * 60 * 60 * 1000),
+          isActive: true,
+          verificationStatus: 'verified',
+          adminApprovalStatus: 'not_required',
+        }),
+      ),
+    );
+    const resource = await MentorResource.create({
+      mentorId: owner._id,
+      title: 'Ten-download milestone guide',
+      type: 'guide',
+      fileUrl: 'https://example.com/mentor-guide.pdf',
+      downloadedByUsers: downloaders.slice(0, 9).map((user) => user._id),
+      downloadCount: 9,
+      // Simulate the old partial-failure state: milestone persisted without score.
+      milestonesAwarded: 1,
+    });
+    const tenthDownloader = downloaders[9]!;
+
+    const response = await request(app)
+      .post(`/api/mentor-resources/${resource._id.toString()}/download`)
+      .set('Authorization', `Bearer ${makeAccessToken(tenthDownloader)}`);
+
+    expect(response.status).toBe(200);
+
+    const [score, events, updatedResource] = await Promise.all([
+      getMentorScore(String(owner._id)),
+      MentorScoreEvent.find({
+        mentorId: owner._id,
+        trigger: MentorScoreTrigger.RESOURCE_MILESTONE_REACHED,
+      }).lean(),
+      MentorResource.findById(resource._id).lean(),
+    ]);
+
+    expect(score?.totalScore).toBe(20);
+    expect(score?.phase3Breakdown.resourceLibrary).toBe(20);
+    expect(events).toHaveLength(1);
+    expect(updatedResource?.downloadedByUsers).toHaveLength(10);
+    expect(updatedResource?.milestonesAwarded).toBe(1);
+  });
+
   it('awards points and respects Phase 1 and Phase 2 caps', async () => {
     const mentor = await createMentorUser('mentor1@example.com', 'Dr. Smith');
     const mentorId = String(mentor._id);

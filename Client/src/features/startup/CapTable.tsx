@@ -1,6 +1,6 @@
 import { useMemo } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
-import { useParams, useSearchParams } from 'react-router-dom';
+import { useParams, useSearchParams, Link } from 'react-router-dom';
 import {
   Cell,
   Pie,
@@ -17,6 +17,7 @@ import {
   Layers,
   PieChart as PieIcon,
   TrendingUp,
+  UserCheck,
   Users,
   Wallet,
 } from 'lucide-react';
@@ -940,6 +941,23 @@ export default function StartupEquityAndDeals() {
 
       {activeView === 'pipeline' ? (
         <div className="space-y-8">
+          <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 p-4 bg-gradient-to-r from-cyan-950/30 via-slate-900 to-indigo-950/30 border border-cyan-500/20 rounded-2xl">
+            <div className="flex items-center gap-3">
+              <div className="w-10 h-10 rounded-xl bg-cyan-500/10 border border-cyan-500/20 flex items-center justify-center text-cyan-400 shrink-0">
+                <UserCheck className="w-5 h-5" />
+              </div>
+              <div>
+                <p className="text-white text-sm font-semibold">Mentorship Proposals Available</p>
+                <p className="text-slate-400 text-xs">Looking for mentor bids and advisory proposals for this startup?</p>
+              </div>
+            </div>
+            <Link
+              to="../mentor-bids"
+              className="inline-flex items-center gap-1.5 px-4 py-2 text-xs font-semibold rounded-xl bg-cyan-500/20 text-cyan-300 border border-cyan-500/40 hover:bg-cyan-500/30 transition-colors shrink-0"
+            >
+              View Mentor Bids
+            </Link>
+          </div>
           {hasBids ? <FounderBidDashboard /> : null}
           <DealPipelineSection
             deals={startupDeals}

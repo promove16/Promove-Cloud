@@ -21,6 +21,7 @@ import {
   getStudentLeaderboard,
   importSchoolStudentCredentials,
   importSchoolStudentRosterEntries,
+  previewSchoolStudentCredentials,
   listSchoolEvents,
   listInstitutionPatents,
   listInstitutionProjects,
@@ -318,6 +319,18 @@ export const importSchoolStudentCredentialsController = async (req: Request, res
   }
 
   const data = await importSchoolStudentCredentials(req.user!._id, req.user!._id, {
+    originalname: req.file.originalname,
+    buffer: req.file.buffer,
+  });
+  res.status(200).json(new ApiResponse(data));
+};
+
+export const previewSchoolStudentCredentialsController = async (req: Request, res: Response) => {
+  if (!req.file?.buffer) {
+    throw new ApiError(400, 'FILE_REQUIRED', 'An Excel or CSV file is required.');
+  }
+
+  const data = await previewSchoolStudentCredentials(req.user!._id, {
     originalname: req.file.originalname,
     buffer: req.file.buffer,
   });

@@ -38,6 +38,7 @@ export interface ScoreBreakdown {
   problemsClaimed: number;
   problemsCompleted: number;
   skillsCompleted: number;
+  tasksCompleted: number;
   progressUploads: number;
   patentsSubmitted: number;
   patentsApproved: number;

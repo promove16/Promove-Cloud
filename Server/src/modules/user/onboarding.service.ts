@@ -1,8 +1,9 @@
 import { User } from './user.model';
 import { ApiError } from '../../utils/ApiError';
-import { applyScoreAsync, SCORE_DELTAS, ScoreTrigger } from '../../services/scoreEngine';
+import { applyScore, SCORE_DELTAS, ScoreTrigger } from '../../services/scoreEngine';
 import { ScoreEvent } from '../innovationScore/score.model';
 import { isGithubOauthAvailable } from './githubProof';
+import { Workspace } from '../workspace/workspace.model';
 
 export interface OnboardingStep {
   id: string;
@@ -47,9 +48,18 @@ export const getOnboardingStatus = async (userId: string): Promise<OnboardingSta
       (user.domain?.trim() || user.headline?.trim()),
   );
 
+  const hasWorkspaces = Boolean(
+    await Workspace.exists({
+      $or: [{ ownerId: userId }, { teamMemberIds: userId }],
+      isActive: true,
+    }),
+  );
+
   const projectDone =
     (user.portfolioProjects?.length ?? 0) > 0 ||
-    (user.scoreBreakdown?.problemsClaimed ?? 0) > 0;
+    (user.scoreBreakdown?.problemsClaimed ?? 0) > 0 ||
+    (user.scoreBreakdown?.problemsCompleted ?? 0) > 0 ||
+    hasWorkspaces;
 
   const githubDone = Boolean(user.connectedAccounts?.github?.userId);
   const githubOauthAvailable = isGithubOauthAvailable();
@@ -128,6 +138,6 @@ export const claimOnboardingStep = async (
     throw new ApiError(400, 'STEP_NOT_COMPLETE', 'Complete this step before claiming points');
   if (step.claimed) return { awarded: 0 };
 
-  await applyScoreAsync({ userId, trigger, metadata: { onboardingStep: stepId } });
+  await applyScore({ userId, trigger, metadata: { onboardingStep: stepId } });
   return { awarded: step.points };
 };

@@ -15,6 +15,8 @@ export interface IEventParticipant {
   studentId: Types.ObjectId;
   submissionScore?: number;
   joinedAt: Date;
+  selectedJobId?: Types.ObjectId;
+  selectedAt?: Date;
 }
 
 export interface IEventRanking {
@@ -63,4 +65,7 @@ export interface EventParticipantView {
   innovationScore: number;
   registeredAt: string;
   submissionScore?: number;
+  selectedJobId?: string;
+  selectedJobTitle?: string;
+  selectedAt?: string;
 }

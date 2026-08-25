@@ -67,4 +67,11 @@ export const forumApi = {
     );
     return res.data.data;
   },
+
+  async markVerifiedSolution(answerId: string) {
+    const res = await api.patch<ApiSuccessResponse<{ verified: boolean }>>(
+      `/api/forum/answers/${answerId}/verify`,
+    );
+    return res.data.data;
+  },
 };

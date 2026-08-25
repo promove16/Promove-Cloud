@@ -11,6 +11,7 @@ import {
   submitCurriculumPdf,
   submitClassPhoto,
   submitIndustrySession,
+  submitPrototypeVelocity,
   submitDemoDay,
   endSessionToken,
   rateSession,
@@ -37,8 +38,9 @@ router.post('/submit/curriculum',      ...mentorOnly, asyncHandler(submitCurricu
 router.post('/submit/class-photo',     ...mentorOnly, asyncHandler(submitClassPhoto));
 
 // Phase 2 – Institutional Incubation
-router.post('/submit/industry-session', ...mentorOnly, asyncHandler(submitIndustrySession));
-router.post('/submit/demo-day',         ...mentorOnly, asyncHandler(submitDemoDay));
+router.post('/submit/industry-session',   ...mentorOnly, asyncHandler(submitIndustrySession));
+router.post('/submit/prototype-velocity', ...mentorOnly, asyncHandler(submitPrototypeVelocity));
+router.post('/submit/demo-day',           ...mentorOnly, asyncHandler(submitDemoDay));
 
 // Phase 3 – Session Token (called by student to release points to mentor)
 router.post('/sessions/:sessionId/end',  authenticate, asyncHandler(endSessionToken));

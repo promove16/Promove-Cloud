@@ -1,8 +1,6 @@
 import { Router } from 'express';
 import { authenticate } from '../../middleware/authenticate';
-import { authorize } from '../../middleware/authorize';
 import { asyncHandler } from '../../utils/asyncHandler';
-import { UserRole } from '../../types/roles.types';
 import {
   createPost,
   listPosts,
@@ -25,11 +23,11 @@ router.post('/:postId/answers',     authenticate, asyncHandler(createAnswer));
 // Helpful vote — any authenticated user
 router.post('/answers/:answerId/helpful', authenticate, asyncHandler(markHelpful));
 
-// Admin: mark verified solution
+// Verify an answer as the solution — the post author (student) or an admin
+// Permission is enforced inside the controller.
 router.patch(
   '/answers/:answerId/verify',
   authenticate,
-  authorize(UserRole.ADMIN),
   asyncHandler(markVerifiedSolution),
 );
 

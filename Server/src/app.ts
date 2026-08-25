@@ -8,7 +8,7 @@ import path from 'path';
 import { existsSync } from 'fs';
 import { env } from './config/env';
 import { httpLogStream } from './config/logger';
-import { apiLimiter, withRateLimit } from './middleware/rateLimiter';
+import { apiLimiter, withRateLimit } from './middleware/rateLimiter'; 
 import { errorHandler } from './middleware/errorHandler';
 import { userActivityMiddleware } from './middleware/userActivity';
 import { httpMetricsMiddleware, metricsHandler } from './middleware/metrics';

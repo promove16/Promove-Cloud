@@ -2,7 +2,9 @@ import jwt from 'jsonwebtoken';
 import request from 'supertest';
 import app from '../../src/app';
 import { env } from '../../src/config/env';
+import { RequestRecord } from '../../src/modules/request/request.model';
 import { TeamRequest } from '../../src/modules/social/teamRequest.model';
+import { Startup } from '../../src/modules/startup/startup.model';
 import { User } from '../../src/modules/user/user.model';
 import { Workspace } from '../../src/modules/workspace/workspace.model';
 import { UserRole } from '../../src/types/roles.types';
@@ -148,5 +150,149 @@ describe('workspace invite acceptance flow', () => {
       toUserId: mentor._id,
     }).lean();
     expect(invite).toBeNull();
+  });
+
+  it('adds an accepted DM startup invitee to the startup and its linked workspace roster', async () => {
+    const owner = await createStudent('DM Startup Owner');
+    const invitee = await createStudent('DM Startup Invitee');
+
+    const workspace = await Workspace.create({
+      ownerId: owner._id,
+      teamMemberIds: [owner._id],
+      title: 'DM Invite Workspace',
+      category: 'Fintech',
+      stage: 'Ideation',
+    });
+    const startup = await Startup.create({
+      founderIds: [owner._id],
+      teamMemberIds: [],
+      projectId: workspace._id,
+      name: 'DM Invite Startup',
+      tagline: 'Invite collaborators from direct messages',
+      category: 'Fintech',
+      stage: 'Ideation',
+    });
+
+    const createResponse = await request(app)
+      .post('/api/workflow-requests')
+      .set(authHeader(owner))
+      .send({
+        requestType: 'startup_member',
+        actionType: 'join',
+        toUserId: invitee._id.toString(),
+        targetEntityType: 'startup',
+        targetEntityId: startup._id.toString(),
+        targetEntityTitle: startup.name,
+        targetRole: 'student',
+        requestedRole: 'Product designer',
+        message: 'Join the startup team from our DM conversation.',
+        metadata: {
+          workspaceId: workspace._id.toString(),
+          startupName: startup.name,
+        },
+      });
+
+    expect(createResponse.status).toBe(201);
+
+    const acceptResponse = await request(app)
+      .post(`/api/workflow-requests/${createResponse.body.data._id}/accept`)
+      .set(authHeader(invitee))
+      .send();
+
+    expect(acceptResponse.status).toBe(200);
+    expect(acceptResponse.body.data.status).toBe('accepted');
+
+    const [updatedRequest, updatedStartup, updatedWorkspace] = await Promise.all([
+      RequestRecord.findById(createResponse.body.data._id).lean(),
+      Startup.findById(startup._id).lean(),
+      Workspace.findById(workspace._id).lean(),
+    ]);
+    expect(updatedRequest?.status).toBe('accepted');
+    expect(updatedStartup?.teamMemberIds.map(String)).toContain(invitee._id.toString());
+    expect(updatedWorkspace?.teamMemberIds.map(String)).toContain(invitee._id.toString());
+
+    const workspaceResponse = await request(app)
+      .get(`/api/workspace/${workspace._id}`)
+      .set(authHeader(owner));
+    expect(workspaceResponse.status).toBe(200);
+    expect(workspaceResponse.body.data.teamMembers).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({
+          _id: invitee._id.toString(),
+          displayName: invitee.displayName,
+        }),
+      ]),
+    );
+  });
+});
+
+describe('workspace upload URL serialization', () => {
+  it('returns a presigned HTTPS URL immediately after an S3 upload', async () => {
+    const owner = await createStudent('Workspace Upload Owner');
+    const workspace = await Workspace.create({
+      ownerId: owner._id,
+      teamMemberIds: [owner._id],
+      title: 'Private Upload Workspace',
+      category: 'Documents',
+      stage: 'Build',
+    });
+
+    const response = await request(app)
+      .post(`/api/workspace/${workspace._id}/upload`)
+      .set(authHeader(owner))
+      .attach('file', Buffer.from('%PDF-1.4\n% ProMove test PDF\n%%EOF'), {
+        filename: 'workspace-document.pdf',
+        contentType: 'application/pdf',
+      });
+
+    expect(response.status).toBe(200);
+    const uploaded = response.body.data.at(-1);
+    expect(uploaded).toEqual(
+      expect.objectContaining({
+        fileName: 'workspace-document.pdf',
+        storageProvider: 's3',
+      }),
+    );
+    expect(uploaded.fileUrl).toMatch(/^https:\/\//);
+    expect(uploaded.fileUrl).toContain('X-Amz-Algorithm=AWS4-HMAC-SHA256');
+    expect(uploaded.fileUrl).toContain('X-Amz-Signature=');
+
+    const persisted = await Workspace.findById(workspace._id).lean();
+    expect(persisted?.uploads.at(-1)?.fileUrl).not.toContain('X-Amz-Signature=');
+    expect(persisted?.uploads.at(-1)?.storageKey).toBeTruthy();
+  });
+
+  it('repairs and signs a legacy scheme-less S3 workspace URL', async () => {
+    const owner = await createStudent('Legacy Workspace Upload Owner');
+    const objectKey = 'promove/workspaces/legacy-workspace-document.pdf';
+    const workspace = await Workspace.create({
+      ownerId: owner._id,
+      teamMemberIds: [owner._id],
+      title: 'Legacy Private Upload Workspace',
+      category: 'Documents',
+      stage: 'Build',
+      uploads: [
+        {
+          fileUrl: `promove-test-bucket.s3.ap-south-1.amazonaws.com/${objectKey}`,
+          fileType: 'pdf',
+          fileName: 'legacy-workspace-document.pdf',
+          fileSizeBytes: 512,
+          uploadedBy: owner._id,
+          uploadedAt: new Date(),
+          category: 'other',
+          mimeType: 'application/pdf',
+        },
+      ],
+    });
+
+    const response = await request(app)
+      .get(`/api/workspace/${workspace._id}`)
+      .set(authHeader(owner));
+
+    expect(response.status).toBe(200);
+    const uploaded = response.body.data.uploads.at(-1);
+    expect(uploaded.fileUrl).toMatch(/^https:\/\//);
+    expect(uploaded.fileUrl).toContain(objectKey);
+    expect(uploaded.fileUrl).toContain('X-Amz-Signature=');
   });
 });
