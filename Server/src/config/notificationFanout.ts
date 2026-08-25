@@ -42,6 +42,17 @@ export const wasNotificationEmitted = (id: string): boolean => {
   return true;
 };
 
+// Periodic cleanup to prevent unbounded growth of the dedup map.
+const CLEANUP_INTERVAL_MS = 5 * 60 * 1000;
+setInterval(() => {
+  const now = Date.now();
+  for (const [id, at] of recentlyEmitted) {
+    if (now - at > EMIT_DEDUPE_TTL_MS) {
+      recentlyEmitted.delete(id);
+    }
+  }
+}, CLEANUP_INTERVAL_MS).unref();
+
 let publishClient: IORedis | null = null;
 
 const getPublishClient = (): IORedis | null => {

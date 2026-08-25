@@ -23,6 +23,7 @@ const NOTIFICATION_TYPE_TO_EMAIL_CATEGORY: Record<string, string> = {
   score_update: 'platform',
   request: 'platform',
   patent_status: 'patents',
+  patent_message: 'patents',
   deal_interest: 'deals',
   startup_launch: 'platform',
   system: 'platform',

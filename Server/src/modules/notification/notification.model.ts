@@ -6,6 +6,7 @@ export type NotificationType =
   | 'chat_invite'
   | 'request'
   | 'patent_status'
+  | 'patent_message'
   | 'deal_interest'
   | 'startup_launch'
   | 'system';
@@ -39,6 +40,7 @@ const notificationSchema = new Schema<INotification>(
         'chat_invite',
         'request',
         'patent_status',
+        'patent_message',
         'deal_interest',
         'startup_launch',
         'system',

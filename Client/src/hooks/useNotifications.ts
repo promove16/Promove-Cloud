@@ -65,7 +65,6 @@ export const useNotifications = () => {
     return () => {
       socket.off('notification:new', handleNotification);
       socket.off('hiring:updated', handleHiringUpdate);
-      socket.disconnect();
     };
   }, [isAuthenticated, queryClient]);
 

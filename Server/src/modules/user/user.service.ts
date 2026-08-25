@@ -18,8 +18,7 @@ import { InstitutionMentorshipProgram } from '../mentor/mentorshipProgram.model'
 import { UserRole } from '../../types/roles.types';
 import { RelevanceBridge } from '../recruiter/relevanceBridge.model';
 import { PlacementRecord } from '../college/placementRecord.model';
-import { NotificationService } from '../notification/notification.service';
-import { io } from '../../config/socket';
+import { queueNotification } from '../notification/notification.delivery';
 import { getStudentCollegeId } from '../recruiter/recruiter.mappers';
 import { sanitizePlainText } from '../../utils/sanitizeText';
 import { applyScore, applyScoreAsync } from '../../services/scoreEngine';
@@ -1472,17 +1471,13 @@ export const launchCurrentUserToRecruiters = async (studentId: string): Promise<
     );
   }
 
-  const notification = await NotificationService.create({
+  await queueNotification({
     userId: studentId,
     type: 'system',
     title: 'Your profile is now visible to all active recruiters',
     body: 'Your profile is now visible to all active recruiters.',
     link: '/leadership-profile',
   });
-
-  if (io) {
-    io.of('/notifications').to(`user:${studentId}`).emit('notification:new', notification);
-  }
 
   return {
     bridgesCreated: recruiters.length,

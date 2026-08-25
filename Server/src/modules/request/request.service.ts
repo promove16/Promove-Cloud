@@ -1008,6 +1008,7 @@ export const withdrawRequest = async (
   });
   await request.save();
   await handlers.get(request.type)?.onWithdraw?.(request, actorUserId);
+  await queueRequestResponseNotification(request, 'withdrawn');
   return mapRequest(request);
 };
 

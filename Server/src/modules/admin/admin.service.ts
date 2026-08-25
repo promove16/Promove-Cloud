@@ -6,7 +6,6 @@ import { ClientSession, Types } from 'mongoose';
 import { logError } from '../../config/logger';
 import { env } from '../../config/env';
 import { redis } from '../../config/redis';
-import { io } from '../../config/socket';
 import { ApiError } from '../../utils/ApiError';
 import { readRedisJson } from '../../utils/redisJson';
 import { sanitizePlainText } from '../../utils/sanitizeText';
@@ -14,6 +13,7 @@ import { applyScore, type ScoreTrigger } from '../../services/scoreEngine';
 import { createPatentSystemDocument } from '../../services/patentSystemDocument';
 import { onPrototypeMilestoneVerified } from '../mentorScore/mentorScore.hooks';
 import { NotificationService } from '../notification/notification.service';
+import { queueNotification } from '../notification/notification.delivery';
 import { Patent } from '../patent/patent.model';
 import { Startup } from '../startup/startup.model';
 import { User } from '../user/user.model';
@@ -383,7 +383,7 @@ const pushNotification = async (
   link?: string,
   metadata?: Record<string, unknown>,
 ) => {
-  const notification = await NotificationService.create({
+  await queueNotification({
     userId,
     type,
     title,
@@ -391,10 +391,6 @@ const pushNotification = async (
     ...(link ? { link } : {}),
     ...(metadata ? { metadata } : {}),
   });
-
-  if (io) {
-    io.of('/notifications').to(`user:${userId}`).emit('notification:new', notification);
-  }
 };
 
 const createAudit = (
