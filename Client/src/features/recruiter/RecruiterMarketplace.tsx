@@ -9,7 +9,6 @@ import {
   Loader2,
   Mail,
   MapPin,
-  MoreHorizontal,
   Pause,
   Play,
   Plus,
@@ -623,39 +622,11 @@ function PostJobRoleModal({
 
 function JobPortalCard({
   job,
-  togglingJobId,
-  deletingJobId,
   onViewJob,
-  onManage,
-  onEdit,
-  onDelete,
-  onToggle,
-  onInviteTalent,
 }: {
   job: RecruiterJobDetail;
-  togglingJobId: string | null;
-  deletingJobId: string | null;
   onViewJob: (jobId: string) => void;
-  onManage: (jobId: string) => void;
-  onEdit: (jobId: string) => void;
-  onDelete: (jobId: string) => void;
-  onToggle: (jobId: string, isActive: boolean) => void;
-  onInviteTalent: () => void;
 }) {
-  const isToggling = togglingJobId === job._id;
-  const [isDropdownOpen, setIsDropdownOpen] = useState(false);
-  const dropdownRef = useRef<HTMLDivElement>(null);
-
-  useEffect(() => {
-    const handleClickOutside = (event: MouseEvent) => {
-      if (dropdownRef.current && !dropdownRef.current.contains(event.target as Node)) {
-        setIsDropdownOpen(false);
-      }
-    };
-    document.addEventListener('mousedown', handleClickOutside);
-    return () => document.removeEventListener('mousedown', handleClickOutside);
-  }, []);
-
   return (
     <article
       role="button"
@@ -667,9 +638,7 @@ function JobPortalCard({
           onViewJob(job._id);
         }
       }}
-      className={`group relative flex cursor-pointer flex-col gap-4 rounded-2xl border border-slate-800 bg-slate-900 p-5 transition-all duration-200 hover:-translate-y-0.5 hover:border-cyan-500/50 hover:bg-slate-900/90 hover:shadow-lg hover:shadow-cyan-500/5 focus:outline-none focus:ring-2 focus:ring-cyan-400/50 ${
-        isDropdownOpen ? 'z-30' : 'hover:z-10'
-      }`}
+      className="group relative flex cursor-pointer flex-col gap-4 rounded-2xl border border-slate-800 bg-slate-900 p-5 transition-all duration-200 hover:-translate-y-0.5 hover:border-cyan-500/50 hover:bg-slate-900/90 hover:shadow-lg hover:shadow-cyan-500/5 focus:outline-none focus:ring-2 focus:ring-cyan-400/50"
     >
       {/* Title + status */}
       <div className="flex items-start justify-between gap-3">
@@ -730,100 +699,6 @@ function JobPortalCard({
       {job.description ? (
         <p className="line-clamp-2 text-sm leading-6 text-slate-400">{job.description}</p>
       ) : null}
-
-      {/* Actions */}
-      <div className="flex items-center justify-between gap-2 border-t border-slate-800 pt-3">
-        <button
-          type="button"
-          onClick={(e) => {
-            e.stopPropagation();
-            onManage(job._id);
-          }}
-          className={primaryButtonClass}
-        >
-          <BriefcaseBusiness className="h-4 w-4" />
-          Manage Applications
-        </button>
-
-        <div className="relative" ref={dropdownRef}>
-          <button
-            type="button"
-            onClick={(e) => {
-              e.stopPropagation();
-              setIsDropdownOpen((prev) => !prev);
-            }}
-            className="flex h-9 w-9 items-center justify-center rounded-lg border border-slate-800 bg-slate-950 text-slate-400 transition-colors hover:border-slate-700 hover:text-white hover:bg-slate-800/50"
-            aria-label="More options"
-            aria-expanded={isDropdownOpen}
-            aria-haspopup="true"
-          >
-            <MoreHorizontal className="h-5 w-5" />
-          </button>
-
-          {isDropdownOpen && (
-            <>
-              <div
-                className="fixed inset-0 z-40"
-                onClick={() => setIsDropdownOpen(false)}
-                aria-hidden="true"
-              />
-              <div className="absolute right-0 z-50 mt-2 w-48 origin-top-right rounded-xl border border-slate-800 bg-slate-950 py-1.5 shadow-xl shadow-black/70 animate-in fade-in-0 zoom-in-95" role="menu">
-                <button
-                  type="button"
-                  onClick={() => {
-                    onEdit(job._id);
-                    setIsDropdownOpen(false);
-                  }}
-                  className="flex w-full items-center gap-3 px-3 py-2 text-left text-sm text-slate-300 hover:bg-slate-800/50"
-                  role="menuitem"
-                >
-                  <Edit className="h-4 w-4 shrink-0" />
-                  <span>Edit Job</span>
-                </button>
-                <button
-                  type="button"
-                  onClick={() => {
-                    onInviteTalent();
-                    setIsDropdownOpen(false);
-                  }}
-                  className="flex w-full items-center gap-3 px-3 py-2 text-left text-sm text-slate-300 hover:bg-slate-800/50"
-                  role="menuitem"
-                >
-                  <Users className="h-4 w-4 shrink-0" />
-                  <span>Invite Talent</span>
-                </button>
-                <button
-                  type="button"
-                  onClick={() => {
-                    onToggle(job._id, job.isActive);
-                    setIsDropdownOpen(false);
-                  }}
-                  disabled={isToggling}
-                  className="flex w-full items-center gap-3 px-3 py-2 text-left text-sm text-slate-300 hover:bg-slate-800/50 disabled:opacity-50 disabled:cursor-not-allowed"
-                  role="menuitem"
-                >
-                  {job.isActive ? <Pause className="h-4 w-4 shrink-0" /> : <Play className="h-4 w-4 shrink-0" />}
-                  <span>{job.isActive ? "Pause Job" : "Activate Job"}</span>
-                </button>
-                <hr className="my-1.5 border-slate-800" />
-                <button
-                  type="button"
-                  onClick={() => {
-                    onDelete(job._id);
-                    setIsDropdownOpen(false);
-                  }}
-                  disabled={deletingJobId === job._id}
-                  className="flex w-full items-center gap-3 px-3 py-2 text-left text-sm text-rose-300 hover:bg-rose-500/10 disabled:opacity-50 disabled:cursor-not-allowed"
-                  role="menuitem"
-                >
-                  <Trash2 className="h-4 w-4 shrink-0" />
-                  <span>{deletingJobId === job._id ? "Deleting..." : "Delete Job"}</span>
-                </button>
-              </div>
-            </>
-          )}
-        </div>
-      </div>
     </article>
   );
 }
@@ -873,6 +748,32 @@ export function RecruiterMarketplace({ dashboardRole: _dashboardRole }: { dashbo
   const jobs = jobsQuery.data ?? [];
   const activeJobs = useMemo(() => jobs.filter((job) => job.isActive), [jobs]);
   const students = studentsQuery.data?.items ?? [];
+
+  const editJobIdParam = searchParams.get("editJobId");
+
+  useEffect(() => {
+    if (editJobIdParam) {
+      const job = jobs.find((j) => j._id === editJobIdParam);
+      if (job) {
+        setEditJobForm({
+          title: job.title,
+          company: job.company,
+          description: job.description,
+          domain: job.domain,
+          type: job.type,
+          location: job.location,
+          workMode: job.workMode ?? "On-site",
+          minimumInnovationScore: String(job.minimumInnovationScore),
+          openings: job.openings ? String(job.openings) : "",
+        });
+        setEditingJobId(editJobIdParam);
+        setEditJobFormError(null);
+      }
+      const params = new URLSearchParams(searchParams);
+      params.delete("editJobId");
+      setSearchParams(params, { replace: true });
+    }
+  }, [editJobIdParam, jobs, searchParams, setSearchParams]);
 
   const jobStats = useMemo(
     () => ({
@@ -1308,14 +1209,7 @@ export function RecruiterMarketplace({ dashboardRole: _dashboardRole }: { dashbo
                   <JobPortalCard
                     key={job._id}
                     job={job}
-                    togglingJobId={togglingJobId}
-                    deletingJobId={deletingJobId}
                     onViewJob={handleViewJob}
-                    onManage={handleManageJob}
-                    onEdit={handleEditJob}
-                    onDelete={handleDeleteJob}
-                    onToggle={handleToggleJob}
-                    onInviteTalent={handleInviteTalentForJob}
                   />
                 ))}
               </div>
