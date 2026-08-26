@@ -35,7 +35,7 @@ const makeAccessToken = (user: { _id: Types.ObjectId; email: string; role: UserR
   );
 
 describe('Mentor curriculum mapping scoring', () => {
-  it('awards 20 points for the PDF and exactly 20 across all planned class photos', async () => {
+  it('awards 20 points for the PDF and 20 flat points per class photo, capped at 40 total', async () => {
     const [mentor, admin] = await Promise.all([
       createUser(UserRole.MENTOR, 'curriculum-mentor@example.com', 'Curriculum Mentor'),
       createUser(UserRole.ADMIN, 'curriculum-admin@example.com', 'Curriculum Admin'),
@@ -88,8 +88,9 @@ describe('Mentor curriculum mapping scoring', () => {
       classPointAwards.push(approvalResponse.body.data.pointsAwarded as number);
     }
 
-    expect(classPointAwards).toEqual([4, 4, 3, 3, 3, 3]);
-    expect(classPointAwards.reduce((total, points) => total + points, 0)).toBe(20);
+    // Each class photo awards flat 20 pts, but cap is 40 total.
+    // Curriculum (20) + class 1 (20) = 40. Classes 2-6 get capped at 0.
+    expect(classPointAwards).toEqual([20, 0, 0, 0, 0, 0]);
 
     const score = await MentorScore.findOne({ mentorId: mentor._id }).lean();
     expect(score?.phase1Breakdown.curriculumMapping).toBe(40);

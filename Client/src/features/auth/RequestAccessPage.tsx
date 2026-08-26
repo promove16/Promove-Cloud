@@ -297,7 +297,9 @@ export function RequestAccessPage() {
         institutionName: formData.institutionName.trim(),
         location: formData.location.trim(),
         totalStudentsEnrolled: totalStudents,
-        academicYear: formData.academicYear.trim(),
+        academicYear: formData.academicYear
+          .trim()
+          .replace(/\b20\d{3,}\b/g, (m) => `20${m.slice(-2)}`),
         iicStarRating: Number(formData.iicStarRating || "0"),
       }),
     );

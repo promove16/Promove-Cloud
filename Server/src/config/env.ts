@@ -116,6 +116,7 @@ const envSchema = z.object({
     .string()
     .url()
     .default("https://api.groq.com/openai/v1"),
+  MAX_FILE_SIZE_MB: z.coerce.number().int().positive().default(10),
 });
 
 const parsed = envSchema.safeParse(process.env);

@@ -238,6 +238,21 @@ const renderInlineAction = (action?: InstitutionOverviewAction) => {
   );
 };
 
+export const formatDisplayAcademicYear = (val?: string): string => {
+  if (!val || typeof val !== 'string') {
+    const now = new Date();
+    const startYear = now.getMonth() >= 5 ? now.getFullYear() : now.getFullYear() - 1;
+    return `${startYear}-${startYear + 1}`;
+  }
+  const trimmed = val.trim();
+  if (!trimmed || trimmed.toLowerCase() === 'current ay') {
+    const now = new Date();
+    const startYear = now.getMonth() >= 5 ? now.getFullYear() : now.getFullYear() - 1;
+    return `${startYear}-${startYear + 1}`;
+  }
+  return trimmed.replace(/\b20\d{3,}\b/g, (m) => `20${m.slice(-2)}`);
+};
+
 export function InstitutionOverviewDashboard({
   institutionLabel,
   institutionName,
@@ -279,8 +294,9 @@ export function InstitutionOverviewDashboard({
   const totalFrameworks = complianceSummary?.frameworkSummary.total ?? complianceFrameworks.length;
   const pendingFrameworkCount = Math.max(totalFrameworks - onTrackCount, 0);
   const alertCount = complianceSummary?.alertSummary.unread ?? 0;
+  const displayAcademicYear = formatDisplayAcademicYear(academicYear);
   const footerCopy = latestReport
-    ? `Latest report generated on ${formatDate(latestReport.generatedAt)} for ${latestReport.academicYear}.`
+    ? `Latest report generated on ${formatDate(latestReport.generatedAt)} for ${formatDisplayAcademicYear(latestReport.academicYear)}.`
     : 'Upload fresh compliance evidence to unlock the latest audit export.';
 
   return (
@@ -365,7 +381,7 @@ export function InstitutionOverviewDashboard({
 
           <div className="pl-[60px] lg:pl-0">
             <div className="text-right text-[32px] font-semibold leading-none tracking-[-0.06em] text-white">
-              {academicYear}
+              {displayAcademicYear}
             </div>
             <div className="mt-1 text-right text-[11px] uppercase tracking-[0.24em] text-orange-100/70">
               Active year

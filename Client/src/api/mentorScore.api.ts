@@ -96,6 +96,18 @@ export const mentorScoreApi = {
     return res.data.data;
   },
 
+  // ─── Phase 1 Training & Quizzes ──────────────────────────────────────────────
+
+  async completeQuiz(body: { quizId: string; quizPoints: number }) {
+    const res = await api.post<ApiSuccessResponse<{ recorded: boolean }>>('/api/mentor-score/training/quiz', body);
+    return res.data.data;
+  },
+
+  async completeTrainingModule(body: { moduleId: string; modulePoints: number }) {
+    const res = await api.post<ApiSuccessResponse<{ recorded: boolean }>>('/api/mentor-score/training/complete', body);
+    return res.data.data;
+  },
+
   // ─── Phase 1 Submissions ──────────────────────────────────────────────────────
 
   async submitLabSync(body: { photoUrls: string[]; kitDescription: string; labDate: string }) {

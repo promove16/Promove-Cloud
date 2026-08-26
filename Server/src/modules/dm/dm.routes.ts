@@ -1,6 +1,8 @@
 import { Router } from 'express';
 import multer from 'multer';
 import { authenticate } from '../../middleware/authenticate';
+import { withRateLimit, uploadLimiter } from '../../middleware/rateLimiter';
+import { enforceStorageQuota } from '../../middleware/storageQuota';
 import { asyncHandler } from '../../utils/asyncHandler';
 import { ApiError } from '../../utils/ApiError';
 import { listConversations, getThread, sendMessage, getPartnerProfile, markAsRead, uploadAttachment } from './dm.controller';
@@ -24,7 +26,7 @@ const upload = multer({
 router.use(authenticate);
 
 // Upload route must come before /:userId to avoid matching issues
-router.post('/upload', upload.single('file'), asyncHandler(uploadAttachment));
+router.post('/upload', withRateLimit(uploadLimiter), enforceStorageQuota(), upload.single('file'), asyncHandler(uploadAttachment));
 
 router.get('/conversations', asyncHandler(listConversations));
 router.get('/partner/:userId', asyncHandler(getPartnerProfile));

@@ -443,44 +443,88 @@ export function MarketplaceJobDetail() {
 
                   {/* Right: CTA buttons — desktop only */}
                   <div className="hidden shrink-0 flex-col gap-2.5 xl:flex xl:min-w-[180px]">
-                    <Button
-                      className="h-11 w-full rounded-full"
-                      onClick={handleApply}
-                      disabled={isApplyLocked || applyToJob.isPending}
-                    >
-                      <ArrowRight className="mr-2 h-4 w-4" />
-                      {applyLabel}
-                    </Button>
-                    <Button
-                      variant="secondary"
-                      className="h-11 w-full rounded-full border-slate-700 bg-transparent text-slate-200 hover:border-slate-500 hover:bg-slate-900"
-                      onClick={handleMessage}
-                    >
-                      <MessageCircle className="mr-2 h-4 w-4" />
-                      Message
-                    </Button>
-                    {applyError && <p className="text-center text-xs text-rose-300">{applyError}</p>}
+                    {userRole === 'recruiter' ? (
+                      <>
+                        <Button
+                          className="h-11 w-full rounded-full"
+                          onClick={() => navigate(`/dashboard/recruiter/applications?jobId=${job._id}`)}
+                        >
+                          <BriefcaseBusiness className="mr-2 h-4 w-4" />
+                          Manage Applications
+                        </Button>
+                        <Button
+                          variant="secondary"
+                          className="h-11 w-full rounded-full border-slate-700 bg-transparent text-slate-200 hover:border-slate-500 hover:bg-slate-900"
+                          onClick={() => navigate('/marketplace?view=talent')}
+                        >
+                          <Users className="mr-2 h-4 w-4" />
+                          Invite Talent
+                        </Button>
+                      </>
+                    ) : (
+                      <>
+                        <Button
+                          className="h-11 w-full rounded-full"
+                          onClick={handleApply}
+                          disabled={isApplyLocked || applyToJob.isPending}
+                        >
+                          <ArrowRight className="mr-2 h-4 w-4" />
+                          {applyLabel}
+                        </Button>
+                        <Button
+                          variant="secondary"
+                          className="h-11 w-full rounded-full border-slate-700 bg-transparent text-slate-200 hover:border-slate-500 hover:bg-slate-900"
+                          onClick={handleMessage}
+                        >
+                          <MessageCircle className="mr-2 h-4 w-4" />
+                          Message
+                        </Button>
+                        {applyError && <p className="text-center text-xs text-rose-300">{applyError}</p>}
+                      </>
+                    )}
                   </div>
                 </div>
 
                 {/* CTA buttons — mobile */}
                 <div className="relative mt-5 flex gap-3 border-t border-slate-800/60 pt-5 xl:hidden">
-                  <Button
-                    className="h-11 flex-1 rounded-full"
-                    onClick={handleApply}
-                    disabled={isApplyLocked || applyToJob.isPending}
-                  >
-                    <ArrowRight className="mr-2 h-4 w-4" />
-                    {applyLabel}
-                  </Button>
-                  <Button
-                    variant="secondary"
-                    className="h-11 flex-1 rounded-full border-slate-700 bg-transparent text-slate-200 hover:border-slate-500 hover:bg-slate-900"
-                    onClick={handleMessage}
-                  >
-                    <MessageCircle className="mr-2 h-4 w-4" />
-                    Message
-                  </Button>
+                  {userRole === 'recruiter' ? (
+                    <>
+                      <Button
+                        className="h-11 flex-1 rounded-full"
+                        onClick={() => navigate(`/dashboard/recruiter/applications?jobId=${job._id}`)}
+                      >
+                        <BriefcaseBusiness className="mr-2 h-4 w-4" />
+                        Manage Applications
+                      </Button>
+                      <Button
+                        variant="secondary"
+                        className="h-11 flex-1 rounded-full border-slate-700 bg-transparent text-slate-200 hover:border-slate-500 hover:bg-slate-900"
+                        onClick={() => navigate('/marketplace?view=talent')}
+                      >
+                        <Users className="mr-2 h-4 w-4" />
+                        Invite Talent
+                      </Button>
+                    </>
+                  ) : (
+                    <>
+                      <Button
+                        className="h-11 flex-1 rounded-full"
+                        onClick={handleApply}
+                        disabled={isApplyLocked || applyToJob.isPending}
+                      >
+                        <ArrowRight className="mr-2 h-4 w-4" />
+                        {applyLabel}
+                      </Button>
+                      <Button
+                        variant="secondary"
+                        className="h-11 flex-1 rounded-full border-slate-700 bg-transparent text-slate-200 hover:border-slate-500 hover:bg-slate-900"
+                        onClick={handleMessage}
+                      >
+                        <MessageCircle className="mr-2 h-4 w-4" />
+                        Message
+                      </Button>
+                    </>
+                  )}
                 </div>
               </section>
 
@@ -596,22 +640,44 @@ export function MarketplaceJobDetail() {
                     </div>
 
                     <div className="space-y-2.5">
-                      <Button
-                        className="h-11 w-full rounded-full"
-                        onClick={handleApply}
-                        disabled={isApplyLocked || applyToJob.isPending}
-                      >
-                        <ArrowRight className="mr-2 h-4 w-4" />
-                        {applyLabel}
-                      </Button>
-                      <Button
-                        variant="secondary"
-                        className="h-11 w-full rounded-full border-slate-700 bg-transparent text-slate-200 hover:border-slate-500 hover:bg-slate-900"
-                        onClick={handleMessage}
-                      >
-                        <MessageCircle className="mr-2 h-4 w-4" />
-                        Message Recruiter
-                      </Button>
+                      {userRole === 'recruiter' ? (
+                        <>
+                          <Button
+                            className="h-11 w-full rounded-full"
+                            onClick={() => navigate(`/dashboard/recruiter/applications?jobId=${job._id}`)}
+                          >
+                            <BriefcaseBusiness className="mr-2 h-4 w-4" />
+                            Manage Applications
+                          </Button>
+                          <Button
+                            variant="secondary"
+                            className="h-11 w-full rounded-full border-slate-700 bg-transparent text-slate-200 hover:border-slate-500 hover:bg-slate-900"
+                            onClick={() => navigate('/marketplace?view=talent')}
+                          >
+                            <Users className="mr-2 h-4 w-4" />
+                            Invite Talent
+                          </Button>
+                        </>
+                      ) : (
+                        <>
+                          <Button
+                            className="h-11 w-full rounded-full"
+                            onClick={handleApply}
+                            disabled={isApplyLocked || applyToJob.isPending}
+                          >
+                            <ArrowRight className="mr-2 h-4 w-4" />
+                            {applyLabel}
+                          </Button>
+                          <Button
+                            variant="secondary"
+                            className="h-11 w-full rounded-full border-slate-700 bg-transparent text-slate-200 hover:border-slate-500 hover:bg-slate-900"
+                            onClick={handleMessage}
+                          >
+                            <MessageCircle className="mr-2 h-4 w-4" />
+                            Message Recruiter
+                          </Button>
+                        </>
+                      )}
                     </div>
 
                     {applyError && <p className="mt-3 text-sm text-rose-300">{applyError}</p>}

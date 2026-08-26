@@ -191,7 +191,11 @@ export function GlobalSmartChat() {
   }
 
   return (
-    <div className="pointer-events-none fixed bottom-5 right-4 z-50 flex items-end justify-end">
+    <div
+      className={`pointer-events-none fixed bottom-5 right-4 ${
+        isOpen ? 'z-50' : 'z-40'
+      } flex items-end justify-end`}
+    >
       {isOpen ? (
         <div className="pointer-events-auto flex w-[calc(100vw-2rem)] max-w-[360px] flex-col overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-xl dark:border-white/10 dark:bg-slate-950">
           <header className="flex items-center justify-between border-b border-slate-100 px-4 py-3 dark:border-white/5">

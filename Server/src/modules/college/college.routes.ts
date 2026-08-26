@@ -3,6 +3,8 @@ import multer from 'multer';
 import { authenticate } from '../../middleware/authenticate';
 import { authorize } from '../../middleware/authorize';
 import { connectionGuard } from '../../middleware/connectionGuard';
+import { withRateLimit, uploadLimiter } from '../../middleware/rateLimiter';
+import { enforceStorageQuota } from '../../middleware/storageQuota';
 import { UserRole } from '../../types/roles.types';
 import { asyncHandler } from '../../utils/asyncHandler';
 import {
@@ -133,6 +135,8 @@ router.post(
 router.post(
   '/compliance/evidence',
   authorize(UserRole.COLLEGE),
+  withRateLimit(uploadLimiter),
+  enforceStorageQuota(),
   complianceEvidenceUpload.single('file'),
   asyncHandler(uploadCollegeComplianceEvidenceController),
 );

@@ -21,7 +21,7 @@ import {
   VerificationTaskStatus,
 } from './mentorScore.types';
 import { getPhaseForTrigger as _getPhase } from './mentorScore.service';
-import { CURRICULUM_PDF_POINTS, getClassPhotoPoints } from './mentorScore.curriculum';
+import { CURRICULUM_PDF_POINTS, CURRICULUM_CLASS_PHOTO_POINTS } from './mentorScore.curriculum';
 
 // ─── Verification Queue ───────────────────────────────────────────────────────
 
@@ -91,7 +91,7 @@ export const approveVerificationTask = async (req: Request, res: Response) => {
         'Class photo must reference a valid approved curriculum and planned class index',
       );
     }
-    defaultPoints = getClassPhotoPoints(plannedClasses, classIndex);
+    defaultPoints = CURRICULUM_CLASS_PHOTO_POINTS;
   }
 
   const finalPoints = (typeof pointsOverride === 'number' && pointsOverride >= 0)
@@ -121,7 +121,7 @@ export const approveVerificationTask = async (req: Request, res: Response) => {
       ? `prototype:${String(task.submissionData.studentId ?? '')}:${task.mentorId}`
       : `task_approved:${task._id}`;
 
-  const newTotal = await awardMentorPoints({
+  const { newTotal, actualDelta } = await awardMentorPoints({
     mentorId:       task.mentorId,
     trigger,
     delta:          finalPoints,
@@ -131,7 +131,7 @@ export const approveVerificationTask = async (req: Request, res: Response) => {
   });
 
   task.status     = 'approved';
-  task.pointsToAward = finalPoints;
+  task.pointsToAward = actualDelta;
   task.reviewedBy = new Types.ObjectId(String(req.user._id));
   task.reviewedAt = new Date();
   await task.save();
@@ -141,10 +141,10 @@ export const approveVerificationTask = async (req: Request, res: Response) => {
     action:      'AWARD_APPROVED',
     targetId:    task._id,
     targetModel: 'MentorVerificationTask',
-    metadata:    { mentorId: task.mentorId, pointsAwarded: finalPoints, trigger },
+    metadata:    { mentorId: task.mentorId, pointsAwarded: actualDelta, trigger },
   });
 
-  res.json(new ApiResponse({ task, newTotal, pointsAwarded: finalPoints }));
+  res.json(new ApiResponse({ task, newTotal, pointsAwarded: actualDelta }));
 };
 
 export const rejectVerificationTask = async (req: Request, res: Response) => {
@@ -259,7 +259,7 @@ export const adminAdjustMentorScore = async (req: Request, res: Response) => {
   }
 
   const key = `admin_adjust:${mentorId}:${Date.now()}`;
-  const newTotal = await awardMentorPoints({
+  const { newTotal } = await awardMentorPoints({
     mentorId,
     trigger:        MentorScoreTrigger.ADMIN_ADJUSTMENT,
     delta:          Number(delta),
@@ -290,7 +290,7 @@ export const awardContentCreatorBonus = async (req: Request, res: Response) => {
     throw new ApiError(400, 'INVALID_POINTS', 'Points must be between 1 and 50');
   }
 
-  const newTotal = await awardMentorPoints({
+  const { newTotal, actualDelta } = await awardMentorPoints({
     mentorId,
     trigger:        MentorScoreTrigger.CONTENT_CREATOR_BONUS,
     delta:          points,
@@ -299,7 +299,7 @@ export const awardContentCreatorBonus = async (req: Request, res: Response) => {
     metadata:       { points, reason, adminId: String(req.user._id) },
   });
 
-  res.json(new ApiResponse({ mentorId, pointsAwarded: points, newTotal }));
+  res.json(new ApiResponse({ mentorId, pointsAwarded: actualDelta, newTotal }));
 };
 
 // ─── Outcome Bonus ────────────────────────────────────────────────────────────
@@ -318,7 +318,7 @@ export const awardOutcomeBonus = async (req: Request, res: Response) => {
     throw new ApiError(400, 'MISSING_FIELDS', 'mentorId, studentId, and achievementType are required');
   }
 
-  const newTotal = await awardMentorPoints({
+  const { newTotal, actualDelta } = await awardMentorPoints({
     mentorId,
     trigger:        MentorScoreTrigger.MENTEE_OUTCOME_BONUS,
     delta:          50,
@@ -327,7 +327,7 @@ export const awardOutcomeBonus = async (req: Request, res: Response) => {
     metadata:       { studentId, achievementType, evidenceUrl, adminId: String(req.user._id) },
   });
 
-  res.json(new ApiResponse({ mentorId, studentId, achievementType, pointsAwarded: 50, newTotal }));
+  res.json(new ApiResponse({ mentorId, studentId, achievementType, pointsAwarded: actualDelta, newTotal }));
 };
 
 // ─── LOI Record (Equity Mentorship) ──────────────────────────────────────────
@@ -345,7 +345,7 @@ export const recordEquityLOI = async (req: Request, res: Response) => {
     throw new ApiError(400, 'MISSING_FIELDS', 'mentorId and bidId are required');
   }
 
-  const newTotal = await awardMentorPoints({
+  const { newTotal, actualDelta } = await awardMentorPoints({
     mentorId,
     trigger:        MentorScoreTrigger.EQUITY_LOI_SIGNED,
     delta:          15,
@@ -354,7 +354,7 @@ export const recordEquityLOI = async (req: Request, res: Response) => {
     metadata:       { bidId, adminId: String(req.user._id), note },
   });
 
-  res.json(new ApiResponse({ mentorId, bidId, newTotal, pointsAwarded: 15 }));
+  res.json(new ApiResponse({ mentorId, bidId, newTotal, pointsAwarded: actualDelta }));
 };
 
 // ─── Maintenance ──────────────────────────────────────────────────────────────

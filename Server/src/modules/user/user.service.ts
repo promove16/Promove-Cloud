@@ -1539,7 +1539,8 @@ const applyInstitutionProfilePatch = (
     institutionName: sanitizePlainText(patch.institutionName ?? current?.institutionName ?? ''),
     location: sanitizePlainText(patch.location ?? current?.location ?? ''),
     totalStudentsEnrolled: patch.totalStudentsEnrolled ?? current?.totalStudentsEnrolled ?? 0,
-    academicYear: sanitizePlainText(patch.academicYear ?? current?.academicYear ?? ''),
+    academicYear: sanitizePlainText(patch.academicYear ?? current?.academicYear ?? '')
+      .replace(/\b20\d{3,}\b/g, (m) => `20${m.slice(-2)}`),
     iicStarRating: patch.iicStarRating ?? current?.iicStarRating ?? 0,
     ...(current?.iicLastUpdated ? { iicLastUpdated: current.iicLastUpdated } : {}),
     ...(patch.organizationType !== undefined

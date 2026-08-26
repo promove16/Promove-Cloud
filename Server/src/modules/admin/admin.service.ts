@@ -2500,7 +2500,9 @@ export const createOnboardedAccount = async (
           : displayName,
         location: profile.location ? sanitizePlainText(profile.location) : 'India',
         totalStudentsEnrolled: profile.totalStudentsEnrolled ?? 0,
-        academicYear: profile.academicYear ?? buildCurrentAcademicYear(),
+        academicYear: profile.academicYear
+          ? sanitizePlainText(profile.academicYear).replace(/\b20\d{3,}\b/g, (m) => `20${m.slice(-2)}`)
+          : buildCurrentAcademicYear(),
         iicStarRating: 0,
         ...(profile.organizationType
           ? { organizationType: sanitizePlainText(profile.organizationType) }

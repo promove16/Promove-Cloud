@@ -1,37 +1,36 @@
 node_modules/
+dist/
 .env
 coverage/
 *.log
+
+# Generated / temp directories
 logs/
-scripts/
-dist/
-temp/
-docs/docs/
-.tmp-*.json
-.postman/
-.playwright-mcp
-postman/
 output/
 test-results/
-docs/
-output/playwright/
-scripts/manual-tests/
-Server/scripts/
-Server/dist/
-Server/deleteUser.js
-Client/dist/
-Client/guidelines/
-Client/ATTRIBUTIONS.md
-.playwright-cli/
-# One-off test scripts and results
-Server/scripts/verify-*.mjs
-Server/scripts/phase*-output.txt
-Server/scripts/phase*-results.json
+temp/
+.tmp-*.json
 
-# Raw PRD extract scratchpads
-docs/*.txt
-infra/
-.codex-logs
-generate-local-env.js
-dump.rdb
+# Dev tool artifacts
+.codex-logs/
+.playwright-cli/
+.playwright-mcp/
+.postman/
 .claude/
+
+# Scratch / one-time files
+dump.rdb
+generate-local-env.js
+Server/test_upload.js
+Server/test_local.js
+Server/src/tests/
+scripts/manual-tests/
+scripts/multi-agent/
+
+# Generated docs / assets
+docs/
+ProMove.postman_collection.json
+ProMove.postman_environment.json
+
+# Infra (deploy configs, not source)
+infra/

@@ -93,11 +93,16 @@ const getPhaseCap = (
  * The single gateway for all mentor point mutations.
  * Every award — positive or negative — flows through here.
  */
-export const awardMentorPoints = async (params: AwardPointsParams): Promise<number> => {
+export interface AwardPointsResult {
+  newTotal: number;
+  actualDelta: number;
+}
+
+export const awardMentorPoints = async (params: AwardPointsParams): Promise<AwardPointsResult> => {
   const { trigger, delta, phase, idempotencyKey, metadata } = params;
   const mentorId = String(params.mentorId);
 
-  if (delta === 0) return 0;
+  if (delta === 0) return { newTotal: 0, actualDelta: 0 };
 
   let result: { awarded: boolean; newTotal: number; actualDelta: number };
 
@@ -173,12 +178,12 @@ export const awardMentorPoints = async (params: AwardPointsParams): Promise<numb
   } catch (err) {
     if (isDuplicateKeyError(err)) {
       const doc = await MentorScore.findOne({ mentorId }).select('totalScore').lean();
-      return doc?.totalScore ?? 0;
+      return { newTotal: doc?.totalScore ?? 0, actualDelta: 0 };
     }
     throw err;
   }
 
-  if (!result.awarded) return result.newTotal;
+  if (!result.awarded) return { newTotal: result.newTotal, actualDelta: 0 };
 
   // ⑥ Invalidate Redis cache
   await redis.del(cacheKey(mentorId));
@@ -197,7 +202,7 @@ export const awardMentorPoints = async (params: AwardPointsParams): Promise<numb
     });
   }
 
-  return result.newTotal;
+  return { newTotal: result.newTotal, actualDelta: result.actualDelta };
 };
 
 // ─── Score Retrieval ──────────────────────────────────────────────────────────

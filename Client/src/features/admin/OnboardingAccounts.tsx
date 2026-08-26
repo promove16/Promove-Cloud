@@ -314,7 +314,13 @@ function InstitutionOnboardingForm({ role }: { role: UserRole.SCHOOL | UserRole.
         ...(form.institutionName.trim() ? { institutionName: form.institutionName.trim() } : {}),
         location: form.location.trim(),
         ...(Number.isFinite(enrolled) ? { totalStudentsEnrolled: enrolled } : {}),
-        ...(form.academicYear.trim() ? { academicYear: form.academicYear.trim() } : {}),
+        ...(form.academicYear.trim()
+          ? {
+              academicYear: form.academicYear
+                .trim()
+                .replace(/\b20\d{3,}\b/g, (m) => `20${m.slice(-2)}`),
+            }
+          : {}),
         ...(form.organizationType.trim() ? { organizationType: form.organizationType.trim() } : {}),
         ...(form.contactPhone.trim() ? { contactPhone: form.contactPhone.trim() } : {}),
       },

@@ -612,12 +612,14 @@ function PostJobRoleModal({
 function JobPortalCard({
   job,
   togglingJobId,
+  onViewJob,
   onManage,
   onToggle,
   onInviteTalent,
 }: {
   job: RecruiterJobDetail;
   togglingJobId: string | null;
+  onViewJob: (jobId: string) => void;
   onManage: (jobId: string) => void;
   onToggle: (jobId: string, isActive: boolean) => void;
   onInviteTalent: () => void;
@@ -625,11 +627,24 @@ function JobPortalCard({
   const isToggling = togglingJobId === job._id;
 
   return (
-    <article className="flex flex-col gap-4 rounded-2xl border border-slate-800 bg-slate-900 p-5 transition hover:border-slate-700">
+    <article
+      role="button"
+      tabIndex={0}
+      onClick={() => onViewJob(job._id)}
+      onKeyDown={(e) => {
+        if (e.key === "Enter" || e.key === " ") {
+          e.preventDefault();
+          onViewJob(job._id);
+        }
+      }}
+      className="group relative flex cursor-pointer flex-col gap-4 rounded-2xl border border-slate-800 bg-slate-900 p-5 transition-all duration-200 hover:-translate-y-0.5 hover:border-cyan-500/50 hover:bg-slate-900/90 hover:shadow-lg hover:shadow-cyan-500/5 focus:outline-none focus:ring-2 focus:ring-cyan-400/50"
+    >
       {/* Title + status */}
       <div className="flex items-start justify-between gap-3">
         <div className="min-w-0">
-          <h3 className="text-lg font-semibold leading-snug text-white">{job.title}</h3>
+          <h3 className="text-lg font-semibold leading-snug text-white transition-colors group-hover:text-cyan-300">
+            {job.title}
+          </h3>
           <p className="mt-0.5 text-sm text-slate-400">{job.company}</p>
         </div>
         <span
@@ -686,17 +701,34 @@ function JobPortalCard({
 
       {/* Actions */}
       <div className="flex flex-wrap items-center gap-2 border-t border-slate-800 pt-3">
-        <button type="button" onClick={() => onManage(job._id)} className={primaryButtonClass}>
+        <button
+          type="button"
+          onClick={(e) => {
+            e.stopPropagation();
+            onManage(job._id);
+          }}
+          className={primaryButtonClass}
+        >
           <BriefcaseBusiness className="h-4 w-4" />
           Manage Applications
         </button>
-        <button type="button" onClick={onInviteTalent} className={secondaryButtonClass}>
+        <button
+          type="button"
+          onClick={(e) => {
+            e.stopPropagation();
+            onInviteTalent();
+          }}
+          className={secondaryButtonClass}
+        >
           <Users className="h-4 w-4" />
           Invite Talent
         </button>
         <button
           type="button"
-          onClick={() => onToggle(job._id, job.isActive)}
+          onClick={(e) => {
+            e.stopPropagation();
+            onToggle(job._id, job.isActive);
+          }}
           disabled={isToggling}
           className={`${secondaryButtonClass} ml-auto`}
           title={job.isActive ? "Pause this job posting" : "Reactivate this job posting"}
@@ -969,6 +1001,10 @@ export function RecruiterMarketplace({ dashboardRole: _dashboardRole }: { dashbo
     toggleJobMutation.mutate({ jobId, isActive: !isActive });
   };
 
+  const handleViewJob = (jobId: string) => {
+    navigate(`/marketplace/jobs/${jobId}`);
+  };
+
   const handleManageJob = (jobId: string) => {
     navigate(`/dashboard/recruiter/applications?jobId=${jobId}`);
   };
@@ -1093,6 +1129,7 @@ export function RecruiterMarketplace({ dashboardRole: _dashboardRole }: { dashbo
                     key={job._id}
                     job={job}
                     togglingJobId={togglingJobId}
+                    onViewJob={handleViewJob}
                     onManage={handleManageJob}
                     onToggle={handleToggleJob}
                     onInviteTalent={handleInviteTalentForJob}

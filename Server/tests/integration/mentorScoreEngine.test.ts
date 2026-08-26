@@ -97,7 +97,7 @@ describe('Mentor Score Engine', () => {
     const mentorId = String(mentor._id);
 
     // 1. Award Phase 1: Lab Sync (+40 pts)
-    const total1 = await awardMentorPoints({
+    const { newTotal: total1 } = await awardMentorPoints({
       mentorId,
       trigger: MentorScoreTrigger.LAB_HARDWARE_VERIFIED,
       delta: 40,
@@ -107,7 +107,7 @@ describe('Mentor Score Engine', () => {
     expect(total1).toBe(40);
 
     // 2. Award Phase 1: Curriculum Approved (+40 pts)
-    const total2 = await awardMentorPoints({
+    const { newTotal: total2 } = await awardMentorPoints({
       mentorId,
       trigger: MentorScoreTrigger.CURRICULUM_APPROVED,
       delta: 40,
@@ -118,7 +118,7 @@ describe('Mentor Score Engine', () => {
 
     // 3. Award Phase 1: Training Module Completed (+60 pts) - Phase 1 limit is 140.
     // Total is 80. Limit is 140, so remaining is 60. Let's award 70 points. It should cap at 60.
-    const total3 = await awardMentorPoints({
+    const { newTotal: total3 } = await awardMentorPoints({
       mentorId,
       trigger: MentorScoreTrigger.TRAINING_MODULE_COMPLETED,
       delta: 70,
@@ -134,7 +134,7 @@ describe('Mentor Score Engine', () => {
     expect(score?.phase1Breakdown.curriculumMapping).toBe(40);
 
     // 4. Award Phase 2: Demo Day (+50 pts)
-    const total4 = await awardMentorPoints({
+    const { newTotal: total4 } = await awardMentorPoints({
       mentorId,
       trigger: MentorScoreTrigger.DEMO_DAY_VERIFIED,
       delta: 50,
@@ -148,7 +148,7 @@ describe('Mentor Score Engine', () => {
     const mentor = await createMentorUser('mentor2@example.com', 'Dr. Jones');
     const mentorId = String(mentor._id);
 
-    const score1 = await awardMentorPoints({
+    const { newTotal: score1 } = await awardMentorPoints({
       mentorId,
       trigger: MentorScoreTrigger.LAB_HARDWARE_VERIFIED,
       delta: 40,
@@ -156,7 +156,7 @@ describe('Mentor Score Engine', () => {
       idempotencyKey: 'idemp-unique-123',
     });
 
-    const score2 = await awardMentorPoints({
+    const { newTotal: score2 } = await awardMentorPoints({
       mentorId,
       trigger: MentorScoreTrigger.LAB_HARDWARE_VERIFIED,
       delta: 40,

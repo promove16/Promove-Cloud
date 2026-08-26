@@ -46,6 +46,7 @@ const createFixedWindowLimiter = (prefix: string, maxRequests: number, windowSec
 export const authLimiter = createFixedWindowLimiter('rl:auth', 10, 15 * 60);
 export const apiLimiter = createFixedWindowLimiter('rl:api', 100, 60);
 export const writeLimiter = createFixedWindowLimiter('rl:write', 30, 60);
+export const uploadLimiter = createFixedWindowLimiter('rl:upload', 20, 60);
 
 // Prefer authenticated user ID so campus NATs / shared IPs do not bleed limits
 // across users. Falls back to req.ip (Express resolves this correctly via

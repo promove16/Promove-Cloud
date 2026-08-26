@@ -11,9 +11,31 @@ import { User } from '../user/user.model';
 import { UserRole } from '../../types/roles.types';
 import { MentorScore } from './mentorScore.model';
 import { onTrainingModuleCompleted, onQuizPassed } from './mentorScore.hooks';
-import { CURRICULUM_PDF_POINTS, getClassPhotoPoints } from './mentorScore.curriculum';
+import { CURRICULUM_PDF_POINTS, CURRICULUM_CLASS_PHOTO_POINTS } from './mentorScore.curriculum';
 
 const PROTOTYPE_POINTS_PER_STUDENT = 10;
+
+const MAX_PHOTO_URLS = 10;
+const isValidHttpUrl = (url: string): boolean => {
+  try {
+    const parsed = new URL(url);
+    return parsed.protocol === 'http:' || parsed.protocol === 'https:';
+  } catch {
+    return false;
+  }
+};
+
+const validatePhotoUrls = (photoUrls: string[] | undefined, label: string): string[] => {
+  if (!photoUrls?.length) throw new ApiError(400, 'PHOTOS_REQUIRED', `At least one ${label} is required`);
+  if (photoUrls.length > MAX_PHOTO_URLS) {
+    throw new ApiError(400, 'TOO_MANY_PHOTOS', `${label} cannot exceed ${MAX_PHOTO_URLS} items`);
+  }
+  const invalid = photoUrls.find((url) => typeof url !== 'string' || !url.trim() || !isValidHttpUrl(url));
+  if (invalid) {
+    throw new ApiError(400, 'INVALID_PHOTO_URL', `Each ${label} must be a valid HTTP(S) URL`);
+  }
+  return photoUrls.map((u) => u.trim());
+};
 
 // ─── My Score Dashboard ───────────────────────────────────────────────────────
 
@@ -93,15 +115,13 @@ export const completeQuiz = async (req: Request, res: Response) => {
 export const submitLabSync = async (req: Request, res: Response) => {
   if (!req.user) throw new ApiError(401, 'UNAUTHORIZED', 'Not authenticated');
 
-  const { photoUrls, kitDescription, labDate } = req.body as {
+  const { photoUrls: rawPhotoUrls, kitDescription, labDate } = req.body as {
     photoUrls:      string[];
     kitDescription: string;
     labDate:        string;
   };
 
-  if (!photoUrls?.length) {
-    throw new ApiError(400, 'PHOTOS_REQUIRED', 'At least one photo URL is required');
-  }
+  const photoUrls = validatePhotoUrls(rawPhotoUrls, 'photo');
 
   const todayStr = new Date().toISOString().split('T')[0];
   if (labDate && labDate > todayStr) {
@@ -196,7 +216,7 @@ export const submitCurriculumPdf = async (req: Request, res: Response) => {
 export const submitClassPhoto = async (req: Request, res: Response) => {
   if (!req.user) throw new ApiError(401, 'UNAUTHORIZED', 'Not authenticated');
 
-  const { photoUrls, curriculumTaskId, classIndex, classDate, topic } = req.body as {
+  const { photoUrls: rawPhotoUrls, curriculumTaskId, classIndex, classDate, topic } = req.body as {
     photoUrls:      string[];
     curriculumTaskId: string;
     classIndex:     number;
@@ -204,7 +224,7 @@ export const submitClassPhoto = async (req: Request, res: Response) => {
     topic:          string;
   };
 
-  if (!photoUrls?.length) throw new ApiError(400, 'PHOTOS_REQUIRED', 'At least one photo is required');
+  const photoUrls = validatePhotoUrls(rawPhotoUrls, 'photo');
   if (!curriculumTaskId)  throw new ApiError(400, 'CURRICULUM_REQUIRED', 'curriculumTaskId is required');
   if (!Number.isInteger(classIndex) || classIndex < 1) {
     throw new ApiError(400, 'INVALID_CLASS_INDEX', 'classIndex must be a positive integer');
@@ -234,7 +254,7 @@ export const submitClassPhoto = async (req: Request, res: Response) => {
       `classIndex cannot exceed the ${plannedClasses} planned classes`,
     );
   }
-  const pointsPerClass = getClassPhotoPoints(plannedClasses, classIndex);
+  const pointsPerClass = CURRICULUM_CLASS_PHOTO_POINTS;
 
   const duplicate = await MentorVerificationTask.findOne({
     mentorId: req.user._id,
@@ -279,7 +299,7 @@ export const submitClassPhoto = async (req: Request, res: Response) => {
 export const submitPrototypeVelocity = async (req: Request, res: Response) => {
   if (!req.user) throw new ApiError(401, 'UNAUTHORIZED', 'Not authenticated');
 
-  const { studentId, projectTitle, stage, photoUrls } = req.body as {
+  const { studentId, projectTitle, stage, photoUrls: rawPhotoUrls } = req.body as {
     studentId:    string;
     projectTitle: string;
     stage:        string;
@@ -288,7 +308,7 @@ export const submitPrototypeVelocity = async (req: Request, res: Response) => {
 
   if (!studentId) throw new ApiError(400, 'STUDENT_REQUIRED', 'studentId is required');
   if (!projectTitle) throw new ApiError(400, 'PROJECT_REQUIRED', 'projectTitle is required');
-  if (!photoUrls?.length) throw new ApiError(400, 'PHOTOS_REQUIRED', 'At least one photo URL is required');
+  const photoUrls = validatePhotoUrls(rawPhotoUrls, 'photo');
 
   if (!Types.ObjectId.isValid(studentId)) {
     throw new ApiError(400, 'INVALID_STUDENT_ID', 'Invalid studentId format');
@@ -424,7 +444,7 @@ export const endSessionToken = async (req: Request, res: Response) => {
   await session.save();
 
   if (sessionPoints > 0) {
-    await awardMentorPoints({
+    const { actualDelta } = await awardMentorPoints({
       mentorId:       session.mentorId,
       trigger:        MentorScoreTrigger.SESSION_TOKEN_RELEASED,
       delta:          sessionPoints,
@@ -432,9 +452,10 @@ export const endSessionToken = async (req: Request, res: Response) => {
       idempotencyKey: `session_token:${sessionId}`,
       metadata:       { sessionId, studentId: String(req.user._id), durationMinutes: session.durationMinutes },
     });
+    return res.json(new ApiResponse({ released: true, pointsAwarded: actualDelta }));
   }
 
-  res.json(new ApiResponse({ released: true, pointsAwarded: sessionPoints }));
+  res.json(new ApiResponse({ released: true, pointsAwarded: 0 }));
 };
 
 // ─── Session Rating (student rates mentor after token release) ────────────────

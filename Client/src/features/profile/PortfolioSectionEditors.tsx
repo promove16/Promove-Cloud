@@ -1282,7 +1282,9 @@ function InstitutionProfileEditor({
         const payload: UpdateUserProfilePayload["institutionProfile"] = {
           institutionName: institutionName.trim(),
           location: location.trim(),
-          academicYear: academicYear.trim(),
+          academicYear: academicYear
+            .trim()
+            .replace(/\b20\d{3,}\b/g, (m) => `20${m.slice(-2)}`),
           organizationType: organizationType.trim(),
           specialties: fromMultiline(specialties),
           locations: fromMultiline(locations),

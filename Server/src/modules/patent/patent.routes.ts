@@ -2,6 +2,8 @@ import multer from 'multer';
 import { Router } from 'express';
 import { authenticate } from '../../middleware/authenticate';
 import { authorize } from '../../middleware/authorize';
+import { withRateLimit, uploadLimiter } from '../../middleware/rateLimiter';
+import { enforceStorageQuota } from '../../middleware/storageQuota';
 import { UserRole } from '../../types/roles.types';
 import { asyncHandler } from '../../utils/asyncHandler';
 import { ApiError } from '../../utils/ApiError';
@@ -55,7 +57,7 @@ router.patch('/:id/showcase', authenticate, authorize(UserRole.STUDENT), asyncHa
 router.post('/requests/submit', authenticate, authorize(UserRole.STUDENT), asyncHandler(createPatentRequest));
 router.get('/requests/mine', authenticate, authorize(UserRole.STUDENT), asyncHandler(listMyPatentRequests));
 router.get('/requests/:id', authenticate, authorize(UserRole.STUDENT), asyncHandler(getPatentRequest));
-router.post('/requests/:id/documents', authenticate, authorize(UserRole.STUDENT), documentUpload.single('file'), asyncHandler(uploadPatentRequestDocumentController));
+router.post('/requests/:id/documents', authenticate, authorize(UserRole.STUDENT), withRateLimit(uploadLimiter), enforceStorageQuota(), documentUpload.single('file'), asyncHandler(uploadPatentRequestDocumentController));
 router.delete('/requests/:id/documents/:documentId', authenticate, authorize(UserRole.STUDENT), asyncHandler(deletePatentRequestDocumentController));
 router.patch('/requests/:id/handover/acknowledge', authenticate, authorize(UserRole.STUDENT), asyncHandler(acknowledgeOfficialHandoverController));
 router.get('/requests/:id/certificate', authenticate, authorize(UserRole.STUDENT), asyncHandler(downloadPatentCertificateController));

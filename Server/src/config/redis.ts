@@ -14,6 +14,8 @@ export type RedisClient = {
   del: (...keys: string[]) => Promise<number>;
   expire: (key: string, seconds: number) => Promise<number>;
   incr: (key: string) => Promise<number>;
+  incrby: (key: string, increment: number) => Promise<number>;
+  decrby: (key: string, decrement: number) => Promise<number>;
   ttl: (key: string) => Promise<number>;
   zadd: (key: string, ...members: ZMember[]) => Promise<number>;
   zcard: (key: string) => Promise<number>;
@@ -103,6 +105,8 @@ const createIoredisClient = (): RedisClient => {
     },
     expire: (key, seconds) => run(() => client.expire(key, seconds), () => fallback.expire(key, seconds)),
     incr: (key) => run(() => client.incr(key), () => fallback.incr(key)),
+    incrby: (key, increment) => run(() => client.incrby(key, increment), () => fallback.incrby(key, increment)),
+    decrby: (key, decrement) => run(() => client.decrby(key, decrement), () => fallback.decrby(key, decrement)),
     ttl: (key) => run(() => client.ttl(key), () => fallback.ttl(key)),
     async zadd(key, ...members) {
       if (members.length === 0) return 0;
@@ -217,6 +221,18 @@ const createMemoryRedisClient = (): RedisClient => {
     async incr(key) {
       purgeExpired(key);
       const next = Number(store.get(key)?.value ?? '0') + 1;
+      store.set(key, { value: String(next), expiresAt: store.get(key)?.expiresAt });
+      return next;
+    },
+    async incrby(key, increment) {
+      purgeExpired(key);
+      const next = Number(store.get(key)?.value ?? '0') + increment;
+      store.set(key, { value: String(next), expiresAt: store.get(key)?.expiresAt });
+      return next;
+    },
+    async decrby(key, decrement) {
+      purgeExpired(key);
+      const next = Number(store.get(key)?.value ?? '0') - decrement;
       store.set(key, { value: String(next), expiresAt: store.get(key)?.expiresAt });
       return next;
     },
