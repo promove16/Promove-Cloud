@@ -259,6 +259,18 @@ export default function CampusEvents({ embedded = false }: CampusEventsProps) {
     },
   });
 
+  const updateEventMutation = useMutation({
+    mutationFn: ({ eventId, payload }: { eventId: string; payload: Parameters<typeof recruiterApi.updateEvent>[1] }) =>
+      recruiterApi.updateEvent(eventId, payload),
+    onSuccess: async () => {
+      toast.success('Event updated successfully.');
+      await refreshData();
+    },
+    onError: (error) => {
+      toast.error(getApiErrorMessage(error, 'Failed to update event.'));
+    },
+  });
+
   const canCreateInvite =
     Boolean(inviteForm.title.trim()) && Boolean(inviteForm.collegeId) && Boolean(inviteForm.date) && Boolean(inviteForm.description.trim()) && availableColleges.length > 0;
 
@@ -699,6 +711,7 @@ export default function CampusEvents({ embedded = false }: CampusEventsProps) {
           isAddingToPipeline={pipelineMutation.isPending && pipelineMutation.variables?.eventId === selectedEvent._id}
           isClosingEvent={closeEventMutation.isPending && closeEventMutation.variables === selectedEvent._id}
           isPostponingEvent={postponeEventMutation.isPending && postponeEventMutation.variables?.eventId === selectedEvent._id}
+          isEditingEvent={updateEventMutation.isPending && updateEventMutation.variables?.eventId === selectedEvent._id}
           onClose={closeEventWorkspace}
           onComputeRankings={() => computeMutation.mutate(selectedEvent._id)}
           onSaveScore={() => scoreMutation.mutate({ eventId: selectedEvent._id, studentId: scoreDraft.studentId, score: Number(scoreDraft.score) })}
@@ -706,6 +719,9 @@ export default function CampusEvents({ embedded = false }: CampusEventsProps) {
           onCloseEvent={() => closeEventMutation.mutate(selectedEvent._id)}
           onPostponeEvent={async ({ newDate, reason }) => {
             await postponeEventMutation.mutateAsync({ eventId: selectedEvent._id, newDate, reason });
+          }}
+          onUpdateEvent={async (payload) => {
+            await updateEventMutation.mutateAsync({ eventId: selectedEvent._id, payload });
           }}
         />
       ) : null}

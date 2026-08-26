@@ -1,5 +1,5 @@
 import { useEffect, useState, type Dispatch, type SetStateAction } from 'react';
-import { BriefcaseBusiness, Building2, CalendarClock, CheckCircle2, Circle, Link2, LockKeyhole, X, XCircle } from 'lucide-react';
+import { BriefcaseBusiness, Building2, CalendarClock, CheckCircle2, Circle, Edit, Link2, LockKeyhole, X, XCircle } from 'lucide-react';
 import { Badge } from '../../components/ui/Badge';
 import { Button } from '../../components/ui/Button';
 import { Card } from '../../components/ui/Card';
@@ -29,12 +29,20 @@ type EventWorkspaceModalProps = {
   isAddingToPipeline: boolean;
   isClosingEvent: boolean;
   isPostponingEvent: boolean;
+  isEditingEvent: boolean;
   onClose: () => void;
   onComputeRankings: () => void;
   onSaveScore: () => void;
   onAddToPipeline: () => void;
   onCloseEvent: () => void;
   onPostponeEvent: (payload: { newDate: string; reason: string }) => Promise<void>;
+  onUpdateEvent: (payload: {
+    title?: string;
+    type?: string;
+    description?: string;
+    linkedJobId?: string | null;
+    minimumInnovationScore?: number;
+  }) => Promise<void>;
 };
 
 type WorkflowStepStatus = 'complete' | 'active' | 'locked';
@@ -83,16 +91,28 @@ export function EventWorkspaceModal({
   isAddingToPipeline,
   isClosingEvent,
   isPostponingEvent,
+  isEditingEvent,
   onClose,
   onComputeRankings,
   onSaveScore,
   onAddToPipeline,
   onCloseEvent,
   onPostponeEvent,
+  onUpdateEvent,
 }: EventWorkspaceModalProps) {
   const [isPostponeOpen, setIsPostponeOpen] = useState(false);
   const [postponeDate, setPostponeDate] = useState('');
   const [postponeReason, setPostponeReason] = useState('');
+
+  const [isEditOpen, setIsEditOpen] = useState(false);
+  const [editForm, setEditForm] = useState({
+    title: event.title,
+    type: event.type,
+    description: event.description,
+    linkedJobId: event.linkedJobId ?? '',
+    minimumInnovationScore: String(event.minimumInnovationScore ?? 0),
+  });
+  const canSubmitEdit = Boolean(editForm.title.trim()) && Boolean(editForm.description.trim());
   const rankingsFinalized = Boolean(event.rankingsComputedAt);
   const scoredParticipantsCount = event.participants.filter((participant) => typeof participant.submissionScore === 'number').length;
   const remainingScores = event.participants.length - scoredParticipantsCount;
@@ -256,6 +276,26 @@ export function EventWorkspaceModal({
                 >
                   <CalendarClock className="mr-2 h-4 w-4" />
                   Postpone Event
+                </Button>
+              ) : null}
+              {event.isActive && !rankingsFinalized ? (
+                <Button
+                  variant="secondary"
+                  onClick={() => {
+                    setEditForm({
+                      title: event.title,
+                      type: event.type,
+                      description: event.description,
+                      linkedJobId: event.linkedJobId ?? '',
+                      minimumInnovationScore: String(event.minimumInnovationScore ?? 0),
+                    });
+                    setIsEditOpen(true);
+                  }}
+                  disabled={isEditingEvent || rankingsFinalized}
+                  title={rankingsFinalized ? 'An event with finalized rankings cannot be edited.' : undefined}
+                >
+                  <Edit className="mr-2 h-4 w-4" />
+                  Edit Event
                 </Button>
               ) : null}
               {event.isActive ? (
@@ -619,6 +659,134 @@ export function EventWorkspaceModal({
               >
                 <CalendarClock className="mr-2 h-4 w-4" />
                 {isPostponingEvent ? 'Sending...' : 'Send for Approval'}
+              </Button>
+            </div>
+          </section>
+        </div>
+      ) : null}
+
+      {isEditOpen ? (
+        <div
+          className="absolute inset-0 z-20 flex items-center justify-center bg-slate-950/80 p-4 backdrop-blur-sm"
+          onMouseDown={(mouseEvent) => {
+            if (mouseEvent.target === mouseEvent.currentTarget && !isEditingEvent) {
+              setIsEditOpen(false);
+            }
+          }}
+        >
+          <section
+            role="dialog"
+            aria-modal="true"
+            aria-labelledby="edit-event-title"
+            className="w-full max-w-lg rounded-2xl border border-cyan-500/30 bg-[#0c1630] p-6 shadow-2xl shadow-black/60"
+          >
+            <div className="flex items-start justify-between gap-4">
+              <div>
+                <div className="text-xs font-semibold uppercase tracking-[0.25em] text-cyan-300">Edit Event Details</div>
+                <h3 id="edit-event-title" className="mt-2 text-xl font-semibold text-white">Edit {event.title}</h3>
+                <p className="mt-2 text-sm leading-6 text-slate-400">
+                  Changes take effect immediately. Date changes require college approval via Postpone Event.
+                </p>
+              </div>
+              <Button
+                variant="ghost"
+                size="sm"
+                className="h-9 w-9 rounded-full p-0"
+                aria-label="Close edit event"
+                onClick={() => setIsEditOpen(false)}
+                disabled={isEditingEvent}
+              >
+                <X className="h-4 w-4" />
+              </Button>
+            </div>
+
+            <div className="mt-5 space-y-4">
+              <label className="block text-sm text-slate-300">
+                Event Title
+                <Input
+                  value={editForm.title}
+                  onChange={(changeEvent) => setEditForm((current) => ({ ...current, title: changeEvent.target.value }))}
+                  className="mt-2"
+                  maxLength={160}
+                />
+              </label>
+              <label className="block text-sm text-slate-300">
+                Event Type
+                <select
+                  value={editForm.type}
+                  onChange={(changeEvent) => setEditForm((current) => ({ ...current, type: changeEvent.target.value }))}
+                  className="mt-2 w-full max-w-full rounded-lg border border-slate-800 bg-slate-950 px-4 py-3 text-white"
+                >
+                  <option value="Placement Drive">Placement Drive</option>
+                  <option value="Internship Drive">Internship Drive</option>
+                  <option value="Hackathon">Hackathon</option>
+                  <option value="Industry Connect Session">Industry Connect Session</option>
+                  <option value="Placement Hackathon">Placement Hackathon</option>
+                  <option value="Innovation Drive">Innovation Drive</option>
+                  <option value="Other">Other</option>
+                </select>
+              </label>
+              <label className="block text-sm text-slate-300">
+                Description
+                <textarea
+                  value={editForm.description}
+                  onChange={(changeEvent: React.ChangeEvent<HTMLTextAreaElement>) => setEditForm((current) => ({ ...current, description: changeEvent.target.value }))}
+                  rows={4}
+                  maxLength={2000}
+                  placeholder="Describe the hiring event, roles, expectations..."
+                  className="mt-2 w-full rounded-lg border border-slate-800 bg-slate-950 px-4 py-3 text-white outline-none focus:border-cyan-500"
+                />
+              </label>
+              <label className="block text-sm text-slate-300">
+                Linked Job (Optional)
+                <select
+                  value={editForm.linkedJobId}
+                  onChange={(changeEvent) => setEditForm((current) => ({ ...current, linkedJobId: changeEvent.target.value }))}
+                  className="mt-2 w-full max-w-full rounded-lg border border-slate-800 bg-slate-950 px-4 py-3 text-white"
+                >
+                  <option value="">No linked job</option>
+                  {activeJobs.map((job) => (
+                    <option key={job._id} value={job._id}>
+                      {job.title} | {job.company}
+                    </option>
+                  ))}
+                </select>
+              </label>
+              <label className="block text-sm text-slate-300">
+                Minimum Innovation Score
+                <Input
+                  type="number"
+                  min="0"
+                  value={editForm.minimumInnovationScore}
+                  onChange={(changeEvent) => setEditForm((current) => ({ ...current, minimumInnovationScore: changeEvent.target.value }))}
+                  className="mt-2"
+                />
+              </label>
+            </div>
+
+            <div className="mt-6 flex justify-end gap-3">
+              <Button variant="secondary" onClick={() => setIsEditOpen(false)} disabled={isEditingEvent}>
+                Cancel
+              </Button>
+              <Button
+                onClick={async () => {
+                  try {
+                    await onUpdateEvent({
+                      title: editForm.title.trim(),
+                      type: editForm.type,
+                      description: editForm.description.trim(),
+                      linkedJobId: editForm.linkedJobId || null,
+                      minimumInnovationScore: Number(editForm.minimumInnovationScore) || 0,
+                    });
+                    setIsEditOpen(false);
+                  } catch {
+                    // The parent mutation reports the API error and keeps this form open for correction.
+                  }
+                }}
+                disabled={isEditingEvent || !canSubmitEdit}
+              >
+                <Edit className="mr-2 h-4 w-4" />
+                {isEditingEvent ? 'Saving...' : 'Save Changes'}
               </Button>
             </div>
           </section>

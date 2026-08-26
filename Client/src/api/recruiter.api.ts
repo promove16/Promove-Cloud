@@ -343,9 +343,22 @@ export const recruiterApi = {
     );
     return response.data.data;
   },
-  async postponeEvent(eventId: string, payload: { newDate: string; reason: string }) {
+async postponeEvent(eventId: string, payload: { newDate: string; reason: string }) {
     const response = await api.patch<ApiSuccessResponse<{ requested: boolean; requestId: string; newDate: string }>>(
       `/api/events/${eventId}/postpone`,
+      payload,
+    );
+    return response.data.data;
+  },
+  async updateEvent(eventId: string, payload: {
+    title?: string;
+    type?: string;
+    description?: string;
+    linkedJobId?: string | null;
+    minimumInnovationScore?: number;
+  }) {
+    const response = await api.patch<ApiSuccessResponse<RecruiterHiringEventView>>(
+      `/api/events/${eventId}`,
       payload,
     );
     return response.data.data;

@@ -1,4 +1,4 @@
-import { type ElementType, useEffect, useMemo, useState } from 'react';
+import { type ElementType, useEffect, useMemo, useRef, useState } from 'react';
 import { Link, useNavigate, useParams } from 'react-router-dom';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import {
@@ -11,9 +11,14 @@ import {
   ChevronRight,
   Clock3,
   ExternalLink,
+  Edit,
   MapPin,
   MessageCircle,
+  MoreHorizontal,
+  Pause,
+  Play,
   Sparkles,
+  Trash2,
   Users,
   Wallet,
 } from 'lucide-react';
@@ -23,6 +28,7 @@ import { marketplaceApi } from '../../api/marketplace.api';
 import { useAuthStore } from '../../store/authStore';
 import { Spinner } from '../../components/ui/Spinner';
 import { Button } from '../../components/ui/Button';
+import { toast } from 'sonner';
 import { RecruiterJobView } from '../../types/recruiter.types';
 import { FormattedJobDescription, parseJobDescription } from '../../components/ui/FormattedJobDescription';
 
@@ -174,6 +180,63 @@ export function MarketplaceJobDetail() {
   const isStudent = userRole === 'student';
   const [hasApplied, setHasApplied] = useState(false);
   const [applyError, setApplyError] = useState<string | null>(null);
+  const [isDesktopDropdownOpen, setIsDesktopDropdownOpen] = useState(false);
+  const [isMobileDropdownOpen, setIsMobileDropdownOpen] = useState(false);
+  const desktopDropdownRef = useRef<HTMLDivElement>(null);
+  const mobileDropdownRef = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    const handleClickOutside = (event: MouseEvent) => {
+      if (
+        desktopDropdownRef.current &&
+        !desktopDropdownRef.current.contains(event.target as Node)
+      ) {
+        setIsDesktopDropdownOpen(false);
+      }
+      if (
+        mobileDropdownRef.current &&
+        !mobileDropdownRef.current.contains(event.target as Node)
+      ) {
+        setIsMobileDropdownOpen(false);
+      }
+    };
+    document.addEventListener('mousedown', handleClickOutside);
+    return () => document.removeEventListener('mousedown', handleClickOutside);
+  }, []);
+
+  const toggleJobMutation = useMutation({
+    mutationFn: (isActive: boolean) => recruiterApi.updateJob(jobId!, { isActive }),
+    onSuccess: async () => {
+      toast.success('Job status updated.');
+      await queryClient.invalidateQueries({ queryKey: ['marketplace', 'job-detail', jobId] });
+      await queryClient.invalidateQueries({ queryKey: ['recruiter', 'jobs'] });
+    },
+    onError: (err) => {
+      toast.error(err instanceof Error ? err.message : 'Unable to update job status.');
+    },
+  });
+
+  const deleteJobMutation = useMutation({
+    mutationFn: () => recruiterApi.deleteJob(jobId!),
+    onSuccess: async () => {
+      toast.success('Job deleted successfully.');
+      await queryClient.invalidateQueries({ queryKey: ['recruiter', 'jobs'] });
+      navigate('/dashboard/recruiter/marketplace');
+    },
+    onError: (err) => {
+      toast.error(err instanceof Error ? err.message : 'Unable to delete this job.');
+    },
+  });
+
+  const handleToggleJob = (currentIsActive: boolean) => {
+    toggleJobMutation.mutate(!currentIsActive);
+  };
+
+  const handleDeleteJob = () => {
+    if (window.confirm('Delete this job posting? This action cannot be undone.')) {
+      deleteJobMutation.mutate();
+    }
+  };
 
   const jobQuery = useQuery({
     queryKey: ['marketplace', 'job-detail', jobId],
@@ -347,8 +410,8 @@ export function MarketplaceJobDetail() {
               {/* ═══════════════════════════════════════════════════════════
                   HERO CARD  —  Naukri / LinkedIn style job header
               ════════════════════════════════════════════════════════════ */}
-              <section className="relative overflow-hidden rounded-2xl border border-slate-800 bg-gradient-to-br from-slate-900 via-slate-900 to-slate-800/70 p-6 sm:p-7">
-                <div className="pointer-events-none absolute inset-0 bg-gradient-to-r from-cyan-500/4 via-transparent to-blue-500/4" />
+              <section className="relative rounded-2xl border border-slate-800 bg-gradient-to-br from-slate-900 via-slate-900 to-slate-800/70 p-6 sm:p-7">
+                <div className="pointer-events-none absolute inset-0 rounded-2xl bg-gradient-to-r from-cyan-500/4 via-transparent to-blue-500/4" />
 
                 <div className="relative flex flex-col gap-5 xl:flex-row xl:items-start xl:gap-6">
                   {/* Left: avatar + job info */}
@@ -442,25 +505,100 @@ export function MarketplaceJobDetail() {
                   </div>
 
                   {/* Right: CTA buttons — desktop only */}
-                  <div className="hidden shrink-0 flex-col gap-2.5 xl:flex xl:min-w-[180px]">
+                  <div className="hidden shrink-0 flex-col gap-2.5 xl:flex xl:min-w-[220px]">
                     {userRole === 'recruiter' ? (
-                      <>
+                      <div className="flex flex-col gap-2.5">
                         <Button
-                          className="h-11 w-full rounded-full"
+                          className="h-11 w-full rounded-full shadow-lg shadow-purple-950/30"
                           onClick={() => navigate(`/dashboard/recruiter/applications?jobId=${job._id}`)}
                         >
                           <BriefcaseBusiness className="mr-2 h-4 w-4" />
                           Manage Applications
                         </Button>
-                        <Button
-                          variant="secondary"
-                          className="h-11 w-full rounded-full border-slate-700 bg-transparent text-slate-200 hover:border-slate-500 hover:bg-slate-900"
-                          onClick={() => navigate('/marketplace?view=talent')}
-                        >
-                          <Users className="mr-2 h-4 w-4" />
-                          Invite Talent
-                        </Button>
-                      </>
+
+                        <div className="flex items-center gap-2">
+                          <button
+                            type="button"
+                            onClick={() => navigate('/marketplace?view=talent')}
+                            className="group relative flex h-11 flex-1 items-center justify-center gap-2 rounded-full border border-cyan-500/40 bg-gradient-to-r from-cyan-500/15 via-sky-500/10 to-blue-500/15 px-4 text-sm font-semibold text-cyan-200 shadow-sm transition-all duration-200 hover:border-cyan-400 hover:bg-cyan-500/25 hover:text-white hover:shadow-[0_0_20px_rgba(6,182,212,0.3)] active:scale-[0.98]"
+                          >
+                            <Users className="h-4 w-4 text-cyan-400 transition-transform group-hover:scale-110" />
+                            <span>Invite Talent</span>
+                            <Sparkles className="h-3.5 w-3.5 text-cyan-300 animate-pulse" />
+                          </button>
+
+                          <div className="relative" ref={desktopDropdownRef}>
+                            <button
+                              type="button"
+                              onClick={() => setIsDesktopDropdownOpen((prev) => !prev)}
+                              className="flex h-11 w-11 shrink-0 items-center justify-center rounded-full border border-slate-700/80 bg-slate-900/90 text-slate-300 transition-all hover:border-slate-500 hover:bg-slate-800 hover:text-white hover:shadow-md"
+                              aria-expanded={isDesktopDropdownOpen}
+                              aria-haspopup="true"
+                              aria-label="More job options"
+                            >
+                              <MoreHorizontal className="h-4 w-4" />
+                            </button>
+
+                            {isDesktopDropdownOpen && (
+                              <>
+                                <div
+                                  className="fixed inset-0 z-40"
+                                  onClick={() => setIsDesktopDropdownOpen(false)}
+                                  aria-hidden="true"
+                                />
+                                <div
+                                  className="absolute right-0 z-50 mt-2 w-48 origin-top-right rounded-xl border border-slate-800 bg-slate-950 py-1.5 shadow-xl shadow-black/60 animate-in fade-in-0 zoom-in-95"
+                                  role="menu"
+                                >
+                                  <button
+                                    type="button"
+                                    onClick={() => {
+                                      navigate(`/dashboard/recruiter/marketplace?editJobId=${job._id}`);
+                                      setIsDesktopDropdownOpen(false);
+                                    }}
+                                    className="flex w-full items-center gap-3 px-3 py-2 text-left text-sm text-slate-300 hover:bg-slate-800/50 hover:text-white transition-colors"
+                                    role="menuitem"
+                                  >
+                                    <Edit className="h-4 w-4 shrink-0" />
+                                    <span>Edit Job</span>
+                                  </button>
+                                  <button
+                                    type="button"
+                                    onClick={() => {
+                                      handleToggleJob(job.isActive);
+                                      setIsDesktopDropdownOpen(false);
+                                    }}
+                                    disabled={toggleJobMutation.isPending}
+                                    className="flex w-full items-center gap-3 px-3 py-2 text-left text-sm text-slate-300 hover:bg-slate-800/50 hover:text-white transition-colors disabled:opacity-50"
+                                    role="menuitem"
+                                  >
+                                    {job.isActive ? (
+                                      <Pause className="h-4 w-4 shrink-0" />
+                                    ) : (
+                                      <Play className="h-4 w-4 shrink-0" />
+                                    )}
+                                    <span>{job.isActive ? 'Pause Job' : 'Activate Job'}</span>
+                                  </button>
+                                  <hr className="my-1.5 border-slate-800" />
+                                  <button
+                                    type="button"
+                                    onClick={() => {
+                                      handleDeleteJob();
+                                      setIsDesktopDropdownOpen(false);
+                                    }}
+                                    disabled={deleteJobMutation.isPending}
+                                    className="flex w-full items-center gap-3 px-3 py-2 text-left text-sm text-rose-300 hover:bg-rose-500/10 transition-colors disabled:opacity-50"
+                                    role="menuitem"
+                                  >
+                                    <Trash2 className="h-4 w-4 shrink-0" />
+                                    <span>{deleteJobMutation.isPending ? 'Deleting...' : 'Delete Job'}</span>
+                                  </button>
+                                </div>
+                              </>
+                            )}
+                          </div>
+                        </div>
+                      </div>
                     ) : (
                       <>
                         <Button
@@ -488,23 +626,98 @@ export function MarketplaceJobDetail() {
                 {/* CTA buttons — mobile */}
                 <div className="relative mt-5 flex gap-3 border-t border-slate-800/60 pt-5 xl:hidden">
                   {userRole === 'recruiter' ? (
-                    <>
+                    <div className="flex flex-col gap-2.5 w-full">
                       <Button
-                        className="h-11 flex-1 rounded-full"
+                        className="h-11 w-full rounded-full shadow-lg shadow-purple-950/30"
                         onClick={() => navigate(`/dashboard/recruiter/applications?jobId=${job._id}`)}
                       >
                         <BriefcaseBusiness className="mr-2 h-4 w-4" />
                         Manage Applications
                       </Button>
-                      <Button
-                        variant="secondary"
-                        className="h-11 flex-1 rounded-full border-slate-700 bg-transparent text-slate-200 hover:border-slate-500 hover:bg-slate-900"
-                        onClick={() => navigate('/marketplace?view=talent')}
-                      >
-                        <Users className="mr-2 h-4 w-4" />
-                        Invite Talent
-                      </Button>
-                    </>
+
+                      <div className="flex items-center gap-2">
+                        <button
+                          type="button"
+                          onClick={() => navigate('/marketplace?view=talent')}
+                          className="group relative flex h-11 flex-1 items-center justify-center gap-2 rounded-full border border-cyan-500/40 bg-gradient-to-r from-cyan-500/15 via-sky-500/10 to-blue-500/15 px-4 text-sm font-semibold text-cyan-200 shadow-sm transition-all duration-200 hover:border-cyan-400 hover:bg-cyan-500/25 hover:text-white hover:shadow-[0_0_20px_rgba(6,182,212,0.3)] active:scale-[0.98]"
+                        >
+                          <Users className="h-4 w-4 text-cyan-400 transition-transform group-hover:scale-110" />
+                          <span>Invite Talent</span>
+                          <Sparkles className="h-3.5 w-3.5 text-cyan-300 animate-pulse" />
+                        </button>
+
+                        <div className="relative" ref={mobileDropdownRef}>
+                          <button
+                            type="button"
+                            onClick={() => setIsMobileDropdownOpen((prev) => !prev)}
+                            className="flex h-11 w-11 shrink-0 items-center justify-center rounded-full border border-slate-700/80 bg-slate-900/90 text-slate-300 transition-all hover:border-slate-500 hover:bg-slate-800 hover:text-white hover:shadow-md"
+                            aria-expanded={isMobileDropdownOpen}
+                            aria-haspopup="true"
+                            aria-label="More job options"
+                          >
+                            <MoreHorizontal className="h-4 w-4" />
+                          </button>
+
+                          {isMobileDropdownOpen && (
+                            <>
+                              <div
+                                className="fixed inset-0 z-40"
+                                onClick={() => setIsMobileDropdownOpen(false)}
+                                aria-hidden="true"
+                              />
+                              <div
+                                className="absolute right-0 z-50 mt-2 w-48 origin-top-right rounded-xl border border-slate-800 bg-slate-950 py-1.5 shadow-xl shadow-black/60 animate-in fade-in-0 zoom-in-95"
+                                role="menu"
+                              >
+                                <button
+                                  type="button"
+                                  onClick={() => {
+                                    navigate(`/dashboard/recruiter/marketplace?editJobId=${job._id}`);
+                                    setIsMobileDropdownOpen(false);
+                                  }}
+                                  className="flex w-full items-center gap-3 px-3 py-2 text-left text-sm text-slate-300 hover:bg-slate-800/50 hover:text-white transition-colors"
+                                  role="menuitem"
+                                >
+                                  <Edit className="h-4 w-4 shrink-0" />
+                                  <span>Edit Job</span>
+                                </button>
+                                <button
+                                  type="button"
+                                  onClick={() => {
+                                    handleToggleJob(job.isActive);
+                                    setIsMobileDropdownOpen(false);
+                                  }}
+                                  disabled={toggleJobMutation.isPending}
+                                  className="flex w-full items-center gap-3 px-3 py-2 text-left text-sm text-slate-300 hover:bg-slate-800/50 hover:text-white transition-colors disabled:opacity-50"
+                                  role="menuitem"
+                                >
+                                  {job.isActive ? (
+                                    <Pause className="h-4 w-4 shrink-0" />
+                                  ) : (
+                                    <Play className="h-4 w-4 shrink-0" />
+                                  )}
+                                  <span>{job.isActive ? 'Pause Job' : 'Activate Job'}</span>
+                                </button>
+                                <hr className="my-1.5 border-slate-800" />
+                                <button
+                                  type="button"
+                                  onClick={() => {
+                                    handleDeleteJob();
+                                    setIsMobileDropdownOpen(false);
+                                  }}
+                                  disabled={deleteJobMutation.isPending}
+                                  className="flex w-full items-center gap-3 px-3 py-2 text-left text-sm text-rose-300 hover:bg-rose-500/10 transition-colors disabled:opacity-50"
+                                  role="menuitem"
+                                >
+                                  <Trash2 className="h-4 w-4 shrink-0" />
+                                  <span>{deleteJobMutation.isPending ? 'Deleting...' : 'Delete Job'}</span>
+                                </button>
+                              </div>
+                            </>
+                          )}
+                        </div>
+                      </div>
+                    </div>
                   ) : (
                     <>
                       <Button
@@ -643,20 +856,21 @@ export function MarketplaceJobDetail() {
                       {userRole === 'recruiter' ? (
                         <>
                           <Button
-                            className="h-11 w-full rounded-full"
+                            className="h-11 w-full rounded-full shadow-lg shadow-purple-950/30"
                             onClick={() => navigate(`/dashboard/recruiter/applications?jobId=${job._id}`)}
                           >
                             <BriefcaseBusiness className="mr-2 h-4 w-4" />
                             Manage Applications
                           </Button>
-                          <Button
-                            variant="secondary"
-                            className="h-11 w-full rounded-full border-slate-700 bg-transparent text-slate-200 hover:border-slate-500 hover:bg-slate-900"
+                          <button
+                            type="button"
                             onClick={() => navigate('/marketplace?view=talent')}
+                            className="group relative flex h-11 w-full items-center justify-center gap-2 rounded-full border border-cyan-500/40 bg-gradient-to-r from-cyan-500/15 via-sky-500/10 to-blue-500/15 px-4 text-sm font-semibold text-cyan-200 shadow-sm transition-all duration-200 hover:border-cyan-400 hover:bg-cyan-500/25 hover:text-white hover:shadow-[0_0_20px_rgba(6,182,212,0.3)] active:scale-[0.98]"
                           >
-                            <Users className="mr-2 h-4 w-4" />
-                            Invite Talent
-                          </Button>
+                            <Users className="h-4 w-4 text-cyan-400 transition-transform group-hover:scale-110" />
+                            <span>Invite Talent</span>
+                            <Sparkles className="h-3.5 w-3.5 text-cyan-300 animate-pulse" />
+                          </button>
                         </>
                       ) : (
                         <>

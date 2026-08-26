@@ -1,22 +1,27 @@
-import { type ReactNode, useDeferredValue, useMemo, useState } from "react";
+import { type ReactNode, useDeferredValue, useEffect, useMemo, useRef, useState } from "react";
 import { isAxiosError } from "axios";
 import { useNavigate, useSearchParams } from "react-router-dom";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import {
   BriefcaseBusiness,
+  Edit,
   Eye,
   Loader2,
   Mail,
   MapPin,
+  MoreHorizontal,
   Pause,
   Play,
   Plus,
+  Save,
   Search,
   ShieldCheck,
   SlidersHorizontal,
+  Trash2,
   Users,
   X,
 } from "lucide-react";
+import { type LucideIcon } from "lucide-react";
 import { toast as appToast } from "../../components/ui/sonner";
 import { recruiterApi } from "../../api/recruiter.api";
 import { getStudentPortfolioViewPath } from "../marketplace/navigation";
@@ -448,6 +453,10 @@ function PostJobRoleModal({
   onChange,
   onClose,
   onSubmit,
+  title = "Post a job role",
+  description = "Publish a role visible to students on the marketplace. Applicants land directly in your hiring pipeline.",
+  submitLabel = "Post Job Role",
+  submitIcon = Plus,
 }: {
   form: JobFormState;
   error: string | null;
@@ -455,18 +464,21 @@ function PostJobRoleModal({
   onChange: (patch: Partial<JobFormState>) => void;
   onClose: () => void;
   onSubmit: () => void;
+  title?: string;
+  description?: string;
+  submitLabel?: string;
+  submitIcon?: LucideIcon;
 }) {
+  const SubmitIcon = submitIcon ?? Plus;
+
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-950 px-4 backdrop-blur-sm">
       <div className="flex max-h-[90vh] w-full max-w-3xl flex-col rounded-3xl border border-slate-800 bg-slate-950 shadow-2xl shadow-black/40">
         <div className="flex shrink-0 items-start justify-between gap-4 border-b border-slate-800 px-6 py-5">
           <div>
             <div className="text-xs uppercase tracking-[0.28em] text-cyan-300">Global Hiring</div>
-            <h2 className="mt-2 text-2xl font-semibold text-white">Post a job role</h2>
-            <p className="mt-2 text-sm text-slate-400">
-              Publish a role visible to students on the marketplace. Applicants land directly in your
-              hiring pipeline.
-            </p>
+            <h2 className="mt-2 text-2xl font-semibold text-white">{title}</h2>
+            <p className="mt-2 text-sm text-slate-400">{description}</p>
           </div>
           <button
             type="button"
@@ -600,8 +612,8 @@ function PostJobRoleModal({
             disabled={isSubmitting}
             className={primaryButtonClass}
           >
-            <Plus className="h-4 w-4" />
-            {isSubmitting ? "Posting..." : "Post Job Role"}
+            <SubmitIcon className="h-4 w-4" />
+            {isSubmitting ? "Saving..." : submitLabel}
           </button>
         </div>
       </div>
@@ -612,19 +624,37 @@ function PostJobRoleModal({
 function JobPortalCard({
   job,
   togglingJobId,
+  deletingJobId,
   onViewJob,
   onManage,
+  onEdit,
+  onDelete,
   onToggle,
   onInviteTalent,
 }: {
   job: RecruiterJobDetail;
   togglingJobId: string | null;
+  deletingJobId: string | null;
   onViewJob: (jobId: string) => void;
   onManage: (jobId: string) => void;
+  onEdit: (jobId: string) => void;
+  onDelete: (jobId: string) => void;
   onToggle: (jobId: string, isActive: boolean) => void;
   onInviteTalent: () => void;
 }) {
   const isToggling = togglingJobId === job._id;
+  const [isDropdownOpen, setIsDropdownOpen] = useState(false);
+  const dropdownRef = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    const handleClickOutside = (event: MouseEvent) => {
+      if (dropdownRef.current && !dropdownRef.current.contains(event.target as Node)) {
+        setIsDropdownOpen(false);
+      }
+    };
+    document.addEventListener('mousedown', handleClickOutside);
+    return () => document.removeEventListener('mousedown', handleClickOutside);
+  }, []);
 
   return (
     <article
@@ -637,7 +667,9 @@ function JobPortalCard({
           onViewJob(job._id);
         }
       }}
-      className="group relative flex cursor-pointer flex-col gap-4 rounded-2xl border border-slate-800 bg-slate-900 p-5 transition-all duration-200 hover:-translate-y-0.5 hover:border-cyan-500/50 hover:bg-slate-900/90 hover:shadow-lg hover:shadow-cyan-500/5 focus:outline-none focus:ring-2 focus:ring-cyan-400/50"
+      className={`group relative flex cursor-pointer flex-col gap-4 rounded-2xl border border-slate-800 bg-slate-900 p-5 transition-all duration-200 hover:-translate-y-0.5 hover:border-cyan-500/50 hover:bg-slate-900/90 hover:shadow-lg hover:shadow-cyan-500/5 focus:outline-none focus:ring-2 focus:ring-cyan-400/50 ${
+        isDropdownOpen ? 'z-30' : 'hover:z-10'
+      }`}
     >
       {/* Title + status */}
       <div className="flex items-start justify-between gap-3">
@@ -700,7 +732,7 @@ function JobPortalCard({
       ) : null}
 
       {/* Actions */}
-      <div className="flex flex-wrap items-center gap-2 border-t border-slate-800 pt-3">
+      <div className="flex items-center justify-between gap-2 border-t border-slate-800 pt-3">
         <button
           type="button"
           onClick={(e) => {
@@ -712,30 +744,85 @@ function JobPortalCard({
           <BriefcaseBusiness className="h-4 w-4" />
           Manage Applications
         </button>
-        <button
-          type="button"
-          onClick={(e) => {
-            e.stopPropagation();
-            onInviteTalent();
-          }}
-          className={secondaryButtonClass}
-        >
-          <Users className="h-4 w-4" />
-          Invite Talent
-        </button>
-        <button
-          type="button"
-          onClick={(e) => {
-            e.stopPropagation();
-            onToggle(job._id, job.isActive);
-          }}
-          disabled={isToggling}
-          className={`${secondaryButtonClass} ml-auto`}
-          title={job.isActive ? "Pause this job posting" : "Reactivate this job posting"}
-        >
-          {job.isActive ? <Pause className="h-4 w-4" /> : <Play className="h-4 w-4" />}
-          {isToggling ? "..." : job.isActive ? "Pause" : "Activate"}
-        </button>
+
+        <div className="relative" ref={dropdownRef}>
+          <button
+            type="button"
+            onClick={(e) => {
+              e.stopPropagation();
+              setIsDropdownOpen((prev) => !prev);
+            }}
+            className="flex h-9 w-9 items-center justify-center rounded-lg border border-slate-800 bg-slate-950 text-slate-400 transition-colors hover:border-slate-700 hover:text-white hover:bg-slate-800/50"
+            aria-label="More options"
+            aria-expanded={isDropdownOpen}
+            aria-haspopup="true"
+          >
+            <MoreHorizontal className="h-5 w-5" />
+          </button>
+
+          {isDropdownOpen && (
+            <>
+              <div
+                className="fixed inset-0 z-40"
+                onClick={() => setIsDropdownOpen(false)}
+                aria-hidden="true"
+              />
+              <div className="absolute right-0 z-50 mt-2 w-48 origin-top-right rounded-xl border border-slate-800 bg-slate-950 py-1.5 shadow-xl shadow-black/70 animate-in fade-in-0 zoom-in-95" role="menu">
+                <button
+                  type="button"
+                  onClick={() => {
+                    onEdit(job._id);
+                    setIsDropdownOpen(false);
+                  }}
+                  className="flex w-full items-center gap-3 px-3 py-2 text-left text-sm text-slate-300 hover:bg-slate-800/50"
+                  role="menuitem"
+                >
+                  <Edit className="h-4 w-4 shrink-0" />
+                  <span>Edit Job</span>
+                </button>
+                <button
+                  type="button"
+                  onClick={() => {
+                    onInviteTalent();
+                    setIsDropdownOpen(false);
+                  }}
+                  className="flex w-full items-center gap-3 px-3 py-2 text-left text-sm text-slate-300 hover:bg-slate-800/50"
+                  role="menuitem"
+                >
+                  <Users className="h-4 w-4 shrink-0" />
+                  <span>Invite Talent</span>
+                </button>
+                <button
+                  type="button"
+                  onClick={() => {
+                    onToggle(job._id, job.isActive);
+                    setIsDropdownOpen(false);
+                  }}
+                  disabled={isToggling}
+                  className="flex w-full items-center gap-3 px-3 py-2 text-left text-sm text-slate-300 hover:bg-slate-800/50 disabled:opacity-50 disabled:cursor-not-allowed"
+                  role="menuitem"
+                >
+                  {job.isActive ? <Pause className="h-4 w-4 shrink-0" /> : <Play className="h-4 w-4 shrink-0" />}
+                  <span>{job.isActive ? "Pause Job" : "Activate Job"}</span>
+                </button>
+                <hr className="my-1.5 border-slate-800" />
+                <button
+                  type="button"
+                  onClick={() => {
+                    onDelete(job._id);
+                    setIsDropdownOpen(false);
+                  }}
+                  disabled={deletingJobId === job._id}
+                  className="flex w-full items-center gap-3 px-3 py-2 text-left text-sm text-rose-300 hover:bg-rose-500/10 disabled:opacity-50 disabled:cursor-not-allowed"
+                  role="menuitem"
+                >
+                  <Trash2 className="h-4 w-4 shrink-0" />
+                  <span>{deletingJobId === job._id ? "Deleting..." : "Delete Job"}</span>
+                </button>
+              </div>
+            </>
+          )}
+        </div>
       </div>
     </article>
   );
@@ -926,6 +1013,45 @@ export function RecruiterMarketplace({ dashboardRole: _dashboardRole }: { dashbo
     },
   });
 
+  const [editingJobId, setEditingJobId] = useState<string | null>(null);
+  const [editJobForm, setEditJobForm] = useState<JobFormState>(createInitialJobForm);
+  const [editJobFormError, setEditJobFormError] = useState<string | null>(null);
+  const [deletingJobId, setDeletingJobId] = useState<string | null>(null);
+
+  const editJobMutation = useMutation({
+    mutationFn: ({ jobId, payload }: { jobId: string; payload: Parameters<typeof recruiterApi.updateJob>[1] }) =>
+      recruiterApi.updateJob(jobId, payload),
+    onSuccess: async () => {
+      const message = "Job updated successfully.";
+      setEditingJobId(null);
+      setEditJobForm(createInitialJobForm());
+      setEditJobFormError(null);
+      appToast.success(message);
+      await queryClient.invalidateQueries({ queryKey: ["recruiter", "jobs"] });
+    },
+    onError: (error) => {
+      const message = error instanceof Error ? error.message : "Unable to update this job right now.";
+      setEditJobFormError(message);
+      appToast.error(message);
+    },
+  });
+
+  const deleteJobMutation = useMutation({
+    mutationFn: (jobId: string) => recruiterApi.deleteJob(jobId),
+    onSuccess: async () => {
+      const message = "Job deleted.";
+      setDeletingJobId(null);
+      appToast.success(message);
+      await queryClient.invalidateQueries({ queryKey: ["recruiter", "jobs"] });
+    },
+    onError: (error) => {
+      appToast.error(
+        error instanceof Error ? error.message : "Unable to delete this job right now.",
+      );
+      setDeletingJobId(null);
+    },
+  });
+
   // ── Handlers ───────────────────────────────────────────────────────────────
 
   const setView = (nextView: RecruiterPortalView) => {
@@ -1010,6 +1136,60 @@ export function RecruiterMarketplace({ dashboardRole: _dashboardRole }: { dashbo
   };
 
   const handleInviteTalentForJob = () => setView("talent");
+
+  const handleEditJob = (jobId: string) => {
+    const job = jobs.find((j) => j._id === jobId);
+    if (!job) return;
+    setEditJobForm({
+      title: job.title,
+      company: job.company,
+      description: job.description,
+      domain: job.domain,
+      type: job.type,
+      location: job.location,
+      workMode: job.workMode ?? "On-site",
+      minimumInnovationScore: String(job.minimumInnovationScore),
+      openings: job.openings ? String(job.openings) : "",
+    });
+    setEditingJobId(jobId);
+    setEditJobFormError(null);
+  };
+
+  const handleDeleteJob = (jobId: string) => {
+    if (window.confirm("Delete this job posting? This action cannot be undone.")) {
+      setDeletingJobId(jobId);
+      deleteJobMutation.mutate(jobId);
+    }
+  };
+
+  const handleSubmitEditJob = () => {
+    if (
+      !editJobForm.title.trim() ||
+      !editJobForm.company.trim() ||
+      !editJobForm.description.trim() ||
+      !editJobForm.domain.trim() ||
+      !editJobForm.location.trim()
+    ) {
+      setEditJobFormError("Title, company, domain, location and description are required.");
+      return;
+    }
+    if (editingJobId) {
+      editJobMutation.mutate({
+        jobId: editingJobId,
+        payload: {
+          title: editJobForm.title.trim(),
+          company: editJobForm.company.trim(),
+          description: editJobForm.description.trim(),
+          domain: editJobForm.domain.trim(),
+          type: editJobForm.type,
+          location: editJobForm.location.trim(),
+          workMode: editJobForm.workMode,
+          minimumInnovationScore: Number(editJobForm.minimumInnovationScore) || 0,
+          openings: editJobForm.openings ? Number(editJobForm.openings) : undefined,
+        },
+      });
+    }
+  };
 
   // ── Render ─────────────────────────────────────────────────────────────────
 
@@ -1129,8 +1309,11 @@ export function RecruiterMarketplace({ dashboardRole: _dashboardRole }: { dashbo
                     key={job._id}
                     job={job}
                     togglingJobId={togglingJobId}
+                    deletingJobId={deletingJobId}
                     onViewJob={handleViewJob}
                     onManage={handleManageJob}
+                    onEdit={handleEditJob}
+                    onDelete={handleDeleteJob}
                     onToggle={handleToggleJob}
                     onInviteTalent={handleInviteTalentForJob}
                   />
@@ -1376,6 +1559,26 @@ export function RecruiterMarketplace({ dashboardRole: _dashboardRole }: { dashbo
             setJobFormError(null);
           }}
           onSubmit={submitJob}
+        />
+      ) : null}
+
+      {editingJobId ? (
+        <PostJobRoleModal
+          form={editJobForm}
+          error={editJobFormError}
+          isSubmitting={editJobMutation.isPending}
+          onChange={(patch) => setEditJobForm((current) => ({ ...current, ...patch }))}
+          onClose={() => {
+            if (editJobMutation.isPending) return;
+            setEditingJobId(null);
+            setEditJobForm(createInitialJobForm());
+            setEditJobFormError(null);
+          }}
+          onSubmit={handleSubmitEditJob}
+          title="Edit Job Role"
+          description="Update the job role details. Changes will be reflected immediately on the marketplace."
+          submitLabel="Save Changes"
+          submitIcon={Save}
         />
       ) : null}
     </>

@@ -11,10 +11,11 @@ import {
   joinEventController,
   listRecruiterHiringEventsController,
   listStudentInstitutionEventsController,
-  selectStudentFromHiringEventController,
-  sendHiringEventInviteController,
   listStudentInstitutionDrivesController,
   postponeHiringEventController,
+  selectStudentFromHiringEventController,
+  sendHiringEventInviteController,
+  updateHiringEventController,
 } from './event.controller';
 
 const router = Router();
@@ -29,6 +30,11 @@ router.patch(
   '/:eventId/postpone',
   authorize(UserRole.RECRUITER),
   asyncHandler(postponeHiringEventController),
+);
+router.patch(
+  '/:eventId',
+  authorize(UserRole.RECRUITER),
+  asyncHandler(updateHiringEventController),
 );
 router.post(
   '/hiring/:eventId/select/:studentId',

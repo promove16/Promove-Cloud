@@ -18,6 +18,8 @@ import {
   selectStudentFromHiringEvent,
   sendHiringEventInvite,
   sendHiringEventInviteSchema,
+  updateHiringEvent,
+  updateHiringEventSchema,
 } from './event.service';
 
 export const joinEventController = async (req: Request, res: Response) => {
@@ -131,4 +133,14 @@ export const postponeHiringEventController = async (req: Request, res: Response)
     payload,
   );
   res.status(201).json(new ApiResponse(data));
+};
+
+export const updateHiringEventController = async (req: Request, res: Response) => {
+  const payload = updateHiringEventSchema.parse(req.body);
+  const data = await updateHiringEvent(
+    req.user!._id,
+    String(req.params.eventId),
+    payload,
+  );
+  res.status(200).json(new ApiResponse(data));
 };

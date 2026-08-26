@@ -85,6 +85,18 @@ export const postponeHiringEventSchema = z.object({
   reason: z.string().trim().min(5).max(500),
 });
 
+export const updateHiringEventSchema = z.object({
+  title: z.string().trim().min(2).max(160).optional(),
+  type: z.enum(HIRING_EVENT_TYPES).optional(),
+  description: z.string().trim().min(10).max(2000).optional(),
+  linkedJobId: z
+    .string()
+    .regex(/^[0-9a-fA-F]{24}$/)
+    .optional()
+    .nullable(),
+  minimumInnovationScore: z.coerce.number().min(0).optional(),
+});
+
 const collegeEventInviteMetadataSchema = z.object({
   title: z.string().trim().min(2).max(160),
   type: z.enum(HIRING_EVENT_TYPES),
@@ -624,6 +636,64 @@ export const requestHiringEventPostponement = async (
     requested: true,
     requestId: requested._id,
     newDate: requestedDate.toISOString(),
+  };
+};
+
+export const updateHiringEvent = async (
+  recruiterId: string,
+  eventId: string,
+  payload: z.infer<typeof updateHiringEventSchema>,
+) => {
+  const event = await Event.findOne({
+    _id: eventId,
+    recruiterId,
+    category: 'hiring',
+  });
+
+  if (!event) {
+    throw new ApiError(404, 'EVENT_NOT_FOUND', 'Hiring event not found');
+  }
+
+  if (!event.isActive) {
+    throw new ApiError(409, 'EVENT_CLOSED', 'A closed event cannot be updated');
+  }
+
+  if (event.rankingsComputedAt) {
+    throw new ApiError(409, 'EVENT_RANKINGS_FINALIZED', 'An event with finalized rankings cannot be updated');
+  }
+
+  const updates: Partial<typeof event> = {};
+
+  if (payload.title !== undefined) updates.title = payload.title;
+  if (payload.type !== undefined) updates.type = payload.type;
+  if (payload.description !== undefined) updates.description = payload.description;
+  if (payload.linkedJobId !== undefined) {
+    if (payload.linkedJobId === null) {
+      updates.linkedJobId = undefined;
+    } else {
+      const job = await JobPost.findOne({ _id: payload.linkedJobId, recruiterId, isActive: true }).select('_id').lean();
+      if (!job) {
+        throw new ApiError(404, 'JOB_NOT_FOUND', 'Linked job not found or inactive');
+      }
+      updates.linkedJobId = payload.linkedJobId as unknown as import('mongoose').Types.ObjectId;
+    }
+  }
+  if (payload.minimumInnovationScore !== undefined) updates.minimumInnovationScore = payload.minimumInnovationScore;
+
+  Object.assign(event, updates);
+  await event.save();
+
+  return {
+    _id: String(event._id),
+    title: event.title,
+    type: event.type,
+    description: event.description,
+    scheduledAt: event.scheduledAt.toISOString(),
+    isActive: event.isActive,
+    institutionId: String(event.institutionId),
+    linkedJobId: event.linkedJobId ? String(event.linkedJobId) : undefined,
+    minimumInnovationScore: event.minimumInnovationScore ?? 0,
+    updatedAt: event.updatedAt.toISOString(),
   };
 };
 
