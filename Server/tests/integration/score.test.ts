@@ -154,10 +154,11 @@ describe('score integration', () => {
     expect(response.body.data.score).toBe(1000);
     expect(response.body.data.weeklyDelta).toBe(15);
     expect(response.body.data.rankPercentile).toBe(33);
-    expect(response.body.data.breakdown).toEqual({
+expect(response.body.data.breakdown).toEqual({
       problemsClaimed: 0,
       problemsCompleted: 0,
       skillsCompleted: 0,
+      tasksCompleted: 0,
       progressUploads: 0,
       patentsSubmitted: 0,
       patentsApproved: 0,
